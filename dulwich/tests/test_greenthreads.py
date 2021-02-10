@@ -25,20 +25,21 @@ import time
 from dulwich.tests import (
     skipIf,
     TestCase,
-    )
+)
 from dulwich.object_store import (
     MemoryObjectStore,
     MissingObjectFinder,
-    )
+)
 from dulwich.objects import (
     Commit,
     Blob,
     Tree,
     parse_timezone,
-    )
+)
 
 try:
     import gevent  # noqa: F401
+
     gevent_support = True
 except ImportError:
     gevent_support = False
@@ -53,14 +54,14 @@ skipmsg = "Gevent library is not installed"
 
 
 def create_commit(marker=None):
-    blob = Blob.from_string(b'The blob content ' + marker)
+    blob = Blob.from_string(b"The blob content " + marker)
     tree = Tree()
     tree.add(b"thefile " + marker, 0o100644, blob.id)
     cmt = Commit()
     cmt.tree = tree.id
     cmt.author = cmt.committer = b"John Doe <john@doe.net>"
     cmt.message = marker
-    tz = parse_timezone(b'-0200')[0]
+    tz = parse_timezone(b"-0200")[0]
     cmt.commit_time = cmt.author_time = int(time.time())
     cmt.commit_timezone = cmt.author_timezone = tz
     return cmt, tree, blob
@@ -69,7 +70,7 @@ def create_commit(marker=None):
 def init_store(store, count=1):
     ret = []
     for i in range(0, count):
-        objs = create_commit(marker=("%d" % i).encode('ascii'))
+        objs = create_commit(marker=("%d" % i).encode("ascii"))
         for obj in objs:
             ret.append(obj)
             store.add_object(obj)
@@ -78,7 +79,6 @@ def init_store(store, count=1):
 
 @skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsObjectStoreIterator(TestCase):
-
     def setUp(self):
         super(TestGreenThreadsObjectStoreIterator, self).setUp()
         self.store = MemoryObjectStore()
@@ -89,20 +89,23 @@ class TestGreenThreadsObjectStoreIterator(TestCase):
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
         finder = MissingObjectFinder(self.store, (), wants)
         iterator = GreenThreadsObjectStoreIterator(
-                self.store, iter(finder.next, None), finder)
+            self.store, iter(finder.next, None), finder
+        )
         # One commit refers one tree and one blob
         self.assertEqual(len(iterator), self.cmt_amount * 3)
-        haves = wants[0:self.cmt_amount-1]
+        haves = wants[0 : self.cmt_amount - 1]
         finder = MissingObjectFinder(self.store, haves, wants)
         iterator = GreenThreadsObjectStoreIterator(
-            self.store, iter(finder.next, None), finder)
+            self.store, iter(finder.next, None), finder
+        )
         self.assertEqual(len(iterator), 3)
 
     def test_iter(self):
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
         finder = MissingObjectFinder(self.store, (), wants)
         iterator = GreenThreadsObjectStoreIterator(
-            self.store, iter(finder.next, None), finder)
+            self.store, iter(finder.next, None), finder
+        )
         objs = []
         for sha, path in iterator:
             self.assertIn(sha, self.objs)
@@ -112,7 +115,6 @@ class TestGreenThreadsObjectStoreIterator(TestCase):
 
 @skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsMissingObjectFinder(TestCase):
-
     def setUp(self):
         super(TestGreenThreadsMissingObjectFinder, self).setUp()
         self.store = MemoryObjectStore()
@@ -126,7 +128,8 @@ class TestGreenThreadsMissingObjectFinder(TestCase):
         self.assertEqual(len(finder.objects_to_send), self.cmt_amount)
 
         finder = GreenThreadsMissingObjectFinder(
-            self.store, wants[0:int(self.cmt_amount/2)], wants)
+            self.store, wants[0 : int(self.cmt_amount / 2)], wants
+        )
         # sha_done will contains commit id and sha of blob refered in tree
-        self.assertEqual(len(finder.sha_done), (self.cmt_amount/2)*2)
-        self.assertEqual(len(finder.objects_to_send), self.cmt_amount/2)
+        self.assertEqual(len(finder.sha_done), (self.cmt_amount / 2) * 2)
+        self.assertEqual(len(finder.objects_to_send), self.cmt_amount / 2)

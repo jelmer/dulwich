@@ -25,7 +25,7 @@
 
 from dulwich.objects import (
     Blob,
-    )
+)
 from dulwich.objectspec import (
     parse_object,
     parse_commit,
@@ -35,14 +35,14 @@ from dulwich.objectspec import (
     parse_reftuple,
     parse_reftuples,
     parse_tree,
-    )
+)
 from dulwich.repo import MemoryRepo
 from dulwich.tests import (
     TestCase,
-    )
+)
 from dulwich.tests.utils import (
     build_commit_graph,
-    )
+)
 
 
 class ParseObjectTests(TestCase):
@@ -68,8 +68,7 @@ class ParseCommitRangeTests(TestCase):
 
     def test_commit_by_sha(self):
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(
-                r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertEqual([c1], list(parse_commit_range(r, c1.id)))
 
 
@@ -92,44 +91,50 @@ class ParseCommitTests(TestCase):
 
 
 class ParseRefTests(TestCase):
-
     def test_nonexistent(self):
         r = {}
         self.assertRaises(KeyError, parse_ref, r, b"thisdoesnotexist")
 
     def test_ambiguous_ref(self):
-        r = {b"ambig1": 'bla',
-             b"refs/ambig1": 'bla',
-             b"refs/tags/ambig1": 'bla',
-             b"refs/heads/ambig1": 'bla',
-             b"refs/remotes/ambig1": 'bla',
-             b"refs/remotes/ambig1/HEAD": "bla"}
+        r = {
+            b"ambig1": "bla",
+            b"refs/ambig1": "bla",
+            b"refs/tags/ambig1": "bla",
+            b"refs/heads/ambig1": "bla",
+            b"refs/remotes/ambig1": "bla",
+            b"refs/remotes/ambig1/HEAD": "bla",
+        }
         self.assertEqual(b"ambig1", parse_ref(r, b"ambig1"))
 
     def test_ambiguous_ref2(self):
-        r = {b"refs/ambig2": 'bla',
-             b"refs/tags/ambig2": 'bla',
-             b"refs/heads/ambig2": 'bla',
-             b"refs/remotes/ambig2": 'bla',
-             b"refs/remotes/ambig2/HEAD": "bla"}
+        r = {
+            b"refs/ambig2": "bla",
+            b"refs/tags/ambig2": "bla",
+            b"refs/heads/ambig2": "bla",
+            b"refs/remotes/ambig2": "bla",
+            b"refs/remotes/ambig2/HEAD": "bla",
+        }
         self.assertEqual(b"refs/ambig2", parse_ref(r, b"ambig2"))
 
     def test_ambiguous_tag(self):
-        r = {b"refs/tags/ambig3": 'bla',
-             b"refs/heads/ambig3": 'bla',
-             b"refs/remotes/ambig3": 'bla',
-             b"refs/remotes/ambig3/HEAD": "bla"}
+        r = {
+            b"refs/tags/ambig3": "bla",
+            b"refs/heads/ambig3": "bla",
+            b"refs/remotes/ambig3": "bla",
+            b"refs/remotes/ambig3/HEAD": "bla",
+        }
         self.assertEqual(b"refs/tags/ambig3", parse_ref(r, b"ambig3"))
 
     def test_ambiguous_head(self):
-        r = {b"refs/heads/ambig4": 'bla',
-             b"refs/remotes/ambig4": 'bla',
-             b"refs/remotes/ambig4/HEAD": "bla"}
+        r = {
+            b"refs/heads/ambig4": "bla",
+            b"refs/remotes/ambig4": "bla",
+            b"refs/remotes/ambig4/HEAD": "bla",
+        }
         self.assertEqual(b"refs/heads/ambig4", parse_ref(r, b"ambig4"))
 
     def test_ambiguous_remote(self):
-        r = {b"refs/remotes/ambig5": 'bla',
-             b"refs/remotes/ambig5/HEAD": "bla"}
+        r = {b"refs/remotes/ambig5": "bla", b"refs/remotes/ambig5/HEAD": "bla"}
         self.assertEqual(b"refs/remotes/ambig5", parse_ref(r, b"ambig5"))
 
     def test_ambiguous_remote_head(self):
@@ -150,7 +155,6 @@ class ParseRefTests(TestCase):
 
 
 class ParseRefsTests(TestCase):
-
     def test_nonexistent(self):
         r = {}
         self.assertRaises(KeyError, parse_refs, r, [b"thisdoesnotexist"])
@@ -165,62 +169,75 @@ class ParseRefsTests(TestCase):
 
 
 class ParseReftupleTests(TestCase):
-
     def test_nonexistent(self):
         r = {}
         self.assertRaises(KeyError, parse_reftuple, r, r, b"thisdoesnotexist")
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
-                         parse_reftuple(r, r, b"foo"))
-        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
-                         parse_reftuple(r, r, b"+foo"))
-        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
-                         parse_reftuple(r, {}, b"+foo"))
-        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", True),
-                         parse_reftuple(r, {}, b"foo", True))
+        self.assertEqual(
+            (b"refs/heads/foo", b"refs/heads/foo", False), parse_reftuple(r, r, b"foo")
+        )
+        self.assertEqual(
+            (b"refs/heads/foo", b"refs/heads/foo", True), parse_reftuple(r, r, b"+foo")
+        )
+        self.assertEqual(
+            (b"refs/heads/foo", b"refs/heads/foo", True), parse_reftuple(r, {}, b"+foo")
+        )
+        self.assertEqual(
+            (b"refs/heads/foo", b"refs/heads/foo", True),
+            parse_reftuple(r, {}, b"foo", True),
+        )
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
-                         parse_reftuple(r, r, b"refs/heads/foo"))
+        self.assertEqual(
+            (b"refs/heads/foo", b"refs/heads/foo", False),
+            parse_reftuple(r, r, b"refs/heads/foo"),
+        )
 
     def test_no_left_ref(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual((None, b"refs/heads/foo", False),
-                         parse_reftuple(r, r, b":refs/heads/foo"))
+        self.assertEqual(
+            (None, b"refs/heads/foo", False), parse_reftuple(r, r, b":refs/heads/foo")
+        )
 
     def test_no_right_ref(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual((b"refs/heads/foo", None, False),
-                         parse_reftuple(r, r, b"refs/heads/foo:"))
+        self.assertEqual(
+            (b"refs/heads/foo", None, False), parse_reftuple(r, r, b"refs/heads/foo:")
+        )
 
     def test_default_with_string(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual((b"refs/heads/foo", b"refs/heads/foo", False),
-                         parse_reftuple(r, r, "foo"))
+        self.assertEqual(
+            (b"refs/heads/foo", b"refs/heads/foo", False), parse_reftuple(r, r, "foo")
+        )
 
 
 class ParseReftuplesTests(TestCase):
-
     def test_nonexistent(self):
         r = {}
-        self.assertRaises(KeyError, parse_reftuples, r, r,
-                          [b"thisdoesnotexist"])
+        self.assertRaises(KeyError, parse_reftuples, r, r, [b"thisdoesnotexist"])
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
-                         parse_reftuples(r, r, [b"foo"]))
+        self.assertEqual(
+            [(b"refs/heads/foo", b"refs/heads/foo", False)],
+            parse_reftuples(r, r, [b"foo"]),
+        )
 
     def test_full(self):
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", False)],
-                         parse_reftuples(r, r, b"refs/heads/foo"))
+        self.assertEqual(
+            [(b"refs/heads/foo", b"refs/heads/foo", False)],
+            parse_reftuples(r, r, b"refs/heads/foo"),
+        )
         r = {b"refs/heads/foo": "bla"}
-        self.assertEqual([(b"refs/heads/foo", b"refs/heads/foo", True)],
-                         parse_reftuples(r, r, b"refs/heads/foo", True))
+        self.assertEqual(
+            [(b"refs/heads/foo", b"refs/heads/foo", True)],
+            parse_reftuples(r, r, b"refs/heads/foo", True),
+        )
 
 
 class ParseTreeTests(TestCase):
@@ -232,7 +249,6 @@ class ParseTreeTests(TestCase):
 
     def test_from_commit(self):
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(
-                r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertEqual(r[c1.tree], parse_tree(r, c1.id))
         self.assertEqual(r[c1.tree], parse_tree(r, c1.tree))

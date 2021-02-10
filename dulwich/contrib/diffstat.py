@@ -39,16 +39,16 @@ import re
 # only needs to detect git style diffs as this is for
 # use with dulwich
 
-_git_header_name = re.compile(br'diff --git a/(.*) b/(.*)')
+_git_header_name = re.compile(br"diff --git a/(.*) b/(.*)")
 
-_GIT_HEADER_START = b'diff --git a/'
-_GIT_BINARY_START = b'Binary file'
-_GIT_RENAMEFROM_START = b'rename from'
-_GIT_RENAMETO_START = b'rename to'
-_GIT_CHUNK_START = b'@@'
-_GIT_ADDED_START = b'+'
-_GIT_DELETED_START = b'-'
-_GIT_UNCHANGED_START = b' '
+_GIT_HEADER_START = b"diff --git a/"
+_GIT_BINARY_START = b"Binary file"
+_GIT_RENAMEFROM_START = b"rename from"
+_GIT_RENAMETO_START = b"rename to"
+_GIT_CHUNK_START = b"@@"
+_GIT_ADDED_START = b"+"
+_GIT_DELETED_START = b"-"
+_GIT_UNCHANGED_START = b" "
 
 # emulate original full Patch class by just extracting
 # filename and minimal chunk added/deleted information to
@@ -89,9 +89,8 @@ def _parse_patch(lines):
         elif line.startswith(_GIT_RENAMEFROM_START) and in_git_header:
             currentfile = line[12:]
         elif line.startswith(_GIT_RENAMETO_START) and in_git_header:
-            currentfile += b' => %s' % line[10:]
-        elif line.startswith(_GIT_CHUNK_START) and \
-                (in_patch_chunk or in_git_header):
+            currentfile += b" => %s" % line[10:]
+        elif line.startswith(_GIT_CHUNK_START) and (in_patch_chunk or in_git_header):
             in_patch_chunk = True
             in_git_header = False
         elif line.startswith(_GIT_ADDED_START) and in_patch_chunk:
@@ -130,8 +129,8 @@ def diffstat(lines, max_width=80):
         insert.append(i)
         delete.append(d)
         namelen = max(namelen, len(filename))
-        maxdiff = max(maxdiff, i+d)
-    output = b''
+        maxdiff = max(maxdiff, i + d)
+    output = b""
     statlen = len(str(maxdiff))  # stats column width
     for i, n in enumerate(names):
         binaryfile = nametypes[i]
@@ -139,16 +138,21 @@ def diffstat(lines, max_width=80):
         # note b'%d' % namelen is not supported until Python 3.5
         # To convert an int to a format width specifier for byte
         # strings use str(namelen).encode('ascii')
-        format = b' %-' + str(namelen).encode('ascii') + \
-            b's | %' + str(statlen).encode('ascii') + b's %s\n'
-        binformat = b' %-' + str(namelen).encode('ascii') + b's | %s\n'
+        format = (
+            b" %-"
+            + str(namelen).encode("ascii")
+            + b"s | %"
+            + str(statlen).encode("ascii")
+            + b"s %s\n"
+        )
+        binformat = b" %-" + str(namelen).encode("ascii") + b"s | %s\n"
         if not binaryfile:
-            hist = b''
+            hist = b""
             # -- calculating histogram --
-            width = len(format % (b'', b'', b''))
+            width = len(format % (b"", b"", b""))
             histwidth = max(2, max_width - width)
             if maxdiff < histwidth:
-                hist = b'+'*insert[i] + b'-'*delete[i]
+                hist = b"+" * insert[i] + b"-" * delete[i]
             else:
                 iratio = (float(insert[i]) / maxdiff) * histwidth
                 dratio = (float(delete[i]) / maxdiff) * histwidth
@@ -165,15 +169,20 @@ def diffstat(lines, max_width=80):
                     dwidth = int(dratio)
                     if dwidth == 0 and 0 < dratio < 1:
                         dwidth = 1
-                hist = b'+'*int(iwidth) + b'-'*int(dwidth)
-            output += (format % (bytes(names[i]),
-                                 str(insert[i] + delete[i]).encode('ascii'),
-                                 hist))
+                hist = b"+" * int(iwidth) + b"-" * int(dwidth)
+            output += format % (
+                bytes(names[i]),
+                str(insert[i] + delete[i]).encode("ascii"),
+                hist,
+            )
         else:
-            output += (binformat % (bytes(names[i]), b'Bin'))
+            output += binformat % (bytes(names[i]), b"Bin")
 
-    output += (b' %d files changed, %d insertions(+), %d deletions(-)'
-               % (len(names), sum(insert), sum(delete)))
+    output += b" %d files changed, %d insertions(+), %d deletions(-)" % (
+        len(names),
+        sum(insert),
+        sum(delete),
+    )
     return output
 
 
@@ -182,12 +191,12 @@ def main():
     # allow diffstat.py to also be used from the comand line
     if len(sys.argv) > 1:
         diffpath = argv[1]
-        data = b''
-        with open(diffpath, 'rb') as f:
+        data = b""
+        with open(diffpath, "rb") as f:
             data = f.read()
-        lines = data.split(b'\n')
+        lines = data.split(b"\n")
         result = diffstat(lines)
-        print(result.decode('utf-8'))
+        print(result.decode("utf-8"))
         return 0
 
     # if no path argument to a diff file is passed in, run
@@ -314,7 +323,7 @@ index 3b41fd80..64914c78 100644
  2. open Sigil.app to the normal nearly blank template epub it generates when opened
  3. use Plugins->Manage Plugins menu and make sure the "Use Bundled Python" checkbox is checked
  4. use the "Add Plugin" button to navigate to and add testplugin.zip and then hit "Okay" to exit the Manage Plugins Dialog
-"""     # noqa: E501 W293
+"""  # noqa: E501 W293
 
     testoutput = b""" docs/qt512.7_remove_bad_workaround.patch            | 15 ++++++++++++
  docs/testplugin_v017.zip                            | Bin
@@ -324,17 +333,17 @@ index 3b41fd80..64914c78 100644
  5 files changed, 16 insertions(+), 27 deletions(-)"""  # noqa: W291
 
     # return 0 on success otherwise return -1
-    result = diffstat(selftest.split(b'\n'))
+    result = diffstat(selftest.split(b"\n"))
     if result == testoutput:
         print("self test passed")
         return 0
     print("self test failed")
     print("Received:")
-    print(result.decode('utf-8'))
+    print(result.decode("utf-8"))
     print("Expected:")
-    print(testoutput.decode('utf-8'))
+    print(testoutput.decode("utf-8"))
     return -1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

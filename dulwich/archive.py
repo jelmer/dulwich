@@ -42,20 +42,21 @@ class ChunkedBytesIO(object):
         BytesIO(b''.join(list_of_bytestrings)) =~= ChunkedBytesIO(
             list_of_bytestrings)
     """
+
     def __init__(self, contents):
         self.contents = contents
         self.pos = (0, 0)
 
     def read(self, maxbytes=None):
         if maxbytes < 0:
-            maxbytes = float('inf')
+            maxbytes = float("inf")
 
         buf = []
         chunk, cursor = self.pos
 
         while chunk < len(self.contents):
             if maxbytes < len(self.contents[chunk]) - cursor:
-                buf.append(self.contents[chunk][cursor:cursor+maxbytes])
+                buf.append(self.contents[chunk][cursor : cursor + maxbytes])
                 cursor += maxbytes
                 self.pos = (chunk, cursor)
                 break
@@ -65,10 +66,10 @@ class ChunkedBytesIO(object):
                 chunk += 1
                 cursor = 0
                 self.pos = (chunk, cursor)
-        return b''.join(buf)
+        return b"".join(buf)
 
 
-def tar_stream(store, tree, mtime, prefix=b'', format=''):
+def tar_stream(store, tree, mtime, prefix=b"", format=""):
     """Generate a tar stream for the contents of a Git tree.
 
     Returns a generator that lazily assembles a .tar.gz archive, yielding it in
@@ -86,16 +87,16 @@ def tar_stream(store, tree, mtime, prefix=b'', format=''):
     """
     buf = BytesIO()
     with closing(tarfile.open(None, "w:%s" % format, buf)) as tar:
-        if format == 'gz':
+        if format == "gz":
             # Manually correct the gzip header file modification time so that
             # archives created from the same Git tree are always identical.
             # The gzip header file modification time is not currenctly
             # accessible from the tarfile API, see:
             # https://bugs.python.org/issue31526
             buf.seek(0)
-            assert buf.read(2) == b'\x1f\x8b', 'Invalid gzip header'
+            assert buf.read(2) == b"\x1f\x8b", "Invalid gzip header"
             buf.seek(4)
-            buf.write(struct.pack('<L', mtime))
+            buf.write(struct.pack("<L", mtime))
             buf.seek(0, SEEK_END)
 
         for entry_abspath, entry in _walk_tree(store, tree, prefix):
@@ -109,7 +110,7 @@ def tar_stream(store, tree, mtime, prefix=b'', format=''):
 
             info = tarfile.TarInfo()
             # tarfile only works with ascii.
-            info.name = entry_abspath.decode('ascii')
+            info.name = entry_abspath.decode("ascii")
             info.size = blob.raw_length()
             info.mode = entry.mode
             info.mtime = mtime
@@ -121,7 +122,7 @@ def tar_stream(store, tree, mtime, prefix=b'', format=''):
     yield buf.getvalue()
 
 
-def _walk_tree(store, tree, root=b''):
+def _walk_tree(store, tree, root=b""):
     """Recursively walk a dulwich Tree, yielding tuples of
     (absolute path, TreeEntry) along the way.
     """

@@ -35,7 +35,7 @@ from dulwich.ignore import (
     match_pattern,
     read_ignore_patterns,
     translate,
-    )
+)
 from dulwich.repo import Repo
 
 
@@ -65,44 +65,45 @@ NEGATIVE_MATCH_TESTS = [
     (b"foo/foo.c", b"/*.c"),
     (b"foo/bar/", b"/bar/"),
     (b"foo/bar/", b"foo/bar/*"),
-    (b"foo/bar", b"foo?bar")
+    (b"foo/bar", b"foo?bar"),
 ]
 
 
 TRANSLATE_TESTS = [
-    (b"*.c", b'(?ms)(.*/)?[^/]*\\.c/?\\Z'),
-    (b"foo.c", b'(?ms)(.*/)?foo\\.c/?\\Z'),
-    (b"/*.c", b'(?ms)[^/]*\\.c/?\\Z'),
-    (b"/foo.c", b'(?ms)foo\\.c/?\\Z'),
-    (b"foo.c", b'(?ms)(.*/)?foo\\.c/?\\Z'),
-    (b"foo.[ch]", b'(?ms)(.*/)?foo\\.[ch]/?\\Z'),
-    (b"bar/", b'(?ms)(.*/)?bar\\/\\Z'),
-    (b"foo/**", b'(?ms)foo(/.*)?/?\\Z'),
-    (b"foo/**/blie.c", b'(?ms)foo(/.*)?\\/blie\\.c/?\\Z'),
-    (b"**/bla.c", b'(?ms)(.*/)?bla\\.c/?\\Z'),
-    (b"foo/**/bar", b'(?ms)foo(/.*)?\\/bar/?\\Z'),
-    (b"foo/bar/*", b'(?ms)foo\\/bar\\/[^/]+/?\\Z'),
+    (b"*.c", b"(?ms)(.*/)?[^/]*\\.c/?\\Z"),
+    (b"foo.c", b"(?ms)(.*/)?foo\\.c/?\\Z"),
+    (b"/*.c", b"(?ms)[^/]*\\.c/?\\Z"),
+    (b"/foo.c", b"(?ms)foo\\.c/?\\Z"),
+    (b"foo.c", b"(?ms)(.*/)?foo\\.c/?\\Z"),
+    (b"foo.[ch]", b"(?ms)(.*/)?foo\\.[ch]/?\\Z"),
+    (b"bar/", b"(?ms)(.*/)?bar\\/\\Z"),
+    (b"foo/**", b"(?ms)foo(/.*)?/?\\Z"),
+    (b"foo/**/blie.c", b"(?ms)foo(/.*)?\\/blie\\.c/?\\Z"),
+    (b"**/bla.c", b"(?ms)(.*/)?bla\\.c/?\\Z"),
+    (b"foo/**/bar", b"(?ms)foo(/.*)?\\/bar/?\\Z"),
+    (b"foo/bar/*", b"(?ms)foo\\/bar\\/[^/]+/?\\Z"),
 ]
 
 
 class TranslateTests(TestCase):
-
     def test_translate(self):
         for (pattern, regex) in TRANSLATE_TESTS:
-            if re.escape(b'/') == b'/':
+            if re.escape(b"/") == b"/":
                 # Slash is no longer escaped in Python3.7, so undo the escaping
                 # in the expected return value..
-                regex = regex.replace(b'\\/', b'/')
+                regex = regex.replace(b"\\/", b"/")
             self.assertEqual(
-                regex, translate(pattern),
-                "orig pattern: %r, regex: %r, expected: %r" %
-                (pattern, translate(pattern), regex))
+                regex,
+                translate(pattern),
+                "orig pattern: %r, regex: %r, expected: %r"
+                % (pattern, translate(pattern), regex),
+            )
 
 
 class ReadIgnorePatterns(TestCase):
-
     def test_read_file(self):
-        f = BytesIO(b"""
+        f = BytesIO(
+            b"""
 # a comment
 
 # and an empty line:
@@ -111,151 +112,140 @@ class ReadIgnorePatterns(TestCase):
 !negative
 with trailing whitespace 
 with escaped trailing whitespace\\ 
-""")  # noqa: W291
-        self.assertEqual(list(read_ignore_patterns(f)), [
-            b'\\#not a comment',
-            b'!negative',
-            b'with trailing whitespace',
-            b'with escaped trailing whitespace '
-        ])
+"""
+        )  # noqa: W291
+        self.assertEqual(
+            list(read_ignore_patterns(f)),
+            [
+                b"\\#not a comment",
+                b"!negative",
+                b"with trailing whitespace",
+                b"with escaped trailing whitespace ",
+            ],
+        )
 
 
 class MatchPatternTests(TestCase):
-
     def test_matches(self):
         for (path, pattern) in POSITIVE_MATCH_TESTS:
             self.assertTrue(
-                match_pattern(path, pattern),
-                "path: %r, pattern: %r" % (path, pattern))
+                match_pattern(path, pattern), "path: %r, pattern: %r" % (path, pattern)
+            )
 
     def test_no_matches(self):
         for (path, pattern) in NEGATIVE_MATCH_TESTS:
             self.assertFalse(
-                match_pattern(path, pattern),
-                "path: %r, pattern: %r" % (path, pattern))
+                match_pattern(path, pattern), "path: %r, pattern: %r" % (path, pattern)
+            )
 
 
 class IgnoreFilterTests(TestCase):
-
     def test_included(self):
-        filter = IgnoreFilter([b'a.c', b'b.c'])
-        self.assertTrue(filter.is_ignored(b'a.c'))
-        self.assertIs(None, filter.is_ignored(b'c.c'))
-        self.assertEqual(
-            [Pattern(b'a.c')],
-            list(filter.find_matching(b'a.c')))
-        self.assertEqual(
-            [],
-            list(filter.find_matching(b'c.c')))
+        filter = IgnoreFilter([b"a.c", b"b.c"])
+        self.assertTrue(filter.is_ignored(b"a.c"))
+        self.assertIs(None, filter.is_ignored(b"c.c"))
+        self.assertEqual([Pattern(b"a.c")], list(filter.find_matching(b"a.c")))
+        self.assertEqual([], list(filter.find_matching(b"c.c")))
 
     def test_included_ignorecase(self):
-        filter = IgnoreFilter([b'a.c', b'b.c'], ignorecase=False)
-        self.assertTrue(filter.is_ignored(b'a.c'))
-        self.assertFalse(filter.is_ignored(b'A.c'))
-        filter = IgnoreFilter([b'a.c', b'b.c'], ignorecase=True)
-        self.assertTrue(filter.is_ignored(b'a.c'))
-        self.assertTrue(filter.is_ignored(b'A.c'))
-        self.assertTrue(filter.is_ignored(b'A.C'))
+        filter = IgnoreFilter([b"a.c", b"b.c"], ignorecase=False)
+        self.assertTrue(filter.is_ignored(b"a.c"))
+        self.assertFalse(filter.is_ignored(b"A.c"))
+        filter = IgnoreFilter([b"a.c", b"b.c"], ignorecase=True)
+        self.assertTrue(filter.is_ignored(b"a.c"))
+        self.assertTrue(filter.is_ignored(b"A.c"))
+        self.assertTrue(filter.is_ignored(b"A.C"))
 
     def test_excluded(self):
-        filter = IgnoreFilter([b'a.c', b'b.c', b'!c.c'])
-        self.assertFalse(filter.is_ignored(b'c.c'))
-        self.assertIs(None, filter.is_ignored(b'd.c'))
-        self.assertEqual(
-            [Pattern(b'!c.c')],
-            list(filter.find_matching(b'c.c')))
-        self.assertEqual([], list(filter.find_matching(b'd.c')))
+        filter = IgnoreFilter([b"a.c", b"b.c", b"!c.c"])
+        self.assertFalse(filter.is_ignored(b"c.c"))
+        self.assertIs(None, filter.is_ignored(b"d.c"))
+        self.assertEqual([Pattern(b"!c.c")], list(filter.find_matching(b"c.c")))
+        self.assertEqual([], list(filter.find_matching(b"d.c")))
 
     def test_include_exclude_include(self):
-        filter = IgnoreFilter([b'a.c', b'!a.c', b'a.c'])
-        self.assertTrue(filter.is_ignored(b'a.c'))
+        filter = IgnoreFilter([b"a.c", b"!a.c", b"a.c"])
+        self.assertTrue(filter.is_ignored(b"a.c"))
         self.assertEqual(
-            [Pattern(b'a.c'), Pattern(b'!a.c'), Pattern(b'a.c')],
-            list(filter.find_matching(b'a.c')))
+            [Pattern(b"a.c"), Pattern(b"!a.c"), Pattern(b"a.c")],
+            list(filter.find_matching(b"a.c")),
+        )
 
     def test_manpage(self):
         # A specific example from the gitignore manpage
-        filter = IgnoreFilter([
-            b'/*',
-            b'!/foo',
-            b'/foo/*',
-            b'!/foo/bar'])
-        self.assertTrue(filter.is_ignored(b'a.c'))
-        self.assertTrue(filter.is_ignored(b'foo/blie'))
-        self.assertFalse(filter.is_ignored(b'foo'))
-        self.assertFalse(filter.is_ignored(b'foo/bar'))
-        self.assertFalse(filter.is_ignored(b'foo/bar/'))
-        self.assertFalse(filter.is_ignored(b'foo/bar/bloe'))
+        filter = IgnoreFilter([b"/*", b"!/foo", b"/foo/*", b"!/foo/bar"])
+        self.assertTrue(filter.is_ignored(b"a.c"))
+        self.assertTrue(filter.is_ignored(b"foo/blie"))
+        self.assertFalse(filter.is_ignored(b"foo"))
+        self.assertFalse(filter.is_ignored(b"foo/bar"))
+        self.assertFalse(filter.is_ignored(b"foo/bar/"))
+        self.assertFalse(filter.is_ignored(b"foo/bar/bloe"))
 
 
 class IgnoreFilterStackTests(TestCase):
-
     def test_stack_first(self):
-        filter1 = IgnoreFilter([b'[a].c', b'[b].c', b'![d].c'])
-        filter2 = IgnoreFilter([b'[a].c', b'![b],c', b'[c].c', b'[d].c'])
+        filter1 = IgnoreFilter([b"[a].c", b"[b].c", b"![d].c"])
+        filter2 = IgnoreFilter([b"[a].c", b"![b],c", b"[c].c", b"[d].c"])
         stack = IgnoreFilterStack([filter1, filter2])
-        self.assertIs(True, stack.is_ignored(b'a.c'))
-        self.assertIs(True, stack.is_ignored(b'b.c'))
-        self.assertIs(True, stack.is_ignored(b'c.c'))
-        self.assertIs(False, stack.is_ignored(b'd.c'))
-        self.assertIs(None, stack.is_ignored(b'e.c'))
+        self.assertIs(True, stack.is_ignored(b"a.c"))
+        self.assertIs(True, stack.is_ignored(b"b.c"))
+        self.assertIs(True, stack.is_ignored(b"c.c"))
+        self.assertIs(False, stack.is_ignored(b"d.c"))
+        self.assertIs(None, stack.is_ignored(b"e.c"))
 
 
 class IgnoreFilterManagerTests(TestCase):
-
     def test_load_ignore(self):
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init(tmp_dir)
-        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
-            f.write(b'/foo/bar\n')
-            f.write(b'/dir2\n')
-            f.write(b'/dir3/\n')
-        os.mkdir(os.path.join(repo.path, 'dir'))
-        with open(os.path.join(repo.path, 'dir', '.gitignore'), 'wb') as f:
-            f.write(b'/blie\n')
-        with open(os.path.join(repo.path, 'dir', 'blie'), 'wb') as f:
-            f.write(b'IGNORED')
-        p = os.path.join(repo.controldir(), 'info', 'exclude')
-        with open(p, 'wb') as f:
-            f.write(b'/excluded\n')
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"/foo/bar\n")
+            f.write(b"/dir2\n")
+            f.write(b"/dir3/\n")
+        os.mkdir(os.path.join(repo.path, "dir"))
+        with open(os.path.join(repo.path, "dir", ".gitignore"), "wb") as f:
+            f.write(b"/blie\n")
+        with open(os.path.join(repo.path, "dir", "blie"), "wb") as f:
+            f.write(b"IGNORED")
+        p = os.path.join(repo.controldir(), "info", "exclude")
+        with open(p, "wb") as f:
+            f.write(b"/excluded\n")
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertTrue(m.is_ignored('dir/blie'))
-        self.assertIs(None,
-                      m.is_ignored(os.path.join('dir', 'bloe')))
-        self.assertIs(None, m.is_ignored('dir'))
-        self.assertTrue(m.is_ignored(os.path.join('foo', 'bar')))
-        self.assertTrue(m.is_ignored(os.path.join('excluded')))
-        self.assertTrue(m.is_ignored(os.path.join(
-            'dir2', 'fileinignoreddir')))
-        self.assertFalse(m.is_ignored('dir3'))
-        self.assertTrue(m.is_ignored('dir3/'))
-        self.assertTrue(m.is_ignored('dir3/bla'))
+        self.assertTrue(m.is_ignored("dir/blie"))
+        self.assertIs(None, m.is_ignored(os.path.join("dir", "bloe")))
+        self.assertIs(None, m.is_ignored("dir"))
+        self.assertTrue(m.is_ignored(os.path.join("foo", "bar")))
+        self.assertTrue(m.is_ignored(os.path.join("excluded")))
+        self.assertTrue(m.is_ignored(os.path.join("dir2", "fileinignoreddir")))
+        self.assertFalse(m.is_ignored("dir3"))
+        self.assertTrue(m.is_ignored("dir3/"))
+        self.assertTrue(m.is_ignored("dir3/bla"))
 
     def test_load_ignore_ignorecase(self):
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init(tmp_dir)
         config = repo.get_config()
-        config.set(b'core', b'ignorecase', True)
+        config.set(b"core", b"ignorecase", True)
         config.write_to_path()
-        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
-            f.write(b'/foo/bar\n')
-            f.write(b'/dir\n')
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"/foo/bar\n")
+            f.write(b"/dir\n")
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertTrue(m.is_ignored(os.path.join('dir', 'blie')))
-        self.assertTrue(m.is_ignored(os.path.join('DIR', 'blie')))
+        self.assertTrue(m.is_ignored(os.path.join("dir", "blie")))
+        self.assertTrue(m.is_ignored(os.path.join("DIR", "blie")))
 
     def test_ignored_contents(self):
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init(tmp_dir)
-        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
-            f.write(b'a/*\n')
-            f.write(b'!a/*.txt\n')
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"a/*\n")
+            f.write(b"!a/*.txt\n")
         m = IgnoreFilterManager.from_repo(repo)
-        os.mkdir(os.path.join(repo.path, 'a'))
-        self.assertIs(None, m.is_ignored('a'))
-        self.assertIs(None, m.is_ignored('a/'))
-        self.assertFalse(m.is_ignored('a/b.txt'))
-        self.assertTrue(m.is_ignored('a/c.dat'))
+        os.mkdir(os.path.join(repo.path, "a"))
+        self.assertIs(None, m.is_ignored("a"))
+        self.assertIs(None, m.is_ignored("a/"))
+        self.assertFalse(m.is_ignored("a/b.txt"))
+        self.assertTrue(m.is_ignored("a/c.dat"))

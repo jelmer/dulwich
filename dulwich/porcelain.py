@@ -75,17 +75,17 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    )
+)
 
 from dulwich.archive import (
     tar_stream,
-    )
+)
 from dulwich.client import (
     get_transport_and_path,
-    )
+)
 from dulwich.config import (
     StackedConfig,
-    )
+)
 from dulwich.diff_tree import (
     CHANGE_ADD,
     CHANGE_DELETE,
@@ -93,66 +93,67 @@ from dulwich.diff_tree import (
     CHANGE_RENAME,
     CHANGE_COPY,
     RENAME_CHANGE_TYPES,
-    )
+)
 from dulwich.errors import (
     SendPackError,
-    )
+)
 from dulwich.graph import (
     can_fast_forward,
-    )
+)
 from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (
     blob_from_path_and_stat,
     get_unstaged_changes,
-    )
+)
 from dulwich.object_store import (
     tree_lookup_path,
-    )
+)
 from dulwich.objects import (
     Commit,
     Tag,
     format_timezone,
     parse_timezone,
     pretty_format_tree_entry,
-    )
+)
 from dulwich.objectspec import (
     parse_commit,
     parse_object,
     parse_ref,
     parse_reftuples,
     parse_tree,
-    )
+)
 from dulwich.pack import (
     write_pack_index,
     write_pack_objects,
-    )
+)
 from dulwich.patch import write_tree_diff
 from dulwich.protocol import (
     Protocol,
     ZERO_SHA,
-    )
+)
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
     LOCAL_BRANCH_PREFIX,
     strip_peeled_refs,
     RefsContainer,
 )
-from dulwich.repo import (BaseRepo, Repo)
+from dulwich.repo import BaseRepo, Repo
 from dulwich.server import (
     FileSystemBackend,
     TCPGitServer,
     ReceivePackHandler,
     UploadPackHandler,
     update_server_info as server_update_server_info,
-    )
+)
 
 
 # Module level tuple definition for status output
-GitStatus = namedtuple('GitStatus', 'staged unstaged untracked')
+GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
 
 
 class NoneStream(RawIOBase):
     """Fallback if stdout or stderr are unavailable, does nothing."""
+
     def read(self, size=-1):
         return None
 
@@ -166,13 +167,11 @@ class NoneStream(RawIOBase):
         return None
 
 
-default_bytes_out_stream = (
-    getattr(sys.stdout, 'buffer', None) or NoneStream())
-default_bytes_err_stream = (
-    getattr(sys.stderr, 'buffer', None) or NoneStream())
+default_bytes_out_stream = getattr(sys.stdout, "buffer", None) or NoneStream()
+default_bytes_err_stream = getattr(sys.stderr, "buffer", None) or NoneStream()
 
 
-DEFAULT_ENCODING = 'utf-8'
+DEFAULT_ENCODING = "utf-8"
 
 
 class Error(Exception):
@@ -228,16 +227,16 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
         if not isinstance(repopath, bytes):
             repopath = os.fsencode(repopath)
         treepath = os.path.relpath(path, repopath)
-        if treepath.startswith(b'..'):
-            err_msg = 'Path %r not in repo path (%r)' % (path, repopath)
+        if treepath.startswith(b".."):
+            err_msg = "Path %r not in repo path (%r)" % (path, repopath)
             raise ValueError(err_msg)
-        if os.path.sep != '/':
-            treepath = treepath.replace(os.path.sep.encode('ascii'), b'/')
+        if os.path.sep != "/":
+            treepath = treepath.replace(os.path.sep.encode("ascii"), b"/")
         return treepath
     else:
         # Resolve might returns a relative path on Windows
         # https://bugs.python.org/issue38671
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             path = os.path.abspath(path)
 
         path = Path(path).resolve()
@@ -245,14 +244,14 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
         # Resolve and abspath seems to behave differently regarding symlinks,
         # as we are doing abspath on the file path, we need to do the same on
         # the repo path or they might not match
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             repopath = os.path.abspath(repopath)
 
         repopath = Path(repopath).resolve()
 
         relpath = path.relative_to(repopath)
-        if sys.platform == 'win32':
-            return str(relpath).replace(os.path.sep, '/').encode(tree_encoding)
+        if sys.platform == "win32":
+            return str(relpath).replace(os.path.sep, "/").encode(tree_encoding)
         else:
             return bytes(relpath)
 
@@ -277,8 +276,12 @@ def check_diverged(repo, current_sha, new_sha):
         raise DivergedBranches(current_sha, new_sha)
 
 
-def archive(repo, committish=None, outstream=default_bytes_out_stream,
-            errstream=default_bytes_err_stream):
+def archive(
+    repo,
+    committish=None,
+    outstream=default_bytes_out_stream,
+    errstream=default_bytes_err_stream,
+):
     """Create an archive.
 
     Args:
@@ -293,8 +296,8 @@ def archive(repo, committish=None, outstream=default_bytes_out_stream,
     with open_repo_closing(repo) as repo_obj:
         c = parse_commit(repo_obj, committish)
         for chunk in tar_stream(
-                repo_obj.object_store, repo_obj.object_store[c.tree],
-                c.commit_time):
+            repo_obj.object_store, repo_obj.object_store[c.tree], c.commit_time
+        ):
             outstream.write(chunk)
 
 
@@ -319,12 +322,13 @@ def symbolic_ref(repo, ref_name, force=False):
     with open_repo_closing(repo) as repo_obj:
         ref_path = _make_branch_ref(ref_name)
         if not force and ref_path not in repo_obj.refs.keys():
-            raise Error('fatal: ref `%s` is not a ref' % ref_name)
-        repo_obj.refs.set_symbolic_ref(b'HEAD', ref_path)
+            raise Error("fatal: ref `%s` is not a ref" % ref_name)
+        repo_obj.refs.set_symbolic_ref(b"HEAD", ref_path)
 
 
-def commit(repo=".", message=None, author=None, committer=None, encoding=None,
-           no_verify=False):
+def commit(
+    repo=".", message=None, author=None, committer=None, encoding=None, no_verify=False
+):
     """Create a new commit.
 
     Args:
@@ -337,16 +341,20 @@ def commit(repo=".", message=None, author=None, committer=None, encoding=None,
     """
     # FIXME: Support --all argument
     # FIXME: Support --signoff argument
-    if getattr(message, 'encode', None):
+    if getattr(message, "encode", None):
         message = message.encode(encoding or DEFAULT_ENCODING)
-    if getattr(author, 'encode', None):
+    if getattr(author, "encode", None):
         author = author.encode(encoding or DEFAULT_ENCODING)
-    if getattr(committer, 'encode', None):
+    if getattr(committer, "encode", None):
         committer = committer.encode(encoding or DEFAULT_ENCODING)
     with open_repo_closing(repo) as r:
         return r.do_commit(
-                message=message, author=author, committer=committer,
-                encoding=encoding, no_verify=no_verify)
+            message=message,
+            author=author,
+            committer=committer,
+            encoding=encoding,
+            no_verify=no_verify,
+        )
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):
@@ -360,7 +368,8 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
     """
     with open_repo_closing(repo) as r:
         return r.do_commit(
-            message=message, tree=tree, committer=committer, author=author)
+            message=message, tree=tree, committer=committer, author=author
+        )
 
 
 def init(path=".", bare=False):
@@ -380,9 +389,17 @@ def init(path=".", bare=False):
         return Repo.init(path)
 
 
-def clone(source, target=None, bare=False, checkout=None,
-          errstream=default_bytes_err_stream, outstream=None,
-          origin=b"origin", depth=None, **kwargs):
+def clone(
+    source,
+    target=None,
+    bare=False,
+    checkout=None,
+    errstream=default_bytes_err_stream,
+    outstream=None,
+    origin=b"origin",
+    depth=None,
+    **kwargs
+):
     """Clone a local or remote git repository.
 
     Args:
@@ -399,13 +416,16 @@ def clone(source, target=None, bare=False, checkout=None,
     # TODO(jelmer): This code overlaps quite a bit with Repo.clone
     if outstream is not None:
         import warnings
+
         warnings.warn(
             "outstream= has been deprecated in favour of errstream=.",
-            DeprecationWarning, stacklevel=3)
+            DeprecationWarning,
+            stacklevel=3,
+        )
         errstream = outstream
 
     if checkout is None:
-        checkout = (not bare)
+        checkout = not bare
     if checkout and bare:
         raise Error("checkout and bare are incompatible")
 
@@ -420,29 +440,36 @@ def clone(source, target=None, bare=False, checkout=None,
     else:
         r = Repo.init(target)
 
-    reflog_message = b'clone: from ' + source.encode('utf-8')
+    reflog_message = b"clone: from " + source.encode("utf-8")
     try:
         target_config = r.get_config()
         if not isinstance(source, bytes):
             source = source.encode(DEFAULT_ENCODING)
-        target_config.set((b'remote', origin), b'url', source)
+        target_config.set((b"remote", origin), b"url", source)
         target_config.set(
-            (b'remote', origin), b'fetch',
-            b'+refs/heads/*:refs/remotes/' + origin + b'/*')
+            (b"remote", origin),
+            b"fetch",
+            b"+refs/heads/*:refs/remotes/" + origin + b"/*",
+        )
         target_config.write_to_path()
         fetch_result = fetch(
-            r, origin, errstream=errstream, message=reflog_message,
-            depth=depth, **kwargs)
+            r,
+            origin,
+            errstream=errstream,
+            message=reflog_message,
+            depth=depth,
+            **kwargs
+        )
         # TODO(jelmer): Support symref capability,
         # https://github.com/jelmer/dulwich/issues/485
         try:
-            head = r[fetch_result.refs[b'HEAD']]
+            head = r[fetch_result.refs[b"HEAD"]]
         except KeyError:
             head = None
         else:
-            r[b'HEAD'] = head.id
+            r[b"HEAD"] = head.id
         if checkout and not bare and head is not None:
-            errstream.write(b'Checking out ' + head.id + b'\n')
+            errstream.write(b"Checking out " + head.id + b"\n")
             r.reset_index(head.tree)
     except BaseException:
         shutil.rmtree(target)
@@ -467,8 +494,9 @@ def add(repo=".", paths=None):
         if not paths:
             paths = list(
                 get_untracked_paths(
-                    str(Path(os.getcwd()).resolve()),
-                    str(repo_path), r.open_index()))
+                    str(Path(os.getcwd()).resolve()), str(repo_path), r.open_index()
+                )
+            )
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
@@ -486,8 +514,8 @@ def add(repo=".", paths=None):
 def _is_subdir(subdir, parentdir):
     """Check whether subdir is parentdir or a subdir of parentdir
 
-        If parentdir or subdir is a relative path, it will be disamgibuated
-        relative to the pwd.
+    If parentdir or subdir is a relative path, it will be disamgibuated
+    relative to the pwd.
     """
     parentdir_abs = os.path.realpath(parentdir) + os.path.sep
     subdir_abs = os.path.realpath(subdir) + os.path.sep
@@ -512,8 +540,9 @@ def clean(repo=".", target_dir=None):
             raise Error("target_dir must be in the repo's working dir")
 
         config = r.get_config_stack()
-        require_force = config.get_boolean(   # noqa: F841
-            (b'clean',), b'requireForce', True)
+        require_force = config.get_boolean(  # noqa: F841
+            (b"clean",), b"requireForce", True
+        )
 
         # TODO(jelmer): if require_force is set, then make sure that -f, -i or
         # -n is specified.
@@ -557,7 +586,7 @@ def remove(repo=".", paths=None, cached=False):
             try:
                 index_sha = index[tree_path].sha
             except KeyError:
-                raise Error('%s did not match any files' % p)
+                raise Error("%s did not match any files" % p)
 
             if not cached:
                 try:
@@ -572,18 +601,19 @@ def remove(repo=".", paths=None, cached=False):
                     else:
                         try:
                             committed_sha = tree_lookup_path(
-                                r.__getitem__, r[r.head()].tree, tree_path)[1]
+                                r.__getitem__, r[r.head()].tree, tree_path
+                            )[1]
                         except KeyError:
                             committed_sha = None
 
                         if blob.id != index_sha and index_sha != committed_sha:
                             raise Error(
-                                'file has staged content differing '
-                                'from both the file and head: %s' % p)
+                                "file has staged content differing "
+                                "from both the file and head: %s" % p
+                            )
 
                         if index_sha != committed_sha:
-                            raise Error(
-                                'file has staged changes: %s' % p)
+                            raise Error("file has staged changes: %s" % p)
                         os.remove(full_path)
             del index[tree_path]
         index.write()
@@ -594,7 +624,7 @@ rm = remove
 
 def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
     if commit.encoding:
-        encoding = commit.encoding.decode('ascii')
+        encoding = commit.encoding.decode("ascii")
     else:
         encoding = default_encoding
     return contents.decode(encoding, "replace")
@@ -602,7 +632,7 @@ def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
 
 def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
     if commit.encoding:
-        encoding = commit.encoding.decode('ascii')
+        encoding = commit.encoding.decode("ascii")
     else:
         encoding = default_encoding
     return contents.encode(encoding)
@@ -616,18 +646,20 @@ def print_commit(commit, decode, outstream=sys.stdout):
       outstream: A stream file to write to
     """
     outstream.write("-" * 50 + "\n")
-    outstream.write("commit: " + commit.id.decode('ascii') + "\n")
+    outstream.write("commit: " + commit.id.decode("ascii") + "\n")
     if len(commit.parents) > 1:
         outstream.write(
-            "merge: " +
-            "...".join([c.decode('ascii') for c in commit.parents[1:]]) + "\n")
+            "merge: "
+            + "...".join([c.decode("ascii") for c in commit.parents[1:]])
+            + "\n"
+        )
     outstream.write("Author: " + decode(commit.author) + "\n")
     if commit.author != commit.committer:
         outstream.write("Committer: " + decode(commit.committer) + "\n")
 
     time_tuple = time.gmtime(commit.author_time + commit.author_timezone)
     time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
-    timezone_str = format_timezone(commit.author_timezone).decode('ascii')
+    timezone_str = format_timezone(commit.author_timezone).decode("ascii")
     outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
     outstream.write(decode(commit.message) + "\n")
@@ -645,7 +677,7 @@ def print_tag(tag, decode, outstream=sys.stdout):
     outstream.write("Tagger: " + decode(tag.tagger) + "\n")
     time_tuple = time.gmtime(tag.tag_time + tag.tag_timezone)
     time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
-    timezone_str = format_timezone(tag.tag_timezone).decode('ascii')
+    timezone_str = format_timezone(tag.tag_timezone).decode("ascii")
     outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
     outstream.write(decode(tag.message) + "\n")
@@ -680,9 +712,7 @@ def show_commit(repo, commit, decode, outstream=sys.stdout):
     else:
         base_tree = None
     diffstream = BytesIO()
-    write_tree_diff(
-        diffstream,
-        repo.object_store, base_tree, commit.tree)
+    write_tree_diff(diffstream, repo.object_store, base_tree, commit.tree)
     diffstream.seek(0)
     outstream.write(commit_decode(commit, diffstream.getvalue()))
 
@@ -719,12 +749,11 @@ def show_object(repo, obj, decode, outstream):
         b"blob": show_blob,
         b"commit": show_commit,
         b"tag": show_tag,
-            }[obj.type_name](repo, obj, decode, outstream)
+    }[obj.type_name](repo, obj, decode, outstream)
 
 
 def print_name_status(changes):
-    """Print a simple status summary, listing changed files.
-    """
+    """Print a simple status summary, listing changed files."""
     for change in changes:
         if not change:
             continue
@@ -732,28 +761,34 @@ def print_name_status(changes):
             change = change[0]
         if change.type == CHANGE_ADD:
             path1 = change.new.path
-            path2 = ''
-            kind = 'A'
+            path2 = ""
+            kind = "A"
         elif change.type == CHANGE_DELETE:
             path1 = change.old.path
-            path2 = ''
-            kind = 'D'
+            path2 = ""
+            kind = "D"
         elif change.type == CHANGE_MODIFY:
             path1 = change.new.path
-            path2 = ''
-            kind = 'M'
+            path2 = ""
+            kind = "M"
         elif change.type in RENAME_CHANGE_TYPES:
             path1 = change.old.path
             path2 = change.new.path
             if change.type == CHANGE_RENAME:
-                kind = 'R'
+                kind = "R"
             elif change.type == CHANGE_COPY:
-                kind = 'C'
-        yield '%-8s%-20s%-20s' % (kind, path1, path2)
+                kind = "C"
+        yield "%-8s%-20s%-20s" % (kind, path1, path2)
 
 
-def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
-        reverse=False, name_status=False):
+def log(
+    repo=".",
+    paths=None,
+    outstream=sys.stdout,
+    max_entries=None,
+    reverse=False,
+    name_status=False,
+):
     """Write commit logs.
 
     Args:
@@ -765,20 +800,23 @@ def log(repo=".", paths=None, outstream=sys.stdout, max_entries=None,
       max_entries: Optional maximum number of entries to display
     """
     with open_repo_closing(repo) as r:
-        walker = r.get_walker(
-            max_entries=max_entries, paths=paths, reverse=reverse)
+        walker = r.get_walker(max_entries=max_entries, paths=paths, reverse=reverse)
         for entry in walker:
+
             def decode(x):
                 return commit_decode(entry.commit, x)
+
             print_commit(entry.commit, decode, outstream)
             if name_status:
                 outstream.writelines(
-                    [line+'\n' for line in print_name_status(entry.changes())])
+                    [line + "\n" for line in print_name_status(entry.changes())]
+                )
 
 
 # TODO(jelmer): better default for encoding?
-def show(repo=".", objects=None, outstream=sys.stdout,
-         default_encoding=DEFAULT_ENCODING):
+def show(
+    repo=".", objects=None, outstream=sys.stdout, default_encoding=DEFAULT_ENCODING
+):
     """Print the changes in a commit.
 
     Args:
@@ -796,11 +834,15 @@ def show(repo=".", objects=None, outstream=sys.stdout,
         for objectish in objects:
             o = parse_object(r, objectish)
             if isinstance(o, Commit):
+
                 def decode(x):
                     return commit_decode(o, x, default_encoding)
+
             else:
+
                 def decode(x):
                     return x.decode(default_encoding)
+
             show_object(r, o, decode, outstream)
 
 
@@ -832,15 +874,24 @@ def rev_list(repo, commits, outstream=sys.stdout):
 
 def tag(*args, **kwargs):
     import warnings
-    warnings.warn("tag has been deprecated in favour of tag_create.",
-                  DeprecationWarning)
+
+    warnings.warn(
+        "tag has been deprecated in favour of tag_create.", DeprecationWarning
+    )
     return tag_create(*args, **kwargs)
 
 
 def tag_create(
-        repo, tag, author=None, message=None, annotated=False,
-        objectish="HEAD", tag_time=None, tag_timezone=None,
-        sign=False):
+    repo,
+    tag,
+    author=None,
+    message=None,
+    annotated=False,
+    objectish="HEAD",
+    tag_time=None,
+    tag_timezone=None,
+    sign=False,
+):
     """Creates a tag in git via dulwich calls:
 
     Args:
@@ -879,9 +930,9 @@ def tag_create(
             tag_obj.tag_timezone = tag_timezone
             if sign:
                 import gpg
+
                 with gpg.Context(armor=True) as c:
-                    tag_obj.signature, unused_result = c.sign(
-                        tag_obj.as_raw_string())
+                    tag_obj.signature, unused_result = c.sign(tag_obj.as_raw_string())
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id
         else:
@@ -892,8 +943,10 @@ def tag_create(
 
 def list_tags(*args, **kwargs):
     import warnings
-    warnings.warn("list_tags has been deprecated in favour of tag_list.",
-                  DeprecationWarning)
+
+    warnings.warn(
+        "list_tags has been deprecated in favour of tag_list.", DeprecationWarning
+    )
     return tag_list(*args, **kwargs)
 
 
@@ -945,9 +998,8 @@ def reset(repo, mode, treeish="HEAD"):
 
 
 def get_remote_repo(
-        repo: Repo,
-        remote_location: Optional[Union[str, bytes]] = None
-        ) -> Tuple[Optional[str], str]:
+    repo: Repo, remote_location: Optional[Union[str, bytes]] = None
+) -> Tuple[Optional[str], str]:
     config = repo.get_config()
     if remote_location is None:
         remote_location = get_branch_remote(repo)
@@ -956,13 +1008,13 @@ def get_remote_repo(
     else:
         encoded_location = remote_location
 
-    section = (b'remote', encoded_location)
+    section = (b"remote", encoded_location)
 
     remote_name = None  # type: Optional[str]
 
     if config.has_section(section):
         remote_name = encoded_location.decode()
-        url = config.get(section, 'url')
+        url = config.get(section, "url")
         encoded_location = url
     else:
         remote_name = None
@@ -970,10 +1022,15 @@ def get_remote_repo(
     return (remote_name, encoded_location.decode())
 
 
-def push(repo, remote_location=None, refspecs=None,
-         outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream,
-         force=False, **kwargs):
+def push(
+    repo,
+    remote_location=None,
+    refspecs=None,
+    outstream=default_bytes_out_stream,
+    errstream=default_bytes_err_stream,
+    force=False,
+    **kwargs
+):
     """Remote push with dulwich via dulwich.client
 
     Args:
@@ -991,14 +1048,14 @@ def push(repo, remote_location=None, refspecs=None,
 
         # Get the client and path
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack(), **kwargs)
+            remote_location, config=r.get_config_stack(), **kwargs
+        )
 
         selected_refs = []
         remote_changed_refs = {}
 
         def update_refs(refs):
-            selected_refs.extend(parse_reftuples(
-                r.refs, refs, refspecs, force=force))
+            selected_refs.extend(parse_reftuples(r.refs, refs, refspecs, force=force))
             new_refs = {}
             # TODO: Handle selected_refs == {None: None}
             for (lh, rh, force_ref) in selected_refs:
@@ -1009,46 +1066,54 @@ def push(repo, remote_location=None, refspecs=None,
                     try:
                         localsha = r.refs[lh]
                     except KeyError:
-                        raise Error(
-                            'No valid ref %s in local repository' % lh)
+                        raise Error("No valid ref %s in local repository" % lh)
                     if not force_ref and rh in refs:
                         check_diverged(r, refs[rh], localsha)
                     new_refs[rh] = localsha
                     remote_changed_refs[rh] = localsha
             return new_refs
 
-        err_encoding = getattr(errstream, 'encoding', None) or DEFAULT_ENCODING
+        err_encoding = getattr(errstream, "encoding", None) or DEFAULT_ENCODING
         remote_location = client.get_url(path)
         try:
             result = client.send_pack(
-                path, update_refs,
+                path,
+                update_refs,
                 generate_pack_data=r.generate_pack_data,
-                progress=errstream.write)
+                progress=errstream.write,
+            )
         except SendPackError as e:
             raise Error(
-                "Push to " + remote_location +
-                " failed -> " + e.args[0].decode(), inner=e)
+                "Push to " + remote_location + " failed -> " + e.args[0].decode(),
+                inner=e,
+            )
         else:
             errstream.write(
-                b"Push to " +
-                remote_location.encode(err_encoding) + b" successful.\n")
+                b"Push to " + remote_location.encode(err_encoding) + b" successful.\n"
+            )
 
         for ref, error in (result.ref_status or {}).items():
             if error is not None:
                 errstream.write(
-                    b"Push of ref %s failed: %s\n" %
-                    (ref, error.encode(err_encoding)))
+                    b"Push of ref %s failed: %s\n" % (ref, error.encode(err_encoding))
+                )
             else:
-                errstream.write(b'Ref %s updated\n' % ref)
+                errstream.write(b"Ref %s updated\n" % ref)
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)
 
 
-def pull(repo, remote_location=None, refspecs=None,
-         outstream=default_bytes_out_stream,
-         errstream=default_bytes_err_stream, fast_forward=True,
-         force=False, **kwargs):
+def pull(
+    repo,
+    remote_location=None,
+    refspecs=None,
+    outstream=default_bytes_out_stream,
+    errstream=default_bytes_err_stream,
+    fast_forward=True,
+    force=False,
+    **kwargs
+):
     """Pull from remote via dulwich.client
 
     Args:
@@ -1068,26 +1133,31 @@ def pull(repo, remote_location=None, refspecs=None,
 
         def determine_wants(remote_refs):
             selected_refs.extend(
-                parse_reftuples(remote_refs, r.refs, refspecs, force=force))
+                parse_reftuples(remote_refs, r.refs, refspecs, force=force)
+            )
             return [
-                remote_refs[lh] for (lh, rh, force_ref) in selected_refs
-                if remote_refs[lh] not in r.object_store]
+                remote_refs[lh]
+                for (lh, rh, force_ref) in selected_refs
+                if remote_refs[lh] not in r.object_store
+            ]
+
         client, path = get_transport_and_path(
-                remote_location, config=r.get_config_stack(), **kwargs)
+            remote_location, config=r.get_config_stack(), **kwargs
+        )
         fetch_result = client.fetch(
-            path, r, progress=errstream.write, determine_wants=determine_wants)
+            path, r, progress=errstream.write, determine_wants=determine_wants
+        )
         for (lh, rh, force_ref) in selected_refs:
             try:
-                check_diverged(
-                    r, r.refs[rh], fetch_result.refs[lh])
+                check_diverged(r, r.refs[rh], fetch_result.refs[lh])
             except DivergedBranches:
                 if fast_forward:
                     raise
                 else:
-                    raise NotImplementedError('merge is not yet supported')
+                    raise NotImplementedError("merge is not yet supported")
             r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
-            r[b'HEAD'] = fetch_result.refs[selected_refs[0][1]]
+            r[b"HEAD"] = fetch_result.refs[selected_refs[0][1]]
 
         # Perform 'git checkout .' - syncs staged changes
         tree = r[b"HEAD"].tree
@@ -1114,12 +1184,11 @@ def status(repo=".", ignored=False):
         index = r.open_index()
         normalizer = r.get_blob_normalizer()
         filter_callback = normalizer.checkin_normalize
-        unstaged_changes = list(
-            get_unstaged_changes(index, r.path, filter_callback)
-        )
+        unstaged_changes = list(get_unstaged_changes(index, r.path, filter_callback))
 
-        untracked_paths = get_untracked_paths(r.path, r.path, index,
-                                              exclude_ignored=not ignored)
+        untracked_paths = get_untracked_paths(
+            r.path, r.path, index, exclude_ignored=not ignored
+        )
         untracked_changes = list(untracked_paths)
 
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
@@ -1134,12 +1203,12 @@ def _walk_working_dir_paths(frompath, basepath):
     """
     for dirpath, dirnames, filenames in os.walk(frompath):
         # Skip .git and below.
-        if '.git' in dirnames:
-            dirnames.remove('.git')
+        if ".git" in dirnames:
+            dirnames.remove(".git")
             if dirpath != basepath:
                 continue
-        if '.git' in filenames:
-            filenames.remove('.git')
+        if ".git" in filenames:
+            filenames.remove(".git")
             if dirpath != basepath:
                 continue
 
@@ -1167,8 +1236,9 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
         ignore_manager = None
 
     for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
-        if (ignore_manager is not None and
-                ignore_manager.is_ignored(os.path.relpath(ap, frompath))):
+        if ignore_manager is not None and ignore_manager.is_ignored(
+            os.path.relpath(ap, frompath)
+        ):
             continue
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
@@ -1190,24 +1260,24 @@ def get_tree_changes(repo):
         # Iterate through the changes and report add/delete/modify
         # TODO: call out to dulwich.diff_tree somehow.
         tracked_changes = {
-            'add': [],
-            'delete': [],
-            'modify': [],
+            "add": [],
+            "delete": [],
+            "modify": [],
         }
         try:
-            tree_id = r[b'HEAD'].tree
+            tree_id = r[b"HEAD"].tree
         except KeyError:
             tree_id = None
 
         for change in index.changes_from_tree(r.object_store, tree_id):
             if not change[0][0]:
-                tracked_changes['add'].append(change[0][1])
+                tracked_changes["add"].append(change[0][1])
             elif not change[0][1]:
-                tracked_changes['delete'].append(change[0][0])
+                tracked_changes["delete"].append(change[0][0])
             elif change[0][0] == change[0][1]:
-                tracked_changes['modify'].append(change[0][0])
+                tracked_changes["modify"].append(change[0][0])
             else:
-                raise NotImplementedError('git mv ops not yet supported')
+                raise NotImplementedError("git mv ops not yet supported")
         return tracked_changes
 
 
@@ -1237,13 +1307,18 @@ def web_daemon(path=".", address=None, port=None):
         make_wsgi_chain,
         make_server,
         WSGIRequestHandlerLogger,
-        WSGIServerLogger)
+        WSGIServerLogger,
+    )
 
     backend = FileSystemBackend(path)
     app = make_wsgi_chain(backend)
-    server = make_server(address, port, app,
-                         handler_class=WSGIRequestHandlerLogger,
-                         server_class=WSGIServerLogger)
+    server = make_server(
+        address,
+        port,
+        app,
+        handler_class=WSGIRequestHandlerLogger,
+        server_class=WSGIServerLogger,
+    )
     server.serve_forever()
 
 
@@ -1256,15 +1331,16 @@ def upload_pack(path=".", inf=None, outf=None):
       outf: Output stream to communicate with client
     """
     if outf is None:
-        outf = getattr(sys.stdout, 'buffer', sys.stdout)
+        outf = getattr(sys.stdout, "buffer", sys.stdout)
     if inf is None:
-        inf = getattr(sys.stdin, 'buffer', sys.stdin)
+        inf = getattr(sys.stdin, "buffer", sys.stdin)
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
 
     def send_fn(data):
         outf.write(data)
         outf.flush()
+
     proto = Protocol(inf.read, send_fn)
     handler = UploadPackHandler(backend, [path], proto)
     # FIXME: Catch exceptions and write a single-line summary to outf.
@@ -1281,15 +1357,16 @@ def receive_pack(path=".", inf=None, outf=None):
       outf: Output stream to communicate with client
     """
     if outf is None:
-        outf = getattr(sys.stdout, 'buffer', sys.stdout)
+        outf = getattr(sys.stdout, "buffer", sys.stdout)
     if inf is None:
-        inf = getattr(sys.stdin, 'buffer', sys.stdin)
+        inf = getattr(sys.stdin, "buffer", sys.stdin)
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
 
     def send_fn(data):
         outf.write(data)
         outf.flush()
+
     proto = Protocol(inf.read, send_fn)
     handler = ReceivePackHandler(backend, [path], proto)
     # FIXME: Catch exceptions and write a single-line summary to outf.
@@ -1298,13 +1375,13 @@ def receive_pack(path=".", inf=None, outf=None):
 
 
 def _make_branch_ref(name):
-    if getattr(name, 'encode', None):
+    if getattr(name, "encode", None):
         name = name.encode(DEFAULT_ENCODING)
     return LOCAL_BRANCH_PREFIX + name
 
 
 def _make_tag_ref(name):
-    if getattr(name, 'encode', None):
+    if getattr(name, "encode", None):
         name = name.encode(DEFAULT_ENCODING)
     return b"refs/tags/" + name
 
@@ -1339,13 +1416,12 @@ def branch_create(repo, name, objectish=None, force=False):
             objectish = "HEAD"
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
-        ref_message = b"branch: Created from " + objectish.encode('utf-8')
+        ref_message = b"branch: Created from " + objectish.encode("utf-8")
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
             if not r.refs.add_if_new(refname, object.id, message=ref_message):
-                raise Error(
-                    "Branch with name %s already exists." % name)
+                raise Error("Branch with name %s already exists." % name)
 
 
 def branch_list(repo):
@@ -1370,10 +1446,10 @@ def active_branch(repo):
       IndexError: if HEAD is floating
     """
     with open_repo_closing(repo) as r:
-        active_ref = r.refs.follow(b'HEAD')[0][1]
+        active_ref = r.refs.follow(b"HEAD")[0][1]
         if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
             raise ValueError(active_ref)
-        return active_ref[len(LOCAL_BRANCH_PREFIX):]
+        return active_ref[len(LOCAL_BRANCH_PREFIX) :]
 
 
 def get_branch_remote(repo):
@@ -1390,36 +1466,49 @@ def get_branch_remote(repo):
         branch_name = active_branch(r.path)
         config = r.get_config()
         try:
-            remote_name = config.get((b'branch', branch_name), b'remote')
+            remote_name = config.get((b"branch", branch_name), b"remote")
         except KeyError:
-            remote_name = b'origin'
+            remote_name = b"origin"
     return remote_name
 
 
 def _import_remote_refs(
-        refs_container: RefsContainer, remote_name: str,
-        refs: Dict[str, str], message: Optional[bytes] = None,
-        prune: bool = False, prune_tags: bool = False):
+    refs_container: RefsContainer,
+    remote_name: str,
+    refs: Dict[str, str],
+    message: Optional[bytes] = None,
+    prune: bool = False,
+    prune_tags: bool = False,
+):
     stripped_refs = strip_peeled_refs(refs)
     branches = {
-        n[len(LOCAL_BRANCH_PREFIX):]: v for (n, v) in stripped_refs.items()
-        if n.startswith(LOCAL_BRANCH_PREFIX)}
+        n[len(LOCAL_BRANCH_PREFIX) :]: v
+        for (n, v) in stripped_refs.items()
+        if n.startswith(LOCAL_BRANCH_PREFIX)
+    }
     refs_container.import_refs(
-        b'refs/remotes/' + remote_name.encode(), branches, message=message,
-        prune=prune)
+        b"refs/remotes/" + remote_name.encode(), branches, message=message, prune=prune
+    )
     tags = {
-        n[len(b'refs/tags/'):]: v for (n, v) in stripped_refs.items()
-        if n.startswith(b'refs/tags/') and
-        not n.endswith(ANNOTATED_TAG_SUFFIX)}
-    refs_container.import_refs(
-        b'refs/tags', tags, message=message,
-        prune=prune_tags)
+        n[len(b"refs/tags/") :]: v
+        for (n, v) in stripped_refs.items()
+        if n.startswith(b"refs/tags/") and not n.endswith(ANNOTATED_TAG_SUFFIX)
+    }
+    refs_container.import_refs(b"refs/tags", tags, message=message, prune=prune_tags)
 
 
-def fetch(repo, remote_location=None,
-          outstream=sys.stdout, errstream=default_bytes_err_stream,
-          message=None, depth=None, prune=False, prune_tags=False, force=False,
-          **kwargs):
+def fetch(
+    repo,
+    remote_location=None,
+    outstream=sys.stdout,
+    errstream=default_bytes_err_stream,
+    message=None,
+    depth=None,
+    prune=False,
+    prune_tags=False,
+    force=False,
+    **kwargs
+):
     """Fetch objects from a remote server.
 
     Args:
@@ -1437,15 +1526,20 @@ def fetch(repo, remote_location=None,
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
         if message is None:
-            message = b'fetch: from ' + remote_location.encode("utf-8")
+            message = b"fetch: from " + remote_location.encode("utf-8")
         client, path = get_transport_and_path(
-            remote_location, config=r.get_config_stack(), **kwargs)
-        fetch_result = client.fetch(path, r, progress=errstream.write,
-                                    depth=depth)
+            remote_location, config=r.get_config_stack(), **kwargs
+        )
+        fetch_result = client.fetch(path, r, progress=errstream.write, depth=depth)
         if remote_name is not None:
             _import_remote_refs(
-                r.refs, remote_name, fetch_result.refs, message, prune=prune,
-                prune_tags=prune_tags)
+                r.refs,
+                remote_name,
+                fetch_result.refs,
+                message,
+                prune=prune,
+                prune_tags=prune_tags,
+            )
     return fetch_result
 
 
@@ -1489,14 +1583,16 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
         entries, data_sum = write_pack_objects(
             packf,
             r.object_store.iter_shas((oid, None) for oid in object_ids),
-            delta_window_size=delta_window_size)
+            delta_window_size=delta_window_size,
+        )
     if idxf is not None:
         entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
         write_pack_index(idxf, entries, data_sum)
 
 
-def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
-            name_only=False):
+def ls_tree(
+    repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False, name_only=False
+):
     """List contents of a tree.
 
     Args:
@@ -1506,6 +1602,7 @@ def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
       recursive: Whether to recursively list files
       name_only: Only print item name
     """
+
     def list_tree(store, treeid, base):
         for (name, mode, sha) in store[treeid].iteritems():
             if base:
@@ -1516,6 +1613,7 @@ def ls_tree(repo, treeish=b"HEAD", outstream=sys.stdout, recursive=False,
                 outstream.write(pretty_format_tree_entry(name, mode, sha))
             if stat.S_ISDIR(mode) and recursive:
                 list_tree(store, sha, name)
+
     with open_repo_closing(repo) as r:
         tree = parse_tree(r, treeish)
         list_tree(r.object_store, tree.id, "")
@@ -1535,7 +1633,7 @@ def remote_add(repo, name, url):
         url = url.encode(DEFAULT_ENCODING)
     with open_repo_closing(repo) as r:
         c = r.get_config()
-        section = (b'remote', name)
+        section = (b"remote", name)
         if c.has_section(section):
             raise RemoteExists(section)
         c.set(section, b"url", url)
@@ -1601,8 +1699,9 @@ def check_mailmap(repo, contact):
     """
     with open_repo_closing(repo) as r:
         from dulwich.mailmap import Mailmap
+
         try:
-            mailmap = Mailmap.from_path(os.path.join(r.path, '.mailmap'))
+            mailmap = Mailmap.from_path(os.path.join(r.path, ".mailmap"))
         except FileNotFoundError:
             mailmap = Mailmap()
         return mailmap.lookup(contact)
@@ -1631,6 +1730,7 @@ def stash_list(repo):
     """List all stashes in a repository."""
     with open_repo_closing(repo) as r:
         from dulwich.stash import Stash
+
         stash = Stash.from_repo(r)
         return enumerate(list(stash.stashes()))
 
@@ -1639,6 +1739,7 @@ def stash_push(repo):
     """Push a new stash onto the stack."""
     with open_repo_closing(repo) as r:
         from dulwich.stash import Stash
+
         stash = Stash.from_repo(r)
         stash.push()
 
@@ -1647,6 +1748,7 @@ def stash_pop(repo):
     """Pop a new stash from the stack."""
     with open_repo_closing(repo) as r:
         from dulwich.stash import Stash
+
         stash = Stash.from_repo(r)
         stash.pop()
 
@@ -1674,10 +1776,10 @@ def describe(repo):
         for key, value in refs.items():
             key = key.decode()
             obj = r.get_object(value)
-            if u'tags' not in key:
+            if u"tags" not in key:
                 continue
 
-            _, tag = key.rsplit(u'/', 1)
+            _, tag = key.rsplit(u"/", 1)
 
             try:
                 commit = obj.object
@@ -1687,16 +1789,14 @@ def describe(repo):
                 commit = r.get_object(commit[1])
             tags[tag] = [
                 datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
-                commit.id.decode('ascii'),
+                commit.id.decode("ascii"),
             ]
 
-        sorted_tags = sorted(tags.items(),
-                             key=lambda tag: tag[1][0],
-                             reverse=True)
+        sorted_tags = sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
 
         # If there are no tags, return the current commit
         if len(sorted_tags) == 0:
-            return 'g{}'.format(r[r.head()].id.decode('ascii')[:7])
+            return "g{}".format(r[r.head()].id.decode("ascii")[:7])
 
         # We're now 0 commits from the top
         commit_count = 0
@@ -1708,7 +1808,7 @@ def describe(repo):
         walker = r.get_walker()
         for entry in walker:
             # Check if tag
-            commit_id = entry.commit.id.decode('ascii')
+            commit_id = entry.commit.id.decode("ascii")
             for tag in sorted_tags:
                 tag_name = tag[0]
                 tag_commit = tag[1][1]
@@ -1716,15 +1816,14 @@ def describe(repo):
                     if commit_count == 0:
                         return tag_name
                     else:
-                        return '{}-{}-g{}'.format(
-                                tag_name,
-                                commit_count,
-                                latest_commit.id.decode('ascii')[:7])
+                        return "{}-{}-g{}".format(
+                            tag_name, commit_count, latest_commit.id.decode("ascii")[:7]
+                        )
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return 'g{}'.format(latest_commit.id.decode('ascii')[:7])
+        return "g{}".format(latest_commit.id.decode("ascii")[:7])
 
 
 def get_object_by_path(repo, path, committish=None):
@@ -1744,9 +1843,7 @@ def get_object_by_path(repo, path, committish=None):
         base_tree = commit.tree
         if not isinstance(path, bytes):
             path = commit_encode(commit, path)
-        (mode, sha) = tree_lookup_path(
-            r.object_store.__getitem__,
-            base_tree, path)
+        (mode, sha) = tree_lookup_path(r.object_store.__getitem__, base_tree, path)
         return r[sha]
 
 

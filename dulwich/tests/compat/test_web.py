@@ -34,29 +34,28 @@ from dulwich.server import (
     DictBackend,
     UploadPackHandler,
     ReceivePackHandler,
-    )
+)
 from dulwich.tests import (
     SkipTest,
     skipIf,
-    )
+)
 from dulwich.web import (
     make_wsgi_chain,
     HTTPGitApplication,
     WSGIRequestHandlerLogger,
     WSGIServerLogger,
-    )
+)
 
 from dulwich.tests.compat.server_utils import (
     ServerTests,
     NoSideBand64kReceivePackHandler,
-    )
+)
 from dulwich.tests.compat.utils import (
     CompatTestCase,
-    )
+)
 
 
-@skipIf(sys.platform == 'win32',
-        'Broken on windows, with very long fail time.')
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class WebTests(ServerTests):
     """Base tests for web server tests.
 
@@ -64,14 +63,18 @@ class WebTests(ServerTests):
     TestCase so tests are not automatically run.
     """
 
-    protocol = 'http'
+    protocol = "http"
 
     def _start_server(self, repo):
-        backend = DictBackend({'/': repo})
+        backend = DictBackend({"/": repo})
         app = self._make_app(backend)
         dul_server = simple_server.make_server(
-          'localhost', 0, app, server_class=WSGIServerLogger,
-          handler_class=WSGIRequestHandlerLogger)
+            "localhost",
+            0,
+            app,
+            server_class=WSGIServerLogger,
+            handler_class=WSGIRequestHandlerLogger,
+        )
         self.addCleanup(dul_server.shutdown)
         self.addCleanup(dul_server.server_close)
         threading.Thread(target=dul_server.serve_forever).start()
@@ -80,8 +83,7 @@ class WebTests(ServerTests):
         return port
 
 
-@skipIf(sys.platform == 'win32',
-        'Broken on windows, with very long fail time.')
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class SmartWebTestCase(WebTests, CompatTestCase):
     """Test cases for smart HTTP server.
 
@@ -91,12 +93,12 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     min_git_version = (1, 6, 6)  # type: Tuple[int, ...]
 
     def _handlers(self):
-        return {b'git-receive-pack': NoSideBand64kReceivePackHandler}
+        return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
     def _check_app(self, app):
-        receive_pack_handler_cls = app.handlers[b'git-receive-pack']
+        receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertNotIn(b'side-band-64k', caps)
+        self.assertNotIn(b"side-band-64k", caps)
 
     def _make_app(self, backend):
         app = make_wsgi_chain(backend, handlers=self._handlers())
@@ -113,16 +115,17 @@ def patch_capabilities(handler, caps_removed):
     # removed, and return the original classmethod for restoration.
     original_capabilities = handler.capabilities
     filtered_capabilities = [
-        i for i in original_capabilities() if i not in caps_removed]
+        i for i in original_capabilities() if i not in caps_removed
+    ]
 
     def capabilities(cls):
         return filtered_capabilities
+
     handler.capabilities = classmethod(capabilities)
     return original_capabilities
 
 
-@skipIf(sys.platform == 'win32',
-        'Broken on windows, with very long fail time.')
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class SmartWebSideBand64kTestCase(SmartWebTestCase):
     """Test cases for smart HTTP server with side-band-64k support."""
 
@@ -143,10 +146,10 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_app(self, app):
-        receive_pack_handler_cls = app.handlers[b'git-receive-pack']
+        receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertIn(b'side-band-64k', caps)
-        self.assertNotIn(b'no-done', caps)
+        self.assertIn(b"side-band-64k", caps)
+        self.assertNotIn(b"no-done", caps)
 
 
 class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
@@ -161,14 +164,13 @@ class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_app(self, app):
-        receive_pack_handler_cls = app.handlers[b'git-receive-pack']
+        receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertIn(b'side-band-64k', caps)
-        self.assertIn(b'no-done', caps)
+        self.assertIn(b"side-band-64k", caps)
+        self.assertIn(b"no-done", caps)
 
 
-@skipIf(sys.platform == 'win32',
-        'Broken on windows, with very long fail time.')
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class DumbWebTestCase(WebTests, CompatTestCase):
     """Test cases for dumb HTTP server."""
 
@@ -177,31 +179,31 @@ class DumbWebTestCase(WebTests, CompatTestCase):
 
     def test_push_to_dulwich(self):
         # Note: remove this if dulwich implements dumb web pushing.
-        raise SkipTest('Dumb web pushing not supported.')
+        raise SkipTest("Dumb web pushing not supported.")
 
     def test_push_to_dulwich_remove_branch(self):
         # Note: remove this if dumb pushing is supported
-        raise SkipTest('Dumb web pushing not supported.')
+        raise SkipTest("Dumb web pushing not supported.")
 
     def test_new_shallow_clone_from_dulwich(self):
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
-        raise SkipTest('Dumb web shallow cloning not supported.')
+        raise SkipTest("Dumb web shallow cloning not supported.")
 
     def test_shallow_clone_from_git_is_identical(self):
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
-        raise SkipTest('Dumb web shallow cloning not supported.')
+        raise SkipTest("Dumb web shallow cloning not supported.")
 
     def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
-        raise SkipTest('Dumb web shallow cloning not supported.')
+        raise SkipTest("Dumb web shallow cloning not supported.")
 
     def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
-        raise SkipTest('Dumb web shallow cloning not supported.')
+        raise SkipTest("Dumb web shallow cloning not supported.")
 
     def test_push_to_dulwich_issue_88_standard(self):
-        raise SkipTest('Dumb web pushing not supported.')
+        raise SkipTest("Dumb web pushing not supported.")

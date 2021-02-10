@@ -56,23 +56,23 @@ def _read_bundle(f, version):
     references = {}
     line = f.readline()
     if version >= 3:
-        while line.startswith(b'@'):
-            line = line[1:].rstrip(b'\n')
+        while line.startswith(b"@"):
+            line = line[1:].rstrip(b"\n")
             try:
-                key, value = line.split(b'=', 1)
+                key, value = line.split(b"=", 1)
             except ValueError:
                 key = line
                 value = None
             else:
-                value = value.decode('utf-8')
-            capabilities[key.decode('utf-8')] = value
+                value = value.decode("utf-8")
+            capabilities[key.decode("utf-8")] = value
             line = f.readline()
-    while line.startswith(b'-'):
-        (obj_id, comment) = line[1:].rstrip(b'\n').split(b' ', 1)
-        prerequisites.append((obj_id, comment.decode('utf-8')))
+    while line.startswith(b"-"):
+        (obj_id, comment) = line[1:].rstrip(b"\n").split(b" ", 1)
+        prerequisites.append((obj_id, comment.decode("utf-8")))
         line = f.readline()
-    while line != b'\n':
-        (obj_id, ref) = line.rstrip(b'\n').split(b' ', 1)
+    while line != b"\n":
+        (obj_id, ref) = line.rstrip(b"\n").split(b" ", 1)
         references[ref] = obj_id
         line = f.readline()
     pack_data = PackData.from_file(f)
@@ -88,12 +88,11 @@ def _read_bundle(f, version):
 def read_bundle(f):
     """Read a bundle file."""
     firstline = f.readline()
-    if firstline == b'# v2 git bundle\n':
+    if firstline == b"# v2 git bundle\n":
         return _read_bundle(f, 2)
-    if firstline == b'# v3 git bundle\n':
+    if firstline == b"# v3 git bundle\n":
         return _read_bundle(f, 3)
-    raise AssertionError(
-        'unsupported bundle format header: %r' % firstline)
+    raise AssertionError("unsupported bundle format header: %r" % firstline)
 
 
 def write_bundle(f, bundle):
@@ -104,20 +103,20 @@ def write_bundle(f, bundle):
         else:
             version = 2
     if version == 2:
-        f.write(b'# v2 git bundle\n')
+        f.write(b"# v2 git bundle\n")
     elif version == 3:
-        f.write(b'# v3 git bundle\n')
+        f.write(b"# v3 git bundle\n")
     else:
-        raise AssertionError('unknown version %d' % version)
+        raise AssertionError("unknown version %d" % version)
     if version == 3:
         for key, value in bundle.capabilities.items():
-            f.write(b'@' + key.encode('utf-8'))
+            f.write(b"@" + key.encode("utf-8"))
             if value is not None:
-                f.write(b'=' + value.encode('utf-8'))
-            f.write(b'\n')
+                f.write(b"=" + value.encode("utf-8"))
+            f.write(b"\n")
     for (obj_id, comment) in bundle.prerequisites:
-        f.write(b'-%s %s\n' % (obj_id, comment.encode('utf-8')))
+        f.write(b"-%s %s\n" % (obj_id, comment.encode("utf-8")))
     for ref, obj_id in bundle.references.items():
-        f.write(b'%s %s\n' % (obj_id, ref))
-    f.write(b'\n')
+        f.write(b"%s %s\n" % (obj_id, ref))
+    f.write(b"\n")
     write_pack_data(f, len(bundle.pack_data), iter(bundle.pack_data))

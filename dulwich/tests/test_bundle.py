@@ -25,28 +25,27 @@ import tempfile
 
 from dulwich.tests import (
     TestCase,
-    )
+)
 
 from dulwich.bundle import (
     Bundle,
     read_bundle,
     write_bundle,
-    )
+)
 
 
 class BundleTests(TestCase):
-
     def test_roundtrip_bundle(self):
         origbundle = Bundle()
         origbundle.version = 3
-        origbundle.capabilities = {'foo': None}
-        origbundle.references = {b'refs/heads/master': b'ab' * 20}
-        origbundle.prerequisites = [(b'cc' * 20, 'comment')]
+        origbundle.capabilities = {"foo": None}
+        origbundle.references = {b"refs/heads/master": b"ab" * 20}
+        origbundle.prerequisites = [(b"cc" * 20, "comment")]
         with tempfile.TemporaryDirectory() as td:
-            with open(os.path.join(td, 'foo'), 'wb') as f:
+            with open(os.path.join(td, "foo"), "wb") as f:
                 write_bundle(f, origbundle)
 
-            with open(os.path.join(td, 'foo'), 'rb') as f:
+            with open(os.path.join(td, "foo"), "rb") as f:
                 newbundle = read_bundle(f)
 
                 self.assertEqual(origbundle, newbundle)

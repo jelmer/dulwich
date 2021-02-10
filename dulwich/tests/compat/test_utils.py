@@ -23,20 +23,20 @@
 from dulwich.tests import (
     SkipTest,
     TestCase,
-    )
+)
 from dulwich.tests.compat import utils
 
 
 class GitVersionTests(TestCase):
-
     def setUp(self):
         super(GitVersionTests, self).setUp()
         self._orig_run_git = utils.run_git
         self._version_str = None  # tests can override to set stub version
 
         def run_git(args, **unused_kwargs):
-            self.assertEqual(['--version'], args)
+            self.assertEqual(["--version"], args)
             return 0, self._version_str
+
         utils.run_git = run_git
 
     def tearDown(self):
@@ -44,19 +44,19 @@ class GitVersionTests(TestCase):
         utils.run_git = self._orig_run_git
 
     def test_git_version_none(self):
-        self._version_str = b'not a git version'
+        self._version_str = b"not a git version"
         self.assertEqual(None, utils.git_version())
 
     def test_git_version_3(self):
-        self._version_str = b'git version 1.6.6'
+        self._version_str = b"git version 1.6.6"
         self.assertEqual((1, 6, 6, 0), utils.git_version())
 
     def test_git_version_4(self):
-        self._version_str = b'git version 1.7.0.2'
+        self._version_str = b"git version 1.7.0.2"
         self.assertEqual((1, 7, 0, 2), utils.git_version())
 
     def test_git_version_extra(self):
-        self._version_str = b'git version 1.7.0.3.295.gd8fa2'
+        self._version_str = b"git version 1.7.0.3.295.gd8fa2"
         self.assertEqual((1, 7, 0, 3), utils.git_version())
 
     def assertRequireSucceeds(self, required_version):
@@ -66,22 +66,20 @@ class GitVersionTests(TestCase):
             self.fail()
 
     def assertRequireFails(self, required_version):
-        self.assertRaises(SkipTest, utils.require_git_version,
-                          required_version)
+        self.assertRaises(SkipTest, utils.require_git_version, required_version)
 
     def test_require_git_version(self):
         try:
-            self._version_str = b'git version 1.6.6'
+            self._version_str = b"git version 1.6.6"
             self.assertRequireSucceeds((1, 6, 6))
             self.assertRequireSucceeds((1, 6, 6, 0))
             self.assertRequireSucceeds((1, 6, 5))
             self.assertRequireSucceeds((1, 6, 5, 99))
             self.assertRequireFails((1, 7, 0))
             self.assertRequireFails((1, 7, 0, 2))
-            self.assertRaises(ValueError, utils.require_git_version,
-                              (1, 6, 6, 0, 0))
+            self.assertRaises(ValueError, utils.require_git_version, (1, 6, 6, 0, 0))
 
-            self._version_str = b'git version 1.7.0.2'
+            self._version_str = b"git version 1.7.0.2"
             self.assertRequireSucceeds((1, 6, 6))
             self.assertRequireSucceeds((1, 6, 6, 0))
             self.assertRequireSucceeds((1, 7, 0))
@@ -90,4 +88,4 @@ class GitVersionTests(TestCase):
             self.assertRequireFails((1, 7, 1))
         except SkipTest as e:
             # This test is designed to catch all SkipTest exceptions.
-            self.fail('Test unexpectedly skipped: %s' % e)
+            self.fail("Test unexpectedly skipped: %s" % e)

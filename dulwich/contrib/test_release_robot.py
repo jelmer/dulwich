@@ -44,10 +44,17 @@ class TagPatternTests(unittest.TestCase):
     def test_tag_pattern(self):
         """test tag patterns"""
         test_cases = {
-            '0.3': '0.3', 'v0.3': '0.3', 'release0.3': '0.3',
-            'Release-0.3': '0.3', 'v0.3rc1': '0.3rc1', 'v0.3-rc1': '0.3-rc1',
-            'v0.3-rc.1': '0.3-rc.1', 'version 0.3': '0.3',
-            'version_0.3_rc_1': '0.3_rc_1', 'v1': '1', '0.3rc1': '0.3rc1'
+            "0.3": "0.3",
+            "v0.3": "0.3",
+            "release0.3": "0.3",
+            "Release-0.3": "0.3",
+            "v0.3rc1": "0.3rc1",
+            "v0.3-rc1": "0.3-rc1",
+            "v0.3-rc.1": "0.3-rc.1",
+            "version 0.3": "0.3",
+            "version_0.3_rc_1": "0.3_rc_1",
+            "v1": "1",
+            "0.3rc1": "0.3rc1",
         }
         for testcase, version in test_cases.items():
             matches = re.match(release_robot.PATTERN, testcase)
@@ -58,12 +65,12 @@ class GetRecentTagsTest(unittest.TestCase):
     """test get recent tags"""
 
     # Git repo for dulwich project
-    test_repo = os.path.join(BASEDIR, 'dulwich_test_repo.zip')
+    test_repo = os.path.join(BASEDIR, "dulwich_test_repo.zip")
     committer = b"Mark Mikofski <mark.mikofski@sunpowercorp.com>"
-    test_tags = [b'v0.1a', b'v0.1']
+    test_tags = [b"v0.1a", b"v0.1"]
     tag_test_data = {
-        test_tags[0]: [1484788003, b'3' * 40, None],
-        test_tags[1]: [1484788314, b'1' * 40, (1484788401, b'2' * 40)]
+        test_tags[0]: [1484788003, b"3" * 40, None],
+        test_tags[1]: [1484788314, b"1" * 40, (1484788401, b"2" * 40)],
     }
 
     @classmethod
@@ -75,20 +82,20 @@ class GetRecentTagsTest(unittest.TestCase):
         cls.c1 = make_commit(
             id=cls.tag_test_data[cls.test_tags[0]][1],
             commit_time=cls.tag_test_data[cls.test_tags[0]][0],
-            message=b'unannotated tag',
-            author=cls.committer
+            message=b"unannotated tag",
+            author=cls.committer,
         )
         obj_store.add_object(cls.c1)
         # tag 1: unannotated
         cls.t1 = cls.test_tags[0]
-        cls.repo[b'refs/tags/' + cls.t1] = cls.c1.id  # add unannotated tag
+        cls.repo[b"refs/tags/" + cls.t1] = cls.c1.id  # add unannotated tag
         # commit 2 ('2017-01-19T01:11:54')
         cls.c2 = make_commit(
             id=cls.tag_test_data[cls.test_tags[1]][1],
             commit_time=cls.tag_test_data[cls.test_tags[1]][0],
-            message=b'annotated tag',
+            message=b"annotated tag",
             parents=[cls.c1.id],
-            author=cls.committer
+            author=cls.committer,
         )
         obj_store.add_object(cls.c2)
         # tag 2: annotated ('2017-01-19T01:13:21')
@@ -96,11 +103,11 @@ class GetRecentTagsTest(unittest.TestCase):
             cls.c2,
             id=cls.tag_test_data[cls.test_tags[1]][2][1],
             name=cls.test_tags[1],
-            tag_time=cls.tag_test_data[cls.test_tags[1]][2][0]
+            tag_time=cls.tag_test_data[cls.test_tags[1]][2][0],
         )
         obj_store.add_object(cls.t2)
-        cls.repo[b'refs/heads/master'] = cls.c2.id
-        cls.repo[b'refs/tags/' + cls.t2.name] = cls.t2.id  # add annotated tag
+        cls.repo[b"refs/heads/master"] = cls.c2.id
+        cls.repo[b"refs/tags/" + cls.t2.name] = cls.t2.id  # add annotated tag
 
     @classmethod
     def tearDownClass(cls):
@@ -111,17 +118,17 @@ class GetRecentTagsTest(unittest.TestCase):
         """test get recent tags"""
         tags = release_robot.get_recent_tags(self.projdir)  # get test tags
         for tag, metadata in tags:
-            tag = tag.encode('utf-8')
+            tag = tag.encode("utf-8")
             test_data = self.tag_test_data[tag]  # test data tag
             # test commit date, id and author name
             self.assertEqual(metadata[0], gmtime_to_datetime(test_data[0]))
-            self.assertEqual(metadata[1].encode('utf-8'), test_data[1])
-            self.assertEqual(metadata[2].encode('utf-8'), self.committer)
+            self.assertEqual(metadata[1].encode("utf-8"), test_data[1])
+            self.assertEqual(metadata[2].encode("utf-8"), self.committer)
             # skip unannotated tags
             tag_obj = test_data[2]
             if not tag_obj:
                 continue
             # tag date, id and name
             self.assertEqual(metadata[3][0], gmtime_to_datetime(tag_obj[0]))
-            self.assertEqual(metadata[3][1].encode('utf-8'), tag_obj[1])
-            self.assertEqual(metadata[3][2].encode('utf-8'), tag)
+            self.assertEqual(metadata[3][1].encode("utf-8"), tag_obj[1])
+            self.assertEqual(metadata[3][2].encode("utf-8"), tag)

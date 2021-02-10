@@ -32,40 +32,38 @@ import sys
 from dulwich.server import (
     DictBackend,
     TCPGitServer,
-    )
+)
 from dulwich.tests import skipIf
 from dulwich.tests.compat.server_utils import (
     ServerTests,
     NoSideBand64kReceivePackHandler,
-    )
+)
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     require_git_version,
-    )
+)
 
 
-@skipIf(sys.platform == 'win32',
-        'Broken on windows, with very long fail time.')
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class GitServerTestCase(ServerTests, CompatTestCase):
     """Tests for client/server compatibility.
 
     This server test case does not use side-band-64k in git-receive-pack.
     """
 
-    protocol = 'git'
+    protocol = "git"
 
     def _handlers(self):
-        return {b'git-receive-pack': NoSideBand64kReceivePackHandler}
+        return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
     def _check_server(self, dul_server):
-        receive_pack_handler_cls = dul_server.handlers[b'git-receive-pack']
+        receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertFalse(b'side-band-64k' in caps)
+        self.assertFalse(b"side-band-64k" in caps)
 
     def _start_server(self, repo):
-        backend = DictBackend({b'/': repo})
-        dul_server = TCPGitServer(backend, b'localhost', 0,
-                                  handlers=self._handlers())
+        backend = DictBackend({b"/": repo})
+        dul_server = TCPGitServer(backend, b"localhost", 0, handlers=self._handlers())
         self._check_server(dul_server)
         self.addCleanup(dul_server.shutdown)
         self.addCleanup(dul_server.server_close)
@@ -75,8 +73,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         return port
 
 
-@skipIf(sys.platform == 'win32',
-        'Broken on windows, with very long fail time.')
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class GitServerSideBand64kTestCase(GitServerTestCase):
     """Tests for client/server compatibility with side-band-64k support."""
 
@@ -88,13 +85,13 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         # side-band-64k is broken in the windows client.
         # https://github.com/msysgit/git/issues/101
         # Fix has landed for the 1.9.3 release.
-        if os.name == 'nt':
+        if os.name == "nt":
             require_git_version((1, 9, 3))
 
     def _handlers(self):
         return None  # default handlers include side-band-64k
 
     def _check_server(self, server):
-        receive_pack_handler_cls = server.handlers[b'git-receive-pack']
+        receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertTrue(b'side-band-64k' in caps)
+        self.assertTrue(b"side-band-64k" in caps)

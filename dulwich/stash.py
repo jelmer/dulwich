@@ -28,7 +28,7 @@ from dulwich.file import GitFile
 from dulwich.index import (
     commit_tree,
     iter_fresh_objects,
-    )
+)
 from dulwich.reflog import read_reflog
 
 
@@ -47,9 +47,10 @@ class Stash(object):
 
     def stashes(self):
         reflog_path = os.path.join(
-            self._repo.commondir(), 'logs', os.fsdecode(self._ref))
+            self._repo.commondir(), "logs", os.fsdecode(self._ref)
+        )
         try:
-            with GitFile(reflog_path, 'rb') as f:
+            with GitFile(reflog_path, "rb") as f:
                 return reversed(list(read_reflog(f)))
         except FileNotFoundError:
             return []
@@ -77,24 +78,29 @@ class Stash(object):
         # First, create the index commit.
         commit_kwargs = {}
         if committer is not None:
-            commit_kwargs['committer'] = committer
+            commit_kwargs["committer"] = committer
         if author is not None:
-            commit_kwargs['author'] = author
+            commit_kwargs["author"] = author
 
         index = self._repo.open_index()
         index_tree_id = index.commit(self._repo.object_store)
         index_commit_id = self._repo.do_commit(
-            ref=None, tree=index_tree_id,
+            ref=None,
+            tree=index_tree_id,
             message=b"Index stash",
             merge_heads=[self._repo.head()],
-            **commit_kwargs)
+            **commit_kwargs
+        )
 
         # Then, the working tree one.
         stash_tree_id = commit_tree(
-                self._repo.object_store,
-                iter_fresh_objects(
-                    index, os.fsencode(self._repo.path),
-                    object_store=self._repo.object_store))
+            self._repo.object_store,
+            iter_fresh_objects(
+                index,
+                os.fsencode(self._repo.path),
+                object_store=self._repo.object_store,
+            ),
+        )
 
         if message is None:
             message = b"A stash on " + self._repo.head()
@@ -103,10 +109,12 @@ class Stash(object):
         self._repo.refs[self._ref] = self._repo.head()
 
         cid = self._repo.do_commit(
-            ref=self._ref, tree=stash_tree_id,
+            ref=self._ref,
+            tree=stash_tree_id,
             message=message,
             merge_heads=[index_commit_id],
-            **commit_kwargs)
+            **commit_kwargs
+        )
 
         return cid
 

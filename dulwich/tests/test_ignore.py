@@ -25,6 +25,7 @@ import os
 import re
 import shutil
 import tempfile
+import unittest
 from dulwich.tests import TestCase
 
 from dulwich.ignore import (
@@ -223,6 +224,26 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertFalse(m.is_ignored("dir3"))
         self.assertTrue(m.is_ignored("dir3/"))
         self.assertTrue(m.is_ignored("dir3/bla"))
+
+    @unittest.expectedFailure
+    def test_nested_gitignores(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+
+        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
+            f.write(b'/*\n')
+            f.write(b'!/foo\n')
+
+        os.mkdir(os.path.join(repo.path, 'foo'))
+        with open(os.path.join(repo.path, 'foo', '.gitignore'), 'wb') as f:
+            f.write(b'/bar\n')
+
+        with open(os.path.join(repo.path, 'foo', 'bar'), 'wb') as f:
+            f.write(b'IGNORED')
+        
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertTrue(m.is_ignored('foo/bar'))
 
     def test_load_ignore_ignorecase(self):
         tmp_dir = tempfile.mkdtemp()

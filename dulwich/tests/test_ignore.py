@@ -25,7 +25,6 @@ import os
 import re
 import shutil
 import tempfile
-import unittest
 from dulwich.tests import TestCase
 
 from dulwich.ignore import (

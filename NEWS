@@ -1,4 +1,4 @@
-0.20.19	UNRELEASED
+0.20.19	2021-02-11
 
  * Fix handling of negative matches in nested gitignores.
    (Corentin Hembise, #836)

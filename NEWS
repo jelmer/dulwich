@@ -1,11 +1,13 @@
+0.20.19	UNRELEASED
+
+ * Fix handling of negative matches in nested gitignores.
+   (Corentin Hembise, #836)
+
 0.20.18	2021-02-04
 
  * Fix formatting in setup.py. (Jelmer Vernooĳ)
 
  * Add release configuration. (Jelmer Vernooĳ)
-
- * Fix handling of negative matches in nested gitignores.
-   (Corentin Hembise, #836)
 
 0.20.17	2021-02-04
 

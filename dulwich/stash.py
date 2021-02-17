@@ -29,7 +29,7 @@ from dulwich.index import (
     commit_tree,
     iter_fresh_objects,
 )
-from dulwich.reflog import read_reflog
+from dulwich.reflog import drop_reflog_entry, read_reflog
 
 
 DEFAULT_STASH_REF = b"refs/stash"
@@ -44,13 +44,13 @@ class Stash(object):
     def __init__(self, repo, ref=DEFAULT_STASH_REF):
         self._ref = ref
         self._repo = repo
-
-    def stashes(self):
-        reflog_path = os.path.join(
+        self._reflog_path = os.path.join(
             self._repo.commondir(), "logs", os.fsdecode(self._ref)
         )
+
+    def stashes(self):
         try:
-            with GitFile(reflog_path, "rb") as f:
+            with GitFile(self._reflog_path, "rb") as f:
                 return reversed(list(read_reflog(f)))
         except FileNotFoundError:
             return []
@@ -62,7 +62,14 @@ class Stash(object):
 
     def drop(self, index):
         """Drop entry with specified index."""
-        raise NotImplementedError(self.drop)
+        with open(self._reflog_path, "rb+") as f:
+            drop_reflog_entry(f, index, rewrite=True)
+        if len(self) == 0:
+            os.remove(self._reflog_path)
+            del self._repo.refs[self._ref]
+            return
+        if index == 0:
+            self._repo.refs[self._ref] = self[0].new_sha
 
     def pop(self, index):
         raise NotImplementedError(self.drop)

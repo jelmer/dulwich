@@ -44,7 +44,10 @@ class Stash(object):
     def __init__(self, repo, ref=DEFAULT_STASH_REF):
         self._ref = ref
         self._repo = repo
-        self._reflog_path = os.path.join(
+
+    @property
+    def _reflog_path(self):
+        return os.path.join(
             self._repo.commondir(), "logs", os.fsdecode(self._ref)
         )
 

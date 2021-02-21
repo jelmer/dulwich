@@ -1,3 +1,7 @@
+0.20.20	UNRELEASED
+
+ * Implement ``Stash.drop``. (Peter Rowlands)
+
 0.20.19	2021-02-11
 
  * Fix handling of negative matches in nested gitignores.

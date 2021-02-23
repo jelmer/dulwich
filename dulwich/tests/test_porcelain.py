@@ -1633,8 +1633,12 @@ class StatusTests(PorcelainTestCase):
             f.write("blah\n")
         with open(os.path.join(self.repo.path, "notignored"), "w") as f:
             f.write("blah\n")
+        os.symlink(
+            os.path.join(self.repo.path, os.pardir, "external_target"),
+            os.path.join(self.repo.path, "link"),
+        )
         self.assertEqual(
-            set(["ignored", "notignored", ".gitignore"]),
+            set(["ignored", "notignored", ".gitignore", "link"]),
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -1642,11 +1646,11 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([".gitignore", "notignored"]),
+            set([".gitignore", "notignored", "link"]),
             set(porcelain.status(self.repo).untracked),
         )
         self.assertEqual(
-            set([".gitignore", "notignored", "ignored"]),
+            set([".gitignore", "notignored", "ignored", "link"]),
             set(porcelain.status(self.repo, ignored=True).untracked),
         )
 

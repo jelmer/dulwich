@@ -2,6 +2,9 @@
 
  * Implement ``Stash.drop``. (Peter Rowlands)
 
+ * Support untracked symlinks to paths outside the
+   repository. (Peter Rowlands, #842)
+
 0.20.19	2021-02-11
 
  * Fix handling of negative matches in nested gitignores.

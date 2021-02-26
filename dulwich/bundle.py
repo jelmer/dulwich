@@ -21,14 +21,26 @@
 """Bundle format support.
 """
 
-from typing import Dict, List, Tuple, Optional, Union, Sequence
-from .pack import PackData, write_pack_data
+from typing import Dict
+
+from typing import List
+
+from typing import Tuple
+
+from typing import Optional
+
+from typing import Union
+
+from typing import Sequence
+
+from .pack import PackData
+
+from .pack import write_pack_data
 
 
 class Bundle(object):
 
     version = None  # type: Optional[int]
-
     capabilities = {}  # type: Dict[str, str]
     prerequisites = []  # type: List[Tuple[bytes, str]]
     references = {}  # type: Dict[str, bytes]

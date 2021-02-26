@@ -24,15 +24,21 @@
 """
 
 import posixpath
+
 import stat
+
 import tarfile
+
 import struct
+
 from os import SEEK_END
+
 from io import BytesIO
+
 from contextlib import closing
 
 
-class ChunkedBytesIO(object):
+class ChunkedBytesIO(object):  # pylint: disable=too-few-public-methods
     """Turn a list of bytestrings into a file-like object.
 
     This is similar to creating a `BytesIO` from a concatenation of the
@@ -44,6 +50,7 @@ class ChunkedBytesIO(object):
     """
 
     def __init__(self, contents):
+        """Init."""
         self.contents = contents
         self.pos = (0, 0)
 
@@ -56,7 +63,7 @@ class ChunkedBytesIO(object):
 
         while chunk < len(self.contents):
             if maxbytes < len(self.contents[chunk]) - cursor:
-                buf.append(self.contents[chunk][cursor : cursor + maxbytes])
+                buf.append(self.contents[chunk][cursor: cursor + maxbytes])
                 cursor += maxbytes
                 self.pos = (chunk, cursor)
                 break
@@ -69,7 +76,7 @@ class ChunkedBytesIO(object):
         return b"".join(buf)
 
 
-def tar_stream(store, tree, mtime, prefix=b"", format=""):
+def tar_stream(store, tree, mtime, prefix=b"", compression_format=""):
     """Generate a tar stream for the contents of a Git tree.
 
     Returns a generator that lazily assembles a .tar.gz archive, yielding it in
@@ -86,8 +93,8 @@ def tar_stream(store, tree, mtime, prefix=b"", format=""):
       Bytestrings
     """
     buf = BytesIO()
-    with closing(tarfile.open(None, "w:%s" % format, buf)) as tar:
-        if format == "gz":
+    with closing(tarfile.open(None, "w:%s" % compression_format, buf)) as tar:
+        if compression_format == "gz":
             # Manually correct the gzip header file modification time so that
             # archives created from the same Git tree are always identical.
             # The gzip header file modification time is not currenctly

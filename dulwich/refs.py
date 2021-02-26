@@ -54,7 +54,7 @@ def parse_symref_value(contents):
     Returns: Destination
     """
     if contents.startswith(SYMREF):
-        return contents[len(SYMREF) :].rstrip(b"\r\n")
+        return contents[len(SYMREF):].rstrip(b"\r\n")
     raise ValueError(contents)
 
 

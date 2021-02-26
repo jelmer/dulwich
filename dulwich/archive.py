@@ -1,25 +1,24 @@
-# archive.py -- Creating an archive from a tarball
-# Copyright (C) 2015 Jonas Haag <jonas@lophus.org>
-# Copyright (C) 2015 Jelmer Vernooij <jelmer@jelmer.uk>
-#
-# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
-# or (at your option) any later version. You can redistribute it and/or
-# modify it under the terms of either of these two licenses.
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# You should have received a copy of the licenses; if not, see
-# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
-# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
-# License, Version 2.0.
-#
-
 """Generates tarballs for Git trees.
+
+archive.py -- Creating an archive from a tarball
+Copyright (C) 2015 Jonas Haag <jonas@lophus.org>
+Copyright (C) 2015 Jelmer Vernooij <jelmer@jelmer.uk>
+
+Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+General Public License as public by the Free Software Foundation; version 2.0
+or (at your option) any later version. You can redistribute it and/or
+modify it under the terms of either of these two licenses.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+You should have received a copy of the licenses; if not, see
+<http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+License, Version 2.0.
 
 """
 
@@ -55,6 +54,14 @@ class ChunkedBytesIO(object):  # pylint: disable=too-few-public-methods
         self.pos = (0, 0)
 
     def read(self, maxbytes=None):
+        """Read.
+
+        Args:
+            maxbytes: int
+
+        Returns:
+            Bytestrings
+        """
         if maxbytes < 0:
             maxbytes = float("inf")
 
@@ -87,8 +94,9 @@ def tar_stream(store, tree, mtime, prefix=b"", compression_format=""):
       store: Object store to retrieve objects from
       tree: Tree object for the tree root
       mtime: UNIX timestamp that is assigned as the modification time for
-        all files, and the gzip header modification time if format='gz'
-      format: Optional compression format for tarball
+        all files, and the gzip header modification time if
+        compression_format='gz'
+      compression_format: Optional compression format for tarball
     Returns:
       Bytestrings
     """
@@ -130,8 +138,10 @@ def tar_stream(store, tree, mtime, prefix=b"", compression_format=""):
 
 
 def _walk_tree(store, tree, root=b""):
-    """Recursively walk a dulwich Tree, yielding tuples of
-    (absolute path, TreeEntry) along the way.
+    """Recursively walk a dulwich Tree.
+
+    Recursively walk a dulwich Tree, Recursively walk a dulwich Tree, yielding
+    tuples of (absolute path, TreeEntry) along the way.
     """
     for entry in tree.iteritems():
         entry_abspath = posixpath.join(root, entry.path)

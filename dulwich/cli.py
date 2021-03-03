@@ -65,49 +65,54 @@ class Command(object):
 
 class cmd_archive(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
-        parser.add_option(
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
             "--remote",
             type=str,
             help="Retrieve archive from specified remote repo",
         )
-        options, args = parser.parse_args(args)
-        committish = args.pop(0)
-        if options.remote:
-            client, path = get_transport_and_path(options.remote)
+        parser.add_argument('committish', type=str, nargs='?')
+        args = parser.parse_args(args)
+        if args.remote:
+            client, path = get_transport_and_path(args.remote)
             client.archive(
                 path,
-                committish,
+                args.committish,
                 sys.stdout.write,
                 write_error=sys.stderr.write,
             )
         else:
             porcelain.archive(
-                ".", committish, outstream=sys.stdout, errstream=sys.stderr
+                ".", args.committish, outstream=sys.stdout.buffer,
+                errstream=sys.stderr
             )
 
 
 class cmd_add(Command):
-    def run(self, args):
-        opts, args = getopt(args, "", [])
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        args = parser.parse_args(argv)
 
         porcelain.add(".", paths=args)
 
 
 class cmd_rm(Command):
-    def run(self, args):
-        opts, args = getopt(args, "", [])
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        args = parser.parse_args(argv)
 
         porcelain.rm(".", paths=args)
 
 
 class cmd_fetch_pack(Command):
-    def run(self, args):
-        opts, args = getopt(args, "", ["all"])
-        opts = dict(opts)
-        client, path = get_transport_and_path(args.pop(0))
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--all', action='store_true')
+        parser.add_argument('location', nargs='?', type=str)
+        args = parser.parse_args(argv)
+        client, path = get_transport_and_path(args.location)
         r = Repo(".")
-        if "--all" in opts:
+        if args.all:
             determine_wants = r.object_store.determine_wants_all
         else:
 
@@ -291,9 +296,11 @@ class cmd_symbolic_ref(Command):
 
 
 class cmd_show(Command):
-    def run(self, args):
-        opts, args = getopt(args, "", [])
-        porcelain.show(".", args)
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('objectish', type=str, nargs='*')
+        args = parser.parse_args(argv)
+        porcelain.show(".", args.objectish or None)
 
 
 class cmd_diff_tree(Command):

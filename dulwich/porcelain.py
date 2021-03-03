@@ -1065,6 +1065,8 @@ def push(
 
     # Open the repo
     with open_repo_closing(repo) as r:
+        if refspecs is None:
+            refspecs = [active_branch(r)]
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
 
         # Get the client and path

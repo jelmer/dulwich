@@ -31,6 +31,7 @@ a way to test Dulwich.
 import os
 import sys
 from getopt import getopt
+import argparse
 import optparse
 import signal
 from typing import Dict, Type
@@ -544,15 +545,13 @@ class cmd_pull(Command):
 
 
 class cmd_push(Command):
-    def run(self, args):
-        parser = optparse.OptionParser()
-        options, args = parser.parse_args(args)
-        if len(args) < 2:
-            print("Usage: dulwich push TO-LOCATION REFSPEC..")
-            sys.exit(1)
-        to_location = args[0]
-        refspecs = args[1:]
-        porcelain.push(".", to_location, refspecs)
+
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('to_location', type=str)
+        parser.add_argument('refspec', type=str, nargs='*')
+        args = parser.parse_args(argv)
+        porcelain.push('.', args.to_location, args.refspec or None)
 
 
 class cmd_remote_add(Command):

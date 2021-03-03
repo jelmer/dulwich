@@ -1,5 +1,8 @@
 0.20.21	UNRELEASED
 
+ * In porcelain.push, default to local active branch.
+   (Jelmer Vernooĳ, #846)
+
 0.20.20	2021-03-03
 
  * Implement ``Stash.drop``. (Peter Rowlands)

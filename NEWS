@@ -3,6 +3,9 @@
  * In porcelain.push, default to local active branch.
    (Jelmer Vernooĳ, #846)
 
+ * Support fetching symrefs.
+   (Jelmer Vernooĳ, #485, #847)
+
 0.20.20	2021-03-03
 
  * Implement ``Stash.drop``. (Peter Rowlands)

@@ -795,8 +795,8 @@ class Tag(ShaFile):
         if self._message is not None:
             chunks.append(b"\n")  # To close headers
             chunks.append(self._message)
-        if self._signature is not None:
             chunks.append(b'\n')
+        if self._signature is not None:
             chunks.append(self._signature)
         return chunks
 

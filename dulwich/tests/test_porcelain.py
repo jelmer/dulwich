@@ -424,6 +424,26 @@ class CloneTests(PorcelainTestCase):
         self.assertRaises(Exception, porcelain.clone, "/nonexistant/repo", target_path)
         self.assertFalse(os.path.exists(target_path))
 
+    def test_fetch_symref(self):
+        f1_1 = make_object(Blob, data=b"f1")
+        trees = {1: [(b"f1", f1_1), (b"f2", f1_1)]}
+        [c1] = build_commit_graph(self.repo.object_store, [[1]], trees)
+        self.repo.refs.set_symbolic_ref(b'HEAD', b'refs/heads/else')
+        self.repo.refs[b"refs/heads/else"] = c1.id
+        target_path = tempfile.mkdtemp()
+        errstream = BytesIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        r = porcelain.clone(
+            self.repo.path, target_path, checkout=False, errstream=errstream
+        )
+        self.addCleanup(r.close)
+        self.assertEqual(r.path, target_path)
+        target_repo = Repo(target_path)
+        self.assertEqual(0, len(target_repo.open_index()))
+        self.assertEqual(c1.id, target_repo.refs[b"refs/heads/else"])
+        self.assertEqual(c1.id, target_repo.refs[b"HEAD"])
+        self.assertEqual({b'HEAD': b'refs/heads/else'}, target_repo.refs.get_symrefs())
+
 
 class InitTests(TestCase):
     def test_non_bare(self):

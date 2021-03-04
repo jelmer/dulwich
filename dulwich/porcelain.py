@@ -475,8 +475,8 @@ def clone(
             depth=depth,
             **kwargs
         )
-        # TODO(jelmer): Support symref capability,
-        # https://github.com/jelmer/dulwich/issues/485
+        for key, target in fetch_result.symrefs.items():
+            r.refs.set_symbolic_ref(key, target)
         try:
             head = r[fetch_result.refs[b"HEAD"]]
         except KeyError:

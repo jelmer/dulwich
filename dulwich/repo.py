@@ -1034,26 +1034,30 @@ class Repo(BaseRepo):
     To create a new repository, use the Repo.init class method.
     """
 
-    def __init__(self, root):
+    def __init__(self, root, object_store=None, bare=None):
         hidden_path = os.path.join(root, CONTROLDIR)
-        if os.path.isdir(os.path.join(hidden_path, OBJECTDIR)):
-            self.bare = False
-            self._controldir = hidden_path
-        elif os.path.isdir(os.path.join(root, OBJECTDIR)) and os.path.isdir(
-            os.path.join(root, REFSDIR)
-        ):
-            self.bare = True
-            self._controldir = root
-        elif os.path.isfile(hidden_path):
-            self.bare = False
-            with open(hidden_path, "r") as f:
-                path = read_gitfile(f)
-            self.bare = False
-            self._controldir = os.path.join(root, path)
+        if bare is None:
+            if os.path.isdir(os.path.join(hidden_path, OBJECTDIR)):
+                bare = False
+            elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
+                    os.path.isdir(os.path.join(root, REFSDIR))):
+                bare = True
+            else:
+                raise NotGitRepository(
+                    "No git repository was found at %(path)s" % dict(path=root)
+                )
+
+        self.bare = bare
+        if bare is False:
+            if os.path.isfile(hidden_path):
+                with open(hidden_path, "r") as f:
+                    path = read_gitfile(f)
+                self.bare = False
+                self._controldir = os.path.join(root, path)
+            else:
+                self._controldir = hidden_path
         else:
-            raise NotGitRepository(
-                "No git repository was found at %(path)s" % dict(path=root)
-            )
+            self._controldir = root
         commondir = self.get_named_file(COMMONDIR)
         if commondir is not None:
             with commondir:
@@ -1071,9 +1075,10 @@ class Repo(BaseRepo):
             format_version = 0
         if format_version != 0:
             raise UnsupportedVersion(format_version)
-        object_store = DiskObjectStore.from_config(
-            os.path.join(self.commondir(), OBJECTDIR), config
-        )
+        if object_store is None:
+            object_store = DiskObjectStore.from_config(
+                os.path.join(self.commondir(), OBJECTDIR), config
+            )
         refs = DiskRefsContainer(
             self.commondir(), self._controldir, logger=self._write_reflog
         )
@@ -1428,11 +1433,12 @@ class Repo(BaseRepo):
         self._put_named_file("description", description)
 
     @classmethod
-    def _init_maybe_bare(cls, path, bare):
+    def _init_maybe_bare(cls, path, bare, object_store=None):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(path, *d))
-        DiskObjectStore.init(os.path.join(path, OBJECTDIR))
-        ret = cls(path)
+        if object_store is None:
+            object_store = DiskObjectStore.init(os.path.join(path, OBJECTDIR))
+        ret = cls(path, bare=bare, object_store=object_store)
         ret.refs.set_symbolic_ref(b"HEAD", DEFAULT_REF)
         ret._init_files(bare)
         return ret
@@ -1451,8 +1457,7 @@ class Repo(BaseRepo):
         controldir = os.path.join(path, CONTROLDIR)
         os.mkdir(controldir)
         _set_filesystem_hidden(controldir)
-        cls._init_maybe_bare(controldir, False)
-        return cls(path)
+        return cls._init_maybe_bare(controldir, False)
 
     @classmethod
     def _init_new_working_directory(cls, path, main_repo, identifier=None, mkdir=False):
@@ -1493,7 +1498,7 @@ class Repo(BaseRepo):
         return r
 
     @classmethod
-    def init_bare(cls, path, mkdir=False):
+    def init_bare(cls, path, mkdir=False, object_store=None):
         """Create a new bare repository.
 
         ``path`` should already exist and be an empty directory.
@@ -1504,7 +1509,7 @@ class Repo(BaseRepo):
         """
         if mkdir:
             os.mkdir(path)
-        return cls._init_maybe_bare(path, True)
+        return cls._init_maybe_bare(path, True, object_store=object_store)
 
     create = init_bare
 

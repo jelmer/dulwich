@@ -873,7 +873,7 @@ class TraditionalGitClient(GitClient):
         self._remote_path_encoding = path_encoding
         super(TraditionalGitClient, self).__init__(**kwargs)
 
-    def _connect(self, cmd, path):
+    async def _connect(self, cmd, path):
         """Create a connection to the server.
 
         This method is abstract - concrete implementations should

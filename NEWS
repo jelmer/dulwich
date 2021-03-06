@@ -1,5 +1,8 @@
 0.20.21	UNRELEASED
 
+ * Add basic support for a GcsObjectStore that stores
+   pack files in gcs. (Jelmer Vernooĳ)
+
  * In porcelain.push, default to local active branch.
    (Jelmer Vernooĳ, #846)
 

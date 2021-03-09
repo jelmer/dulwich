@@ -29,6 +29,9 @@ from ..object_store import BucketBasedObjectStore
 from ..pack import PackData, Pack, load_pack_index_file
 
 
+# TODO(jelmer): For performance, read ranges?
+
+
 class GcsObjectStore(BucketBasedObjectStore):
 
     def __init__(self, bucket, subpath=''):

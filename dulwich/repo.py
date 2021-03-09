@@ -1037,7 +1037,8 @@ class Repo(BaseRepo):
     def __init__(self, root, object_store=None, bare=None):
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
-            if os.path.isdir(os.path.join(hidden_path, OBJECTDIR)):
+            if (os.path.isfile(hidden_path) or
+                    os.path.isdir(os.path.join(hidden_path, OBJECTDIR))):
                 bare = False
             elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
                     os.path.isdir(os.path.join(root, REFSDIR))):
@@ -1433,11 +1434,11 @@ class Repo(BaseRepo):
         self._put_named_file("description", description)
 
     @classmethod
-    def _init_maybe_bare(cls, path, bare, object_store=None):
+    def _init_maybe_bare(cls, path, controldir, bare, object_store=None):
         for d in BASE_DIRECTORIES:
-            os.mkdir(os.path.join(path, *d))
+            os.mkdir(os.path.join(controldir, *d))
         if object_store is None:
-            object_store = DiskObjectStore.init(os.path.join(path, OBJECTDIR))
+            object_store = DiskObjectStore.init(os.path.join(controldir, OBJECTDIR))
         ret = cls(path, bare=bare, object_store=object_store)
         ret.refs.set_symbolic_ref(b"HEAD", DEFAULT_REF)
         ret._init_files(bare)
@@ -1457,7 +1458,7 @@ class Repo(BaseRepo):
         controldir = os.path.join(path, CONTROLDIR)
         os.mkdir(controldir)
         _set_filesystem_hidden(controldir)
-        return cls._init_maybe_bare(controldir, False)
+        return cls._init_maybe_bare(path, controldir, False)
 
     @classmethod
     def _init_new_working_directory(cls, path, main_repo, identifier=None, mkdir=False):
@@ -1509,7 +1510,7 @@ class Repo(BaseRepo):
         """
         if mkdir:
             os.mkdir(path)
-        return cls._init_maybe_bare(path, True, object_store=object_store)
+        return cls._init_maybe_bare(path, path, True, object_store=object_store)
 
     create = init_bare
 

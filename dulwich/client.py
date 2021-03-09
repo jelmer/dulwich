@@ -40,6 +40,7 @@ Known capabilities that are not supported:
 
 from contextlib import closing
 from io import BytesIO, BufferedReader
+import logging
 import os
 import select
 import socket
@@ -109,6 +110,9 @@ from dulwich.refs import (
     read_info_refs,
     ANNOTATED_TAG_SUFFIX,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidWants(Exception):
@@ -626,6 +630,9 @@ class GitClient(object):
                 )
 
             if old_sha1 != new_sha1:
+                logger.debug(
+                    'Sending updated ref %r: %r -> %r',
+                    refname, old_sha1, new_sha1)
                 if sent_capabilities:
                     proto.write_pkt_line(old_sha1 + b" " + new_sha1 + b" " + refname)
                 else:

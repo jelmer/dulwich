@@ -923,7 +923,7 @@ def tag_create(
       objectish: object the tag should point at, defaults to HEAD
       tag_time: Optional time for annotated tag
       tag_timezone: Optional timezone for annotated tag
-      sign: GPG Sign the tag
+      sign: GPG Sign the tag (bool, defaults to True to use default GPG key, str with Key ID to use a specific GPG key)
     """
 
     with open_repo_closing(repo) as r:

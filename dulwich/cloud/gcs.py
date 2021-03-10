@@ -21,7 +21,6 @@
 
 """Storage of repositories on GCS."""
 
-from io import BytesIO
 import posixpath
 import tempfile
 

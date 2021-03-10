@@ -99,6 +99,7 @@ class Stash(object):
             tree=index_tree_id,
             message=b"Index stash",
             merge_heads=[self._repo.head()],
+            no_verify=True,
             **commit_kwargs
         )
 
@@ -123,6 +124,7 @@ class Stash(object):
             tree=stash_tree_id,
             message=message,
             merge_heads=[index_commit_id],
+            no_verify=True,
             **commit_kwargs
         )
 

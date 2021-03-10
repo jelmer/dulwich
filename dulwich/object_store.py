@@ -1526,6 +1526,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
         import tempfile
 
         pf = tempfile.SpooledTemporaryFile()
+
         def commit():
             if pf.tell() == 0:
                 pf.close()

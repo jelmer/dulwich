@@ -144,7 +144,7 @@ from dulwich.refs import (
     strip_peeled_refs,
     RefsContainer,
 )
-from dulwich.repo import BaseRepo, Repo
+from dulwich.repo import DEFAULT_REF, BaseRepo, Repo
 from dulwich.server import (
     FileSystemBackend,
     TCPGitServer,
@@ -404,6 +404,7 @@ def clone(
     outstream=None,
     origin=b"origin",
     depth=None,
+    branch=None,
     **kwargs
 ):
     """Clone a local or remote git repository.
@@ -466,14 +467,21 @@ def clone(
             depth=depth,
             **kwargs
         )
-        for key, target in fetch_result.symrefs.items():
-            r.refs.set_symbolic_ref(key, target)
-        try:
-            head = r[fetch_result.refs[b"HEAD"]]
-        except KeyError:
-            head = None
+        for key, target_ref in fetch_result.symrefs.items():
+            r.refs.set_symbolic_ref(key, target_ref)
+
+        head_ref = b"HEAD" if b"HEAD" in fetch_result.refs else None
+        if branch:
+            for ref in (_make_branch_ref(branch), _make_tag_ref(branch)):
+                if ref in fetch_result.refs:
+                    head_ref = ref
+                    break
+
+        if head_ref:
+            head = _clone_update_head(r, head_ref, fetch_result)
         else:
-            r[b"HEAD"] = head.id
+            head = None
+
         if checkout and not bare and head is not None:
             errstream.write(b"Checking out " + head.id + b"\n")
             r.reset_index(head.tree)
@@ -483,6 +491,34 @@ def clone(
         raise
 
     return r
+
+
+def _clone_update_head(r, new_ref, fetch_result):
+    ref_message = b"clone: from " + source
+    if new_ref.startswith(LOCAL_TAG_PREFIX):
+        # ref is a tag, detach HEAD at remote tag
+        _cls, head_sha = r[fetch_result.refs[new_ref]].object
+        head = r[head_sha]
+        del r.refs[b"HEAD"]
+        r.refs.set_if_equals(
+            b"HEAD", None, head_sha, message=ref_message
+        )
+    else:
+        head = r[fetch_result.refs[new_ref]]
+        if new_ref == b"HEAD":
+            # set HEAD to default remote branch if it differs from DEFAULT_REF
+            default_ref = fetch_result.symrefs.get(b"HEAD")
+            if default_ref and default_ref != DEFAULT_REF:
+                del r.refs[DEFAULT_REF]
+                r.refs.set_symbolic_ref(b"HEAD", default_ref)
+        else:
+            # set HEAD to specific remote branch
+            del r.refs[DEFAULT_REF]
+            r.refs.set_symbolic_ref(b"HEAD", new_ref)
+        r.refs.set_if_equals(
+            b"HEAD", None, head.id, message=ref_message
+        )
+    return head
 
 
 def add(repo=".", paths=None):

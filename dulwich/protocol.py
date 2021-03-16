@@ -107,6 +107,8 @@ KNOWN_RECEIVE_CAPABILITIES = set(
     ]
 )
 
+DEPTH_INFINITE = 0x7FFFFFFF
+
 
 def agent_string():
     return ("dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")

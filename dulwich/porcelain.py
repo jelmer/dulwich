@@ -478,7 +478,7 @@ def clone(
                     break
 
         if head_ref:
-            head = _clone_update_head(r, head_ref, fetch_result)
+            head = _clone_update_head(r, source, origin, head_ref, fetch_result)
         else:
             head = None
 
@@ -493,8 +493,18 @@ def clone(
     return r
 
 
-def _clone_update_head(r, new_ref, fetch_result):
+def _clone_update_head(r, source, origin, new_ref, fetch_result):
     ref_message = b"clone: from " + source
+
+    # set refs/remotes/origin/HEAD
+    origin_head = fetch_result.symrefs.get(b"HEAD", b"")
+    if origin_head.startswith(LOCAL_BRANCH_PREFIX):
+        origin_base = b"refs/remotes/" + origin + b"/"
+        origin_ref = origin_base + b"HEAD"
+        target_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
+        r.refs.set_symbolic_ref(origin_ref, target_ref)
+
+    # set local HEAD
     if new_ref.startswith(LOCAL_TAG_PREFIX):
         # ref is a tag, detach HEAD at remote tag
         _cls, head_sha = r[fetch_result.refs[new_ref]].object

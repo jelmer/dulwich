@@ -73,14 +73,20 @@ PACKDIR = "pack"
 class BaseObjectStore(object):
     """Object store interface."""
 
-    def determine_wants_all(self, refs):
+    def _determine_wants_all(self, refs, force=False):
         return [
             sha
             for (ref, sha) in refs.items()
-            if sha not in self
+            if (force or sha not in self)
             and not ref.endswith(ANNOTATED_TAG_SUFFIX)
             and not sha == ZERO_SHA
         ]
+
+    def determine_wants_all(self, refs):
+        return self._determine_wants_all(refs)
+
+    def determine_wants_force(self, refs):
+        return self._determine_wants_all(refs, force=True)
 
     def iter_shas(self, shas):
         """Iterate over the objects for the specified shas.

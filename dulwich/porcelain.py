@@ -1217,12 +1217,14 @@ def status(repo=".", ignored=False):
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
-def _walk_working_dir_paths(frompath, basepath):
+def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
     """Get path, is_dir for files in working dir from frompath
 
     Args:
       frompath: Path to begin walk
       basepath: Path to compare to
+      prune_dirnames: Optional callback to prune dirnames during os.walk
+        dirnames will be set to result of prune_dirnames(dirpath, dirnames)
     """
     for dirpath, dirnames, filenames in os.walk(frompath):
         # Skip .git and below.
@@ -1242,6 +1244,9 @@ def _walk_working_dir_paths(frompath, basepath):
             filepath = os.path.join(dirpath, filename)
             yield filepath, False
 
+        if prune_dirnames:
+            dirnames[:] = prune_dirnames(dirpath, dirnames)
+
 
 def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
     """Get untracked paths.
@@ -1258,15 +1263,25 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
     else:
         ignore_manager = None
 
-    for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
-        if ignore_manager is not None and ignore_manager.is_ignored(
-            os.path.relpath(ap, frompath)
-        ):
-            continue
+    def prune_dirnames(dirpath, dirnames):
+        if ignore_manager is not None:
+            path = os.path.relpath(dirpath, frompath)
+            if ignore_manager.is_ignored(path):
+                return []
+        return dirnames
+
+    for ap, is_dir in _walk_working_dir_paths(
+        frompath, basepath, prune_dirnames=prune_dirnames
+    ):
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
-                yield os.path.relpath(ap, frompath)
+                path = os.path.relpath(ap, frompath)
+                if (
+                    ignore_manager is None
+                    or not ignore_manager.is_ignored(path)
+                ):
+                    yield path
 
 
 def get_tree_changes(repo):

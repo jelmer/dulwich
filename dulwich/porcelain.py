@@ -1265,7 +1265,7 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
 
     def prune_dirnames(dirpath, dirnames):
         if ignore_manager is not None:
-            path = os.path.relpath(dirpath, frompath)
+            path = os.path.join(os.path.relpath(dirpath, frompath), "")
             if ignore_manager.is_ignored(path):
                 return []
         return dirnames

@@ -501,6 +501,10 @@ def add(repo=".", paths=None):
       repo: Repository for the files
       paths: Paths to add.  No value passed stages all modified files.
     Returns: Tuple with set of added files and ignored files
+
+    If the repository contains ignored directories, the returned set will
+    contain the path to an ignored directory (with trailing slash). Individual
+    files within ignored directories will not be returned.
     """
     ignored = set()
     with open_repo_closing(repo) as r:
@@ -519,7 +523,9 @@ def add(repo=".", paths=None):
             paths = [paths]
         for p in paths:
             relpath = str(Path(p).resolve().relative_to(repo_path))
-            # FIXME: Support patterns, directories.
+            # FIXME: Support patterns
+            if os.path.isdir(p):
+                relpath = os.path.join(relpath, "")
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
                 continue
@@ -1227,15 +1233,21 @@ def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
         dirnames will be set to result of prune_dirnames(dirpath, dirnames)
     """
     for dirpath, dirnames, filenames in os.walk(frompath):
+        skip_subrepo = False
         # Skip .git and below.
         if ".git" in dirnames:
             dirnames.remove(".git")
             if dirpath != basepath:
-                continue
+                skip_subrepo = True
+
         if ".git" in filenames:
             filenames.remove(".git")
             if dirpath != basepath:
-                continue
+                skip_subrepo = True
+
+        if skip_subrepo:
+            dirnames.clear()
+            filenames.clear()
 
         if dirpath != frompath:
             yield dirpath, True
@@ -1256,18 +1268,24 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
       basepath: Path to compare to
       index: Index to check against
       exclude_ignored: Whether to exclude ignored paths
+
+    Note: ignored directories will never be walked for performance reasons.
+      If exclude_ignored is False, only the path to an ignored directory will
+      be yielded, no files inside the directory will be returned
     """
-    if exclude_ignored:
-        with open_repo_closing(frompath) as r:
-            ignore_manager = IgnoreFilterManager.from_repo(r)
-    else:
-        ignore_manager = None
+    with open_repo_closing(basepath) as r:
+        ignore_manager = IgnoreFilterManager.from_repo(r)
+
+    ignored_dirs = []
 
     def prune_dirnames(dirpath, dirnames):
-        if ignore_manager is not None:
-            path = os.path.join(os.path.relpath(dirpath, frompath), "")
-            if ignore_manager.is_ignored(path):
-                return []
+        path = os.path.relpath(dirpath, basepath)
+        if ignore_manager.is_ignored(os.path.join(path, "")):
+            if not exclude_ignored:
+                ignored_dirs.append(
+                    os.path.join(os.path.relpath(dirpath, frompath), "")
+                )
+            return []
         return dirnames
 
     for ap, is_dir in _walk_working_dir_paths(
@@ -1276,12 +1294,15 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
-                path = os.path.relpath(ap, frompath)
                 if (
-                    ignore_manager is None
-                    or not ignore_manager.is_ignored(path)
+                    not exclude_ignored
+                    or not ignore_manager.is_ignored(
+                        os.path.relpath(ap, basepath)
+                    )
                 ):
-                    yield path
+                    yield os.path.relpath(ap, frompath)
+
+    yield from ignored_dirs
 
 
 def get_tree_changes(repo):

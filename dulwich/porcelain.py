@@ -1233,21 +1233,16 @@ def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
         dirnames will be set to result of prune_dirnames(dirpath, dirnames)
     """
     for dirpath, dirnames, filenames in os.walk(frompath):
-        skip_subrepo = False
         # Skip .git and below.
         if ".git" in dirnames:
             dirnames.remove(".git")
             if dirpath != basepath:
-                skip_subrepo = True
+                continue
 
         if ".git" in filenames:
             filenames.remove(".git")
             if dirpath != basepath:
-                skip_subrepo = True
-
-        if skip_subrepo:
-            dirnames.clear()
-            filenames.clear()
+                continue
 
         if dirpath != frompath:
             yield dirpath, True
@@ -1279,13 +1274,15 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
     ignored_dirs = []
 
     def prune_dirnames(dirpath, dirnames):
-        path = os.path.relpath(dirpath, basepath)
-        if ignore_manager.is_ignored(os.path.join(path, "")):
-            if not exclude_ignored:
-                ignored_dirs.append(
-                    os.path.join(os.path.relpath(dirpath, frompath), "")
-                )
-            return []
+        for i in range(len(dirnames) - 1, -1, -1):
+            path = os.path.join(dirpath, dirnames[i])
+            ip = os.path.join(os.path.relpath(path, basepath), "")
+            if ignore_manager.is_ignored(ip):
+                if not exclude_ignored:
+                    ignored_dirs.append(
+                        os.path.join(os.path.relpath(path, frompath), "")
+                    )
+                del dirnames[i]
         return dirnames
 
     for ap, is_dir in _walk_working_dir_paths(

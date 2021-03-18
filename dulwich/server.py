@@ -372,8 +372,8 @@ class UploadPackHandler(PackHandler):
         )
         wants = []
 
-        def wants_wrapper(refs):
-            wants.extend(graph_walker.determine_wants(refs))
+        def wants_wrapper(refs, **kwargs):
+            wants.extend(graph_walker.determine_wants(refs, **kwargs))
             return wants
 
         objects_iter = self.repo.fetch_objects(
@@ -573,7 +573,7 @@ class _ProtocolGraphWalker(object):
         self._cache_index = 0
         self._impl = None
 
-    def determine_wants(self, heads):
+    def determine_wants(self, heads, depth=None):
         """Determine the wants for a set of heads.
 
         The given heads are advertised to the client, who then specifies which

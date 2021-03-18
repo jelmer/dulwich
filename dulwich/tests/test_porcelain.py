@@ -524,21 +524,25 @@ class AddTests(PorcelainTestCase):
 
     def test_add_ignored(self):
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
-            f.write("foo")
+            f.write("foo\nsubdir/")
         with open(os.path.join(self.repo.path, "foo"), "w") as f:
             f.write("BAR")
         with open(os.path.join(self.repo.path, "bar"), "w") as f:
             f.write("BAR")
+        os.mkdir(os.path.join(self.repo.path, "subdir"))
+        with open(os.path.join(self.repo.path, "subdir", "baz"), "w") as f:
+            f.write("BAZ")
         (added, ignored) = porcelain.add(
             self.repo.path,
             paths=[
                 os.path.join(self.repo.path, "foo"),
                 os.path.join(self.repo.path, "bar"),
+                os.path.join(self.repo.path, "subdir"),
             ],
         )
         self.assertIn(b"bar", self.repo.open_index())
         self.assertEqual(set(["bar"]), set(added))
-        self.assertEqual(set(["foo"]), ignored)
+        self.assertEqual(set(["foo", os.path.join("subdir", "")]), ignored)
 
     def test_add_file_absolute_path(self):
         # Absolute paths are (not yet) supported
@@ -1689,7 +1693,7 @@ class StatusTests(PorcelainTestCase):
             f.write("blop\n")
 
         self.assertEqual(
-            set([".gitignore", "notignored"]),
+            set([".gitignore", "notignored", os.path.join("nested", "")]),
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -1705,17 +1709,11 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set(
-                [
-                    os.path.join("nested", "ignored"),
-                    os.path.join("nested", "with"),
-                    os.path.join("nested", "manager"),
-                ]
-            ),
+            set([os.path.join(os.curdir, "")]),
             set(
                 porcelain.get_untracked_paths(
-                    self.repo.path,
                     subrepo.path,
+                    self.repo.path,
                     self.repo.open_index(),
                     exclude_ignored=False,
                 )
@@ -1725,8 +1723,8 @@ class StatusTests(PorcelainTestCase):
             set([]),
             set(
                 porcelain.get_untracked_paths(
-                    self.repo.path,
                     subrepo.path,
+                    self.repo.path,
                     self.repo.open_index(),
                     exclude_ignored=True,
                 )

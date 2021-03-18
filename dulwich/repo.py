@@ -495,7 +495,7 @@ class BaseRepo(object):
                     refs[ref + ANNOTATED_TAG_SUFFIX] = obj.object[1]
                 refs[ref] = sha
 
-        wants = determine_wants(refs)
+        wants = determine_wants(refs, depth=depth)
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 

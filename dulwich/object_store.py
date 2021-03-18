@@ -64,6 +64,7 @@ from dulwich.pack import (
     PackIndexer,
     PackStreamCopier,
 )
+from dulwich.protocol import DEPTH_INFINITE
 from dulwich.refs import ANNOTATED_TAG_SUFFIX
 
 INFODIR = "info"
@@ -73,20 +74,21 @@ PACKDIR = "pack"
 class BaseObjectStore(object):
     """Object store interface."""
 
-    def _determine_wants_all(self, refs, force=False):
-        return [
+    def determine_wants_all(self, refs, depth=None):
+        def _want_deepen(sha):
+            if not depth or isinstance(self[sha], Tag):
+                return False
+            if depth == DEPTH_INFINITE:
+                return True
+            return depth > self._get_depth(sha)
+
+        return {
             sha
             for (ref, sha) in refs.items()
-            if (force or sha not in self)
+            if sha not in self or _want_deepen(sha)
             and not ref.endswith(ANNOTATED_TAG_SUFFIX)
             and not sha == ZERO_SHA
-        ]
-
-    def determine_wants_all(self, refs):
-        return self._determine_wants_all(refs)
-
-    def determine_wants_force(self, refs):
-        return self._determine_wants_all(refs, force=True)
+        }
 
     def iter_shas(self, shas):
         """Iterate over the objects for the specified shas.
@@ -355,6 +357,35 @@ class BaseObjectStore(object):
                 cmt = self[e]
                 queue.extend(get_parents(cmt))
         return (commits, bases)
+
+    def _get_depth(
+        self, head, get_parents=lambda commit: commit.parents, max_depth=None,
+    ):
+        """Return the current available depth for the given head.
+        For commits with multiple parents, the largest possible depth will be
+        returned.
+
+        Args:
+            head: commit to start from
+            get_parents: optional function for getting the parents of a commit
+            max_depth: maximum depth to search
+        """
+        if head not in self:
+            return 0
+        current_depth = 1
+        queue = [(head, current_depth)]
+        while queue and (max_depth is None or current_depth < max_depth):
+            e, depth = queue.pop(0)
+            current_depth = max(current_depth, depth)
+            cmt = self[e]
+            if not isinstance(cmt, Commit):
+                raise TypeError("Expected commit, got %r" % cmt)
+            queue.extend(
+                (parent, depth + 1)
+                for parent in get_parents(cmt)
+                if parent in self
+            )
+        return current_depth
 
     def close(self):
         """Close any files opened by this object store."""
@@ -1359,7 +1390,10 @@ class ObjectStoreGraphWalker(object):
         """Iterate over ancestors of heads in the target."""
         if self.heads:
             ret = self.heads.pop()
-            ps = self.get_parents(ret)
+            try:
+                ps = self.get_parents(ret)
+            except KeyError:
+                return None
             self.parents[ret] = ps
             self.heads.update([p for p in ps if p not in self.parents])
             return ret

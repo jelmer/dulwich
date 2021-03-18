@@ -1678,7 +1678,7 @@ class StatusTests(PorcelainTestCase):
             set(porcelain.status(self.repo, ignored=True).untracked),
         )
 
-    def test_get_untracked_paths_nested(self):
+    def test_get_untracked_paths_subrepo(self):
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
             f.write("nested/\n")
         with open(os.path.join(self.repo.path, "notignored"), "w") as f:
@@ -1701,6 +1701,17 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
+            set([".gitignore", "notignored"]),
+            set(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    exclude_ignored=True,
+                )
+            ),
+        )
+        self.assertEqual(
             set(["ignored", "with", "manager"]),
             set(
                 porcelain.get_untracked_paths(
@@ -1709,26 +1720,66 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([os.path.join(os.curdir, "")]),
+            set(),
             set(
                 porcelain.get_untracked_paths(
                     subrepo.path,
                     self.repo.path,
                     self.repo.open_index(),
-                    exclude_ignored=False,
                 )
             ),
         )
         self.assertEqual(
-            set([]),
+            set([os.path.join('nested', 'ignored'),
+                os.path.join('nested', 'with'),
+                os.path.join('nested', 'manager')]),
             set(
                 porcelain.get_untracked_paths(
+                    self.repo.path,
                     subrepo.path,
+                    self.repo.open_index(),
+                )
+            ),
+        )
+
+    def test_get_untracked_paths_subdir(self):
+        with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
+            f.write("subdir/\nignored")
+        with open(os.path.join(self.repo.path, "notignored"), "w") as f:
+            f.write("blah\n")
+        os.mkdir(os.path.join(self.repo.path, "subdir"))
+        with open(os.path.join(self.repo.path, "ignored"), "w") as f:
+            f.write("foo")
+        with open(os.path.join(self.repo.path, "subdir", "ignored"), "w") as f:
+            f.write("foo")
+
+        self.assertEqual(
+            set(
+                [
+                    ".gitignore",
+                    "notignored",
+                    "ignored",
+                    os.path.join("subdir", ""),
+                ]
+            ),
+            set(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
+                    self.repo.path,
+                    self.repo.open_index(),
+                )
+            )
+        )
+        self.assertEqual(
+            set([".gitignore", "notignored"]),
+            set(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
                     self.repo.path,
                     self.repo.open_index(),
                     exclude_ignored=True,
                 )
-            ),
+            )
         )
 
 

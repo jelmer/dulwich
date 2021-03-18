@@ -160,7 +160,7 @@ class GitClientTests(TestCase):
         self.rin.write(b"0000")
         self.rin.seek(0)
 
-        def check_heads(heads):
+        def check_heads(heads, **kwargs):
             self.assertEqual(heads, {})
             return []
 
@@ -178,7 +178,7 @@ class GitClientTests(TestCase):
         )
         self.rin.seek(0)
 
-        def check_heads(heads):
+        def check_heads(heads, **kwargs):
             self.assertEqual({}, heads)
             return []
 
@@ -195,7 +195,7 @@ class GitClientTests(TestCase):
             b"0000"
         )
         self.rin.seek(0)
-        ret = self.client.fetch_pack(b"bla", lambda heads: [], None, None, None)
+        ret = self.client.fetch_pack(b"bla", lambda heads, **kwargs: [], None, None, None)
         self.assertEqual(
             {b"HEAD": b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"}, ret.refs
         )
@@ -831,7 +831,7 @@ class LocalGitClientTests(TestCase):
         out = BytesIO()
         walker = {}
         ret = c.fetch_pack(
-            s.path, lambda heads: [], graph_walker=walker, pack_data=out.write
+            s.path, lambda heads, **kwargs: [], graph_walker=walker, pack_data=out.write
         )
         self.assertEqual(
             {
@@ -857,7 +857,7 @@ class LocalGitClientTests(TestCase):
         walker = MemoryRepo().get_graph_walker()
         ret = c.fetch_pack(
             s.path,
-            lambda heads: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
+            lambda heads, **kwargs: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
             graph_walker=walker,
             pack_data=out.write,
         )

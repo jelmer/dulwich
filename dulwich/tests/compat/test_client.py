@@ -276,7 +276,7 @@ class DulwichClientTestBase(object):
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
 
-            def dw(refs):
+            def dw(refs, **kwargs):
                 return list(refs.values())
 
             result = c.fetch(
@@ -317,7 +317,7 @@ class DulwichClientTestBase(object):
             result = c.fetch(
                 self._build_path("/server_new.export"),
                 dest,
-                lambda refs: [protocol.ZERO_SHA],
+                lambda refs, **kwargs: [protocol.ZERO_SHA],
             )
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])

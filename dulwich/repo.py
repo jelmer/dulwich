@@ -698,7 +698,12 @@ class BaseRepo(object):
             shallow.update(new_shallow)
         if new_unshallow:
             shallow.difference_update(new_unshallow)
-        self._put_named_file("shallow", b"".join([sha + b"\n" for sha in shallow]))
+        if shallow:
+            self._put_named_file(
+                "shallow", b"".join([sha + b"\n" for sha in shallow])
+            )
+        else:
+            self._del_named_file("shallow")
 
     def get_peeled(self, ref):
         """Get the peeled value of a ref.

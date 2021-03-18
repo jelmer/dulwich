@@ -76,7 +76,7 @@ class BaseObjectStore(object):
 
     def determine_wants_all(self, refs, depth=None):
         def _want_deepen(sha):
-            if not depth or isinstance(self[sha], Tag):
+            if not depth:
                 return False
             if depth == DEPTH_INFINITE:
                 return True
@@ -378,8 +378,9 @@ class BaseObjectStore(object):
             e, depth = queue.pop(0)
             current_depth = max(current_depth, depth)
             cmt = self[e]
-            if not isinstance(cmt, Commit):
-                raise TypeError("Expected commit, got %r" % cmt)
+            if isinstance(cmt, Tag):
+                _cls, sha = cmt.object
+                cmt = self[sha]
             queue.extend(
                 (parent, depth + 1)
                 for parent in get_parents(cmt)

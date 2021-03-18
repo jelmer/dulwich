@@ -82,13 +82,13 @@ class BaseObjectStore(object):
                 return True
             return depth > self._get_depth(sha)
 
-        return {
+        return [
             sha
             for (ref, sha) in refs.items()
-            if sha not in self or _want_deepen(sha)
+            if (sha not in self or _want_deepen(sha))
             and not ref.endswith(ANNOTATED_TAG_SUFFIX)
             and not sha == ZERO_SHA
-        }
+        ]
 
     def iter_shas(self, shas):
         """Iterate over the objects for the specified shas.

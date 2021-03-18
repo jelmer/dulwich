@@ -502,10 +502,7 @@ class GitClient(object):
 
         """
         if determine_wants is None:
-            if depth is not None and depth > 1:
-                determine_wants = target.object_store.determine_wants_force
-            else:
-                determine_wants = target.object_store.determine_wants_all
+            determine_wants = target.object_store.determine_wants_all
         if CAPABILITY_THIN_PACK in self._fetch_capabilities:
             # TODO(jelmer): Avoid reading entire file into memory and
             # only processing it after the whole file has been fetched.
@@ -1026,7 +1023,7 @@ class TraditionalGitClient(GitClient):
                 return FetchPackResult(refs, symrefs, agent)
 
             try:
-                wants = determine_wants(refs)
+                wants = determine_wants(refs, depth=depth)
             except BaseException:
                 proto.write_pkt_line(None)
                 raise
@@ -2045,7 +2042,7 @@ class HttpGitClient(GitClient):
             symrefs,
             agent,
         ) = self._negotiate_upload_pack_capabilities(server_capabilities)
-        wants = determine_wants(refs)
+        wants = determine_wants(refs, depth=depth)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants:

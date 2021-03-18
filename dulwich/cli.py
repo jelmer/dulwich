@@ -116,7 +116,7 @@ class cmd_fetch_pack(Command):
             determine_wants = r.object_store.determine_wants_all
         else:
 
-            def determine_wants(x):
+            def determine_wants(x, **kwargs):
                 return [y for y in args if y not in r.object_store]
 
         client.fetch(path, r, determine_wants)

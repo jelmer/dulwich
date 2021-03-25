@@ -1,4 +1,4 @@
-0.20.21	UNRELEASED
+%(version)s	%(date)s
 
  * Add basic support for a GcsObjectStore that stores
    pack files in gcs. (Jelmer Vernooĳ)

@@ -9,6 +9,9 @@
  * Support fetching symrefs.
    (Jelmer Vernooĳ, #485, #847)
 
+ * Add aarch64 wheel building.
+   (odidev, Jelmer Vernooij)
+
 0.20.20	2021-03-03
 
  * Implement ``Stash.drop``. (Peter Rowlands)

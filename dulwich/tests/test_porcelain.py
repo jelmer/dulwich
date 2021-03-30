@@ -1119,7 +1119,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
         subprocess.run(
-            ["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"],
+            ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
             check=True,
             capture_output=True,
         )
@@ -1152,7 +1152,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
         subprocess.run(
-            ["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"],
+            ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
             check=True,
             capture_output=True,
         )

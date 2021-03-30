@@ -697,7 +697,7 @@ def print_tag(tag, decode, outstream=sys.stdout):
     timezone_str = format_timezone(tag.tag_timezone).decode("ascii")
     outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
-    outstream.write(decode(tag.message) + "\n")
+    outstream.write(decode(tag.message))
     outstream.write("\n")
 
 
@@ -938,7 +938,7 @@ def tag_create(
                 # TODO(jelmer): Don't use repo private method.
                 author = r._get_user_identity(r.get_config_stack())
             tag_obj.tagger = author
-            tag_obj.message = message
+            tag_obj.message = message + "\n".encode()
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
             if tag_time is None:

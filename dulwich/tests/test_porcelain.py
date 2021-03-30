@@ -910,7 +910,7 @@ class TagCreateTests(PorcelainTestCase):
         tag = self.repo[b"refs/tags/tryme"]
         self.assertTrue(isinstance(tag, Tag))
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
-        self.assertEqual(b"bar", tag.message)
+        self.assertEqual(b"bar\n", tag.message)
         self.assertLess(time.time() - tag.tag_time, 5)
 
     def test_unannotated(self):

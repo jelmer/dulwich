@@ -25,6 +25,7 @@ import os
 import re
 import shutil
 import stat
+import subprocess
 import tarfile
 import tempfile
 import time
@@ -72,6 +73,194 @@ class PorcelainTestCase(TestCase):
         self.repo_path = os.path.join(self.test_dir, "repo")
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
+
+class PorcelainGpgTestCase(PorcelainTestCase):
+    DEFAULT_KEY = """
+-----BEGIN PGP PRIVATE KEY BLOCK-----
+
+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
+=YPjc
+-----END PGP PRIVATE KEY BLOCK-----
+    """
+
+    DEFAULT_KEY_ID = '8EB47C310E1F24AE383D832F7CDD800A52E65E26'
+
+    NON_DEFAULT_KEY = """
+-----BEGIN PGP PRIVATE KEY BLOCK-----
+
+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
+=kOKh
+-----END PGP PRIVATE KEY BLOCK-----
+"""
+
+    NON_DEFAULT_KEY_ID = '6A93393F50C5E6ACD3D6FB45B936212EDB4E14C0'
+
+    def setUp(self):
+        super(PorcelainGpgTestCase, self).setUp()
+        self.gpg_dir = os.path.join(self.test_dir, "gpg")
+        os.mkdir(self.gpg_dir)
+        self.addCleanup(shutil.rmtree, self.gpg_dir)
+        self._old_gnupghome = os.environ.get("GNUPGHOME")
+        os.environ["GNUPGHOME"] = self.gpg_dir
+        self.addCleanup(os.environ.__setitem__, "GNUPGHOME", self._old_gnupghome)
+
+    def import_default_key(self):
+        subprocess.run(['gpg', '--import'], capture_output=True, input=PorcelainGpgTestCase.DEFAULT_KEY, text=True)
+
+    def import_non_default_key(self):
+        subprocess.run(['gpg', '--import'], capture_output=True, input=PorcelainGpgTestCase.NON_DEFAULT_KEY, text=True)
 
 
 class ArchiveTests(PorcelainTestCase):
@@ -889,6 +1078,64 @@ class RevListTests(PorcelainTestCase):
             c3.id + b"\n" + c2.id + b"\n" + c1.id + b"\n", outstream.getvalue()
         )
 
+class TagCreateSignTests(PorcelainGpgTestCase):
+    def test_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(('user',), 'signingKey', PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_default_key()
+
+        porcelain.tag_create(
+            self.repo.path,
+            b"tryme",
+            b"foo <foo@bar.com>",
+            b"bar",
+            annotated=True,
+            sign=True
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"tryme"])
+        tag = self.repo[b"refs/tags/tryme"]
+        self.assertTrue(isinstance(tag, Tag))
+        self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
+        self.assertEqual(b"bar\n", tag.message)
+        self.assertLess(time.time() - tag.tag_time, 5)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        # Instead we need to check the signature can be verified by git
+        subprocess.run(["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"], check=True, capture_output=True)
+
+    def test_non_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(('user',), 'signingKey', PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_non_default_key()
+
+        porcelain.tag_create(
+            self.repo.path,
+            b"tryme",
+            b"foo <foo@bar.com>",
+            b"bar",
+            annotated=True,
+            sign=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"tryme"])
+        tag = self.repo[b"refs/tags/tryme"]
+        self.assertTrue(isinstance(tag, Tag))
+        self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
+        self.assertEqual(b"bar\n", tag.message)
+        self.assertLess(time.time() - tag.tag_time, 5)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        # Instead we need to check the signature can be verified by git
+        subprocess.run(["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"], check=True, capture_output=True)
 
 class TagCreateTests(PorcelainTestCase):
     def test_annotated(self):

@@ -262,7 +262,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
             ["gpg", "--import"],
             stdout=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.DEFAULT_KEY,
-            text=True,
+            universal_newlines=True,
         )
 
     def import_non_default_key(self):
@@ -270,7 +270,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
             ["gpg", "--import"],
             stdout=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.NON_DEFAULT_KEY,
-            text=True,
+            universal_newlines=True,
         )
 
 

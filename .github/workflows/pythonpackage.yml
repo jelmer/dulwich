@@ -35,7 +35,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
       if: "matrix.os == 'ubuntu-latest'"
     - name: Install native dependencies (MacOS)
-      run: brew install gpgme
+      run: brew install swig gpgme
       if: "matrix.os == 'macos-latest'"
     - name: Install dependencies
       run: |

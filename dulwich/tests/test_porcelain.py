@@ -260,7 +260,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
     def import_default_key(self):
         subprocess.run(
             ["gpg", "--import"],
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.DEFAULT_KEY,
             text=True,
         )
@@ -268,7 +268,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
     def import_non_default_key(self):
         subprocess.run(
             ["gpg", "--import"],
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.NON_DEFAULT_KEY,
             text=True,
         )
@@ -1121,7 +1121,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         subprocess.run(
             ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
             check=True,
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
         )
 
     def test_non_default_key(self):
@@ -1154,7 +1154,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         subprocess.run(
             ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
             check=True,
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
         )
 
 

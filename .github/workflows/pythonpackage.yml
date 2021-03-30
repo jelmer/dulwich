@@ -32,7 +32,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install native dependencies (Ubuntu)
-      run: apt update && apt install -y libgpgme libgpg-error-dev
+      run: sudo apt-get update && sudo apt-get install -y libgpgme libgpg-error-dev
       if: "matrix.os == 'ubuntu-latest'"
     - name: Install native dependencies (MacOS)
       run: brew install gpgme

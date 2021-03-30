@@ -74,6 +74,7 @@ class PorcelainTestCase(TestCase):
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
+
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """
 -----BEGIN PGP PRIVATE KEY BLOCK-----
@@ -159,7 +160,7 @@ BcZYEcqkDeW64mdTo65ILOPQ+HMCK12AnnBsbyfbsWAUczkQ7GVq
 -----END PGP PRIVATE KEY BLOCK-----
     """
 
-    DEFAULT_KEY_ID = '8EB47C310E1F24AE383D832F7CDD800A52E65E26'
+    DEFAULT_KEY_ID = "8EB47C310E1F24AE383D832F7CDD800A52E65E26"
 
     NON_DEFAULT_KEY = """
 -----BEGIN PGP PRIVATE KEY BLOCK-----
@@ -245,7 +246,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
 -----END PGP PRIVATE KEY BLOCK-----
 """
 
-    NON_DEFAULT_KEY_ID = '6A93393F50C5E6ACD3D6FB45B936212EDB4E14C0'
+    NON_DEFAULT_KEY_ID = "6A93393F50C5E6ACD3D6FB45B936212EDB4E14C0"
 
     def setUp(self):
         super(PorcelainGpgTestCase, self).setUp()
@@ -257,10 +258,20 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
         self.addCleanup(os.environ.__setitem__, "GNUPGHOME", self._old_gnupghome)
 
     def import_default_key(self):
-        subprocess.run(['gpg', '--import'], capture_output=True, input=PorcelainGpgTestCase.DEFAULT_KEY, text=True)
+        subprocess.run(
+            ["gpg", "--import"],
+            capture_output=True,
+            input=PorcelainGpgTestCase.DEFAULT_KEY,
+            text=True,
+        )
 
     def import_non_default_key(self):
-        subprocess.run(['gpg', '--import'], capture_output=True, input=PorcelainGpgTestCase.NON_DEFAULT_KEY, text=True)
+        subprocess.run(
+            ["gpg", "--import"],
+            capture_output=True,
+            input=PorcelainGpgTestCase.NON_DEFAULT_KEY,
+            text=True,
+        )
 
 
 class ArchiveTests(PorcelainTestCase):
@@ -617,7 +628,7 @@ class CloneTests(PorcelainTestCase):
         f1_1 = make_object(Blob, data=b"f1")
         trees = {1: [(b"f1", f1_1), (b"f2", f1_1)]}
         [c1] = build_commit_graph(self.repo.object_store, [[1]], trees)
-        self.repo.refs.set_symbolic_ref(b'HEAD', b'refs/heads/else')
+        self.repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/else")
         self.repo.refs[b"refs/heads/else"] = c1.id
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
@@ -631,7 +642,7 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c1.id, target_repo.refs[b"refs/heads/else"])
         self.assertEqual(c1.id, target_repo.refs[b"HEAD"])
-        self.assertEqual({b'HEAD': b'refs/heads/else'}, target_repo.refs.get_symrefs())
+        self.assertEqual({b"HEAD": b"refs/heads/else"}, target_repo.refs.get_symrefs())
 
 
 class InitTests(TestCase):
@@ -1078,6 +1089,7 @@ class RevListTests(PorcelainTestCase):
             c3.id + b"\n" + c2.id + b"\n" + c1.id + b"\n", outstream.getvalue()
         )
 
+
 class TagCreateSignTests(PorcelainGpgTestCase):
     def test_default_key(self):
         c1, c2, c3 = build_commit_graph(
@@ -1085,7 +1097,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         )
         self.repo.refs[b"HEAD"] = c3.id
         cfg = self.repo.get_config()
-        cfg.set(('user',), 'signingKey', PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
         self.import_default_key()
 
         porcelain.tag_create(
@@ -1094,7 +1106,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
             b"foo <foo@bar.com>",
             b"bar",
             annotated=True,
-            sign=True
+            sign=True,
         )
 
         tags = self.repo.refs.as_dict(b"refs/tags")
@@ -1106,7 +1118,11 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertLess(time.time() - tag.tag_time, 5)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
-        subprocess.run(["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"],
+            check=True,
+            capture_output=True,
+        )
 
     def test_non_default_key(self):
         c1, c2, c3 = build_commit_graph(
@@ -1114,7 +1130,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         )
         self.repo.refs[b"HEAD"] = c3.id
         cfg = self.repo.get_config()
-        cfg.set(('user',), 'signingKey', PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
         self.import_non_default_key()
 
         porcelain.tag_create(
@@ -1123,7 +1139,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
             b"foo <foo@bar.com>",
             b"bar",
             annotated=True,
-            sign=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID
+            sign=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID,
         )
 
         tags = self.repo.refs.as_dict(b"refs/tags")
@@ -1135,7 +1151,12 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertLess(time.time() - tag.tag_time, 5)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
-        subprocess.run(["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"],
+            check=True,
+            capture_output=True,
+        )
+
 
 class TagCreateTests(PorcelainTestCase):
     def test_annotated(self):

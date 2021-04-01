@@ -452,6 +452,13 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
         )
 
+    def test_delete_refs_container(self):
+        # We shouldn't delete the refs directory
+        self._refs[b'refs/heads/blah'] = b"42d06bd4b77fed026b154d16493e5deab78f02ec"
+        for ref in self._refs.allkeys():
+            del self._refs[ref]
+        self.assertTrue(os.path.exists(os.path.join(self._refs.path, b'refs')))
+
     def test_setitem_packed(self):
         with open(os.path.join(self._refs.path, b"packed-refs"), "w") as f:
             f.write("# pack-refs with: peeled fully-peeled sorted \n")

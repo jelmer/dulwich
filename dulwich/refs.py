@@ -1068,6 +1068,8 @@ class DiskRefsContainer(RefsContainer):
             except ValueError:
                 break
 
+            if parent == b'refs':
+                break
             parent_filename = self.refpath(parent)
             try:
                 os.rmdir(parent_filename)

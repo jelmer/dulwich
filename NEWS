@@ -1,6 +1,9 @@
-%(version)s	%(date)s
+0.20.22	UNRELEASED
 
-%(version)s	%(date)s
+ * Prevent removal of refs directory when the last ref is
+   deleted. (Jelmer Vernooĳ)
+
+0.20.21	2021-03-20
 
  * Add basic support for a GcsObjectStore that stores
    pack files in gcs. (Jelmer Vernooĳ)

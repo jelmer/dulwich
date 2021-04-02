@@ -403,7 +403,7 @@ class TestSwiftConnector(TestCase):
                 "geventhttpclient.HTTPClient.request",
                 lambda *args: Response(status=404),
             ):
-                self.assertRaises(swift.SwiftException, lambda: self.conn.create_root())
+                self.assertRaises(swift.SwiftException, self.conn.create_root)
 
     def test_get_container_objects(self):
         with patch(

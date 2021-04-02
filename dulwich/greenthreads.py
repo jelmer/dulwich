@@ -135,7 +135,7 @@ class GreenThreadsObjectStoreIterator(ObjectStoreIterator):
     def __len__(self):
         if len(self._shas) > 0:
             return len(self._shas)
-        while len(self.finder.objects_to_send):
+        while self.finder.objects_to_send:
             jobs = []
             for _ in range(0, len(self.finder.objects_to_send)):
                 jobs.append(self.p.spawn(self.finder.next))

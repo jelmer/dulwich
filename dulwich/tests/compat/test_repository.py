@@ -63,7 +63,7 @@ class ObjectStoreTestCase(CompatTestCase):
         return refs
 
     def _parse_objects(self, output):
-        return set(s.rstrip(b"\n").split(b" ")[0] for s in BytesIO(output))
+        return {s.rstrip(b"\n").split(b" ")[0] for s in BytesIO(output)}
 
     def test_bare(self):
         self.assertTrue(self._repo.bare)

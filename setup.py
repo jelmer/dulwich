@@ -60,7 +60,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
 tests_require = ['fastimport']
 
 
-if '__pypy__' not in sys.modules and not sys.platform == 'win32':
+if '__pypy__' not in sys.modules and sys.platform != 'win32':
     tests_require.extend([
         'gevent', 'geventhttpclient', 'setuptools>=17.1'])
 

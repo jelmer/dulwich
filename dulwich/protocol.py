@@ -121,7 +121,7 @@ def capability_symref(from_ref, to_ref):
 
 
 def extract_capability_names(capabilities):
-    return set(parse_capability(c)[0] for c in capabilities)
+    return {parse_capability(c)[0] for c in capabilities}
 
 
 def parse_capability(capability):

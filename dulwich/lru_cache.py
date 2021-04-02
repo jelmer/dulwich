@@ -196,7 +196,7 @@ class LRUCache(object):
 
     def items(self):
         """Get the key:value pairs as a dict."""
-        return dict((k, n.value) for k, n in self._cache.items())
+        return {k: n.value for k, n in self._cache.items()}
 
     def cleanup(self):
         """Clear the cache until it shrinks to the requested size.

@@ -76,7 +76,7 @@ class TestPack(PackTests):
             pack_path = os.path.join(self._tempdir, "Elch")
             write_pack(pack_path, origpack.pack_tuples())
             output = run_git_or_fail(["verify-pack", "-v", pack_path])
-            orig_shas = set(o.id for o in origpack.iterobjects())
+            orig_shas = {o.id for o in origpack.iterobjects()}
             self.assertEqual(orig_shas, _git_verify_pack_object_list(output))
 
     def test_deltas_work(self):
@@ -89,7 +89,7 @@ class TestPack(PackTests):
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
-            set(x[0].id for x in all_to_pack),
+            {x[0].id for x in all_to_pack},
             _git_verify_pack_object_list(output),
         )
         # We specifically made a new blob that should be a delta
@@ -119,7 +119,7 @@ class TestPack(PackTests):
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
-            set(x[0].id for x in all_to_pack),
+            {x[0].id for x in all_to_pack},
             _git_verify_pack_object_list(output),
         )
         # We specifically made a new blob that should be a delta
@@ -158,7 +158,7 @@ class TestPack(PackTests):
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
-            set(x[0].id for x in all_to_pack),
+            {x[0].id for x in all_to_pack},
             _git_verify_pack_object_list(output),
         )
         # We specifically made a new blob that should be a delta

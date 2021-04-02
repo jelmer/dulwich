@@ -954,7 +954,7 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(None)
                 return SendPackResult(old_refs, agent=agent, ref_status={})
 
-            if len(new_refs) == 0 and len(orig_new_refs):
+            if len(new_refs) == 0 and orig_new_refs:
                 # NOOP - Original new refs filtered out by policy
                 proto.write_pkt_line(None)
                 if report_status_parser is not None:

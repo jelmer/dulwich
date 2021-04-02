@@ -388,7 +388,6 @@ class cmd_daemon(Command):
             gitdir = args[0]
         else:
             gitdir = "."
-        from dulwich import porcelain
 
         porcelain.daemon(gitdir, address=options.listen_address, port=options.port)
 
@@ -420,7 +419,6 @@ class cmd_web_daemon(Command):
             gitdir = args[0]
         else:
             gitdir = "."
-        from dulwich import porcelain
 
         porcelain.web_daemon(gitdir, address=options.listen_address, port=options.port)
 

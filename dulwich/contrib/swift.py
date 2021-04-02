@@ -121,7 +121,7 @@ cache_length = 20
 
 class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
     def __len__(self):
-        while len(self.finder.objects_to_send):
+        while self.finder.objects_to_send:
             for _ in range(0, len(self.finder.objects_to_send)):
                 sha = self.finder.next()
                 self._shas.append(sha)
@@ -735,7 +735,7 @@ class SwiftObjectStore(PackBasedObjectStore):
             f.seek(0)
             pack = PackData(file=f, filename="")
             entries = pack.sorted_entries()
-            if len(entries):
+            if entries:
                 basename = posixpath.join(
                     self.pack_dir,
                     "pack-%s" % iter_sha1(entry[0] for entry in entries),

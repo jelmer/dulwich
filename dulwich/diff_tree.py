@@ -591,7 +591,7 @@ class RenameDetector(object):
             return
 
         modifies = {}
-        delete_map = dict((d.old.path, d) for d in self._deletes)
+        delete_map = {d.old.path: d for d in self._deletes}
         for add in self._adds:
             path = add.new.path
             delete = delete_map.get(path)

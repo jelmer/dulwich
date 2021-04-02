@@ -344,7 +344,7 @@ class WalkerTest(TestCase):
         blob = make_object(Blob, data=b"blob")
         names = [b"a", b"a", b"b", b"b", b"c", b"c"]
 
-        trees = dict((i + 1, [(n, blob, F)]) for i, n in enumerate(names))
+        trees = {i + 1: [(n, blob, F)] for i, n in enumerate(names)}
         c1, c2, c3, c4, c5, c6 = self.make_linear_commits(6, trees=trees)
         self.assertWalkYields([c5], [c6.id], paths=[b"c"])
 

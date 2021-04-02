@@ -684,7 +684,7 @@ class BaseRepo(object):
         if f is None:
             return set()
         with f:
-            return set(line.strip() for line in f)
+            return {line.strip() for line in f}
 
     def update_shallow(self, new_shallow, new_unshallow):
         """Update the list of shallow objects.
@@ -889,7 +889,6 @@ class BaseRepo(object):
         Returns:
           New commit SHA1
         """
-        import time
 
         c = Commit()
         if tree is None:

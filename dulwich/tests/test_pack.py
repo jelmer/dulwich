@@ -308,7 +308,7 @@ class TestPackData(PackTests):
 
     def test_iterentries(self):
         with self.get_pack_data(pack1_sha) as p:
-            entries = set((sha_to_hex(s), o, c) for s, o, c in p.iterentries())
+            entries = {(sha_to_hex(s), o, c) for s, o, c in p.iterentries()}
             self.assertEqual(
                 set(
                     [
@@ -501,7 +501,7 @@ class TestPack(PackTests):
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(AssertionError, lambda: bad_pack.data)
             self.assertRaises(
-                AssertionError, lambda: bad_pack.check_length_and_checksum()
+                AssertionError, bad_pack.check_length_and_checksum
             )
 
     def test_checksum_mismatch(self):
@@ -515,12 +515,12 @@ class TestPack(PackTests):
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
             self.assertRaises(
-                ChecksumMismatch, lambda: bad_pack.check_length_and_checksum()
+                ChecksumMismatch, bad_pack.check_length_and_checksum
             )
 
     def test_iterobjects_2(self):
         with self.get_pack(pack1_sha) as p:
-            objs = dict((o.id, o) for o in p.iterobjects())
+            objs = {o.id: o for o in p.iterobjects()}
             self.assertEqual(3, len(objs))
             self.assertEqual(sorted(objs), sorted(p.index))
             self.assertTrue(isinstance(objs[a_sha], Blob))

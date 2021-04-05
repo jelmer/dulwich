@@ -1,40 +1,38 @@
-#!/usr/bin/python3 -u
-#
-# dulwich - Simple command-line interface to Dulwich
-# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
-# vim: expandtab
-#
-# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
-# or (at your option) any later version. You can redistribute it and/or
-# modify it under the terms of either of these two licenses.
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# You should have received a copy of the licenses; if not, see
-# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
-# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
-# License, Version 2.0.
-#
+"""Simple command-line interface to Dulwich>.
 
-"""Simple command-line interface to Dulwich>
+dulwich - Simple command-line interface to Dulwich
+Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
+vim: expandtab
+
+Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+General Public License as public by the Free Software Foundation; version 2.0
+or (at your option) any later version. You can redistribute it and/or
+modify it under the terms of either of these two licenses.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+You should have received a copy of the licenses; if not, see
+<http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+License, Version 2.0.
 
 This is a very simple command-line wrapper for Dulwich. It is by
 no means intended to be a full-blown Git command-line interface but just
 a way to test Dulwich.
 """
 
-import os
-import sys
-from getopt import getopt
 import argparse
+from getopt import getopt
 import optparse
+import os
+from typing import Dict
+from typing import Type
 import signal
-from typing import Dict, Type
+import sys
 
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path

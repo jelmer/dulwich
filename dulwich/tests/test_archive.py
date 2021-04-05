@@ -22,24 +22,24 @@ License, Version 2.0.
 """
 
 from io import BytesIO
+
 import tarfile
+
 import struct
+
 from unittest import skipUnless
 
 from dulwich.archive import tar_stream
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Blob,
-    Tree,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    build_commit_graph,
-)
+
+from dulwich.object_store import MemoryObjectStore
+
+from dulwich.objects import Blob
+
+from dulwich.objects import Tree
+
+from dulwich.tests import TestCase
+
+from dulwich.tests.utils import build_commit_graph
 
 try:
     from unittest.mock import patch
@@ -81,20 +81,23 @@ class ArchiveTests(TestCase):
         self.assertEqual(["blah/somename"], tf.getnames())
 
     def test_gzip_mtime(self):
-        stream = self._get_example_tar_stream(mtime=1234, format="gz")
+        stream = self._get_example_tar_stream(
+            mtime=1234, compression_format="gz")
         expected_mtime = struct.pack("<L", 1234)
         self.assertEqual(stream.getvalue()[4:8], expected_mtime)
 
     @skipUnless(patch, "Required mock.patch")
     def test_same_file(self):
+        """Test same file."""
         contents = [None, None]
-        for format in ["", "gz", "bz2"]:
+        for compression_format in ["", "gz", "bz2"]:
             for i in [0, 1]:
                 with patch("time.time", return_value=i):
-                    stream = self._get_example_tar_stream(mtime=0, format=format)
+                    stream = self._get_example_tar_stream(
+                        mtime=0, compression_format=compression_format)
                     contents[i] = stream.getvalue()
             self.assertEqual(
                 contents[0],
                 contents[1],
-                "Different file contents for format %r" % format,
+                "Different file contents for format %r" % compression_format,
             )

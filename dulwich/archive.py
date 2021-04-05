@@ -42,7 +42,7 @@ class ChunkedBytesIO(object):  # pylint: disable=too-few-public-methods
 
     This is similar to creating a `BytesIO` from a concatenation of the
     bytestring list, but saves memory by NOT creating one giant bytestring
-    first::
+    first:
 
         BytesIO(b''.join(list_of_bytestrings)) =~= ChunkedBytesIO(
             list_of_bytestrings)
@@ -69,17 +69,17 @@ class ChunkedBytesIO(object):  # pylint: disable=too-few-public-methods
         chunk, cursor = self.pos
 
         while chunk < len(self.contents):
-            if maxbytes < len(self.contents[chunk]) - cursor:
-                buf.append(self.contents[chunk][cursor: cursor + maxbytes])
-                cursor += maxbytes
-                self.pos = (chunk, cursor)
-                break
-            else:
+            if maxbytes >= len(self.contents[chunk]) - cursor:
                 buf.append(self.contents[chunk][cursor:])
                 maxbytes -= len(self.contents[chunk]) - cursor
                 chunk += 1
                 cursor = 0
                 self.pos = (chunk, cursor)
+            else:
+                buf.append(self.contents[chunk][cursor: cursor + maxbytes])
+                cursor += maxbytes
+                self.pos = (chunk, cursor)
+                break
         return b"".join(buf)
 
 
@@ -91,14 +91,15 @@ def tar_stream(store, tree, mtime, prefix=b"", compression_format=""):
     concatenate these chunks.
 
     Args:
-      store: Object store to retrieve objects from
-      tree: Tree object for the tree root
-      mtime: UNIX timestamp that is assigned as the modification time for
-        all files, and the gzip header modification time if
-        compression_format='gz'
-      compression_format: Optional compression format for tarball
+        store: Object store to retrieve objects from
+        tree: Tree object for the tree root
+        mtime: UNIX timestamp that is assigned as the modification time for
+            all files, and the gzip header modification time if
+            compression_format='gz'
+        prefix:
+        compression_format: Optional compression format for tarball
     Returns:
-      Bytestrings
+        Bytestrings
     """
     buf = BytesIO()
     with closing(tarfile.open(None, "w:%s" % compression_format, buf)) as tar:

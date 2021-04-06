@@ -3,6 +3,9 @@
  * Prevent removal of refs directory when the last ref is
    deleted. (Jelmer Vernooĳ)
 
+ * Fix filename: MERGE_HEADS => MERGE_HEAD.
+   (Jelmer Vernooĳ, #861)
+
 0.20.21	2021-03-20
 
  * Add basic support for a GcsObjectStore that stores

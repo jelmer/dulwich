@@ -892,7 +892,7 @@ class BuildRepoRootTests(TestCase):
         )
         with open(os.path.join(r.path, "a"), "w") as f:
             f.write("merged text")
-        with open(os.path.join(r.path, ".git", "MERGE_HEADS"), "w") as f:
+        with open(os.path.join(r.path, ".git", "MERGE_HEAD"), "w") as f:
             f.write("c27a2d21dd136312d7fa9e8baabb82561a1727d0\n")
         r.stage(["a"])
         commit_sha = r.do_commit(

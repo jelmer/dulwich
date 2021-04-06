@@ -883,7 +883,7 @@ class BaseRepo(object):
             current index will be committed).
           encoding: Encoding
           ref: Optional ref to commit to (defaults to current branch)
-          merge_heads: Merge heads (defaults to .git/MERGE_HEADS)
+          merge_heads: Merge heads (defaults to .git/MERGE_HEAD)
           no_verify: Skip pre-commit and commit-msg hooks
 
         Returns:
@@ -909,7 +909,7 @@ class BaseRepo(object):
 
         config = self.get_config_stack()
         if merge_heads is None:
-            merge_heads = self._read_heads("MERGE_HEADS")
+            merge_heads = self._read_heads("MERGE_HEAD")
         if committer is None:
             committer = get_user_identity(config, kind="COMMITTER")
         check_user_identity(committer)
@@ -990,7 +990,7 @@ class BaseRepo(object):
                 # commit and all its objects as garbage.
                 raise CommitError("%s changed during commit" % (ref,))
 
-        self._del_named_file("MERGE_HEADS")
+        self._del_named_file("MERGE_HEAD")
 
         try:
             self.hooks["post-commit"].execute()

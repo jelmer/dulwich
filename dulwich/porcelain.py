@@ -501,6 +501,10 @@ def add(repo=".", paths=None):
       repo: Repository for the files
       paths: Paths to add.  No value passed stages all modified files.
     Returns: Tuple with set of added files and ignored files
+
+    If the repository contains ignored directories, the returned set will
+    contain the path to an ignored directory (with trailing slash). Individual
+    files within ignored directories will not be returned.
     """
     ignored = set()
     with open_repo_closing(repo) as r:
@@ -519,7 +523,9 @@ def add(repo=".", paths=None):
             paths = [paths]
         for p in paths:
             relpath = str(Path(p).resolve().relative_to(repo_path))
-            # FIXME: Support patterns, directories.
+            # FIXME: Support patterns
+            if os.path.isdir(p):
+                relpath = os.path.join(relpath, "")
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
                 continue
@@ -1217,12 +1223,14 @@ def status(repo=".", ignored=False):
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
-def _walk_working_dir_paths(frompath, basepath):
+def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
     """Get path, is_dir for files in working dir from frompath
 
     Args:
       frompath: Path to begin walk
       basepath: Path to compare to
+      prune_dirnames: Optional callback to prune dirnames during os.walk
+        dirnames will be set to result of prune_dirnames(dirpath, dirnames)
     """
     for dirpath, dirnames, filenames in os.walk(frompath):
         # Skip .git and below.
@@ -1230,6 +1238,7 @@ def _walk_working_dir_paths(frompath, basepath):
             dirnames.remove(".git")
             if dirpath != basepath:
                 continue
+
         if ".git" in filenames:
             filenames.remove(".git")
             if dirpath != basepath:
@@ -1242,6 +1251,9 @@ def _walk_working_dir_paths(frompath, basepath):
             filepath = os.path.join(dirpath, filename)
             yield filepath, False
 
+        if prune_dirnames:
+            dirnames[:] = prune_dirnames(dirpath, dirnames)
+
 
 def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
     """Get untracked paths.
@@ -1251,22 +1263,43 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
       basepath: Path to compare to
       index: Index to check against
       exclude_ignored: Whether to exclude ignored paths
-    """
-    if exclude_ignored:
-        with open_repo_closing(frompath) as r:
-            ignore_manager = IgnoreFilterManager.from_repo(r)
-    else:
-        ignore_manager = None
 
-    for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
-        if ignore_manager is not None and ignore_manager.is_ignored(
-            os.path.relpath(ap, frompath)
-        ):
-            continue
+    Note: ignored directories will never be walked for performance reasons.
+      If exclude_ignored is False, only the path to an ignored directory will
+      be yielded, no files inside the directory will be returned
+    """
+    with open_repo_closing(basepath) as r:
+        ignore_manager = IgnoreFilterManager.from_repo(r)
+
+    ignored_dirs = []
+
+    def prune_dirnames(dirpath, dirnames):
+        for i in range(len(dirnames) - 1, -1, -1):
+            path = os.path.join(dirpath, dirnames[i])
+            ip = os.path.join(os.path.relpath(path, basepath), "")
+            if ignore_manager.is_ignored(ip):
+                if not exclude_ignored:
+                    ignored_dirs.append(
+                        os.path.join(os.path.relpath(path, frompath), "")
+                    )
+                del dirnames[i]
+        return dirnames
+
+    for ap, is_dir in _walk_working_dir_paths(
+        frompath, basepath, prune_dirnames=prune_dirnames
+    ):
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
-                yield os.path.relpath(ap, frompath)
+                if (
+                    not exclude_ignored
+                    or not ignore_manager.is_ignored(
+                        os.path.relpath(ap, basepath)
+                    )
+                ):
+                    yield os.path.relpath(ap, frompath)
+
+    yield from ignored_dirs
 
 
 def get_tree_changes(repo):

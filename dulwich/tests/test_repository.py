@@ -827,6 +827,14 @@ class BuildRepoRootTests(TestCase):
             {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"},
             self._repo.get_shallow(),
         )
+        self._repo.update_shallow(
+            None, [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"]
+        )
+        self.assertEqual(set(), self._repo.get_shallow())
+        self.assertEqual(
+            False,
+            os.path.exists(os.path.join(self._repo.controldir(), "shallow")),
+        )
 
     def test_build_repo(self):
         r = self._repo

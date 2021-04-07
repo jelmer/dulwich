@@ -1154,7 +1154,7 @@ def pull(
             refspecs = [b"HEAD"]
         selected_refs = []
 
-        def determine_wants(remote_refs):
+        def determine_wants(remote_refs, **kwargs):
             selected_refs.extend(
                 parse_reftuples(remote_refs, r.refs, refspecs, force=force)
             )

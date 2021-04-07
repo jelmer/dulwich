@@ -522,9 +522,10 @@ def add(repo=".", paths=None):
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
-            relpath = str(Path(p).resolve().relative_to(repo_path))
+            path = Path(p)
+            relpath = str(path.resolve().relative_to(repo_path))
             # FIXME: Support patterns
-            if os.path.isdir(p):
+            if path.is_dir():
                 relpath = os.path.join(relpath, "")
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)

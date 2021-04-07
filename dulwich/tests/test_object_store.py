@@ -103,7 +103,7 @@ class ObjectStoreTests(object):
             self.assertEqual(
                 [], self.store.determine_wants_all(refs, depth=1)
             )
-            m.assert_called()
+            m.assert_called_with(testobject.id)
             self.assertEqual(
                 [testobject.id], self.store.determine_wants_all(refs, depth=2)
             )

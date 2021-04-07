@@ -26,9 +26,11 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
+from unittest import skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
@@ -1093,6 +1095,7 @@ class RevListTests(PorcelainTestCase):
         )
 
 
+@skipIf('__pypy__' not in sys.modules or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTests(PorcelainGpgTestCase):
     def test_default_key(self):
         c1, c2, c3 = build_commit_graph(

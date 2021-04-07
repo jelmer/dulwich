@@ -6,6 +6,11 @@
  * Fix filename: MERGE_HEADS => MERGE_HEAD.
    (Jelmer Vernooĳ, #861)
 
+ * For ignored directories, porcelain.add and porcelain.status now only return
+   the path to directory itself in the list of ignored paths. Previously, paths
+   for all files within the directory would also be included in the list.
+   (Peter Rowlands, #853)
+
 0.20.21	2021-03-20
 
  * Add basic support for a GcsObjectStore that stores

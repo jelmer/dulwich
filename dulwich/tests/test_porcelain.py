@@ -1129,6 +1129,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertLess(time.time() - tag.tag_time, 5)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
+        tag = self.repo[b'refs/tags/tryme']
         subprocess.run(
             ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
             check=True,
@@ -1160,6 +1161,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
         self.assertLess(time.time() - tag.tag_time, 5)
+        tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
         subprocess.run(

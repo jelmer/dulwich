@@ -866,6 +866,21 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
+    def sign(self, keyid: Optional[str] = None):
+        import gpg
+        with gpg.Context(armor=True) as c:
+            if keyid is not None:
+                key = c.get_key(keyid)
+                with gpg.Context(armor=True, signers=[key]) as ctx:
+                    self.signature, unused_result = ctx.sign(
+                        self.as_raw_string(),
+                        mode=gpg.constants.sig.mode.DETACH,
+                    )
+            else:
+                self.signature, unused_result = c.sign(
+                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
+                )
+
 
 class TreeEntry(namedtuple("TreeEntry", ["path", "mode", "sha"])):
     """Named tuple encapsulating a single tree entry."""

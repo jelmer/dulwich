@@ -127,7 +127,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         self.assertEqual(remote_refs, None)
 
     def test_push_commit(self):
-        def determine_wants(*args):
+        def determine_wants(*args, **kwargs):
             return {"refs/heads/master": local_repo.refs["HEAD"]}
 
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
@@ -144,7 +144,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         self.assertEqual(sha, remote_sha)
 
     def test_push_branch(self):
-        def determine_wants(*args):
+        def determine_wants(*args, **kwargs):
             return {"refs/heads/mybranch": local_repo.refs["refs/heads/mybranch"]}
 
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
@@ -161,7 +161,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         self.assertEqual(sha, remote_sha)
 
     def test_push_multiple_branch(self):
-        def determine_wants(*args):
+        def determine_wants(*args, **kwargs):
             return {
                 "refs/heads/mybranch": local_repo.refs["refs/heads/mybranch"],
                 "refs/heads/master": local_repo.refs["refs/heads/master"],
@@ -191,7 +191,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         self.assertDictEqual(local_shas, remote_shas)
 
     def test_push_data_branch(self):
-        def determine_wants(*args):
+        def determine_wants(*args, **kwargs):
             return {"refs/heads/master": local_repo.refs["HEAD"]}
 
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
@@ -243,7 +243,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         for f in files:
             self.assertEqual(os.path.isfile(f), True)
 
-        def determine_wants(*args):
+        def determine_wants(*args, **kwargs):
             return {"refs/heads/master": local_repo.refs["HEAD"]}
 
         os.mkdir(os.path.join(self.temp_d, "test"))
@@ -259,7 +259,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         )
 
     def test_push_remove_branch(self):
-        def determine_wants(*args):
+        def determine_wants(*args, **kwargs):
             return {
                 "refs/heads/pullr-108": objects.ZERO_SHA,
                 "refs/heads/master": local_repo.refs["refs/heads/master"],
@@ -276,7 +276,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         self.assertNotIn("refs/heads/pullr-108", swift_repo.refs.allkeys())
 
     def test_push_annotated_tag(self):
-        def determine_wants(*args):
+        def determine_wants(*args, **kwargs):
             return {
                 "refs/heads/master": local_repo.refs["HEAD"],
                 "refs/tags/v1.0": local_repo.refs["refs/tags/v1.0"],

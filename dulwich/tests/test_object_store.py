@@ -23,6 +23,7 @@
 
 from contextlib import closing
 from io import BytesIO
+from unittest import skipUnless
 import os
 import shutil
 import stat
@@ -54,6 +55,7 @@ from dulwich.pack import (
     REF_DELTA,
     write_pack_objects,
 )
+from dulwich.protocol import DEPTH_INFINITE
 from dulwich.tests import (
     TestCase,
 )
@@ -62,6 +64,11 @@ from dulwich.tests.utils import (
     make_tag,
     build_pack,
 )
+
+try:
+    from unittest.mock import patch
+except ImportError:
+    patch = None  # type: ignore
 
 
 testobject = make_object(Blob, data=b"yummy data")
@@ -77,6 +84,48 @@ class ObjectStoreTests(object):
     def test_determine_wants_all_zero(self):
         self.assertEqual(
             [], self.store.determine_wants_all({b"refs/heads/foo": b"0" * 40})
+        )
+
+    @skipUnless(patch, "Required mock.patch")
+    def test_determine_wants_all_depth(self):
+        self.store.add_object(testobject)
+        refs = {b"refs/heads/foo": testobject.id}
+        with patch.object(self.store, "_get_depth", return_value=1) as m:
+            self.assertEqual(
+                [], self.store.determine_wants_all(refs, depth=0)
+            )
+            self.assertEqual(
+                [testobject.id],
+                self.store.determine_wants_all(refs, depth=DEPTH_INFINITE),
+            )
+            m.assert_not_called()
+
+            self.assertEqual(
+                [], self.store.determine_wants_all(refs, depth=1)
+            )
+            m.assert_called()
+            self.assertEqual(
+                [testobject.id], self.store.determine_wants_all(refs, depth=2)
+            )
+
+    def test_get_depth(self):
+        self.assertEqual(
+            0, self.store._get_depth(testobject.id)
+        )
+
+        self.store.add_object(testobject)
+        self.assertEqual(
+            1, self.store._get_depth(testobject.id, get_parents=lambda x: [])
+        )
+
+        parent = make_object(Blob, data=b"parent data")
+        self.store.add_object(parent)
+        self.assertEqual(
+            2,
+            self.store._get_depth(
+                testobject.id,
+                get_parents=lambda x: [parent.id] if x == testobject else [],
+            ),
         )
 
     def test_iter(self):

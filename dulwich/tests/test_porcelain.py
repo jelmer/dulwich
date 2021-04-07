@@ -22,6 +22,7 @@
 
 from io import BytesIO, StringIO
 import os
+import platform
 import re
 import shutil
 import stat
@@ -1095,7 +1096,7 @@ class RevListTests(PorcelainTestCase):
         )
 
 
-@skipIf('__pypy__' not in sys.modules or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
+@skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTests(PorcelainGpgTestCase):
     def test_default_key(self):
         c1, c2, c3 = build_commit_graph(

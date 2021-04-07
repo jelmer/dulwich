@@ -704,7 +704,7 @@ def print_tag(tag, decode, outstream=sys.stdout):
     timezone_str = format_timezone(tag.tag_timezone).decode("ascii")
     outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
     outstream.write("\n")
-    outstream.write(decode(tag.message) + "\n")
+    outstream.write(decode(tag.message))
     outstream.write("\n")
 
 
@@ -930,7 +930,9 @@ def tag_create(
       objectish: object the tag should point at, defaults to HEAD
       tag_time: Optional time for annotated tag
       tag_timezone: Optional timezone for annotated tag
-      sign: GPG Sign the tag
+      sign: GPG Sign the tag (bool, defaults to False,
+        pass True to use default GPG key,
+        pass a str containing Key ID to use a specific GPG key)
     """
 
     with open_repo_closing(repo) as r:
@@ -943,7 +945,7 @@ def tag_create(
                 # TODO(jelmer): Don't use repo private method.
                 author = r._get_user_identity(r.get_config_stack())
             tag_obj.tagger = author
-            tag_obj.message = message
+            tag_obj.message = message + "\n".encode()
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
             if tag_time is None:
@@ -957,9 +959,19 @@ def tag_create(
             tag_obj.tag_timezone = tag_timezone
             if sign:
                 import gpg
-
                 with gpg.Context(armor=True) as c:
-                    tag_obj.signature, unused_result = c.sign(tag_obj.as_raw_string())
+                    if isinstance(sign, str):
+                        key = c.get_key(sign)
+                        with gpg.Context(armor=True, signers=[key]) as ctx:
+                            tag_obj.signature, unused_result = ctx.sign(
+                                tag_obj.as_raw_string(),
+                                mode=gpg.constants.sig.mode.DETACH,
+                            )
+                    else:
+                        tag_obj.signature, unused_result = c.sign(
+                            tag_obj.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
+                        )
+
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id
         else:

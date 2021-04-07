@@ -11,6 +11,12 @@
    for all files within the directory would also be included in the list.
    (Peter Rowlands, #853)
 
+ * Provide depth argument to ``determine_wants``.
+   (Peter Rowlands)
+
+ * Various tag signature handling improvements.
+   (Daniel Murphy)
+
 0.20.21	2021-03-20
 
  * Add basic support for a GcsObjectStore that stores

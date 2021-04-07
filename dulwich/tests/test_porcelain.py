@@ -254,7 +254,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
     def setUp(self):
         super(PorcelainGpgTestCase, self).setUp()
         self.gpg_dir = os.path.join(self.test_dir, "gpg")
-        os.mkdir(self.gpg_dir)
+        os.mkdir(self.gpg_dir, mode=0o700)
         self.addCleanup(shutil.rmtree, self.gpg_dir)
         self._old_gnupghome = os.environ.get("GNUPGHOME")
         os.environ["GNUPGHOME"] = self.gpg_dir
@@ -267,6 +267,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
         subprocess.run(
             ["gpg", "--import"],
             stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.DEFAULT_KEY,
             universal_newlines=True,
         )
@@ -275,6 +276,7 @@ AanKpb2pqswnk1CVhAzh+l7JhOR5RUVOMCv9mb3TwYQcE7qhMovHWhLmpFhlfO4a
         subprocess.run(
             ["gpg", "--import"],
             stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.NON_DEFAULT_KEY,
             universal_newlines=True,
         )
@@ -1130,9 +1132,12 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
         tag = self.repo[b'refs/tags/tryme']
+        # TODO(jelmer): Remove calls to C git, and call tag.verify() instead -
+        # perhaps moving git call to compat testsuite?
         subprocess.run(
             ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
             check=True,
+            stderr=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
         )
 
@@ -1164,9 +1169,12 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         # Instead we need to check the signature can be verified by git
+        # TODO(jelmer): Remove calls to C git, and call tag.verify() instead -
+        # perhaps moving git call to compat testsuite?
         subprocess.run(
             ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
             check=True,
+            stderr=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
         )
 

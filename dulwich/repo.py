@@ -87,6 +87,8 @@ from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
 
 from dulwich.refs import (  # noqa: F401
     ANNOTATED_TAG_SUFFIX,
+    LOCAL_BRANCH_PREFIX,
+    LOCAL_TAG_PREFIX,
     check_ref_format,
     RefsContainer,
     DictRefsContainer,
@@ -1370,6 +1372,7 @@ class Repo(BaseRepo):
         bare=False,
         origin=b"origin",
         checkout=None,
+        branch=None,
     ):
         """Clone this repository.
 
@@ -1381,53 +1384,154 @@ class Repo(BaseRepo):
             cloned from this repository
         Returns: Created repository as `Repo`
         """
-        if not bare:
-            target = self.init(target_path, mkdir=mkdir)
-        else:
-            if checkout:
-                raise ValueError("checkout and bare are incompatible")
-            target = self.init_bare(target_path, mkdir=mkdir)
-        self.fetch(target)
+
+        def clone_refs(target_repo, ref_message):
+            self.fetch(target_repo)
+            target_repo.refs.import_refs(
+                b"refs/remotes/" + origin,
+                self.refs.as_dict(b"refs/heads"),
+                message=ref_message,
+            )
+            target_repo.refs.import_refs(
+                b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
+            )
+            try:
+                target_repo.refs.add_if_new(
+                    DEFAULT_REF, self.refs[DEFAULT_REF], message=ref_message
+                )
+            except KeyError:
+                pass
+
+            head_chain, _sha = self.refs.follow(b"HEAD")
+            return head_chain[-1] if head_chain else None
+
         encoded_path = self.path
         if not isinstance(encoded_path, bytes):
             encoded_path = os.fsencode(encoded_path)
-        ref_message = b"clone: from " + encoded_path
-        target.refs.import_refs(
-            b"refs/remotes/" + origin,
-            self.refs.as_dict(b"refs/heads"),
-            message=ref_message,
-        )
-        target.refs.import_refs(
-            b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
-        )
-        try:
-            target.refs.add_if_new(
-                DEFAULT_REF, self.refs[DEFAULT_REF], message=ref_message
-            )
-        except KeyError:
-            pass
-        target_config = target.get_config()
-        target_config.set(("remote", "origin"), "url", encoded_path)
-        target_config.set(
-            ("remote", "origin"),
-            "fetch",
-            "+refs/heads/*:refs/remotes/origin/*",
-        )
-        target_config.write_to_path()
 
-        # Update target head
-        head_chain, head_sha = self.refs.follow(b"HEAD")
-        if head_chain and head_sha is not None:
-            target.refs.set_symbolic_ref(b"HEAD", head_chain[-1], message=ref_message)
-            target[b"HEAD"] = head_sha
+        return self.do_clone(
+            encoded_path,
+            target_path,
+            clone_refs=clone_refs,
+            mkdir=mkdir,
+            bare=bare,
+            origin=origin,
+            checkout=checkout,
+            branch=branch,
+        )
 
+    @classmethod
+    def do_clone(
+        cls,
+        source_path,
+        target_path,
+        clone_refs=None,
+        mkdir=True,
+        bare=False,
+        origin=b"origin",
+        checkout=None,
+        errstream=None,
+        branch=None,
+    ):
+        """Clone this repository.
+
+        Args:
+          target_path: Target path
+          mkdir: Create the target directory
+          bare: Whether to create a bare repository
+          origin: Base name for refs in target repository
+            cloned from this repository
+        Returns: Created repository as `Repo`
+        """
+        if not clone_refs:
+            raise ValueError("clone_refs callback is required")
+
+        if not bare:
+            target = cls.init(target_path, mkdir=mkdir)
             if checkout is None:
-                checkout = not bare
+                checkout = True
+        else:
             if checkout:
-                # Checkout HEAD to target dir
+                raise ValueError("checkout and bare are incompatible")
+            target = cls.init_bare(target_path, mkdir=mkdir)
+
+        try:
+            target_config = target.get_config()
+            target_config.set((b"remote", origin), b"url", source_path)
+            target_config.set(
+                (b"remote", origin),
+                b"fetch",
+                b"+refs/heads/*:refs/remotes/" + origin + b"/*",
+            )
+            target_config.write_to_path()
+
+            ref_message = b"clone: from " + source_path
+            origin_head = clone_refs(target, ref_message)
+
+            # set refs/remotes/origin/HEAD
+            if origin_head and origin_head.startswith(LOCAL_BRANCH_PREFIX):
+                cls._clone_set_origin_head(target, origin, origin_head)
+
+            head_ref = b"HEAD" if origin_head else None
+            if branch:
+                for ref in (LOCAL_BRANCH_PREFIX + branch, LOCAL_TAG_PREFIX + branch):
+                    if ref in target.refs:
+                        head_ref = ref
+                        break
+
+            # Update target head
+            if head_ref:
+                head = cls._clone_set_head(target, head_ref, ref_message)
+            else:
+                head = None
+
+            if checkout and head is not None:
+                if errstream:
+                    errstream.write(b"Checking out " + head.id + b"\n")
                 target.reset_index()
+        except BaseException:
+            target.close()
+            raise
 
         return target
+
+    @staticmethod
+    def _clone_set_origin_head(r, origin, origin_head):
+        origin_base = b"refs/remotes/" + origin + b"/"
+        origin_ref = origin_base + b"HEAD"
+        target_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
+        if target_ref in r.refs:
+            r.refs.set_symbolic_ref(origin_ref, target_ref)
+
+            # set HEAD to default remote branch if it differs from DEFAULT_REF
+            if origin_head != DEFAULT_REF:
+                origin_ref = origin_base + DEFAULT_REF[len(LOCAL_BRANCH_PREFIX) :]
+                if origin_ref not in r.refs:
+                    del r.refs[DEFAULT_REF]
+                r.refs.set_symbolic_ref(b"HEAD", origin_head)
+
+    @staticmethod
+    def _clone_set_head(r, head_ref, ref_message):
+        if head_ref.startswith(LOCAL_TAG_PREFIX):
+            print(r.refs)
+            # detach HEAD at specified tag
+            _cls, head_sha = r.refs[head_ref].object
+            head = r[head_sha]
+            del r.refs[b"HEAD"]
+            r.refs.set_if_equals(
+                b"HEAD", None, head_sha, message=ref_message
+            )
+        else:
+            if head_ref == b"HEAD":
+                _chain, head = r.refs.follow(head_ref)
+            else:
+                # set HEAD to specific remote branch
+                r.refs.set_symbolic_ref(b"HEAD", head_ref)
+                head = r.refs[head_ref]
+                r.refs.set_if_equals(
+                    b"HEAD", None, head.id, message=ref_message
+                )
+        return head
 
     def reset_index(self, tree=None):
         """Reset the index back to a specific tree.

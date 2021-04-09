@@ -385,6 +385,7 @@ class RepositoryRootTests(TestCase):
                 {
                     b"HEAD": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
                     b"refs/remotes/origin/master": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
+                    b"refs/remotes/origin/HEAD": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
                     b"refs/heads/master": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
                     b"refs/tags/mytag": b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a",
                     b"refs/tags/mytag-packed": b"b0931cadc54336e78a1d980420e3268903b57a50",

@@ -992,17 +992,14 @@ def status(repo=".", ignored=False):
             get_unstaged_changes(index, r.path, filter_callback)
         )
         ignore_manager = IgnoreFilterManager.from_repo(r)
-        untracked_paths = get_untracked_paths(r.path, r.path, index)
-        if ignored:
-            untracked_changes = list(untracked_paths)
-        else:
-            untracked_changes = [
-                    p for p in untracked_paths
-                    if not ignore_manager.is_ignored(p)]
+        untracked_paths = get_untracked_paths(
+            r.path, r.path, index, ignore_manager=None if ignored else ignore_manager
+        )
+        untracked_changes = list(untracked_paths)
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
-def _walk_working_dir_paths(frompath, basepath):
+def _walk_working_dir_paths(frompath, basepath, ignore_manager=None):
     """Get path, is_dir for files in working dir from frompath
 
     Args:
@@ -1020,15 +1017,27 @@ def _walk_working_dir_paths(frompath, basepath):
             if dirpath != basepath:
                 continue
 
+        if ignore_manager:
+            for dirname in dirnames[:]:
+                if ignore_manager.is_ignored(
+                    os.path.relpath(os.path.join(dirpath, dirname), frompath)
+                ):
+                    dirnames.remove(dirname)
+
+
         if dirpath != frompath:
             yield dirpath, True
 
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
+            if ignore_manager and ignore_manager.is_ignored(
+                os.path.relpath(filepath, frompath)
+            ):
+                continue
             yield filepath, False
 
 
-def get_untracked_paths(frompath, basepath, index):
+def get_untracked_paths(frompath, basepath, index, ignore_manager=None):
     """Get untracked paths.
 
     Args:
@@ -1036,7 +1045,9 @@ def get_untracked_paths(frompath, basepath, index):
       basepath: Path to compare to
       index: Index to check against
     """
-    for ap, is_dir in _walk_working_dir_paths(frompath, basepath):
+    for ap, is_dir in _walk_working_dir_paths(
+        frompath, basepath, ignore_manager=ignore_manager
+    ):
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:

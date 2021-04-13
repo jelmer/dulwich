@@ -1402,8 +1402,9 @@ class Repo(BaseRepo):
             except KeyError:
                 pass
 
-            head_chain, _sha = self.refs.follow(b"HEAD")
-            return head_chain[-1] if head_chain else None
+            head_chain, sha = self.refs.follow(b"HEAD")
+            head_chain = head_chain[-1] if head_chain else None
+            return head_chain, sha
 
         encoded_path = self.path
         if not isinstance(encoded_path, bytes):
@@ -1466,7 +1467,9 @@ class Repo(BaseRepo):
             target_config.write_to_path()
 
             ref_message = b"clone: from " + source_path
-            origin_head = clone_refs(target, ref_message)
+            origin_head, origin_sha = clone_refs(target, ref_message)
+            if origin_sha:
+                target.refs[b"HEAD"] = origin_sha
 
             # set refs/remotes/origin/HEAD
             if origin_head and origin_head.startswith(LOCAL_BRANCH_PREFIX):
@@ -1487,7 +1490,7 @@ class Repo(BaseRepo):
 
             if checkout and head is not None:
                 if errstream:
-                    errstream.write(b"Checking out " + head.id + b"\n")
+                    errstream.write(b"Checking out " + head + b"\n")
                 target.reset_index()
         except BaseException:
             target.close()
@@ -1513,7 +1516,6 @@ class Repo(BaseRepo):
     @staticmethod
     def _clone_set_head(r, head_ref, ref_message):
         if head_ref.startswith(LOCAL_TAG_PREFIX):
-            print(r.refs)
             # detach HEAD at specified tag
             _cls, head_sha = r.refs[head_ref].object
             head = r[head_sha]

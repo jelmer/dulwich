@@ -455,8 +455,6 @@ def clone(
             depth=depth,
             **kwargs
         )
-        for key, target_ref in fetch_result.symrefs.items():
-            target_repo.refs.set_symbolic_ref(key, target_ref)
         head_ref = fetch_result.symrefs.get(b"HEAD", None)
         try:
             head_sha = target_repo[fetch_result.refs[b"HEAD"]].id

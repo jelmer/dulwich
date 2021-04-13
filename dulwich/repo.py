@@ -1380,8 +1380,11 @@ class Repo(BaseRepo):
           target_path: Target path
           mkdir: Create the target directory
           bare: Whether to create a bare repository
+          checkout: Whether or not to check-out HEAD after cloning
           origin: Base name for refs in target repository
             cloned from this repository
+          branch: Optional branch or tag to be used as HEAD in the new repository
+            instead of this repository's HEAD.
         Returns: Created repository as `Repo`
         """
 
@@ -1428,16 +1431,6 @@ class Repo(BaseRepo):
         errstream=None,
         branch=None,
     ):
-        """Clone this repository.
-
-        Args:
-          target_path: Target path
-          mkdir: Create the target directory
-          bare: Whether to create a bare repository
-          origin: Base name for refs in target repository
-            cloned from this repository
-        Returns: Created repository as `Repo`
-        """
         if not clone_refs:
             raise ValueError("clone_refs callback is required")
 

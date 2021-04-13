@@ -452,6 +452,48 @@ class RepositoryRootTests(TestCase):
             ValueError, r.clone, tmp_dir, mkdir=False, checkout=True, bare=True
         )
 
+    def test_clone_branch(self):
+        r = self.open_repo("a.git")
+        r.refs[b"refs/heads/mybranch"] = b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a"
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with r.clone(tmp_dir, mkdir=False, branch=b"mybranch") as t:
+            # HEAD should point to specified branch and not origin HEAD
+            chain, sha = t.refs.follow(b"HEAD")
+            self.assertEqual(chain[-1], b"refs/heads/mybranch")
+            self.assertEqual(sha, b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a")
+            self.assertEqual(
+                t.refs[b"refs/remotes/origin/HEAD"],
+                b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
+            )
+
+    def test_clone_tag(self):
+        r = self.open_repo("a.git")
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with r.clone(tmp_dir, mkdir=False, branch=b"mytag") as t:
+            # HEAD should be detached (and not a symbolic ref) at tag
+            self.assertEqual(
+                t.refs.read_ref(b"HEAD"),
+                b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a",
+            )
+            self.assertEqual(
+                t.refs[b"refs/remotes/origin/HEAD"],
+                b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
+            )
+
+    def test_clone_invalid_branch(self):
+        r = self.open_repo("a.git")
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        self.assertRaises(
+            ValueError,
+            r.clone,
+            tmp_dir,
+            mkdir=False,
+            branch=b"mybranch",
+        )
+
     def test_merge_history(self):
         r = self.open_repo("simple_merge.git")
         shas = [e.commit.id for e in r.get_walker()]

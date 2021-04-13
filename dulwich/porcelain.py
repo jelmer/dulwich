@@ -422,7 +422,6 @@ def clone(
         instead of the cloned repository's HEAD.
     Returns: The new repository
     """
-    # TODO(jelmer): This code overlaps quite a bit with Repo.clone
     if outstream is not None:
         import warnings
 

@@ -17,6 +17,13 @@
  * Various tag signature handling improvements.
    (Daniel Murphy)
 
+ * Add support for version 3 index files. (Jelmer Vernooĳ)
+
+ API CHANGES
+
+ * The APIs for writing and reading individual index entries have changed
+   to handle lists of (name, entry) tuples rather than tuples.
+
 0.20.21	2021-03-20
 
  * Add basic support for a GcsObjectStore that stores

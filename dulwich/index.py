@@ -56,6 +56,7 @@ from dulwich.pack import (
 )
 
 
+# TODO(jelmer): Switch to dataclass?
 IndexEntry = collections.namedtuple(
     "IndexEntry",
     [
@@ -69,13 +70,26 @@ IndexEntry = collections.namedtuple(
         "size",
         "sha",
         "flags",
+        "extended_flags",
     ],
 )
 
 
+# 2-bit stage (during merge)
 FLAG_STAGEMASK = 0x3000
+
+# assume-valid
 FLAG_VALID = 0x8000
+
+# extended flag (must be zero in version 2)
 FLAG_EXTENDED = 0x4000
+
+
+# used by sparse checkout
+EXTENDED_FLAG_SKIP_WORKTREE = 0x4000
+
+# used by "git add -N"
+EXTENDED_FLAG_INTEND_TO_ADD = 0x2000
 
 
 DEFAULT_VERSION = 2
@@ -130,13 +144,13 @@ def write_cache_time(f, t):
     f.write(struct.pack(">LL", *t))
 
 
-def read_cache_entry(f):
+def read_cache_entry(f, version: int) -> Tuple[str, IndexEntry]:
     """Read an entry from a cache file.
 
     Args:
       f: File-like object to read from
     Returns:
-      tuple with: device, inode, mode, uid, gid, size, sha, flags
+      tuple with: name, IndexEntry
     """
     beginoffset = f.tell()
     ctime = read_cache_time(f)
@@ -151,51 +165,64 @@ def read_cache_entry(f):
         sha,
         flags,
     ) = struct.unpack(">LLLLLL20sH", f.read(20 + 4 * 6 + 2))
+    if flags & FLAG_EXTENDED:
+        if version < 3:
+            raise AssertionError(
+                'extended flag set in index with version < 3')
+        extended_flags = struct.unpack(">H", f.read(2))
+    else:
+        extended_flags = 0
     name = f.read((flags & 0x0FFF))
     # Padding:
     real_size = (f.tell() - beginoffset + 8) & ~7
     f.read((beginoffset + real_size) - f.tell())
     return (
         name,
-        ctime,
-        mtime,
-        dev,
-        ino,
-        mode,
-        uid,
-        gid,
-        size,
-        sha_to_hex(sha),
-        flags & ~0x0FFF,
-    )
-
-
-def write_cache_entry(f, entry):
-    """Write an index entry to a file.
-
-    Args:
-      f: File object
-      entry: Entry to write, tuple with:
-        (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags)
-    """
-    beginoffset = f.tell()
-    (name, ctime, mtime, dev, ino, mode, uid, gid, size, sha, flags) = entry
-    write_cache_time(f, ctime)
-    write_cache_time(f, mtime)
-    flags = len(name) | (flags & ~0x0FFF)
-    f.write(
-        struct.pack(
-            b">LLLLLL20sH",
-            dev & 0xFFFFFFFF,
-            ino & 0xFFFFFFFF,
+        IndexEntry(
+            ctime,
+            mtime,
+            dev,
+            ino,
             mode,
             uid,
             gid,
             size,
-            hex_to_sha(sha),
+            sha_to_hex(sha),
+            flags & ~0x0FFF,
+            extended_flags,
+        ))
+
+
+def write_cache_entry(f, name, entry, version=None):
+    """Write an index entry to a file.
+
+    Args:
+      f: File object
+      entry: IndexEntry to write, tuple with:
+    """
+    beginoffset = f.tell()
+    write_cache_time(f, entry.ctime)
+    write_cache_time(f, entry.mtime)
+    flags = len(name) | (entry.flags & ~0x0FFF)
+    if entry.extended_flags:
+        flags |= FLAG_EXTENDED
+    if flags & FLAG_EXTENDED and version is not None and version < 3:
+        raise AssertionError('unable to use extended flags in version < 3')
+    f.write(
+        struct.pack(
+            b">LLLLLL20sH",
+            entry.dev & 0xFFFFFFFF,
+            entry.ino & 0xFFFFFFFF,
+            entry.mode,
+            entry.uid,
+            entry.gid,
+            entry.size,
+            hex_to_sha(entry.sha),
             flags,
         )
     )
+    if flags & FLAG_EXTENDED:
+        f.write(struct.pack(b">H", entry.extended_flags))
     f.write(name)
     real_size = (f.tell() - beginoffset + 8) & ~7
     f.write(b"\0" * ((beginoffset + real_size) - f.tell()))
@@ -207,9 +234,9 @@ def read_index(f: BinaryIO):
     if header != b"DIRC":
         raise AssertionError("Invalid index file header: %r" % header)
     (version, num_entries) = struct.unpack(b">LL", f.read(4 * 2))
-    assert version in (1, 2)
+    assert version in (1, 2, 3), "index version is %r" % version
     for i in range(num_entries):
-        yield read_cache_entry(f)
+        yield read_cache_entry(f, version)
 
 
 def read_index_dict(f):
@@ -219,12 +246,12 @@ def read_index_dict(f):
       f: File object to read from
     """
     ret = {}
-    for x in read_index(f):
-        ret[x[0]] = IndexEntry(*x[1:])
+    for name, entry in read_index(f):
+        ret[name] = entry
     return ret
 
 
-def write_index(f: BinaryIO, entries: List[Any], version: Optional[int] = None):
+def write_index(f: BinaryIO, entries: Iterable[Tuple[bytes, IndexEntry]], version: Optional[int] = None):
     """Write an index file.
 
     Args:
@@ -236,8 +263,8 @@ def write_index(f: BinaryIO, entries: List[Any], version: Optional[int] = None):
         version = DEFAULT_VERSION
     f.write(b"DIRC")
     f.write(struct.pack(b">LL", version, len(entries)))
-    for x in entries:
-        write_cache_entry(f, x)
+    for name, entry in entries:
+        write_cache_entry(f, name, entry, version)
 
 
 def write_index_dict(
@@ -248,7 +275,7 @@ def write_index_dict(
     """Write an index file based on the contents of a dictionary."""
     entries_list = []
     for name in sorted(entries):
-        entries_list.append((name,) + tuple(entries[name]))
+        entries_list.append((name, entries[name]))
     write_index(f, entries_list, version=version)
 
 
@@ -312,8 +339,8 @@ class Index(object):
         f = GitFile(self._filename, "rb")
         try:
             f = SHA1Reader(f)
-            for x in read_index(f):
-                self[x[0]] = IndexEntry(*x[1:])
+            for name, entry in read_index(f):
+                self[name] = entry
             # FIXME: Additional data?
             f.read(os.path.getsize(self._filename) - f.tell() - 20)
             f.check_sha()
@@ -362,7 +389,7 @@ class Index(object):
 
     def __setitem__(self, name, x):
         assert isinstance(name, bytes)
-        assert len(x) == 10
+        assert len(x) == len(IndexEntry._fields)
         # Remove the old entry if any
         self._byname[name] = IndexEntry(*x)
 
@@ -522,7 +549,8 @@ def changes_from_tree(
 
 
 def index_entry_from_stat(
-    stat_val, hex_sha: bytes, flags: int, mode: Optional[int] = None
+    stat_val, hex_sha: bytes, flags: int, mode: Optional[int] = None,
+    extended_flags: Optional[int]  =None
 ):
     """Create a new index entry from a stat value.
 
@@ -545,6 +573,7 @@ def index_entry_from_stat(
         stat_val.st_size,
         hex_sha,
         flags,
+        extended_flags
     )
 
 

@@ -48,6 +48,7 @@ from dulwich.index import (
     write_index_dict,
     _tree_to_fs_path,
     _fs_to_tree_path,
+    IndexEntry,
 )
 from dulwich.object_store import (
     MemoryObjectStore,
@@ -141,6 +142,7 @@ class SimpleIndexTestCase(IndexTestCase):
                 0,
                 b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
                 0,
+                0,
             ),
             self.get_simple_index("index")[b"bla"],
         )
@@ -172,6 +174,7 @@ class SimpleIndexWriterTestCase(IndexTestCase):
         entries = [
             (
                 b"barbla",
+                IndexEntry(
                 (1230680220, 0),
                 (1230680220, 0),
                 2050,
@@ -182,6 +185,7 @@ class SimpleIndexWriterTestCase(IndexTestCase):
                 0,
                 b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
                 0,
+                0)
             )
         ]
         filename = os.path.join(self.tempdir, "test-simple-write-index")
@@ -203,7 +207,7 @@ class ReadIndexDictTests(IndexTestCase):
 
     def test_simple_write(self):
         entries = {
-            b"barbla": (
+            b"barbla": IndexEntry(
                 (1230680220, 0),
                 (1230680220, 0),
                 2050,
@@ -213,6 +217,7 @@ class ReadIndexDictTests(IndexTestCase):
                 1000,
                 0,
                 b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+                0,
                 0,
             )
         }
@@ -314,7 +319,7 @@ class IndexEntryFromStatTests(TestCase):
         entry = index_entry_from_stat(st, "22" * 20, 0)
         self.assertEqual(
             entry,
-            (
+            IndexEntry(
                 1324180496,
                 1324180496,
                 64769,
@@ -325,6 +330,7 @@ class IndexEntryFromStatTests(TestCase):
                 12288,
                 "2222222222222222222222222222222222222222",
                 0,
+                None,
             ),
         )
 
@@ -346,7 +352,7 @@ class IndexEntryFromStatTests(TestCase):
         entry = index_entry_from_stat(st, "22" * 20, 0, mode=stat.S_IFREG + 0o755)
         self.assertEqual(
             entry,
-            (
+            IndexEntry(
                 1324180496,
                 1324180496,
                 64769,
@@ -357,6 +363,7 @@ class IndexEntryFromStatTests(TestCase):
                 12288,
                 "2222222222222222222222222222222222222222",
                 0,
+                None,
             ),
         )
 

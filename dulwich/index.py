@@ -169,13 +169,14 @@ def read_cache_entry(f, version: int) -> Tuple[str, IndexEntry]:
         if version < 3:
             raise AssertionError(
                 'extended flag set in index with version < 3')
-        extended_flags = struct.unpack(">H", f.read(2))
+        (extended_flags, ) = struct.unpack(">H", f.read(2))
     else:
         extended_flags = 0
     name = f.read((flags & 0x0FFF))
     # Padding:
-    real_size = (f.tell() - beginoffset + 8) & ~7
-    f.read((beginoffset + real_size) - f.tell())
+    if version < 4:
+        real_size = (f.tell() - beginoffset + 8) & ~7
+        f.read((beginoffset + real_size) - f.tell())
     return (
         name,
         IndexEntry(
@@ -193,7 +194,7 @@ def read_cache_entry(f, version: int) -> Tuple[str, IndexEntry]:
         ))
 
 
-def write_cache_entry(f, name, entry, version=None):
+def write_cache_entry(f, name, entry, version):
     """Write an index entry to a file.
 
     Args:
@@ -224,8 +225,9 @@ def write_cache_entry(f, name, entry, version=None):
     if flags & FLAG_EXTENDED:
         f.write(struct.pack(b">H", entry.extended_flags))
     f.write(name)
-    real_size = (f.tell() - beginoffset + 8) & ~7
-    f.write(b"\0" * ((beginoffset + real_size) - f.tell()))
+    if version < 4:
+        real_size = (f.tell() - beginoffset + 8) & ~7
+        f.write(b"\0" * ((beginoffset + real_size) - f.tell()))
 
 
 def read_index(f: BinaryIO):
@@ -550,7 +552,7 @@ def changes_from_tree(
 
 def index_entry_from_stat(
     stat_val, hex_sha: bytes, flags: int, mode: Optional[int] = None,
-    extended_flags: Optional[int]  =None
+    extended_flags: Optional[int] = None
 ):
     """Create a new index entry from a stat value.
 

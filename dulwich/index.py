@@ -253,7 +253,7 @@ def read_index_dict(f):
     return ret
 
 
-def write_index(f: BinaryIO, entries: Iterable[Tuple[bytes, IndexEntry]], version: Optional[int] = None):
+def write_index(f: BinaryIO, entries: List[Tuple[bytes, IndexEntry]], version: Optional[int] = None):
     """Write an index file.
 
     Args:

@@ -31,6 +31,16 @@ The normalization is a two-fold process that happens at two moments:
   when doing a `git add` call. We call this process the write filter in this
   module.
 
+Note that when checking status (getting unstaged changes), whether or not
+normalization is done on write depends on whether or not the file in the
+working dir has also been normalized on read:
+
+- For autocrlf=true all files are always normalized on both read and write.
+- For autocrlf=input files are only normalized on write if they are newly
+  "added". Since files which are already committed are not normalized on
+  checkout into the working tree, they are also left alone when staging
+  modifications into the index.
+
 One thing to know is that Git does line-ending normalization only on text
 files. How does Git know that a file is text? We can either mark a file as a
 text file, a binary file or ask Git to automatically decides. Git has an
@@ -272,3 +282,25 @@ def normalize_blob(blob, conversion, binary_detection):
     new_blob.data = converted_data
 
     return new_blob
+
+
+class TreeBlobNormalizer(BlobNormalizer):
+    def __init__(self, config_stack, git_attributes, object_store, tree=None):
+        super().__init__(config_stack, git_attributes)
+        if tree:
+            self.existing_paths = {
+                name
+                for name, _, _ in object_store.iter_tree_contents(tree)
+            }
+        else:
+            self.existing_paths = set()
+
+    def checkin_normalize(self, blob, tree_path):
+        # Existing files should only be normalized on checkin if it was
+        # previously normalized on checkout
+        if (
+            self.fallback_read_filter is not None
+            or tree_path not in self.existing_paths
+        ):
+            return super().checkin_normalize(blob, tree_path)
+        return blob

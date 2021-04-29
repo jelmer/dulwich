@@ -36,9 +36,10 @@ normalization is done on write depends on whether or not the file in the
 working dir has also been normalized on read:
 
 - For autocrlf=true all files are always normalized on both read and write.
-- For autocrlf=input files are only normalized once - whenever a new file is
-  added to the index. Since files which already exist in the index are
-  unmodified on read, they are also left unmodified upon subsequent writes.
+- For autocrlf=input files are only normalized on write if they are newly
+  "added". Since files which are already committed are not normalized on
+  checkout into the working tree, they are also left alone when staging
+  modifications into the index.
 
 One thing to know is that Git does line-ending normalization only on text
 files. How does Git know that a file is text? We can either mark a file as a
@@ -242,8 +243,6 @@ class BlobNormalizer(object):
 
     def checkin_normalize(self, blob, tree_path):
         """Normalize a blob during a checkin operation"""
-        # Existing files should only be normalized on checkin if it was
-        # previously normalized on checkout
         if self.fallback_write_filter is not None:
             return normalize_blob(
                 blob, self.fallback_write_filter, binary_detection=True

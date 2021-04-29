@@ -83,7 +83,7 @@ from dulwich.hooks import (
     PostReceiveShellHook,
 )
 
-from dulwich.line_ending import BlobNormalizer
+from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
 
 from dulwich.refs import (  # noqa: F401
     ANNOTATED_TAG_SUFFIX,
@@ -1297,15 +1297,8 @@ class Repo(BaseRepo):
                     except KeyError:
                         pass
                 else:
-                    # Check if the file is already in the index
-                    try:
-                        index[tree_path]
-                        new_file = False
-                    except KeyError:
-                        new_file = True
-
                     blob = blob_from_path_and_stat(full_path, st)
-                    blob = blob_normalizer.checkin_normalize(blob, fs_path, new_file)
+                    blob = blob_normalizer.checkin_normalize(blob, fs_path)
                     self.object_store.add_object(blob)
                     index[tree_path] = index_entry_from_stat(st, blob.id, 0)
         index.write()
@@ -1539,7 +1532,17 @@ class Repo(BaseRepo):
         """Return a BlobNormalizer object"""
         # TODO Parse the git attributes files
         git_attributes = {}
-        return BlobNormalizer(self.get_config_stack(), git_attributes)
+        config_stack = self.get_config_stack()
+        try:
+            tree = self.object_store[self.refs[b"HEAD"]].tree
+            return TreeBlobNormalizer(
+                config_stack,
+                git_attributes,
+                self.object_store,
+                tree,
+            )
+        except KeyError:
+            return BlobNormalizer(config_stack, git_attributes)
 
 
 class MemoryRepo(BaseRepo):

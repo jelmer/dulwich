@@ -1825,7 +1825,7 @@ class StatusTests(PorcelainTestCase):
         self.assertListEqual(results.unstaged, [b"crlf"])
         self.assertListEqual(results.untracked, [])
 
-    def test_status_crlf_convert(self):
+    def test_status_autocrlf_true(self):
         # First make a commit as if the file has been added on a Linux system
         # or with core.autocrlf=True
         file_path = os.path.join(self.repo.path, "crlf")
@@ -1851,6 +1851,34 @@ class StatusTests(PorcelainTestCase):
 
         results = porcelain.status(self.repo)
         self.assertDictEqual({"add": [], "delete": [], "modify": []}, results.staged)
+        self.assertListEqual(results.unstaged, [])
+        self.assertListEqual(results.untracked, [])
+
+    def test_status_autocrlf_input(self):
+        # Commit existing file with CRLF
+        file_path = os.path.join(self.repo.path, "crlf-exists")
+        with open(file_path, "wb") as f:
+            f.write(b"line1\r\nline2")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"test status",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Add new (untracked) file
+        file_path = os.path.join(self.repo.path, "crlf-new")
+        with open(file_path, "wb") as f:
+            f.write(b"line1\r\nline2")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+
+        results = porcelain.status(self.repo)
+        self.assertDictEqual({"add": [b"crlf-new"], "delete": [], "modify": []}, results.staged)
         self.assertListEqual(results.unstaged, [])
         self.assertListEqual(results.untracked, [])
 

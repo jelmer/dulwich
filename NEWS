@@ -19,6 +19,8 @@
 
  * Add support for version 3 index files. (Jelmer Vernooĳ)
 
+ * Fix autocrlf=input handling. (Peter Rowlands, Boris Feld)
+
  API CHANGES
 
  * The APIs for writing and reading individual index entries have changed

@@ -524,6 +524,13 @@ class StackedConfig(Config):
 
         if "GIT_CONFIG_NOSYSTEM" not in os.environ:
             paths.append("/etc/gitconfig")
+            if sys.platform == "win32":
+                paths.extend(
+                    [
+                        "C:/Program Files/Git/etc/gitconfig",
+                        "C:/ProgramData/Git/config",
+                    ]
+                )
 
         backends = []
         for path in paths:

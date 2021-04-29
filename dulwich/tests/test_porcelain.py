@@ -1825,7 +1825,7 @@ class StatusTests(PorcelainTestCase):
         self.assertListEqual(results.unstaged, [b"crlf"])
         self.assertListEqual(results.untracked, [])
 
-    def test_status_crlf_no_convert(self):
+    def test_status_autocrlf_true(self):
         # First make a commit as if the file has been added on a Linux system
         # or with core.autocrlf=True
         file_path = os.path.join(self.repo.path, "crlf")
@@ -1849,48 +1849,36 @@ class StatusTests(PorcelainTestCase):
         c.set("core", "autocrlf", True)
         c.write_to_path()
 
-        # The file should be seen as modified as the line-ending conversion
-        # will NOT be applied since the file is already in the store and in
-        # the staging area
         results = porcelain.status(self.repo)
         self.assertDictEqual({"add": [], "delete": [], "modify": []}, results.staged)
-        self.assertListEqual(results.unstaged, [b"crlf"])
-        self.assertListEqual(results.untracked, [])
-
-    def test_status_crlf_convert(self):
-        # With an empty repo
-        file_path = os.path.join(self.repo.path, 'crlf')
-        repo = Repo(self.repo_path)
-
-        c = self.repo.get_config()
-        c.set("core", "autocrlf", True)
-        c.write_to_path()
-
-        # Write the file as it would be on Windows
-        with open(file_path, 'wb') as f:
-            f.write(b'line1\r\nline2')
-
-        # Stage the file, the conversion should happens as the file is new
-        repo.stage([b"crlf"])
-
-        # So far, the file should be seen only as added
-        results = porcelain.status(self.repo)
-        self.assertDictEqual(
-            {'add': [b"crlf"], 'delete': [], 'modify': []},
-            results.staged)
         self.assertListEqual(results.unstaged, [])
         self.assertListEqual(results.untracked, [])
 
-        # Then update the file line-ending to Unix line endings
-        with open(file_path, 'wb') as f:
-            f.write(b'line1\nline2')
+    def test_status_autocrlf_input(self):
+        # Commit existing file with CRLF
+        file_path = os.path.join(self.repo.path, "crlf-exists")
+        with open(file_path, "wb") as f:
+            f.write(b"line1\r\nline2")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"test status",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
 
-        # It should match the blob in staging area, so the file shouldn't be
-        # shown as unstaged
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Add new (untracked) file
+        file_path = os.path.join(self.repo.path, "crlf-new")
+        with open(file_path, "wb") as f:
+            f.write(b"line1\r\nline2")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+
         results = porcelain.status(self.repo)
-        self.assertDictEqual(
-            {'add': [b"crlf"], 'delete': [], 'modify': []},
-            results.staged)
+        self.assertDictEqual({"add": [b"crlf-new"], "delete": [], "modify": []}, results.staged)
         self.assertListEqual(results.unstaged, [])
         self.assertListEqual(results.untracked, [])
 

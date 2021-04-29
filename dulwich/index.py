@@ -827,13 +827,7 @@ def get_unstaged_changes(index: Index, root_path, filter_blob_callback=None):
             blob = blob_from_path_and_stat(full_path, st)
 
             if filter_blob_callback is not None:
-                try:
-                    index[tree_path]
-                    new_file = False
-                except KeyError:
-                    new_file = True
-
-                blob = filter_blob_callback(blob, tree_path, new_file)
+                blob = filter_blob_callback(blob, tree_path)
         except FileNotFoundError:
             # The file was removed, so we assume that counts as
             # different from whatever file used to exist.

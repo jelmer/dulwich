@@ -240,14 +240,11 @@ class BlobNormalizer(object):
             core_eol, core_autocrlf, self.gitattributes
         )
 
-    def checkin_normalize(self, blob, tree_path, new_file=False):
+    def checkin_normalize(self, blob, tree_path):
         """Normalize a blob during a checkin operation"""
         # Existing files should only be normalized on checkin if it was
         # previously normalized on checkout
-        if (
-            self.fallback_write_filter is not None
-            and (self.fallback_read_filter is not None or new_file)
-        ):
+        if self.fallback_write_filter is not None:
             return normalize_blob(
                 blob, self.fallback_write_filter, binary_detection=True
             )
@@ -286,3 +283,25 @@ def normalize_blob(blob, conversion, binary_detection):
     new_blob.data = converted_data
 
     return new_blob
+
+
+class TreeBlobNormalizer(BlobNormalizer):
+    def __init__(self, config_stack, git_attributes, object_store, tree=None):
+        super().__init__(config_stack, git_attributes)
+        if tree:
+            self.existing_paths = {
+                name
+                for name, _, _ in object_store.iter_tree_contents(tree)
+            }
+        else:
+            self.existing_paths = set()
+
+    def checkin_normalize(self, blob, tree_path):
+        # Existing files should only be normalized on checkin if it was
+        # previously normalized on checkout
+        if (
+            self.fallback_read_filter is not None
+            or tree_path not in self.existing_paths
+        ):
+            return super().checkin_normalize(blob, tree_path)
+        return blob

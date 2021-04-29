@@ -800,7 +800,7 @@ def _has_directory_changed(tree_path, entry):
     return False
 
 
-def get_unstaged_changes(index: Index, repo, filter_blob_callback=None):
+def get_unstaged_changes(index: Index, root_path, filter_blob_callback=None):
     """Walk through an index and check for differences against working tree.
 
     Args:
@@ -808,7 +808,6 @@ def get_unstaged_changes(index: Index, repo, filter_blob_callback=None):
       root_path: path in which to find files
     Returns: iterator over paths with unstaged changes
     """
-    root_path = repo.path
     # For each entry in the index check the sha1 & ensure not staged
     if not isinstance(root_path, bytes):
         root_path = os.fsencode(root_path)
@@ -828,7 +827,6 @@ def get_unstaged_changes(index: Index, repo, filter_blob_callback=None):
             blob = blob_from_path_and_stat(full_path, st)
 
             if filter_blob_callback is not None:
-                # Check if the file is already in the index
                 try:
                     index[tree_path]
                     new_file = False

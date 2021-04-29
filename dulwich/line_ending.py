@@ -31,8 +31,14 @@ The normalization is a two-fold process that happens at two moments:
   when doing a `git add` call. We call this process the write filter in this
   module.
 
-The normalization only happens when the resulting file does not exists yet.
-For the write filter, they are files that are shown as added in status.
+Note that when checking status (getting unstaged changes), whether or not
+normalization is done on write depends on whether or not the file in the
+working dir has also been normalized on read:
+
+- For autocrlf=true all files are always normalized on both read and write.
+- For autocrlf=input files are only normalized once - whenever a new file is
+  added to the index. Since files which already exist in the index are
+  unmodified on read, they are also left unmodified upon subsequent writes.
 
 One thing to know is that Git does line-ending normalization only on text
 files. How does Git know that a file is text? We can either mark a file as a
@@ -234,33 +240,22 @@ class BlobNormalizer(object):
             core_eol, core_autocrlf, self.gitattributes
         )
 
-    def checkin_normalize(self, blob, tree_path, new_file=True):
-        """ Normalize a blob during a checkin operation
-
-        new_file is set to True by default for backward-compatibility
-        """
-        if not new_file:
-            # Line-ending normalization only happens for new files, aka files
-            # not already commited
-            return blob
-
-        if self.fallback_write_filter is not None:
+    def checkin_normalize(self, blob, tree_path, new_file=False):
+        """Normalize a blob during a checkin operation"""
+        # Existing files should only be normalized on checkin if it was
+        # previously normalized on checkout
+        if (
+            self.fallback_write_filter is not None
+            and (self.fallback_read_filter is not None or new_file)
+        ):
             return normalize_blob(
                 blob, self.fallback_write_filter, binary_detection=True
             )
 
         return blob
 
-    def checkout_normalize(self, blob, tree_path, new_file=True):
-        """ Normalize a blob during a checkout operation
-
-        new_file is set to True by default for backward-compatibility
-        """
-        if not new_file:
-            # Line-ending normalization only happens for new files, aka files
-            # not already commited
-            return blob
-
+    def checkout_normalize(self, blob, tree_path):
+        """Normalize a blob during a checkout operation"""
         if self.fallback_read_filter is not None:
             return normalize_blob(
                 blob, self.fallback_read_filter, binary_detection=True

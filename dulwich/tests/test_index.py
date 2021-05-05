@@ -175,17 +175,17 @@ class SimpleIndexWriterTestCase(IndexTestCase):
             (
                 b"barbla",
                 IndexEntry(
-                (1230680220, 0),
-                (1230680220, 0),
-                2050,
-                3761020,
-                33188,
-                1000,
-                1000,
-                0,
-                b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
-                0,
-                0)
+                    (1230680220, 0),
+                    (1230680220, 0),
+                    2050,
+                    3761020,
+                    33188,
+                    1000,
+                    1000,
+                    0,
+                    b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+                    0,
+                    0)
             )
         ]
         filename = os.path.join(self.tempdir, "test-simple-write-index")

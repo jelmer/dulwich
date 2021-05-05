@@ -535,13 +535,13 @@ def _find_git_in_win_reg():
 
 # There is no set standard for system config dirs on windows. We try the
 # following:
-#   - %ProgramData%/Git/config - (deprecated) Windows config dir per CGit docs
-#   - %ProgramFiles%/Git/etc/gitconfig - Git for Windows (msysgit) config dir
+#   - %PROGRAMDATA%/Git/config - (deprecated) Windows config dir per CGit docs
+#   - %PROGRAMFILES%/Git/etc/gitconfig - Git for Windows (msysgit) config dir
 #     Used if CGit installation (Git/bin/git.exe) is found in PATH in the
 #     system registry
 def get_win_system_paths():
-    if "ProgramData" in os.environ:
-        yield os.path.join(os.environ["ProgramData"], "Git", "config")
+    if "PROGRAMDATA" in os.environ:
+        yield os.path.join(os.environ["PROGRAMDATA"], "Git", "config")
 
     for git_dir in _find_git_in_win_path():
         yield os.path.join(git_dir, "etc", "gitconfig")

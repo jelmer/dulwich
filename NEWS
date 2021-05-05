@@ -21,6 +21,9 @@
 
  * Fix autocrlf=input handling. (Peter Rowlands, Boris Feld)
 
+ * Attempt to find C Git global config on Windows.
+   (Peter Rowlands)
+
  API CHANGES
 
  * The APIs for writing and reading individual index entries have changed

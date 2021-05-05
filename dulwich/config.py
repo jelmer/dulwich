@@ -498,6 +498,57 @@ def get_xdg_config_home_path(*path_segments):
     return os.path.join(xdg_config_home, *path_segments)
 
 
+def _find_git_in_win_path():
+    for exe in ("git.exe", "git.cmd"):
+        for path in os.environ.get("PATH", "").split(";"):
+            if os.path.exists(os.path.join(path, exe)):
+                # exe path is .../Git/bin/git.exe or .../Git/cmd/git.exe
+                git_dir, _bin_dir = os.path.split(path)
+                yield git_dir
+                break
+
+
+def _find_git_in_win_reg():
+    import platform
+    import winreg
+
+    if platform.machine() == "AMD64":
+        subkey = (
+            "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\"
+            "CurrentVersion\\Uninstall\\Git_is1"
+        )
+    else:
+        subkey = (
+            "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\"
+            "Uninstall\\Git_is1"
+        )
+
+    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            with winreg.OpenKey(key, subkey) as k:
+                val, typ = winreg.QueryValueEx(k, "InstallLocation")
+                if typ == winreg.REG_SZ:
+                    yield val
+        except OSError:
+            pass
+
+
+# There is no set standard for system config dirs on windows. We try the
+# following:
+#   - %ProgramData%/Git/config - (deprecated) Windows config dir per CGit docs
+#   - %ProgramFiles%/Git/etc/gitconfig - Git for Windows (msysgit) config dir
+#     Used if CGit installation (Git/bin/git.exe) is found in PATH in the
+#     system registry
+def get_win_system_paths():
+    if "ProgramData" in os.environ:
+        yield os.path.join(os.environ["ProgramData"], "Git", "config")
+
+    for git_dir in _find_git_in_win_path():
+        yield os.path.join(git_dir, "etc", "gitconfig")
+    for git_dir in _find_git_in_win_reg():
+        yield os.path.join(git_dir, "etc", "gitconfig")
+
+
 class StackedConfig(Config):
     """Configuration which reads from multiple config files.."""
 
@@ -525,12 +576,7 @@ class StackedConfig(Config):
         if "GIT_CONFIG_NOSYSTEM" not in os.environ:
             paths.append("/etc/gitconfig")
             if sys.platform == "win32":
-                paths.extend(
-                    [
-                        "C:/Program Files/Git/etc/gitconfig",
-                        "C:/ProgramData/Git/config",
-                    ]
-                )
+                paths.extend(get_win_system_paths())
 
         backends = []
         for path in paths:

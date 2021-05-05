@@ -20,7 +20,12 @@
 
 """Tests for reading and writing configuration files."""
 
+import os
+import sys
 from io import BytesIO
+from unittest import skipIf
+from unittest.mock import patch
+
 from dulwich.config import (
     ConfigDict,
     ConfigFile,
@@ -268,8 +273,54 @@ class ConfigDictTests(TestCase):
 
 
 class StackedConfigTests(TestCase):
+    def setUp(self):
+        super(StackedConfigTests, self).setUp()
+        self._old_path = os.environ.get("PATH")
+
+    def tearDown(self):
+        super(StackedConfigTests, self).tearDown()
+        os.environ["PATH"] = self._old_path
+
     def test_default_backends(self):
         StackedConfig.default_backends()
+
+    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    def test_windows_config_from_path(self):
+        from dulwich.config import get_win_system_paths
+
+        install_dir = os.path.join("C:", "foo", "Git")
+        os.environ["PATH"] = os.path.join(install_dir, "cmd")
+        with patch("os.path.exists", return_value=True):
+            paths = set(get_win_system_paths())
+        self.assertEqual(
+            {
+                os.path.join(os.environ.get("ProgramData"), "Git", "config"),
+                os.path.join(install_dir, "etc", "gitconfig"),
+            },
+            paths,
+        )
+
+    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    def test_windows_config_from_reg(self):
+        import winreg
+
+        from dulwich.config import get_win_system_paths
+
+        del os.environ["PATH"]
+        install_dir = os.path.join("C:", "foo", "Git")
+        with patch("winreg.OpenKey"):
+            with patch(
+                "winreg.QueryValueEx",
+                return_value=(install_dir, winreg.REG_SZ),
+            ):
+                paths = set(get_win_system_paths())
+        self.assertEqual(
+            {
+                os.path.join(os.environ.get("ProgramData"), "Git", "config"),
+                os.path.join(install_dir, "etc", "gitconfig"),
+            },
+            paths,
+        )
 
 
 class EscapeValueTests(TestCase):

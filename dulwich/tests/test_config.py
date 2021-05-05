@@ -294,7 +294,7 @@ class StackedConfigTests(TestCase):
             paths = set(get_win_system_paths())
         self.assertEqual(
             {
-                os.path.join(os.environ.get("ProgramData"), "Git", "config"),
+                os.path.join(os.environ.get("PROGRAMDATA"), "Git", "config"),
                 os.path.join(install_dir, "etc", "gitconfig"),
             },
             paths,
@@ -316,7 +316,7 @@ class StackedConfigTests(TestCase):
                 paths = set(get_win_system_paths())
         self.assertEqual(
             {
-                os.path.join(os.environ.get("ProgramData"), "Git", "config"),
+                os.path.join(os.environ.get("PROGRAMDATA"), "Git", "config"),
                 os.path.join(install_dir, "etc", "gitconfig"),
             },
             paths,

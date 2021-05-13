@@ -9,9 +9,8 @@ Example usage:
 
 import sys
 
-from dulwich.repo import Repo
-
 from dulwich.patch import write_tree_diff
+from dulwich.repo import Repo
 
 
 REPO_PATH = "."

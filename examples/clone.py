@@ -9,11 +9,9 @@ Example usage:
 """
 
 
-import sys
-
-from os.path import basename
-
 from getopt import getopt
+from os.path import basename
+import sys
 
 from dulwich import porcelain
 
@@ -28,9 +26,7 @@ if len(args) < 2:
 elif len(args) < 3:
     target_path = basename(args[1].split(":")[-1])
     if target_path[-4:] == ".git":
-        porcelain.clone(args[1], target_path[:-4])
-    else:
-        porcelain.clone(args[1], target_path)
+        target_path = target_path[:-4]
 
 else:
     target_path = args[2]

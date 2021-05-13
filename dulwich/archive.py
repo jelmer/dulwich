@@ -22,19 +22,13 @@ License, Version 2.0.
 
 """
 
-import posixpath
-
-import stat
-
-import tarfile
-
-import struct
-
-from os import SEEK_END
-
-from io import BytesIO
-
 from contextlib import closing
+from io import BytesIO
+from os import SEEK_END
+import posixpath
+import stat
+import struct
+import tarfile
 
 
 class ChunkedBytesIO(object):  # pylint: disable=too-few-public-methods

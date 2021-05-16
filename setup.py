@@ -9,9 +9,7 @@ Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
 # Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
 import io
-
 import os
-
 import sys
 
 try:
@@ -24,10 +22,8 @@ except ImportError:
 else:
     HAS_SETUPTOOLS = True
 from distutils.core import Distribution
-
-from typing import Dict
-
 from typing import Any
+from typing import Dict
 
 
 if sys.version_info < (3, 6):
@@ -63,10 +59,11 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     # XCode 4.0 dropped support for ppc architecture, which is hardcoded in
     # distutils.sysconfig
     import subprocess
-    p = subprocess.Popen(
-        ['/usr/bin/xcodebuild', '-version'], stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, env={})
-    out, err = p.communicate()
+    with subprocess.Popen(
+            ['/usr/bin/xcodebuild', '-version'], stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, env={}) as popen:
+        out, err = popen.communicate()
+
     for line in out.splitlines():
         line = line.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely

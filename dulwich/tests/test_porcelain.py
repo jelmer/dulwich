@@ -1820,11 +1820,6 @@ class StatusTests(PorcelainTestCase):
         with open(file_path, "wb") as f:
             f.write(b"line1\r\nline2")
 
-        if sys.platform == "win32":
-            c = self.repo.get_config()
-            c.set("core", "autocrlf", "false")
-            c.write_to_path()
-
         results = porcelain.status(self.repo)
         self.assertDictEqual({"add": [], "delete": [], "modify": []}, results.staged)
         self.assertListEqual(results.unstaged, [b"crlf"])
@@ -1861,10 +1856,6 @@ class StatusTests(PorcelainTestCase):
 
     def test_status_autocrlf_input(self):
         # Commit existing file with CRLF
-        c = self.repo.get_config()
-        c.set("core", "autocrlf", "false")
-        c.write_to_path()
-
         file_path = os.path.join(self.repo.path, "crlf-exists")
         with open(file_path, "wb") as f:
             f.write(b"line1\r\nline2")

@@ -881,6 +881,23 @@ class Tag(ShaFile):
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 
+    def verify(self):
+        """Verify GPG signature for this tag (if it is signed).
+
+        Raises:
+          gpg.errors.BadSignatures: if GPG signature verification fails
+        """
+        if self._signature is None:
+            return
+
+        import gpg
+
+        with gpg.Context() as ctx:
+            unused_data, unused_result = ctx.verify(
+                self.as_raw_string()[: -len(self._signature)],
+                self._signature,
+            )
+
 
 class TreeEntry(namedtuple("TreeEntry", ["path", "mode", "sha"])):
     """Named tuple encapsulating a single tree entry."""

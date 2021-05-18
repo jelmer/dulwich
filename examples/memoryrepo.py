@@ -8,14 +8,12 @@ Example usage:
 """
 
 import stat
-
 import sys
 
-from dulwich import porcelain
-
 from dulwich.objects import Blob
-
+from dulwich import porcelain
 from dulwich.repo import MemoryRepo
+
 
 local_repo = MemoryRepo()
 local_repo.refs.set_symbolic_ref(b'HEAD', b'refs/heads/master')

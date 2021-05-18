@@ -1,4 +1,7 @@
-# test_bundle.py -- tests for bundle
+"""Tests for bundle support.
+
+test_bundle.py -- tests for bundle.
+"""
 # Copyright (C) 2020 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -18,20 +21,13 @@
 # License, Version 2.0.
 #
 
-"""Tests for bundle support."""
-
 import os
 import tempfile
 
-from dulwich.tests import (
-    TestCase,
-)
-
-from dulwich.bundle import (
-    Bundle,
-    read_bundle,
-    write_bundle,
-)
+from dulwich.bundle import Bundle
+from dulwich.bundle import read_bundle
+from dulwich.bundle import write_bundle
+from dulwich.tests import TestCase
 
 
 class BundleTests(TestCase):

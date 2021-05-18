@@ -1,7 +1,6 @@
 """Example printing the last author of a specified file."""
 
 import sys
-
 import time
 
 from dulwich.repo import Repo

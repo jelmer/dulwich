@@ -1,45 +1,46 @@
 """Simple command-line interface to Dulwich>.
 
 dulwich - Simple command-line interface to Dulwich
-Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
-vim: expandtab
-
-Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-General Public License as public by the Free Software Foundation; version 2.0
-or (at your option) any later version. You can redistribute it and/or
-modify it under the terms of either of these two licenses.
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-You should have received a copy of the licenses; if not, see
-<http://www.gnu.org/licenses/> for a copy of the GNU General Public License
-and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
-License, Version 2.0.
-
-This is a very simple command-line wrapper for Dulwich. It is by
-no means intended to be a full-blown Git command-line interface but just
-a way to test Dulwich.
 """
+# Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
+# vim: expandtab
+#
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
+# This is a very simple command-line wrapper for Dulwich. It is by
+# no means intended to be a full-blown Git command-line interface but just
+# a way to test Dulwich.
 
 import argparse
 from getopt import getopt
-import optparse
+from optparse import OptionParser
 import os
-from typing import Dict
-from typing import Type
 import signal
 import sys
+from typing import Dict
+from typing import Type
 
-from dulwich import porcelain
 from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
-from dulwich.pack import Pack, sha_to_hex
+from dulwich.pack import Pack
+from dulwich.pack import sha_to_hex
 from dulwich.patch import write_tree_diff
+from dulwich import porcelain
 from dulwich.repo import Repo
 
 
@@ -142,7 +143,7 @@ class cmd_fsck(Command):
 
 class cmd_log(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         parser.add_option(
             "--reverse",
             dest="reverse",
@@ -235,7 +236,7 @@ class cmd_init(Command):
 
 class cmd_clone(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         parser.add_option(
             "--bare",
             dest="bare",
@@ -321,7 +322,7 @@ class cmd_rev_list(Command):
 
 class cmd_tag(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         parser.add_option(
             "-a",
             "--annotated",
@@ -363,7 +364,7 @@ class cmd_daemon(Command):
         from dulwich import log_utils
         from dulwich.protocol import TCP_GIT_PORT
 
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         parser.add_option(
             "-l",
             "--listen_address",
@@ -394,7 +395,7 @@ class cmd_web_daemon(Command):
     def run(self, args):
         from dulwich import log_utils
 
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         parser.add_option(
             "-l",
             "--listen_address",
@@ -423,14 +424,14 @@ class cmd_web_daemon(Command):
 
 class cmd_write_tree(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         sys.stdout.write("%s\n" % porcelain.write_tree("."))
 
 
 class cmd_receive_pack(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
@@ -441,7 +442,7 @@ class cmd_receive_pack(Command):
 
 class cmd_upload_pack(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
@@ -452,7 +453,7 @@ class cmd_upload_pack(Command):
 
 class cmd_status(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
@@ -492,7 +493,7 @@ class cmd_ls_remote(Command):
 
 class cmd_ls_tree(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         parser.add_option(
             "-r",
             "--recursive",
@@ -538,7 +539,7 @@ class cmd_pack_objects(Command):
 
 class cmd_pull(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         try:
             from_location = args[0]
@@ -559,7 +560,7 @@ class cmd_push(Command):
 
 class cmd_remote_add(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         porcelain.remote_add(".", args[0], args[1])
 
@@ -590,7 +591,7 @@ class cmd_remote(SuperCommand):
 
 class cmd_check_ignore(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         ret = 1
         for path in porcelain.check_ignore(".", args):
@@ -601,7 +602,7 @@ class cmd_check_ignore(Command):
 
 class cmd_check_mailmap(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         for arg in args:
             canonical_identity = porcelain.check_mailmap(".", arg)
@@ -610,7 +611,7 @@ class cmd_check_mailmap(Command):
 
 class cmd_stash_list(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         for i, entry in porcelain.stash_list("."):
             print("stash@{%d}: %s" % (i, entry.message.rstrip("\n")))
@@ -618,7 +619,7 @@ class cmd_stash_list(Command):
 
 class cmd_stash_push(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         porcelain.stash_push(".")
         print("Saved working directory and index state")
@@ -626,7 +627,7 @@ class cmd_stash_push(Command):
 
 class cmd_stash_pop(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         porcelain.stash_pop(".")
         print("Restrored working directory and index state")
@@ -643,7 +644,7 @@ class cmd_stash(SuperCommand):
 
 class cmd_ls_files(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         for name in porcelain.ls_files("."):
             print(name)
@@ -651,14 +652,14 @@ class cmd_ls_files(Command):
 
 class cmd_describe(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         options, args = parser.parse_args(args)
         print(porcelain.describe("."))
 
 
 class cmd_help(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
+        parser = OptionParser()
         parser.add_option(
             "-a",
             "--all",

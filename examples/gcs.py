@@ -1,11 +1,7 @@
-#!/usr/bin/python3
-
-from dulwich.repo import Repo
-from dulwich.cloud.gcs import GcsObjectStore
-
 import tempfile
-
+from dulwich.cloud.gcs import GcsObjectStore
 from google.cloud import storage
+from dulwich.repo import Repo
 
 client = storage.Client()
 bucket = client.get_bucket('mybucket')

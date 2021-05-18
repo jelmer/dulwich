@@ -1105,6 +1105,8 @@ class RevListTests(PorcelainTestCase):
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTests(PorcelainGpgTestCase):
     def test_default_key(self):
+        import gpg
+
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
@@ -1132,6 +1134,12 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
+
+        tag._chunked_text = [b"bad data", tag._signature]
+        self.assertRaises(
+            gpg.errors.BadSignatures,
+            tag.verify,
+        )
 
     def test_non_default_key(self):
         c1, c2, c3 = build_commit_graph(

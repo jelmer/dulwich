@@ -1,4 +1,4 @@
-# test_utils.py -- Tests for git compatibility utilities
+# test_porcelain .py -- Tests for dulwich.porcelain/CGit compatibility
 # Copyright (C) 2010 Google, Inc.
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU

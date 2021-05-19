@@ -30,6 +30,7 @@ import stat
 from typing import (
     Optional,
     Dict,
+    Iterable,
     Union,
     Type,
 )
@@ -881,11 +882,19 @@ class Tag(ShaFile):
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 
-    def verify(self):
+    def verify(self, keyids: Optional[Iterable[str]] = None):
         """Verify GPG signature for this tag (if it is signed).
+
+        Args:
+          keyids: Optional iterable of trusted keyids for this tag.
+            If this tag is not signed by any key in keyids verification will
+            fail. If not specified, this function only verifies that the tag
+            has a valid signature.
 
         Raises:
           gpg.errors.BadSignatures: if GPG signature verification fails
+          gpg.errors.MissingSignatures: if tag was not signed by a key
+            specified in keyids
         """
         if self._signature is None:
             return
@@ -893,10 +902,23 @@ class Tag(ShaFile):
         import gpg
 
         with gpg.Context() as ctx:
-            unused_data, unused_result = ctx.verify(
+            data, result = ctx.verify(
                 self.as_raw_string()[: -len(self._signature)],
-                self._signature,
+                signature=self._signature,
             )
+            if keyids:
+                keys = [
+                    ctx.get_key(key)
+                    for key in keyids
+                ]
+                for key in keys:
+                    for subkey in keys:
+                        for sig in result.signatures:
+                            if subkey.can_sign and subkey.fpr == sig.fpr:
+                                return
+                raise gpg.errors.MissingSignatures(
+                    result, keys, results=(data, result)
+                )
 
 
 class TreeEntry(namedtuple("TreeEntry", ["path", "mode", "sha"])):

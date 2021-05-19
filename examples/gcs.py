@@ -1,7 +1,10 @@
+"""."""
+
 import tempfile
 from dulwich.cloud.gcs import GcsObjectStore
-from google.cloud import storage
 from dulwich.repo import Repo
+from google.cloud import storage
+
 
 client = storage.Client()
 bucket = client.get_bucket('mybucket')

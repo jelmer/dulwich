@@ -1,7 +1,3 @@
-"""Bundle format support.
-
-bundle.py -- Bundle format support
-"""
 # Copyright (C) 2020 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -19,6 +15,8 @@ bundle.py -- Bundle format support
 # <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
+"""Bundle format support."""
+
 from typing import Dict
 from typing import List
 from typing import Optional

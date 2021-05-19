@@ -1,7 +1,3 @@
-"""Simple command-line interface to Dulwich>.
-
-dulwich - Simple command-line interface to Dulwich
-"""
 # Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>
 # vim: expandtab
 #
@@ -21,13 +17,15 @@ dulwich - Simple command-line interface to Dulwich
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 #
-# This is a very simple command-line wrapper for Dulwich. It is by
-# no means intended to be a full-blown Git command-line interface but just
-# a way to test Dulwich.
+"""Simple command-line interface to Dulwich.
 
-import argparse
+This is a very simple command-line wrapper for Dulwich. It is by
+no means intended to be a full-blown Git command-line interface but just
+a way to test Dulwich.
+"""
+
+from argparse import ArgumentParser
 from getopt import getopt
-from optparse import OptionParser
 import os
 import signal
 import sys
@@ -64,7 +62,7 @@ class Command(object):
 
 class cmd_archive(Command):
     def run(self, args):
-        parser = argparse.ArgumentParser()
+        parser = ArgumentParser()
         parser.add_argument(
             "--remote",
             type=str,
@@ -89,7 +87,7 @@ class cmd_archive(Command):
 
 class cmd_add(Command):
     def run(self, argv):
-        parser = argparse.ArgumentParser()
+        parser = ArgumentParser()
         args = parser.parse_args(argv)
 
         porcelain.add(".", paths=args)
@@ -97,7 +95,7 @@ class cmd_add(Command):
 
 class cmd_rm(Command):
     def run(self, argv):
-        parser = argparse.ArgumentParser()
+        parser = ArgumentParser()
         args = parser.parse_args(argv)
 
         porcelain.rm(".", paths=args)
@@ -105,7 +103,7 @@ class cmd_rm(Command):
 
 class cmd_fetch_pack(Command):
     def run(self, argv):
-        parser = argparse.ArgumentParser()
+        parser = ArgumentParser()
         parser.add_argument('--all', action='store_true')
         parser.add_argument('location', nargs='?', type=str)
         args = parser.parse_args(argv)
@@ -143,14 +141,14 @@ class cmd_fsck(Command):
 
 class cmd_log(Command):
     def run(self, args):
-        parser = OptionParser()
-        parser.add_option(
+        parser = ArgumentParser()
+        parser.add_argument(
             "--reverse",
             dest="reverse",
             action="store_true",
             help="Reverse order in which entries are printed",
         )
-        parser.add_option(
+        parser.add_argument(
             "--name-status",
             dest="name_status",
             action="store_true",
@@ -179,7 +177,8 @@ class cmd_diff(Command):
         commit_id = args[0]
         commit = r[commit_id]
         parent_commit = r[commit.parents[0]]
-        write_tree_diff(sys.stdout, r.object_store, parent_commit.tree, commit.tree)
+        write_tree_diff(
+            sys.stdout, r.object_store, parent_commit.tree, commit.tree)
 
 
 class cmd_dump_pack(Command):
@@ -236,14 +235,14 @@ class cmd_init(Command):
 
 class cmd_clone(Command):
     def run(self, args):
-        parser = OptionParser()
-        parser.add_option(
+        parser = ArgumentParser()
+        parser.add_argument(
             "--bare",
             dest="bare",
             help="Whether to create a bare repository.",
             action="store_true",
         )
-        parser.add_option(
+        parser.add_argument(
             "--depth", dest="depth", type=int, help="Depth at which to fetch"
         )
         options, args = parser.parse_args(args)
@@ -296,7 +295,7 @@ class cmd_symbolic_ref(Command):
 
 class cmd_show(Command):
     def run(self, argv):
-        parser = argparse.ArgumentParser()
+        parser = ArgumentParser()
         parser.add_argument('objectish', type=str, nargs='*')
         args = parser.parse_args(argv)
         porcelain.show(".", args.objectish or None)
@@ -322,14 +321,14 @@ class cmd_rev_list(Command):
 
 class cmd_tag(Command):
     def run(self, args):
-        parser = OptionParser()
-        parser.add_option(
+        parser = ArgumentParser()
+        parser.add_argument(
             "-a",
             "--annotated",
             help="Create an annotated tag.",
             action="store_true",
         )
-        parser.add_option(
+        parser.add_argument(
             "-s", "--sign", help="Sign the annotated tag.", action="store_true"
         )
         options, args = parser.parse_args(args)
@@ -364,15 +363,15 @@ class cmd_daemon(Command):
         from dulwich import log_utils
         from dulwich.protocol import TCP_GIT_PORT
 
-        parser = OptionParser()
-        parser.add_option(
+        parser = ArgumentParser()
+        parser.add_argument(
             "-l",
             "--listen_address",
             dest="listen_address",
             default="localhost",
             help="Binding IP address.",
         )
-        parser.add_option(
+        parser.add_argument(
             "-p",
             "--port",
             dest="port",
@@ -388,22 +387,23 @@ class cmd_daemon(Command):
         else:
             gitdir = "."
 
-        porcelain.daemon(gitdir, address=options.listen_address, port=options.port)
+        porcelain.daemon(
+            gitdir, address=options.listen_address, port=options.port)
 
 
 class cmd_web_daemon(Command):
     def run(self, args):
         from dulwich import log_utils
 
-        parser = OptionParser()
-        parser.add_option(
+        parser = ArgumentParser()
+        parser.add_argument(
             "-l",
             "--listen_address",
             dest="listen_address",
             default="",
             help="Binding IP address.",
         )
-        parser.add_option(
+        parser.add_argument(
             "-p",
             "--port",
             dest="port",
@@ -419,20 +419,21 @@ class cmd_web_daemon(Command):
         else:
             gitdir = "."
 
-        porcelain.web_daemon(gitdir, address=options.listen_address, port=options.port)
+        porcelain.web_daemon(
+            gitdir, address=options.listen_address, port=options.port)
 
 
 class cmd_write_tree(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         sys.stdout.write("%s\n" % porcelain.write_tree("."))
 
 
 class cmd_receive_pack(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
         else:
@@ -442,8 +443,8 @@ class cmd_receive_pack(Command):
 
 class cmd_upload_pack(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
         else:
@@ -453,8 +454,8 @@ class cmd_upload_pack(Command):
 
 class cmd_status(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
         else:
@@ -465,13 +466,18 @@ class cmd_status(Command):
             for kind, names in status.staged.items():
                 for name in names:
                     sys.stdout.write(
-                        "\t%s: %s\n" % (kind, name.decode(sys.getfilesystemencoding()))
+                        "\t%s: %s\n" % (
+                            kind, name.decode(sys.getfilesystemencoding())
+                        )
                     )
             sys.stdout.write("\n")
         if status.unstaged:
             sys.stdout.write("Changes not staged for commit:\n\n")
             for name in status.unstaged:
-                sys.stdout.write("\t%s\n" % name.decode(sys.getfilesystemencoding()))
+                sys.stdout.write("\t%s\n" % name.decode(
+                    sys.getfilesystemencoding()
+                    )
+                )
             sys.stdout.write("\n")
         if status.untracked:
             sys.stdout.write("Untracked files:\n\n")
@@ -493,14 +499,15 @@ class cmd_ls_remote(Command):
 
 class cmd_ls_tree(Command):
     def run(self, args):
-        parser = OptionParser()
-        parser.add_option(
+        parser = ArgumentParser()
+        parser.add_argument(
             "-r",
             "--recursive",
             action="store_true",
             help="Recusively list tree contents.",
         )
-        parser.add_option("--name-only", action="store_true", help="Only display name.")
+        parser.add_argument(
+            "--name-only", action="store_true", help="Only display name.")
         options, args = parser.parse_args(args)
         try:
             treeish = args.pop(0)
@@ -539,8 +546,8 @@ class cmd_pack_objects(Command):
 
 class cmd_pull(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         try:
             from_location = args[0]
         except IndexError:
@@ -551,7 +558,7 @@ class cmd_pull(Command):
 class cmd_push(Command):
 
     def run(self, argv):
-        parser = argparse.ArgumentParser()
+        parser = ArgumentParser()
         parser.add_argument('to_location', type=str)
         parser.add_argument('refspec', type=str, nargs='*')
         args = parser.parse_args(argv)
@@ -560,8 +567,8 @@ class cmd_push(Command):
 
 class cmd_remote_add(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         porcelain.remote_add(".", args[0], args[1])
 
 
@@ -571,7 +578,9 @@ class SuperCommand(Command):
 
     def run(self, args):
         if not args:
-            print("Supported subcommands: %s" % ", ".join(self.subcommands.keys()))
+            print(
+                "Supported subcommands: %s" % ", ".join(
+                    self.subcommands.keys()))
             return False
         cmd = args[0]
         try:
@@ -591,8 +600,8 @@ class cmd_remote(SuperCommand):
 
 class cmd_check_ignore(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         ret = 1
         for path in porcelain.check_ignore(".", args):
             print(path)
@@ -602,8 +611,8 @@ class cmd_check_ignore(Command):
 
 class cmd_check_mailmap(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         for arg in args:
             canonical_identity = porcelain.check_mailmap(".", arg)
             print(canonical_identity)
@@ -611,24 +620,24 @@ class cmd_check_mailmap(Command):
 
 class cmd_stash_list(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         for i, entry in porcelain.stash_list("."):
             print("stash@{%d}: %s" % (i, entry.message.rstrip("\n")))
 
 
 class cmd_stash_push(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         porcelain.stash_push(".")
         print("Saved working directory and index state")
 
 
 class cmd_stash_pop(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         porcelain.stash_pop(".")
         print("Restrored working directory and index state")
 
@@ -644,23 +653,23 @@ class cmd_stash(SuperCommand):
 
 class cmd_ls_files(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         for name in porcelain.ls_files("."):
             print(name)
 
 
 class cmd_describe(Command):
     def run(self, args):
-        parser = OptionParser()
-        options, args = parser.parse_args(args)
+        parser = ArgumentParser()
+        _, args = parser.parse_args(args)
         print(porcelain.describe("."))
 
 
 class cmd_help(Command):
     def run(self, args):
-        parser = OptionParser()
-        parser.add_option(
+        parser = ArgumentParser()
+        parser.add_argument(
             "-a",
             "--all",
             dest="all",

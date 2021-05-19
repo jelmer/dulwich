@@ -1,12 +1,8 @@
 #!/usr/bin/python3
 # encoding: utf-8
-"""Setup file for dulwich.
-
-Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
-"""
-
-# Setup file for dulwich
 # Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
+"""Setup file for dulwich."""
+
 
 import io
 import os

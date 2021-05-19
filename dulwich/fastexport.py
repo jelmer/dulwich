@@ -17,8 +17,6 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 #
-
-
 """Fast export/import functionality."""
 
 from dulwich.index import (

@@ -1,7 +1,3 @@
-"""Generates tarballs for Git trees.
-
-archive.py -- Creating an archive from a tarball
-"""
 # Copyright (C) 2015 Jonas Haag <jonas@lophus.org>
 # Copyright (C) 2015 Jelmer Vernooij <jelmer@jelmer.uk>
 #
@@ -20,7 +16,10 @@ archive.py -- Creating an archive from a tarball
 # <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
+"""Generates tarballs for Git trees.
 
+archive.py -- Creating an archive from a tarball
+"""
 
 from contextlib import closing
 from io import BytesIO

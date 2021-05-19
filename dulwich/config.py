@@ -17,7 +17,6 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 #
-
 """Reading and writing Git configuration files.
 
 TODO:

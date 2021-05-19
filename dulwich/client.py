@@ -1,3 +1,22 @@
+# client.py -- Implementation of the client side git protocols
+# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
+#
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+#
 """Client side support for the Git protocol.
 
 The Dulwich client supports the following capabilities:
@@ -18,28 +37,6 @@ Known capabilities that are not supported:
  * include-tag
 """
 
-# client.py -- Implementation of the client side git protocols
-# Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
-#
-# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
-# or (at your option) any later version. You can redistribute it and/or
-# modify it under the terms of either of these two licenses.
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# You should have received a copy of the licenses; if not, see
-# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
-# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
-# License, Version 2.0.
-#
-
-from contextlib import closing
-from io import BytesIO, BufferedReader
 import logging
 import os
 import select
@@ -47,70 +44,64 @@ import shlex
 import socket
 import subprocess
 import sys
-from typing import Optional, Dict, Callable, Set
-
-from urllib.parse import (
-    quote as urlquote,
-    unquote as urlunquote,
-    urlparse,
-    urljoin,
-    urlunsplit,
-    urlunparse,
-)
-
+from contextlib import closing
+from io import BufferedReader
+from io import BytesIO
+from typing import Optional
+from typing import Dict
+from typing import Callable
+from typing import Set
+from urllib.parse import quote as urlquote
+from urllib.parse import unquote as urlunquote
+from urllib.parse import urlparse
+from urllib.parse import urljoin
+from urllib.parse import urlunsplit
+from urllib.parse import urlunparse
 import dulwich
 from dulwich.config import get_xdg_config_home_path
-from dulwich.errors import (
-    GitProtocolError,
-    NotGitRepository,
-    SendPackError,
-)
-from dulwich.protocol import (
-    HangupException,
-    _RBUFSIZE,
-    agent_string,
-    capability_agent,
-    extract_capability_names,
-    CAPABILITY_AGENT,
-    CAPABILITY_DELETE_REFS,
-    CAPABILITY_INCLUDE_TAG,
-    CAPABILITY_MULTI_ACK,
-    CAPABILITY_MULTI_ACK_DETAILED,
-    CAPABILITY_OFS_DELTA,
-    CAPABILITY_QUIET,
-    CAPABILITY_REPORT_STATUS,
-    CAPABILITY_SHALLOW,
-    CAPABILITY_SYMREF,
-    CAPABILITY_SIDE_BAND_64K,
-    CAPABILITY_THIN_PACK,
-    CAPABILITIES_REF,
-    KNOWN_RECEIVE_CAPABILITIES,
-    KNOWN_UPLOAD_CAPABILITIES,
-    COMMAND_DEEPEN,
-    COMMAND_SHALLOW,
-    COMMAND_UNSHALLOW,
-    COMMAND_DONE,
-    COMMAND_HAVE,
-    COMMAND_WANT,
-    SIDE_BAND_CHANNEL_DATA,
-    SIDE_BAND_CHANNEL_PROGRESS,
-    SIDE_BAND_CHANNEL_FATAL,
-    PktLineParser,
-    Protocol,
-    ProtocolFile,
-    TCP_GIT_PORT,
-    ZERO_SHA,
-    extract_capabilities,
-    parse_capability,
-)
-from dulwich.pack import (
-    write_pack_data,
-    write_pack_objects,
-)
-from dulwich.refs import (
-    read_info_refs,
-    ANNOTATED_TAG_SUFFIX,
-)
+from dulwich.errors import GitProtocolError
+from dulwich.errors import NotGitRepository
+from dulwich.errors import SendPackError
+from dulwich.protocol import HangupException
+from dulwich.protocol import _RBUFSIZE
+from dulwich.protocol import agent_string
+from dulwich.protocol import capability_agent
+from dulwich.protocol import extract_capability_names
+from dulwich.protocol import CAPABILITY_AGENT
+from dulwich.protocol import CAPABILITY_DELETE_REFS
+from dulwich.protocol import CAPABILITY_INCLUDE_TAG
+from dulwich.protocol import CAPABILITY_MULTI_ACK
+from dulwich.protocol import CAPABILITY_MULTI_ACK_DETAILED
+from dulwich.protocol import CAPABILITY_OFS_DELTA
+from dulwich.protocol import CAPABILITY_QUIET
+from dulwich.protocol import CAPABILITY_REPORT_STATUS
+from dulwich.protocol import CAPABILITY_SHALLOW
+from dulwich.protocol import CAPABILITY_SYMREF
+from dulwich.protocol import CAPABILITY_SIDE_BAND_64K
+from dulwich.protocol import CAPABILITY_THIN_PACK
+from dulwich.protocol import CAPABILITIES_REF
+from dulwich.protocol import KNOWN_RECEIVE_CAPABILITIES
+from dulwich.protocol import KNOWN_UPLOAD_CAPABILITIES
+from dulwich.protocol import COMMAND_DEEPEN
+from dulwich.protocol import COMMAND_SHALLOW
+from dulwich.protocol import COMMAND_UNSHALLOW
+from dulwich.protocol import COMMAND_DONE
+from dulwich.protocol import COMMAND_HAVE
+from dulwich.protocol import COMMAND_WANT
+from dulwich.protocol import SIDE_BAND_CHANNEL_DATA
+from dulwich.protocol import SIDE_BAND_CHANNEL_PROGRESS
+from dulwich.protocol import SIDE_BAND_CHANNEL_FATAL
+from dulwich.protocol import PktLineParser
+from dulwich.protocol import Protocol
+from dulwich.protocol import ProtocolFile
+from dulwich.protocol import TCP_GIT_PORT
+from dulwich.protocol import ZERO_SHA
+from dulwich.protocol import extract_capabilities
+from dulwich.protocol import parse_capability
+from dulwich.pack import write_pack_data
+from dulwich.pack import write_pack_objects
+from dulwich.refs import read_info_refs
+from dulwich.refs import ANNOTATED_TAG_SUFFIX
 
 
 logger = logging.getLogger(__name__)

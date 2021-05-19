@@ -8,7 +8,6 @@ Example usage:
   3. python examples/clone.py git://github.com/jelmer/dulwich.git dulwich
 """
 
-
 from getopt import getopt
 from os.path import basename
 import sys

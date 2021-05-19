@@ -1,9 +1,11 @@
 """."""
 
 import tempfile
+
+from google.cloud import storage
+
 from dulwich.cloud.gcs import GcsObjectStore
 from dulwich.repo import Repo
-from google.cloud import storage
 
 
 client = storage.Client()

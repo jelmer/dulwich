@@ -13,6 +13,7 @@ args = parser.parse_args()
 
 client, path = get_transport_and_path_from_url(args.url)
 
+
 def generate_pack_data(*args, **kwargs):
     return pack_objects_to_data([])
 

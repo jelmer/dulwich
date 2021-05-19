@@ -1134,6 +1134,14 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
+        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+        self.import_non_default_key()
+        self.assertRaises(
+            gpg.errors.MissingSignatures,
+            tag.verify,
+            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
+        )
 
         tag._chunked_text = [b"bad data", tag._signature]
         self.assertRaises(

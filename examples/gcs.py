@@ -1,4 +1,4 @@
-"""."""
+"""Storage of repositories on GCS.."""
 
 import tempfile
 

@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # object_store.py -- Object store for git objects
 # Copyright (C) 2021 Jelmer Vernooij <jelmer@jelmer.uk>
 #

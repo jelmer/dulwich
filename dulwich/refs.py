@@ -17,25 +17,22 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 #
+"""Ref handling."""
 
-
-"""Ref handling.
-
-"""
 import os
 
 from dulwich.errors import (
     PackedRefsException,
     RefFormatError,
 )
+from dulwich.file import (
+    ensure_dir_exists,
+    GitFile,
+)
 from dulwich.objects import (
     git_line,
     valid_hexsha,
     ZERO_SHA,
-)
-from dulwich.file import (
-    GitFile,
-    ensure_dir_exists,
 )
 
 
@@ -79,7 +76,7 @@ def check_ref_format(refname):
     if b".." in refname:
         return False
     for i, c in enumerate(refname):
-        if ord(refname[i : i + 1]) < 0o40 or c in BAD_REF_CHARS:
+        if ord(refname[i: i + 1]) < 0o40 or c in BAD_REF_CHARS:
             return False
     if refname[-1] in b"/.":
         return False

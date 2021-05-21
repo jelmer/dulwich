@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (C) 2009 Jelmer Vernooij <jelmer@jelmer.uk>
  *
  * Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU

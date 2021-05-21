@@ -21,7 +21,6 @@
 from io import BytesIO
 import stat
 
-
 from dulwich.object_store import (
     MemoryObjectStore,
 )

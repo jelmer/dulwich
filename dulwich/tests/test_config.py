@@ -20,22 +20,22 @@
 
 """Tests for reading and writing configuration files."""
 
+from io import BytesIO
 import os
 import sys
-from io import BytesIO
-from unittest import skipIf
 from unittest.mock import patch
+from unittest import skipIf
 
 from dulwich.config import (
-    ConfigDict,
-    ConfigFile,
-    StackedConfig,
     _check_section_name,
     _check_variable_name,
-    _format_string,
     _escape_value,
+    _format_string,
     _parse_string,
+    ConfigDict,
+    ConfigFile,
     parse_submodules,
+    StackedConfig,
 )
 from dulwich.tests import (
     TestCase,

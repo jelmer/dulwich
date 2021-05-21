@@ -1,46 +1,34 @@
-"""Tests for archive support.
-
-test_archive.py -- tests for archive
-Copyright (C) 2015 Jelmer Vernooij <jelmer@jelmer.uk>
-
-Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-General Public License as public by the Free Software Foundation; version 2.0
-or (at your option) any later version. You can redistribute it and/or
-modify it under the terms of either of these two licenses.
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-You should have received a copy of the licenses; if not, see
-<http://www.gnu.org/licenses/> for a copy of the GNU General Public License
-and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
-License, Version 2.0.
-
-"""
+# test_archive.py -- tests for archive
+# Copyright (C) 2015 Jelmer Vernooij <jelmer@jelmer.uk>
+#
+# Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
+# General Public License as public by the Free Software Foundation; version 2.0
+# or (at your option) any later version. You can redistribute it and/or
+# modify it under the terms of either of these two licenses.
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# You should have received a copy of the licenses; if not, see
+# <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
+# and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
+# License, Version 2.0.
+"""Tests for archive support."""
 
 from io import BytesIO
-
-import tarfile
-
 import struct
-
+import tarfile
 from unittest import skipUnless
 
 from dulwich.archive import tar_stream
-
 from dulwich.object_store import MemoryObjectStore
-
 from dulwich.objects import Blob
-
 from dulwich.objects import Tree
-
 from dulwich.tests import TestCase
-
 from dulwich.tests.utils import build_commit_graph
-
 try:
     from unittest.mock import patch
 except ImportError:
@@ -48,7 +36,10 @@ except ImportError:
 
 
 class ArchiveTests(TestCase):
+    """Archive test class."""
+
     def test_empty(self):
+        """Test empty function."""
         store = MemoryObjectStore()
         c1, c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
         tree = store[c3.tree]
@@ -82,22 +73,22 @@ class ArchiveTests(TestCase):
 
     def test_gzip_mtime(self):
         stream = self._get_example_tar_stream(
-            mtime=1234, compression_format="gz")
+            mtime=1234, format="gz")
         expected_mtime = struct.pack("<L", 1234)
         self.assertEqual(stream.getvalue()[4:8], expected_mtime)
 
     @skipUnless(patch, "Required mock.patch")
     def test_same_file(self):
-        """Test same file."""
+        """Test same file funtion."""
         contents = [None, None]
-        for compression_format in ["", "gz", "bz2"]:
+        for format in ["", "gz", "bz2"]:
             for i in [0, 1]:
                 with patch("time.time", return_value=i):
                     stream = self._get_example_tar_stream(
-                        mtime=0, compression_format=compression_format)
+                        mtime=0, format=format)
                     contents[i] = stream.getvalue()
             self.assertEqual(
                 contents[0],
                 contents[1],
-                "Different file contents for format %r" % compression_format,
+                "Different file contents for format %r" % format,
             )

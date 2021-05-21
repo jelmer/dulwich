@@ -27,7 +27,6 @@ import subprocess
 import sys
 import tempfile
 
-
 # If Python itself provides an exception, use that
 import unittest
 from unittest import (  # noqa: F401

@@ -37,6 +37,9 @@ Known capabilities that are not supported:
  * include-tag
 """
 
+from contextlib import closing
+from io import BufferedReader
+from io import BytesIO
 import logging
 import os
 import select
@@ -44,13 +47,12 @@ import shlex
 import socket
 import subprocess
 import sys
-from contextlib import closing
-from io import BufferedReader
-from io import BytesIO
-from typing import Optional
-from typing import Dict
-from typing import Callable
-from typing import Set
+from typing import (
+    Callable,
+    Dict,
+    Optional,
+    Set,
+)
 from urllib.parse import quote as urlquote
 from urllib.parse import unquote as urlunquote
 from urllib.parse import urlparse
@@ -62,47 +64,52 @@ from dulwich.config import get_xdg_config_home_path
 from dulwich.errors import GitProtocolError
 from dulwich.errors import NotGitRepository
 from dulwich.errors import SendPackError
-from dulwich.protocol import HangupException
-from dulwich.protocol import _RBUFSIZE
-from dulwich.protocol import agent_string
-from dulwich.protocol import capability_agent
-from dulwich.protocol import extract_capability_names
-from dulwich.protocol import CAPABILITY_AGENT
-from dulwich.protocol import CAPABILITY_DELETE_REFS
-from dulwich.protocol import CAPABILITY_INCLUDE_TAG
-from dulwich.protocol import CAPABILITY_MULTI_ACK
-from dulwich.protocol import CAPABILITY_MULTI_ACK_DETAILED
-from dulwich.protocol import CAPABILITY_OFS_DELTA
-from dulwich.protocol import CAPABILITY_QUIET
-from dulwich.protocol import CAPABILITY_REPORT_STATUS
-from dulwich.protocol import CAPABILITY_SHALLOW
-from dulwich.protocol import CAPABILITY_SYMREF
-from dulwich.protocol import CAPABILITY_SIDE_BAND_64K
-from dulwich.protocol import CAPABILITY_THIN_PACK
-from dulwich.protocol import CAPABILITIES_REF
-from dulwich.protocol import KNOWN_RECEIVE_CAPABILITIES
-from dulwich.protocol import KNOWN_UPLOAD_CAPABILITIES
-from dulwich.protocol import COMMAND_DEEPEN
-from dulwich.protocol import COMMAND_SHALLOW
-from dulwich.protocol import COMMAND_UNSHALLOW
-from dulwich.protocol import COMMAND_DONE
-from dulwich.protocol import COMMAND_HAVE
-from dulwich.protocol import COMMAND_WANT
-from dulwich.protocol import SIDE_BAND_CHANNEL_DATA
-from dulwich.protocol import SIDE_BAND_CHANNEL_PROGRESS
-from dulwich.protocol import SIDE_BAND_CHANNEL_FATAL
-from dulwich.protocol import PktLineParser
-from dulwich.protocol import Protocol
-from dulwich.protocol import ProtocolFile
-from dulwich.protocol import TCP_GIT_PORT
-from dulwich.protocol import ZERO_SHA
-from dulwich.protocol import extract_capabilities
-from dulwich.protocol import parse_capability
-from dulwich.pack import write_pack_data
-from dulwich.pack import write_pack_objects
-from dulwich.refs import read_info_refs
-from dulwich.refs import ANNOTATED_TAG_SUFFIX
-
+from dulwich.protocol import (
+    _RBUFSIZE,
+    agent_string,
+    CAPABILITIES_REF,
+    capability_agent,
+    CAPABILITY_AGENT,
+    CAPABILITY_DELETE_REFS,
+    CAPABILITY_INCLUDE_TAG,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_OFS_DELTA,
+    CAPABILITY_QUIET,
+    CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SHALLOW,
+    CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_SYMREF,
+    CAPABILITY_THIN_PACK,
+    COMMAND_DEEPEN,
+    COMMAND_DONE,
+    COMMAND_HAVE,
+    COMMAND_SHALLOW,
+    COMMAND_UNSHALLOW,
+    COMMAND_WANT,
+    extract_capabilities,
+    extract_capability_names,
+    HangupException,
+    KNOWN_RECEIVE_CAPABILITIES,
+    KNOWN_UPLOAD_CAPABILITIES,
+    parse_capability,
+    PktLineParser,
+    Protocol,
+    ProtocolFile,
+    SIDE_BAND_CHANNEL_DATA,
+    SIDE_BAND_CHANNEL_FATAL,
+    SIDE_BAND_CHANNEL_PROGRESS,
+    TCP_GIT_PORT,
+    ZERO_SHA,
+)
+from dulwich.pack import (
+    write_pack_data,
+    write_pack_objects,
+)
+from dulwich.refs import (
+    ANNOTATED_TAG_SUFFIX,
+    read_info_refs,
+)
 
 logger = logging.getLogger(__name__)
 

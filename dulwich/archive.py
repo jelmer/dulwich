@@ -1,3 +1,4 @@
+# archive.py -- Creating an archive from a tarball
 # Copyright (C) 2015 Jonas Haag <jonas@lophus.org>
 # Copyright (C) 2015 Jelmer Vernooij <jelmer@jelmer.uk>
 #
@@ -16,10 +17,7 @@
 # <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
-"""Generates tarballs for Git trees.
-
-archive.py -- Creating an archive from a tarball
-"""
+"""Generates tarballs for Git trees, Creating an archive from a tarball."""
 
 from contextlib import closing
 from io import BytesIO
@@ -42,7 +40,12 @@ class ChunkedBytesIO(object):  # pylint: disable=too-few-public-methods
     """
 
     def __init__(self, contents):
-        """Init."""
+        """Init.
+
+        Args:
+            contents:
+
+        """
         self.contents = contents
         self.pos = (0, 0)
 
@@ -76,7 +79,7 @@ class ChunkedBytesIO(object):  # pylint: disable=too-few-public-methods
         return b"".join(buf)
 
 
-def tar_stream(store, tree, mtime, prefix=b"", compression_format=""):
+def tar_stream(store, tree, mtime, prefix=b"", format=""):
     """Generate a tar stream for the contents of a Git tree.
 
     Returns a generator that lazily assembles a .tar.gz archive, yielding it in
@@ -88,15 +91,16 @@ def tar_stream(store, tree, mtime, prefix=b"", compression_format=""):
         tree: Tree object for the tree root
         mtime: UNIX timestamp that is assigned as the modification time for
             all files, and the gzip header modification time if
-            compression_format='gz'
+            format='gz'
         prefix:
-        compression_format: Optional compression format for tarball
+        format: Optional container format for tarball
     Returns:
         Bytestrings
     """
+    # pylint: disable=W0622
     buf = BytesIO()
-    with closing(tarfile.open(None, "w:%s" % compression_format, buf)) as tar:
-        if compression_format == "gz":
+    with closing(tarfile.open(None, "w:%s" % format, buf)) as tar:
+        if format == "gz":
             # Manually correct the gzip header file modification time so that
             # archives created from the same Git tree are always identical.
             # The gzip header file modification time is not currenctly
@@ -134,8 +138,8 @@ def tar_stream(store, tree, mtime, prefix=b"", compression_format=""):
 def _walk_tree(store, tree, root=b""):
     """Recursively walk a dulwich Tree.
 
-    Recursively walk a dulwich Tree, Recursively walk a dulwich Tree, yielding
-    tuples of (absolute path, TreeEntry) along the way.
+    Recursively walk a dulwich Tree, yielding tuples of
+    (absolute path, TreeEntry) along the way.
     """
     for entry in tree.iteritems():
         entry_abspath = posixpath.join(root, entry.path)

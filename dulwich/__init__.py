@@ -1,3 +1,4 @@
+# __init__.py -- The git module of dulwich
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 # Copyright (C) 2008 Jelmer Vernooij <jelmer@jelmer.uk>
 #
@@ -16,9 +17,6 @@
 # <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
-"""Python implementation of the Git file formats and protocols.
-
-__init__.py -- The git module of dulwich
-"""
+"""Python implementation of the Git file formats and protocols."""
 
 __version__ = (0, 20, 26)

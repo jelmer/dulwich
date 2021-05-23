@@ -17,6 +17,8 @@
  * Various tag signature handling improvements.
    (Daniel Murphy)
 
+ * Add separate Tag.verify().  (Peter Rowlands)
+
  * Add support for version 3 index files. (Jelmer Vernooĳ)
 
  * Fix autocrlf=input handling. (Peter Rowlands, Boris Feld)

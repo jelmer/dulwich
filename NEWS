@@ -1,4 +1,4 @@
-0.20.22	UNRELEASED
+0.20.22	2021-05-24
 
  * Prevent removal of refs directory when the last ref is
    deleted. (Jelmer Vernooĳ)

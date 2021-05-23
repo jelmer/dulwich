@@ -69,7 +69,7 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
                 "-v",
                 "tryme"
             ],
-            env=os.environ.copy(),
+            env={'GNUPGHOME': os.environ['GNUPGHOME']},
         )
 
     def test_verify(self):
@@ -90,7 +90,7 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
                 "foo",
                 "verifyme",
             ],
-            env=os.environ.copy(),
+            env={'GNUPGHOME': os.environ['GNUPGHOME']},
         )
         tag = self.repo[b"refs/tags/verifyme"]
         self.assertNotEqual(tag.signature, None)

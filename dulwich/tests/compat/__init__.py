@@ -28,6 +28,7 @@ def test_suite():
         "client",
         "pack",
         "patch",
+        "porcelain",
         "repository",
         "server",
         "utils",

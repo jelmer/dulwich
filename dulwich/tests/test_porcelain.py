@@ -1105,6 +1105,8 @@ class RevListTests(PorcelainTestCase):
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTests(PorcelainGpgTestCase):
     def test_default_key(self):
+        import gpg
+
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
@@ -1129,16 +1131,22 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
         self.assertLess(time.time() - tag.tag_time, 5)
-        # GPG Signatures aren't deterministic, so we can't do a static assertion.
-        # Instead we need to check the signature can be verified by git
         tag = self.repo[b'refs/tags/tryme']
-        # TODO(jelmer): Remove calls to C git, and call tag.verify() instead -
-        # perhaps moving git call to compat testsuite?
-        subprocess.run(
-            ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
-            check=True,
-            stderr=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        tag.verify()
+        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+        self.import_non_default_key()
+        self.assertRaises(
+            gpg.errors.MissingSignatures,
+            tag.verify,
+            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
+        )
+
+        tag._chunked_text = [b"bad data", tag._signature]
+        self.assertRaises(
+            gpg.errors.BadSignatures,
+            tag.verify,
         )
 
     def test_non_default_key(self):
@@ -1168,15 +1176,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertLess(time.time() - tag.tag_time, 5)
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
-        # Instead we need to check the signature can be verified by git
-        # TODO(jelmer): Remove calls to C git, and call tag.verify() instead -
-        # perhaps moving git call to compat testsuite?
-        subprocess.run(
-            ["git", "--git-dir={}".format(self.repo.controldir()), "tag", "-v", "tryme"],
-            check=True,
-            stderr=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-        )
+        tag.verify()
 
 
 class TagCreateTests(PorcelainTestCase):

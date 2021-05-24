@@ -21,12 +21,10 @@ _, args = getopt(sys.argv, "", [])
 if len(args) < 2:
     print("usage: %s host:path path" % (args[0], ))
     sys.exit(1)
-
 elif len(args) < 3:
     target_path = basename(args[1].split(":")[-1])
     if target_path[-4:] == ".git":
         target_path = target_path[:-4]
-
 else:
     target_path = args[2]
 

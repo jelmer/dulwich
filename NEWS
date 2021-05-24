@@ -1,5 +1,8 @@
 0.20.23	UNRELEASED
 
+ * Fix installation of GPG during package publishing.
+   (Ruslan Kuprieiev)
+
 0.20.22	2021-05-24
 
  * Prevent removal of refs directory when the last ref is

@@ -1,5 +1,8 @@
 0.20.24	UNRELEASED
 
+ * config: disregard UTF-8 BOM when reading file.
+   (Dan Villiom Podlaski Christiansen)
+
 0.20.23	2021-05-24
 
  * Fix installation of GPG during package publishing.

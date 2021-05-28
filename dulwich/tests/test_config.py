@@ -108,6 +108,11 @@ class ConfigFileTests(TestCase):
         self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
+    def test_from_file_utf8_bom(self):
+        text = "[core]\nfoo = b\u00e4r\n".encode("utf-8-sig")
+        cf = self.from_file(text)
+        self.assertEqual(b"b\xc3\xa4r", cf.get((b"core",), b"foo"))
+
     def test_from_file_section_case_insensitive_lower(self):
         cf = self.from_file(b"[cOre]\nfOo = bar\n")
         self.assertEqual(b"bar", cf.get((b"core",), b"foo"))

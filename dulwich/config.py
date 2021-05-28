@@ -388,7 +388,7 @@ class ConfigFile(ConfigDict):
         self.path = None
 
     @classmethod
-    def from_file(cls, f: BinaryIO) -> "ConfigFile":
+    def from_file(cls, f: BinaryIO) -> "ConfigFile":  # noqa: C901
         """Read configuration from a file-like object."""
         ret = cls()
         section = None  # type: Optional[Tuple[bytes, ...]]

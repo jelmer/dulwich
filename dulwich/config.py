@@ -395,6 +395,8 @@ class ConfigFile(ConfigDict):
         setting = None
         continuation = None
         for lineno, line in enumerate(f.readlines()):
+            if lineno == 0 and line.startswith(b'\xef\xbb\xbf'):
+                line = line[3:]
             line = line.lstrip()
             if setting is None:
                 # Parse section header ("[bla]")

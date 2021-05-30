@@ -3,7 +3,7 @@ Index: dulwich/dulwich/tests/test_porcelain.py
 ===================================================================
 --- dulwich.orig/dulwich/tests/test_porcelain.py
 +++ dulwich/dulwich/tests/test_porcelain.py
-@@ -941,6 +941,9 @@ class PushTests(PorcelainTestCase):
+@@ -1324,6 +1324,9 @@ class PushTests(PorcelainTestCase):
          clone the remote, commit a file to the clone, then push the changes
          back to the remote.
          """

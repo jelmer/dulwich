@@ -20,7 +20,12 @@
 
 """Tests for reading and writing configuration files."""
 
+import os
+import sys
 from io import BytesIO
+from unittest import skipIf
+from unittest.mock import patch
+
 from dulwich.config import (
     ConfigDict,
     ConfigFile,
@@ -31,14 +36,13 @@ from dulwich.config import (
     _escape_value,
     _parse_string,
     parse_submodules,
-    )
+)
 from dulwich.tests import (
     TestCase,
-    )
+)
 
 
 class ConfigFileTests(TestCase):
-
     def from_file(self, text):
         return ConfigFile.from_file(BytesIO(text))
 
@@ -49,17 +53,27 @@ class ConfigFileTests(TestCase):
         self.assertEqual(ConfigFile(), ConfigFile())
 
     def test_default_config(self):
-        cf = self.from_file(b"""[core]
+        cf = self.from_file(
+            b"""[core]
 \trepositoryformatversion = 0
 \tfilemode = true
 \tbare = false
 \tlogallrefupdates = true
-""")
-        self.assertEqual(ConfigFile({(b"core", ): {
-            b"repositoryformatversion": b"0",
-            b"filemode": b"true",
-            b"bare": b"false",
-            b"logallrefupdates": b"true"}}), cf)
+"""
+        )
+        self.assertEqual(
+            ConfigFile(
+                {
+                    (b"core",): {
+                        b"repositoryformatversion": b"0",
+                        b"filemode": b"true",
+                        b"bare": b"false",
+                        b"logallrefupdates": b"true",
+                    }
+                }
+            ),
+            cf,
+        )
 
     def test_from_file_empty(self):
         cf = self.from_file(b"")
@@ -67,81 +81,71 @@ class ConfigFileTests(TestCase):
 
     def test_empty_line_before_section(self):
         cf = self.from_file(b"\n[section]\n")
-        self.assertEqual(ConfigFile({(b"section", ): {}}), cf)
+        self.assertEqual(ConfigFile({(b"section",): {}}), cf)
 
     def test_comment_before_section(self):
         cf = self.from_file(b"# foo\n[section]\n")
-        self.assertEqual(ConfigFile({(b"section", ): {}}), cf)
+        self.assertEqual(ConfigFile({(b"section",): {}}), cf)
 
     def test_comment_after_section(self):
         cf = self.from_file(b"[section] # foo\n")
-        self.assertEqual(ConfigFile({(b"section", ): {}}), cf)
+        self.assertEqual(ConfigFile({(b"section",): {}}), cf)
 
     def test_comment_after_variable(self):
         cf = self.from_file(b"[section]\nbar= foo # a comment\n")
-        self.assertEqual(ConfigFile({(b"section", ): {b"bar": b"foo"}}), cf)
+        self.assertEqual(ConfigFile({(b"section",): {b"bar": b"foo"}}), cf)
 
     def test_comment_character_within_value_string(self):
-        cf = self.from_file(b"[section]\nbar= \"foo#bar\"\n")
-        self.assertEqual(
-            ConfigFile({(b"section", ): {b"bar": b"foo#bar"}}), cf)
+        cf = self.from_file(b'[section]\nbar= "foo#bar"\n')
+        self.assertEqual(ConfigFile({(b"section",): {b"bar": b"foo#bar"}}), cf)
 
     def test_comment_character_within_section_string(self):
-        cf = self.from_file(b"[branch \"foo#bar\"] # a comment\nbar= foo\n")
-        self.assertEqual(
-            ConfigFile({(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
+        cf = self.from_file(b'[branch "foo#bar"] # a comment\nbar= foo\n')
+        self.assertEqual(ConfigFile({(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
 
     def test_from_file_section(self):
         cf = self.from_file(b"[core]\nfoo = bar\n")
-        self.assertEqual(b"bar", cf.get((b"core", ), b"foo"))
+        self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
     def test_from_file_section_case_insensitive_lower(self):
         cf = self.from_file(b"[cOre]\nfOo = bar\n")
-        self.assertEqual(b"bar", cf.get((b"core", ), b"foo"))
+        self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
     def test_from_file_section_case_insensitive_mixed(self):
         cf = self.from_file(b"[cOre]\nfOo = bar\n")
-        self.assertEqual(b"bar", cf.get((b"core", ), b"fOo"))
+        self.assertEqual(b"bar", cf.get((b"core",), b"fOo"))
         self.assertEqual(b"bar", cf.get((b"cOre", b"fOo"), b"fOo"))
 
     def test_from_file_with_mixed_quoted(self):
-        cf = self.from_file(b"[core]\nfoo = \"bar\"la\n")
-        self.assertEqual(b"barla", cf.get((b"core", ), b"foo"))
+        cf = self.from_file(b'[core]\nfoo = "bar"la\n')
+        self.assertEqual(b"barla", cf.get((b"core",), b"foo"))
 
     def test_from_file_section_with_open_brackets(self):
         self.assertRaises(ValueError, self.from_file, b"[core\nfoo = bar\n")
 
     def test_from_file_value_with_open_quoted(self):
-        self.assertRaises(ValueError, self.from_file, b"[core]\nfoo = \"bar\n")
+        self.assertRaises(ValueError, self.from_file, b'[core]\nfoo = "bar\n')
 
     def test_from_file_with_quotes(self):
-        cf = self.from_file(
-            b"[core]\n"
-            b'foo = " bar"\n')
-        self.assertEqual(b" bar", cf.get((b"core", ), b"foo"))
+        cf = self.from_file(b"[core]\n" b'foo = " bar"\n')
+        self.assertEqual(b" bar", cf.get((b"core",), b"foo"))
 
     def test_from_file_with_interrupted_line(self):
-        cf = self.from_file(
-            b"[core]\n"
-            b'foo = bar\\\n'
-            b' la\n')
-        self.assertEqual(b"barla", cf.get((b"core", ), b"foo"))
+        cf = self.from_file(b"[core]\n" b"foo = bar\\\n" b" la\n")
+        self.assertEqual(b"barla", cf.get((b"core",), b"foo"))
 
     def test_from_file_with_boolean_setting(self):
-        cf = self.from_file(
-            b"[core]\n"
-            b'foo\n')
-        self.assertEqual(b"true", cf.get((b"core", ), b"foo"))
+        cf = self.from_file(b"[core]\n" b"foo\n")
+        self.assertEqual(b"true", cf.get((b"core",), b"foo"))
 
     def test_from_file_subsection(self):
-        cf = self.from_file(b"[branch \"foo\"]\nfoo = bar\n")
+        cf = self.from_file(b'[branch "foo"]\nfoo = bar\n')
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
     def test_from_file_subsection_invalid(self):
-        self.assertRaises(
-                ValueError, self.from_file, b"[branch \"foo]\nfoo = bar\n")
+        self.assertRaises(ValueError, self.from_file, b'[branch "foo]\nfoo = bar\n')
 
     def test_from_file_subsection_not_quoted(self):
         cf = self.from_file(b"[branch.foo]\nfoo = bar\n")
@@ -155,7 +159,7 @@ class ConfigFileTests(TestCase):
 
     def test_write_to_file_section(self):
         c = ConfigFile()
-        c.set((b"core", ), b"foo", b"bar")
+        c.set((b"core",), b"foo", b"bar")
         f = BytesIO()
         c.write_to_file(f)
         self.assertEqual(b"[core]\n\tfoo = bar\n", f.getvalue())
@@ -165,100 +169,161 @@ class ConfigFileTests(TestCase):
         c.set((b"branch", b"blie"), b"foo", b"bar")
         f = BytesIO()
         c.write_to_file(f)
-        self.assertEqual(b"[branch \"blie\"]\n\tfoo = bar\n", f.getvalue())
+        self.assertEqual(b'[branch "blie"]\n\tfoo = bar\n', f.getvalue())
 
     def test_same_line(self):
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
     def test_quoted(self):
-        cf = self.from_file(b"""[gui]
+        cf = self.from_file(
+            b"""[gui]
 \tfontdiff = -family \\\"Ubuntu Mono\\\" -size 11 -overstrike 0
-""")
-        self.assertEqual(ConfigFile({(b'gui', ): {
-            b'fontdiff': b'-family "Ubuntu Mono" -size 11 -overstrike 0',
-        }}), cf)
+"""
+        )
+        self.assertEqual(
+            ConfigFile(
+                {
+                    (b"gui",): {
+                        b"fontdiff": b'-family "Ubuntu Mono" -size 11 -overstrike 0',
+                    }
+                }
+            ),
+            cf,
+        )
 
     def test_quoted_multiline(self):
-        cf = self.from_file(b"""[alias]
+        cf = self.from_file(
+            b"""[alias]
 who = \"!who() {\\
   git log --no-merges --pretty=format:'%an - %ae' $@ | uniq -c | sort -rn;\\
 };\\
 who\"
-""")
-        self.assertEqual(ConfigFile({(b'alias', ): {
-            b'who': (b"!who() {git log --no-merges --pretty=format:'%an - "
-                     b"%ae' $@ | uniq -c | sort -rn;};who")
-            }}), cf)
+"""
+        )
+        self.assertEqual(
+            ConfigFile(
+                {
+                    (b"alias",): {
+                        b"who": (
+                            b"!who() {git log --no-merges --pretty=format:'%an - "
+                            b"%ae' $@ | uniq -c | sort -rn;};who"
+                        )
+                    }
+                }
+            ),
+            cf,
+        )
 
     def test_set_hash_gets_quoted(self):
         c = ConfigFile()
         c.set(b"xandikos", b"color", b"#665544")
         f = BytesIO()
         c.write_to_file(f)
-        self.assertEqual(b"[xandikos]\n\tcolor = \"#665544\"\n", f.getvalue())
+        self.assertEqual(b'[xandikos]\n\tcolor = "#665544"\n', f.getvalue())
 
 
 class ConfigDictTests(TestCase):
-
     def test_get_set(self):
         cd = ConfigDict()
         self.assertRaises(KeyError, cd.get, b"foo", b"core")
-        cd.set((b"core", ), b"foo", b"bla")
-        self.assertEqual(b"bla", cd.get((b"core", ), b"foo"))
-        cd.set((b"core", ), b"foo", b"bloe")
-        self.assertEqual(b"bloe", cd.get((b"core", ), b"foo"))
+        cd.set((b"core",), b"foo", b"bla")
+        self.assertEqual(b"bla", cd.get((b"core",), b"foo"))
+        cd.set((b"core",), b"foo", b"bloe")
+        self.assertEqual(b"bloe", cd.get((b"core",), b"foo"))
 
     def test_get_boolean(self):
         cd = ConfigDict()
-        cd.set((b"core", ), b"foo", b"true")
-        self.assertTrue(cd.get_boolean((b"core", ), b"foo"))
-        cd.set((b"core", ), b"foo", b"false")
-        self.assertFalse(cd.get_boolean((b"core", ), b"foo"))
-        cd.set((b"core", ), b"foo", b"invalid")
-        self.assertRaises(ValueError, cd.get_boolean, (b"core", ), b"foo")
+        cd.set((b"core",), b"foo", b"true")
+        self.assertTrue(cd.get_boolean((b"core",), b"foo"))
+        cd.set((b"core",), b"foo", b"false")
+        self.assertFalse(cd.get_boolean((b"core",), b"foo"))
+        cd.set((b"core",), b"foo", b"invalid")
+        self.assertRaises(ValueError, cd.get_boolean, (b"core",), b"foo")
 
     def test_dict(self):
         cd = ConfigDict()
-        cd.set((b"core", ), b"foo", b"bla")
-        cd.set((b"core2", ), b"foo", b"bloe")
+        cd.set((b"core",), b"foo", b"bla")
+        cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"core", ), (b"core2", )], list(cd.keys()))
-        self.assertEqual(cd[(b"core", )], {b'foo': b'bla'})
+        self.assertEqual([(b"core",), (b"core2",)], list(cd.keys()))
+        self.assertEqual(cd[(b"core",)], {b"foo": b"bla"})
 
-        cd[b'a'] = b'b'
-        self.assertEqual(cd[b'a'], b'b')
+        cd[b"a"] = b"b"
+        self.assertEqual(cd[b"a"], b"b")
 
     def test_iteritems(self):
         cd = ConfigDict()
-        cd.set((b"core", ), b"foo", b"bla")
-        cd.set((b"core2", ), b"foo", b"bloe")
+        cd.set((b"core",), b"foo", b"bla")
+        cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual(
-            [(b'foo', b'bla')],
-            list(cd.iteritems((b"core", ))))
+        self.assertEqual([(b"foo", b"bla")], list(cd.iteritems((b"core",))))
 
     def test_iteritems_nonexistant(self):
         cd = ConfigDict()
-        cd.set((b"core2", ), b"foo", b"bloe")
+        cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([], list(cd.iteritems((b"core", ))))
+        self.assertEqual([], list(cd.iteritems((b"core",))))
 
     def test_itersections(self):
         cd = ConfigDict()
-        cd.set((b"core2", ), b"foo", b"bloe")
+        cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"core2", )], list(cd.itersections()))
+        self.assertEqual([(b"core2",)], list(cd.itersections()))
 
 
 class StackedConfigTests(TestCase):
+    def setUp(self):
+        super(StackedConfigTests, self).setUp()
+        self._old_path = os.environ.get("PATH")
+
+    def tearDown(self):
+        super(StackedConfigTests, self).tearDown()
+        os.environ["PATH"] = self._old_path
 
     def test_default_backends(self):
         StackedConfig.default_backends()
 
+    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    def test_windows_config_from_path(self):
+        from dulwich.config import get_win_system_paths
+
+        install_dir = os.path.join("C:", "foo", "Git")
+        os.environ["PATH"] = os.path.join(install_dir, "cmd")
+        with patch("os.path.exists", return_value=True):
+            paths = set(get_win_system_paths())
+        self.assertEqual(
+            {
+                os.path.join(os.environ.get("PROGRAMDATA"), "Git", "config"),
+                os.path.join(install_dir, "etc", "gitconfig"),
+            },
+            paths,
+        )
+
+    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    def test_windows_config_from_reg(self):
+        import winreg
+
+        from dulwich.config import get_win_system_paths
+
+        del os.environ["PATH"]
+        install_dir = os.path.join("C:", "foo", "Git")
+        with patch("winreg.OpenKey"):
+            with patch(
+                "winreg.QueryValueEx",
+                return_value=(install_dir, winreg.REG_SZ),
+            ):
+                paths = set(get_win_system_paths())
+        self.assertEqual(
+            {
+                os.path.join(os.environ.get("PROGRAMDATA"), "Git", "config"),
+                os.path.join(install_dir, "etc", "gitconfig"),
+            },
+            paths,
+        )
+
 
 class EscapeValueTests(TestCase):
-
     def test_nothing(self):
         self.assertEqual(b"foo", _escape_value(b"foo"))
 
@@ -270,28 +335,26 @@ class EscapeValueTests(TestCase):
 
 
 class FormatStringTests(TestCase):
-
     def test_quoted(self):
         self.assertEqual(b'" foo"', _format_string(b" foo"))
         self.assertEqual(b'"\\tfoo"', _format_string(b"\tfoo"))
 
     def test_not_quoted(self):
-        self.assertEqual(b'foo', _format_string(b"foo"))
-        self.assertEqual(b'foo bar', _format_string(b"foo bar"))
+        self.assertEqual(b"foo", _format_string(b"foo"))
+        self.assertEqual(b"foo bar", _format_string(b"foo bar"))
 
 
 class ParseStringTests(TestCase):
-
     def test_quoted(self):
-        self.assertEqual(b' foo', _parse_string(b'" foo"'))
-        self.assertEqual(b'\tfoo', _parse_string(b'"\\tfoo"'))
+        self.assertEqual(b" foo", _parse_string(b'" foo"'))
+        self.assertEqual(b"\tfoo", _parse_string(b'"\\tfoo"'))
 
     def test_not_quoted(self):
-        self.assertEqual(b'foo', _parse_string(b"foo"))
-        self.assertEqual(b'foo bar', _parse_string(b"foo bar"))
+        self.assertEqual(b"foo", _parse_string(b"foo"))
+        self.assertEqual(b"foo bar", _parse_string(b"foo bar"))
 
     def test_nothing(self):
-        self.assertEqual(b"", _parse_string(b''))
+        self.assertEqual(b"", _parse_string(b""))
 
     def test_tab(self):
         self.assertEqual(b"\tbar\t", _parse_string(b"\\tbar\\t"))
@@ -300,11 +363,10 @@ class ParseStringTests(TestCase):
         self.assertEqual(b"\nbar\t", _parse_string(b"\\nbar\\t\t"))
 
     def test_quote(self):
-        self.assertEqual(b"\"foo\"", _parse_string(b"\\\"foo\\\""))
+        self.assertEqual(b'"foo"', _parse_string(b'\\"foo\\"'))
 
 
 class CheckVariableNameTests(TestCase):
-
     def test_invalid(self):
         self.assertFalse(_check_variable_name(b"foo "))
         self.assertFalse(_check_variable_name(b"bar,bar"))
@@ -317,7 +379,6 @@ class CheckVariableNameTests(TestCase):
 
 
 class CheckSectionNameTests(TestCase):
-
     def test_invalid(self):
         self.assertFalse(_check_section_name(b"foo "))
         self.assertFalse(_check_section_name(b"bar,bar"))
@@ -330,14 +391,24 @@ class CheckSectionNameTests(TestCase):
 
 
 class SubmodulesTests(TestCase):
-
     def testSubmodules(self):
-        cf = ConfigFile.from_file(BytesIO(b"""\
+        cf = ConfigFile.from_file(
+            BytesIO(
+                b"""\
 [submodule "core/lib"]
 \tpath = core/lib
 \turl = https://github.com/phhusson/QuasselC.git
-"""))
+"""
+            )
+        )
         got = list(parse_submodules(cf))
-        self.assertEqual([
-            (b'core/lib', b'https://github.com/phhusson/QuasselC.git',
-             b'core/lib')], got)
+        self.assertEqual(
+            [
+                (
+                    b"core/lib",
+                    b"https://github.com/phhusson/QuasselC.git",
+                    b"core/lib",
+                )
+            ],
+            got,
+        )

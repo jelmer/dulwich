@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.20.15
+Version: 0.20.23
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
@@ -9,7 +9,10 @@ License: Apachev2 or later or GPLv2
 Project-URL: Bug Tracker, https://github.com/dulwich/dulwich/issues
 Project-URL: Repository, https://www.dulwich.io/code/
 Project-URL: GitHub, https://github.com/dulwich/dulwich
-Description: This is the Dulwich project.
+Description: Dulwich
+        =======
+        
+        This is the Dulwich project.
         
         It aims to provide an interface to git repos (both local and remote) that
         doesn't call out to git directly but instead uses pure Python.
@@ -80,7 +83,7 @@ Description: This is the Dulwich project.
         Help
         ----
         
-        There is a *#dulwich* IRC channel on the `Freenode <https://www.freenode.net/>`_, and
+        There is a *#dulwich* IRC channel on the `OFTC <https://www.oftc.net/>`_, and
         `dulwich-announce <https://groups.google.com/forum/#!forum/dulwich-announce>`_
         and `dulwich-discuss <https://groups.google.com/forum/#!forum/dulwich-discuss>`_
         mailing lists.

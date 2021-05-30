@@ -24,14 +24,14 @@
 from io import BytesIO
 from os import (
     SEEK_END,
-    )
+)
 import socket
 
 import dulwich
 from dulwich.errors import (
     HangupException,
     GitProtocolError,
-    )
+)
 
 TCP_GIT_PORT = 9418
 
@@ -48,77 +48,86 @@ SIDE_BAND_CHANNEL_PROGRESS = 2
 # fatal error message just before stream aborts
 SIDE_BAND_CHANNEL_FATAL = 3
 
-CAPABILITY_ATOMIC = b'atomic'
-CAPABILITY_DEEPEN_SINCE = b'deepen-since'
-CAPABILITY_DEEPEN_NOT = b'deepen-not'
-CAPABILITY_DEEPEN_RELATIVE = b'deepen-relative'
-CAPABILITY_DELETE_REFS = b'delete-refs'
-CAPABILITY_INCLUDE_TAG = b'include-tag'
-CAPABILITY_MULTI_ACK = b'multi_ack'
-CAPABILITY_MULTI_ACK_DETAILED = b'multi_ack_detailed'
-CAPABILITY_NO_DONE = b'no-done'
-CAPABILITY_NO_PROGRESS = b'no-progress'
-CAPABILITY_OFS_DELTA = b'ofs-delta'
-CAPABILITY_QUIET = b'quiet'
-CAPABILITY_REPORT_STATUS = b'report-status'
-CAPABILITY_SHALLOW = b'shallow'
-CAPABILITY_SIDE_BAND = b'side-band'
-CAPABILITY_SIDE_BAND_64K = b'side-band-64k'
-CAPABILITY_THIN_PACK = b'thin-pack'
-CAPABILITY_AGENT = b'agent'
-CAPABILITY_SYMREF = b'symref'
-CAPABILITY_ALLOW_TIP_SHA1_IN_WANT = b'allow-tip-sha1-in-want'
-CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT = b'allow-reachable-sha1-in-want'
+CAPABILITY_ATOMIC = b"atomic"
+CAPABILITY_DEEPEN_SINCE = b"deepen-since"
+CAPABILITY_DEEPEN_NOT = b"deepen-not"
+CAPABILITY_DEEPEN_RELATIVE = b"deepen-relative"
+CAPABILITY_DELETE_REFS = b"delete-refs"
+CAPABILITY_INCLUDE_TAG = b"include-tag"
+CAPABILITY_MULTI_ACK = b"multi_ack"
+CAPABILITY_MULTI_ACK_DETAILED = b"multi_ack_detailed"
+CAPABILITY_NO_DONE = b"no-done"
+CAPABILITY_NO_PROGRESS = b"no-progress"
+CAPABILITY_OFS_DELTA = b"ofs-delta"
+CAPABILITY_QUIET = b"quiet"
+CAPABILITY_REPORT_STATUS = b"report-status"
+CAPABILITY_SHALLOW = b"shallow"
+CAPABILITY_SIDE_BAND = b"side-band"
+CAPABILITY_SIDE_BAND_64K = b"side-band-64k"
+CAPABILITY_THIN_PACK = b"thin-pack"
+CAPABILITY_AGENT = b"agent"
+CAPABILITY_SYMREF = b"symref"
+CAPABILITY_ALLOW_TIP_SHA1_IN_WANT = b"allow-tip-sha1-in-want"
+CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT = b"allow-reachable-sha1-in-want"
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
-CAPABILITIES_REF = b'capabilities^{}'
+CAPABILITIES_REF = b"capabilities^{}"
 
 COMMON_CAPABILITIES = [
     CAPABILITY_OFS_DELTA,
     CAPABILITY_SIDE_BAND,
     CAPABILITY_SIDE_BAND_64K,
     CAPABILITY_AGENT,
-    CAPABILITY_NO_PROGRESS]
-KNOWN_UPLOAD_CAPABILITIES = set(COMMON_CAPABILITIES + [
-    CAPABILITY_THIN_PACK,
-    CAPABILITY_MULTI_ACK,
-    CAPABILITY_MULTI_ACK_DETAILED,
-    CAPABILITY_INCLUDE_TAG,
-    CAPABILITY_DEEPEN_SINCE,
-    CAPABILITY_SYMREF,
-    CAPABILITY_SHALLOW,
-    CAPABILITY_DEEPEN_NOT,
-    CAPABILITY_DEEPEN_RELATIVE,
-    CAPABILITY_ALLOW_TIP_SHA1_IN_WANT,
-    CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
-    ])
-KNOWN_RECEIVE_CAPABILITIES = set(COMMON_CAPABILITIES + [
-    CAPABILITY_REPORT_STATUS,
-    CAPABILITY_DELETE_REFS,
-    CAPABILITY_QUIET,
-    CAPABILITY_ATOMIC,
-    ])
+    CAPABILITY_NO_PROGRESS,
+]
+KNOWN_UPLOAD_CAPABILITIES = set(
+    COMMON_CAPABILITIES
+    + [
+        CAPABILITY_THIN_PACK,
+        CAPABILITY_MULTI_ACK,
+        CAPABILITY_MULTI_ACK_DETAILED,
+        CAPABILITY_INCLUDE_TAG,
+        CAPABILITY_DEEPEN_SINCE,
+        CAPABILITY_SYMREF,
+        CAPABILITY_SHALLOW,
+        CAPABILITY_DEEPEN_NOT,
+        CAPABILITY_DEEPEN_RELATIVE,
+        CAPABILITY_ALLOW_TIP_SHA1_IN_WANT,
+        CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
+    ]
+)
+KNOWN_RECEIVE_CAPABILITIES = set(
+    COMMON_CAPABILITIES
+    + [
+        CAPABILITY_REPORT_STATUS,
+        CAPABILITY_DELETE_REFS,
+        CAPABILITY_QUIET,
+        CAPABILITY_ATOMIC,
+    ]
+)
+
+DEPTH_INFINITE = 0x7FFFFFFF
 
 
 def agent_string():
-    return ('dulwich/%d.%d.%d' % dulwich.__version__).encode('ascii')
+    return ("dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
 
 
 def capability_agent():
-    return CAPABILITY_AGENT + b'=' + agent_string()
+    return CAPABILITY_AGENT + b"=" + agent_string()
 
 
 def capability_symref(from_ref, to_ref):
-    return CAPABILITY_SYMREF + b'=' + from_ref + b':' + to_ref
+    return CAPABILITY_SYMREF + b"=" + from_ref + b":" + to_ref
 
 
 def extract_capability_names(capabilities):
-    return set(parse_capability(c)[0] for c in capabilities)
+    return {parse_capability(c)[0] for c in capabilities}
 
 
 def parse_capability(capability):
-    parts = capability.split(b'=', 1)
+    parts = capability.split(b"=", 1)
     if len(parts) == 1:
         return (parts[0], None)
     return tuple(parts)
@@ -128,12 +137,12 @@ def symref_capabilities(symrefs):
     return [capability_symref(*k) for k in symrefs]
 
 
-COMMAND_DEEPEN = b'deepen'
-COMMAND_SHALLOW = b'shallow'
-COMMAND_UNSHALLOW = b'unshallow'
-COMMAND_DONE = b'done'
-COMMAND_WANT = b'want'
-COMMAND_HAVE = b'have'
+COMMAND_DEEPEN = b"deepen"
+COMMAND_SHALLOW = b"shallow"
+COMMAND_UNSHALLOW = b"unshallow"
+COMMAND_DONE = b"done"
+COMMAND_WANT = b"want"
+COMMAND_HAVE = b"have"
 
 
 class ProtocolFile(object):
@@ -156,7 +165,7 @@ def format_cmd_pkt(cmd, *args):
 
 def parse_cmd_pkt(line):
     splice_at = line.find(b" ")
-    cmd, args = line[:splice_at], line[splice_at+1:]
+    cmd, args = line[:splice_at], line[splice_at + 1 :]
     assert args[-1:] == b"\x00"
     return cmd, args[:-1].split(b"\0")
 
@@ -170,8 +179,8 @@ def pkt_line(data):
         None, returns the flush-pkt ('0000').
     """
     if data is None:
-        return b'0000'
-    return ('%04x' % (len(data) + 4)).encode('ascii') + data
+        return b"0000"
+    return ("%04x" % (len(data) + 4)).encode("ascii") + data
 
 
 class Protocol(object):
@@ -224,18 +233,19 @@ class Protocol(object):
             size = int(sizestr, 16)
             if size == 0:
                 if self.report_activity:
-                    self.report_activity(4, 'read')
+                    self.report_activity(4, "read")
                 return None
             if self.report_activity:
-                self.report_activity(size, 'read')
-            pkt_contents = read(size-4)
+                self.report_activity(size, "read")
+            pkt_contents = read(size - 4)
         except socket.error as e:
             raise GitProtocolError(e)
         else:
             if len(pkt_contents) + 4 != size:
                 raise GitProtocolError(
-                    'Length of pkt read %04x does not match length prefix %04x'
-                    % (len(pkt_contents) + 4, size))
+                    "Length of pkt read %04x does not match length prefix %04x"
+                    % (len(pkt_contents) + 4, size)
+                )
             return pkt_contents
 
     def eof(self):
@@ -265,7 +275,7 @@ class Protocol(object):
           ValueError: If more than one pkt-line is unread.
         """
         if self._readahead is not None:
-            raise ValueError('Attempted to unread multiple pkt-lines.')
+            raise ValueError("Attempted to unread multiple pkt-lines.")
         self._readahead = BytesIO(pkt_line(data))
 
     def read_pkt_seq(self):
@@ -290,7 +300,7 @@ class Protocol(object):
             line = pkt_line(line)
             self.write(line)
             if self.report_activity:
-                self.report_activity(len(line), 'write')
+                self.report_activity(len(line), "write")
         except socket.error as e:
             raise GitProtocolError(e)
 
@@ -298,7 +308,6 @@ class Protocol(object):
         """Return a writable file-like object for this protocol."""
 
         class ProtocolFile(object):
-
             def __init__(self, proto):
                 self._proto = proto
                 self._offset = 0
@@ -366,10 +375,12 @@ class ReceivableProtocol(Protocol):
     will still block until at least one byte is read.
     """
 
-    def __init__(self, recv, write, close=None, report_activity=None,
-                 rbufsize=_RBUFSIZE):
+    def __init__(
+        self, recv, write, close=None, report_activity=None, rbufsize=_RBUFSIZE
+    ):
         super(ReceivableProtocol, self).__init__(
-                self.read, write, close=close, report_activity=report_activity)
+            self.read, write, close=close, report_activity=report_activity
+        )
         self._recv = recv
         self._rbuf = BytesIO()
         self._rbufsize = rbufsize
@@ -492,9 +503,9 @@ def extract_want_line_capabilities(text):
 
 def ack_type(capabilities):
     """Extract the ack type from a capabilities list."""
-    if b'multi_ack_detailed' in capabilities:
+    if b"multi_ack_detailed" in capabilities:
         return MULTI_ACK_DETAILED
-    elif b'multi_ack' in capabilities:
+    elif b"multi_ack" in capabilities:
         return MULTI_ACK
     return SINGLE_ACK
 
@@ -544,16 +555,14 @@ class BufferedPktLineWriter(object):
 
 
 class PktLineParser(object):
-    """Packet line parser that hands completed packets off to a callback.
-    """
+    """Packet line parser that hands completed packets off to a callback."""
 
     def __init__(self, handle_pkt):
         self.handle_pkt = handle_pkt
         self._readahead = BytesIO()
 
     def parse(self, data):
-        """Parse a fragment of data and call back for any completed packets.
-        """
+        """Parse a fragment of data and call back for any completed packets."""
         self._readahead.write(data)
         buf = self._readahead.getvalue()
         if len(buf) < 4:

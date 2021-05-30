@@ -33,8 +33,8 @@ def _find_lcas(lookup_parents, c1, c2s):
     # Flags to Record State
     _ANC_OF_1 = 1  # ancestor of commit 1
     _ANC_OF_2 = 2  # ancestor of commit 2
-    _DNC = 4       # Do Not Consider
-    _LCA = 8       # potential LCA
+    _DNC = 4  # Do Not Consider
+    _LCA = 8  # potential LCA
 
     def _has_candidates(wlst, cstates):
         for cmt in wlst:

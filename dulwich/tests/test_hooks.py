@@ -37,16 +37,15 @@ from dulwich.tests import TestCase
 
 
 class ShellHookTests(TestCase):
-
     def setUp(self):
         super(ShellHookTests, self).setUp()
-        if os.name != 'posix':
-            self.skipTest('shell hook tests requires POSIX shell')
-        self.assertTrue(os.path.exists('/bin/sh'))
+        if os.name != "posix":
+            self.skipTest("shell hook tests requires POSIX shell")
+        self.assertTrue(os.path.exists("/bin/sh"))
 
     def test_hook_pre_commit(self):
         repo_dir = os.path.join(tempfile.mkdtemp())
-        os.mkdir(os.path.join(repo_dir, 'hooks'))
+        os.mkdir(os.path.join(repo_dir, "hooks"))
         self.addCleanup(shutil.rmtree, repo_dir)
 
         pre_commit_fail = """#!/bin/sh
@@ -56,34 +55,40 @@ exit 1
         pre_commit_success = """#!/bin/sh
 exit 0
 """
-        pre_commit_cwd = """#!/bin/sh
-if [ "$(pwd)" != '""" + repo_dir + """' ]; then
-    echo "Expected path '""" + repo_dir + """', got '$(pwd)'"
+        pre_commit_cwd = (
+            """#!/bin/sh
+if [ "$(pwd)" != '"""
+            + repo_dir
+            + """' ]; then
+    echo "Expected path '"""
+            + repo_dir
+            + """', got '$(pwd)'"
     exit 1
 fi
 
 exit 0
 """
+        )
 
-        pre_commit = os.path.join(repo_dir, 'hooks', 'pre-commit')
+        pre_commit = os.path.join(repo_dir, "hooks", "pre-commit")
         hook = PreCommitShellHook(repo_dir)
 
-        with open(pre_commit, 'w') as f:
+        with open(pre_commit, "w") as f:
             f.write(pre_commit_fail)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        if sys.platform != 'darwin':
+        if sys.platform != "darwin":
             # Don't bother running this test on darwin since path
             # canonicalization messages with our simple string comparison.
-            with open(pre_commit, 'w') as f:
+            with open(pre_commit, "w") as f:
                 f.write(pre_commit_cwd)
             os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
             hook.execute()
 
-        with open(pre_commit, 'w') as f:
+        with open(pre_commit, "w") as f:
             f.write(pre_commit_success)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
@@ -92,7 +97,7 @@ exit 0
     def test_hook_commit_msg(self):
 
         repo_dir = os.path.join(tempfile.mkdtemp())
-        os.mkdir(os.path.join(repo_dir, 'hooks'))
+        os.mkdir(os.path.join(repo_dir, "hooks"))
         self.addCleanup(shutil.rmtree, repo_dir)
 
         commit_msg_fail = """#!/bin/sh
@@ -103,32 +108,36 @@ exit 1
 exit 0
 """
 
-        commit_msg_cwd = """#!/bin/sh
-if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
+        commit_msg_cwd = (
+            """#!/bin/sh
+if [ "$(pwd)" = '"""
+            + repo_dir
+            + "' ]; then exit 0; else exit 1; fi\n"
+        )
 
-        commit_msg = os.path.join(repo_dir, 'hooks', 'commit-msg')
+        commit_msg = os.path.join(repo_dir, "hooks", "commit-msg")
         hook = CommitMsgShellHook(repo_dir)
 
-        with open(commit_msg, 'w') as f:
+        with open(commit_msg, "w") as f:
             f.write(commit_msg_fail)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        self.assertRaises(errors.HookError, hook.execute, b'failed commit')
+        self.assertRaises(errors.HookError, hook.execute, b"failed commit")
 
-        if sys.platform != 'darwin':
+        if sys.platform != "darwin":
             # Don't bother running this test on darwin since path
             # canonicalization messages with our simple string comparison.
-            with open(commit_msg, 'w') as f:
+            with open(commit_msg, "w") as f:
                 f.write(commit_msg_cwd)
             os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-            hook.execute(b'cwd test commit')
+            hook.execute(b"cwd test commit")
 
-        with open(commit_msg, 'w') as f:
+        with open(commit_msg, "w") as f:
             f.write(commit_msg_success)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        hook.execute(b'empty commit')
+        hook.execute(b"empty commit")
 
     def test_hook_post_commit(self):
 
@@ -136,38 +145,46 @@ if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
         os.close(fd)
 
         repo_dir = os.path.join(tempfile.mkdtemp())
-        os.mkdir(os.path.join(repo_dir, 'hooks'))
+        os.mkdir(os.path.join(repo_dir, "hooks"))
         self.addCleanup(shutil.rmtree, repo_dir)
 
-        post_commit_success = """#!/bin/sh
-rm """ + path + "\n"
+        post_commit_success = (
+            """#!/bin/sh
+rm """
+            + path
+            + "\n"
+        )
 
         post_commit_fail = """#!/bin/sh
 exit 1
 """
 
-        post_commit_cwd = """#!/bin/sh
-if [ "$(pwd)" = '""" + repo_dir + "' ]; then exit 0; else exit 1; fi\n"
+        post_commit_cwd = (
+            """#!/bin/sh
+if [ "$(pwd)" = '"""
+            + repo_dir
+            + "' ]; then exit 0; else exit 1; fi\n"
+        )
 
-        post_commit = os.path.join(repo_dir, 'hooks', 'post-commit')
+        post_commit = os.path.join(repo_dir, "hooks", "post-commit")
         hook = PostCommitShellHook(repo_dir)
 
-        with open(post_commit, 'w') as f:
+        with open(post_commit, "w") as f:
             f.write(post_commit_fail)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
         self.assertRaises(errors.HookError, hook.execute)
 
-        if sys.platform != 'darwin':
+        if sys.platform != "darwin":
             # Don't bother running this test on darwin since path
             # canonicalization messages with our simple string comparison.
-            with open(post_commit, 'w') as f:
+            with open(post_commit, "w") as f:
                 f.write(post_commit_cwd)
             os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
             hook.execute()
 
-        with open(post_commit, 'w') as f:
+        with open(post_commit, "w") as f:
             f.write(post_commit_success)
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 

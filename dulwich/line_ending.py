@@ -31,6 +31,16 @@ The normalization is a two-fold process that happens at two moments:
   when doing a `git add` call. We call this process the write filter in this
   module.
 
+Note that when checking status (getting unstaged changes), whether or not
+normalization is done on write depends on whether or not the file in the
+working dir has also been normalized on read:
+
+- For autocrlf=true all files are always normalized on both read and write.
+- For autocrlf=input files are only normalized on write if they are newly
+  "added". Since files which are already committed are not normalized on
+  checkout into the working tree, they are also left alone when staging
+  modifications into the index.
+
 One thing to know is that Git does line-ending normalization only on text
 files. How does Git know that a file is text? We can either mark a file as a
 text file, a binary file or ask Git to automatically decides. Git has an
@@ -156,8 +166,7 @@ def convert_lf_to_crlf(text_hunk):
 
 
 def get_checkout_filter(core_eol, core_autocrlf, git_attributes):
-    """ Returns the correct checkout filter based on the passed arguments
-    """
+    """Returns the correct checkout filter based on the passed arguments"""
     # TODO this function should process the git_attributes for the path and if
     # the text attribute is not defined, fallback on the
     # get_checkout_filter_autocrlf function with the autocrlf value
@@ -165,8 +174,7 @@ def get_checkout_filter(core_eol, core_autocrlf, git_attributes):
 
 
 def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
-    """ Returns the correct checkin filter based on the passed arguments
-    """
+    """Returns the correct checkin filter based on the passed arguments"""
     # TODO this function should process the git_attributes for the path and if
     # the text attribute is not defined, fallback on the
     # get_checkin_filter_autocrlf function with the autocrlf value
@@ -174,7 +182,7 @@ def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
 
 
 def get_checkout_filter_autocrlf(core_autocrlf):
-    """ Returns the correct checkout filter base on autocrlf value
+    """Returns the correct checkout filter base on autocrlf value
 
     Args:
       core_autocrlf: The bytes configuration value of core.autocrlf.
@@ -190,7 +198,7 @@ def get_checkout_filter_autocrlf(core_autocrlf):
 
 
 def get_checkin_filter_autocrlf(core_autocrlf):
-    """ Returns the correct checkin filter base on autocrlf value
+    """Returns the correct checkin filter base on autocrlf value
 
     Args:
       core_autocrlf: The bytes configuration value of core.autocrlf.
@@ -207,7 +215,7 @@ def get_checkin_filter_autocrlf(core_autocrlf):
 
 
 class BlobNormalizer(object):
-    """ An object to store computation result of which filter to apply based
+    """An object to store computation result of which filter to apply based
     on configuration, gitattributes, path and operation (checkin or checkout)
     """
 
@@ -234,8 +242,7 @@ class BlobNormalizer(object):
         )
 
     def checkin_normalize(self, blob, tree_path):
-        """ Normalize a blob during a checkin operation
-        """
+        """Normalize a blob during a checkin operation"""
         if self.fallback_write_filter is not None:
             return normalize_blob(
                 blob, self.fallback_write_filter, binary_detection=True
@@ -244,8 +251,7 @@ class BlobNormalizer(object):
         return blob
 
     def checkout_normalize(self, blob, tree_path):
-        """ Normalize a blob during a checkout operation
-        """
+        """Normalize a blob during a checkout operation"""
         if self.fallback_read_filter is not None:
             return normalize_blob(
                 blob, self.fallback_read_filter, binary_detection=True
@@ -255,7 +261,7 @@ class BlobNormalizer(object):
 
 
 def normalize_blob(blob, conversion, binary_detection):
-    """ Takes a blob as input returns either the original blob if
+    """Takes a blob as input returns either the original blob if
     binary_detection is True and the blob content looks like binary, else
     return a new blob with converted data
     """
@@ -276,3 +282,25 @@ def normalize_blob(blob, conversion, binary_detection):
     new_blob.data = converted_data
 
     return new_blob
+
+
+class TreeBlobNormalizer(BlobNormalizer):
+    def __init__(self, config_stack, git_attributes, object_store, tree=None):
+        super().__init__(config_stack, git_attributes)
+        if tree:
+            self.existing_paths = {
+                name
+                for name, _, _ in object_store.iter_tree_contents(tree)
+            }
+        else:
+            self.existing_paths = set()
+
+    def checkin_normalize(self, blob, tree_path):
+        # Existing files should only be normalized on checkin if it was
+        # previously normalized on checkout
+        if (
+            self.fallback_read_filter is not None
+            or tree_path not in self.existing_paths
+        ):
+            return super().checkin_normalize(blob, tree_path)
+        return blob

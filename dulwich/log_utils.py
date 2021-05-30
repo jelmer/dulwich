@@ -49,15 +49,18 @@ class _NullHandler(logging.Handler):
 
 
 _NULL_HANDLER = _NullHandler()
-_DULWICH_LOGGER = getLogger('dulwich')
+_DULWICH_LOGGER = getLogger("dulwich")
 _DULWICH_LOGGER.addHandler(_NULL_HANDLER)
 
 
 def default_logging_config():
     """Set up the default Dulwich loggers."""
     remove_null_handler()
-    logging.basicConfig(level=logging.INFO, stream=sys.stderr,
-                        format='%(asctime)s %(levelname)s: %(message)s')
+    logging.basicConfig(
+        level=logging.INFO,
+        stream=sys.stderr,
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
 
 
 def remove_null_handler():

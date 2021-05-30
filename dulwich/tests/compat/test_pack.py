@@ -29,24 +29,24 @@ import tempfile
 
 from dulwich.pack import (
     write_pack,
-    )
+)
 from dulwich.objects import (
     Blob,
-    )
+)
 from dulwich.tests import (
     SkipTest,
-    )
+)
 from dulwich.tests.test_pack import (
     a_sha,
     pack1_sha,
     PackTests,
-    )
+)
 from dulwich.tests.compat.utils import (
     require_git_version,
     run_git_or_fail,
-    )
+)
 
-_NON_DELTA_RE = re.compile(b'non delta: (?P<non_delta>\\d+) objects')
+_NON_DELTA_RE = re.compile(b"non delta: (?P<non_delta>\\d+) objects")
 
 
 def _git_verify_pack_object_list(output):
@@ -75,28 +75,32 @@ class TestPack(PackTests):
             self.assertSucceeds(origpack.index.check)
             pack_path = os.path.join(self._tempdir, "Elch")
             write_pack(pack_path, origpack.pack_tuples())
-            output = run_git_or_fail(['verify-pack', '-v', pack_path])
-            orig_shas = set(o.id for o in origpack.iterobjects())
+            output = run_git_or_fail(["verify-pack", "-v", pack_path])
+            orig_shas = {o.id for o in origpack.iterobjects()}
             self.assertEqual(orig_shas, _git_verify_pack_object_list(output))
 
     def test_deltas_work(self):
         with self.get_pack(pack1_sha) as orig_pack:
             orig_blob = orig_pack[a_sha]
             new_blob = Blob()
-            new_blob.data = orig_blob.data + b'x'
+            new_blob.data = orig_blob.data + b"x"
             all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None)]
-        pack_path = os.path.join(self._tempdir, 'pack_with_deltas')
+        pack_path = os.path.join(self._tempdir, "pack_with_deltas")
         write_pack(pack_path, all_to_pack, deltify=True)
-        output = run_git_or_fail(['verify-pack', '-v', pack_path])
-        self.assertEqual(set(x[0].id for x in all_to_pack),
-                         _git_verify_pack_object_list(output))
+        output = run_git_or_fail(["verify-pack", "-v", pack_path])
+        self.assertEqual(
+            {x[0].id for x in all_to_pack},
+            _git_verify_pack_object_list(output),
+        )
         # We specifically made a new blob that should be a delta
         # against the blob a_sha, so make sure we really got only 3
         # non-delta objects:
-        got_non_delta = int(_NON_DELTA_RE.search(output).group('non_delta'))
+        got_non_delta = int(_NON_DELTA_RE.search(output).group("non_delta"))
         self.assertEqual(
-            3, got_non_delta,
-            'Expected 3 non-delta objects, got %d' % got_non_delta)
+            3,
+            got_non_delta,
+            "Expected 3 non-delta objects, got %d" % got_non_delta,
+        )
 
     def test_delta_medium_object(self):
         # This tests an object set that will have a copy operation
@@ -104,26 +108,32 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as orig_pack:
             orig_blob = orig_pack[a_sha]
             new_blob = Blob()
-            new_blob.data = orig_blob.data + (b'x' * 2 ** 20)
+            new_blob.data = orig_blob.data + (b"x" * 2 ** 20)
             new_blob_2 = Blob()
-            new_blob_2.data = new_blob.data + b'y'
-            all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None),
-                                                           (new_blob_2, None)]
-        pack_path = os.path.join(self._tempdir, 'pack_with_deltas')
+            new_blob_2.data = new_blob.data + b"y"
+            all_to_pack = list(orig_pack.pack_tuples()) + [
+                (new_blob, None),
+                (new_blob_2, None),
+            ]
+        pack_path = os.path.join(self._tempdir, "pack_with_deltas")
         write_pack(pack_path, all_to_pack, deltify=True)
-        output = run_git_or_fail(['verify-pack', '-v', pack_path])
-        self.assertEqual(set(x[0].id for x in all_to_pack),
-                         _git_verify_pack_object_list(output))
+        output = run_git_or_fail(["verify-pack", "-v", pack_path])
+        self.assertEqual(
+            {x[0].id for x in all_to_pack},
+            _git_verify_pack_object_list(output),
+        )
         # We specifically made a new blob that should be a delta
         # against the blob a_sha, so make sure we really got only 3
         # non-delta objects:
-        got_non_delta = int(_NON_DELTA_RE.search(output).group('non_delta'))
+        got_non_delta = int(_NON_DELTA_RE.search(output).group("non_delta"))
         self.assertEqual(
-            3, got_non_delta,
-            'Expected 3 non-delta objects, got %d' % got_non_delta)
+            3,
+            got_non_delta,
+            "Expected 3 non-delta objects, got %d" % got_non_delta,
+        )
         # We expect one object to have a delta chain length of two
         # (new_blob_2), so let's verify that actually happens:
-        self.assertIn(b'chain length = 2', output)
+        self.assertIn(b"chain length = 2", output)
 
     # This test is SUPER slow: over 80 seconds on a 2012-era
     # laptop. This is because SequenceMatcher is worst-case quadratic
@@ -134,23 +144,29 @@ class TestPack(PackTests):
         # This tests an object set that will have a copy operation
         # 2**25 in size. This is a copy large enough that it requires
         # two copy operations in git's binary delta format.
-        raise SkipTest('skipping slow, large test')
+        raise SkipTest("skipping slow, large test")
         with self.get_pack(pack1_sha) as orig_pack:
             new_blob = Blob()
-            new_blob.data = 'big blob' + ('x' * 2 ** 25)
+            new_blob.data = "big blob" + ("x" * 2 ** 25)
             new_blob_2 = Blob()
-            new_blob_2.data = new_blob.data + 'y'
-            all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None),
-                                                           (new_blob_2, None)]
+            new_blob_2.data = new_blob.data + "y"
+            all_to_pack = list(orig_pack.pack_tuples()) + [
+                (new_blob, None),
+                (new_blob_2, None),
+            ]
         pack_path = os.path.join(self._tempdir, "pack_with_deltas")
         write_pack(pack_path, all_to_pack, deltify=True)
-        output = run_git_or_fail(['verify-pack', '-v', pack_path])
-        self.assertEqual(set(x[0].id for x in all_to_pack),
-                         _git_verify_pack_object_list(output))
+        output = run_git_or_fail(["verify-pack", "-v", pack_path])
+        self.assertEqual(
+            {x[0].id for x in all_to_pack},
+            _git_verify_pack_object_list(output),
+        )
         # We specifically made a new blob that should be a delta
         # against the blob a_sha, so make sure we really got only 4
         # non-delta objects:
-        got_non_delta = int(_NON_DELTA_RE.search(output).group('non_delta'))
+        got_non_delta = int(_NON_DELTA_RE.search(output).group("non_delta"))
         self.assertEqual(
-            4, got_non_delta,
-            'Expected 4 non-delta objects, got %d' % got_non_delta)
+            4,
+            got_non_delta,
+            "Expected 4 non-delta objects, got %d" % got_non_delta,
+        )

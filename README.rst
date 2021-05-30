@@ -1,3 +1,6 @@
+Dulwich
+=======
+
 This is the Dulwich project.
 
 It aims to provide an interface to git repos (both local and remote) that
@@ -69,7 +72,7 @@ doc``. It can also be found `on the web <https://www.dulwich.io/docs/>`_.
 Help
 ----
 
-There is a *#dulwich* IRC channel on the `Freenode <https://www.freenode.net/>`_, and
+There is a *#dulwich* IRC channel on the `OFTC <https://www.oftc.net/>`_, and
 `dulwich-announce <https://groups.google.com/forum/#!forum/dulwich-announce>`_
 and `dulwich-discuss <https://groups.google.com/forum/#!forum/dulwich-discuss>`_
 mailing lists.

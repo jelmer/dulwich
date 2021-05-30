@@ -30,16 +30,16 @@ from dulwich.diff_tree import (
     tree_changes,
     tree_changes_for_merge,
     RenameDetector,
-    )
+)
 from dulwich.errors import (
     MissingCommitError,
-    )
+)
 from dulwich.objects import (
     Tag,
-    )
+)
 
-ORDER_DATE = 'date'
-ORDER_TOPO = 'topo'
+ORDER_DATE = "date"
+ORDER_TOPO = "topo"
 
 ALL_ORDERS = (ORDER_DATE, ORDER_TOPO)
 
@@ -86,8 +86,7 @@ class WalkEntry(object):
                     parent = self._store[subtree_sha]
             else:
                 changes_func = tree_changes_for_merge
-                parent = [
-                        self._store[p].tree for p in self._get_parents(commit)]
+                parent = [self._store[p].tree for p in self._get_parents(commit)]
                 if path_prefix:
                     parent_trees = [self._store[p] for p in parent]
                     parent = []
@@ -108,15 +107,22 @@ class WalkEntry(object):
                     self._store.__getitem__,
                     path_prefix,
                 )
-            cached = list(changes_func(
-              self._store, parent, commit_tree_sha,
-              rename_detector=self._rename_detector))
+            cached = list(
+                changes_func(
+                    self._store,
+                    parent,
+                    commit_tree_sha,
+                    rename_detector=self._rename_detector,
+                )
+            )
             self._changes[path_prefix] = cached
         return self._changes[path_prefix]
 
     def __repr__(self):
-        return '<WalkEntry commit=%s, changes=%r>' % (
-          self.commit.id, self.changes())
+        return "<WalkEntry commit=%s, changes=%r>" % (
+            self.commit.id,
+            self.changes(),
+        )
 
 
 class _CommitTimeQueue(object):
@@ -187,8 +193,7 @@ class _CommitTimeQueue(object):
             is_excluded = sha in self._excluded
             if is_excluded:
                 self._exclude_parents(commit)
-                if self._pq and all(c.id in self._excluded
-                                    for _, c in self._pq):
+                if self._pq and all(c.id in self._excluded for _, c in self._pq):
                     _, n = self._pq[0]
                     if self._last and n.commit_time >= self._last.commit_time:
                         # If the next commit is newer than the last one, we
@@ -200,8 +205,7 @@ class _CommitTimeQueue(object):
                     else:
                         reset_extra_commits = False
 
-            if (self._min_time is not None and
-                    commit.commit_time < self._min_time):
+            if self._min_time is not None and commit.commit_time < self._min_time:
                 # We want to stop walking at min_time, but commits at the
                 # boundary may be out of order with respect to their parents.
                 # So we walk _MAX_EXTRA_COMMITS more commits once we hit this
@@ -232,11 +236,22 @@ class Walker(object):
     be treated as iterators of Commit objects.
     """
 
-    def __init__(self, store, include, exclude=None, order=ORDER_DATE,
-                 reverse=False, max_entries=None, paths=None,
-                 rename_detector=None, follow=False, since=None, until=None,
-                 get_parents=lambda commit: commit.parents,
-                 queue_cls=_CommitTimeQueue):
+    def __init__(
+        self,
+        store,
+        include,
+        exclude=None,
+        order=ORDER_DATE,
+        reverse=False,
+        max_entries=None,
+        paths=None,
+        rename_detector=None,
+        follow=False,
+        since=None,
+        until=None,
+        get_parents=lambda commit: commit.parents,
+        queue_cls=_CommitTimeQueue,
+    ):
         """Constructor.
 
         Args:
@@ -266,7 +281,7 @@ class Walker(object):
         # Note: when adding arguments to this method, please also update
         # dulwich.repo.BaseRepo.get_walker
         if order not in ALL_ORDERS:
-            raise ValueError('Unknown walk order %s' % order)
+            raise ValueError("Unknown walk order %s" % order)
         self.store = store
         if isinstance(include, bytes):
             # TODO(jelmer): Really, this should require a single type.
@@ -296,8 +311,10 @@ class Walker(object):
         for followed_path in self.paths:
             if changed_path == followed_path:
                 return True
-            if (changed_path.startswith(followed_path) and
-                    changed_path[len(followed_path)] == b'/'[0]):
+            if (
+                changed_path.startswith(followed_path)
+                and changed_path[len(followed_path)] == b"/"[0]
+            ):
                 return True
         return False
 

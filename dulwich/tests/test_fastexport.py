@@ -24,23 +24,23 @@ import stat
 
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.objects import (
     Blob,
     Commit,
     Tree,
     ZERO_SHA,
-    )
+)
 from dulwich.repo import (
     MemoryRepo,
-    )
+)
 from dulwich.tests import (
     SkipTest,
     TestCase,
-    )
+)
 from dulwich.tests.utils import (
     build_commit_graph,
-    )
+)
 
 
 class GitFastExporterTests(TestCase):
@@ -60,8 +60,7 @@ class GitFastExporterTests(TestCase):
         b = Blob()
         b.data = b"fooBAR"
         self.fastexporter.emit_blob(b)
-        self.assertEqual(b'blob\nmark :1\ndata 6\nfooBAR\n',
-                         self.stream.getvalue())
+        self.assertEqual(b"blob\nmark :1\ndata 6\nfooBAR\n", self.stream.getvalue())
 
     def test_emit_commit(self):
         b = Blob()
@@ -76,7 +75,8 @@ class GitFastExporterTests(TestCase):
         c.tree = t.id
         self.store.add_objects([(b, None), (t, None), (c, None)])
         self.fastexporter.emit_commit(c, b"refs/heads/master")
-        self.assertEqual(b"""blob
+        self.assertEqual(
+            b"""blob
 mark :1
 data 3
 FOO
@@ -87,7 +87,9 @@ committer Jelmer <jelmer@host> 1271345553 +0000
 data 3
 msg
 M 644 :1 foo
-""", self.stream.getvalue())
+""",
+            self.stream.getvalue(),
+        )
 
 
 class GitImportProcessorTests(TestCase):
@@ -104,6 +106,7 @@ class GitImportProcessorTests(TestCase):
 
     def test_reset_handler(self):
         from fastimport import commands
+
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         cmd = commands.ResetCommand(b"refs/heads/foo", c1.id)
         self.processor.reset_handler(cmd)
@@ -112,14 +115,16 @@ class GitImportProcessorTests(TestCase):
 
     def test_reset_handler_marker(self):
         from fastimport import commands
+
         [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
-        self.processor.markers[b'10'] = c1.id
-        cmd = commands.ResetCommand(b"refs/heads/foo", b':10')
+        self.processor.markers[b"10"] = c1.id
+        cmd = commands.ResetCommand(b"refs/heads/foo", b":10")
         self.processor.reset_handler(cmd)
         self.assertEqual(c1.id, self.repo.get_refs()[b"refs/heads/foo"])
 
     def test_reset_handler_default(self):
         from fastimport import commands
+
         [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
         cmd = commands.ResetCommand(b"refs/heads/foo", None)
         self.processor.reset_handler(cmd)
@@ -127,11 +132,17 @@ class GitImportProcessorTests(TestCase):
 
     def test_commit_handler(self):
         from fastimport import commands
+
         cmd = commands.CommitCommand(
-                b"refs/heads/foo",  b"mrkr",
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                b"FOO", None, [], [])
+            b"refs/heads/foo",
+            b"mrkr",
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            b"FOO",
+            None,
+            [],
+            [],
+        )
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
         self.assertEqual(b"Jelmer <jelmer@samba.org>", commit.author)
@@ -146,16 +157,21 @@ class GitImportProcessorTests(TestCase):
 
     def test_commit_handler_markers(self):
         from fastimport import commands
-        [c1, c2, c3] = build_commit_graph(self.repo.object_store,
-                                          [[1], [2], [3]])
-        self.processor.markers[b'10'] = c1.id
-        self.processor.markers[b'42'] = c2.id
-        self.processor.markers[b'98'] = c3.id
+
+        [c1, c2, c3] = build_commit_graph(self.repo.object_store, [[1], [2], [3]])
+        self.processor.markers[b"10"] = c1.id
+        self.processor.markers[b"42"] = c2.id
+        self.processor.markers[b"98"] = c3.id
         cmd = commands.CommitCommand(
-                b"refs/heads/foo",  b"mrkr",
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                b"FOO", b':10', [b':42', b':98'], [])
+            b"refs/heads/foo",
+            b"mrkr",
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            b"FOO",
+            b":10",
+            [b":42", b":98"],
+            [],
+        )
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
         self.assertEqual(c1.id, commit.parents[0])
@@ -163,7 +179,9 @@ class GitImportProcessorTests(TestCase):
         self.assertEqual(c3.id, commit.parents[2])
 
     def test_import_stream(self):
-        markers = self.processor.import_stream(BytesIO(b"""blob
+        markers = self.processor.import_stream(
+            BytesIO(
+                b"""blob
 mark :1
 data 11
 text for a
@@ -175,37 +193,50 @@ data 20
 <The commit message>
 M 100644 :1 a
 
-"""))
+"""
+            )
+        )
         self.assertEqual(2, len(markers))
         self.assertTrue(isinstance(self.repo[markers[b"1"]], Blob))
         self.assertTrue(isinstance(self.repo[markers[b"2"]], Commit))
 
     def test_file_add(self):
         from fastimport import commands
+
         cmd = commands.BlobCommand(b"23", b"data")
         self.processor.blob_handler(cmd)
         cmd = commands.CommitCommand(
-                b"refs/heads/foo", b"mrkr",
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                b"FOO", None, [],
-                [commands.FileModifyCommand(b"path", 0o100644, b":23", None)])
+            b"refs/heads/foo",
+            b"mrkr",
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            b"FOO",
+            None,
+            [],
+            [commands.FileModifyCommand(b"path", 0o100644, b":23", None)],
+        )
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
-        self.assertEqual([
-            (b'path', 0o100644, b'6320cd248dd8aeaab759d5871f8781b5c0505172')],
-            self.repo[commit.tree].items())
+        self.assertEqual(
+            [(b"path", 0o100644, b"6320cd248dd8aeaab759d5871f8781b5c0505172")],
+            self.repo[commit.tree].items(),
+        )
 
     def simple_commit(self):
         from fastimport import commands
+
         cmd = commands.BlobCommand(b"23", b"data")
         self.processor.blob_handler(cmd)
         cmd = commands.CommitCommand(
-                b"refs/heads/foo", b"mrkr",
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                b"FOO", None, [],
-                [commands.FileModifyCommand(b"path", 0o100644, b":23", None)])
+            b"refs/heads/foo",
+            b"mrkr",
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            b"FOO",
+            None,
+            [],
+            [commands.FileModifyCommand(b"path", 0o100644, b":23", None)],
+        )
         self.processor.commit_handler(cmd)
         commit = self.repo[self.processor.last_commit]
         return commit
@@ -218,44 +249,69 @@ M 100644 :1 a
         Returns: The created commit object
         """
         from fastimport import commands
+
         cmd = commands.CommitCommand(
-                b"refs/heads/foo", b"mrkr",
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
-                b"FOO", None, [], file_cmds)
+            b"refs/heads/foo",
+            b"mrkr",
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            (b"Jelmer", b"jelmer@samba.org", 432432432.0, 3600),
+            b"FOO",
+            None,
+            [],
+            file_cmds,
+        )
         self.processor.commit_handler(cmd)
         return self.repo[self.processor.last_commit]
 
     def test_file_copy(self):
         from fastimport import commands
+
         self.simple_commit()
-        commit = self.make_file_commit(
-                [commands.FileCopyCommand(b"path", b"new_path")])
-        self.assertEqual([
-                (b'new_path', 0o100644,
-                 b'6320cd248dd8aeaab759d5871f8781b5c0505172'),
-                (b'path', 0o100644,
-                 b'6320cd248dd8aeaab759d5871f8781b5c0505172'),
-                ], self.repo[commit.tree].items())
+        commit = self.make_file_commit([commands.FileCopyCommand(b"path", b"new_path")])
+        self.assertEqual(
+            [
+                (
+                    b"new_path",
+                    0o100644,
+                    b"6320cd248dd8aeaab759d5871f8781b5c0505172",
+                ),
+                (
+                    b"path",
+                    0o100644,
+                    b"6320cd248dd8aeaab759d5871f8781b5c0505172",
+                ),
+            ],
+            self.repo[commit.tree].items(),
+        )
 
     def test_file_move(self):
         from fastimport import commands
+
         self.simple_commit()
         commit = self.make_file_commit(
-                [commands.FileRenameCommand(b"path", b"new_path")])
-        self.assertEqual([
-                (b'new_path', 0o100644,
-                 b'6320cd248dd8aeaab759d5871f8781b5c0505172'),
-                ], self.repo[commit.tree].items())
+            [commands.FileRenameCommand(b"path", b"new_path")]
+        )
+        self.assertEqual(
+            [
+                (
+                    b"new_path",
+                    0o100644,
+                    b"6320cd248dd8aeaab759d5871f8781b5c0505172",
+                ),
+            ],
+            self.repo[commit.tree].items(),
+        )
 
     def test_file_delete(self):
         from fastimport import commands
+
         self.simple_commit()
         commit = self.make_file_commit([commands.FileDeleteCommand(b"path")])
         self.assertEqual([], self.repo[commit.tree].items())
 
     def test_file_deleteall(self):
         from fastimport import commands
+
         self.simple_commit()
         commit = self.make_file_commit([commands.FileDeleteAllCommand()])
         self.assertEqual([], self.repo[commit.tree].items())

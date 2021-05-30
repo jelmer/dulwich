@@ -27,7 +27,7 @@ from dulwich.errors import ObjectFormatException
 from dulwich.tests import TestCase
 from dulwich.objects import (
     Tree,
-    )
+)
 from dulwich.repo import (
     parse_graftpoints,
     serialize_graftpoints,
@@ -37,11 +37,10 @@ from dulwich.repo import (
 
 
 def makesha(digit):
-    return (str(digit).encode('ascii') * 40)[:40]
+    return (str(digit).encode("ascii") * 40)[:40]
 
 
 class GraftParserTests(TestCase):
-
     def assertParse(self, expected, graftpoints):
         self.assertEqual(expected, parse_graftpoints(iter(graftpoints)))
 
@@ -52,49 +51,60 @@ class GraftParserTests(TestCase):
         self.assertParse({makesha(0): []}, [makesha(0)])
 
     def test_parents(self):
-        self.assertParse({makesha(0): [makesha(1), makesha(2)]},
-                         [b' '.join([makesha(0), makesha(1), makesha(2)])])
+        self.assertParse(
+            {makesha(0): [makesha(1), makesha(2)]},
+            [b" ".join([makesha(0), makesha(1), makesha(2)])],
+        )
 
     def test_multiple_hybrid(self):
         self.assertParse(
-            {makesha(0): [],
-             makesha(1): [makesha(2)],
-             makesha(3): [makesha(4), makesha(5)]},
-            [makesha(0),
-             b' '.join([makesha(1), makesha(2)]),
-             b' '.join([makesha(3), makesha(4), makesha(5)])])
+            {
+                makesha(0): [],
+                makesha(1): [makesha(2)],
+                makesha(3): [makesha(4), makesha(5)],
+            },
+            [
+                makesha(0),
+                b" ".join([makesha(1), makesha(2)]),
+                b" ".join([makesha(3), makesha(4), makesha(5)]),
+            ],
+        )
 
 
 class GraftSerializerTests(TestCase):
-
     def assertSerialize(self, expected, graftpoints):
-        self.assertEqual(
-            sorted(expected),
-            sorted(serialize_graftpoints(graftpoints)))
+        self.assertEqual(sorted(expected), sorted(serialize_graftpoints(graftpoints)))
 
     def test_no_grafts(self):
-        self.assertSerialize(b'', {})
+        self.assertSerialize(b"", {})
 
     def test_no_parents(self):
         self.assertSerialize(makesha(0), {makesha(0): []})
 
     def test_parents(self):
-        self.assertSerialize(b' '.join([makesha(0), makesha(1), makesha(2)]),
-                             {makesha(0): [makesha(1), makesha(2)]})
+        self.assertSerialize(
+            b" ".join([makesha(0), makesha(1), makesha(2)]),
+            {makesha(0): [makesha(1), makesha(2)]},
+        )
 
     def test_multiple_hybrid(self):
         self.assertSerialize(
-            b'\n'.join([
-                makesha(0),
-                b' '.join([makesha(1), makesha(2)]),
-                b' '.join([makesha(3), makesha(4), makesha(5)])]),
-            {makesha(0): [],
-             makesha(1): [makesha(2)],
-             makesha(3): [makesha(4), makesha(5)]})
+            b"\n".join(
+                [
+                    makesha(0),
+                    b" ".join([makesha(1), makesha(2)]),
+                    b" ".join([makesha(3), makesha(4), makesha(5)]),
+                ]
+            ),
+            {
+                makesha(0): [],
+                makesha(1): [makesha(2)],
+                makesha(3): [makesha(4), makesha(5)],
+            },
+        )
 
 
 class GraftsInRepositoryBase(object):
-
     def tearDown(self):
         super(GraftsInRepositoryBase, self).tearDown()
 
@@ -112,33 +122,31 @@ class GraftsInRepositoryBase(object):
     def test_no_parents_graft(self):
         r = self.get_repo_with_grafts({self._repo.head(): []})
 
-        self.assertEqual([e.commit.id for e in r.get_walker()],
-                         [r.head()])
+        self.assertEqual([e.commit.id for e in r.get_walker()], [r.head()])
 
     def test_existing_parent_graft(self):
         r = self.get_repo_with_grafts({self._shas[-1]: [self._shas[0]]})
 
-        self.assertEqual([e.commit.id for e in r.get_walker()],
-                         [self._shas[-1], self._shas[0]])
+        self.assertEqual(
+            [e.commit.id for e in r.get_walker()],
+            [self._shas[-1], self._shas[0]],
+        )
 
     def test_remove_graft(self):
         r = self.get_repo_with_grafts({self._repo.head(): []})
         r._remove_graftpoints([self._repo.head()])
 
-        self.assertEqual([e.commit.id for e in r.get_walker()],
-                         self._shas[::-1])
+        self.assertEqual([e.commit.id for e in r.get_walker()], self._shas[::-1])
 
     def test_object_store_fail_invalid_parents(self):
         r = self._repo
 
         self.assertRaises(
-            ObjectFormatException,
-            r._add_graftpoints,
-            {self._shas[-1]: ['1']})
+            ObjectFormatException, r._add_graftpoints, {self._shas[-1]: ["1"]}
+        )
 
 
 class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
-
     def setUp(self):
         super(GraftsInRepoTests, self).setUp()
         self._repo_dir = os.path.join(tempfile.mkdtemp())
@@ -148,24 +156,21 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         self._shas = []
 
         commit_kwargs = {
-            'committer': b'Test Committer <test@nodomain.com>',
-            'author': b'Test Author <test@nodomain.com>',
-            'commit_timestamp': 12395,
-            'commit_timezone': 0,
-            'author_timestamp': 12395,
-            'author_timezone': 0,
+            "committer": b"Test Committer <test@nodomain.com>",
+            "author": b"Test Author <test@nodomain.com>",
+            "commit_timestamp": 12395,
+            "commit_timezone": 0,
+            "author_timestamp": 12395,
+            "author_timezone": 0,
         }
 
-        self._shas.append(r.do_commit(
-            b'empty commit', **commit_kwargs))
-        self._shas.append(r.do_commit(
-            b'empty commit', **commit_kwargs))
-        self._shas.append(r.do_commit(
-            b'empty commit', **commit_kwargs))
+        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
+        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
+        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
 
     def test_init_with_empty_info_grafts(self):
         r = self._repo
-        r._put_named_file(os.path.join('info', 'grafts'), b'')
+        r._put_named_file(os.path.join("info", "grafts"), b"")
 
         r = Repo(self._repo_dir)
         self.assertEqual({}, r._graftpoints)
@@ -173,15 +178,15 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
     def test_init_with_info_grafts(self):
         r = self._repo
         r._put_named_file(
-            os.path.join('info', 'grafts'),
-            self._shas[-1] + b' ' + self._shas[0])
+            os.path.join("info", "grafts"),
+            self._shas[-1] + b" " + self._shas[0],
+        )
 
         r = Repo(self._repo_dir)
         self.assertEqual({self._shas[-1]: [self._shas[0]]}, r._graftpoints)
 
 
 class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
-
     def setUp(self):
         super(GraftsInMemoryRepoTests, self).setUp()
         r = self._repo = MemoryRepo()
@@ -191,18 +196,15 @@ class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
         tree = Tree()
 
         commit_kwargs = {
-            'committer': b'Test Committer <test@nodomain.com>',
-            'author': b'Test Author <test@nodomain.com>',
-            'commit_timestamp': 12395,
-            'commit_timezone': 0,
-            'author_timestamp': 12395,
-            'author_timezone': 0,
-            'tree': tree.id
+            "committer": b"Test Committer <test@nodomain.com>",
+            "author": b"Test Author <test@nodomain.com>",
+            "commit_timestamp": 12395,
+            "commit_timezone": 0,
+            "author_timestamp": 12395,
+            "author_timezone": 0,
+            "tree": tree.id,
         }
 
-        self._shas.append(r.do_commit(
-            b'empty commit', **commit_kwargs))
-        self._shas.append(r.do_commit(
-            b'empty commit', **commit_kwargs))
-        self._shas.append(r.do_commit(
-            b'empty commit', **commit_kwargs))
+        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
+        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
+        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))

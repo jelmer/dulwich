@@ -23,7 +23,7 @@ if sys.version_info < (3, 5):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.15'
+dulwich_version_string = '0.20.23'
 
 
 class DulwichDistribution(Distribution):
@@ -60,7 +60,7 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
 tests_require = ['fastimport']
 
 
-if '__pypy__' not in sys.modules and not sys.platform == 'win32':
+if '__pypy__' not in sys.modules and sys.platform != 'win32':
     tests_require.extend([
         'gevent', 'geventhttpclient', 'setuptools>=17.1'])
 

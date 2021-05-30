@@ -32,13 +32,13 @@ import warnings
 
 from dulwich.index import (
     commit_tree,
-    )
+)
 from dulwich.objects import (
     FixedSha,
     Commit,
     Tag,
     object_class,
-    )
+)
 from dulwich.pack import (
     OFS_DELTA,
     REF_DELTA,
@@ -48,12 +48,12 @@ from dulwich.pack import (
     write_pack_header,
     write_pack_object,
     create_delta,
-    )
+)
 from dulwich.repo import Repo
 from dulwich.tests import (  # noqa: F401
     skipIf,
     SkipTest,
-    )
+)
 
 
 # Plain files are very frequently used in tests, so let the mode be very short.
@@ -76,7 +76,7 @@ def open_repo(name, temp_dir=None):
     """
     if temp_dir is None:
         temp_dir = tempfile.mkdtemp()
-    repo_dir = os.path.join(os.path.dirname(__file__), 'data', 'repos', name)
+    repo_dir = os.path.join(os.path.dirname(__file__), "data", "repos", name)
     temp_repo_dir = os.path.join(temp_dir, name)
     shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)
     return Repo(temp_repo_dir)
@@ -108,12 +108,14 @@ def make_object(cls, **attrs):
         monkey-patched in, so this is a class that is exactly the same only
         with a __dict__ instead of __slots__.
         """
+
         pass
-    TestObject.__name__ = 'TestObject_' + cls.__name__
+
+    TestObject.__name__ = "TestObject_" + cls.__name__
 
     obj = TestObject()
     for name, value in attrs.items():
-        if name == 'id':
+        if name == "id":
             # id property is read-only, so we overwrite sha instead.
             sha = FixedSha(value)
             obj.sha = lambda: sha
@@ -130,15 +132,17 @@ def make_commit(**attrs):
     Returns: A newly initialized Commit object.
     """
     default_time = 1262304000  # 2010-01-01 00:00:00
-    all_attrs = {'author': b'Test Author <test@nodomain.com>',
-                 'author_time': default_time,
-                 'author_timezone': 0,
-                 'committer': b'Test Committer <test@nodomain.com>',
-                 'commit_time': default_time,
-                 'commit_timezone': 0,
-                 'message': b'Test message.',
-                 'parents': [],
-                 'tree': b'0' * 40}
+    all_attrs = {
+        "author": b"Test Author <test@nodomain.com>",
+        "author_time": default_time,
+        "author_timezone": 0,
+        "committer": b"Test Committer <test@nodomain.com>",
+        "commit_time": default_time,
+        "commit_timezone": 0,
+        "message": b"Test message.",
+        "parents": [],
+        "tree": b"0" * 40,
+    }
     all_attrs.update(attrs)
     return make_object(Commit, **all_attrs)
 
@@ -154,13 +158,14 @@ def make_tag(target, **attrs):
     target_id = target.id
     target_type = object_class(target.type_name)
     default_time = int(time.mktime(datetime.datetime(2010, 1, 1).timetuple()))
-    all_attrs = {'tagger': b'Test Author <test@nodomain.com>',
-                 'tag_time': default_time,
-                 'tag_timezone': 0,
-                 'message': b'Test message.',
-                 'object': (target_type, target_id),
-                 'name': b'Test Tag',
-                 }
+    all_attrs = {
+        "tagger": b"Test Author <test@nodomain.com>",
+        "tag_time": default_time,
+        "tag_timezone": 0,
+        "message": b"Test message.",
+        "object": (target_type, target_id),
+        "name": b"Test Tag",
+    }
     all_attrs.update(attrs)
     return make_object(Tag, **all_attrs)
 
@@ -234,8 +239,7 @@ def build_pack(f, objects_spec, store=None):
     while len(full_objects) < num_objects:
         for i, (type_num, data) in enumerate(objects_spec):
             if type_num not in DELTA_TYPES:
-                full_objects[i] = (type_num, data,
-                                   obj_sha(type_num, [data]))
+                full_objects[i] = (type_num, data, obj_sha(type_num, [data]))
                 continue
             base, data = data
             if isinstance(base, int):
@@ -244,8 +248,11 @@ def build_pack(f, objects_spec, store=None):
                 base_type_num, _, _ = full_objects[base]
             else:
                 base_type_num, _ = store.get_raw(base)
-            full_objects[i] = (base_type_num, data,
-                               obj_sha(base_type_num, [data]))
+            full_objects[i] = (
+                base_type_num,
+                data,
+                obj_sha(base_type_num, [data]),
+            )
 
     for i, (type_num, obj) in enumerate(objects_spec):
         offset = f.tell()
@@ -322,8 +329,8 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         try:
             parent_ids = [nums[pn] for pn in commit[1:]]
         except KeyError as e:
-            missing_parent, = e.args
-            raise ValueError('Unknown parent %i' % missing_parent)
+            (missing_parent,) = e.args
+            raise ValueError("Unknown parent %i" % missing_parent)
 
         blobs = []
         for entry in trees.get(commit_num, []):
@@ -336,17 +343,17 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         tree_id = commit_tree(object_store, blobs)
 
         commit_attrs = {
-            'message': ('Commit %i' % commit_num).encode('ascii'),
-            'parents': parent_ids,
-            'tree': tree_id,
-            'commit_time': commit_time,
-            }
+            "message": ("Commit %i" % commit_num).encode("ascii"),
+            "parents": parent_ids,
+            "tree": tree_id,
+            "commit_time": commit_time,
+        }
         commit_attrs.update(attrs.get(commit_num, {}))
         commit_obj = make_commit(**commit_attrs)
 
         # By default, increment the time by a lot. Out-of-order commits should
         # be closer together than this because their main cause is clock skew.
-        commit_time = commit_attrs['commit_time'] + 100
+        commit_time = commit_attrs["commit_time"] + 100
         nums[commit_num] = commit_obj.id
         object_store.add_object(commit_obj)
         commits.append(commit_obj)
@@ -360,7 +367,7 @@ def setup_warning_catcher():
     caught_warnings = []
     original_showwarning = warnings.showwarning
 
-    def custom_showwarning(*args,  **kwargs):
+    def custom_showwarning(*args, **kwargs):
         caught_warnings.append(args[0])
 
     warnings.showwarning = custom_showwarning

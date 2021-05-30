@@ -20,10 +20,12 @@
 
 """Object specification."""
 
+from typing import Union, List, Tuple
+
 
 def to_bytes(text):
     if getattr(text, "encode", None) is not None:
-        text = text.encode('ascii')
+        text = text.encode("ascii")
     return text
 
 
@@ -75,7 +77,7 @@ def parse_ref(container, refspec):
         b"refs/tags/" + refspec,
         b"refs/heads/" + refspec,
         b"refs/remotes/" + refspec,
-        b"refs/remotes/" + refspec + b"/HEAD"
+        b"refs/remotes/" + refspec + b"/HEAD",
     ]
     for ref in possible_refs:
         if ref in container:
@@ -119,7 +121,9 @@ def parse_reftuple(lh_container, rh_container, refspec, force=False):
 
 
 def parse_reftuples(
-        lh_container, rh_container, refspecs, force=False):
+        lh_container, rh_container,
+        refspecs: Union[bytes, List[bytes], List[Tuple[bytes, bytes]]],
+        force: bool = False):
     """Parse a list of reftuple specs to a list of reftuples.
 
     Args:
@@ -136,8 +140,7 @@ def parse_reftuples(
     ret = []
     # TODO: Support * in refspecs
     for refspec in refspecs:
-        ret.append(parse_reftuple(
-            lh_container, rh_container, refspec, force=force))
+        ret.append(parse_reftuple(lh_container, rh_container, refspec, force=force))
     return ret
 
 

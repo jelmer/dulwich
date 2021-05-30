@@ -28,17 +28,17 @@ import tempfile
 
 from dulwich.objects import (
     hex_to_sha,
-    )
+)
 from dulwich.repo import (
     check_ref_format,
     Repo,
-    )
+)
 from dulwich.tests.compat.utils import (
     require_git_version,
     rmtree_ro,
     run_git_or_fail,
     CompatTestCase,
-    )
+)
 
 
 class ObjectStoreTestCase(CompatTestCase):
@@ -46,7 +46,7 @@ class ObjectStoreTestCase(CompatTestCase):
 
     def setUp(self):
         super(ObjectStoreTestCase, self).setUp()
-        self._repo = self.import_repo('server_new.export')
+        self._repo = self.import_repo("server_new.export")
 
     def _run_git(self, args):
         return run_git_or_fail(args, cwd=self._repo.path)
@@ -54,7 +54,7 @@ class ObjectStoreTestCase(CompatTestCase):
     def _parse_refs(self, output):
         refs = {}
         for line in BytesIO(output):
-            fields = line.rstrip(b'\n').split(b' ')
+            fields = line.rstrip(b"\n").split(b" ")
             self.assertEqual(3, len(fields))
             refname, type_name, sha = fields
             check_ref_format(refname[5:])
@@ -63,26 +63,27 @@ class ObjectStoreTestCase(CompatTestCase):
         return refs
 
     def _parse_objects(self, output):
-        return set(s.rstrip(b'\n').split(b' ')[0] for s in BytesIO(output))
+        return {s.rstrip(b"\n").split(b" ")[0] for s in BytesIO(output)}
 
     def test_bare(self):
         self.assertTrue(self._repo.bare)
-        self.assertFalse(os.path.exists(os.path.join(self._repo.path, '.git')))
+        self.assertFalse(os.path.exists(os.path.join(self._repo.path, ".git")))
 
     def test_head(self):
-        output = self._run_git(['rev-parse', 'HEAD'])
-        head_sha = output.rstrip(b'\n')
+        output = self._run_git(["rev-parse", "HEAD"])
+        head_sha = output.rstrip(b"\n")
         hex_to_sha(head_sha)
-        self.assertEqual(head_sha, self._repo.refs[b'HEAD'])
+        self.assertEqual(head_sha, self._repo.refs[b"HEAD"])
 
     def test_refs(self):
         output = self._run_git(
-          ['for-each-ref', '--format=%(refname) %(objecttype) %(objectname)'])
+            ["for-each-ref", "--format=%(refname) %(objecttype) %(objectname)"]
+        )
         expected_refs = self._parse_refs(output)
 
         actual_refs = {}
         for refname, sha in self._repo.refs.as_dict().items():
-            if refname == b'HEAD':
+            if refname == b"HEAD":
                 continue  # handled in test_head
             obj = self._repo[sha]
             self.assertEqual(sha, obj.id)
@@ -92,12 +93,11 @@ class ObjectStoreTestCase(CompatTestCase):
     # TODO(dborowitz): peeled ref tests
 
     def _get_loose_shas(self):
-        output = self._run_git(
-            ['rev-list', '--all', '--objects', '--unpacked'])
+        output = self._run_git(["rev-list", "--all", "--objects", "--unpacked"])
         return self._parse_objects(output)
 
     def _get_all_shas(self):
-        output = self._run_git(['rev-list', '--all', '--objects'])
+        output = self._run_git(["rev-list", "--all", "--objects"])
         return self._parse_objects(output)
 
     def assertShasMatch(self, expected_shas, actual_shas_iter):
@@ -112,14 +112,14 @@ class ObjectStoreTestCase(CompatTestCase):
         # TODO(dborowitz): This is currently not very useful since
         # fast-imported repos only contained packed objects.
         expected_shas = self._get_loose_shas()
-        self.assertShasMatch(expected_shas,
-                             self._repo.object_store._iter_loose_objects())
+        self.assertShasMatch(
+            expected_shas, self._repo.object_store._iter_loose_objects()
+        )
 
     def test_packed_objects(self):
         expected_shas = self._get_all_shas() - self._get_loose_shas()
         self.assertShasMatch(
-            expected_shas,
-            chain.from_iterable(self._repo.object_store.packs)
+            expected_shas, chain.from_iterable(self._repo.object_store.packs)
         )
 
     def test_all_objects(self):
@@ -142,15 +142,13 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         Returns: The path to the new working tree.
         """
         temp_dir = tempfile.mkdtemp()
-        run_git_or_fail(['worktree', 'add', temp_dir, branch],
-                        cwd=repo_dir)
+        run_git_or_fail(["worktree", "add", temp_dir, branch], cwd=repo_dir)
         self.addCleanup(rmtree_ro, temp_dir)
         return temp_dir
 
     def setUp(self):
         super(WorkingTreeTestCase, self).setUp()
-        self._worktree_path = self.create_new_worktree(
-            self._repo.path, 'branch')
+        self._worktree_path = self.create_new_worktree(self._repo.path, "branch")
         self._worktree_repo = Repo(self._worktree_path)
         self.addCleanup(self._worktree_repo.close)
         self._mainworktree_repo = self._repo
@@ -159,42 +157,40 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
 
     def test_refs(self):
         super(WorkingTreeTestCase, self).test_refs()
-        self.assertEqual(self._mainworktree_repo.refs.allkeys(),
-                         self._repo.refs.allkeys())
+        self.assertEqual(
+            self._mainworktree_repo.refs.allkeys(), self._repo.refs.allkeys()
+        )
 
     def test_head_equality(self):
-        self.assertNotEqual(self._repo.refs[b'HEAD'],
-                            self._mainworktree_repo.refs[b'HEAD'])
+        self.assertNotEqual(
+            self._repo.refs[b"HEAD"], self._mainworktree_repo.refs[b"HEAD"]
+        )
 
     def test_bare(self):
         self.assertFalse(self._repo.bare)
-        self.assertTrue(os.path.isfile(os.path.join(self._repo.path, '.git')))
+        self.assertTrue(os.path.isfile(os.path.join(self._repo.path, ".git")))
 
     def _parse_worktree_list(self, output):
         worktrees = []
         for line in BytesIO(output):
-            fields = line.rstrip(b'\n').split()
+            fields = line.rstrip(b"\n").split()
             worktrees.append(tuple(f.decode() for f in fields))
         return worktrees
 
     def test_git_worktree_list(self):
         # 'git worktree list' was introduced in 2.7.0
         require_git_version((2, 7, 0))
-        output = run_git_or_fail(['worktree', 'list'], cwd=self._repo.path)
+        output = run_git_or_fail(["worktree", "list"], cwd=self._repo.path)
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
-        self.assertEqual(worktrees[0][1], '(bare)')
-        self.assertTrue(
-            os.path.samefile(worktrees[0][0], self._mainworktree_repo.path))
+        self.assertEqual(worktrees[0][1], "(bare)")
+        self.assertTrue(os.path.samefile(worktrees[0][0], self._mainworktree_repo.path))
 
-        output = run_git_or_fail(
-            ['worktree', 'list'], cwd=self._mainworktree_repo.path)
+        output = run_git_or_fail(["worktree", "list"], cwd=self._mainworktree_repo.path)
         worktrees = self._parse_worktree_list(output)
         self.assertEqual(len(worktrees), self._number_of_working_tree)
-        self.assertEqual(worktrees[0][1], '(bare)')
-        self.assertTrue(os.path.samefile(
-            worktrees[0][0],
-            self._mainworktree_repo.path))
+        self.assertEqual(worktrees[0][1], "(bare)")
+        self.assertTrue(os.path.samefile(worktrees[0][0], self._mainworktree_repo.path))
 
 
 class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
@@ -208,14 +204,16 @@ class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
         worktree_repo_path = tempfile.mkdtemp()
         self.addCleanup(rmtree_ro, worktree_repo_path)
         self._repo = Repo._init_new_working_directory(
-            worktree_repo_path, self._mainworktree_repo)
+            worktree_repo_path, self._mainworktree_repo
+        )
         self.addCleanup(self._repo.close)
         self._number_of_working_tree = 3
 
     def test_head_equality(self):
-        self.assertEqual(self._repo.refs[b'HEAD'],
-                         self._mainworktree_repo.refs[b'HEAD'])
+        self.assertEqual(
+            self._repo.refs[b"HEAD"], self._mainworktree_repo.refs[b"HEAD"]
+        )
 
     def test_bare(self):
         self.assertFalse(self._repo.bare)
-        self.assertTrue(os.path.isfile(os.path.join(self._repo.path, '.git')))
+        self.assertTrue(os.path.isfile(os.path.join(self._repo.path, ".git")))

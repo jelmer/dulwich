@@ -35,15 +35,15 @@ from unittest import (  # noqa: F401
     TestCase as _TestCase,
     skipIf,
     expectedFailure,
-    )
+)
 
 
 class TestCase(_TestCase):
-
     def setUp(self):
         super(TestCase, self).setUp()
         self._old_home = os.environ.get("HOME")
         os.environ["HOME"] = "/nonexistant"
+        os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
 
     def tearDown(self):
         super(TestCase, self).tearDown()
@@ -57,9 +57,11 @@ class BlackboxTestCase(TestCase):
     """Blackbox testing."""
 
     # TODO(jelmer): Include more possible binary paths.
-    bin_directories = [os.path.abspath(os.path.join(
-            os.path.dirname(__file__), "..", "..", "bin")), '/usr/bin',
-            '/usr/local/bin']
+    bin_directories = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin")),
+        "/usr/bin",
+        "/usr/local/bin",
+    ]
 
     def bin_path(self, name):
         """Determine the full path of a binary.
@@ -92,50 +94,52 @@ class BlackboxTestCase(TestCase):
         # Save us from all that headache and call python with the bin script.
         argv = [sys.executable, self.bin_path(name)] + args
         return subprocess.Popen(
-                argv,
-                stdout=subprocess.PIPE,
-                stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-                env=env)
+            argv,
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
 
 
 def self_test_suite():
     names = [
-        'archive',
-        'blackbox',
-        'bundle',
-        'client',
-        'config',
-        'diff_tree',
-        'fastexport',
-        'file',
-        'grafts',
-        'graph',
-        'greenthreads',
-        'hooks',
-        'ignore',
-        'index',
-        'lfs',
-        'line_ending',
-        'lru_cache',
-        'mailmap',
-        'objects',
-        'objectspec',
-        'object_store',
-        'missing_obj_finder',
-        'pack',
-        'patch',
-        'porcelain',
-        'protocol',
-        'reflog',
-        'refs',
-        'repository',
-        'server',
-        'stash',
-        'utils',
-        'walk',
-        'web',
-        ]
-    module_names = ['dulwich.tests.test_' + name for name in names]
+        "archive",
+        "blackbox",
+        "bundle",
+        "client",
+        "config",
+        "diff_tree",
+        "fastexport",
+        "file",
+        "grafts",
+        "graph",
+        "greenthreads",
+        "hooks",
+        "ignore",
+        "index",
+        "lfs",
+        "line_ending",
+        "lru_cache",
+        "mailmap",
+        "objects",
+        "objectspec",
+        "object_store",
+        "missing_obj_finder",
+        "pack",
+        "patch",
+        "porcelain",
+        "protocol",
+        "reflog",
+        "refs",
+        "repository",
+        "server",
+        "stash",
+        "utils",
+        "walk",
+        "web",
+    ]
+    module_names = ["dulwich.tests.test_" + name for name in names]
     loader = unittest.TestLoader()
     return loader.loadTestsFromNames(module_names)
 
@@ -148,28 +152,34 @@ def tutorial_test_suite():
     import dulwich.repo  # noqa: F401
     import dulwich.server  # noqa: F401
     import dulwich.patch  # noqa: F401
+
     tutorial = [
-        'introduction',
-        'file-format',
-        'repo',
-        'object-store',
-        'remote',
-        'conclusion',
-        ]
+        "introduction",
+        "file-format",
+        "repo",
+        "object-store",
+        "remote",
+        "conclusion",
+    ]
     tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
 
     def setup(test):
         test.__old_cwd = os.getcwd()
         test.tempdir = tempfile.mkdtemp()
-        test.globs.update({'tempdir': test.tempdir})
+        test.globs.update({"tempdir": test.tempdir})
         os.chdir(test.tempdir)
 
     def teardown(test):
         os.chdir(test.__old_cwd)
         shutil.rmtree(test.tempdir)
+
     return doctest.DocFileSuite(
-            module_relative=True, package='dulwich.tests',
-            setUp=setup, tearDown=teardown, *tutorial_files)
+        module_relative=True,
+        package="dulwich.tests",
+        setUp=setup,
+        tearDown=teardown,
+        *tutorial_files
+    )
 
 
 def nocompat_test_suite():
@@ -177,6 +187,7 @@ def nocompat_test_suite():
     result.addTests(self_test_suite())
     result.addTests(tutorial_test_suite())
     from dulwich.contrib import test_suite as contrib_test_suite
+
     result.addTests(contrib_test_suite())
     return result
 
@@ -184,6 +195,7 @@ def nocompat_test_suite():
 def compat_test_suite():
     result = unittest.TestSuite()
     from dulwich.tests.compat import test_suite as compat_test_suite
+
     result.addTests(compat_test_suite())
     return result
 
@@ -191,10 +203,12 @@ def compat_test_suite():
 def test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         result.addTests(tutorial_test_suite())
     from dulwich.tests.compat import test_suite as compat_test_suite
+
     result.addTests(compat_test_suite())
     from dulwich.contrib import test_suite as contrib_test_suite
+
     result.addTests(contrib_test_suite())
     return result

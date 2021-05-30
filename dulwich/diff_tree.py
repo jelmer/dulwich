@@ -23,7 +23,7 @@
 from collections import (
     defaultdict,
     namedtuple,
-    )
+)
 
 from io import BytesIO
 from itertools import chain
@@ -32,16 +32,16 @@ import stat
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,
-    )
+)
 
 
 # TreeChange type constants.
-CHANGE_ADD = 'add'
-CHANGE_MODIFY = 'modify'
-CHANGE_DELETE = 'delete'
-CHANGE_RENAME = 'rename'
-CHANGE_COPY = 'copy'
-CHANGE_UNCHANGED = 'unchanged'
+CHANGE_ADD = "add"
+CHANGE_MODIFY = "modify"
+CHANGE_DELETE = "delete"
+CHANGE_RENAME = "rename"
+CHANGE_COPY = "copy"
+CHANGE_UNCHANGED = "unchanged"
 
 RENAME_CHANGE_TYPES = (CHANGE_RENAME, CHANGE_COPY)
 
@@ -53,7 +53,7 @@ MAX_FILES = 200
 REWRITE_THRESHOLD = None
 
 
-class TreeChange(namedtuple('TreeChange', ['type', 'old', 'new'])):
+class TreeChange(namedtuple("TreeChange", ["type", "old", "new"])):
     """Named tuple a single change between two trees."""
 
     @classmethod
@@ -142,7 +142,7 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
     # case.
     mode1 = tree1_id and stat.S_IFDIR or None
     mode2 = tree2_id and stat.S_IFDIR or None
-    todo = [(TreeEntry(b'', mode1, tree1_id), TreeEntry(b'', mode2, tree2_id))]
+    todo = [(TreeEntry(b"", mode1, tree1_id), TreeEntry(b"", mode2, tree2_id))]
     while todo:
         entry1, entry2 = todo.pop()
         is_tree1 = _is_tree(entry1)
@@ -163,9 +163,15 @@ def _skip_tree(entry, include_trees):
     return entry
 
 
-def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
-                 rename_detector=None, include_trees=False,
-                 change_type_same=False):
+def tree_changes(
+    store,
+    tree1_id,
+    tree2_id,
+    want_unchanged=False,
+    rename_detector=None,
+    include_trees=False,
+    change_type_same=False,
+):
     """Find the differences between the contents of two trees.
 
     Args:
@@ -182,16 +188,19 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
       Iterator over TreeChange instances for each change between the
         source and target tree.
     """
-    if (rename_detector is not None and tree1_id is not None and
-            tree2_id is not None):
+    if rename_detector is not None and tree1_id is not None and tree2_id is not None:
         for change in rename_detector.changes_with_renames(
-                tree1_id, tree2_id, want_unchanged=want_unchanged,
-                include_trees=include_trees):
+            tree1_id,
+            tree2_id,
+            want_unchanged=want_unchanged,
+            include_trees=include_trees,
+        ):
             yield change
         return
 
-    entries = walk_trees(store, tree1_id, tree2_id,
-                         prune_identical=(not want_unchanged))
+    entries = walk_trees(
+        store, tree1_id, tree2_id, prune_identical=(not want_unchanged)
+    )
     for entry1, entry2 in entries:
         if entry1 == entry2 and not want_unchanged:
             continue
@@ -201,8 +210,10 @@ def tree_changes(store, tree1_id, tree2_id, want_unchanged=False,
         entry2 = _skip_tree(entry2, include_trees)
 
         if entry1 != _NULL_ENTRY and entry2 != _NULL_ENTRY:
-            if (stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode)
-                    and not change_type_same):
+            if (
+                stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode)
+                and not change_type_same
+            ):
                 # File type changed: report as delete/add.
                 yield TreeChange.delete(entry1)
                 entry1 = _NULL_ENTRY
@@ -232,8 +243,7 @@ def _all_same(seq, key):
     return _all_eq(seq[1:], key, key(seq[0]))
 
 
-def tree_changes_for_merge(store, parent_tree_ids, tree_id,
-                           rename_detector=None):
+def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None):
     """Get the tree changes for a merge tree relative to all its parents.
 
     Args:
@@ -254,9 +264,10 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id,
       in the merge tree is not found in any of the parents, or in the case of
       deletes, if not all of the old SHAs match.
     """
-    all_parent_changes = [tree_changes(store, t, tree_id,
-                                       rename_detector=rename_detector)
-                          for t in parent_tree_ids]
+    all_parent_changes = [
+        tree_changes(store, t, tree_id, rename_detector=rename_detector)
+        for t in parent_tree_ids
+    ]
     num_parents = len(parent_tree_ids)
     changes_by_path = defaultdict(lambda: [None] * num_parents)
 
@@ -315,10 +326,10 @@ def _count_blocks(obj):
     block_getvalue = block.getvalue
 
     for c in chain.from_iterable(obj.as_raw_chunks()):
-        c = c.to_bytes(1, 'big')
+        c = c.to_bytes(1, "big")
         block_write(c)
         n += 1
-        if c == b'\n' or n == _BLOCK_SIZE:
+        if c == b"\n" or n == _BLOCK_SIZE:
             value = block_getvalue()
             block_counts[hash(value)] += len(value)
             block_seek(0)
@@ -392,10 +403,14 @@ def _tree_change_key(entry):
 class RenameDetector(object):
     """Object for handling rename detection between two trees."""
 
-    def __init__(self, store, rename_threshold=RENAME_THRESHOLD,
-                 max_files=MAX_FILES,
-                 rewrite_threshold=REWRITE_THRESHOLD,
-                 find_copies_harder=False):
+    def __init__(
+        self,
+        store,
+        rename_threshold=RENAME_THRESHOLD,
+        max_files=MAX_FILES,
+        rewrite_threshold=REWRITE_THRESHOLD,
+        find_copies_harder=False,
+    ):
         """Initialize the rename detector.
 
         Args:
@@ -426,8 +441,11 @@ class RenameDetector(object):
         self._changes = []
 
     def _should_split(self, change):
-        if (self._rewrite_threshold is None or change.type != CHANGE_MODIFY or
-                change.old.sha == change.new.sha):
+        if (
+            self._rewrite_threshold is None
+            or change.type != CHANGE_MODIFY
+            or change.old.sha == change.new.sha
+        ):
             return False
         old_obj = self._store[change.old.sha]
         new_obj = self._store[change.new.sha]
@@ -441,8 +459,9 @@ class RenameDetector(object):
         elif self._should_split(change):
             self._deletes.append(TreeChange.delete(change.old))
             self._adds.append(TreeChange.add(change.new))
-        elif ((self._find_copies_harder and change.type == CHANGE_UNCHANGED)
-              or change.type == CHANGE_MODIFY):
+        elif (
+            self._find_copies_harder and change.type == CHANGE_UNCHANGED
+        ) or change.type == CHANGE_MODIFY:
             # Treat all modifies as potential deletes for rename detection,
             # but don't split them (to avoid spurious renames). Setting
             # find_copies_harder means we treat unchanged the same as
@@ -453,15 +472,18 @@ class RenameDetector(object):
 
     def _collect_changes(self, tree1_id, tree2_id):
         want_unchanged = self._find_copies_harder or self._want_unchanged
-        for change in tree_changes(self._store, tree1_id, tree2_id,
-                                   want_unchanged=want_unchanged,
-                                   include_trees=self._include_trees):
+        for change in tree_changes(
+            self._store,
+            tree1_id,
+            tree2_id,
+            want_unchanged=want_unchanged,
+            include_trees=self._include_trees,
+        ):
             self._add_change(change)
 
     def _prune(self, add_paths, delete_paths):
         self._adds = [a for a in self._adds if a.new.path not in add_paths]
-        self._deletes = [d for d in self._deletes
-                         if d.old.path not in delete_paths]
+        self._deletes = [d for d in self._deletes if d.old.path not in delete_paths]
 
     def _find_exact_renames(self):
         add_map = defaultdict(list)
@@ -534,8 +556,7 @@ class RenameDetector(object):
                 if stat.S_IFMT(delete.old.mode) != stat.S_IFMT(add.new.mode):
                     continue
                 new_obj = self._store[add.new.sha]
-                score = _similarity_score(old_obj, new_obj,
-                                          block_cache=block_cache)
+                score = _similarity_score(old_obj, new_obj, block_cache=block_cache)
                 if score > self._rename_threshold:
                     new_type = self._rename_type(check_paths, delete, add)
                     rename = TreeChange(new_type, delete.old, add.new)
@@ -570,17 +591,17 @@ class RenameDetector(object):
             return
 
         modifies = {}
-        delete_map = dict((d.old.path, d) for d in self._deletes)
+        delete_map = {d.old.path: d for d in self._deletes}
         for add in self._adds:
             path = add.new.path
             delete = delete_map.get(path)
-            if (delete is not None and
-                    stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)):
+            if delete is not None and stat.S_IFMT(delete.old.mode) == stat.S_IFMT(
+                add.new.mode
+            ):
                 modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
 
         self._adds = [a for a in self._adds if a.new.path not in modifies]
-        self._deletes = [a for a in self._deletes if a.new.path not in
-                         modifies]
+        self._deletes = [a for a in self._deletes if a.new.path not in modifies]
         self._changes += modifies.values()
 
     def _sorted_changes(self):
@@ -594,11 +615,11 @@ class RenameDetector(object):
     def _prune_unchanged(self):
         if self._want_unchanged:
             return
-        self._deletes = [
-            d for d in self._deletes if d.type != CHANGE_UNCHANGED]
+        self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]
 
-    def changes_with_renames(self, tree1_id, tree2_id, want_unchanged=False,
-                             include_trees=False):
+    def changes_with_renames(
+        self, tree1_id, tree2_id, want_unchanged=False, include_trees=False
+    ):
         """Iterate TreeChanges between two tree SHAs, with rename detection."""
         self._reset()
         self._want_unchanged = want_unchanged
@@ -622,6 +643,6 @@ try:
         _is_tree,
         _merge_entries,
         _count_blocks,
-        )
+    )
 except ImportError:
     pass

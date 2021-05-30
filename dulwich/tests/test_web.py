@@ -28,20 +28,20 @@ from typing import Type
 
 from dulwich.object_store import (
     MemoryObjectStore,
-    )
+)
 from dulwich.objects import (
     Blob,
-    )
+)
 from dulwich.repo import (
     BaseRepo,
     MemoryRepo,
-    )
+)
 from dulwich.server import (
     DictBackend,
-    )
+)
 from dulwich.tests import (
     TestCase,
-    )
+)
 from dulwich.web import (
     HTTP_OK,
     HTTP_NOT_FOUND,
@@ -59,16 +59,17 @@ from dulwich.web import (
     _LengthLimitedFile,
     HTTPGitRequest,
     HTTPGitApplication,
-    )
+)
 
 from dulwich.tests.utils import (
     make_object,
     make_tag,
-    )
+)
 
 
 class MinimalistWSGIInputStream(object):
     """WSGI input stream with no 'seek()' and 'tell()' methods."""
+
     def __init__(self, data):
         self.data = data
         self.pos = 0
@@ -77,13 +78,14 @@ class MinimalistWSGIInputStream(object):
         start = self.pos
         end = self.pos + howmuch
         if start >= len(self.data):
-            return ''
+            return ""
         self.pos = end
         return self.data[start:end]
 
 
 class MinimalistWSGIInputStream2(MinimalistWSGIInputStream):
     """WSGI input stream with no *working* 'seek()' and 'tell()' methods."""
+
     def seek(self, pos):
         raise NotImplementedError
 
@@ -113,8 +115,9 @@ class WebTestCase(TestCase):
     def setUp(self):
         super(WebTestCase, self).setUp()
         self._environ = {}
-        self._req = self._req_class(self._environ, self._start_response,
-                                    handlers=self._handlers())
+        self._req = self._req_class(
+            self._environ, self._start_response, handlers=self._handlers()
+        )
         self._status = None
         self._headers = []
         self._output = BytesIO()
@@ -128,7 +131,7 @@ class WebTestCase(TestCase):
         return None
 
     def assertContentTypeEquals(self, expected):
-        self.assertTrue(('Content-Type', expected) in self._headers)
+        self.assertTrue(("Content-Type", expected) in self._headers)
 
 
 def _test_backend(objects, refs=None, named_files=None):
@@ -139,31 +142,29 @@ def _test_backend(objects, refs=None, named_files=None):
     repo = MemoryRepo.init_bare(objects, refs)
     for path, contents in named_files.items():
         repo._put_named_file(path, contents)
-    return DictBackend({'/': repo})
+    return DictBackend({"/": repo})
 
 
 class DumbHandlersTestCase(WebTestCase):
-
     def test_send_file_not_found(self):
-        list(send_file(self._req, None, 'text/plain'))
+        list(send_file(self._req, None, "text/plain"))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
 
     def test_send_file(self):
-        f = BytesIO(b'foobar')
-        output = b''.join(send_file(self._req, f, 'some/thing'))
-        self.assertEqual(b'foobar', output)
+        f = BytesIO(b"foobar")
+        output = b"".join(send_file(self._req, f, "some/thing"))
+        self.assertEqual(b"foobar", output)
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('some/thing')
+        self.assertContentTypeEquals("some/thing")
         self.assertTrue(f.closed)
 
     def test_send_file_buffered(self):
         bufsize = 10240
-        xs = b'x' * bufsize
+        xs = b"x" * bufsize
         f = BytesIO(2 * xs)
-        self.assertEqual([xs, xs],
-                         list(send_file(self._req, f, 'some/thing')))
+        self.assertEqual([xs, xs], list(send_file(self._req, f, "some/thing")))
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('some/thing')
+        self.assertContentTypeEquals("some/thing")
         self.assertTrue(f.closed)
 
     def test_send_file_error(self):
@@ -179,122 +180,123 @@ class DumbHandlersTestCase(WebTestCase):
                 self.closed = True
 
         f = TestFile(IOError)
-        list(send_file(self._req, f, 'some/thing'))
+        list(send_file(self._req, f, "some/thing"))
         self.assertEqual(HTTP_ERROR, self._status)
         self.assertTrue(f.closed)
         self.assertFalse(self._req.cached)
 
         # non-IOErrors are reraised
         f = TestFile(AttributeError)
-        self.assertRaises(AttributeError, list,
-                          send_file(self._req, f, 'some/thing'))
+        self.assertRaises(AttributeError, list, send_file(self._req, f, "some/thing"))
         self.assertTrue(f.closed)
         self.assertFalse(self._req.cached)
 
     def test_get_text_file(self):
-        backend = _test_backend([], named_files={'description': b'foo'})
-        mat = re.search('.*', 'description')
-        output = b''.join(get_text_file(self._req, backend, mat))
-        self.assertEqual(b'foo', output)
+        backend = _test_backend([], named_files={"description": b"foo"})
+        mat = re.search(".*", "description")
+        output = b"".join(get_text_file(self._req, backend, mat))
+        self.assertEqual(b"foo", output)
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('text/plain')
+        self.assertContentTypeEquals("text/plain")
         self.assertFalse(self._req.cached)
 
     def test_get_loose_object(self):
-        blob = make_object(Blob, data=b'foo')
+        blob = make_object(Blob, data=b"foo")
         backend = _test_backend([blob])
-        mat = re.search('^(..)(.{38})$', blob.id.decode('ascii'))
-        output = b''.join(get_loose_object(self._req, backend, mat))
+        mat = re.search("^(..)(.{38})$", blob.id.decode("ascii"))
+        output = b"".join(get_loose_object(self._req, backend, mat))
         self.assertEqual(blob.as_legacy_object(), output)
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('application/x-git-loose-object')
+        self.assertContentTypeEquals("application/x-git-loose-object")
         self.assertTrue(self._req.cached)
 
     def test_get_loose_object_missing(self):
-        mat = re.search('^(..)(.{38})$', '1' * 40)
+        mat = re.search("^(..)(.{38})$", "1" * 40)
         list(get_loose_object(self._req, _test_backend([]), mat))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
 
     def test_get_loose_object_error(self):
-        blob = make_object(Blob, data=b'foo')
+        blob = make_object(Blob, data=b"foo")
         backend = _test_backend([blob])
-        mat = re.search('^(..)(.{38})$', blob.id.decode('ascii'))
+        mat = re.search("^(..)(.{38})$", blob.id.decode("ascii"))
 
         def as_legacy_object_error(self):
             raise IOError
 
-        self.addCleanup(
-            setattr, Blob, 'as_legacy_object', Blob.as_legacy_object)
+        self.addCleanup(setattr, Blob, "as_legacy_object", Blob.as_legacy_object)
         Blob.as_legacy_object = as_legacy_object_error
         list(get_loose_object(self._req, backend, mat))
         self.assertEqual(HTTP_ERROR, self._status)
 
     def test_get_pack_file(self):
-        pack_name = os.path.join(
-            'objects', 'pack', 'pack-%s.pack' % ('1' * 40))
-        backend = _test_backend([], named_files={pack_name: b'pack contents'})
-        mat = re.search('.*', pack_name)
-        output = b''.join(get_pack_file(self._req, backend, mat))
-        self.assertEqual(b'pack contents', output)
+        pack_name = os.path.join("objects", "pack", "pack-%s.pack" % ("1" * 40))
+        backend = _test_backend([], named_files={pack_name: b"pack contents"})
+        mat = re.search(".*", pack_name)
+        output = b"".join(get_pack_file(self._req, backend, mat))
+        self.assertEqual(b"pack contents", output)
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('application/x-git-packed-objects')
+        self.assertContentTypeEquals("application/x-git-packed-objects")
         self.assertTrue(self._req.cached)
 
     def test_get_idx_file(self):
-        idx_name = os.path.join('objects', 'pack', 'pack-%s.idx' % ('1' * 40))
-        backend = _test_backend([], named_files={idx_name: b'idx contents'})
-        mat = re.search('.*', idx_name)
-        output = b''.join(get_idx_file(self._req, backend, mat))
-        self.assertEqual(b'idx contents', output)
+        idx_name = os.path.join("objects", "pack", "pack-%s.idx" % ("1" * 40))
+        backend = _test_backend([], named_files={idx_name: b"idx contents"})
+        mat = re.search(".*", idx_name)
+        output = b"".join(get_idx_file(self._req, backend, mat))
+        self.assertEqual(b"idx contents", output)
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('application/x-git-packed-objects-toc')
+        self.assertContentTypeEquals("application/x-git-packed-objects-toc")
         self.assertTrue(self._req.cached)
 
     def test_get_info_refs(self):
-        self._environ['QUERY_STRING'] = ''
+        self._environ["QUERY_STRING"] = ""
 
-        blob1 = make_object(Blob, data=b'1')
-        blob2 = make_object(Blob, data=b'2')
-        blob3 = make_object(Blob, data=b'3')
+        blob1 = make_object(Blob, data=b"1")
+        blob2 = make_object(Blob, data=b"2")
+        blob3 = make_object(Blob, data=b"3")
 
-        tag1 = make_tag(blob2, name=b'tag-tag')
+        tag1 = make_tag(blob2, name=b"tag-tag")
 
         objects = [blob1, blob2, blob3, tag1]
         refs = {
-          b'HEAD': b'000',
-          b'refs/heads/master': blob1.id,
-          b'refs/tags/tag-tag': tag1.id,
-          b'refs/tags/blob-tag': blob3.id,
-          }
+            b"HEAD": b"000",
+            b"refs/heads/master": blob1.id,
+            b"refs/tags/tag-tag": tag1.id,
+            b"refs/tags/blob-tag": blob3.id,
+        }
         backend = _test_backend(objects, refs=refs)
 
-        mat = re.search('.*', '//info/refs')
-        self.assertEqual([blob1.id + b'\trefs/heads/master\n',
-                          blob3.id + b'\trefs/tags/blob-tag\n',
-                          tag1.id + b'\trefs/tags/tag-tag\n',
-                          blob2.id + b'\trefs/tags/tag-tag^{}\n'],
-                         list(get_info_refs(self._req, backend, mat)))
+        mat = re.search(".*", "//info/refs")
+        self.assertEqual(
+            [
+                blob1.id + b"\trefs/heads/master\n",
+                blob3.id + b"\trefs/tags/blob-tag\n",
+                tag1.id + b"\trefs/tags/tag-tag\n",
+                blob2.id + b"\trefs/tags/tag-tag^{}\n",
+            ],
+            list(get_info_refs(self._req, backend, mat)),
+        )
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('text/plain')
+        self.assertContentTypeEquals("text/plain")
         self.assertFalse(self._req.cached)
 
     def test_get_info_refs_not_found(self):
-        self._environ['QUERY_STRING'] = ''
+        self._environ["QUERY_STRING"] = ""
 
         objects = []
         refs = {}
         backend = _test_backend(objects, refs=refs)
 
-        mat = re.search('info/refs', '/foo/info/refs')
+        mat = re.search("info/refs", "/foo/info/refs")
         self.assertEqual(
-            [b'No git repository was found at /foo'],
-            list(get_info_refs(self._req, backend, mat)))
+            [b"No git repository was found at /foo"],
+            list(get_info_refs(self._req, backend, mat)),
+        )
         self.assertEqual(HTTP_NOT_FOUND, self._status)
-        self.assertContentTypeEquals('text/plain')
+        self.assertContentTypeEquals("text/plain")
 
     def test_get_info_packs(self):
         class TestPackData(object):
-
             def __init__(self, sha):
                 self.filename = "pack-%s.pack" % sha
 
@@ -312,61 +314,66 @@ class DumbHandlersTestCase(WebTestCase):
 
         store = TestObjectStore()
         repo = BaseRepo(store, None)
-        backend = DictBackend({'/': repo})
-        mat = re.search('.*', '//info/packs')
-        output = b''.join(get_info_packs(self._req, backend, mat))
-        expected = b''.join(
-            [(b'P pack-' + s + b'.pack\n')
-             for s in [b'1' * 40, b'2' * 40, b'3' * 40]])
+        backend = DictBackend({"/": repo})
+        mat = re.search(".*", "//info/packs")
+        output = b"".join(get_info_packs(self._req, backend, mat))
+        expected = b"".join(
+            [(b"P pack-" + s + b".pack\n") for s in [b"1" * 40, b"2" * 40, b"3" * 40]]
+        )
         self.assertEqual(expected, output)
         self.assertEqual(HTTP_OK, self._status)
-        self.assertContentTypeEquals('text/plain')
+        self.assertContentTypeEquals("text/plain")
         self.assertFalse(self._req.cached)
 
 
 class SmartHandlersTestCase(WebTestCase):
-
     class _TestUploadPackHandler(object):
-        def __init__(self, backend, args, proto, stateless_rpc=None,
-                     advertise_refs=False):
+        def __init__(
+            self,
+            backend,
+            args,
+            proto,
+            stateless_rpc=None,
+            advertise_refs=False,
+        ):
             self.args = args
             self.proto = proto
             self.stateless_rpc = stateless_rpc
             self.advertise_refs = advertise_refs
 
         def handle(self):
-            self.proto.write(b'handled input: ' + self.proto.recv(1024))
+            self.proto.write(b"handled input: " + self.proto.recv(1024))
 
     def _make_handler(self, *args, **kwargs):
         self._handler = self._TestUploadPackHandler(*args, **kwargs)
         return self._handler
 
     def _handlers(self):
-        return {b'git-upload-pack': self._make_handler}
+        return {b"git-upload-pack": self._make_handler}
 
     def test_handle_service_request_unknown(self):
-        mat = re.search('.*', '/git-evil-handler')
-        content = list(handle_service_request(self._req, 'backend', mat))
+        mat = re.search(".*", "/git-evil-handler")
+        content = list(handle_service_request(self._req, "backend", mat))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
-        self.assertFalse(b'git-evil-handler' in b"".join(content))
+        self.assertFalse(b"git-evil-handler" in b"".join(content))
         self.assertFalse(self._req.cached)
 
     def _run_handle_service_request(self, content_length=None):
-        self._environ['wsgi.input'] = BytesIO(b'foo')
+        self._environ["wsgi.input"] = BytesIO(b"foo")
         if content_length is not None:
-            self._environ['CONTENT_LENGTH'] = content_length
-        mat = re.search('.*', '/git-upload-pack')
+            self._environ["CONTENT_LENGTH"] = content_length
+        mat = re.search(".*", "/git-upload-pack")
 
         class Backend(object):
             def open_repository(self, path):
                 return None
-        handler_output = b''.join(
-          handle_service_request(self._req, Backend(), mat))
+
+        handler_output = b"".join(handle_service_request(self._req, Backend(), mat))
         write_output = self._output.getvalue()
         # Ensure all output was written via the write callback.
-        self.assertEqual(b'', handler_output)
-        self.assertEqual(b'handled input: foo', write_output)
-        self.assertContentTypeEquals('application/x-git-upload-pack-result')
+        self.assertEqual(b"", handler_output)
+        self.assertEqual(b"handled input: foo", write_output)
+        self.assertContentTypeEquals("application/x-git-upload-pack-result")
         self.assertFalse(self._handler.advertise_refs)
         self.assertTrue(self._handler.stateless_rpc)
         self.assertFalse(self._req.cached)
@@ -375,42 +382,46 @@ class SmartHandlersTestCase(WebTestCase):
         self._run_handle_service_request()
 
     def test_handle_service_request_with_length(self):
-        self._run_handle_service_request(content_length='3')
+        self._run_handle_service_request(content_length="3")
 
     def test_handle_service_request_empty_length(self):
-        self._run_handle_service_request(content_length='')
+        self._run_handle_service_request(content_length="")
 
     def test_get_info_refs_unknown(self):
-        self._environ['QUERY_STRING'] = 'service=git-evil-handler'
+        self._environ["QUERY_STRING"] = "service=git-evil-handler"
 
         class Backend(object):
             def open_repository(self, url):
                 return None
 
-        mat = re.search('.*', '/git-evil-pack')
+        mat = re.search(".*", "/git-evil-pack")
         content = list(get_info_refs(self._req, Backend(), mat))
-        self.assertFalse(b'git-evil-handler' in b"".join(content))
+        self.assertFalse(b"git-evil-handler" in b"".join(content))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertFalse(self._req.cached)
 
     def test_get_info_refs(self):
-        self._environ['wsgi.input'] = BytesIO(b'foo')
-        self._environ['QUERY_STRING'] = 'service=git-upload-pack'
+        self._environ["wsgi.input"] = BytesIO(b"foo")
+        self._environ["QUERY_STRING"] = "service=git-upload-pack"
 
         class Backend(object):
-
             def open_repository(self, url):
                 return None
 
-        mat = re.search('.*', '/git-upload-pack')
-        handler_output = b''.join(get_info_refs(self._req, Backend(), mat))
+        mat = re.search(".*", "/git-upload-pack")
+        handler_output = b"".join(get_info_refs(self._req, Backend(), mat))
         write_output = self._output.getvalue()
-        self.assertEqual((b'001e# service=git-upload-pack\n'
-                          b'0000'
-                          # input is ignored by the handler
-                          b'handled input: '), write_output)
+        self.assertEqual(
+            (
+                b"001e# service=git-upload-pack\n"
+                b"0000"
+                # input is ignored by the handler
+                b"handled input: "
+            ),
+            write_output,
+        )
         # Ensure all output was written via the write callback.
-        self.assertEqual(b'', handler_output)
+        self.assertEqual(b"", handler_output)
         self.assertTrue(self._handler.advertise_refs)
         self.assertTrue(self._handler.stateless_rpc)
         self.assertFalse(self._req.cached)
@@ -418,19 +429,19 @@ class SmartHandlersTestCase(WebTestCase):
 
 class LengthLimitedFileTestCase(TestCase):
     def test_no_cutoff(self):
-        f = _LengthLimitedFile(BytesIO(b'foobar'), 1024)
-        self.assertEqual(b'foobar', f.read())
+        f = _LengthLimitedFile(BytesIO(b"foobar"), 1024)
+        self.assertEqual(b"foobar", f.read())
 
     def test_cutoff(self):
-        f = _LengthLimitedFile(BytesIO(b'foobar'), 3)
-        self.assertEqual(b'foo', f.read())
-        self.assertEqual(b'', f.read())
+        f = _LengthLimitedFile(BytesIO(b"foobar"), 3)
+        self.assertEqual(b"foo", f.read())
+        self.assertEqual(b"", f.read())
 
     def test_multiple_reads(self):
-        f = _LengthLimitedFile(BytesIO(b'foobar'), 3)
-        self.assertEqual(b'fo', f.read(2))
-        self.assertEqual(b'o', f.read(2))
-        self.assertEqual(b'', f.read())
+        f = _LengthLimitedFile(BytesIO(b"foobar"), 3)
+        self.assertEqual(b"fo", f.read(2))
+        self.assertEqual(b"o", f.read(2))
+        self.assertEqual(b"", f.read())
 
 
 class HTTPGitRequestTestCase(WebTestCase):
@@ -440,19 +451,17 @@ class HTTPGitRequestTestCase(WebTestCase):
 
     def test_not_found(self):
         self._req.cache_forever()  # cache headers should be discarded
-        message = 'Something not found'
-        self.assertEqual(message.encode('ascii'), self._req.not_found(message))
+        message = "Something not found"
+        self.assertEqual(message.encode("ascii"), self._req.not_found(message))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
-        self.assertEqual(set([('Content-Type', 'text/plain')]),
-                         set(self._headers))
+        self.assertEqual(set([("Content-Type", "text/plain")]), set(self._headers))
 
     def test_forbidden(self):
         self._req.cache_forever()  # cache headers should be discarded
-        message = 'Something not found'
-        self.assertEqual(message.encode('ascii'), self._req.forbidden(message))
+        message = "Something not found"
+        self.assertEqual(message.encode("ascii"), self._req.forbidden(message))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
-        self.assertEqual(set([('Content-Type', 'text/plain')]),
-                         set(self._headers))
+        self.assertEqual(set([("Content-Type", "text/plain")]), set(self._headers))
 
     def test_respond_ok(self):
         self._req.respond()
@@ -461,70 +470,77 @@ class HTTPGitRequestTestCase(WebTestCase):
 
     def test_respond(self):
         self._req.nocache()
-        self._req.respond(status=402, content_type='some/type',
-                          headers=[('X-Foo', 'foo'), ('X-Bar', 'bar')])
-        self.assertEqual(set([
-          ('X-Foo', 'foo'),
-          ('X-Bar', 'bar'),
-          ('Content-Type', 'some/type'),
-          ('Expires', 'Fri, 01 Jan 1980 00:00:00 GMT'),
-          ('Pragma', 'no-cache'),
-          ('Cache-Control', 'no-cache, max-age=0, must-revalidate'),
-          ]), set(self._headers))
+        self._req.respond(
+            status=402,
+            content_type="some/type",
+            headers=[("X-Foo", "foo"), ("X-Bar", "bar")],
+        )
+        self.assertEqual(
+            set(
+                [
+                    ("X-Foo", "foo"),
+                    ("X-Bar", "bar"),
+                    ("Content-Type", "some/type"),
+                    ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
+                    ("Pragma", "no-cache"),
+                    ("Cache-Control", "no-cache, max-age=0, must-revalidate"),
+                ]
+            ),
+            set(self._headers),
+        )
         self.assertEqual(402, self._status)
 
 
 class HTTPGitApplicationTestCase(TestCase):
-
     def setUp(self):
         super(HTTPGitApplicationTestCase, self).setUp()
-        self._app = HTTPGitApplication('backend')
+        self._app = HTTPGitApplication("backend")
 
         self._environ = {
-            'PATH_INFO': '/foo',
-            'REQUEST_METHOD': 'GET',
+            "PATH_INFO": "/foo",
+            "REQUEST_METHOD": "GET",
         }
 
     def _test_handler(self, req, backend, mat):
         # tests interface used by all handlers
         self.assertEqual(self._environ, req.environ)
-        self.assertEqual('backend', backend)
-        self.assertEqual('/foo', mat.group(0))
-        return 'output'
+        self.assertEqual("backend", backend)
+        self.assertEqual("/foo", mat.group(0))
+        return "output"
 
     def _add_handler(self, app):
-        req = self._environ['REQUEST_METHOD']
+        req = self._environ["REQUEST_METHOD"]
         app.services = {
-          (req, re.compile('/foo$')): self._test_handler,
+            (req, re.compile("/foo$")): self._test_handler,
         }
 
     def test_call(self):
         self._add_handler(self._app)
-        self.assertEqual('output', self._app(self._environ, None))
+        self.assertEqual("output", self._app(self._environ, None))
 
     def test_fallback_app(self):
         def test_app(environ, start_response):
-            return 'output'
+            return "output"
 
-        app = HTTPGitApplication('backend', fallback_app=test_app)
-        self.assertEqual('output', app(self._environ, None))
+        app = HTTPGitApplication("backend", fallback_app=test_app)
+        self.assertEqual("output", app(self._environ, None))
 
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
     __doc__ = """TestCase for testing the GunzipFilter, ensuring the wsgi.input
     is correctly decompressed and headers are corrected.
     """
-    example_text = __doc__.encode('ascii')
+    example_text = __doc__.encode("ascii")
 
     def setUp(self):
         super(GunzipTestCase, self).setUp()
         self._app = GunzipFilter(self._app)
-        self._environ['HTTP_CONTENT_ENCODING'] = 'gzip'
-        self._environ['REQUEST_METHOD'] = 'POST'
+        self._environ["HTTP_CONTENT_ENCODING"] = "gzip"
+        self._environ["REQUEST_METHOD"] = "POST"
 
     def _get_zstream(self, text):
         zstream = BytesIO()
-        zfile = gzip.GzipFile(fileobj=zstream, mode='w')
+        zfile = gzip.GzipFile(fileobj=zstream, mode="w")
         zfile.write(text)
         zfile.close()
         zlength = zstream.tell()
@@ -534,22 +550,19 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
     def _test_call(self, orig, zstream, zlength):
         self._add_handler(self._app.app)
         self.assertLess(zlength, len(orig))
-        self.assertEqual(self._environ['HTTP_CONTENT_ENCODING'], 'gzip')
-        self._environ['CONTENT_LENGTH'] = zlength
-        self._environ['wsgi.input'] = zstream
+        self.assertEqual(self._environ["HTTP_CONTENT_ENCODING"], "gzip")
+        self._environ["CONTENT_LENGTH"] = zlength
+        self._environ["wsgi.input"] = zstream
         self._app(self._environ, None)
-        buf = self._environ['wsgi.input']
+        buf = self._environ["wsgi.input"]
         self.assertIsNot(buf, zstream)
         buf.seek(0)
         self.assertEqual(orig, buf.read())
-        self.assertIs(None, self._environ.get('CONTENT_LENGTH'))
-        self.assertNotIn('HTTP_CONTENT_ENCODING', self._environ)
+        self.assertIs(None, self._environ.get("CONTENT_LENGTH"))
+        self.assertNotIn("HTTP_CONTENT_ENCODING", self._environ)
 
     def test_call(self):
-        self._test_call(
-            self.example_text,
-            *self._get_zstream(self.example_text)
-        )
+        self._test_call(self.example_text, *self._get_zstream(self.example_text))
 
     def test_call_no_seek(self):
         """
@@ -560,7 +573,9 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         zstream, zlength = self._get_zstream(self.example_text)
         self._test_call(
             self.example_text,
-            MinimalistWSGIInputStream(zstream.read()), zlength)
+            MinimalistWSGIInputStream(zstream.read()),
+            zlength,
+        )
 
     def test_call_no_working_seek(self):
         """
@@ -569,5 +584,7 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         """
         zstream, zlength = self._get_zstream(self.example_text)
         self._test_call(
-                self.example_text,
-                MinimalistWSGIInputStream2(zstream.read()), zlength)
+            self.example_text,
+            MinimalistWSGIInputStream2(zstream.read()),
+            zlength,
+        )

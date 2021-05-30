@@ -23,6 +23,7 @@
 
 from contextlib import closing
 from io import BytesIO
+from unittest import skipUnless
 import os
 import shutil
 import stat
@@ -30,17 +31,17 @@ import tempfile
 
 from dulwich.index import (
     commit_tree,
-    )
+)
 from dulwich.errors import (
     NotTreeError,
-    )
+)
 from dulwich.objects import (
     sha_to_hex,
     Blob,
     Tree,
     TreeEntry,
     EmptyFileException,
-    )
+)
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
@@ -49,34 +50,83 @@ from dulwich.object_store import (
     commit_tree_changes,
     read_packs_file,
     tree_lookup_path,
-    )
+)
 from dulwich.pack import (
     REF_DELTA,
     write_pack_objects,
-    )
+)
+from dulwich.protocol import DEPTH_INFINITE
 from dulwich.tests import (
     TestCase,
-    )
+)
 from dulwich.tests.utils import (
     make_object,
     make_tag,
     build_pack,
-    )
+)
+
+try:
+    from unittest.mock import patch
+except ImportError:
+    patch = None  # type: ignore
 
 
 testobject = make_object(Blob, data=b"yummy data")
 
 
 class ObjectStoreTests(object):
-
     def test_determine_wants_all(self):
         self.assertEqual(
             [b"1" * 40],
-            self.store.determine_wants_all({b"refs/heads/foo": b"1" * 40}))
+            self.store.determine_wants_all({b"refs/heads/foo": b"1" * 40}),
+        )
 
     def test_determine_wants_all_zero(self):
         self.assertEqual(
-            [], self.store.determine_wants_all({b"refs/heads/foo": b"0" * 40}))
+            [], self.store.determine_wants_all({b"refs/heads/foo": b"0" * 40})
+        )
+
+    @skipUnless(patch, "Required mock.patch")
+    def test_determine_wants_all_depth(self):
+        self.store.add_object(testobject)
+        refs = {b"refs/heads/foo": testobject.id}
+        with patch.object(self.store, "_get_depth", return_value=1) as m:
+            self.assertEqual(
+                [], self.store.determine_wants_all(refs, depth=0)
+            )
+            self.assertEqual(
+                [testobject.id],
+                self.store.determine_wants_all(refs, depth=DEPTH_INFINITE),
+            )
+            m.assert_not_called()
+
+            self.assertEqual(
+                [], self.store.determine_wants_all(refs, depth=1)
+            )
+            m.assert_called_with(testobject.id)
+            self.assertEqual(
+                [testobject.id], self.store.determine_wants_all(refs, depth=2)
+            )
+
+    def test_get_depth(self):
+        self.assertEqual(
+            0, self.store._get_depth(testobject.id)
+        )
+
+        self.store.add_object(testobject)
+        self.assertEqual(
+            1, self.store._get_depth(testobject.id, get_parents=lambda x: [])
+        )
+
+        parent = make_object(Blob, data=b"parent data")
+        self.store.add_object(parent)
+        self.assertEqual(
+            2,
+            self.store._get_depth(
+                testobject.id,
+                get_parents=lambda x: [parent.id] if x == testobject else [],
+            ),
+        )
 
     def test_iter(self):
         self.assertEqual([], list(self.store))
@@ -99,11 +149,11 @@ class ObjectStoreTests(object):
         """Test if updating an existing stored object doesn't erase the
         object from the store.
         """
-        test_object = make_object(Blob, data=b'data')
+        test_object = make_object(Blob, data=b"data")
 
         self.store.add_object(test_object)
         test_object_id = test_object.id
-        test_object.data = test_object.data + b'update'
+        test_object.data = test_object.data + b"update"
         stored_test_object = self.store[test_object_id]
 
         self.assertNotEqual(test_object.id, stored_test_object.id)
@@ -125,69 +175,75 @@ class ObjectStoreTests(object):
         self.assertEqual(r, testobject)
 
     def test_tree_changes(self):
-        blob_a1 = make_object(Blob, data=b'a1')
-        blob_a2 = make_object(Blob, data=b'a2')
-        blob_b = make_object(Blob, data=b'b')
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_a2 = make_object(Blob, data=b"a2")
+        blob_b = make_object(Blob, data=b"b")
         for blob in [blob_a1, blob_a2, blob_b]:
             self.store.add_object(blob)
 
-        blobs_1 = [(b'a', blob_a1.id, 0o100644), (b'b', blob_b.id, 0o100644)]
+        blobs_1 = [(b"a", blob_a1.id, 0o100644), (b"b", blob_b.id, 0o100644)]
         tree1_id = commit_tree(self.store, blobs_1)
-        blobs_2 = [(b'a', blob_a2.id, 0o100644), (b'b', blob_b.id, 0o100644)]
+        blobs_2 = [(b"a", blob_a2.id, 0o100644), (b"b", blob_b.id, 0o100644)]
         tree2_id = commit_tree(self.store, blobs_2)
-        change_a = ((b'a', b'a'), (0o100644, 0o100644),
-                    (blob_a1.id, blob_a2.id))
-        self.assertEqual([change_a],
-                         list(self.store.tree_changes(tree1_id, tree2_id)))
+        change_a = (
+            (b"a", b"a"),
+            (0o100644, 0o100644),
+            (blob_a1.id, blob_a2.id),
+        )
+        self.assertEqual([change_a], list(self.store.tree_changes(tree1_id, tree2_id)))
         self.assertEqual(
-            [change_a, ((b'b', b'b'), (0o100644, 0o100644),
-             (blob_b.id, blob_b.id))],
-            list(self.store.tree_changes(tree1_id, tree2_id,
-                 want_unchanged=True)))
+            [
+                change_a,
+                ((b"b", b"b"), (0o100644, 0o100644), (blob_b.id, blob_b.id)),
+            ],
+            list(self.store.tree_changes(tree1_id, tree2_id, want_unchanged=True)),
+        )
 
     def test_iter_tree_contents(self):
-        blob_a = make_object(Blob, data=b'a')
-        blob_b = make_object(Blob, data=b'b')
-        blob_c = make_object(Blob, data=b'c')
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
+        blob_c = make_object(Blob, data=b"c")
         for blob in [blob_a, blob_b, blob_c]:
             self.store.add_object(blob)
 
         blobs = [
-            (b'a', blob_a.id, 0o100644),
-            (b'ad/b', blob_b.id, 0o100644),
-            (b'ad/bd/c', blob_c.id, 0o100755),
-            (b'ad/c', blob_c.id, 0o100644),
-            (b'c', blob_c.id, 0o100644),
+            (b"a", blob_a.id, 0o100644),
+            (b"ad/b", blob_b.id, 0o100644),
+            (b"ad/bd/c", blob_c.id, 0o100755),
+            (b"ad/c", blob_c.id, 0o100644),
+            (b"c", blob_c.id, 0o100644),
         ]
         tree_id = commit_tree(self.store, blobs)
-        self.assertEqual([TreeEntry(p, m, h) for (p, h, m) in blobs],
-                         list(self.store.iter_tree_contents(tree_id)))
+        self.assertEqual(
+            [TreeEntry(p, m, h) for (p, h, m) in blobs],
+            list(self.store.iter_tree_contents(tree_id)),
+        )
 
     def test_iter_tree_contents_include_trees(self):
-        blob_a = make_object(Blob, data=b'a')
-        blob_b = make_object(Blob, data=b'b')
-        blob_c = make_object(Blob, data=b'c')
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
+        blob_c = make_object(Blob, data=b"c")
         for blob in [blob_a, blob_b, blob_c]:
             self.store.add_object(blob)
 
         blobs = [
-          (b'a', blob_a.id, 0o100644),
-          (b'ad/b', blob_b.id, 0o100644),
-          (b'ad/bd/c', blob_c.id, 0o100755),
-          ]
+            (b"a", blob_a.id, 0o100644),
+            (b"ad/b", blob_b.id, 0o100644),
+            (b"ad/bd/c", blob_c.id, 0o100755),
+        ]
         tree_id = commit_tree(self.store, blobs)
         tree = self.store[tree_id]
-        tree_ad = self.store[tree[b'ad'][1]]
-        tree_bd = self.store[tree_ad[b'bd'][1]]
+        tree_ad = self.store[tree[b"ad"][1]]
+        tree_bd = self.store[tree_ad[b"bd"][1]]
 
         expected = [
-          TreeEntry(b'', 0o040000, tree_id),
-          TreeEntry(b'a', 0o100644, blob_a.id),
-          TreeEntry(b'ad', 0o040000, tree_ad.id),
-          TreeEntry(b'ad/b', 0o100644, blob_b.id),
-          TreeEntry(b'ad/bd', 0o040000, tree_bd.id),
-          TreeEntry(b'ad/bd/c', 0o100755, blob_c.id),
-          ]
+            TreeEntry(b"", 0o040000, tree_id),
+            TreeEntry(b"a", 0o100644, blob_a.id),
+            TreeEntry(b"ad", 0o040000, tree_ad.id),
+            TreeEntry(b"ad/b", 0o100644, blob_b.id),
+            TreeEntry(b"ad/bd", 0o040000, tree_bd.id),
+            TreeEntry(b"ad/bd/c", 0o100755, blob_c.id),
+        ]
         actual = self.store.iter_tree_contents(tree_id, include_trees=True)
         self.assertEqual(expected, list(actual))
 
@@ -198,16 +254,17 @@ class ObjectStoreTests(object):
 
     def test_peel_sha(self):
         self.store.add_object(testobject)
-        tag1 = self.make_tag(b'1', testobject)
-        tag2 = self.make_tag(b'2', testobject)
-        tag3 = self.make_tag(b'3', testobject)
+        tag1 = self.make_tag(b"1", testobject)
+        tag2 = self.make_tag(b"2", testobject)
+        tag3 = self.make_tag(b"3", testobject)
         for obj in [testobject, tag1, tag2, tag3]:
             self.assertEqual(testobject, self.store.peel_sha(obj.id))
 
     def test_get_raw(self):
         self.store.add_object(testobject)
-        self.assertEqual((Blob.type_num, b'yummy data'),
-                         self.store.get_raw(testobject.id))
+        self.assertEqual(
+            (Blob.type_num, b"yummy data"), self.store.get_raw(testobject.id)
+        )
 
     def test_close(self):
         # For now, just check that close doesn't barf.
@@ -216,7 +273,6 @@ class ObjectStoreTests(object):
 
 
 class OverlayObjectStoreTests(ObjectStoreTests, TestCase):
-
     def setUp(self):
         TestCase.setUp(self)
         self.bases = [MemoryObjectStore(), MemoryObjectStore()]
@@ -224,7 +280,6 @@ class OverlayObjectStoreTests(ObjectStoreTests, TestCase):
 
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
-
     def setUp(self):
         TestCase.setUp(self)
         self.store = MemoryObjectStore()
@@ -248,17 +303,22 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
     def test_add_thin_pack(self):
         o = MemoryObjectStore()
-        blob = make_object(Blob, data=b'yummy data')
+        blob = make_object(Blob, data=b"yummy data")
         o.add_object(blob)
 
         f = BytesIO()
-        entries = build_pack(f, [
-            (REF_DELTA, (blob.id, b'more yummy data')),
-            ], store=o)
+        entries = build_pack(
+            f,
+            [
+                (REF_DELTA, (blob.id, b"more yummy data")),
+            ],
+            store=o,
+        )
         o.add_thin_pack(f.read, None)
         packed_blob_sha = sha_to_hex(entries[0][3])
-        self.assertEqual((Blob.type_num, b'more yummy data'),
-                         o.get_raw(packed_blob_sha))
+        self.assertEqual(
+            (Blob.type_num, b"more yummy data"), o.get_raw(packed_blob_sha)
+        )
 
     def test_add_thin_pack_empty(self):
         o = MemoryObjectStore()
@@ -270,7 +330,6 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
 
 class PackBasedObjectStoreTests(ObjectStoreTests):
-
     def tearDown(self):
         for pack in self.store.packs:
             pack.close()
@@ -303,8 +362,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         b5 = make_object(Blob, data=b"and more data")
         b6 = make_object(Blob, data=b"and some more data")
         self.store.add_objects([(b5, None), (b6, None)])
-        self.assertEqual({b1.id, b2.id, b3.id, b4.id, b5.id, b6.id},
-                         set(self.store))
+        self.assertEqual({b1.id, b2.id, b3.id, b4.id, b5.id, b6.id}, set(self.store))
         self.assertEqual(2, len(self.store.packs))
         self.assertEqual(6, self.store.repack())
         self.assertEqual(1, len(self.store.packs))
@@ -331,7 +389,6 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
 
 
 class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
-
     def setUp(self):
         TestCase.setUp(self)
         self.store_dir = tempfile.mkdtemp()
@@ -345,8 +402,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_loose_compression_level(self):
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
-        alternate_store = DiskObjectStore(
-            alternate_dir, loose_compression_level=6)
+        alternate_store = DiskObjectStore(alternate_dir, loose_compression_level=6)
         b2 = make_object(Blob, data=b"yummy data")
         alternate_store.add_object(b2)
 
@@ -365,14 +421,16 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_read_alternate_paths(self):
         store = DiskObjectStore(self.store_dir)
 
-        abs_path = os.path.abspath(os.path.normpath('/abspath'))
+        abs_path = os.path.abspath(os.path.normpath("/abspath"))
         # ensures in particular existence of the alternates file
         store.add_alternate_path(abs_path)
         self.assertEqual(set(store._read_alternate_paths()), {abs_path})
 
         store.add_alternate_path("relative-path")
-        self.assertIn(os.path.join(store.path, "relative-path"),
-                      set(store._read_alternate_paths()))
+        self.assertIn(
+            os.path.join(store.path, "relative-path"),
+            set(store._read_alternate_paths()),
+        )
 
         # arguably, add_alternate_path() could strip comments.
         # Meanwhile it's more convenient to use it than to import INFODIR
@@ -383,16 +441,17 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_corrupted_object_raise_exception(self):
         """Corrupted sha1 disk file should raise specific exception"""
         self.store.add_object(testobject)
-        self.assertEqual((Blob.type_num, b'yummy data'),
-                         self.store.get_raw(testobject.id))
+        self.assertEqual(
+            (Blob.type_num, b"yummy data"), self.store.get_raw(testobject.id)
+        )
         self.assertTrue(self.store.contains_loose(testobject.id))
         self.assertIsNotNone(self.store._get_loose_object(testobject.id))
 
         path = self.store._get_shafile_path(testobject.id)
-        with open(path, 'wb') as f:  # corrupt the file
-            f.write(b'')
+        with open(path, "wb") as f:  # corrupt the file
+            f.write(b"")
 
-        expected_error_msg = 'Corrupted empty file detected'
+        expected_error_msg = "Corrupted empty file detected"
         try:
             self.store.contains_loose(testobject.id)
         except EmptyFileException as e:
@@ -404,13 +463,11 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual(str(e), expected_error_msg)
 
         # this does not change iteration on loose objects though
-        self.assertEqual([testobject.id],
-                         list(self.store._iter_loose_objects()))
+        self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
     def test_tempfile_in_loose_store(self):
         self.store.add_object(testobject)
-        self.assertEqual([testobject.id],
-                         list(self.store._iter_loose_objects()))
+        self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
         # add temporary files to the loose store
         for i in range(256):
@@ -420,8 +477,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             fd, n = tempfile.mkstemp(prefix="tmp_obj_", dir=dirname)
             os.close(fd)
 
-        self.assertEqual([testobject.id],
-                         list(self.store._iter_loose_objects()))
+        self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
     def test_add_alternate_path(self):
         store = DiskObjectStore(self.store_dir)
@@ -430,8 +486,8 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual(["/foo/path"], list(store._read_alternate_paths()))
         store.add_alternate_path("/bar/path")
         self.assertEqual(
-            ["/foo/path", "/bar/path"],
-            list(store._read_alternate_paths()))
+            ["/foo/path", "/bar/path"], list(store._read_alternate_paths())
+        )
 
     def test_rel_alternative_path(self):
         alternate_dir = tempfile.mkdtemp()
@@ -441,8 +497,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         alternate_store.add_object(b2)
         store = DiskObjectStore(self.store_dir)
         self.assertRaises(KeyError, store.__getitem__, b2.id)
-        store.add_alternate_path(
-            os.path.relpath(alternate_dir, self.store_dir))
+        store.add_alternate_path(os.path.relpath(alternate_dir, self.store_dir))
         self.assertEqual(list(alternate_store), list(store.alternates[0]))
         self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
@@ -466,23 +521,28 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_add_thin_pack(self):
         o = DiskObjectStore(self.store_dir)
         try:
-            blob = make_object(Blob, data=b'yummy data')
+            blob = make_object(Blob, data=b"yummy data")
             o.add_object(blob)
 
             f = BytesIO()
-            entries = build_pack(f, [
-              (REF_DELTA, (blob.id, b'more yummy data')),
-              ], store=o)
+            entries = build_pack(
+                f,
+                [
+                    (REF_DELTA, (blob.id, b"more yummy data")),
+                ],
+                store=o,
+            )
 
             with o.add_thin_pack(f.read, None) as pack:
                 packed_blob_sha = sha_to_hex(entries[0][3])
                 pack.check_length_and_checksum()
-                self.assertEqual(
-                    sorted([blob.id, packed_blob_sha]), list(pack))
+                self.assertEqual(sorted([blob.id, packed_blob_sha]), list(pack))
                 self.assertTrue(o.contains_packed(packed_blob_sha))
                 self.assertTrue(o.contains_packed(blob.id))
-                self.assertEqual((Blob.type_num, b'more yummy data'),
-                                 o.get_raw(packed_blob_sha))
+                self.assertEqual(
+                    (Blob.type_num, b"more yummy data"),
+                    o.get_raw(packed_blob_sha),
+                )
         finally:
             o.close()
 
@@ -495,58 +555,62 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
 
 class TreeLookupPathTests(TestCase):
-
     def setUp(self):
         TestCase.setUp(self)
         self.store = MemoryObjectStore()
-        blob_a = make_object(Blob, data=b'a')
-        blob_b = make_object(Blob, data=b'b')
-        blob_c = make_object(Blob, data=b'c')
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
+        blob_c = make_object(Blob, data=b"c")
         for blob in [blob_a, blob_b, blob_c]:
             self.store.add_object(blob)
 
         blobs = [
-          (b'a', blob_a.id, 0o100644),
-          (b'ad/b', blob_b.id, 0o100644),
-          (b'ad/bd/c', blob_c.id, 0o100755),
-          (b'ad/c', blob_c.id, 0o100644),
-          (b'c', blob_c.id, 0o100644),
-          ]
+            (b"a", blob_a.id, 0o100644),
+            (b"ad/b", blob_b.id, 0o100644),
+            (b"ad/bd/c", blob_c.id, 0o100755),
+            (b"ad/c", blob_c.id, 0o100644),
+            (b"c", blob_c.id, 0o100644),
+        ]
         self.tree_id = commit_tree(self.store, blobs)
 
     def get_object(self, sha):
         return self.store[sha]
 
     def test_lookup_blob(self):
-        o_id = tree_lookup_path(self.get_object, self.tree_id, b'a')[1]
+        o_id = tree_lookup_path(self.get_object, self.tree_id, b"a")[1]
         self.assertTrue(isinstance(self.store[o_id], Blob))
 
     def test_lookup_tree(self):
-        o_id = tree_lookup_path(self.get_object, self.tree_id, b'ad')[1]
+        o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad")[1]
         self.assertTrue(isinstance(self.store[o_id], Tree))
-        o_id = tree_lookup_path(self.get_object, self.tree_id, b'ad/bd')[1]
+        o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad/bd")[1]
         self.assertTrue(isinstance(self.store[o_id], Tree))
-        o_id = tree_lookup_path(self.get_object, self.tree_id, b'ad/bd/')[1]
+        o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad/bd/")[1]
         self.assertTrue(isinstance(self.store[o_id], Tree))
 
     def test_lookup_nonexistent(self):
         self.assertRaises(
-            KeyError, tree_lookup_path, self.get_object, self.tree_id, b'j')
+            KeyError, tree_lookup_path, self.get_object, self.tree_id, b"j"
+        )
 
     def test_lookup_not_tree(self):
         self.assertRaises(
-            NotTreeError, tree_lookup_path, self.get_object, self.tree_id,
-            b'ad/b/j')
+            NotTreeError,
+            tree_lookup_path,
+            self.get_object,
+            self.tree_id,
+            b"ad/b/j",
+        )
 
 
 class ObjectStoreGraphWalkerTests(TestCase):
-
     def get_walker(self, heads, parent_map):
         new_parent_map = dict(
-                [(k * 40, [(p * 40) for p in ps])
-                 for (k, ps) in parent_map.items()])
-        return ObjectStoreGraphWalker([x * 40 for x in heads],
-                                      new_parent_map.__getitem__)
+            [(k * 40, [(p * 40) for p in ps]) for (k, ps) in parent_map.items()]
+        )
+        return ObjectStoreGraphWalker(
+            [x * 40 for x in heads], new_parent_map.__getitem__
+        )
 
     def test_ack_invalid_value(self):
         gw = self.get_walker([], {})
@@ -587,13 +651,16 @@ class ObjectStoreGraphWalkerTests(TestCase):
         # c  d
         # \ /
         #  e
-        gw = self.get_walker([b"a", b"b"], {
+        gw = self.get_walker(
+            [b"a", b"b"],
+            {
                 b"a": [b"c"],
                 b"b": [b"d"],
                 b"c": [b"e"],
                 b"d": [b"e"],
                 b"e": [],
-                })
+            },
+        )
         walk = []
         acked = False
         walk.append(next(gw))
@@ -612,86 +679,106 @@ class ObjectStoreGraphWalkerTests(TestCase):
         walk.append(next(gw))
         self.assertIs(None, next(gw))
 
-        self.assertEqual([b"a" * 40, b"b" * 40, b"c" * 40, b"d" * 40],
-                         sorted(walk))
+        self.assertEqual([b"a" * 40, b"b" * 40, b"c" * 40, b"d" * 40], sorted(walk))
         self.assertLess(walk.index(b"a" * 40), walk.index(b"c" * 40))
         self.assertLess(walk.index(b"b" * 40), walk.index(b"d" * 40))
 
 
 class CommitTreeChangesTests(TestCase):
-
     def setUp(self):
         super(CommitTreeChangesTests, self).setUp()
         self.store = MemoryObjectStore()
-        self.blob_a = make_object(Blob, data=b'a')
-        self.blob_b = make_object(Blob, data=b'b')
-        self.blob_c = make_object(Blob, data=b'c')
+        self.blob_a = make_object(Blob, data=b"a")
+        self.blob_b = make_object(Blob, data=b"b")
+        self.blob_c = make_object(Blob, data=b"c")
         for blob in [self.blob_a, self.blob_b, self.blob_c]:
             self.store.add_object(blob)
 
         blobs = [
-          (b'a', self.blob_a.id, 0o100644),
-          (b'ad/b', self.blob_b.id, 0o100644),
-          (b'ad/bd/c', self.blob_c.id, 0o100755),
-          (b'ad/c', self.blob_c.id, 0o100644),
-          (b'c', self.blob_c.id, 0o100644),
-          ]
+            (b"a", self.blob_a.id, 0o100644),
+            (b"ad/b", self.blob_b.id, 0o100644),
+            (b"ad/bd/c", self.blob_c.id, 0o100755),
+            (b"ad/c", self.blob_c.id, 0o100644),
+            (b"c", self.blob_c.id, 0o100644),
+        ]
         self.tree_id = commit_tree(self.store, blobs)
 
     def test_no_changes(self):
         self.assertEqual(
-                self.store[self.tree_id],
-                commit_tree_changes(self.store, self.store[self.tree_id], []))
+            self.store[self.tree_id],
+            commit_tree_changes(self.store, self.store[self.tree_id], []),
+        )
 
     def test_add_blob(self):
-        blob_d = make_object(Blob, data=b'd')
+        blob_d = make_object(Blob, data=b"d")
         new_tree = commit_tree_changes(
-                self.store, self.store[self.tree_id], [
-                    (b'd', 0o100644, blob_d.id)])
+            self.store, self.store[self.tree_id], [(b"d", 0o100644, blob_d.id)]
+        )
         self.assertEqual(
-            new_tree[b'd'],
-            (33188, b'c59d9b6344f1af00e504ba698129f07a34bbed8d'))
+            new_tree[b"d"],
+            (33188, b"c59d9b6344f1af00e504ba698129f07a34bbed8d"),
+        )
 
     def test_add_blob_in_dir(self):
-        blob_d = make_object(Blob, data=b'd')
+        blob_d = make_object(Blob, data=b"d")
         new_tree = commit_tree_changes(
-                self.store, self.store[self.tree_id], [
-                    (b'e/f/d', 0o100644, blob_d.id)])
+            self.store,
+            self.store[self.tree_id],
+            [(b"e/f/d", 0o100644, blob_d.id)],
+        )
         self.assertEqual(
-            new_tree.items(), [
-                TreeEntry(path=b'a', mode=stat.S_IFREG | 0o100644,
-                          sha=self.blob_a.id),
-                TreeEntry(path=b'ad', mode=stat.S_IFDIR,
-                          sha=b'0e2ce2cd7725ff4817791be31ccd6e627e801f4a'),
-                TreeEntry(path=b'c', mode=stat.S_IFREG | 0o100644,
-                          sha=self.blob_c.id),
-                TreeEntry(path=b'e', mode=stat.S_IFDIR,
-                          sha=b'6ab344e288724ac2fb38704728b8896e367ed108')
-                ])
-        e_tree = self.store[new_tree[b'e'][1]]
+            new_tree.items(),
+            [
+                TreeEntry(path=b"a", mode=stat.S_IFREG | 0o100644, sha=self.blob_a.id),
+                TreeEntry(
+                    path=b"ad",
+                    mode=stat.S_IFDIR,
+                    sha=b"0e2ce2cd7725ff4817791be31ccd6e627e801f4a",
+                ),
+                TreeEntry(path=b"c", mode=stat.S_IFREG | 0o100644, sha=self.blob_c.id),
+                TreeEntry(
+                    path=b"e",
+                    mode=stat.S_IFDIR,
+                    sha=b"6ab344e288724ac2fb38704728b8896e367ed108",
+                ),
+            ],
+        )
+        e_tree = self.store[new_tree[b"e"][1]]
         self.assertEqual(
-            e_tree.items(), [
-                TreeEntry(path=b'f', mode=stat.S_IFDIR,
-                          sha=b'24d2c94d8af232b15a0978c006bf61ef4479a0a5')
-                ])
-        f_tree = self.store[e_tree[b'f'][1]]
+            e_tree.items(),
+            [
+                TreeEntry(
+                    path=b"f",
+                    mode=stat.S_IFDIR,
+                    sha=b"24d2c94d8af232b15a0978c006bf61ef4479a0a5",
+                )
+            ],
+        )
+        f_tree = self.store[e_tree[b"f"][1]]
         self.assertEqual(
-            f_tree.items(), [
-                TreeEntry(path=b'd', mode=stat.S_IFREG | 0o100644,
-                          sha=blob_d.id)
-                ])
+            f_tree.items(),
+            [TreeEntry(path=b"d", mode=stat.S_IFREG | 0o100644, sha=blob_d.id)],
+        )
 
     def test_delete_blob(self):
         new_tree = commit_tree_changes(
-                self.store, self.store[self.tree_id], [
-                    (b'ad/bd/c', None, None)])
-        self.assertEqual(set(new_tree), {b'a', b'ad', b'c'})
-        ad_tree = self.store[new_tree[b'ad'][1]]
-        self.assertEqual(set(ad_tree), {b'b', b'c'})
+            self.store, self.store[self.tree_id], [(b"ad/bd/c", None, None)]
+        )
+        self.assertEqual(set(new_tree), {b"a", b"ad", b"c"})
+        ad_tree = self.store[new_tree[b"ad"][1]]
+        self.assertEqual(set(ad_tree), {b"b", b"c"})
 
 
 class TestReadPacksFile(TestCase):
-
     def test_read_packs(self):
-        self.assertEqual(["pack-1.pack"], list(read_packs_file(BytesIO(b"""P pack-1.pack
-"""))))
+        self.assertEqual(
+            ["pack-1.pack"],
+            list(
+                read_packs_file(
+                    BytesIO(
+                        b"""P pack-1.pack
+"""
+                    )
+                )
+            ),
+        )

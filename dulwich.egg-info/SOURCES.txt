@@ -1,4 +1,6 @@
 .coveragerc
+.deepsource.toml
+.flake8
 .gitignore
 .mailmap
 .testr.conf
@@ -15,6 +17,7 @@ SECURITY.md
 TODO
 build.cmd
 dulwich.cfg
+releaser.conf
 requirements.txt
 setup.cfg
 setup.py
@@ -92,12 +95,15 @@ dulwich.egg-info/dependency_links.txt
 dulwich.egg-info/entry_points.txt
 dulwich.egg-info/requires.txt
 dulwich.egg-info/top_level.txt
+dulwich/cloud/__init__.py
+dulwich/cloud/gcs.py
 dulwich/contrib/README.md
 dulwich/contrib/__init__.py
 dulwich/contrib/diffstat.py
 dulwich/contrib/paramiko_vendor.py
 dulwich/contrib/release_robot.py
 dulwich/contrib/swift.py
+dulwich/contrib/test_paramiko_vendor.py
 dulwich/contrib/test_release_robot.py
 dulwich/contrib/test_swift.py
 dulwich/contrib/test_swift_smoke.py
@@ -142,6 +148,7 @@ dulwich/tests/compat/server_utils.py
 dulwich/tests/compat/test_client.py
 dulwich/tests/compat/test_pack.py
 dulwich/tests/compat/test_patch.py
+dulwich/tests/compat/test_porcelain.py
 dulwich/tests/compat/test_repository.py
 dulwich/tests/compat/test_server.py
 dulwich/tests/compat/test_utils.py
@@ -229,5 +236,7 @@ dulwich/tests/data/trees/70/c190eb48fa8bbb50ddc692a17b44cb781af7f6
 examples/clone.py
 examples/config.py
 examples/diff.py
+examples/gcs.py
 examples/latest_change.py
 examples/memoryrepo.py
+examples/rename-branch.py

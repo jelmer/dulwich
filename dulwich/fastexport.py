@@ -23,19 +23,19 @@
 
 from dulwich.index import (
     commit_tree,
-    )
+)
 from dulwich.objects import (
     Blob,
     Commit,
     Tag,
     ZERO_SHA,
-    )
+)
 from fastimport import (  # noqa: E402
     commands,
     errors as fastimport_errors,
     parser,
     processor,
-    )
+)
 
 import stat  # noqa: E402
 
@@ -59,7 +59,7 @@ class GitFastExporter(object):
 
     def _allocate_marker(self):
         self._marker_idx += 1
-        return ("%d" % (self._marker_idx,)).encode('ascii')
+        return ("%d" % (self._marker_idx,)).encode("ascii")
 
     def _export_blob(self, blob):
         marker = self._allocate_marker()
@@ -72,9 +72,11 @@ class GitFastExporter(object):
         return marker
 
     def _iter_files(self, base_tree, new_tree):
-        for ((old_path, new_path), (old_mode, new_mode),
-             (old_hexsha, new_hexsha)) in \
-                self.store.tree_changes(base_tree, new_tree):
+        for (
+            (old_path, new_path),
+            (old_mode, new_mode),
+            (old_hexsha, new_hexsha),
+        ) in self.store.tree_changes(base_tree, new_tree):
             if new_path is None:
                 yield commands.FileDeleteCommand(old_path)
                 continue
@@ -84,7 +86,7 @@ class GitFastExporter(object):
             if old_path != new_path and old_path is not None:
                 yield commands.FileRenameCommand(old_path, new_path)
             if old_mode != new_mode or old_hexsha != new_hexsha:
-                prefixed_marker = b':' + marker
+                prefixed_marker = b":" + marker
                 yield commands.FileModifyCommand(
                     new_path, new_mode, prefixed_marker, None
                 )
@@ -101,11 +103,20 @@ class GitFastExporter(object):
         author, author_email = split_email(commit.author)
         committer, committer_email = split_email(commit.committer)
         cmd = commands.CommitCommand(
-            ref, marker,
+            ref,
+            marker,
             (author, author_email, commit.author_time, commit.author_timezone),
-            (committer, committer_email, commit.commit_time,
-                commit.commit_timezone),
-            commit.message, from_, merges, file_cmds)
+            (
+                committer,
+                committer_email,
+                commit.commit_time,
+                commit.commit_timezone,
+            ),
+            commit.message,
+            from_,
+            merges,
+            file_cmds,
+        )
         return (cmd, marker)
 
     def emit_commit(self, commit, ref, base_tree=None):
@@ -115,9 +126,8 @@ class GitFastExporter(object):
 
 
 class GitImportProcessor(processor.ImportProcessor):
-    """An import processor that imports into a Git repository using Dulwich.
+    """An import processor that imports into a Git repository using Dulwich."""
 
-    """
     # FIXME: Batch creation of objects?
 
     def __init__(self, repo, params=None, verbose=False, outf=None):
@@ -156,8 +166,12 @@ class GitImportProcessor(processor.ImportProcessor):
         else:
             author = cmd.committer
         (author_name, author_email, author_timestamp, author_timezone) = author
-        (committer_name, committer_email, commit_timestamp,
-            commit_timezone) = cmd.committer
+        (
+            committer_name,
+            committer_email,
+            commit_timestamp,
+            commit_timezone,
+        ) = cmd.committer
         commit.author = author_name + b" <" + author_email + b">"
         commit.author_timezone = author_timezone
         commit.author_time = int(author_timestamp)
@@ -181,11 +195,9 @@ class GitImportProcessor(processor.ImportProcessor):
             elif filecmd.name == b"filedelete":
                 del self._contents[filecmd.path]
             elif filecmd.name == b"filecopy":
-                self._contents[filecmd.dest_path] = self._contents[
-                    filecmd.src_path]
+                self._contents[filecmd.dest_path] = self._contents[filecmd.src_path]
             elif filecmd.name == b"filerename":
-                self._contents[filecmd.new_path] = self._contents[
-                    filecmd.old_path]
+                self._contents[filecmd.new_path] = self._contents[filecmd.old_path]
                 del self._contents[filecmd.old_path]
             elif filecmd.name == b"filedeleteall":
                 self._contents = {}
@@ -193,8 +205,8 @@ class GitImportProcessor(processor.ImportProcessor):
                 raise Exception("Command %s not supported" % filecmd.name)
         commit.tree = commit_tree(
             self.repo.object_store,
-            ((path, hexsha, mode) for (path, (mode, hexsha)) in
-                self._contents.items()))
+            ((path, hexsha, mode) for (path, (mode, hexsha)) in self._contents.items()),
+        )
         if self.last_commit != ZERO_SHA:
             commit.parents.append(self.last_commit)
         for merge in cmd.merges:
@@ -216,8 +228,11 @@ class GitImportProcessor(processor.ImportProcessor):
         self.last_commit = commit_id
         if commit_id != ZERO_SHA:
             tree_id = self.repo[commit_id].tree
-            for (path, mode, hexsha) in (
-                    self.repo.object_store.iter_tree_contents(tree_id)):
+            for (
+                path,
+                mode,
+                hexsha,
+            ) in self.repo.object_store.iter_tree_contents(tree_id):
                 self._contents[path] = (mode, hexsha)
 
     def reset_handler(self, cmd):

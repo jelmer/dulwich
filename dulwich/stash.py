@@ -28,8 +28,8 @@ from dulwich.file import GitFile
 from dulwich.index import (
     commit_tree,
     iter_fresh_objects,
-    )
-from dulwich.reflog import read_reflog
+)
+from dulwich.reflog import drop_reflog_entry, read_reflog
 
 
 DEFAULT_STASH_REF = b"refs/stash"
@@ -45,11 +45,15 @@ class Stash(object):
         self._ref = ref
         self._repo = repo
 
+    @property
+    def _reflog_path(self):
+        return os.path.join(
+            self._repo.commondir(), "logs", os.fsdecode(self._ref)
+        )
+
     def stashes(self):
-        reflog_path = os.path.join(
-            self._repo.commondir(), 'logs', os.fsdecode(self._ref))
         try:
-            with GitFile(reflog_path, 'rb') as f:
+            with GitFile(self._reflog_path, "rb") as f:
                 return reversed(list(read_reflog(f)))
         except FileNotFoundError:
             return []
@@ -61,10 +65,17 @@ class Stash(object):
 
     def drop(self, index):
         """Drop entry with specified index."""
-        raise NotImplementedError(self.drop)
+        with open(self._reflog_path, "rb+") as f:
+            drop_reflog_entry(f, index, rewrite=True)
+        if len(self) == 0:
+            os.remove(self._reflog_path)
+            del self._repo.refs[self._ref]
+            return
+        if index == 0:
+            self._repo.refs[self._ref] = self[0].new_sha
 
     def pop(self, index):
-        raise NotImplementedError(self.drop)
+        raise NotImplementedError(self.pop)
 
     def push(self, committer=None, author=None, message=None):
         """Create a new stash.
@@ -77,24 +88,30 @@ class Stash(object):
         # First, create the index commit.
         commit_kwargs = {}
         if committer is not None:
-            commit_kwargs['committer'] = committer
+            commit_kwargs["committer"] = committer
         if author is not None:
-            commit_kwargs['author'] = author
+            commit_kwargs["author"] = author
 
         index = self._repo.open_index()
         index_tree_id = index.commit(self._repo.object_store)
         index_commit_id = self._repo.do_commit(
-            ref=None, tree=index_tree_id,
+            ref=None,
+            tree=index_tree_id,
             message=b"Index stash",
             merge_heads=[self._repo.head()],
-            **commit_kwargs)
+            no_verify=True,
+            **commit_kwargs
+        )
 
         # Then, the working tree one.
         stash_tree_id = commit_tree(
-                self._repo.object_store,
-                iter_fresh_objects(
-                    index, os.fsencode(self._repo.path),
-                    object_store=self._repo.object_store))
+            self._repo.object_store,
+            iter_fresh_objects(
+                index,
+                os.fsencode(self._repo.path),
+                object_store=self._repo.object_store,
+            ),
+        )
 
         if message is None:
             message = b"A stash on " + self._repo.head()
@@ -103,10 +120,13 @@ class Stash(object):
         self._repo.refs[self._ref] = self._repo.head()
 
         cid = self._repo.do_commit(
-            ref=self._ref, tree=stash_tree_id,
+            ref=self._ref,
+            tree=stash_tree_id,
             message=message,
             merge_heads=[index_commit_id],
-            **commit_kwargs)
+            no_verify=True,
+            **commit_kwargs
+        )
 
         return cid
 

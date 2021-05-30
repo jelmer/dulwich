@@ -52,8 +52,8 @@ import time
 from dulwich.repo import Repo
 
 # CONSTANTS
-PROJDIR = '.'
-PATTERN = r'[ a-zA-Z_\-]*([\d\.]+[\-\w\.]*)'
+PROJDIR = "."
+PATTERN = r"[ a-zA-Z_\-]*([\d\.]+[\-\w\.]*)"
 
 
 def get_recent_tags(projdir=PROJDIR):
@@ -74,15 +74,15 @@ def get_recent_tags(projdir=PROJDIR):
         tags = {}  # empty dictionary to hold tags, commits and datetimes
         # iterate over refs in repository
         for key, value in refs.items():
-            key = key.decode('utf-8')  # compatible with Python-3
+            key = key.decode("utf-8")  # compatible with Python-3
             obj = project.get_object(value)  # dulwich object from SHA-1
             # don't just check if object is "tag" b/c it could be a "commit"
             # instead check if "tags" is in the ref-name
-            if u'tags' not in key:
+            if u"tags" not in key:
                 # skip ref if not a tag
                 continue
             # strip the leading text from refs to get "tag name"
-            _, tag = key.rsplit(u'/', 1)
+            _, tag = key.rsplit(u"/", 1)
             # check if tag object is "commit" or "tag" pointing to a "commit"
             try:
                 commit = obj.object  # a tuple (commit class, commit id)
@@ -92,8 +92,8 @@ def get_recent_tags(projdir=PROJDIR):
             else:
                 tag_meta = (
                     datetime.datetime(*time.gmtime(obj.tag_time)[:6]),
-                    obj.id.decode('utf-8'),
-                    obj.name.decode('utf-8')
+                    obj.id.decode("utf-8"),
+                    obj.name.decode("utf-8"),
                 )  # compatible with Python-3
                 commit = project.get_object(commit[1])  # commit object
             # get tag commit datetime, but dulwich returns seconds since
@@ -101,9 +101,9 @@ def get_recent_tags(projdir=PROJDIR):
             # timetuple then convert to datetime
             tags[tag] = [
                 datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
-                commit.id.decode('utf-8'),
-                commit.author.decode('utf-8'),
-                tag_meta
+                commit.id.decode("utf-8"),
+                commit.author.decode("utf-8"),
+                tag_meta,
             ]  # compatible with Python-3
 
     # return list of tags sorted by their datetimes from newest to oldest
@@ -139,7 +139,7 @@ def get_current_version(projdir=PROJDIR, pattern=PATTERN, logger=None):
     return current_version
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) > 1:
         _PROJDIR = sys.argv[1]
     else:

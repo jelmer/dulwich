@@ -27,20 +27,19 @@ import tempfile
 from dulwich import porcelain
 from dulwich.repo import (
     Repo,
-    )
+)
 from dulwich.tests.compat.utils import (
     CompatTestCase,
     run_git_or_fail,
-    )
+)
 
 
 class CompatPatchTestCase(CompatTestCase):
-
     def setUp(self):
         super(CompatPatchTestCase, self).setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
-        self.repo_path = os.path.join(self.test_dir, 'repo')
+        self.repo_path = os.path.join(self.test_dir, "repo")
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
@@ -82,8 +81,9 @@ class CompatPatchTestCase(CompatTestCase):
         second_tree = self.repo[second_commit].tree
 
         outstream = BytesIO()
-        porcelain.diff_tree(self.repo.path, first_tree, second_tree,
-                            outstream=outstream)
+        porcelain.diff_tree(
+            self.repo.path, first_tree, second_tree, outstream=outstream
+        )
 
         # Save it on disk
         patch_path = os.path.join(self.test_dir, "patch.patch")

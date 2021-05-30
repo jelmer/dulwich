@@ -1,3 +1,88 @@
+0.20.23	2021-05-24
+
+ * Fix installation of GPG during package publishing.
+   (Ruslan Kuprieiev)
+
+0.20.22	2021-05-24
+
+ * Prevent removal of refs directory when the last ref is
+   deleted. (Jelmer Vernooĳ)
+
+ * Fix filename: MERGE_HEADS => MERGE_HEAD.
+   (Jelmer Vernooĳ, #861)
+
+ * For ignored directories, porcelain.add and porcelain.status now only return
+   the path to directory itself in the list of ignored paths. Previously, paths
+   for all files within the directory would also be included in the list.
+   (Peter Rowlands, #853)
+
+ * Provide depth argument to ``determine_wants``.
+   (Peter Rowlands)
+
+ * Various tag signature handling improvements.
+   (Daniel Murphy)
+
+ * Add separate Tag.verify().  (Peter Rowlands)
+
+ * Add support for version 3 index files. (Jelmer Vernooĳ)
+
+ * Fix autocrlf=input handling. (Peter Rowlands, Boris Feld)
+
+ * Attempt to find C Git global config on Windows.
+   (Peter Rowlands)
+
+ API CHANGES
+
+ * The APIs for writing and reading individual index entries have changed
+   to handle lists of (name, entry) tuples rather than tuples.
+
+0.20.21	2021-03-20
+
+ * Add basic support for a GcsObjectStore that stores
+   pack files in gcs. (Jelmer Vernooĳ)
+
+ * In porcelain.push, default to local active branch.
+   (Jelmer Vernooĳ, #846)
+
+ * Support fetching symrefs.
+   (Jelmer Vernooĳ, #485, #847)
+
+ * Add aarch64 wheel building.
+   (odidev, Jelmer Vernooij)
+
+0.20.20	2021-03-03
+
+ * Implement ``Stash.drop``. (Peter Rowlands)
+
+ * Support untracked symlinks to paths outside the
+   repository. (Peter Rowlands, #842)
+
+0.20.19	2021-02-11
+
+ * Fix handling of negative matches in nested gitignores.
+   (Corentin Hembise, #836)
+
+0.20.18	2021-02-04
+
+ * Fix formatting in setup.py. (Jelmer Vernooĳ)
+
+ * Add release configuration. (Jelmer Vernooĳ)
+
+0.20.17	2021-02-04
+
+ * credentials: ignore end-of-line character. (Georges Racinet)
+
+ * Fix failure in get_untracked_paths when the repository contains symlinks.
+   (#830, #793, mattseddon)
+
+ * docs: Clarify that Git objects are created on `git add`.
+   (Utku Gultopu)
+
+0.20.16	2021-01-16
+
+ * Add flag to only attempt to fetch ignored untracked files when specifically requested.
+   (Matt Seddon)
+
 0.20.15	2020-12-23
 
  * Add some functions for parsing and writing bundles.
@@ -994,6 +1079,7 @@
 
   * In dulwich.index.build_index_from_tree, by default
     refuse to create entries that start with .git/.
+    (Jelmer Vernooĳ, CVE-2014-9706)
 
   * Fix running of testsuite when installed.
     (Jelmer Vernooĳ, #223)

@@ -41,9 +41,12 @@ The client object can then be used to retrieve a pack. The ``fetch_pack``
 method takes a ``determine_wants`` callback argument, which allows the
 client to determine which objects it wants to end up with::
 
-   >>> def determine_wants(refs):
+   >>> def determine_wants(refs, depth=None):
    ...    # retrieve all objects
    ...    return refs.values()
+
+Note that the ``depth`` keyword argument will contain an optional requested
+shallow fetch depth.
 
 Another required object is a "graph walker", which is used to determine
 which objects that the client already has should not be sent again

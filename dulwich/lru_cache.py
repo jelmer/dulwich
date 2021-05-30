@@ -26,7 +26,7 @@ _null_key = object()
 class _LRUNode(object):
     """This maintains the linked-list which is the lru internals."""
 
-    __slots__ = ('prev', 'next_key', 'key', 'value', 'cleanup', 'size')
+    __slots__ = ("prev", "next_key", "key", "value", "cleanup", "size")
 
     def __init__(self, key, value, cleanup=None):
         self.prev = None
@@ -44,8 +44,12 @@ class _LRUNode(object):
             prev_key = None
         else:
             prev_key = self.prev.key
-        return '%s(%r n:%r p:%r)' % (self.__class__.__name__, self.key,
-                                     self.next_key, prev_key)
+        return "%s(%r n:%r p:%r)" % (
+            self.__class__.__name__,
+            self.key,
+            self.next_key,
+            prev_key,
+        )
 
     def run_cleanup(self):
         if self.cleanup is not None:
@@ -108,29 +112,35 @@ class LRUCache(object):
         node = self._most_recently_used
         if node is not None:
             if node.prev is not None:
-                raise AssertionError('the _most_recently_used entry is not'
-                                     ' supposed to have a previous entry'
-                                     ' %s' % (node,))
+                raise AssertionError(
+                    "the _most_recently_used entry is not"
+                    " supposed to have a previous entry"
+                    " %s" % (node,)
+                )
         while node is not None:
             if node.next_key is _null_key:
                 if node is not self._least_recently_used:
-                    raise AssertionError('only the last node should have'
-                                         ' no next value: %s' % (node,))
+                    raise AssertionError(
+                        "only the last node should have" " no next value: %s" % (node,)
+                    )
                 node_next = None
             else:
                 node_next = self._cache[node.next_key]
                 if node_next.prev is not node:
-                    raise AssertionError('inconsistency found, node.next.prev'
-                                         ' != node: %s' % (node,))
+                    raise AssertionError(
+                        "inconsistency found, node.next.prev" " != node: %s" % (node,)
+                    )
             if node.prev is None:
                 if node is not self._most_recently_used:
-                    raise AssertionError('only the _most_recently_used should'
-                                         ' not have a previous node: %s'
-                                         % (node,))
+                    raise AssertionError(
+                        "only the _most_recently_used should"
+                        " not have a previous node: %s" % (node,)
+                    )
             else:
                 if node.prev.next_key != node.key:
-                    raise AssertionError('inconsistency found, node.prev.next'
-                                         ' != node: %s' % (node,))
+                    raise AssertionError(
+                        "inconsistency found, node.prev.next" " != node: %s" % (node,)
+                    )
             yield node
             node = node_next
 
@@ -147,7 +157,7 @@ class LRUCache(object):
                         'value' should be cleaned up.
         """
         if key is _null_key:
-            raise ValueError('cannot use _null_key as a key')
+            raise ValueError("cannot use _null_key as a key")
         if key in self._cache:
             node = self._cache[key]
             node.run_cleanup()
@@ -186,7 +196,7 @@ class LRUCache(object):
 
     def items(self):
         """Get the key:value pairs as a dict."""
-        return dict((k, n.value) for k, n in self._cache.items())
+        return {k: n.value for k, n in self._cache.items()}
 
     def cleanup(self):
         """Clear the cache until it shrinks to the requested size.
@@ -262,16 +272,14 @@ class LRUCache(object):
 
     def resize(self, max_cache, after_cleanup_count=None):
         """Change the number of entries that will be cached."""
-        self._update_max_cache(max_cache,
-                               after_cleanup_count=after_cleanup_count)
+        self._update_max_cache(max_cache, after_cleanup_count=after_cleanup_count)
 
     def _update_max_cache(self, max_cache, after_cleanup_count=None):
         self._max_cache = max_cache
         if after_cleanup_count is None:
             self._after_cleanup_count = self._max_cache * 8 / 10
         else:
-            self._after_cleanup_count = min(after_cleanup_count,
-                                            self._max_cache)
+            self._after_cleanup_count = min(after_cleanup_count, self._max_cache)
         self.cleanup()
 
 
@@ -285,8 +293,9 @@ class LRUSizeCache(LRUCache):
     defaults to len() if not supplied.
     """
 
-    def __init__(self, max_size=1024*1024, after_cleanup_size=None,
-                 compute_size=None):
+    def __init__(
+        self, max_size=1024 * 1024, after_cleanup_size=None, compute_size=None
+    ):
         """Create a new LRUSizeCache.
 
         Args:
@@ -306,7 +315,7 @@ class LRUSizeCache(LRUCache):
         if compute_size is None:
             self._compute_size = len
         self._update_max_size(max_size, after_cleanup_size=after_cleanup_size)
-        LRUCache.__init__(self, max_cache=max(int(max_size/512), 1))
+        LRUCache.__init__(self, max_cache=max(int(max_size / 512), 1))
 
     def add(self, key, value, cleanup=None):
         """Add a new value to the cache.
@@ -321,7 +330,7 @@ class LRUSizeCache(LRUCache):
                         'value' should be cleaned up.
         """
         if key is _null_key:
-            raise ValueError('cannot use _null_key as a key')
+            raise ValueError("cannot use _null_key as a key")
         node = self._cache.get(key, None)
         value_len = self._compute_size(value)
         if value_len >= self._after_cleanup_size:
@@ -363,7 +372,7 @@ class LRUSizeCache(LRUCache):
     def resize(self, max_size, after_cleanup_size=None):
         """Change the number of bytes that will be cached."""
         self._update_max_size(max_size, after_cleanup_size=after_cleanup_size)
-        max_cache = max(int(max_size/512), 1)
+        max_cache = max(int(max_size / 512), 1)
         self._update_max_cache(max_cache)
 
     def _update_max_size(self, max_size, after_cleanup_size=None):

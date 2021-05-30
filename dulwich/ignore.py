@@ -32,7 +32,7 @@ from typing import (
     TYPE_CHECKING,
     Dict,
     Union,
-    )
+)
 
 if TYPE_CHECKING:
     from dulwich.repo import Repo
@@ -42,34 +42,34 @@ from dulwich.config import get_xdg_config_home_path, Config
 
 def _translate_segment(segment: bytes) -> bytes:
     if segment == b"*":
-        return b'[^/]+'
+        return b"[^/]+"
     res = b""
     i, n = 0, len(segment)
     while i < n:
-        c = segment[i:i+1]
-        i = i+1
-        if c == b'*':
-            res += b'[^/]*'
-        elif c == b'?':
-            res += b'[^/]'
-        elif c == b'[':
+        c = segment[i : i + 1]
+        i = i + 1
+        if c == b"*":
+            res += b"[^/]*"
+        elif c == b"?":
+            res += b"[^/]"
+        elif c == b"[":
             j = i
-            if j < n and segment[j:j+1] == b'!':
-                j = j+1
-            if j < n and segment[j:j+1] == b']':
-                j = j+1
-            while j < n and segment[j:j+1] != b']':
-                j = j+1
+            if j < n and segment[j : j + 1] == b"!":
+                j = j + 1
+            if j < n and segment[j : j + 1] == b"]":
+                j = j + 1
+            while j < n and segment[j : j + 1] != b"]":
+                j = j + 1
             if j >= n:
-                res += b'\\['
+                res += b"\\["
             else:
-                stuff = segment[i:j].replace(b'\\', b'\\\\')
-                i = j+1
-                if stuff.startswith(b'!'):
-                    stuff = b'^' + stuff[1:]
-                elif stuff.startswith(b'^'):
-                    stuff = b'\\' + stuff
-                res += b'[' + stuff + b']'
+                stuff = segment[i:j].replace(b"\\", b"\\\\")
+                i = j + 1
+                if stuff.startswith(b"!"):
+                    stuff = b"^" + stuff[1:]
+                elif stuff.startswith(b"^"):
+                    stuff = b"\\" + stuff
+                res += b"[" + stuff + b"]"
         else:
             res += re.escape(c)
     return res
@@ -84,32 +84,31 @@ def translate(pat: bytes) -> bytes:
     to cope with features in Git ignore patterns.
     """
 
-    res = b'(?ms)'
+    res = b"(?ms)"
 
-    if b'/' not in pat[:-1]:
+    if b"/" not in pat[:-1]:
         # If there's no slash, this is a filename-based match
-        res += b'(.*/)?'
+        res += b"(.*/)?"
 
-    if pat.startswith(b'**/'):
+    if pat.startswith(b"**/"):
         # Leading **/
         pat = pat[2:]
-        res += b'(.*/)?'
+        res += b"(.*/)?"
 
-    if pat.startswith(b'/'):
+    if pat.startswith(b"/"):
         pat = pat[1:]
 
-    for i, segment in enumerate(pat.split(b'/')):
-        if segment == b'**':
-            res += b'(/.*)?'
+    for i, segment in enumerate(pat.split(b"/")):
+        if segment == b"**":
+            res += b"(/.*)?"
             continue
         else:
-            res += ((re.escape(b'/') if i > 0 else b'') +
-                    _translate_segment(segment))
+            res += (re.escape(b"/") if i > 0 else b"") + _translate_segment(segment)
 
-    if not pat.endswith(b'/'):
-        res += b'/?'
+    if not pat.endswith(b"/"):
+        res += b"/?"
 
-    return res + b'\\Z'
+    return res + b"\\Z"
 
 
 def read_ignore_patterns(f: BinaryIO) -> Iterable[bytes]:
@@ -127,20 +126,19 @@ def read_ignore_patterns(f: BinaryIO) -> Iterable[bytes]:
         if not line:
             continue
 
-        if line.startswith(b'#'):
+        if line.startswith(b"#"):
             # Comment
             continue
 
         # Trailing spaces are ignored unless they are quoted with a backslash.
-        while line.endswith(b' ') and not line.endswith(b'\\ '):
+        while line.endswith(b" ") and not line.endswith(b"\\ "):
             line = line[:-1]
-        line = line.replace(b'\\ ', b' ')
+        line = line.replace(b"\\ ", b" ")
 
         yield line
 
 
-def match_pattern(
-        path: bytes, pattern: bytes, ignorecase: bool = False) -> bool:
+def match_pattern(path: bytes, pattern: bytes, ignorecase: bool = False) -> bool:
     """Match a gitignore-style pattern against a path.
 
     Args:
@@ -159,11 +157,11 @@ class Pattern(object):
     def __init__(self, pattern: bytes, ignorecase: bool = False):
         self.pattern = pattern
         self.ignorecase = ignorecase
-        if pattern[0:1] == b'!':
+        if pattern[0:1] == b"!":
             self.is_exclude = False
             pattern = pattern[1:]
         else:
-            if pattern[0:1] == b'\\':
+            if pattern[0:1] == b"\\":
                 pattern = pattern[1:]
             self.is_exclude = True
         flags = 0
@@ -178,13 +176,18 @@ class Pattern(object):
         return os.fsdecode(self.pattern)
 
     def __eq__(self, other: object) -> bool:
-        return (isinstance(other, type(self)) and
-                self.pattern == other.pattern and
-                self.ignorecase == other.ignorecase)
+        return (
+            isinstance(other, type(self))
+            and self.pattern == other.pattern
+            and self.ignorecase == other.ignorecase
+        )
 
     def __repr__(self) -> str:
         return "%s(%r, %r)" % (
-            type(self).__name__, self.pattern, self.ignorecase)
+            type(self).__name__,
+            self.pattern,
+            self.ignorecase,
+        )
 
     def match(self, path: bytes) -> bool:
         """Try to match a path against this ignore pattern.
@@ -197,9 +200,7 @@ class Pattern(object):
 
 
 class IgnoreFilter(object):
-
-    def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False,
-                 path=None):
+    def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False, path=None):
         self._patterns = []  # type: List[Pattern]
         self._ignorecase = ignorecase
         self._path = path
@@ -238,15 +239,14 @@ class IgnoreFilter(object):
         return status
 
     @classmethod
-    def from_path(cls, path, ignorecase: bool = False) -> 'IgnoreFilter':
-        with open(path, 'rb') as f:
+    def from_path(cls, path, ignorecase: bool = False) -> "IgnoreFilter":
+        with open(path, "rb") as f:
             return cls(read_ignore_patterns(f), ignorecase, path=path)
 
     def __repr__(self) -> str:
-        path = getattr(self, '_path', None)
+        path = getattr(self, "_path", None)
         if path is not None:
-            return "%s.from_path(%r)" % (
-                type(self).__name__, path)
+            return "%s.from_path(%r)" % (type(self).__name__, path)
         else:
             return "<%s>" % (type(self).__name__)
 
@@ -283,19 +283,22 @@ def default_user_ignore_filter_path(config: Config) -> str:
       Path to a global ignore file
     """
     try:
-        return config.get((b'core', ), b'excludesFile')
+        return config.get((b"core",), b"excludesFile")
     except KeyError:
         pass
 
-    return get_xdg_config_home_path('git', 'ignore')
+    return get_xdg_config_home_path("git", "ignore")
 
 
 class IgnoreFilterManager(object):
     """Ignore file manager."""
 
     def __init__(
-            self, top_path: str, global_filters: List[IgnoreFilter],
-            ignorecase: bool):
+        self,
+        top_path: str,
+        global_filters: List[IgnoreFilter],
+        ignorecase: bool,
+    ):
         self._path_filters = {}  # type: Dict[str, Optional[IgnoreFilter]]
         self._top_path = top_path
         self._global_filters = global_filters
@@ -303,9 +306,11 @@ class IgnoreFilterManager(object):
 
     def __repr__(self) -> str:
         return "%s(%s, %r, %r)" % (
-            type(self).__name__, self._top_path,
+            type(self).__name__,
+            self._top_path,
             self._global_filters,
-            self._ignorecase)
+            self._ignorecase,
+        )
 
     def _load_path(self, path: str) -> Optional[IgnoreFilter]:
         try:
@@ -313,10 +318,9 @@ class IgnoreFilterManager(object):
         except KeyError:
             pass
 
-        p = os.path.join(self._top_path, path, '.gitignore')
+        p = os.path.join(self._top_path, path, ".gitignore")
         try:
-            self._path_filters[path] = IgnoreFilter.from_path(
-                p, self._ignorecase)
+            self._path_filters[path] = IgnoreFilter.from_path(p, self._ignorecase)
         except IOError:
             self._path_filters[path] = None
         return self._path_filters[path]
@@ -324,34 +328,31 @@ class IgnoreFilterManager(object):
     def find_matching(self, path: str) -> Iterable[Pattern]:
         """Find matching patterns for path.
 
-        Stops after the first ignore file with matches.
-
         Args:
           path: Path to check
         Returns:
           Iterator over Pattern instances
         """
         if os.path.isabs(path):
-            raise ValueError('%s is an absolute path' % path)
+            raise ValueError("%s is an absolute path" % path)
         filters = [(0, f) for f in self._global_filters]
-        if os.path.sep != '/':
-            path = path.replace(os.path.sep, '/')
-        parts = path.split('/')
-        for i in range(len(parts)+1):
-            dirname = '/'.join(parts[:i])
+        if os.path.sep != "/":
+            path = path.replace(os.path.sep, "/")
+        parts = path.split("/")
+        matches = []
+        for i in range(len(parts) + 1):
+            dirname = "/".join(parts[:i])
             for s, f in filters:
-                relpath = '/'.join(parts[s:i])
+                relpath = "/".join(parts[s:i])
                 if i < len(parts):
                     # Paths leading up to the final part are all directories,
                     # so need a trailing slash.
-                    relpath += '/'
-                matches = list(f.find_matching(relpath))
-                if matches:
-                    return iter(matches)
+                    relpath += "/"
+                matches += list(f.find_matching(relpath))
             ignore_filter = self._load_path(dirname)
             if ignore_filter is not None:
                 filters.insert(0, (i, ignore_filter))
-        return iter([])
+        return iter(matches)
 
     def is_ignored(self, path: str) -> Optional[bool]:
         """Check whether a path is explicitly included or excluded in ignores.
@@ -368,7 +369,7 @@ class IgnoreFilterManager(object):
         return None
 
     @classmethod
-    def from_repo(cls, repo: 'Repo') -> 'IgnoreFilterManager':
+    def from_repo(cls, repo: "Repo") -> "IgnoreFilterManager":
         """Create a IgnoreFilterManager from a repository.
 
         Args:
@@ -378,13 +379,13 @@ class IgnoreFilterManager(object):
         """
         global_filters = []
         for p in [
-                os.path.join(repo.controldir(), 'info', 'exclude'),
-                default_user_ignore_filter_path(repo.get_config_stack())]:
+            os.path.join(repo.controldir(), "info", "exclude"),
+            default_user_ignore_filter_path(repo.get_config_stack()),
+        ]:
             try:
-                global_filters.append(
-                    IgnoreFilter.from_path(os.path.expanduser(p)))
+                global_filters.append(IgnoreFilter.from_path(os.path.expanduser(p)))
             except IOError:
                 pass
         config = repo.get_config_stack()
-        ignorecase = config.get_boolean((b'core'), (b'ignorecase'), False)
+        ignorecase = config.get_boolean((b"core"), (b"ignorecase"), False)
         return cls(repo.path, global_filters, ignorecase)

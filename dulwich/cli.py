@@ -51,6 +51,7 @@ def signal_int(signal, frame):
 
 def signal_quit(signal, frame):
     import pdb
+
     pdb.set_trace()
 
 
@@ -63,57 +64,65 @@ class Command(object):
 
 
 class cmd_archive(Command):
-
     def run(self, args):
-        parser = optparse.OptionParser()
-        parser.add_option("--remote", type=str,
-                          help="Retrieve archive from specified remote repo")
-        options, args = parser.parse_args(args)
-        committish = args.pop(0)
-        if options.remote:
-            client, path = get_transport_and_path(options.remote)
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--remote",
+            type=str,
+            help="Retrieve archive from specified remote repo",
+        )
+        parser.add_argument('committish', type=str, nargs='?')
+        args = parser.parse_args(args)
+        if args.remote:
+            client, path = get_transport_and_path(args.remote)
             client.archive(
-                path, committish, sys.stdout.write,
-                write_error=sys.stderr.write)
+                path,
+                args.committish,
+                sys.stdout.write,
+                write_error=sys.stderr.write,
+            )
         else:
             porcelain.archive(
-                '.', committish, outstream=sys.stdout,
-                errstream=sys.stderr)
+                ".", args.committish, outstream=sys.stdout.buffer,
+                errstream=sys.stderr
+            )
 
 
 class cmd_add(Command):
-
-    def run(self, args):
-        opts, args = getopt(args, "", [])
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        args = parser.parse_args(argv)
 
         porcelain.add(".", paths=args)
 
 
 class cmd_rm(Command):
-
-    def run(self, args):
-        opts, args = getopt(args, "", [])
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        args = parser.parse_args(argv)
 
         porcelain.rm(".", paths=args)
 
 
 class cmd_fetch_pack(Command):
-
-    def run(self, args):
-        opts, args = getopt(args, "", ["all"])
-        opts = dict(opts)
-        client, path = get_transport_and_path(args.pop(0))
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--all', action='store_true')
+        parser.add_argument('location', nargs='?', type=str)
+        args = parser.parse_args(argv)
+        client, path = get_transport_and_path(args.location)
         r = Repo(".")
-        if "--all" in opts:
+        if args.all:
             determine_wants = r.object_store.determine_wants_all
         else:
-            def determine_wants(x):
+
+            def determine_wants(x, **kwargs):
                 return [y for y in args if y not in r.object_store]
+
         client.fetch(path, r, determine_wants)
 
 
 class cmd_fetch(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
         opts = dict(opts)
@@ -126,32 +135,40 @@ class cmd_fetch(Command):
 
 
 class cmd_fsck(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
         opts = dict(opts)
-        for (obj, msg) in porcelain.fsck('.'):
+        for (obj, msg) in porcelain.fsck("."):
             print("%s: %s" % (obj, msg))
 
 
 class cmd_log(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
-        parser.add_option("--reverse", dest="reverse", action="store_true",
-                          help="Reverse order in which entries are printed")
-        parser.add_option("--name-status", dest="name_status",
-                          action="store_true",
-                          help="Print name/status for each changed file")
+        parser.add_option(
+            "--reverse",
+            dest="reverse",
+            action="store_true",
+            help="Reverse order in which entries are printed",
+        )
+        parser.add_option(
+            "--name-status",
+            dest="name_status",
+            action="store_true",
+            help="Print name/status for each changed file",
+        )
         options, args = parser.parse_args(args)
 
-        porcelain.log(".", paths=args, reverse=options.reverse,
-                      name_status=options.name_status,
-                      outstream=sys.stdout)
+        porcelain.log(
+            ".",
+            paths=args,
+            reverse=options.reverse,
+            name_status=options.name_status,
+            outstream=sys.stdout,
+        )
 
 
 class cmd_diff(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
 
@@ -163,12 +180,10 @@ class cmd_diff(Command):
         commit_id = args[0]
         commit = r[commit_id]
         parent_commit = r[commit.parents[0]]
-        write_tree_diff(
-            sys.stdout, r.object_store, parent_commit.tree, commit.tree)
+        write_tree_diff(sys.stdout, r.object_store, parent_commit.tree, commit.tree)
 
 
 class cmd_dump_pack(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
 
@@ -193,7 +208,6 @@ class cmd_dump_pack(Command):
 
 
 class cmd_dump_index(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
 
@@ -209,7 +223,6 @@ class cmd_dump_index(Command):
 
 
 class cmd_init(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", ["bare"])
         opts = dict(opts)
@@ -223,14 +236,17 @@ class cmd_init(Command):
 
 
 class cmd_clone(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
-        parser.add_option("--bare", dest="bare",
-                          help="Whether to create a bare repository.",
-                          action="store_true")
-        parser.add_option("--depth", dest="depth",
-                          type=int, help="Depth at which to fetch")
+        parser.add_option(
+            "--bare",
+            dest="bare",
+            help="Whether to create a bare repository.",
+            action="store_true",
+        )
+        parser.add_option(
+            "--depth", dest="depth", type=int, help="Depth at which to fetch"
+        )
         options, args = parser.parse_args(args)
 
         if args == []:
@@ -247,7 +263,6 @@ class cmd_clone(Command):
 
 
 class cmd_commit(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", ["message"])
         opts = dict(opts)
@@ -255,7 +270,6 @@ class cmd_commit(Command):
 
 
 class cmd_commit_tree(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", ["message"])
         if args == []:
@@ -266,13 +280,11 @@ class cmd_commit_tree(Command):
 
 
 class cmd_update_server_info(Command):
-
     def run(self, args):
         porcelain.update_server_info(".")
 
 
 class cmd_symbolic_ref(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", ["ref-name", "force"])
         if not args:
@@ -280,18 +292,18 @@ class cmd_symbolic_ref(Command):
             sys.exit(1)
 
         ref_name = args.pop(0)
-        porcelain.symbolic_ref(".", ref_name=ref_name, force='--force' in args)
+        porcelain.symbolic_ref(".", ref_name=ref_name, force="--force" in args)
 
 
 class cmd_show(Command):
-
-    def run(self, args):
-        opts, args = getopt(args, "", [])
-        porcelain.show(".", args)
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('objectish', type=str, nargs='*')
+        args = parser.parse_args(argv)
+        porcelain.show(".", args.objectish or None)
 
 
 class cmd_diff_tree(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
         if len(args) < 2:
@@ -301,41 +313,40 @@ class cmd_diff_tree(Command):
 
 
 class cmd_rev_list(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
         if len(args) < 1:
-            print('Usage: dulwich rev-list COMMITID...')
+            print("Usage: dulwich rev-list COMMITID...")
             sys.exit(1)
-        porcelain.rev_list('.', args)
+        porcelain.rev_list(".", args)
 
 
 class cmd_tag(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         parser.add_option(
-            "-a", "--annotated", help="Create an annotated tag.",
-            action="store_true")
+            "-a",
+            "--annotated",
+            help="Create an annotated tag.",
+            action="store_true",
+        )
         parser.add_option(
-            "-s", "--sign", help="Sign the annotated tag.",
-            action="store_true")
+            "-s", "--sign", help="Sign the annotated tag.", action="store_true"
+        )
         options, args = parser.parse_args(args)
         porcelain.tag_create(
-            '.', args[0], annotated=options.annotated,
-            sign=options.sign)
+            ".", args[0], annotated=options.annotated, sign=options.sign
+        )
 
 
 class cmd_repack(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", [])
         opts = dict(opts)
-        porcelain.repack('.')
+        porcelain.repack(".")
 
 
 class cmd_reset(Command):
-
     def run(self, args):
         opts, args = getopt(args, "", ["hard", "soft", "mixed"])
         opts = dict(opts)
@@ -346,110 +357,122 @@ class cmd_reset(Command):
             mode = "soft"
         elif "--mixed" in opts:
             mode = "mixed"
-        porcelain.reset('.', mode=mode, *args)
+        porcelain.reset(".", mode=mode, *args)
 
 
 class cmd_daemon(Command):
-
     def run(self, args):
         from dulwich import log_utils
         from dulwich.protocol import TCP_GIT_PORT
+
         parser = optparse.OptionParser()
-        parser.add_option("-l", "--listen_address", dest="listen_address",
-                          default="localhost",
-                          help="Binding IP address.")
-        parser.add_option("-p", "--port", dest="port", type=int,
-                          default=TCP_GIT_PORT,
-                          help="Binding TCP port.")
+        parser.add_option(
+            "-l",
+            "--listen_address",
+            dest="listen_address",
+            default="localhost",
+            help="Binding IP address.",
+        )
+        parser.add_option(
+            "-p",
+            "--port",
+            dest="port",
+            type=int,
+            default=TCP_GIT_PORT,
+            help="Binding TCP port.",
+        )
         options, args = parser.parse_args(args)
 
         log_utils.default_logging_config()
         if len(args) >= 1:
             gitdir = args[0]
         else:
-            gitdir = '.'
-        from dulwich import porcelain
-        porcelain.daemon(gitdir, address=options.listen_address,
-                         port=options.port)
+            gitdir = "."
+
+        porcelain.daemon(gitdir, address=options.listen_address, port=options.port)
 
 
 class cmd_web_daemon(Command):
-
     def run(self, args):
         from dulwich import log_utils
+
         parser = optparse.OptionParser()
-        parser.add_option("-l", "--listen_address", dest="listen_address",
-                          default="",
-                          help="Binding IP address.")
-        parser.add_option("-p", "--port", dest="port", type=int,
-                          default=8000,
-                          help="Binding TCP port.")
+        parser.add_option(
+            "-l",
+            "--listen_address",
+            dest="listen_address",
+            default="",
+            help="Binding IP address.",
+        )
+        parser.add_option(
+            "-p",
+            "--port",
+            dest="port",
+            type=int,
+            default=8000,
+            help="Binding TCP port.",
+        )
         options, args = parser.parse_args(args)
 
         log_utils.default_logging_config()
         if len(args) >= 1:
             gitdir = args[0]
         else:
-            gitdir = '.'
-        from dulwich import porcelain
-        porcelain.web_daemon(gitdir, address=options.listen_address,
-                             port=options.port)
+            gitdir = "."
+
+        porcelain.web_daemon(gitdir, address=options.listen_address, port=options.port)
 
 
 class cmd_write_tree(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        sys.stdout.write('%s\n' % porcelain.write_tree('.'))
+        sys.stdout.write("%s\n" % porcelain.write_tree("."))
 
 
 class cmd_receive_pack(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
         else:
-            gitdir = '.'
+            gitdir = "."
         porcelain.receive_pack(gitdir)
 
 
 class cmd_upload_pack(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
         else:
-            gitdir = '.'
+            gitdir = "."
         porcelain.upload_pack(gitdir)
 
 
 class cmd_status(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         if len(args) >= 1:
             gitdir = args[0]
         else:
-            gitdir = '.'
+            gitdir = "."
         status = porcelain.status(gitdir)
         if any(names for (kind, names) in status.staged.items()):
             sys.stdout.write("Changes to be committed:\n\n")
             for kind, names in status.staged.items():
                 for name in names:
-                    sys.stdout.write("\t%s: %s\n" % (
-                        kind, name.decode(sys.getfilesystemencoding())))
+                    sys.stdout.write(
+                        "\t%s: %s\n" % (kind, name.decode(sys.getfilesystemencoding()))
+                    )
             sys.stdout.write("\n")
         if status.unstaged:
             sys.stdout.write("Changes not staged for commit:\n\n")
             for name in status.unstaged:
-                sys.stdout.write(
-                    "\t%s\n" % name.decode(sys.getfilesystemencoding()))
+                sys.stdout.write("\t%s\n" % name.decode(sys.getfilesystemencoding()))
             sys.stdout.write("\n")
         if status.untracked:
             sys.stdout.write("Untracked files:\n\n")
@@ -459,11 +482,10 @@ class cmd_status(Command):
 
 
 class cmd_ls_remote(Command):
-
     def run(self, args):
-        opts, args = getopt(args, '', [])
+        opts, args = getopt(args, "", [])
         if len(args) < 1:
-            print('Usage: dulwich ls-remote URL')
+            print("Usage: dulwich ls-remote URL")
             sys.exit(1)
         refs = porcelain.ls_remote(args[0])
         for ref in sorted(refs):
@@ -471,48 +493,52 @@ class cmd_ls_remote(Command):
 
 
 class cmd_ls_tree(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
-        parser.add_option("-r", "--recursive", action="store_true",
-                          help="Recusively list tree contents.")
-        parser.add_option("--name-only", action="store_true",
-                          help="Only display name.")
+        parser.add_option(
+            "-r",
+            "--recursive",
+            action="store_true",
+            help="Recusively list tree contents.",
+        )
+        parser.add_option("--name-only", action="store_true", help="Only display name.")
         options, args = parser.parse_args(args)
         try:
             treeish = args.pop(0)
         except IndexError:
             treeish = None
         porcelain.ls_tree(
-            '.', treeish, outstream=sys.stdout, recursive=options.recursive,
-            name_only=options.name_only)
+            ".",
+            treeish,
+            outstream=sys.stdout,
+            recursive=options.recursive,
+            name_only=options.name_only,
+        )
 
 
 class cmd_pack_objects(Command):
-
     def run(self, args):
-        opts, args = getopt(args, '', ['stdout'])
+        opts, args = getopt(args, "", ["stdout"])
         opts = dict(opts)
-        if len(args) < 1 and '--stdout' not in args:
-            print('Usage: dulwich pack-objects basename')
+        if len(args) < 1 and "--stdout" not in args:
+            print("Usage: dulwich pack-objects basename")
             sys.exit(1)
         object_ids = [line.strip() for line in sys.stdin.readlines()]
         basename = args[0]
-        if '--stdout' in opts:
-            packf = getattr(sys.stdout, 'buffer', sys.stdout)
+        if "--stdout" in opts:
+            packf = getattr(sys.stdout, "buffer", sys.stdout)
             idxf = None
             close = []
         else:
-            packf = open(basename + '.pack', 'w')
-            idxf = open(basename + '.idx', 'w')
+            packf = open(basename + ".pack", "w")
+            idxf = open(basename + ".idx", "w")
             close = [packf, idxf]
-        porcelain.pack_objects('.', object_ids, packf, idxf)
+        porcelain.pack_objects(".", object_ids, packf, idxf)
         for f in close:
             f.close()
 
 
 class cmd_pull(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
@@ -520,7 +546,7 @@ class cmd_pull(Command):
             from_location = args[0]
         except IndexError:
             from_location = None
-        porcelain.pull('.', from_location)
+        porcelain.pull(".", from_location)
 
 
 class cmd_push(Command):
@@ -534,11 +560,10 @@ class cmd_push(Command):
 
 
 class cmd_remote_add(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        porcelain.remote_add('.', args[0], args[1])
+        porcelain.remote_add(".", args[0], args[1])
 
 
 class SuperCommand(Command):
@@ -547,14 +572,13 @@ class SuperCommand(Command):
 
     def run(self, args):
         if not args:
-            print("Supported subcommands: %s" %
-                  ', '.join(self.subcommands.keys()))
+            print("Supported subcommands: %s" % ", ".join(self.subcommands.keys()))
             return False
         cmd = args[0]
         try:
             cmd_kls = self.subcommands[cmd]
         except KeyError:
-            print('No such subcommand: %s' % args[0])
+            print("No such subcommand: %s" % args[0])
             return False
         return cmd_kls().run(args[1:])
 
@@ -567,51 +591,46 @@ class cmd_remote(SuperCommand):
 
 
 class cmd_check_ignore(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         ret = 1
-        for path in porcelain.check_ignore('.', args):
+        for path in porcelain.check_ignore(".", args):
             print(path)
             ret = 0
         return ret
 
 
 class cmd_check_mailmap(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         for arg in args:
-            canonical_identity = porcelain.check_mailmap('.', arg)
+            canonical_identity = porcelain.check_mailmap(".", arg)
             print(canonical_identity)
 
 
 class cmd_stash_list(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        for i, entry in porcelain.stash_list('.'):
-            print("stash@{%d}: %s" % (i, entry.message.rstrip('\n')))
+        for i, entry in porcelain.stash_list("."):
+            print("stash@{%d}: %s" % (i, entry.message.rstrip("\n")))
 
 
 class cmd_stash_push(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        porcelain.stash_push('.')
+        porcelain.stash_push(".")
         print("Saved working directory and index state")
 
 
 class cmd_stash_pop(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        porcelain.stash_pop('.')
+        porcelain.stash_pop(".")
         print("Restrored working directory and index state")
 
 
@@ -625,42 +644,45 @@ class cmd_stash(SuperCommand):
 
 
 class cmd_ls_files(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        for name in porcelain.ls_files('.'):
+        for name in porcelain.ls_files("."):
             print(name)
 
 
 class cmd_describe(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        print(porcelain.describe('.'))
+        print(porcelain.describe("."))
 
 
 class cmd_help(Command):
-
     def run(self, args):
         parser = optparse.OptionParser()
-        parser.add_option("-a", "--all", dest="all",
-                          action="store_true",
-                          help="List all commands.")
+        parser.add_option(
+            "-a",
+            "--all",
+            dest="all",
+            action="store_true",
+            help="List all commands.",
+        )
         options, args = parser.parse_args(args)
 
         if options.all:
-            print('Available commands:')
+            print("Available commands:")
             for cmd in sorted(commands):
-                print('  %s' % cmd)
+                print("  %s" % cmd)
         else:
-            print("""\
+            print(
+                """\
 The dulwich command line tool is currently a very basic frontend for the
 Dulwich python module. For full functionality, please see the API reference.
 
 For a list of supported commands, see 'dulwich help -a'.
-""")
+"""
+            )
 
 
 commands = {
@@ -704,7 +726,7 @@ commands = {
     "upload-pack": cmd_upload_pack,
     "web-daemon": cmd_web_daemon,
     "write-tree": cmd_write_tree,
-    }
+}
 
 
 def main(argv=None):
@@ -725,8 +747,8 @@ def main(argv=None):
     return cmd_kls().run(argv[1:])
 
 
-if __name__ == '__main__':
-    if 'DULWICH_PDB' in os.environ and getattr(signal, 'SIGQUIT', None):
+if __name__ == "__main__":
+    if "DULWICH_PDB" in os.environ and getattr(signal, "SIGQUIT", None):
         signal.signal(signal.SIGQUIT, signal_quit)  # type: ignore
     signal.signal(signal.SIGINT, signal_int)
 

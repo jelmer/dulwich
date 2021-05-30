@@ -32,13 +32,12 @@ from dulwich.objects import (
     Blob,
     Commit,
     S_ISGITLINK,
-    )
+)
 
 FIRST_FEW_BYTES = 8000
 
 
-def write_commit_patch(f, commit, contents, progress, version=None,
-                       encoding=None):
+def write_commit_patch(f, commit, contents, progress, version=None, encoding=None):
     """Write a individual file patch.
 
     Args:
@@ -51,19 +50,30 @@ def write_commit_patch(f, commit, contents, progress, version=None,
     if isinstance(contents, str):
         contents = contents.encode(encoding)
     (num, total) = progress
-    f.write(b"From " + commit.id + b" " +
-            time.ctime(commit.commit_time).encode(encoding) + b"\n")
+    f.write(
+        b"From "
+        + commit.id
+        + b" "
+        + time.ctime(commit.commit_time).encode(encoding)
+        + b"\n"
+    )
     f.write(b"From: " + commit.author + b"\n")
-    f.write(b"Date: " +
-            time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n")
-    f.write(("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding) +
-            commit.message + b"\n")
+    f.write(
+        b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n"
+    )
+    f.write(
+        ("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding)
+        + commit.message
+        + b"\n"
+    )
     f.write(b"\n")
     f.write(b"---\n")
     try:
         import subprocess
-        p = subprocess.Popen(["diffstat"], stdout=subprocess.PIPE,
-                             stdin=subprocess.PIPE)
+
+        p = subprocess.Popen(
+            ["diffstat"], stdout=subprocess.PIPE, stdin=subprocess.PIPE
+        )
     except (ImportError, OSError):
         pass  # diffstat not available?
     else:
@@ -74,6 +84,7 @@ def write_commit_patch(f, commit, contents, progress, version=None,
     f.write(b"-- \n")
     if version is None:
         from dulwich import __version__ as dulwich_version
+
         f.write(b"Dulwich %d.%d.%d\n" % dulwich_version)
     else:
         f.write(version.encode(encoding) + b"\n")
@@ -86,7 +97,7 @@ def get_summary(commit):
       commit: Commit
     Returns: Summary string
     """
-    decoded = commit.message.decode(errors='replace')
+    decoded = commit.message.decode(errors="replace")
     return decoded.splitlines()[0].replace(" ", "-")
 
 
@@ -97,15 +108,24 @@ def _format_range_unified(start, stop):
     beginning = start + 1  # lines start numbering with one
     length = stop - start
     if length == 1:
-        return '{}'.format(beginning)
+        return "{}".format(beginning)
     if not length:
         beginning -= 1  # empty ranges begin at line just before the range
-    return '{},{}'.format(beginning, length)
+    return "{},{}".format(beginning, length)
 
 
-def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
-                 tofiledate='', n=3, lineterm='\n', tree_encoding='utf-8',
-                 output_encoding='utf-8'):
+def unified_diff(
+    a,
+    b,
+    fromfile="",
+    tofile="",
+    fromfiledate="",
+    tofiledate="",
+    n=3,
+    lineterm="\n",
+    tree_encoding="utf-8",
+    output_encoding="utf-8",
+):
     """difflib.unified_diff that can detect "No newline at end of file" as
     original "git diff" does.
 
@@ -115,43 +135,37 @@ def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
     for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
             started = True
-            fromdate = '\t{}'.format(fromfiledate) if fromfiledate else ''
-            todate = '\t{}'.format(tofiledate) if tofiledate else ''
-            yield '--- {}{}{}'.format(
-                fromfile.decode(tree_encoding),
-                fromdate,
-                lineterm
-                ).encode(output_encoding)
-            yield '+++ {}{}{}'.format(
-                tofile.decode(tree_encoding),
-                todate,
-                lineterm
-                ).encode(output_encoding)
+            fromdate = "\t{}".format(fromfiledate) if fromfiledate else ""
+            todate = "\t{}".format(tofiledate) if tofiledate else ""
+            yield "--- {}{}{}".format(
+                fromfile.decode(tree_encoding), fromdate, lineterm
+            ).encode(output_encoding)
+            yield "+++ {}{}{}".format(
+                tofile.decode(tree_encoding), todate, lineterm
+            ).encode(output_encoding)
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
         file2_range = _format_range_unified(first[3], last[4])
-        yield '@@ -{} +{} @@{}'.format(
-            file1_range,
-            file2_range,
-            lineterm
-             ).encode(output_encoding)
+        yield "@@ -{} +{} @@{}".format(file1_range, file2_range, lineterm).encode(
+            output_encoding
+        )
 
         for tag, i1, i2, j1, j2 in group:
-            if tag == 'equal':
+            if tag == "equal":
                 for line in a[i1:i2]:
-                    yield b' ' + line
+                    yield b" " + line
                 continue
-            if tag in ('replace', 'delete'):
+            if tag in ("replace", "delete"):
                 for line in a[i1:i2]:
-                    if not line[-1:] == b'\n':
-                        line += b'\n\\ No newline at end of file\n'
-                    yield b'-' + line
-            if tag in ('replace', 'insert'):
+                    if not line[-1:] == b"\n":
+                        line += b"\n\\ No newline at end of file\n"
+                    yield b"-" + line
+            if tag in ("replace", "insert"):
                 for line in b[j1:j2]:
-                    if not line[-1:] == b'\n':
-                        line += b'\n\\ No newline at end of file\n'
-                    yield b'+' + line
+                    if not line[-1:] == b"\n":
+                        line += b"\n\\ No newline at end of file\n"
+                    yield b"+" + line
 
 
 def is_binary(content):
@@ -160,7 +174,7 @@ def is_binary(content):
     Args:
       content: Bytestring to check for binary content
     """
-    return b'\0' in content[:FIRST_FEW_BYTES]
+    return b"\0" in content[:FIRST_FEW_BYTES]
 
 
 def shortid(hexsha):
@@ -197,7 +211,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
 
     def content(mode, hexsha):
         if hexsha is None:
-            return Blob.from_string(b'')
+            return Blob.from_string(b"")
         elif S_ISGITLINK(mode):
             return Blob.from_string(b"Subproject commit " + hexsha + b"\n")
         else:
@@ -208,12 +222,13 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
             return []
         else:
             return content.splitlines()
-    f.writelines(gen_diff_header(
-        (old_path, new_path), (old_mode, new_mode), (old_id, new_id)))
+
+    f.writelines(
+        gen_diff_header((old_path, new_path), (old_mode, new_mode), (old_id, new_id))
+    )
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
-    if not diff_binary and (
-            is_binary(old_content.data) or is_binary(new_content.data)):
+    if not diff_binary and (is_binary(old_content.data) or is_binary(new_content.data)):
         binary_diff = (
             b"Binary files "
             + patched_old_path
@@ -223,8 +238,14 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         )
         f.write(binary_diff)
     else:
-        f.writelines(unified_diff(lines(old_content), lines(new_content),
-                     patched_old_path, patched_new_path))
+        f.writelines(
+            unified_diff(
+                lines(old_content),
+                lines(new_content),
+                patched_old_path,
+                patched_new_path,
+            )
+        )
 
 
 # TODO(jelmer): Support writing unicode, rather than bytes.
@@ -250,13 +271,13 @@ def gen_diff_header(paths, modes, shas):
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                yield ("old file mode %o\n" % old_mode).encode('ascii')
-            yield ("new file mode %o\n" % new_mode).encode('ascii')
+                yield ("old file mode %o\n" % old_mode).encode("ascii")
+            yield ("new file mode %o\n" % new_mode).encode("ascii")
         else:
-            yield ("deleted file mode %o\n" % old_mode).encode('ascii')
+            yield ("deleted file mode %o\n" % old_mode).encode("ascii")
     yield b"index " + shortid(old_sha) + b".." + shortid(new_sha)
     if new_mode is not None and old_mode is not None:
-        yield (" %o" % new_mode).encode('ascii')
+        yield (" %o" % new_mode).encode("ascii")
     yield b"\n"
 
 
@@ -281,13 +302,19 @@ def write_blob_diff(f, old_file, new_file):
             return blob.splitlines()
         else:
             return []
-    f.writelines(gen_diff_header(
-        (old_path, new_path), (old_mode, new_mode),
-        (getattr(old_blob, "id", None), getattr(new_blob, "id", None))))
+
+    f.writelines(
+        gen_diff_header(
+            (old_path, new_path),
+            (old_mode, new_mode),
+            (getattr(old_blob, "id", None), getattr(new_blob, "id", None)),
+        )
+    )
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
-    f.writelines(unified_diff(old_contents, new_contents,
-                 patched_old_path, patched_new_path))
+    f.writelines(
+        unified_diff(old_contents, new_contents, patched_old_path, patched_new_path)
+    )
 
 
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
@@ -302,8 +329,13 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
     """
     changes = store.tree_changes(old_tree, new_tree)
     for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
-        write_object_diff(f, store, (oldpath, oldmode, oldsha),
-                          (newpath, newmode, newsha), diff_binary=diff_binary)
+        write_object_diff(
+            f,
+            store,
+            (oldpath, oldmode, oldsha),
+            (newpath, newmode, newsha),
+            diff_binary=diff_binary,
+        )
 
 
 def git_am_patch_split(f, encoding=None):
@@ -317,8 +349,7 @@ def git_am_patch_split(f, encoding=None):
     encoding = encoding or getattr(f, "encoding", "ascii")
     encoding = encoding or "ascii"
     contents = f.read()
-    if (isinstance(contents, bytes) and
-            getattr(email.parser, "BytesParser", None)):
+    if isinstance(contents, bytes) and getattr(email.parser, "BytesParser", None):
         parser = email.parser.BytesParser()
         msg = parser.parsebytes(contents)
     else:
@@ -344,7 +375,7 @@ def parse_patch_message(msg, encoding=None):
         subject = msg["subject"]
     else:
         close = msg["subject"].index("] ", patch_tag_start)
-        subject = msg["subject"][close+2:]
+        subject = msg["subject"][close + 2 :]
     c.message = (subject.replace("\n", "") + "\n").encode(encoding)
     first = True
 
@@ -357,7 +388,7 @@ def parse_patch_message(msg, encoding=None):
             break
         if first:
             if line.startswith(b"From: "):
-                c.author = line[len(b"From: "):].rstrip()
+                c.author = line[len(b"From: ") :].rstrip()
             else:
                 c.message += b"\n" + line
             first = False

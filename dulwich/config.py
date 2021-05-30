@@ -33,17 +33,18 @@ from typing import BinaryIO, Tuple, Optional
 
 from collections import (
     OrderedDict,
-    )
+)
+
 try:
     from collections.abc import (
         Iterable,
         MutableMapping,
-        )
+    )
 except ImportError:  # python < 3.7
     from collections import (
         Iterable,
         MutableMapping,
-        )
+    )
 
 from dulwich.file import GitFile
 
@@ -56,15 +57,12 @@ def lower_key(key):
         return key.lower()
 
     if isinstance(key, Iterable):
-        return type(key)(
-            map(lower_key, key)
-        )
+        return type(key)(map(lower_key, key))
 
     return key
 
 
 class CaseInsensitiveDict(OrderedDict):
-
     @classmethod
     def make(cls, dict_in=None):
 
@@ -87,7 +85,7 @@ class CaseInsensitiveDict(OrderedDict):
     def __setitem__(self, key, value, **kwargs):
         key = lower_key(key)
 
-        super(CaseInsensitiveDict, self).__setitem__(key, value,  **kwargs)
+        super(CaseInsensitiveDict, self).__setitem__(key, value, **kwargs)
 
     def __getitem__(self, item):
         key = lower_key(item)
@@ -188,7 +186,7 @@ class Config(object):
         Returns:
           boolean indicating whether the section exists
         """
-        return (name in self.itersections())
+        return name in self.itersections()
 
 
 class ConfigDict(Config, MutableMapping):
@@ -205,9 +203,7 @@ class ConfigDict(Config, MutableMapping):
         return "%s(%r)" % (self.__class__.__name__, self._values)
 
     def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__) and
-            other._values == self._values)
+        return isinstance(other, self.__class__) and other._values == self._values
 
     def __getitem__(self, key):
         return self._values.__getitem__(key)
@@ -234,13 +230,16 @@ class ConfigDict(Config, MutableMapping):
 
     def _check_section_and_name(self, section, name):
         if not isinstance(section, tuple):
-            section = (section, )
+            section = (section,)
 
-        section = tuple([
-            subsection.encode(self.encoding)
-            if not isinstance(subsection, bytes) else subsection
-            for subsection in section
-            ])
+        section = tuple(
+            [
+                subsection.encode(self.encoding)
+                if not isinstance(subsection, bytes)
+                else subsection
+                for subsection in section
+            ]
+        )
 
         if not isinstance(name, bytes):
             name = name.encode(self.encoding)
@@ -274,11 +273,13 @@ class ConfigDict(Config, MutableMapping):
 
 
 def _format_string(value):
-    if (value.startswith(b" ") or
-            value.startswith(b"\t") or
-            value.endswith(b" ") or
-            b'#' in value or
-            value.endswith(b"\t")):
+    if (
+        value.startswith(b" ")
+        or value.startswith(b"\t")
+        or value.endswith(b" ")
+        or b"#" in value
+        or value.endswith(b"\t")
+    ):
         return b'"' + _escape_value(value) + b'"'
     else:
         return _escape_value(value)
@@ -286,11 +287,11 @@ def _format_string(value):
 
 _ESCAPE_TABLE = {
     ord(b"\\"): ord(b"\\"),
-    ord(b"\""): ord(b"\""),
+    ord(b'"'): ord(b'"'),
     ord(b"n"): ord(b"\n"),
     ord(b"t"): ord(b"\t"),
     ord(b"b"): ord(b"\b"),
-    }
+}
 _COMMENT_CHARS = [ord(b"#"), ord(b";")]
 _WHITESPACE_CHARS = [ord(b"\t"), ord(b" ")]
 
@@ -309,18 +310,19 @@ def _parse_string(value):
                 v = _ESCAPE_TABLE[value[i]]
             except IndexError:
                 raise ValueError(
-                    "escape character in %r at %d before end of string" %
-                    (value, i))
+                    "escape character in %r at %d before end of string" % (value, i)
+                )
             except KeyError:
                 raise ValueError(
                     "escape character followed by unknown character "
-                    "%s at %d in %r" % (value[i], i, value))
+                    "%s at %d in %r" % (value[i], i, value)
+                )
             if whitespace:
                 ret.extend(whitespace)
                 whitespace = bytearray()
             ret.append(v)
-        elif c == ord(b"\""):
-            in_quotes = (not in_quotes)
+        elif c == ord(b'"'):
+            in_quotes = not in_quotes
         elif c in _COMMENT_CHARS and not in_quotes:
             # the rest of the line is a comment
             break
@@ -344,22 +346,22 @@ def _escape_value(value):
     value = value.replace(b"\\", b"\\\\")
     value = value.replace(b"\n", b"\\n")
     value = value.replace(b"\t", b"\\t")
-    value = value.replace(b"\"", b"\\\"")
+    value = value.replace(b'"', b'\\"')
     return value
 
 
 def _check_variable_name(name):
     for i in range(len(name)):
-        c = name[i:i+1]
-        if not c.isalnum() and c != b'-':
+        c = name[i : i + 1]
+        if not c.isalnum() and c != b"-":
             return False
     return True
 
 
 def _check_section_name(name):
     for i in range(len(name)):
-        c = name[i:i+1]
-        if not c.isalnum() and c not in (b'-', b'.'):
+        c = name[i : i + 1]
+        if not c.isalnum() and c not in (b"-", b"."):
             return False
     return True
 
@@ -379,15 +381,14 @@ def _strip_comments(line):
 
 
 class ConfigFile(ConfigDict):
-    """A Git configuration file, like .git/config or ~/.gitconfig.
-    """
+    """A Git configuration file, like .git/config or ~/.gitconfig."""
 
     def __init__(self, values=None, encoding=None):
         super(ConfigFile, self).__init__(values=values, encoding=encoding)
         self.path = None
 
     @classmethod
-    def from_file(cls, f: BinaryIO) -> 'ConfigFile':
+    def from_file(cls, f: BinaryIO) -> "ConfigFile":
         """Read configuration from a file-like object."""
         ret = cls()
         section = None  # type: Optional[Tuple[bytes, ...]]
@@ -404,26 +405,23 @@ class ConfigFile(ConfigDict):
                     except ValueError:
                         raise ValueError("expected trailing ]")
                     pts = line[1:last].split(b" ", 1)
-                    line = line[last+1:]
+                    line = line[last + 1 :]
                     if len(pts) == 2:
-                        if pts[1][:1] != b"\"" or pts[1][-1:] != b"\"":
-                            raise ValueError(
-                                "Invalid subsection %r" % pts[1])
+                        if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
+                            raise ValueError("Invalid subsection %r" % pts[1])
                         else:
                             pts[1] = pts[1][1:-1]
                         if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" %
-                                             pts[0])
+                            raise ValueError("invalid section name %r" % pts[0])
                         section = (pts[0], pts[1])
                     else:
                         if not _check_section_name(pts[0]):
-                            raise ValueError(
-                                "invalid section name %r" % pts[0])
+                            raise ValueError("invalid section name %r" % pts[0])
                         pts = pts[0].split(b".", 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])
                         else:
-                            section = (pts[0], )
+                            section = (pts[0],)
                     ret._values.setdefault(section)
                 if _strip_comments(line).strip() == b"":
                     continue
@@ -456,9 +454,9 @@ class ConfigFile(ConfigDict):
         return ret
 
     @classmethod
-    def from_path(cls, path) -> 'ConfigFile':
+    def from_path(cls, path) -> "ConfigFile":
         """Read configuration from a file on disk."""
-        with GitFile(path, 'rb') as f:
+        with GitFile(path, "rb") as f:
             ret = cls.from_file(f)
             ret.path = path
             return ret
@@ -467,7 +465,7 @@ class ConfigFile(ConfigDict):
         """Write configuration to a file on disk."""
         if path is None:
             path = self.path
-        with GitFile(path, 'wb') as f:
+        with GitFile(path, "wb") as f:
             self.write_to_file(f)
 
     def write_to_file(self, f: BinaryIO) -> None:
@@ -476,13 +474,12 @@ class ConfigFile(ConfigDict):
             try:
                 section_name, subsection_name = section
             except ValueError:
-                (section_name, ) = section
+                (section_name,) = section
                 subsection_name = None
             if subsection_name is None:
                 f.write(b"[" + section_name + b"]\n")
             else:
-                f.write(b"[" + section_name +
-                        b" \"" + subsection_name + b"\"]\n")
+                f.write(b"[" + section_name + b' "' + subsection_name + b'"]\n')
             for key, value in values.items():
                 if value is True:
                     value = b"true"
@@ -495,9 +492,61 @@ class ConfigFile(ConfigDict):
 
 def get_xdg_config_home_path(*path_segments):
     xdg_config_home = os.environ.get(
-        "XDG_CONFIG_HOME", os.path.expanduser("~/.config/"),
+        "XDG_CONFIG_HOME",
+        os.path.expanduser("~/.config/"),
     )
     return os.path.join(xdg_config_home, *path_segments)
+
+
+def _find_git_in_win_path():
+    for exe in ("git.exe", "git.cmd"):
+        for path in os.environ.get("PATH", "").split(";"):
+            if os.path.exists(os.path.join(path, exe)):
+                # exe path is .../Git/bin/git.exe or .../Git/cmd/git.exe
+                git_dir, _bin_dir = os.path.split(path)
+                yield git_dir
+                break
+
+
+def _find_git_in_win_reg():
+    import platform
+    import winreg
+
+    if platform.machine() == "AMD64":
+        subkey = (
+            "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\"
+            "CurrentVersion\\Uninstall\\Git_is1"
+        )
+    else:
+        subkey = (
+            "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\"
+            "Uninstall\\Git_is1"
+        )
+
+    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            with winreg.OpenKey(key, subkey) as k:
+                val, typ = winreg.QueryValueEx(k, "InstallLocation")
+                if typ == winreg.REG_SZ:
+                    yield val
+        except OSError:
+            pass
+
+
+# There is no set standard for system config dirs on windows. We try the
+# following:
+#   - %PROGRAMDATA%/Git/config - (deprecated) Windows config dir per CGit docs
+#   - %PROGRAMFILES%/Git/etc/gitconfig - Git for Windows (msysgit) config dir
+#     Used if CGit installation (Git/bin/git.exe) is found in PATH in the
+#     system registry
+def get_win_system_paths():
+    if "PROGRAMDATA" in os.environ:
+        yield os.path.join(os.environ["PROGRAMDATA"], "Git", "config")
+
+    for git_dir in _find_git_in_win_path():
+        yield os.path.join(git_dir, "etc", "gitconfig")
+    for git_dir in _find_git_in_win_reg():
+        yield os.path.join(git_dir, "etc", "gitconfig")
 
 
 class StackedConfig(Config):
@@ -526,6 +575,8 @@ class StackedConfig(Config):
 
         if "GIT_CONFIG_NOSYSTEM" not in os.environ:
             paths.append("/etc/gitconfig")
+            if sys.platform == "win32":
+                paths.extend(get_win_system_paths())
 
         backends = []
         for path in paths:
@@ -538,7 +589,7 @@ class StackedConfig(Config):
 
     def get(self, section, name):
         if not isinstance(section, tuple):
-            section = (section, )
+            section = (section,)
         for backend in self.backends:
             try:
                 return backend.get(section, name)
@@ -555,15 +606,15 @@ class StackedConfig(Config):
 def parse_submodules(config):
     """Parse a gitmodules GitConfig file, returning submodules.
 
-   Args:
-     config: A `ConfigFile`
-   Returns:
-     list of tuples (submodule path, url, name),
-       where name is quoted part of the section's name.
+    Args:
+      config: A `ConfigFile`
+    Returns:
+      list of tuples (submodule path, url, name),
+        where name is quoted part of the section's name.
     """
     for section in config.keys():
         section_kind, section_name = section
-        if section_kind == b'submodule':
-            sm_path = config.get(section, b'path')
-            sm_url = config.get(section, b'url')
+        if section_kind == b"submodule":
+            sm_path = config.get(section, b"path")
+            sm_url = config.get(section, b"url")
             yield (sm_path, sm_url, section_name)

@@ -1,2 +1,2 @@
 version=4
-opts=pgpsigurlmangle=s/$/.asc/ https://pypi.debian.net/dulwich dulwich-(.*).tar.gz
+opts=pgpsigurlmangle=s/$/.asc/ https://pypi.debian.net/dulwich/dulwich-(.*).tar.gz

@@ -1,6 +1,7 @@
 dulwich (0.20.15-2) UNRELEASED; urgency=medium
 
   * Update watch file format version to 4.
+  * Fix watch file.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Wed, 03 Mar 2021 17:14:44 -0000
 

@@ -123,7 +123,7 @@ def read_ignore_patterns(f: BinaryIO) -> Iterable[bytes]:
         line = line.rstrip(b"\r\n")
 
         # Ignore blank lines, they're used for readability.
-        if not line:
+        if not line.strip():
             continue
 
         if line.startswith(b"#"):

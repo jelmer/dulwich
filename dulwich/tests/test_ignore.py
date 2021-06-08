@@ -105,7 +105,7 @@ class ReadIgnorePatterns(TestCase):
         f = BytesIO(
             b"""
 # a comment
-
+\x20\x20
 # and an empty line:
 
 \\#not a comment

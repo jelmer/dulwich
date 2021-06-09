@@ -3,6 +3,8 @@
  * config: disregard UTF-8 BOM when reading file.
    (Dan Villiom Podlaski Christiansen)
 
+ * Skip lines with spaces only in .gitignore. (Andrey Torsunov, #878)
+
 0.20.23	2021-05-24
 
  * Fix installation of GPG during package publishing.

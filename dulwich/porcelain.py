@@ -1808,13 +1808,13 @@ def stash_push(repo):
         stash.push()
 
 
-def stash_pop(repo):
+def stash_pop(repo, index):
     """Pop a new stash from the stack."""
     with open_repo_closing(repo) as r:
         from dulwich.stash import Stash
 
         stash = Stash.from_repo(r)
-        stash.pop()
+        stash.pop(index)
 
 
 def ls_files(repo):

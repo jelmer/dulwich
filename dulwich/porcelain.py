@@ -1809,12 +1809,21 @@ def stash_push(repo):
 
 
 def stash_pop(repo, index):
-    """Pop a new stash from the stack."""
+    """Pop a stash from the stack."""
     with open_repo_closing(repo) as r:
         from dulwich.stash import Stash
 
         stash = Stash.from_repo(r)
         stash.pop(index)
+
+
+def stash_drop(repo, index):
+    """Drop a stash from the stack."""
+    with open_repo_closing(repo) as r:
+        from dulwich.stash import Stash
+
+        stash = Stash.from_repo(r)
+        stash.drop(index)
 
 
 def ls_files(repo):

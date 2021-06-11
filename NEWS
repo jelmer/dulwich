@@ -5,6 +5,9 @@
 
  * Skip lines with spaces only in .gitignore. (Andrey Torsunov, #878)
 
+ * Add a separate HTTPProxyUnauthorized exception for 407 errors.
+   (Jelmer Vernooĳ, #822)
+
 0.20.23	2021-05-24
 
  * Fix installation of GPG during package publishing.

@@ -133,6 +133,15 @@ class HTTPUnauthorized(Exception):
         self.url = url
 
 
+class HTTPProxyUnauthorized(Exception):
+    """Raised when proxy authentication fails."""
+
+    def __init__(self, proxy_authenticate, url):
+        Exception.__init__(self, "No valid proxy credentials provided")
+        self.proxy_authenticate = proxy_authenticate
+        self.url = url
+
+
 def _fileno_can_read(fileno):
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
@@ -1759,8 +1768,6 @@ def default_urllib3_manager(   # noqa: C901
     if proxy_server is not None:
         if proxy_manager_cls is None:
             proxy_manager_cls = urllib3.ProxyManager
-        # `urllib3` requires a `str` object in both Python 2 and 3, while
-        # `ConfigDict` coerces entries to `bytes` on Python 3. Compensate.
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
         manager = proxy_manager_cls(proxy_server, headers=headers, **kwargs)
@@ -1873,6 +1880,8 @@ class HttpGitClient(GitClient):
             raise NotGitRepository()
         if resp.status == 401:
             raise HTTPUnauthorized(resp.getheader("WWW-Authenticate"), url)
+        if resp.status == 407:
+            raise HTTPProxyUnauthorized(resp.getheader("Proxy-Authenticate"), url)
         if resp.status != 200:
             raise GitProtocolError(
                 "unexpected http resp %d for %s" % (resp.status, url)

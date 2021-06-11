@@ -549,8 +549,8 @@ class GitClient(object):
         Args:
           path: Remote path to fetch from
           determine_wants: Function determine what refs
-        to fetch. Receives dictionary of name->sha, should return
-        list of shas to fetch.
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch.
           graph_walker: Object with next() and ack().
           pack_data: Callback called for each bit of data in the pack
           progress: Callback for progress reports (strings)
@@ -901,10 +901,10 @@ class TraditionalGitClient(GitClient):
         Args:
           path: Repository path (as bytestring)
           update_refs: Function to determine changes to remote refs.
-        Receive dict with existing remote refs, returns dict with
-        changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+            Receive dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
           generate_pack_data: Function that can return a tuple with
-        number of objects and pack data to upload.
+            number of objects and pack data to upload.
           progress: Optional callback called with progress updates
 
         Returns:
@@ -995,8 +995,8 @@ class TraditionalGitClient(GitClient):
         Args:
           path: Remote path to fetch from
           determine_wants: Function determine what refs
-        to fetch. Receives dictionary of name->sha, should return
-        list of shas to fetch.
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch.
           graph_walker: Object with next() and ack().
           pack_data: Callback called for each bit of data in the pack
           progress: Callback for progress reports (strings)
@@ -1292,9 +1292,9 @@ class LocalGitClient(GitClient):
         Args:
           path: Repository path (as bytestring)
           update_refs: Function to determine changes to remote refs.
-        Receive dict with existing remote refs, returns dict with
-        changed refs (name -> sha, where sha=ZERO_SHA for deletions)
-        with number of items and pack data to upload.
+            Receive dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+            with number of items and pack data to upload.
           progress: Optional progress function
 
         Returns:
@@ -1353,8 +1353,8 @@ class LocalGitClient(GitClient):
           path: Path to fetch from (as bytestring)
           target: Target repository to fetch into
           determine_wants: Optional function determine what refs
-        to fetch. Receives dictionary of name->sha, should return
-        list of shas to fetch. Defaults to all shas.
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch. Defaults to all shas.
           progress: Optional progress function
           depth: Shallow fetch depth
 
@@ -1385,8 +1385,8 @@ class LocalGitClient(GitClient):
         Args:
           path: Remote path to fetch from
           determine_wants: Function determine what refs
-        to fetch. Receives dictionary of name->sha, should return
-        list of shas to fetch.
+            to fetch. Receives dictionary of name->sha, should return
+            list of shas to fetch.
           graph_walker: Object with next() and ack().
           pack_data: Callback called for each bit of data in the pack
           progress: Callback for progress reports (strings)
@@ -1955,10 +1955,10 @@ class HttpGitClient(GitClient):
         Args:
           path: Repository path (as bytestring)
           update_refs: Function to determine changes to remote refs.
-        Receives dict with existing remote refs, returns dict with
-        changed refs (name -> sha, where sha=ZERO_SHA for deletions)
+            Receives dict with existing remote refs, returns dict with
+            changed refs (name -> sha, where sha=ZERO_SHA for deletions)
           generate_pack_data: Function that can return a tuple
-        with number of elements and pack data to upload.
+            with number of elements and pack data to upload.
           progress: Optional progress function
 
         Returns:

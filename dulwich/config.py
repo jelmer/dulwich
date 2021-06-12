@@ -29,7 +29,8 @@ TODO:
 import os
 import sys
 
-from typing import BinaryIO, Tuple, Optional
+from pathlib import Path
+from typing import BinaryIO, Iterator, Tuple, Optional
 
 from collections import (
     OrderedDict,
@@ -500,6 +501,77 @@ def get_xdg_config_home_path(*path_segments):
     return os.path.join(xdg_config_home, *path_segments)
 
 
+def _traverse_parent_paths() -> Iterator[Path]:
+    """Traverse every parent from the current directory.
+
+    Yields:
+        Path objects representing every directory, starting at the working
+        directory (included) and moving up to the root of the file system.
+    """
+    path = Path().resolve()
+    while path.parents:
+        yield path
+        path = path.parent
+    yield path
+
+
+def _is_git_directory(path: Path) -> bool:
+    """Check if the provided path is a Git directory.
+
+    Args:
+        path: Path to an alleged Git directory.
+    Returns:
+        Whether the provided path seems to be a Git directory or not.
+    """
+    if not path.is_dir():
+        return False
+    if not (path / 'HEAD').is_file():
+        return False
+    if not (path / 'objects').is_dir():
+        return False
+    if not (path / 'refs').is_dir():
+        return False
+    return True
+
+
+def _parse_git_file(path: Path) -> Optional[Path]:
+    """Parse a .git file and extract the path to the referenced .git directory.
+
+    Args:
+        path: Path to an alleged Git file.
+    Returns:
+        Path to the referenced .git directory if valid, else None.
+    """
+    if not path.is_file():
+        return
+    with open(path, 'r') as file:
+        data = file.read()
+        if data.startswith("gitdir: "):
+            path = Path(data.removeprefix("gitdir: "))
+            if path.is_dir() and _is_git_directory(path):
+                return path
+
+
+def _find_git_directory() -> Optional[Path]:
+    """Find a .git directory through all the available means.
+
+    Returns:
+        A .git directory if found, else None.
+    """
+    git_dir = Path(os.getenv('GIT_DIR', ''))
+    if _is_git_directory(git_dir):
+        return git_dir
+    for path in _traverse_parent_paths():
+        if _is_git_directory(path):
+            return path
+        elif _is_git_directory(path / '.git'):
+            return path / '.git'
+        else:
+            path = _parse_git_file(path / '.git')
+            if path:
+                return path
+
+
 def _find_git_in_win_path():
     for exe in ("git.exe", "git.cmd"):
         for path in os.environ.get("PATH", "").split(";"):
@@ -574,6 +646,7 @@ class StackedConfig(Config):
         paths = []
         paths.append(os.path.expanduser("~/.gitconfig"))
         paths.append(get_xdg_config_home_path("git", "config"))
+        paths.append(_find_git_directory() / "config")
 
         if "GIT_CONFIG_NOSYSTEM" not in os.environ:
             paths.append("/etc/gitconfig")

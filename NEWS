@@ -292,7 +292,7 @@
  BUG FIXES
 
  * Avoid ``PermissionError``, since it is Python3-specific.
-  (Jelmer Vernooĳ)
+   (Jelmer Vernooĳ)
 
  * Fix regression that added a dependency on C git for the
    test suite. (Jelmer Vernooĳ, #720)

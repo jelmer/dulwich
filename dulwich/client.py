@@ -1779,70 +1779,19 @@ def default_urllib3_manager(   # noqa: C901
     return manager
 
 
-class HttpGitClient(GitClient):
-    def __init__(
-        self,
-        base_url,
-        dumb=None,
-        pool_manager=None,
-        config=None,
-        username=None,
-        password=None,
-        **kwargs
-    ):
+class AbstractHttpGitClient(GitClient):
+    """Abstract base class for HTTP Git Clients.
+
+    This is agonistic of the actual HTTP implementation.
+
+    Subclasses should provide an implementation of the
+    _http_request method.
+    """
+
+    def __init__(self, base_url, dumb=False, **kwargs):
         self._base_url = base_url.rstrip("/") + "/"
-        self._username = username
-        self._password = password
         self.dumb = dumb
-
-        if pool_manager is None:
-            self.pool_manager = default_urllib3_manager(config)
-        else:
-            self.pool_manager = pool_manager
-
-        if username is not None:
-            # No escaping needed: ":" is not allowed in username:
-            # https://tools.ietf.org/html/rfc2617#section-2
-            credentials = "%s:%s" % (username, password)
-            import urllib3.util
-
-            basic_auth = urllib3.util.make_headers(basic_auth=credentials)
-            self.pool_manager.headers.update(basic_auth)
-
         GitClient.__init__(self, **kwargs)
-
-    def get_url(self, path):
-        return self._get_url(path).rstrip("/")
-
-    @classmethod
-    def from_parsedurl(cls, parsedurl, **kwargs):
-        password = parsedurl.password
-        if password is not None:
-            kwargs["password"] = urlunquote(password)
-        username = parsedurl.username
-        if username is not None:
-            kwargs["username"] = urlunquote(username)
-        netloc = parsedurl.hostname
-        if parsedurl.port:
-            netloc = "%s:%s" % (netloc, parsedurl.port)
-        if parsedurl.username:
-            netloc = "%s@%s" % (parsedurl.username, netloc)
-        parsedurl = parsedurl._replace(netloc=netloc)
-        return cls(urlunparse(parsedurl), **kwargs)
-
-    def __repr__(self):
-        return "%s(%r, dumb=%r)" % (
-            type(self).__name__,
-            self._base_url,
-            self.dumb,
-        )
-
-    def _get_url(self, path):
-        if not isinstance(path, str):
-            # urllib3.util.url._encode_invalid_chars() converts the path back
-            # to bytes using the utf-8 codec.
-            path = path.decode("utf-8")
-        return urljoin(self._base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers=None, data=None, allow_compression=False):
         """Perform HTTP request.
@@ -1860,50 +1809,8 @@ class HttpGitClient(GitClient):
           method for the response data.
 
         """
-        req_headers = self.pool_manager.headers.copy()
-        if headers is not None:
-            req_headers.update(headers)
-        req_headers["Pragma"] = "no-cache"
-        if allow_compression:
-            req_headers["Accept-Encoding"] = "gzip"
-        else:
-            req_headers["Accept-Encoding"] = "identity"
 
-        if data is None:
-            resp = self.pool_manager.request("GET", url, headers=req_headers)
-        else:
-            resp = self.pool_manager.request(
-                "POST", url, headers=req_headers, body=data
-            )
-
-        if resp.status == 404:
-            raise NotGitRepository()
-        if resp.status == 401:
-            raise HTTPUnauthorized(resp.getheader("WWW-Authenticate"), url)
-        if resp.status == 407:
-            raise HTTPProxyUnauthorized(resp.getheader("Proxy-Authenticate"), url)
-        if resp.status != 200:
-            raise GitProtocolError(
-                "unexpected http resp %d for %s" % (resp.status, url)
-            )
-
-        # TODO: Optimization available by adding `preload_content=False` to the
-        # request and just passing the `read` method on instead of going via
-        # `BytesIO`, if we can guarantee that the entire response is consumed
-        # before issuing the next to still allow for connection reuse from the
-        # pool.
-        read = BytesIO(resp.data).read
-
-        resp.content_type = resp.getheader("Content-Type")
-        # Check if geturl() is available (urllib3 version >= 1.23)
-        try:
-            resp_url = resp.geturl()
-        except AttributeError:
-            # get_redirect_location() is available for urllib3 >= 1.1
-            resp.redirect_location = resp.get_redirect_location()
-        else:
-            resp.redirect_location = resp_url if resp_url != url else ""
-        return resp, read
+        raise NotImplementedError(self._http_request)
 
     def _discover_references(self, service, base_url):
         assert base_url[-1] == "/"
@@ -1943,6 +1850,11 @@ class HttpGitClient(GitClient):
             resp.close()
 
     def _smart_request(self, service, url, data):
+        """Send a 'smart' HTTP request.
+
+        This is a simple wrapper around _http_request that sets
+        a couple of extra headers.
+        """
         assert url[-1] == "/"
         url = urljoin(url, service)
         result_content_type = "application/x-%s-result" % service
@@ -2097,6 +2009,123 @@ class HttpGitClient(GitClient):
         url = self._get_url(path)
         refs, _, _ = self._discover_references(b"git-upload-pack", url)
         return refs
+
+    def get_url(self, path):
+        return self._get_url(path).rstrip("/")
+
+    def _get_url(self, path):
+        return urljoin(self._base_url, path).rstrip("/") + "/"
+
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        password = parsedurl.password
+        if password is not None:
+            kwargs["password"] = urlunquote(password)
+        username = parsedurl.username
+        if username is not None:
+            kwargs["username"] = urlunquote(username)
+        netloc = parsedurl.hostname
+        if parsedurl.port:
+            netloc = "%s:%s" % (netloc, parsedurl.port)
+        if parsedurl.username:
+            netloc = "%s@%s" % (parsedurl.username, netloc)
+        parsedurl = parsedurl._replace(netloc=netloc)
+        return cls(urlunparse(parsedurl), **kwargs)
+
+    def __repr__(self):
+        return "%s(%r, dumb=%r)" % (
+            type(self).__name__,
+            self._base_url,
+            self.dumb,
+        )
+
+
+class Urllib3HttpGitClient(AbstractHttpGitClient):
+    def __init__(
+        self,
+        base_url,
+        dumb=None,
+        pool_manager=None,
+        config=None,
+        username=None,
+        password=None,
+        **kwargs
+    ):
+        self._username = username
+        self._password = password
+
+        if pool_manager is None:
+            self.pool_manager = default_urllib3_manager(config)
+        else:
+            self.pool_manager = pool_manager
+
+        if username is not None:
+            # No escaping needed: ":" is not allowed in username:
+            # https://tools.ietf.org/html/rfc2617#section-2
+            credentials = "%s:%s" % (username, password)
+            import urllib3.util
+
+            basic_auth = urllib3.util.make_headers(basic_auth=credentials)
+            self.pool_manager.headers.update(basic_auth)
+
+        super(Urllib3HttpGitClient, self).__init__(
+            base_url=base_url, dumb=dumb, **kwargs)
+
+    def _get_url(self, path):
+        if not isinstance(path, str):
+            # urllib3.util.url._encode_invalid_chars() converts the path back
+            # to bytes using the utf-8 codec.
+            path = path.decode("utf-8")
+        return urljoin(self._base_url, path).rstrip("/") + "/"
+
+    def _http_request(self, url, headers=None, data=None, allow_compression=False):
+        req_headers = self.pool_manager.headers.copy()
+        if headers is not None:
+            req_headers.update(headers)
+        req_headers["Pragma"] = "no-cache"
+        if allow_compression:
+            req_headers["Accept-Encoding"] = "gzip"
+        else:
+            req_headers["Accept-Encoding"] = "identity"
+
+        if data is None:
+            resp = self.pool_manager.request("GET", url, headers=req_headers)
+        else:
+            resp = self.pool_manager.request(
+                "POST", url, headers=req_headers, body=data
+            )
+
+        if resp.status == 404:
+            raise NotGitRepository()
+        if resp.status == 401:
+            raise HTTPUnauthorized(resp.getheader("WWW-Authenticate"), url)
+        if resp.status == 407:
+            raise HTTPProxyUnauthorized(resp.getheader("Proxy-Authenticate"), url)
+        if resp.status != 200:
+            raise GitProtocolError(
+                "unexpected http resp %d for %s" % (resp.status, url)
+            )
+
+        # TODO: Optimization available by adding `preload_content=False` to the
+        # request and just passing the `read` method on instead of going via
+        # `BytesIO`, if we can guarantee that the entire response is consumed
+        # before issuing the next to still allow for connection reuse from the
+        # pool.
+        read = BytesIO(resp.data).read
+
+        resp.content_type = resp.getheader("Content-Type")
+        # Check if geturl() is available (urllib3 version >= 1.23)
+        try:
+            resp_url = resp.geturl()
+        except AttributeError:
+            # get_redirect_location() is available for urllib3 >= 1.1
+            resp.redirect_location = resp.get_redirect_location()
+        else:
+            resp.redirect_location = resp_url if resp_url != url else ""
+        return resp, read
+
+
+HttpGitClient = Urllib3HttpGitClient
 
 
 def get_transport_and_path_from_url(url, config=None, **kwargs):

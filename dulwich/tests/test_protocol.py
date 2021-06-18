@@ -211,10 +211,12 @@ class CapabilitiesTestCase(TestCase):
     def test_caps(self):
         self.assertEqual((b"bla", [b"la"]), extract_capabilities(b"bla\0la"))
         self.assertEqual((b"bla", [b"la"]), extract_capabilities(b"bla\0la\n"))
-        self.assertEqual((b"bla", [b"la", b"la"]), extract_capabilities(b"bla\0la la"))
+        self.assertEqual((b"bla", [b"la", b"la"]),
+                         extract_capabilities(b"bla\0la la"))
 
     def test_plain_want_line(self):
-        self.assertEqual((b"want bla", []), extract_want_line_capabilities(b"want bla"))
+        self.assertEqual(
+            (b"want bla", []), extract_want_line_capabilities(b"want bla"))
 
     def test_caps_want_line(self):
         self.assertEqual(

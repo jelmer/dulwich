@@ -57,7 +57,12 @@ class BlackboxTestCase(TestCase):
 
     # TODO(jelmer): Include more possible binary paths.
     bin_directories = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin")),
+        os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "bin")),
         "/usr/bin",
         "/usr/local/bin",
     ]

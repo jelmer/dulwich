@@ -246,15 +246,18 @@ class SwiftConnector(object):
         self.conf = conf
         self.auth_ver = self.conf.get("swift", "auth_ver")
         if self.auth_ver not in ["1", "2"]:
-            raise NotImplementedError("Wrong authentication version use either 1 or 2")
+            raise NotImplementedError(
+                "Wrong authentication version use either 1 or 2")
         self.auth_url = self.conf.get("swift", "auth_url")
         self.user = self.conf.get("swift", "username")
         self.password = self.conf.get("swift", "password")
         self.concurrency = self.conf.getint("swift", "concurrency") or 10
         self.http_timeout = self.conf.getint("swift", "http_timeout") or 20
-        self.http_pool_length = self.conf.getint("swift", "http_pool_length") or 10
+        self.http_pool_length = self.conf.getint(
+            "swift", "http_pool_length") or 10
         self.region_name = self.conf.get("swift", "region_name") or "RegionOne"
-        self.endpoint_type = self.conf.get("swift", "endpoint_type") or "internalURL"
+        self.endpoint_type = self.conf.get(
+            "swift", "endpoint_type") or "internalURL"
         self.cache_length = self.conf.getint("swift", "cache_length") or 20
         self.chunk_length = self.conf.getint("swift", "chunk_length") or 12228
         self.root = root
@@ -325,7 +328,8 @@ class SwiftConnector(object):
         path = urlparse.urlparse(self.auth_url).path
         if not path.endswith("tokens"):
             path = posixpath.join(path, "tokens")
-        ret = auth_httpclient.request("POST", path, body=auth_json, headers=headers)
+        ret = auth_httpclient.request(
+            "POST", path, body=auth_json, headers=headers)
 
         if ret.status_code < 200 or ret.status_code >= 300:
             raise SwiftException(
@@ -341,10 +345,10 @@ class SwiftConnector(object):
         token = auth_ret_json["access"]["token"]["id"]
         catalogs = auth_ret_json["access"]["serviceCatalog"]
         object_store = [
-            o_store for o_store in catalogs if o_store["type"] == "object-store"
-        ][0]
+            o_store for o_store in catalogs if o_store["type"] == "object-store"][0]
         endpoints = object_store["endpoints"]
-        endpoint = [endp for endp in endpoints if endp["region"] == self.region_name][0]
+        endpoint = [endp for endp in endpoints if endp["region"]
+                    == self.region_name][0]
         return endpoint[self.endpoint_type], token
 
     def test_root_exists(self):
@@ -428,7 +432,8 @@ class SwiftConnector(object):
         headers = {"Content-Length": str(len(data))}
 
         def _send():
-            ret = self.httpclient.request("PUT", path, body=data, headers=headers)
+            ret = self.httpclient.request(
+                "PUT", path, body=data, headers=headers)
             return ret
 
         try:
@@ -544,14 +549,14 @@ class SwiftPackReader(object):
         """
         end = self.offset + length
         if self.base_offset + end > self.pack_length:
-            data = self.buff[self.offset :]
+            data = self.buff[self.offset:]
             self.offset = end
             return data
         if end > len(self.buff):
             # Need to read more from swift
             self._read(more=True)
             return self.read(length)
-        data = self.buff[self.offset : end]
+        data = self.buff[self.offset: end]
         self.offset = end
         return data
 
@@ -592,7 +597,8 @@ class SwiftPackData(PackData):
         self._header_size = 12
         headers = self.scon.get_object_stat(self._filename)
         self.pack_length = int(headers["content-length"])
-        pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
+        pack_reader = SwiftPackReader(
+            self.scon, self._filename, self.pack_length)
         (version, self._num_objects) = read_pack_header(pack_reader.read)
         self._offset_cache = LRUSizeCache(
             1024 * 1024 * self.scon.cache_length,
@@ -604,13 +610,15 @@ class SwiftPackData(PackData):
         if offset in self._offset_cache:
             return self._offset_cache[offset]
         assert offset >= self._header_size
-        pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
+        pack_reader = SwiftPackReader(
+            self.scon, self._filename, self.pack_length)
         pack_reader.seek(offset)
         unpacked, _ = unpack_object(pack_reader.read)
         return (unpacked.pack_type_num, unpacked._obj())
 
     def get_stored_checksum(self):
-        pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
+        pack_reader = SwiftPackReader(
+            self.scon, self._filename, self.pack_length)
         return pack_reader.read_checksum()
 
     def close(self):
@@ -631,8 +639,10 @@ class SwiftPack(Pack):
         super(SwiftPack, self).__init__(*args, **kwargs)
         self._pack_info_path = self._basename + ".info"
         self._pack_info = None
-        self._pack_info_load = lambda: load_pack_info(self._pack_info_path, self.scon)
-        self._idx_load = lambda: swift_load_pack_index(self.scon, self._idx_path)
+        self._pack_info_load = lambda: load_pack_info(
+            self._pack_info_path, self.scon)
+        self._idx_load = lambda: swift_load_pack_index(
+            self.scon, self._idx_path)
         self._data_load = lambda: SwiftPackData(self.scon, self._data_path)
 
     @property
@@ -687,7 +697,8 @@ class SwiftObjectStore(PackBasedObjectStore):
                  instance if gevent is enabled
         """
         shas = iter(finder.next, None)
-        return PackInfoObjectStoreIterator(self, shas, finder, self.scon.concurrency)
+        return PackInfoObjectStoreIterator(
+            self, shas, finder, self.scon.concurrency)
 
     def find_missing_objects(self, *args, **kwargs):
         kwargs["concurrency"] = self.scon.concurrency
@@ -781,7 +792,8 @@ class SwiftObjectStore(PackBasedObjectStore):
         f = os.fdopen(fd, "w+b")
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(
+                read_all, read_some, f, delta_iter=indexer)
             copier.verify()
             return self._complete_thin_pack(f, path, copier, indexer)
         finally:
@@ -1065,7 +1077,8 @@ def main(argv=sys.argv):
     }
 
     if len(sys.argv) < 2:
-        print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
+        print("Usage: %s <%s> [OPTIONS...]" %
+              (sys.argv[0], "|".join(commands.keys())))
         sys.exit(1)
 
     cmd = sys.argv[1]

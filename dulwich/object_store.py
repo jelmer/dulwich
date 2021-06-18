@@ -459,7 +459,8 @@ class PackBasedObjectStore(BaseObjectStore):
     @property
     def packs(self):
         """List with pack objects."""
-        return list(self._iter_cached_packs()) + list(self._update_pack_cache())
+        return list(self._iter_cached_packs()) + \
+            list(self._update_pack_cache())
 
     def _iter_alternate_objects(self):
         """Iterate over the SHAs of all the objects in alternate stores."""
@@ -591,13 +592,21 @@ class PackBasedObjectStore(BaseObjectStore):
             __len__.
         Returns: Pack object of the objects written.
         """
-        return self.add_pack_data(*pack_objects_to_data(objects), progress=progress)
+        return self.add_pack_data(
+            *pack_objects_to_data(objects),
+            progress=progress)
 
 
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
-    def __init__(self, path, loose_compression_level=-1, pack_compression_level=-1):
+    def __init__(
+            self,
+            path,
+            loose_compression_level=-
+            1,
+            pack_compression_level=-
+            1):
         """Open an object store.
 
         Args:
@@ -844,7 +853,8 @@ class DiskObjectStore(PackBasedObjectStore):
         with os.fdopen(fd, "w+b") as f:
             os.chmod(path, PACK_MODE)
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(
+                read_all, read_some, f, delta_iter=indexer)
             copier.verify()
             return self._complete_thin_pack(f, path, copier, indexer)
 
@@ -925,8 +935,8 @@ class DiskObjectStore(PackBasedObjectStore):
             return  # Already there, no need to write again
         with GitFile(path, "wb", mask=PACK_MODE) as f:
             f.write(
-                obj.as_legacy_object(compression_level=self.loose_compression_level)
-            )
+                obj.as_legacy_object(
+                    compression_level=self.loose_compression_level))
 
     @classmethod
     def init(cls, path):
@@ -1064,7 +1074,8 @@ class MemoryObjectStore(BaseObjectStore):
         f, commit, abort = self.add_pack()
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(
+                read_all, read_some, f, delta_iter=indexer)
             copier.verify()
             self._complete_thin_pack(f, indexer)
         except BaseException:
@@ -1315,7 +1326,8 @@ class MissingObjectFinder(object):
         self._tagged = get_tagged and get_tagged() or {}
 
     def add_todo(self, entries):
-        self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
+        self.objects_to_send.update(
+            [e for e in entries if not e[0] in self.sha_done])
 
     def next(self):
         while True:
@@ -1341,7 +1353,8 @@ class MissingObjectFinder(object):
         if sha in self._tagged:
             self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
-        self.progress(("counting objects: %d\r" % len(self.sha_done)).encode("ascii"))
+        self.progress(("counting objects: %d\r" %
+                       len(self.sha_done)).encode("ascii"))
         return (sha, name)
 
     __next__ = next
@@ -1443,7 +1456,9 @@ def commit_tree_changes(object_store, tree, changes):
             else:
                 tree[path] = (new_mode, new_sha)
         else:
-            nested_changes.setdefault(dirname, []).append((subpath, new_mode, new_sha))
+            nested_changes.setdefault(
+                dirname, []).append(
+                (subpath, new_mode, new_sha))
     for name, subchanges in nested_changes.items():
         try:
             orig_subtree = object_store[tree[name][1]]

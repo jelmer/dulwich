@@ -476,7 +476,7 @@ class cmd_status(Command):
             for name in status.unstaged:
                 sys.stdout.write("\t%s\n" % name.decode(
                     sys.getfilesystemencoding()
-                    )
+                )
                 )
             sys.stdout.write("\n")
         if status.untracked:

@@ -110,8 +110,8 @@ class ReadIgnorePatterns(TestCase):
 
 \\#not a comment
 !negative
-with trailing whitespace 
-with escaped trailing whitespace\\ 
+with trailing whitespace
+with escaped trailing whitespace\\
 """
         )  # noqa: W291
         self.assertEqual(
@@ -162,7 +162,8 @@ class IgnoreFilterTests(TestCase):
         filter = IgnoreFilter([b"a.c", b"b.c", b"!c.c"])
         self.assertFalse(filter.is_ignored(b"c.c"))
         self.assertIs(None, filter.is_ignored(b"d.c"))
-        self.assertEqual([Pattern(b"!c.c")], list(filter.find_matching(b"c.c")))
+        self.assertEqual([Pattern(b"!c.c")],
+                         list(filter.find_matching(b"c.c")))
         self.assertEqual([], list(filter.find_matching(b"d.c")))
 
     def test_include_exclude_include(self):
@@ -239,7 +240,7 @@ class IgnoreFilterManagerTests(TestCase):
 
         with open(os.path.join(repo.path, 'foo', 'bar'), 'wb') as f:
             f.write(b'IGNORED')
-        
+
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored('foo/bar'))
 

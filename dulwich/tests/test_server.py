@@ -153,7 +153,10 @@ class HandlerTestCase(TestCase):
         self.assertSucceeds(set_caps, [b"cap2", b"ignoreme"])
 
     def test_has_capability(self):
-        self.assertRaises(GitProtocolError, self._handler.has_capability, b"cap")
+        self.assertRaises(
+            GitProtocolError,
+            self._handler.has_capability,
+            b"cap")
         caps = self._handler.capabilities()
         self._handler.set_client_capabilities(caps)
         for cap in caps:
@@ -175,8 +178,12 @@ class UploadPackHandlerTestCase(TestCase):
         self._handler.set_client_capabilities(caps)
         self._handler.progress(b"first message")
         self._handler.progress(b"second message")
-        self.assertEqual(b"first message", self._handler.proto.get_received_line(2))
-        self.assertEqual(b"second message", self._handler.proto.get_received_line(2))
+        self.assertEqual(
+            b"first message",
+            self._handler.proto.get_received_line(2))
+        self.assertEqual(
+            b"second message",
+            self._handler.proto.get_received_line(2))
         self.assertRaises(IndexError, self._handler.proto.get_received_line, 2)
 
     def test_no_progress(self):
@@ -232,7 +239,8 @@ class UploadPackHandlerTestCase(TestCase):
         )
         self._handler.handle()
         # The server should always send a pack, even if it's empty.
-        self.assertTrue(self._handler.proto.get_received_line(1).startswith(b"PACK"))
+        self.assertTrue(
+            self._handler.proto.get_received_line(1).startswith(b"PACK"))
 
     def test_nothing_to_do_no_wants(self):
         # Don't send a pack if the client didn't ask for anything.
@@ -451,7 +459,11 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self.assertEqual(
             (b"want", TWO), _split_proto_line(b"want " + TWO + b"\n", allowed)
         )
-        self.assertRaises(GitProtocolError, _split_proto_line, b"want xxxx\n", allowed)
+        self.assertRaises(
+            GitProtocolError,
+            _split_proto_line,
+            b"want xxxx\n",
+            allowed)
         self.assertRaises(
             UnexpectedCommandError,
             _split_proto_line,
@@ -465,7 +477,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
             allowed,
         )
         self.assertRaises(GitProtocolError, _split_proto_line, b"bar", allowed)
-        self.assertEqual((b"done", None), _split_proto_line(b"done\n", allowed))
+        self.assertEqual(
+            (b"done", None), _split_proto_line(
+                b"done\n", allowed))
         self.assertEqual((None, None), _split_proto_line(b"", allowed))
 
     def test_determine_wants(self):
@@ -493,16 +507,26 @@ class ProtocolGraphWalkerTestCase(TestCase):
         self._walker.advertise_refs = False
 
         self._walker.proto.set_output([b"want " + FOUR + b" multi_ack", None])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertRaises(
+            GitProtocolError,
+            self._walker.determine_wants,
+            heads)
 
         self._walker.proto.set_output([None])
         self.assertEqual([], self._walker.determine_wants(heads))
 
-        self._walker.proto.set_output([b"want " + ONE + b" multi_ack", b"foo", None])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self._walker.proto.set_output(
+            [b"want " + ONE + b" multi_ack", b"foo", None])
+        self.assertRaises(
+            GitProtocolError,
+            self._walker.determine_wants,
+            heads)
 
         self._walker.proto.set_output([b"want " + FOUR + b" multi_ack", None])
-        self.assertRaises(GitProtocolError, self._walker.determine_wants, heads)
+        self.assertRaises(
+            GitProtocolError,
+            self._walker.determine_wants,
+            heads)
 
     def test_determine_wants_advertisement(self):
         self._walker.proto.set_output([None])
@@ -627,7 +651,8 @@ class TestProtocolGraphWalker(object):
             return
         # Whether or not PACK is sent after is determined by this, so
         # record this value.
-        self.pack_sent = self._impl.handle_done(self.done_required, self.done_received)
+        self.pack_sent = self._impl.handle_done(
+            self.done_required, self.done_received)
         return self.pack_sent
 
     def notify_done(self):
@@ -1097,7 +1122,9 @@ class FileSystemBackendTests(TestCase):
     def test_bad_repo_path(self):
         backend = FileSystemBackend()
 
-        self.assertRaises(NotGitRepository, lambda: backend.open_repository("/ups"))
+        self.assertRaises(
+            NotGitRepository,
+            lambda: backend.open_repository("/ups"))
 
 
 class DictBackendTests(TestCase):
@@ -1116,7 +1143,9 @@ class DictBackendTests(TestCase):
         repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b"/": repo})
 
-        self.assertRaises(NotGitRepository, lambda: backend.open_repository("/ups"))
+        self.assertRaises(
+            NotGitRepository,
+            lambda: backend.open_repository("/ups"))
 
 
 class ServeCommandTests(TestCase):

@@ -80,7 +80,8 @@ class WalkerTest(TestCase):
         attrs = kwargs.pop("attrs", {})
         for i, t in enumerate(times):
             attrs.setdefault(i + 1, {})["commit_time"] = t
-        return build_commit_graph(self.store, commit_spec, attrs=attrs, **kwargs)
+        return build_commit_graph(
+            self.store, commit_spec, attrs=attrs, **kwargs)
 
     def make_linear_commits(self, num_commits, **kwargs):
         commit_spec = []
@@ -186,7 +187,8 @@ class WalkerTest(TestCase):
 
     def test_reverse_after_max_entries(self):
         c1, c2, c3 = self.make_linear_commits(3)
-        self.assertWalkYields([c1, c2, c3], [c3.id], max_entries=3, reverse=True)
+        self.assertWalkYields([c1, c2, c3], [c3.id],
+                              max_entries=3, reverse=True)
         self.assertWalkYields([c2, c3], [c3.id], max_entries=2, reverse=True)
         self.assertWalkYields([c3], [c3.id], max_entries=1, reverse=True)
 
@@ -269,9 +271,9 @@ class WalkerTest(TestCase):
 
         # All changes are included, not just for requested paths.
         changes = [
-            TreeChange(CHANGE_MODIFY, (b"a", F, blob_a1.id), (b"a", F, blob_a3.id)),
-            TreeChange(CHANGE_MODIFY, (b"x/b", F, blob_b2.id), (b"x/b", F, blob_b3.id)),
-        ]
+            TreeChange(
+                CHANGE_MODIFY, (b"a", F, blob_a1.id), (b"a", F, blob_a3.id)), TreeChange(
+                CHANGE_MODIFY, (b"x/b", F, blob_b2.id), (b"x/b", F, blob_b3.id)), ]
         self.assertWalkYields(
             [TestWalkEntry(c3, changes)], [c3.id], max_entries=1, paths=[b"a"]
         )
@@ -425,7 +427,8 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2], [c3.id], since=50, until=150)
 
     def test_since_over_scan(self):
-        commits = self.make_linear_commits(11, times=[9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9])
+        commits = self.make_linear_commits(
+            11, times=[9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9])
         c8, _, c10, c11 = commits[-4:]
         del self.store[commits[0].id]
         # c9 is older than we want to walk, but is out of order with its
@@ -508,7 +511,8 @@ class WalkEntryTest(TestCase):
         attrs = kwargs.pop("attrs", {})
         for i, t in enumerate(times):
             attrs.setdefault(i + 1, {})["commit_time"] = t
-        return build_commit_graph(self.store, commit_spec, attrs=attrs, **kwargs)
+        return build_commit_graph(
+            self.store, commit_spec, attrs=attrs, **kwargs)
 
     def make_linear_commits(self, num_commits, **kwargs):
         commit_spec = []

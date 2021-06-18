@@ -39,4 +39,7 @@ class LFSTests(TestCase):
             self.assertEqual(b"ab", f.read())
 
     def test_missing(self):
-        self.assertRaises(KeyError, self.lfs.open_object, "abcdeabcdeabcdeabcde")
+        self.assertRaises(
+            KeyError,
+            self.lfs.open_object,
+            "abcdeabcdeabcdeabcde")

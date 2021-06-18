@@ -63,7 +63,8 @@ class GitServerTestCase(ServerTests, CompatTestCase):
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
-        dul_server = TCPGitServer(backend, b"localhost", 0, handlers=self._handlers())
+        dul_server = TCPGitServer(
+            backend, b"localhost", 0, handlers=self._handlers())
         self._check_server(dul_server)
         self.addCleanup(dul_server.shutdown)
         self.addCleanup(dul_server.server_close)

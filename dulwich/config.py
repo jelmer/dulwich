@@ -202,7 +202,8 @@ class ConfigDict(Config, MutableMapping):
         return "%s(%r)" % (self.__class__.__name__, self._values)
 
     def __eq__(self, other):
-        return isinstance(other, self.__class__) and other._values == self._values
+        return isinstance(
+            other, self.__class__) and other._values == self._values
 
     def __getitem__(self, key):
         return self._values.__getitem__(key)
@@ -309,8 +310,8 @@ def _parse_string(value):
                 v = _ESCAPE_TABLE[value[i]]
             except IndexError:
                 raise ValueError(
-                    "escape character in %r at %d before end of string" % (value, i)
-                )
+                    "escape character in %r at %d before end of string" %
+                    (value, i))
             except KeyError:
                 raise ValueError(
                     "escape character followed by unknown character "
@@ -351,7 +352,7 @@ def _escape_value(value):
 
 def _check_variable_name(name):
     for i in range(len(name)):
-        c = name[i : i + 1]
+        c = name[i: i + 1]
         if not c.isalnum() and c != b"-":
             return False
     return True
@@ -359,7 +360,7 @@ def _check_variable_name(name):
 
 def _check_section_name(name):
     for i in range(len(name)):
-        c = name[i : i + 1]
+        c = name[i: i + 1]
         if not c.isalnum() and c not in (b"-", b"."):
             return False
     return True
@@ -406,18 +407,20 @@ class ConfigFile(ConfigDict):
                     except ValueError:
                         raise ValueError("expected trailing ]")
                     pts = line[1:last].split(b" ", 1)
-                    line = line[last + 1 :]
+                    line = line[last + 1:]
                     if len(pts) == 2:
                         if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
                             raise ValueError("Invalid subsection %r" % pts[1])
                         else:
                             pts[1] = pts[1][1:-1]
                         if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" % pts[0])
+                            raise ValueError(
+                                "invalid section name %r" % pts[0])
                         section = (pts[0], pts[1])
                     else:
                         if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" % pts[0])
+                            raise ValueError(
+                                "invalid section name %r" % pts[0])
                         pts = pts[0].split(b".", 1)
                         if len(pts) == 2:
                             section = (pts[0], pts[1])
@@ -480,7 +483,12 @@ class ConfigFile(ConfigDict):
             if subsection_name is None:
                 f.write(b"[" + section_name + b"]\n")
             else:
-                f.write(b"[" + section_name + b' "' + subsection_name + b'"]\n')
+                f.write(
+                    b"[" +
+                    section_name +
+                    b' "' +
+                    subsection_name +
+                    b'"]\n')
             for key, value in values.items():
                 if value is True:
                     value = b"true"

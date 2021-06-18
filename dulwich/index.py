@@ -253,7 +253,10 @@ def read_index_dict(f):
     return ret
 
 
-def write_index(f: BinaryIO, entries: List[Tuple[bytes, IndexEntry]], version: Optional[int] = None):
+def write_index(f: BinaryIO,
+                entries: List[Tuple[bytes,
+                                    IndexEntry]],
+                version: Optional[int] = None):
     """Write an index file.
 
     Args:
@@ -952,7 +955,11 @@ def iter_fresh_blobs(index, root_path):
             yield entry
 
 
-def iter_fresh_objects(paths, root_path, include_deleted=False, object_store=None):
+def iter_fresh_objects(
+        paths,
+        root_path,
+        include_deleted=False,
+        object_store=None):
     """Iterate over versions of objecs on disk referenced by index.
 
     Args:
@@ -962,7 +969,8 @@ def iter_fresh_objects(paths, root_path, include_deleted=False, object_store=Non
       object_store: Optional object store to report new items to
     Returns: Iterator over path, sha, mode
     """
-    for path, entry in iter_fresh_entries(paths, root_path, object_store=object_store):
+    for path, entry in iter_fresh_entries(
+            paths, root_path, object_store=object_store):
         if entry is None:
             if include_deleted:
                 yield path, None, None

@@ -64,7 +64,7 @@ def git_version(git_path=_DEFAULT_GIT):
     if not output.startswith(version_prefix):
         return None
 
-    parts = output[len(version_prefix) :].split(b".")
+    parts = output[len(version_prefix):].split(b".")
     nums = []
     for part in parts:
         try:
@@ -92,8 +92,8 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     found_version = git_version(git_path=git_path)
     if found_version is None:
         raise SkipTest(
-            "Test requires git >= %s, but c git not found" % (required_version,)
-        )
+            "Test requires git >= %s, but c git not found" %
+            (required_version,))
 
     if len(required_version) > _VERSION_LEN:
         raise ValueError(
@@ -110,13 +110,16 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
         required_version = ".".join(map(str, required_version))
         found_version = ".".join(map(str, found_version))
         raise SkipTest(
-            "Test requires git >= %s, found %s" % (required_version, found_version)
-        )
+            "Test requires git >= %s, found %s" %
+            (required_version, found_version))
 
 
 def run_git(
-    args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False, **popen_kwargs
-):
+        args,
+        git_path=_DEFAULT_GIT,
+        input=None,
+        capture_stdout=False,
+        **popen_kwargs):
     """Run a git command.
 
     Input is piped from the input parameter and output is sent to the standard
@@ -154,8 +157,7 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     if "stderr" not in popen_kwargs:
         popen_kwargs["stderr"] = subprocess.STDOUT
     returncode, stdout = run_git(
-        args, git_path=git_path, input=input, capture_stdout=True, **popen_kwargs
-    )
+        args, git_path=git_path, input=input, capture_stdout=True, **popen_kwargs)
     if returncode != 0:
         raise AssertionError(
             "git with args %r failed with %d: %r" % (args, returncode, stdout)
@@ -179,7 +181,10 @@ def import_repo_to_dir(name):
     temp_repo_dir = os.path.join(temp_dir, name)
     export_file = open(export_path, "rb")
     run_git_or_fail(["init", "--quiet", "--bare", temp_repo_dir])
-    run_git_or_fail(["fast-import"], input=export_file.read(), cwd=temp_repo_dir)
+    run_git_or_fail(
+        ["fast-import"],
+        input=export_file.read(),
+        cwd=temp_repo_dir)
     export_file.close()
     return temp_repo_dir
 

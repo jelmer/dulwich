@@ -202,9 +202,8 @@ class GitImportProcessor(processor.ImportProcessor):
             else:
                 raise Exception("Command %s not supported" % filecmd.name)
         commit.tree = commit_tree(
-            self.repo.object_store,
-            ((path, hexsha, mode) for (path, (mode, hexsha)) in self._contents.items()),
-        )
+            self.repo.object_store, ((path, hexsha, mode) for (
+                path, (mode, hexsha)) in self._contents.items()), )
         if self.last_commit != ZERO_SHA:
             commit.parents.append(self.last_commit)
         for merge in cmd.merges:

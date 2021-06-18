@@ -191,7 +191,10 @@ class ObjectStoreTests(object):
             (0o100644, 0o100644),
             (blob_a1.id, blob_a2.id),
         )
-        self.assertEqual([change_a], list(self.store.tree_changes(tree1_id, tree2_id)))
+        self.assertEqual(
+            [change_a], list(
+                self.store.tree_changes(
+                    tree1_id, tree2_id)))
         self.assertEqual(
             [
                 change_a,
@@ -363,7 +366,8 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         b5 = make_object(Blob, data=b"and more data")
         b6 = make_object(Blob, data=b"and some more data")
         self.store.add_objects([(b5, None), (b6, None)])
-        self.assertEqual({b1.id, b2.id, b3.id, b4.id, b5.id, b6.id}, set(self.store))
+        self.assertEqual({b1.id, b2.id, b3.id, b4.id,
+                         b5.id, b6.id}, set(self.store))
         self.assertEqual(2, len(self.store.packs))
         self.assertEqual(6, self.store.repack())
         self.assertEqual(1, len(self.store.packs))
@@ -403,7 +407,8 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_loose_compression_level(self):
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
-        alternate_store = DiskObjectStore(alternate_dir, loose_compression_level=6)
+        alternate_store = DiskObjectStore(
+            alternate_dir, loose_compression_level=6)
         b2 = make_object(Blob, data=b"yummy data")
         alternate_store.add_object(b2)
 
@@ -475,11 +480,13 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual(str(e), expected_error_msg)
 
         # this does not change iteration on loose objects though
-        self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
+        self.assertEqual([testobject.id], list(
+            self.store._iter_loose_objects()))
 
     def test_tempfile_in_loose_store(self):
         self.store.add_object(testobject)
-        self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
+        self.assertEqual([testobject.id], list(
+            self.store._iter_loose_objects()))
 
         # add temporary files to the loose store
         for i in range(256):
@@ -489,7 +496,8 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             fd, n = tempfile.mkstemp(prefix="tmp_obj_", dir=dirname)
             os.close(fd)
 
-        self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
+        self.assertEqual([testobject.id], list(
+            self.store._iter_loose_objects()))
 
     def test_add_alternate_path(self):
         store = DiskObjectStore(self.store_dir)
@@ -509,7 +517,10 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         alternate_store.add_object(b2)
         store = DiskObjectStore(self.store_dir)
         self.assertRaises(KeyError, store.__getitem__, b2.id)
-        store.add_alternate_path(os.path.relpath(alternate_dir, self.store_dir))
+        store.add_alternate_path(
+            os.path.relpath(
+                alternate_dir,
+                self.store_dir))
         self.assertEqual(list(alternate_store), list(store.alternates[0]))
         self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
@@ -548,7 +559,8 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             with o.add_thin_pack(f.read, None) as pack:
                 packed_blob_sha = sha_to_hex(entries[0][3])
                 pack.check_length_and_checksum()
-                self.assertEqual(sorted([blob.id, packed_blob_sha]), list(pack))
+                self.assertEqual(
+                    sorted([blob.id, packed_blob_sha]), list(pack))
                 self.assertTrue(o.contains_packed(packed_blob_sha))
                 self.assertTrue(o.contains_packed(blob.id))
                 self.assertEqual(
@@ -617,9 +629,8 @@ class TreeLookupPathTests(TestCase):
 
 class ObjectStoreGraphWalkerTests(TestCase):
     def get_walker(self, heads, parent_map):
-        new_parent_map = dict(
-            [(k * 40, [(p * 40) for p in ps]) for (k, ps) in parent_map.items()]
-        )
+        new_parent_map = dict([(k * 40, [(p * 40) for p in ps])
+                               for (k, ps) in parent_map.items()])
         return ObjectStoreGraphWalker(
             [x * 40 for x in heads], new_parent_map.__getitem__
         )
@@ -691,7 +702,8 @@ class ObjectStoreGraphWalkerTests(TestCase):
         walk.append(next(gw))
         self.assertIs(None, next(gw))
 
-        self.assertEqual([b"a" * 40, b"b" * 40, b"c" * 40, b"d" * 40], sorted(walk))
+        self.assertEqual([b"a" * 40, b"b" * 40, b"c" *
+                         40, b"d" * 40], sorted(walk))
         self.assertLess(walk.index(b"a" * 40), walk.index(b"c" * 40))
         self.assertLess(walk.index(b"b" * 40), walk.index(b"d" * 40))
 
@@ -768,9 +780,9 @@ class CommitTreeChangesTests(TestCase):
         )
         f_tree = self.store[e_tree[b"f"][1]]
         self.assertEqual(
-            f_tree.items(),
-            [TreeEntry(path=b"d", mode=stat.S_IFREG | 0o100644, sha=blob_d.id)],
-        )
+            f_tree.items(), [
+                TreeEntry(
+                    path=b"d", mode=stat.S_IFREG | 0o100644, sha=blob_d.id)], )
 
     def test_delete_blob(self):
         new_tree = commit_tree_changes(

@@ -66,7 +66,10 @@ class GitVersionTests(TestCase):
             self.fail()
 
     def assertRequireFails(self, required_version):
-        self.assertRaises(SkipTest, utils.require_git_version, required_version)
+        self.assertRaises(
+            SkipTest,
+            utils.require_git_version,
+            required_version)
 
     def test_require_git_version(self):
         try:
@@ -77,7 +80,8 @@ class GitVersionTests(TestCase):
             self.assertRequireSucceeds((1, 6, 5, 99))
             self.assertRequireFails((1, 7, 0))
             self.assertRequireFails((1, 7, 0, 2))
-            self.assertRaises(ValueError, utils.require_git_version, (1, 6, 6, 0, 0))
+            self.assertRaises(
+                ValueError, utils.require_git_version, (1, 6, 6, 0, 0))
 
             self._version_str = b"git version 1.7.0.2"
             self.assertRequireSucceeds((1, 6, 6))

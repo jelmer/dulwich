@@ -223,7 +223,7 @@ class FakeSwiftConnector(object):
                     r = -int(r)
                     return self.store[name][r:]
                 else:
-                    return self.store[name][int(l) : int(r)]
+                    return self.store[name][int(l): int(r)]
             except KeyError:
                 return None
 
@@ -247,7 +247,10 @@ class FakeSwiftConnector(object):
 class TestSwiftRepo(TestCase):
     def setUp(self):
         super(TestSwiftRepo, self).setUp()
-        self.conf = swift.load_conf(file=StringIO(config_file % def_config_file))
+        self.conf = swift.load_conf(
+            file=StringIO(
+                config_file %
+                def_config_file))
 
     def test_init(self):
         store = {"fakerepo/objects/pack": ""}
@@ -263,7 +266,11 @@ class TestSwiftRepo(TestCase):
             "dulwich.contrib.swift.SwiftConnector",
             new_callable=create_swift_connector,
         ):
-            self.assertRaises(Exception, swift.SwiftRepo, "fakerepo", self.conf)
+            self.assertRaises(
+                Exception,
+                swift.SwiftRepo,
+                "fakerepo",
+                self.conf)
 
     def test_init_bad_data(self):
         store = {"fakerepo/.git/objects/pack": ""}
@@ -272,7 +279,11 @@ class TestSwiftRepo(TestCase):
             new_callable=create_swift_connector,
             store=store,
         ):
-            self.assertRaises(Exception, swift.SwiftRepo, "fakerepo", self.conf)
+            self.assertRaises(
+                Exception,
+                swift.SwiftRepo,
+                "fakerepo",
+                self.conf)
 
     def test_put_named_file(self):
         store = {"fakerepo/objects/pack": ""}
@@ -308,7 +319,10 @@ class TestSwiftInfoRefsContainer(TestCase):
             b"cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
         )
         self.store = {"fakerepo/info/refs": content}
-        self.conf = swift.load_conf(file=StringIO(config_file % def_config_file))
+        self.conf = swift.load_conf(
+            file=StringIO(
+                config_file %
+                def_config_file))
         self.fsc = FakeSwiftConnector("fakerepo", conf=self.conf)
         self.object_store = {}
 
@@ -344,7 +358,10 @@ class TestSwiftInfoRefsContainer(TestCase):
 class TestSwiftConnector(TestCase):
     def setUp(self):
         super(TestSwiftConnector, self).setUp()
-        self.conf = swift.load_conf(file=StringIO(config_file % def_config_file))
+        self.conf = swift.load_conf(
+            file=StringIO(
+                config_file %
+                def_config_file))
         with patch("geventhttpclient.HTTPClient.request", fake_auth_request_v1):
             self.conn = swift.SwiftConnector("fakerepo", conf=self.conf)
 
@@ -426,7 +443,8 @@ class TestSwiftConnector(TestCase):
             "geventhttpclient.HTTPClient.request",
             lambda *args: Response(headers={"content-length": "10"}),
         ):
-            self.assertEqual(self.conn.get_object_stat("a")["content-length"], "10")
+            self.assertEqual(self.conn.get_object_stat("a")
+                             ["content-length"], "10")
 
     def test_get_object_stat_fails(self):
         with patch(
@@ -440,7 +458,9 @@ class TestSwiftConnector(TestCase):
             "geventhttpclient.HTTPClient.request",
             lambda *args, **kwargs: Response(),
         ):
-            self.assertEqual(self.conn.put_object("a", BytesIO(b"content")), None)
+            self.assertEqual(
+                self.conn.put_object(
+                    "a", BytesIO(b"content")), None)
 
     def test_put_object_fails(self):
         with patch(
@@ -462,7 +482,9 @@ class TestSwiftConnector(TestCase):
             "geventhttpclient.HTTPClient.request",
             lambda *args, **kwargs: Response(content=b"content"),
         ):
-            self.assertEqual(self.conn.get_object("a", range="0-6"), b"content")
+            self.assertEqual(
+                self.conn.get_object(
+                    "a", range="0-6"), b"content")
 
     def test_get_object_fails(self):
         with patch(

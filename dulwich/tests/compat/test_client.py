@@ -124,8 +124,10 @@ class DulwichClientTestBase(object):
     def test_send_pack_from_shallow_clone(self):
         c = self._client()
         server_new_path = os.path.join(self.gitroot, "server_new.export")
-        run_git_or_fail(["config", "http.uploadpack", "true"], cwd=server_new_path)
-        run_git_or_fail(["config", "http.receivepack", "true"], cwd=server_new_path)
+        run_git_or_fail(["config", "http.uploadpack", "true"],
+                        cwd=server_new_path)
+        run_git_or_fail(["config", "http.receivepack",
+                        "true"], cwd=server_new_path)
         remote_path = self._build_path("/server_new.export")
         with repo.Repo(self.dest) as local:
             result = c.fetch(remote_path, local, depth=1)
@@ -144,7 +146,10 @@ class DulwichClientTestBase(object):
                 )
             sendrefs = dict(local.get_refs())
             del sendrefs[b"HEAD"]
-            c.send_pack(remote_path, lambda _: sendrefs, local.generate_pack_data)
+            c.send_pack(
+                remote_path,
+                lambda _: sendrefs,
+                local.generate_pack_data)
         with repo.Repo(server_new_path) as remote:
             self.assertEqual(remote.head(), commit_id)
 
@@ -243,7 +248,8 @@ class DulwichClientTestBase(object):
     def test_fetch_pack_depth(self):
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
-            result = c.fetch(self._build_path("/server_new.export"), dest, depth=1)
+            result = c.fetch(self._build_path(
+                "/server_new.export"), dest, depth=1)
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertEqual(
@@ -336,7 +342,10 @@ class DulwichClientTestBase(object):
 
             c = self._client()
             self.assertEqual(dest.refs[b"refs/heads/abranch"], dummy_commit)
-            c.send_pack(self._build_path("/dest"), lambda _: sendrefs, gen_pack)
+            c.send_pack(
+                self._build_path("/dest"),
+                lambda _: sendrefs,
+                gen_pack)
             self.assertFalse(b"refs/heads/abranch" in dest.refs)
 
     def test_send_new_branch_empty_pack(self):
@@ -351,7 +360,10 @@ class DulwichClientTestBase(object):
 
             c = self._client()
             self.assertEqual(dest.refs[b"refs/heads/abranch"], dummy_commit)
-            c.send_pack(self._build_path("/dest"), lambda _: sendrefs, gen_pack)
+            c.send_pack(
+                self._build_path("/dest"),
+                lambda _: sendrefs,
+                gen_pack)
             self.assertEqual(dummy_commit, dest.refs[b"refs/heads/abranch"])
 
     def test_get_refs(self):
@@ -369,8 +381,8 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.setUp(self)
         if check_for_daemon(limit=1):
             raise SkipTest(
-                "git-daemon was already running on port %s" % protocol.TCP_GIT_PORT
-            )
+                "git-daemon was already running on port %s" %
+                protocol.TCP_GIT_PORT)
         fd, self.pidfile = tempfile.mkstemp(
             prefix="dulwich-test-git-client", suffix=".pid"
         )
@@ -402,7 +414,8 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             pid = int(f.read().strip())
         if sys.platform == "win32":
             PROCESS_TERMINATE = 1
-            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
+            handle = ctypes.windll.kernel32.OpenProcess(
+                PROCESS_TERMINATE, False, pid)
             ctypes.windll.kernel32.TerminateProcess(handle, -1)
             ctypes.windll.kernel32.CloseHandle(handle)
         else:
@@ -518,7 +531,7 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         # find an explicit query string, if present.
         i = rest.rfind("?")
         if i >= 0:
-            rest, query = rest[:i], rest[i + 1 :]
+            rest, query = rest[:i], rest[i + 1:]
         else:
             query = ""
 
@@ -594,8 +607,12 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             env.setdefault(k, "")
 
         self.wfile.write(b"HTTP/1.1 200 Script output follows\r\n")
-        self.wfile.write(("Server: %s\r\n" % self.server.server_name).encode("ascii"))
-        self.wfile.write(("Date: %s\r\n" % self.date_time_string()).encode("ascii"))
+        self.wfile.write(
+            ("Server: %s\r\n" %
+             self.server.server_name).encode("ascii"))
+        self.wfile.write(
+            ("Date: %s\r\n" %
+             self.date_time_string()).encode("ascii"))
 
         decoded_query = query.replace("+", " ")
 
@@ -615,7 +632,8 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         args = ["http-backend"]
         if "=" not in decoded_query:
             args.append(decoded_query)
-        stdout = run_git_or_fail(args, input=data, env=env, stderr=subprocess.PIPE)
+        stdout = run_git_or_fail(
+            args, input=data, env=env, stderr=subprocess.PIPE)
         self.wfile.write(stdout)
 
 
@@ -624,7 +642,8 @@ class HTTPGitServer(http.server.HTTPServer):
     allow_reuse_address = True
 
     def __init__(self, server_address, root_path):
-        http.server.HTTPServer.__init__(self, server_address, GitHTTPRequestHandler)
+        http.server.HTTPServer.__init__(
+            self, server_address, GitHTTPRequestHandler)
         self.root_path = root_path
         self.server_name = "localhost"
 

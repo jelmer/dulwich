@@ -56,7 +56,12 @@ class ArchiveTests(TestCase):
         t1 = Tree()
         t1.add(b"somename", 0o100644, b1.id)
         store.add_object(t1)
-        stream = b"".join(tar_stream(store, t1, *tar_stream_args, **tar_stream_kwargs))
+        stream = b"".join(
+            tar_stream(
+                store,
+                t1,
+                *tar_stream_args,
+                **tar_stream_kwargs))
         return BytesIO(stream)
 
     def test_simple(self):

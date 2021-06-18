@@ -37,7 +37,13 @@ from dulwich.objects import (
 FIRST_FEW_BYTES = 8000
 
 
-def write_commit_patch(f, commit, contents, progress, version=None, encoding=None):
+def write_commit_patch(
+        f,
+        commit,
+        contents,
+        progress,
+        version=None,
+        encoding=None):
     """Write a individual file patch.
 
     Args:
@@ -59,8 +65,9 @@ def write_commit_patch(f, commit, contents, progress, version=None, encoding=Non
     )
     f.write(b"From: " + commit.author + b"\n")
     f.write(
-        b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n"
-    )
+        b"Date: " +
+        time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) +
+        b"\n")
     f.write(
         ("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding)
         + commit.message
@@ -223,12 +230,14 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
         else:
             return content.splitlines()
 
-    f.writelines(
-        gen_diff_header((old_path, new_path), (old_mode, new_mode), (old_id, new_id))
-    )
+    f.writelines(gen_diff_header((old_path, new_path),
+                                 (old_mode, new_mode), (old_id, new_id)))
     old_content = content(old_mode, old_id)
     new_content = content(new_mode, new_id)
-    if not diff_binary and (is_binary(old_content.data) or is_binary(new_content.data)):
+    if not diff_binary and (
+        is_binary(
+            old_content.data) or is_binary(
+            new_content.data)):
         binary_diff = (
             b"Binary files "
             + patched_old_path
@@ -313,8 +322,11 @@ def write_blob_diff(f, old_file, new_file):
     old_contents = lines(old_blob)
     new_contents = lines(new_blob)
     f.writelines(
-        unified_diff(old_contents, new_contents, patched_old_path, patched_new_path)
-    )
+        unified_diff(
+            old_contents,
+            new_contents,
+            patched_old_path,
+            patched_new_path))
 
 
 def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
@@ -349,7 +361,12 @@ def git_am_patch_split(f, encoding=None):
     encoding = encoding or getattr(f, "encoding", "ascii")
     encoding = encoding or "ascii"
     contents = f.read()
-    if isinstance(contents, bytes) and getattr(email.parser, "BytesParser", None):
+    if isinstance(
+        contents,
+        bytes) and getattr(
+        email.parser,
+        "BytesParser",
+            None):
         parser = email.parser.BytesParser()
         msg = parser.parsebytes(contents)
     else:
@@ -375,7 +392,7 @@ def parse_patch_message(msg, encoding=None):
         subject = msg["subject"]
     else:
         close = msg["subject"].index("] ", patch_tag_start)
-        subject = msg["subject"][close + 2 :]
+        subject = msg["subject"][close + 2:]
     c.message = (subject.replace("\n", "") + "\n").encode(encoding)
     first = True
 
@@ -388,7 +405,7 @@ def parse_patch_message(msg, encoding=None):
             break
         if first:
             if line.startswith(b"From: "):
-                c.author = line[len(b"From: ") :].rstrip()
+                c.author = line[len(b"From: "):].rstrip()
             else:
                 c.message += b"\n" + line
             first = False

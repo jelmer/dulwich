@@ -117,7 +117,8 @@ class TestLRUCache(TestCase):
         # 'foo' is now most recent, so final cleanup will call it last
         cache["foo"]
         cache.clear()
-        self.assertEqual([("baz", "1"), ("biz", "3"), ("foo", "2")], cleanup_called)
+        self.assertEqual([("baz", "1"), ("biz", "3"),
+                         ("foo", "2")], cleanup_called)
 
     def test_cleanup_on_replace(self):
         """Replacing an object should cleanup the old value."""

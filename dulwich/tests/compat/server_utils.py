@@ -123,9 +123,13 @@ class ServerTests(object):
         self.assertReposEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
 
-        run_git_or_fail(["push", self.url(port), ":master"], cwd=self._new_repo.path)
+        run_git_or_fail(["push", self.url(port), ":master"],
+                        cwd=self._new_repo.path)
 
-        self.assertEqual(list(self._old_repo.get_refs().keys()), [b"refs/heads/branch"])
+        self.assertEqual(
+            list(
+                self._old_repo.get_refs().keys()),
+            [b"refs/heads/branch"])
 
     def test_fetch_from_dulwich(self):
         self.import_repos()
@@ -163,7 +167,8 @@ class ServerTests(object):
         new_repo_base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, new_repo_base_dir)
         new_repo_dir = os.path.join(new_repo_base_dir, "empty_new")
-        run_git_or_fail(["clone", self.url(port), new_repo_dir], cwd=new_repo_base_dir)
+        run_git_or_fail(["clone", self.url(port), new_repo_dir],
+                        cwd=new_repo_base_dir)
         new_repo = Repo(new_repo_dir)
         self.assertReposEqual(self._old_repo, new_repo)
 
@@ -305,19 +310,24 @@ class ServerTests(object):
     def test_fetch_from_dulwich_issue_88_standard(self):
         # Basically an integration test to see that the ACK/NAK
         # generation works on repos with common head.
-        self._source_repo = self.import_repo("issue88_expect_ack_nak_server.export")
-        self._client_repo = self.import_repo("issue88_expect_ack_nak_client.export")
+        self._source_repo = self.import_repo(
+            "issue88_expect_ack_nak_server.export")
+        self._client_repo = self.import_repo(
+            "issue88_expect_ack_nak_client.export")
         port = self._start_server(self._source_repo)
 
-        run_git_or_fail(["fetch", self.url(port), "master"], cwd=self._client_repo.path)
+        run_git_or_fail(["fetch", self.url(port), "master"],
+                        cwd=self._client_repo.path)
         self.assertObjectStoreEqual(
             self._source_repo.object_store, self._client_repo.object_store
         )
 
     def test_fetch_from_dulwich_issue_88_alternative(self):
         # likewise, but the case where the two repos have no common parent
-        self._source_repo = self.import_repo("issue88_expect_ack_nak_other.export")
-        self._client_repo = self.import_repo("issue88_expect_ack_nak_client.export")
+        self._source_repo = self.import_repo(
+            "issue88_expect_ack_nak_other.export")
+        self._client_repo = self.import_repo(
+            "issue88_expect_ack_nak_client.export")
         port = self._start_server(self._source_repo)
 
         self.assertRaises(
@@ -325,7 +335,8 @@ class ServerTests(object):
             self._client_repo.get_object,
             b"02a14da1fc1fc13389bbf32f0af7d8899f2b2323",
         )
-        run_git_or_fail(["fetch", self.url(port), "master"], cwd=self._client_repo.path)
+        run_git_or_fail(["fetch", self.url(port), "master"],
+                        cwd=self._client_repo.path)
         self.assertEqual(
             b"commit",
             self._client_repo.get_object(
@@ -336,11 +347,14 @@ class ServerTests(object):
     def test_push_to_dulwich_issue_88_standard(self):
         # Same thing, but we reverse the role of the server/client
         # and do a push instead.
-        self._source_repo = self.import_repo("issue88_expect_ack_nak_client.export")
-        self._client_repo = self.import_repo("issue88_expect_ack_nak_server.export")
+        self._source_repo = self.import_repo(
+            "issue88_expect_ack_nak_client.export")
+        self._client_repo = self.import_repo(
+            "issue88_expect_ack_nak_server.export")
         port = self._start_server(self._source_repo)
 
-        run_git_or_fail(["push", self.url(port), "master"], cwd=self._client_repo.path)
+        run_git_or_fail(["push", self.url(port), "master"],
+                        cwd=self._client_repo.path)
         self.assertReposEqual(self._source_repo, self._client_repo)
 
 

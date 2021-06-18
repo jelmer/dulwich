@@ -68,7 +68,11 @@ class ParseCommitRangeTests(TestCase):
 
     def test_commit_by_sha(self):
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(
+            r.object_store, [
+                [1], [
+                    2, 1], [
+                    3, 1, 2]])
         self.assertEqual([c1], list(parse_commit_range(r, c1.id)))
 
 
@@ -224,7 +228,12 @@ class ParseReftupleTests(TestCase):
 class ParseReftuplesTests(TestCase):
     def test_nonexistent(self):
         r = {}
-        self.assertRaises(KeyError, parse_reftuples, r, r, [b"thisdoesnotexist"])
+        self.assertRaises(
+            KeyError,
+            parse_reftuples,
+            r,
+            r,
+            [b"thisdoesnotexist"])
 
     def test_head(self):
         r = {b"refs/heads/foo": "bla"}
@@ -255,7 +264,11 @@ class ParseTreeTests(TestCase):
 
     def test_from_commit(self):
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, c3 = build_commit_graph(
+            r.object_store, [
+                [1], [
+                    2, 1], [
+                    3, 1, 2]])
         self.assertEqual(r[c1.tree], parse_tree(r, c1.id))
         self.assertEqual(r[c1.tree], parse_tree(r, c1.tree))
 

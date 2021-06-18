@@ -93,6 +93,7 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 
 class Server(paramiko.ServerInterface):
     """http://docs.paramiko.org/en/2.4/api/server.html"""
+
     def __init__(self, commands, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
         self.commands = commands

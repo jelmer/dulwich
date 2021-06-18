@@ -154,7 +154,12 @@ def get_text_file(req, backend, mat):
     req.nocache()
     path = _url_to_path(mat.group())
     logger.info("Sending plain text file %s", path)
-    return send_file(req, get_repo(backend, mat).get_named_file(path), "text/plain")
+    return send_file(
+        req,
+        get_repo(
+            backend,
+            mat).get_named_file(path),
+        "text/plain")
 
 
 def get_loose_object(req, backend, mat):
@@ -210,7 +215,10 @@ def get_info_refs(req, backend, mat):
             yield req.forbidden("Unsupported service")
             return
         req.nocache()
-        write = req.respond(HTTP_OK, "application/x-%s-advertisement" % service)
+        write = req.respond(
+            HTTP_OK,
+            "application/x-%s-advertisement" %
+            service)
         proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(
             backend,
@@ -219,7 +227,8 @@ def get_info_refs(req, backend, mat):
             stateless_rpc=req,
             advertise_refs=True,
         )
-        handler.proto.write_pkt_line(b"# service=" + service.encode("ascii") + b"\n")
+        handler.proto.write_pkt_line(
+            b"# service=" + service.encode("ascii") + b"\n")
         handler.proto.write_pkt_line(None)
         handler.handle()
     else:
@@ -289,7 +298,12 @@ class HTTPGitRequest(object):
     :ivar environ: the WSGI environment for the request.
     """
 
-    def __init__(self, environ, start_response, dumb: bool = False, handlers=None):
+    def __init__(
+            self,
+            environ,
+            start_response,
+            dumb: bool = False,
+            handlers=None):
         self.environ = environ
         self.dumb = dumb
         self.handlers = handlers
@@ -383,7 +397,12 @@ class HTTPGitApplication(object):
         ("POST", re.compile("/git-receive-pack$")): handle_service_request,
     }
 
-    def __init__(self, backend, dumb: bool = False, handlers=None, fallback_app=None):
+    def __init__(
+            self,
+            backend,
+            dumb: bool = False,
+            handlers=None,
+            fallback_app=None):
         self.backend = backend
         self.dumb = dumb
         self.handlers = dict(DEFAULT_HANDLERS)

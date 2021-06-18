@@ -814,7 +814,10 @@ def log(
       max_entries: Optional maximum number of entries to display
     """
     with open_repo_closing(repo) as r:
-        walker = r.get_walker(max_entries=max_entries, paths=paths, reverse=reverse)
+        walker = r.get_walker(
+            max_entries=max_entries,
+            paths=paths,
+            reverse=reverse)
         for entry in walker:
 
             def decode(x):
@@ -1075,7 +1078,12 @@ def push(
         remote_changed_refs = {}
 
         def update_refs(refs):
-            selected_refs.extend(parse_reftuples(r.refs, refs, refspecs, force=force))
+            selected_refs.extend(
+                parse_reftuples(
+                    r.refs,
+                    refs,
+                    refspecs,
+                    force=force))
             new_refs = {}
             # TODO: Handle selected_refs == {None: None}
             for (lh, rh, force_ref) in selected_refs:
@@ -1104,19 +1112,23 @@ def push(
             )
         except SendPackError as e:
             raise Error(
-                "Push to " + remote_location + " failed -> " + e.args[0].decode(),
+                "Push to " +
+                remote_location +
+                " failed -> " +
+                e.args[0].decode(),
                 inner=e,
             )
         else:
             errstream.write(
-                b"Push to " + remote_location.encode(err_encoding) + b" successful.\n"
-            )
+                b"Push to " +
+                remote_location.encode(err_encoding) +
+                b" successful.\n")
 
         for ref, error in (result.ref_status or {}).items():
             if error is not None:
                 errstream.write(
-                    b"Push of ref %s failed: %s\n" % (ref, error.encode(err_encoding))
-                )
+                    b"Push of ref %s failed: %s\n" %
+                    (ref, error.encode(err_encoding)))
             else:
                 errstream.write(b"Ref %s updated\n" % ref)
 
@@ -1204,7 +1216,9 @@ def status(repo=".", ignored=False):
         index = r.open_index()
         normalizer = r.get_blob_normalizer()
         filter_callback = normalizer.checkin_normalize
-        unstaged_changes = list(get_unstaged_changes(index, r.path, filter_callback))
+        unstaged_changes = list(
+            get_unstaged_changes(
+                index, r.path, filter_callback))
 
         untracked_paths = get_untracked_paths(
             r.path, r.path, index, exclude_ignored=not ignored
@@ -1496,7 +1510,7 @@ def active_branch(repo):
         active_ref = r.refs.follow(b"HEAD")[0][1]
         if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
             raise ValueError(active_ref)
-        return active_ref[len(LOCAL_BRANCH_PREFIX) :]
+        return active_ref[len(LOCAL_BRANCH_PREFIX):]
 
 
 def get_branch_remote(repo):
@@ -1529,7 +1543,7 @@ def _import_remote_refs(
 ):
     stripped_refs = strip_peeled_refs(refs)
     branches = {
-        n[len(LOCAL_BRANCH_PREFIX) :]: v
+        n[len(LOCAL_BRANCH_PREFIX):]: v
         for (n, v) in stripped_refs.items()
         if n.startswith(LOCAL_BRANCH_PREFIX)
     }
@@ -1540,11 +1554,15 @@ def _import_remote_refs(
         prune=prune,
     )
     tags = {
-        n[len(b"refs/tags/") :]: v
+        n[len(b"refs/tags/"):]: v
         for (n, v) in stripped_refs.items()
         if n.startswith(b"refs/tags/") and not n.endswith(ANNOTATED_TAG_SUFFIX)
     }
-    refs_container.import_refs(b"refs/tags", tags, message=message, prune=prune_tags)
+    refs_container.import_refs(
+        b"refs/tags",
+        tags,
+        message=message,
+        prune=prune_tags)
 
 
 def fetch(
@@ -1580,7 +1598,8 @@ def fetch(
         client, path = get_transport_and_path(
             remote_location, config=r.get_config_stack(), **kwargs
         )
-        fetch_result = client.fetch(path, r, progress=errstream.write, depth=depth)
+        fetch_result = client.fetch(
+            path, r, progress=errstream.write, depth=depth)
         if remote_name is not None:
             _import_remote_refs(
                 r.refs,
@@ -1873,7 +1892,10 @@ def describe(repo):
                 commit.id.decode("ascii"),
             ]
 
-        sorted_tags = sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
+        sorted_tags = sorted(
+            tags.items(),
+            key=lambda tag: tag[1][0],
+            reverse=True)
 
         # If there are no tags, return the current commit
         if len(sorted_tags) == 0:
@@ -1926,7 +1948,8 @@ def get_object_by_path(repo, path, committish=None):
         base_tree = commit.tree
         if not isinstance(path, bytes):
             path = commit_encode(commit, path)
-        (mode, sha) = tree_lookup_path(r.object_store.__getitem__, base_tree, path)
+        (mode, sha) = tree_lookup_path(
+            r.object_store.__getitem__, base_tree, path)
         return r[sha]
 
 

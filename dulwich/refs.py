@@ -109,7 +109,14 @@ class RefsContainer(object):
             return
         if message is None:
             return
-        self._logger(ref, old_sha, new_sha, committer, timestamp, timezone, message)
+        self._logger(
+            ref,
+            old_sha,
+            new_sha,
+            committer,
+            timestamp,
+            timezone,
+            message)
 
     def set_symbolic_ref(
         self,
@@ -177,7 +184,8 @@ class RefsContainer(object):
                 except KeyError:
                     pass
         for ref in to_delete:
-            self.remove_if_equals(b"/".join((base, ref)), None, message=message)
+            self.remove_if_equals(b"/".join((base, ref)),
+                                  None, message=message)
 
     def allkeys(self):
         """All refs present in this container."""
@@ -281,7 +289,7 @@ class RefsContainer(object):
         depth = 0
         refnames = []
         while contents.startswith(SYMREF):
-            refname = contents[len(SYMREF) :]
+            refname = contents[len(SYMREF):]
             refnames.append(refname)
             contents = self.read_ref(refname)
             if not contents:
@@ -295,9 +303,8 @@ class RefsContainer(object):
         import warnings
 
         warnings.warn(
-            "RefsContainer._follow is deprecated. Use RefsContainer.follow " "instead.",
-            DeprecationWarning,
-        )
+            "RefsContainer._follow is deprecated. Use RefsContainer.follow "
+            "instead.", DeprecationWarning, )
         refnames, contents = self.follow(name)
         if not refnames:
             return (None, contents)
@@ -703,7 +710,7 @@ class DiskRefsContainer(RefsContainer):
         subkeys = set()
         path = self.refpath(base)
         for root, unused_dirs, files in os.walk(path):
-            dir = root[len(path) :]
+            dir = root[len(path):]
             if os.path.sep != "/":
                 dir = dir.replace(os.fsencode(os.path.sep), b"/")
             dir = dir.strip(b"/")
@@ -715,7 +722,7 @@ class DiskRefsContainer(RefsContainer):
                     subkeys.add(refname)
         for key in self.get_packed_refs():
             if key.startswith(base):
-                subkeys.add(key[len(base) :].strip(b"/"))
+                subkeys.add(key[len(base):].strip(b"/"))
         return subkeys
 
     def allkeys(self):
@@ -725,7 +732,7 @@ class DiskRefsContainer(RefsContainer):
         path = self.refpath(b"")
         refspath = self.refpath(b"refs")
         for root, unused_dirs, files in os.walk(refspath):
-            dir = root[len(path) :]
+            dir = root[len(path):]
             if os.path.sep != "/":
                 dir = dir.replace(os.fsencode(os.path.sep), b"/")
             for filename in files:
@@ -767,7 +774,8 @@ class DiskRefsContainer(RefsContainer):
                 return {}
             with f:
                 first_line = next(iter(f)).rstrip()
-                if first_line.startswith(b"# pack-refs") and b" peeled" in first_line:
+                if first_line.startswith(
+                        b"# pack-refs") and b" peeled" in first_line:
                     for sha, name, peeled in read_packed_refs_with_peeled(f):
                         self._packed_refs[name] = sha
                         if peeled:
@@ -1110,7 +1118,8 @@ def read_packed_refs(f):
             # Comment
             continue
         if line.startswith(b"^"):
-            raise PackedRefsException("found peeled ref in packed-refs without peeled")
+            raise PackedRefsException(
+                "found peeled ref in packed-refs without peeled")
         yield _split_ref_line(line)
 
 

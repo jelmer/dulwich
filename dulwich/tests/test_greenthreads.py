@@ -93,7 +93,7 @@ class TestGreenThreadsObjectStoreIterator(TestCase):
         )
         # One commit refers one tree and one blob
         self.assertEqual(len(iterator), self.cmt_amount * 3)
-        haves = wants[0 : self.cmt_amount - 1]
+        haves = wants[0: self.cmt_amount - 1]
         finder = MissingObjectFinder(self.store, haves, wants)
         iterator = GreenThreadsObjectStoreIterator(
             self.store, iter(finder.next, None), finder
@@ -128,7 +128,7 @@ class TestGreenThreadsMissingObjectFinder(TestCase):
         self.assertEqual(len(finder.objects_to_send), self.cmt_amount)
 
         finder = GreenThreadsMissingObjectFinder(
-            self.store, wants[0 : int(self.cmt_amount / 2)], wants
+            self.store, wants[0: int(self.cmt_amount / 2)], wants
         )
         # sha_done will contains commit id and sha of blob refered in tree
         self.assertEqual(len(finder.sha_done), (self.cmt_amount / 2) * 2)

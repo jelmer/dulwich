@@ -242,7 +242,11 @@ def _all_same(seq, key):
     return _all_eq(seq[1:], key, key(seq[0]))
 
 
-def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None):
+def tree_changes_for_merge(
+        store,
+        parent_tree_ids,
+        tree_id,
+        rename_detector=None):
     """Get the tree changes for a merge tree relative to all its parents.
 
     Args:
@@ -482,7 +486,8 @@ class RenameDetector(object):
 
     def _prune(self, add_paths, delete_paths):
         self._adds = [a for a in self._adds if a.new.path not in add_paths]
-        self._deletes = [d for d in self._deletes if d.old.path not in delete_paths]
+        self._deletes = [
+            d for d in self._deletes if d.old.path not in delete_paths]
 
     def _find_exact_renames(self):
         add_map = defaultdict(list)
@@ -555,7 +560,8 @@ class RenameDetector(object):
                 if stat.S_IFMT(delete.old.mode) != stat.S_IFMT(add.new.mode):
                     continue
                 new_obj = self._store[add.new.sha]
-                score = _similarity_score(old_obj, new_obj, block_cache=block_cache)
+                score = _similarity_score(
+                    old_obj, new_obj, block_cache=block_cache)
                 if score > self._rename_threshold:
                     new_type = self._rename_type(check_paths, delete, add)
                     rename = TreeChange(new_type, delete.old, add.new)
@@ -594,13 +600,14 @@ class RenameDetector(object):
         for add in self._adds:
             path = add.new.path
             delete = delete_map.get(path)
-            if delete is not None and stat.S_IFMT(delete.old.mode) == stat.S_IFMT(
-                add.new.mode
-            ):
+            if delete is not None and stat.S_IFMT(
+                    delete.old.mode) == stat.S_IFMT(
+                    add.new.mode):
                 modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
 
         self._adds = [a for a in self._adds if a.new.path not in modifies]
-        self._deletes = [a for a in self._deletes if a.new.path not in modifies]
+        self._deletes = [
+            a for a in self._deletes if a.new.path not in modifies]
         self._changes += modifies.values()
 
     def _sorted_changes(self):
@@ -614,7 +621,8 @@ class RenameDetector(object):
     def _prune_unchanged(self):
         if self._want_unchanged:
             return
-        self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]
+        self._deletes = [
+            d for d in self._deletes if d.type != CHANGE_UNCHANGED]
 
     def changes_with_renames(
         self, tree1_id, tree2_id, want_unchanged=False, include_trees=False

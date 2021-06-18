@@ -86,7 +86,8 @@ class WalkEntry(object):
                     parent = self._store[subtree_sha]
             else:
                 changes_func = tree_changes_for_merge
-                parent = [self._store[p].tree for p in self._get_parents(commit)]
+                parent = [
+                    self._store[p].tree for p in self._get_parents(commit)]
                 if path_prefix:
                     parent_trees = [self._store[p] for p in parent]
                     parent = []
@@ -193,7 +194,9 @@ class _CommitTimeQueue(object):
             is_excluded = sha in self._excluded
             if is_excluded:
                 self._exclude_parents(commit)
-                if self._pq and all(c.id in self._excluded for _, c in self._pq):
+                if self._pq and all(
+                        c.id in self._excluded for _,
+                        c in self._pq):
                     _, n = self._pq[0]
                     if self._last and n.commit_time >= self._last.commit_time:
                         # If the next commit is newer than the last one, we

@@ -101,7 +101,8 @@ class ConfigFileTests(TestCase):
 
     def test_comment_character_within_section_string(self):
         cf = self.from_file(b'[branch "foo#bar"] # a comment\nbar= foo\n')
-        self.assertEqual(ConfigFile({(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
+        self.assertEqual(ConfigFile(
+            {(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
 
     def test_from_file_section(self):
         cf = self.from_file(b"[core]\nfoo = bar\n")
@@ -150,7 +151,10 @@ class ConfigFileTests(TestCase):
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
     def test_from_file_subsection_invalid(self):
-        self.assertRaises(ValueError, self.from_file, b'[branch "foo]\nfoo = bar\n')
+        self.assertRaises(
+            ValueError,
+            self.from_file,
+            b'[branch "foo]\nfoo = bar\n')
 
     def test_from_file_subsection_not_quoted(self):
         cf = self.from_file(b"[branch.foo]\nfoo = bar\n")

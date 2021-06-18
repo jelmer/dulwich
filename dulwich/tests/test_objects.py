@@ -226,9 +226,13 @@ class BlobReadTests(TestCase):
         sha = b"60dacdc733de308bb77bb76ce0fb0f9b44c9769e"
         c = self.commit(sha)
         self.assertEqual(c.tree, tree_sha)
-        self.assertEqual(c.parents, [b"0d89f20333fbb1d2f3a94da77f4981373d8f4310"])
+        self.assertEqual(
+            c.parents,
+            [b"0d89f20333fbb1d2f3a94da77f4981373d8f4310"])
         self.assertEqual(c.author, b"James Westby <jw+debian@jameswestby.net>")
-        self.assertEqual(c.committer, b"James Westby <jw+debian@jameswestby.net>")
+        self.assertEqual(
+            c.committer,
+            b"James Westby <jw+debian@jameswestby.net>")
         self.assertEqual(c.commit_time, 1174759230)
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
@@ -240,7 +244,9 @@ class BlobReadTests(TestCase):
         self.assertEqual(c.tree, b"90182552c4a85a45ec2a835cadc3451bebdfe870")
         self.assertEqual(c.parents, [])
         self.assertEqual(c.author, b"James Westby <jw+debian@jameswestby.net>")
-        self.assertEqual(c.committer, b"James Westby <jw+debian@jameswestby.net>")
+        self.assertEqual(
+            c.committer,
+            b"James Westby <jw+debian@jameswestby.net>")
         self.assertEqual(c.commit_time, 1174758034)
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
@@ -258,7 +264,9 @@ class BlobReadTests(TestCase):
             ],
         )
         self.assertEqual(c.author, b"James Westby <jw+debian@jameswestby.net>")
-        self.assertEqual(c.committer, b"James Westby <jw+debian@jameswestby.net>")
+        self.assertEqual(
+            c.committer,
+            b"James Westby <jw+debian@jameswestby.net>")
         self.assertEqual(c.commit_time, 1174773719)
         self.assertEqual(c.commit_timezone, 0)
         self.assertEqual(c.author_timezone, 0)
@@ -415,7 +423,7 @@ author James Westby <jw+debian@jameswestby.net> 1174773719 +0000
 committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000
 gpgsig -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1
- 
+
  iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
  vi975+xvO14R8Pp8k2nps7lSxCdtCd+xVT1VRHs0wNhOZo2YCVoU1HATkPejqSeV
  NScTHcxnk4/+bxyfk14xvJkNp7FlQ3npmBkA+lbV0Ubr33rvtIE5jiJPyz+SgWAg
@@ -459,11 +467,11 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
  type commit
  tag v2.6.22-rc7
  tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
- 
+
  Linux 2.6.22-rc7
  -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1.4.7 (GNU/Linux)
- 
+
  iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
  OK2XeQOiEeXtT76rV4t2WR4=
  =ivrA
@@ -497,11 +505,11 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
  type commit
  tag v2.6.22-rc7
  tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
- 
+
  Linux 2.6.22-rc7
  -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1.4.7 (GNU/Linux)
- 
+
  iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
  OK2XeQOiEeXtT76rV4t2WR4=
  =ivrA
@@ -510,11 +518,11 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
  type commit
  tag v2.6.22-rc7
  tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
- 
+
  Linux 2.6.22-rc7
  -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1.4.7 (GNU/Linux)
- 
+
  iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
  OK2XeQOiEeXtT76rV4t2WR4=
  =ivrA
@@ -603,7 +611,9 @@ class CommitParseTests(ShaFileCheckTests):
         c = Commit.from_string(self.make_commit_text())
         self.assertEqual(b"Merge ../b\n", c.message)
         self.assertEqual(b"James Westby <jw+debian@jameswestby.net>", c.author)
-        self.assertEqual(b"James Westby <jw+debian@jameswestby.net>", c.committer)
+        self.assertEqual(
+            b"James Westby <jw+debian@jameswestby.net>",
+            c.committer)
         self.assertEqual(b"d80c186a03f423a81b39df39dc87fd269736ca86", c.tree)
         self.assertEqual(
             [
@@ -624,7 +634,10 @@ class CommitParseTests(ShaFileCheckTests):
         self.assertEqual(None, c.encoding)
 
     def test_custom(self):
-        c = Commit.from_string(self.make_commit_text(extra={b"extra-field": b"data"}))
+        c = Commit.from_string(
+            self.make_commit_text(
+                extra={
+                    b"extra-field": b"data"}))
         self.assertEqual([(b"extra-field", b"data")], c.extra)
 
     def test_encoding(self):
@@ -634,13 +647,22 @@ class CommitParseTests(ShaFileCheckTests):
     def test_check(self):
         self.assertCheckSucceeds(Commit, self.make_commit_text())
         self.assertCheckSucceeds(Commit, self.make_commit_text(parents=None))
-        self.assertCheckSucceeds(Commit, self.make_commit_text(encoding=b"UTF-8"))
+        self.assertCheckSucceeds(
+            Commit, self.make_commit_text(
+                encoding=b"UTF-8"))
 
         self.assertCheckFails(Commit, self.make_commit_text(tree=b"xxx"))
-        self.assertCheckFails(Commit, self.make_commit_text(parents=[a_sha, b"xxx"]))
+        self.assertCheckFails(
+            Commit, self.make_commit_text(
+                parents=[
+                    a_sha, b"xxx"]))
         bad_committer = b"some guy without an email address 1174773719 +0000"
-        self.assertCheckFails(Commit, self.make_commit_text(committer=bad_committer))
-        self.assertCheckFails(Commit, self.make_commit_text(author=bad_committer))
+        self.assertCheckFails(
+            Commit, self.make_commit_text(
+                committer=bad_committer))
+        self.assertCheckFails(
+            Commit, self.make_commit_text(
+                author=bad_committer))
         self.assertCheckFails(Commit, self.make_commit_text(author=None))
         self.assertCheckFails(Commit, self.make_commit_text(committer=None))
         self.assertCheckFails(
@@ -738,7 +760,7 @@ author Jelmer Vernooij <jelmer@samba.org> 1412179807 +0200
 committer Jelmer Vernooij <jelmer@samba.org> 1412179807 +0200
 gpgsig -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1
- 
+
  iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
  vi975+xvO14R8Pp8k2nps7lSxCdtCd+xVT1VRHs0wNhOZo2YCVoU1HATkPejqSeV
  NScTHcxnk4/+bxyfk14xvJkNp7FlQ3npmBkA+lbV0Ubr33rvtIE5jiJPyz+SgWAg
@@ -788,7 +810,7 @@ parent c09b6dec7a73760fbdb478383a3c926b18db8bbe
 author Neil Matatall <oreoshake@github.com> 1461964057 -1000
 committer Neil Matatall <oreoshake@github.com> 1461964057 -1000
 gpgsig -----BEGIN PGP SIGNATURE-----
- 
+
  wsBcBAABCAAQBQJXI80ZCRA6pcNDcVZ70gAAarcIABs72xRX3FWeox349nh6ucJK
  CtwmBTusez2Zwmq895fQEbZK7jpaGO5TRO4OvjFxlRo0E08UFx3pxZHSpj6bsFeL
  hHsDXnCaotphLkbgKKRdGZo7tDqM84wuEDlh4MwNe7qlFC7bYLDyysc81ZX5lpMm
@@ -797,7 +819,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
  nHxksHfeNln9RKseIDcy4b2ATjhDNIJZARHNfr6oy4u3XPW4svRqtBsLoMiIeuI=
  =ms6q
  -----END PGP SIGNATURE-----
- 
+
 
 3.3.0 version bump and docs
 """
@@ -838,7 +860,10 @@ class TreeTests(ShaFileCheckTests):
         x = Tree()
         x.add(b"myname", 0o100755, myhexsha)
         self.assertEqual(x[b"myname"], (0o100755, myhexsha))
-        self.assertEqual(b"100755 myname\0" + hex_to_sha(myhexsha), x.as_raw_string())
+        self.assertEqual(
+            b"100755 myname\0" +
+            hex_to_sha(myhexsha),
+            x.as_raw_string())
 
     def test_add_old_order(self):
         myhexsha = b"d80c186a03f423a81b39df39dc87fd269736ca86"
@@ -849,13 +874,19 @@ class TreeTests(ShaFileCheckTests):
         finally:
             warnings.resetwarnings()
         self.assertEqual(x[b"myname"], (0o100755, myhexsha))
-        self.assertEqual(b"100755 myname\0" + hex_to_sha(myhexsha), x.as_raw_string())
+        self.assertEqual(
+            b"100755 myname\0" +
+            hex_to_sha(myhexsha),
+            x.as_raw_string())
 
     def test_simple(self):
         myhexsha = b"d80c186a03f423a81b39df39dc87fd269736ca86"
         x = Tree()
         x[b"myname"] = (0o100755, myhexsha)
-        self.assertEqual(b"100755 myname\0" + hex_to_sha(myhexsha), x.as_raw_string())
+        self.assertEqual(
+            b"100755 myname\0" +
+            hex_to_sha(myhexsha),
+            x.as_raw_string())
         self.assertEqual(b"100755 myname\0" + hex_to_sha(myhexsha), bytes(x))
 
     def test_tree_update_id(self):
@@ -890,13 +921,15 @@ class TreeTests(ShaFileCheckTests):
         def eval_parse_tree(*args, **kwargs):
             return list(parse_tree(*args, **kwargs))
 
-        self.assertEqual([(b"foo", 0o100644, a_sha)], eval_parse_tree(broken_tree))
+        self.assertEqual([(b"foo", 0o100644, a_sha)],
+                         eval_parse_tree(broken_tree))
         self.assertRaises(
             ObjectFormatException, eval_parse_tree, broken_tree, strict=True
         )
 
     test_parse_tree = functest_builder(_do_test_parse_tree, _parse_tree_py)
-    test_parse_tree_extension = ext_functest_builder(_do_test_parse_tree, parse_tree)
+    test_parse_tree_extension = ext_functest_builder(
+        _do_test_parse_tree, parse_tree)
 
     def _do_test_sorted_tree_items(self, sorted_tree_items):
         def do_sort(entries):
@@ -980,12 +1013,15 @@ class TreeTests(ShaFileCheckTests):
         # shas
         self.assertCheckFails(t, b"100644 a\0" + (b"x" * 5))
         self.assertCheckFails(t, b"100644 a\0" + (b"x" * 18) + b"\0")
-        self.assertCheckFails(t, b"100644 a\0" + (b"x" * 21) + b"\n100644 b\0" + sha)
+        self.assertCheckFails(
+            t, b"100644 a\0" + (b"x" * 21) + b"\n100644 b\0" + sha)
 
         # ordering
         sha2 = hex_to_sha(b_sha)
-        self.assertCheckSucceeds(t, b"100644 a\0" + sha + b"\n100644 b\0" + sha)
-        self.assertCheckSucceeds(t, b"100644 a\0" + sha + b"\n100644 b\0" + sha2)
+        self.assertCheckSucceeds(
+            t, b"100644 a\0" + sha + b"\n100644 b\0" + sha)
+        self.assertCheckSucceeds(
+            t, b"100644 a\0" + sha + b"\n100644 b\0" + sha2)
         self.assertCheckFails(t, b"100644 a\0" + sha + b"\n100755 a\0" + sha2)
         self.assertCheckFails(t, b"100644 b\0" + sha2 + b"\n100644 a\0" + sha)
 
@@ -1042,8 +1078,8 @@ class TagSerializeTests(TestCase):
 
 
 default_tagger = (
-    b"Linus Torvalds <torvalds@woody.linux-foundation.org> " b"1183319674 -0700"
-)
+    b"Linus Torvalds <torvalds@woody.linux-foundation.org> "
+    b"1183319674 -0700")
 default_message = b"""Linux 2.6.22-rc7
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.7 (GNU/Linux)
@@ -1089,7 +1125,9 @@ class TagParseTests(ShaFileCheckTests):
         )
         self.assertEqual(b"v2.6.22-rc7", x.name)
         object_type, object_sha = x.object
-        self.assertEqual(b"a38d6181ff27824c79fc7df825164a212eff6a3f", object_sha)
+        self.assertEqual(
+            b"a38d6181ff27824c79fc7df825164a212eff6a3f",
+            object_sha)
         self.assertEqual(Commit, object_type)
         self.assertEqual(
             datetime.datetime.utcfromtimestamp(x.tag_time),
@@ -1124,7 +1162,9 @@ class TagParseTests(ShaFileCheckTests):
         self.assertCheckFails(Tag, self.make_tag_text(object_type_name=None))
         self.assertCheckFails(Tag, self.make_tag_text(name=None))
         self.assertCheckFails(Tag, self.make_tag_text(name=b""))
-        self.assertCheckFails(Tag, self.make_tag_text(object_type_name=b"foobar"))
+        self.assertCheckFails(
+            Tag, self.make_tag_text(
+                object_type_name=b"foobar"))
         self.assertCheckFails(
             Tag,
             self.make_tag_text(
@@ -1215,7 +1255,9 @@ class CheckTests(TestCase):
             b"Dave Borowitz <dborowitz@google.com>",
             "failed to check good identity",
         )
-        check_identity(b"<dborowitz@google.com>", "failed to check good identity")
+        check_identity(
+            b"<dborowitz@google.com>",
+            "failed to check good identity")
         self.assertRaises(
             ObjectFormatException, check_identity, b"Dave Borowitz", "no email"
         )
@@ -1283,11 +1325,14 @@ class TimezoneTests(TestCase):
         self.assertEqual(b"--700", format_timezone(int(((7 * 60)) * 60), True))
 
     def test_parse_timezone_pdt_half(self):
-        self.assertEqual((((-4 * 60) - 40) * 60, False), parse_timezone(b"-0440"))
+        self.assertEqual((((-4 * 60) - 40) * 60, False),
+                         parse_timezone(b"-0440"))
 
     def test_parse_timezone_double_negative(self):
-        self.assertEqual((int(((7 * 60)) * 60), False), parse_timezone(b"+700"))
-        self.assertEqual((int(((7 * 60)) * 60), True), parse_timezone(b"--700"))
+        self.assertEqual((int(((7 * 60)) * 60), False),
+                         parse_timezone(b"+700"))
+        self.assertEqual((int(((7 * 60)) * 60), True),
+                         parse_timezone(b"--700"))
 
 
 class ShaFileCopyTests(TestCase):

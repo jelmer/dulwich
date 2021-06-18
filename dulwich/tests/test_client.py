@@ -119,10 +119,15 @@ class GitClientTests(TestCase):
         super(GitClientTests, self).setUp()
         self.rout = BytesIO()
         self.rin = BytesIO()
-        self.client = DummyClient(lambda x: True, self.rin.read, self.rout.write)
+        self.client = DummyClient(
+            lambda x: True,
+            self.rin.read,
+            self.rout.write)
 
     def test_caps(self):
-        agent_cap = ("agent=dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
+        agent_cap = (
+            "agent=dulwich/%d.%d.%d" %
+            dulwich.__version__).encode("ascii")
         self.assertEqual(
             set(
                 [
@@ -195,7 +200,8 @@ class GitClientTests(TestCase):
             b"0000"
         )
         self.rin.seek(0)
-        ret = self.client.fetch_pack(b"bla", lambda heads, **kwargs: [], None, None, None)
+        ret = self.client.fetch_pack(
+            b"bla", lambda heads, **kwargs: [], None, None, None)
         self.assertEqual(
             {b"HEAD": b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"}, ret.refs
         )
@@ -260,7 +266,8 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"}
+            return {
+                b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"}
 
         def generate_pack_data(have, want, ofs_delta=False):
             return 0, []
@@ -418,9 +425,8 @@ class GitClientTests(TestCase):
             {b"refs/heads/master": "remote does not support deleting refs"},
         )
         self.assertEqual(
-            result.refs,
-            {b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"},
-        )
+            result.refs, {
+                b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"}, )
         self.assertEqual(self.rout.getvalue(), b"0000")
 
 
@@ -463,13 +469,15 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual("/bar/baz", path)
 
     def test_username_and_port_explicit_unknown_scheme(self):
-        c, path = get_transport_and_path("unknown://git@server:7999/dply/stuff.git")
+        c, path = get_transport_and_path(
+            "unknown://git@server:7999/dply/stuff.git")
         self.assertTrue(isinstance(c, SSHGitClient))
         self.assertEqual("unknown", c.host)
         self.assertEqual("//git@server:7999/dply/stuff.git", path)
 
     def test_username_and_port_explicit(self):
-        c, path = get_transport_and_path("ssh://git@server:7999/dply/stuff.git")
+        c, path = get_transport_and_path(
+            "ssh://git@server:7999/dply/stuff.git")
         self.assertTrue(isinstance(c, SSHGitClient))
         self.assertEqual("git", c.username)
         self.assertEqual("server", c.host)
@@ -575,7 +583,8 @@ class TestGetTransportAndPath(TestCase):
     def test_http_auth_with_username(self):
         url = "https://github.com/jelmer/dulwich"
 
-        c, path = get_transport_and_path(url, username="user2", password="blah")
+        c, path = get_transport_and_path(
+            url, username="user2", password="blah")
 
         self.assertTrue(isinstance(c, HttpGitClient))
         self.assertEqual("/jelmer/dulwich", path)
@@ -585,7 +594,8 @@ class TestGetTransportAndPath(TestCase):
     def test_http_auth_with_username_and_in_url(self):
         url = "https://user:passwd@github.com/jelmer/dulwich"
 
-        c, path = get_transport_and_path(url, username="user2", password="blah")
+        c, path = get_transport_and_path(
+            url, username="user2", password="blah")
 
         self.assertTrue(isinstance(c, HttpGitClient))
         self.assertEqual("/jelmer/dulwich", path)
@@ -627,14 +637,16 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_port_explicit(self):
-        c, path = get_transport_and_path_from_url("git+ssh://foo.com:1234/bar/baz")
+        c, path = get_transport_and_path_from_url(
+            "git+ssh://foo.com:1234/bar/baz")
         self.assertTrue(isinstance(c, SSHGitClient))
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_homepath(self):
-        c, path = get_transport_and_path_from_url("git+ssh://foo.com/~/bar/baz")
+        c, path = get_transport_and_path_from_url(
+            "git+ssh://foo.com/~/bar/baz")
         self.assertTrue(isinstance(c, SSHGitClient))
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
@@ -642,7 +654,8 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertEqual("/~/bar/baz", path)
 
     def test_ssh_port_homepath(self):
-        c, path = get_transport_and_path_from_url("git+ssh://foo.com:1234/~/bar/baz")
+        c, path = get_transport_and_path_from_url(
+            "git+ssh://foo.com:1234/~/bar/baz")
         self.assertTrue(isinstance(c, SSHGitClient))
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
@@ -659,7 +672,10 @@ class TestGetTransportAndPathFromUrl(TestCase):
         )
 
     def test_local_path(self):
-        self.assertRaises(ValueError, get_transport_and_path_from_url, "foo.bar/baz")
+        self.assertRaises(
+            ValueError,
+            get_transport_and_path_from_url,
+            "foo.bar/baz")
 
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
@@ -754,7 +770,9 @@ class SSHGitClientTests(TestCase):
         self.assertEqual("ssh://user@git.samba.org:2222/tmp/repo.git", url)
 
     def test_default_command(self):
-        self.assertEqual(b"git-upload-pack", self.client._get_cmd_path(b"upload-pack"))
+        self.assertEqual(
+            b"git-upload-pack",
+            self.client._get_cmd_path(b"upload-pack"))
 
     def test_alternative_command_path(self):
         self.client.alternative_paths[b"upload-pack"] = b"/usr/lib/git/git-upload-pack"
@@ -785,7 +803,9 @@ class SSHGitClientTests(TestCase):
         self.assertEqual("git-command '/path/to/repo'", server.command)
 
         client._connect(b"relative-command", b"/~/path/to/repo")
-        self.assertEqual("git-relative-command '~/path/to/repo'", server.command)
+        self.assertEqual(
+            "git-relative-command '~/path/to/repo'",
+            server.command)
 
     def test_ssh_command_precedence(self):
         os.environ["GIT_SSH"] = "/path/to/ssh"
@@ -816,7 +836,8 @@ class ReportStatusParserTests(TestCase):
         parser.handle_packet(b"unpack ok")
         parser.handle_packet(b"ng refs/foo/bar need to pull")
         parser.handle_packet(None)
-        self.assertEqual([(b"refs/foo/bar", "need to pull")], list(parser.check()))
+        self.assertEqual([(b"refs/foo/bar", "need to pull")],
+                         list(parser.check()))
 
     def test_ok(self):
         parser = ReportStatusParser()
@@ -848,8 +869,11 @@ class LocalGitClientTests(TestCase):
         out = BytesIO()
         walker = {}
         ret = c.fetch_pack(
-            s.path, lambda heads, **kwargs: [], graph_walker=walker, pack_data=out.write
-        )
+            s.path,
+            lambda heads,
+            **kwargs: [],
+            graph_walker=walker,
+            pack_data=out.write)
         self.assertEqual(
             {
                 b"HEAD": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
@@ -874,7 +898,8 @@ class LocalGitClientTests(TestCase):
         walker = MemoryRepo().get_graph_walker()
         ret = c.fetch_pack(
             s.path,
-            lambda heads, **kwargs: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
+            lambda heads,
+            **kwargs: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
             graph_walker=walker,
             pack_data=out.write,
         )
@@ -1035,13 +1060,18 @@ class HttpGitClientTests(TestCase):
             def __init__(self):
                 self.headers = {}
 
-            def request(self, method, url, fields=None, headers=None, redirect=True):
+            def request(
+                    self,
+                    method,
+                    url,
+                    fields=None,
+                    headers=None,
+                    redirect=True):
                 base_url = url[: -len(tail)]
                 redirect_base_url = test_data[base_url]["redirect_url"]
                 redirect_url = redirect_base_url + tail
                 headers = {
-                    "Content-Type": "application/x-git-upload-pack-advertisement"
-                }
+                    "Content-Type": "application/x-git-upload-pack-advertisement"}
                 body = test_data[base_url]["refs_data"]
                 # urllib3 handles automatic redirection by default
                 status = 200
@@ -1067,10 +1097,12 @@ class HttpGitClientTests(TestCase):
             # instantiate HttpGitClient with mocked pool manager
             c = HttpGitClient(base_url, pool_manager=pool_manager, config=None)
             # call method that detects url redirection
-            _, _, processed_url = c._discover_references(b"git-upload-pack", base_url)
+            _, _, processed_url = c._discover_references(
+                b"git-upload-pack", base_url)
 
             # send the same request as the method above without redirection
-            resp = c.pool_manager.request("GET", base_url + tail, redirect=False)
+            resp = c.pool_manager.request(
+                "GET", base_url + tail, redirect=False)
 
             # check expected behavior of urllib3
             redirect_location = resp.get_redirect_location()
@@ -1079,7 +1111,8 @@ class HttpGitClientTests(TestCase):
 
             if redirect_location:
                 # check that url redirection has been correctly detected
-                self.assertEqual(processed_url, redirect_location[: -len(tail)])
+                self.assertEqual(processed_url,
+                                 redirect_location[: -len(tail)])
             else:
                 # check also the no redirection case
                 self.assertEqual(processed_url, base_url)
@@ -1107,7 +1140,9 @@ class TCPGitClientTests(TestCase):
 class DefaultUrllib3ManagerTest(TestCase):
     def test_no_config(self):
         manager = default_urllib3_manager(config=None)
-        self.assertEqual(manager.connection_pool_kw["cert_reqs"], "CERT_REQUIRED")
+        self.assertEqual(
+            manager.connection_pool_kw["cert_reqs"],
+            "CERT_REQUIRED")
 
     def test_config_no_proxy(self):
         import urllib3
@@ -1131,7 +1166,9 @@ class DefaultUrllib3ManagerTest(TestCase):
         config = ConfigDict()
         config.set(b"http", b"sslVerify", b"true")
         manager = default_urllib3_manager(config=config)
-        self.assertEqual(manager.connection_pool_kw["cert_reqs"], "CERT_REQUIRED")
+        self.assertEqual(
+            manager.connection_pool_kw["cert_reqs"],
+            "CERT_REQUIRED")
 
     def test_config_no_ssl(self):
         config = ConfigDict()
@@ -1307,12 +1344,13 @@ class PLinkSSHVendorTests(TestCase):
         )
 
         for w in warnings_list:
-            if type(w) == type(expected_warning) and w.args == expected_warning.args:
+            if isinstance(w, type(expected_warning)
+                          ) and w.args == expected_warning.args:
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
-            )
+                "Expected warning %r not in %r" %
+                (expected_warning, warnings_list))
 
         args = command.proc.args
 
@@ -1352,12 +1390,13 @@ class PLinkSSHVendorTests(TestCase):
         )
 
         for w in warnings_list:
-            if type(w) == type(expected_warning) and w.args == expected_warning.args:
+            if isinstance(w, type(expected_warning)
+                          ) and w.args == expected_warning.args:
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
-            )
+                "Expected warning %r not in %r" %
+                (expected_warning, warnings_list))
 
         args = command.proc.args
 
@@ -1411,7 +1450,8 @@ class PLinkSSHVendorTests(TestCase):
 
 class RsyncUrlTests(TestCase):
     def test_simple(self):
-        self.assertEqual(parse_rsync_url("foo:bar/path"), (None, "foo", "bar/path"))
+        self.assertEqual(parse_rsync_url("foo:bar/path"),
+                         (None, "foo", "bar/path"))
         self.assertEqual(
             parse_rsync_url("user@foo:bar/path"), ("user", "foo", "bar/path")
         )
@@ -1436,15 +1476,13 @@ class CheckWantsTests(TestCase):
         )
 
     def test_annotated(self):
-        self.assertRaises(
-            InvalidWants,
-            check_wants,
-            [b"2f3dc7a53fb752a6961d3a56683df46d4d3bf262"],
-            {
-                b"refs/heads/blah": b"3f3dc7a53fb752a6961d3a56683df46d4d3bf262",
-                b"refs/heads/blah^{}": b"2f3dc7a53fb752a6961d3a56683df46d4d3bf262",
-            },
-        )
+        self.assertRaises(InvalidWants,
+                          check_wants,
+                          [b"2f3dc7a53fb752a6961d3a56683df46d4d3bf262"],
+                          {b"refs/heads/blah": b"3f3dc7a53fb752a6961d3a56683df46d4d3bf262",
+                           b"refs/heads/blah^{}": b"2f3dc7a53fb752a6961d3a56683df46d4d3bf262",
+                           },
+                          )
 
 
 class FetchPackResultTests(TestCase):
@@ -1476,21 +1514,21 @@ class GitCredentialStoreTests(TestCase):
 
     def test_nonmatching_scheme(self):
         self.assertEqual(
-            get_credentials_from_store(b"http", b"example.org", fnames=[self.fname]),
-            None,
-        )
+            get_credentials_from_store(
+                b"http", b"example.org", fnames=[
+                    self.fname]), None, )
 
     def test_nonmatching_hostname(self):
         self.assertEqual(
-            get_credentials_from_store(b"https", b"noentry.org", fnames=[self.fname]),
-            None,
-        )
+            get_credentials_from_store(
+                b"https", b"noentry.org", fnames=[
+                    self.fname]), None, )
 
     def test_match_without_username(self):
         self.assertEqual(
-            get_credentials_from_store(b"https", b"example.org", fnames=[self.fname]),
-            (b"user", b"pass"),
-        )
+            get_credentials_from_store(
+                b"https", b"example.org", fnames=[
+                    self.fname]), (b"user", b"pass"), )
 
     def test_match_with_matching_username(self):
         self.assertEqual(

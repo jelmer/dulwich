@@ -35,7 +35,13 @@ Entry = collections.namedtuple(
 )
 
 
-def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message):
+def format_reflog_line(
+        old_sha,
+        new_sha,
+        committer,
+        timestamp,
+        timezone,
+        message):
     """Generate a single reflog line.
 
     Args:

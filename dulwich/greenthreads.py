@@ -90,8 +90,10 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         self.object_store = object_store
         p = pool.Pool(size=concurrency)
 
-        have_commits, have_tags = _split_commits_and_tags(object_store, haves, True, p)
-        want_commits, want_tags = _split_commits_and_tags(object_store, wants, False, p)
+        have_commits, have_tags = _split_commits_and_tags(
+            object_store, haves, True, p)
+        want_commits, want_tags = _split_commits_and_tags(
+            object_store, wants, False, p)
         all_ancestors = object_store._collect_ancestors(have_commits)[0]
         missing_commits, common_commits = object_store._collect_ancestors(
             want_commits, all_ancestors

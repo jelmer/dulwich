@@ -75,7 +75,13 @@ class GcsObjectStore(BucketBasedObjectStore):
             lambda: self._load_pack_index(name))
 
     def _upload_pack(self, basename, pack_file, index_file):
-        idxblob = self.bucket.blob(posixpath.join(self.subpath, basename + '.idx'))
-        datablob = self.bucket.blob(posixpath.join(self.subpath, basename + '.pack'))
+        idxblob = self.bucket.blob(
+            posixpath.join(
+                self.subpath,
+                basename + '.idx'))
+        datablob = self.bucket.blob(
+            posixpath.join(
+                self.subpath,
+                basename + '.pack'))
         idxblob.upload_from_file(index_file)
         datablob.upload_from_file(pack_file)

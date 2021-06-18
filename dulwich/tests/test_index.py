@@ -120,14 +120,16 @@ class SimpleIndexTestCase(IndexTestCase):
             list(self.get_simple_index("index").iterblobs()),
         )
 
-        expected_warning = PendingDeprecationWarning("Use iterobjects() instead.")
+        expected_warning = PendingDeprecationWarning(
+            "Use iterobjects() instead.")
         for w in warnings_list:
-            if type(w) == type(expected_warning) and w.args == expected_warning.args:
+            if isinstance(w, type(expected_warning)
+                          ) and w.args == expected_warning.args:
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
-            )
+                "Expected warning %r not in %r" %
+                (expected_warning, warnings_list))
 
     def test_getitem(self):
         self.assertEqual(
@@ -255,7 +257,8 @@ class CommitTreeTests(TestCase):
         self.assertEqual(dirid, b"c1a1deb9788150829579a8b4efa6311e7b638650")
         self.assertEqual((stat.S_IFDIR, dirid), self.store[rootid][b"bla"])
         self.assertEqual((stat.S_IFREG, blob.id), self.store[dirid][b"bar"])
-        self.assertEqual(set([rootid, dirid, blob.id]), set(self.store._data.keys()))
+        self.assertEqual(set([rootid, dirid, blob.id]),
+                         set(self.store._data.keys()))
 
 
 class CleanupModeTests(TestCase):
@@ -349,7 +352,8 @@ class IndexEntryFromStatTests(TestCase):
                 1324180496,
             )
         )
-        entry = index_entry_from_stat(st, "22" * 20, 0, mode=stat.S_IFREG + 0o755)
+        entry = index_entry_from_stat(
+            st, "22" * 20, 0, mode=stat.S_IFREG + 0o755)
         self.assertEqual(
             entry,
             IndexEntry(
@@ -412,7 +416,8 @@ class BuildIndexTests(TestCase):
             tree[b".git/a"] = (stat.S_IFREG | 0o644, filea.id)
             tree[b"c/e"] = (stat.S_IFREG | 0o644, filee.id)
 
-            repo.object_store.add_objects([(o, None) for o in [filea, filee, tree]])
+            repo.object_store.add_objects(
+                [(o, None) for o in [filea, filee, tree]])
 
             build_index_from_tree(
                 repo.path, repo.index_path(), repo.object_store, tree.id
@@ -486,8 +491,13 @@ class BuildIndexTests(TestCase):
             self.assertFileContents(dpath, b"file d")
 
             # Verify no extra files
-            self.assertEqual([".git", "a", "b", "c"], sorted(os.listdir(repo.path)))
-            self.assertEqual(["d"], sorted(os.listdir(os.path.join(repo.path, "c"))))
+            self.assertEqual([".git", "a", "b", "c"],
+                             sorted(os.listdir(repo.path)))
+            self.assertEqual(
+                ["d"], sorted(
+                    os.listdir(
+                        os.path.join(
+                            repo.path, "c"))))
 
     @skipIf(not getattr(os, "sync", None), "Requires sync support")
     def test_norewrite(self):
@@ -545,7 +555,8 @@ class BuildIndexTests(TestCase):
             tree[b"c/d"] = (stat.S_IFREG | 0o644, filed.id)
             tree[b"c/e"] = (stat.S_IFLNK, filee.id)  # symlink
 
-            repo.object_store.add_objects([(o, None) for o in [filed, filee, tree]])
+            repo.object_store.add_objects(
+                [(o, None) for o in [filed, filee, tree]])
 
             build_index_from_tree(
                 repo.path, repo.index_path(), repo.object_store, tree.id

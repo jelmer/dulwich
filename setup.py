@@ -116,6 +116,7 @@ setup(name='dulwich',
       package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
       scripts=scripts,
       ext_modules=ext_modules,
+      zip_safe=False,
       distclass=DulwichDistribution,
       classifiers=[
           'Development Status :: 4 - Beta',

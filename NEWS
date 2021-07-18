@@ -1,3 +1,5 @@
+0.20.25	UNRELEASED
+
 0.20.24	2021-07-18
 
  * config: disregard UTF-8 BOM when reading file.

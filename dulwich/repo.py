@@ -1131,8 +1131,10 @@ class Repo(BaseRepo):
 
         root_path_bytes = self.path.encode(sys.getfilesystemencoding())
 
-        if not isinstance(fs_paths, list):
+        if isinstance(fs_paths, str):
             fs_paths = [fs_paths]
+        fs_paths=list(fs_paths)
+
         from dulwich.index import (
             blob_from_path_and_stat,
             index_entry_from_stat,

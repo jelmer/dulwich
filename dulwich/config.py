@@ -41,7 +41,7 @@ try:
         MutableMapping,
     )
 except ImportError:  # python < 3.7
-    from collections import (
+    from collections import (  # type: ignore
         Iterable,
         MutableMapping,
     )

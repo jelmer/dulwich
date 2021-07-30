@@ -466,13 +466,13 @@ class cmd_status(Command):
             for kind, names in status.staged.items():
                 for name in names:
                     sys.stdout.write(
-                        "\t%s: %s\n" % (kind, name.decode(sys.getfilesystemencoding()))
+                        "\t%s: %s\n" % (kind, name)
                     )
             sys.stdout.write("\n")
         if status.unstaged:
             sys.stdout.write("Changes not staged for commit:\n\n")
             for name in status.unstaged:
-                sys.stdout.write("\t%s\n" % name.decode(sys.getfilesystemencoding()))
+                sys.stdout.write("\t%s\n" % name)
             sys.stdout.write("\n")
         if status.untracked:
             sys.stdout.write("Untracked files:\n\n")

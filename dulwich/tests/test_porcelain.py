@@ -1759,8 +1759,8 @@ class StatusTests(PorcelainTestCase):
 
         results = porcelain.status(self.repo)
 
-        self.assertEqual(results.staged["add"][0], filename_add.encode("ascii"))
-        self.assertEqual(results.unstaged, [b"foo"])
+        self.assertEqual(results.staged["add"][0], filename_add)
+        self.assertEqual(results.unstaged, ["foo"])
 
     def test_status_all(self):
         del_path = os.path.join(self.repo.path, "foo")
@@ -1795,10 +1795,10 @@ class StatusTests(PorcelainTestCase):
             f.write("origstuff")
         results = porcelain.status(self.repo.path)
         self.assertDictEqual(
-            {"add": [b"baz"], "delete": [b"foo"], "modify": [b"bar"]},
+            {"add": ["baz"], "delete": ["foo"], "modify": ["bar"]},
             results.staged,
         )
-        self.assertListEqual(results.unstaged, [b"blye"])
+        self.assertListEqual(results.unstaged, ["blye"])
         self.assertListEqual(results.untracked, ["blyat"])
 
     def test_status_crlf_mismatch(self):
@@ -1822,7 +1822,7 @@ class StatusTests(PorcelainTestCase):
 
         results = porcelain.status(self.repo)
         self.assertDictEqual({"add": [], "delete": [], "modify": []}, results.staged)
-        self.assertListEqual(results.unstaged, [b"crlf"])
+        self.assertListEqual(results.unstaged, ["crlf"])
         self.assertListEqual(results.untracked, [])
 
     def test_status_autocrlf_true(self):
@@ -1878,7 +1878,7 @@ class StatusTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=[file_path])
 
         results = porcelain.status(self.repo)
-        self.assertDictEqual({"add": [b"crlf-new"], "delete": [], "modify": []}, results.staged)
+        self.assertDictEqual({"add": ["crlf-new"], "delete": [], "modify": []}, results.staged)
         self.assertListEqual(results.unstaged, [])
         self.assertListEqual(results.untracked, [])
 

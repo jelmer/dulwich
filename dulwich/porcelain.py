@@ -1211,13 +1211,13 @@ def status(repo=".", ignored=False):
         # 1. Get status of staged
         tracked_changes = get_tree_changes(r)
         for key in tracked_changes.keys():
-            tracked_changes[key] = [file.decode() for file in tracked_changes[key]]  #decode
+            tracked_changes[key] = [file.decode() for file in tracked_changes[key]]
         # 2. Get status of unstaged
         index = r.open_index()
         normalizer = r.get_blob_normalizer()
         filter_callback = normalizer.checkin_normalize
         unstaged_changes = list(get_unstaged_changes(index, r.path, filter_callback))
-        unstaged_changes = [file.decode() for file in unstaged_changes]  # decode
+        unstaged_changes = [file.decode() for file in unstaged_changes]
 
         untracked_paths = get_untracked_paths(
             r.path, r.path, index, exclude_ignored=not ignored

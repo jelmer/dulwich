@@ -24,6 +24,7 @@
 import datetime
 import os
 import shutil
+import stat
 import tempfile
 import time
 import types
@@ -82,11 +83,20 @@ def open_repo(name, temp_dir=None):
     return Repo(temp_repo_dir)
 
 
+def safe_rmtree(path):
+    """Version of shutil.rmtree() that handles unwritable files"""
+    def really_delete(action, name, exc):
+        os.chmod(name, stat.S_IWRITE)
+        os.remove(name)
+
+    shutil.rmtree(path, onerror=really_delete)
+
+
 def tear_down_repo(repo):
     """Tear down a test repository."""
     repo.close()
     temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
-    shutil.rmtree(temp_dir)
+    safe_rmtree(temp_dir)
 
 
 def make_object(cls, **attrs):

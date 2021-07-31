@@ -731,7 +731,7 @@ commands = {
 
 def main(argv=None):
     if argv is None:
-        argv = sys.argv
+        argv = sys.argv[1:]
 
     if len(argv) < 1:
         print("Usage: dulwich <%s> [OPTIONS...]" % ("|".join(commands.keys())))
@@ -747,9 +747,13 @@ def main(argv=None):
     return cmd_kls().run(argv[1:])
 
 
-if __name__ == "__main__":
+def _main():
     if "DULWICH_PDB" in os.environ and getattr(signal, "SIGQUIT", None):
         signal.signal(signal.SIGQUIT, signal_quit)  # type: ignore
     signal.signal(signal.SIGINT, signal_int)
 
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())
+
+
+if __name__ == "__main__":
+    _main()

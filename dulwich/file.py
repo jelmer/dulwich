@@ -66,7 +66,7 @@ def _fancy_rename(oldname, newname):
     os.remove(tmpfile)
 
 
-def GitFile(filename, mode="rb", bufsize=-1):
+def GitFile(filename, mode="rb", bufsize=-1, mask=0o644):
     """Create a file object that obeys the git file locking protocol.
 
     Returns: a builtin file object or a _GitFile object
@@ -77,6 +77,10 @@ def GitFile(filename, mode="rb", bufsize=-1):
     are not.  To read and write from the same file, you can take advantage of
     the fact that opening a file for write does not actually open the file you
     request.
+
+    The default file mask makes any created files user-writable and
+    world-readable.
+
     """
     if "a" in mode:
         raise IOError("append mode not supported for Git files")
@@ -85,7 +89,7 @@ def GitFile(filename, mode="rb", bufsize=-1):
     if "b" not in mode:
         raise IOError("text mode not supported for Git files")
     if "w" in mode:
-        return _GitFile(filename, mode, bufsize)
+        return _GitFile(filename, mode, bufsize, mask)
     else:
         return io.open(filename, mode, bufsize)
 
@@ -136,7 +140,7 @@ class _GitFile(object):
         "writelines",
     )
 
-    def __init__(self, filename, mode, bufsize):
+    def __init__(self, filename, mode, bufsize, mask):
         self._filename = filename
         if isinstance(self._filename, bytes):
             self._lockfilename = self._filename + b".lock"
@@ -146,6 +150,7 @@ class _GitFile(object):
             fd = os.open(
                 self._lockfilename,
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
+                mask,
             )
         except FileExistsError:
             raise FileLocked(filename, self._lockfilename)

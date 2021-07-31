@@ -27,6 +27,7 @@ from unittest import skipUnless
 import os
 import shutil
 import stat
+import sys
 import tempfile
 
 from dulwich.index import (
@@ -443,7 +444,8 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         path = self.store._get_shafile_path(testobject.id)
         mode = os.stat(path).st_mode
 
-        self.assertEqual(oct(mode), "0o100444")
+        packmode = "0o100444" if sys.platform != "win32" else "0o100666"
+        self.assertEqual(oct(mode), packmode)
 
     def test_corrupted_object_raise_exception(self):
         """Corrupted sha1 disk file should raise specific exception"""

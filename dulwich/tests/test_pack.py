@@ -338,6 +338,7 @@ class TestPackData(PackTests):
             p.create_index_v1(filename)
             idx1 = load_pack_index(filename)
             idx2 = self.get_pack_index(pack1_sha)
+            self.assertEqual(oct(os.stat(filename).st_mode), "0o100644")
             self.assertEqual(idx1, idx2)
 
     def test_create_index_v2(self):
@@ -346,6 +347,7 @@ class TestPackData(PackTests):
             p.create_index_v2(filename)
             idx1 = load_pack_index(filename)
             idx2 = self.get_pack_index(pack1_sha)
+            self.assertEqual(oct(os.stat(filename).st_mode), "0o100644")
             self.assertEqual(idx1, idx2)
 
     def test_compute_file_sha(self):

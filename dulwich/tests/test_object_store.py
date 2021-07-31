@@ -438,6 +438,13 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         for alt_path in store._read_alternate_paths():
             self.assertNotIn("#", alt_path)
 
+    def test_file_modes(self):
+        self.store.add_object(testobject)
+        path = self.store._get_shafile_path(testobject.id)
+        mode = os.stat(path).st_mode
+
+        self.assertEqual(oct(mode), "0o100444")
+
     def test_corrupted_object_raise_exception(self):
         """Corrupted sha1 disk file should raise specific exception"""
         self.store.add_object(testobject)
@@ -448,8 +455,11 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertIsNotNone(self.store._get_loose_object(testobject.id))
 
         path = self.store._get_shafile_path(testobject.id)
+        old_mode = os.stat(path).st_mode
+        os.chmod(path, 0o600)
         with open(path, "wb") as f:  # corrupt the file
             f.write(b"")
+        os.chmod(path, old_mode)
 
         expected_error_msg = "Corrupted empty file detected"
         try:

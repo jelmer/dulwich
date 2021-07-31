@@ -731,7 +731,7 @@ commands = {
 
 def main(argv=None):
     if argv is None:
-        argv = sys.argv
+        argv = sys.argv[1:]
 
     if len(argv) < 1:
         print("Usage: dulwich <%s> [OPTIONS...]" % ("|".join(commands.keys())))
@@ -752,4 +752,4 @@ if __name__ == "__main__":
         signal.signal(signal.SIGQUIT, signal_quit)  # type: ignore
     signal.signal(signal.SIGINT, signal_int)
 
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

@@ -70,7 +70,10 @@ from dulwich.refs import ANNOTATED_TAG_SUFFIX
 INFODIR = "info"
 PACKDIR = "pack"
 
-PACK_MODE = 0o444
+# use permissions consistent with Git; just readable by everyone
+# TODO: should packs also be non-writable on Windows? if so, that
+# would requite some rather significant adjustments to the test suite
+PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
 
 
 class BaseObjectStore(object):

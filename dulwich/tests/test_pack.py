@@ -26,6 +26,7 @@ from io import BytesIO
 from hashlib import sha1
 import os
 import shutil
+import sys
 import tempfile
 import zlib
 
@@ -83,6 +84,7 @@ pack1_sha = b"bc63ddad95e7321ee734ea11a7a62d314e0d7481"
 a_sha = b"6f670c0fb53f9463760b7295fbb814e965fb20c8"
 tree_sha = b"b2a2766a2879c209ab1176e7e778b81ae422eeaa"
 commit_sha = b"f18faa16531ac570a3fdc8c7ca16682548dafd12"
+indexmode = "0o100644" if sys.platform != "win32" else "0o100666"
 
 
 class PackTests(TestCase):
@@ -338,7 +340,7 @@ class TestPackData(PackTests):
             p.create_index_v1(filename)
             idx1 = load_pack_index(filename)
             idx2 = self.get_pack_index(pack1_sha)
-            self.assertEqual(oct(os.stat(filename).st_mode), "0o100644")
+            self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
 
     def test_create_index_v2(self):
@@ -347,7 +349,7 @@ class TestPackData(PackTests):
             p.create_index_v2(filename)
             idx1 = load_pack_index(filename)
             idx2 = self.get_pack_index(pack1_sha)
-            self.assertEqual(oct(os.stat(filename).st_mode), "0o100644")
+            self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
 
     def test_compute_file_sha(self):

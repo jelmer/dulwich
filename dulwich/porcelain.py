@@ -108,7 +108,6 @@ from dulwich.index import (
 )
 from dulwich.object_store import (
     tree_lookup_path,
-    parse_tree,
 )
 from dulwich.objects import (
     Commit,
@@ -1781,12 +1780,12 @@ def unstage(repo: Repo, paths: list[bytes] = []):
         except KeyError:
             # if index_entry doesnt exist, this file was being removed. readd it
             # update index entry stats to reflect commit
-            index_entry = [(0, 0), (0,0), 15, 0, 0, 1000, 1000, 0, tree_entry[1], 0, 0]
-        index_entry[0] = (repo[b'HEAD'].commit_time, 0)  #ctime
-        index_entry[1] = (repo[b'HEAD'].commit_time, 0)  #mtime
-        index_entry[4] = tree_entry[0]  #mode
-        index_entry[7] = len(repo[tree_entry[1]].data)  #size
-        index_entry[8] = tree_entry[1]  #sha
+            index_entry = [(0, 0), (0, 0), 15, 0, 0, 1000, 1000, 0, tree_entry[1], 0, 0]
+        index_entry[0] = (repo[b'HEAD'].commit_time, 0)  # ctime
+        index_entry[1] = (repo[b'HEAD'].commit_time, 0)  # mtime
+        index_entry[4] = tree_entry[0]                   # mode
+        index_entry[7] = len(repo[tree_entry[1]].data)   # size
+        index_entry[8] = tree_entry[1]                   # sha
 
         index[path] = index_entry
         index.write()
@@ -1806,14 +1805,14 @@ def unstage_all(repo: Repo):
     for entry in repo.object_store.iter_tree_contents(tree_id):
         files_path.append(entry.path)
     for entry in index:
-        files_path.append(entry[0])
+        files_path.append(entry)
     # remove the same files
     files_path = list(set(files_path))
 
     unstage(repo, files_path)
 
 
-def reset_file(repo, file_path: str ,target: bytes = b'HEAD'):
+def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
     '''
     reset the file to specific commit or branch
     Args:
@@ -1827,10 +1826,10 @@ def reset_file(repo, file_path: str ,target: bytes = b'HEAD'):
         sha = repo.head()
     else:
         sha = target
-    tree = parse_tree(repo,treeish=sha)
+    tree = parse_tree(repo, treeish=sha)
 
     def get_entry(repo, tree, file_path: str):
-        if os.path.split(file_path)[0] != '': # file_path with directory
+        if os.path.split(file_path)[0] != '':  # file_path with directory
             par_dir_tree_id = get_entry(repo, tree, os.path.split(file_path)[0])[1]
             tree = parse_tree(repo, treeish=par_dir_tree_id)
             tree_id = tree[os.path.split(file_path)[1].encode()]
@@ -1843,13 +1842,13 @@ def reset_file(repo, file_path: str ,target: bytes = b'HEAD'):
                 print('file not in tree')
                 return None
 
-    file_entry = get_entry(repo,tree,file_path)
+    file_entry = get_entry(repo, tree, file_path)
     if file_entry:  
         full_path = os.path.join(repo.path, file_path)
 
         blob = repo.object_store[file_entry[1]]
         mode = file_entry[0]
-        build_file_from_blob(blob,mode,full_path.encode())
+        build_file_from_blob(blob, mode, full_path.encode())
 
 
 def reset_all_file(repo, target: bytes = b'HEAD'):

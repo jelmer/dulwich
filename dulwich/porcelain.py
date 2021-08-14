@@ -1774,8 +1774,7 @@ def unstage(repo: Repo, paths: list[bytes] = []):
                 del index[path]
                 index.write()
             except KeyError:
-                print('file not in index.', path.decode())
-            return
+                raise KeyError("file '%s' not in index" % (path.decode()))
 
         try:
             index_entry = index[path]
@@ -1841,8 +1840,7 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
                 return tree[file_path.encode()]
             except KeyError:
                 # untracked file not in tree.
-                print('file not in tree')
-                return None
+                raise KeyError("file '%s' not in tree" % (file_path))
 
     file_entry = get_entry(repo, tree, file_path)
     if file_entry:  

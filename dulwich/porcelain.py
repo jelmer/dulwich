@@ -1776,17 +1776,19 @@ def unstage(repo: Repo, paths: list[bytes] = []):
             except KeyError:
                 raise KeyError("file '%s' not in index" % (path.decode()))
 
-        try:
-            index_entry = index[path]
-        except KeyError:
-            # if index_entry doesnt exist, this file was being removed. readd it
-            index_entry = IndexEntry((0, 0), (0, 0), 15, 0, 0, 1000, 1000, 0, tree_entry[1], 0, 0)
-        # update index entry stats to reflect commit
-        index_entry.ctime = (repo[b'HEAD'].commit_time, 0)
-        index_entry.mtime = (repo[b'HEAD'].commit_time, 0)
-        index_entry.mode = tree_entry[0]
-        index_entry.size = len(repo[tree_entry[1]].data)
-        index_entry.sha = tree_entry[1]
+        index_entry = IndexEntry(
+            ctime=(repo[b'HEAD'].commit_time, 0),
+            mtime=(repo[b'HEAD'].commit_time, 0),
+            dev=15,
+            ino=0,
+            mode=tree_entry[0],
+            uid=1000,
+            gid=1000,
+            size=len(repo[tree_entry[1]].data),
+            sha=tree_entry[1],
+            flags=0,
+            extended_flags=0
+        )
 
         index[path] = index_entry
     index.write()

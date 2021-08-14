@@ -1755,12 +1755,12 @@ def update_head(repo, target, detached=False, new_branch=None):
 
 
 def unstage(repo: Repo, paths: list[bytes] = []):
-    '''
+    """
     unstage specific file in the index
     Args:
         repo: dulwich Repo object
         paths: a list of file to unstage
-    '''
+    """
     for path in paths:
         index = repo.open_index()
         tree_id = repo[b'HEAD']._tree
@@ -1792,12 +1792,12 @@ def unstage(repo: Repo, paths: list[bytes] = []):
 
 
 def unstage_all(repo: Repo):
-    '''
+    """
     unstage all file in the index
     Args:
         repo: dulwich Repo object
         paths: a list of file to unstage
-    '''
+    """
     index = repo.open_index()
     tree_id = repo[b'HEAD'].tree
     files_path = []
@@ -1813,13 +1813,13 @@ def unstage_all(repo: Repo):
 
 
 def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
-    '''
+    """
     reset the file to specific commit or branch
     Args:
         repo: dulwich Repo object
         file_path: file to reset
         target: branch or commit or b'HEAD' to reset
-    '''
+    """
     if target in branch_list(repo):
         sha = repo.refs[b'refs/heads/' + target]
     elif target == b'HEAD':
@@ -1852,12 +1852,12 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
 
 
 def reset_all_file(repo, target: bytes = b'HEAD'):
-    '''
+    """
     reset all unstaged file to target
     Args:
         repo: dulwich Repo object
         target: branch or commit or b'HEAD' to reset
-    '''
+    """
 
     normalizer = repo.get_blob_normalizer()
     filter_callback = normalizer.checkin_normalize
@@ -1867,12 +1867,12 @@ def reset_all_file(repo, target: bytes = b'HEAD'):
 
 
 def checkout(repo, branch: bytes):
-    '''
+    """
     switch branches or restore working tree files
     Args:
         repo: dulwich Repo object
         branch: branch name to checkout
-    '''
+    """
 
     update_head(repo, branch)
     unstage_all(repo)

@@ -1790,7 +1790,7 @@ def unstage(repo: Repo, paths: list[bytes] = []):
         index_entry.sha = tree_entry[1]
 
         index[path] = index_entry
-        index.write()
+    index.write()
 
 
 def unstage_all(repo: Repo):

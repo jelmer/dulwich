@@ -105,6 +105,7 @@ from dulwich.index import (
     blob_from_path_and_stat,
     get_unstaged_changes,
     build_file_from_blob,
+    IndexEntry,
 )
 from dulwich.object_store import (
     tree_lookup_path,
@@ -1764,6 +1765,7 @@ def unstage(repo: Repo, paths: list[bytes] = []):
     for path in paths:
         index = repo.open_index()
         tree_id = repo[b'HEAD']._tree
+
         try:
             tree_entry = repo[tree_id].lookup_path(lambda x: repo[x], path)
         except KeyError:
@@ -1776,16 +1778,16 @@ def unstage(repo: Repo, paths: list[bytes] = []):
             return
 
         try:
-            index_entry = list(index[path])
+            index_entry = index[path]
         except KeyError:
             # if index_entry doesnt exist, this file was being removed. readd it
-            # update index entry stats to reflect commit
-            index_entry = [(0, 0), (0, 0), 15, 0, 0, 1000, 1000, 0, tree_entry[1], 0, 0]
-        index_entry[0] = (repo[b'HEAD'].commit_time, 0)  # ctime
-        index_entry[1] = (repo[b'HEAD'].commit_time, 0)  # mtime
-        index_entry[4] = tree_entry[0]                   # mode
-        index_entry[7] = len(repo[tree_entry[1]].data)   # size
-        index_entry[8] = tree_entry[1]                   # sha
+            index_entry = IndexEntry((0, 0), (0, 0), 15, 0, 0, 1000, 1000, 0, tree_entry[1], 0, 0)
+        # update index entry stats to reflect commit
+        index_entry.ctime = (repo[b'HEAD'].commit_time, 0)
+        index_entry.mtime = (repo[b'HEAD'].commit_time, 0)
+        index_entry.mode = tree_entry[0]
+        index_entry.size = len(repo[tree_entry[1]].data)
+        index_entry.sha = tree_entry[1]
 
         index[path] = index_entry
         index.write()
@@ -1845,7 +1847,6 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
     file_entry = get_entry(repo, tree, file_path)
     if file_entry:  
         full_path = os.path.join(repo.path, file_path)
-
         blob = repo.object_store[file_entry[1]]
         mode = file_entry[0]
         build_file_from_blob(blob, mode, full_path.encode())

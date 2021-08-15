@@ -1850,11 +1850,11 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
                 raise KeyError("file '%s' not in tree" % (file_path))
 
     file_entry = get_entry(repo, tree, file_path)
-    if file_entry:  
-        full_path = os.path.join(repo.path, file_path)
-        blob = repo.object_store[file_entry[1]]
-        mode = file_entry[0]
-        build_file_from_blob(blob, mode, full_path.encode())
+    
+    full_path = os.path.join(repo.path, file_path)
+    blob = repo.object_store[file_entry[1]]
+    mode = file_entry[0]
+    build_file_from_blob(blob, mode, full_path.encode())
 
 
 def reset_all_file(repo, target: bytes = b'HEAD'):

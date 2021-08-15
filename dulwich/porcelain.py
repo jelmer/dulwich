@@ -1756,16 +1756,16 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
-def unstage(repo: Repo, paths: List[bytes] = []):
+def unstage(repo: Repo, relpaths: List[bytes] = []):
     """
     unstage specific file in the index
     Args:
         repo: dulwich Repo object
-        paths: a list of file to unstage
+        paths: a list of file to unstage, relative to the repository path
     """
     index = repo.open_index()
     tree_id = repo[b'HEAD']._tree
-    for path in paths:
+    for path in relpaths:
         try:
             tree_entry = repo[tree_id].lookup_path(lambda x: repo[x], path)
         except KeyError:

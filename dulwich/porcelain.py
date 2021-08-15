@@ -1770,10 +1770,9 @@ def unstage(repo: Repo, paths: List[bytes] = []):
             tree_entry = repo[tree_id].lookup_path(lambda x: repo[x], path)
         except KeyError:
             # if tree_entry didnt exist, this file was being added, so remove index entry
-            tree_entry = None
             try:
                 del index[path]
-                index.write()
+                continue
             except KeyError:
                 raise KeyError("file '%s' not in index" % (path.decode()))
 
@@ -1787,11 +1786,11 @@ def unstage(repo: Repo, paths: List[bytes] = []):
             mtime=(repo[b'HEAD'].commit_time, 0),
             dev=st.st_dev if st else 0,
             ino=st.st_ino if st else 0,
-            mode=tree_entry[0] if tree_entry else 0,
+            mode=tree_entry[0],
             uid=st.st_uid if st else 0,
             gid=st.st_gid if st else 0,
-            size=len(repo[tree_entry[1]].data) if tree_entry else 0,
-            sha=tree_entry[1] if tree_entry else 0,
+            size=len(repo[tree_entry[1]].data),
+            sha=tree_entry[1],
             flags=0,
             extended_flags=0
         )

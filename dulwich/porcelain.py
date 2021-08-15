@@ -1762,30 +1762,35 @@ def unstage(repo: Repo, paths: list[bytes] = []):
         repo: dulwich Repo object
         paths: a list of file to unstage
     """
+    index = repo.open_index()
+    tree_id = repo[b'HEAD']._tree
     for path in paths:
-        index = repo.open_index()
-        tree_id = repo[b'HEAD']._tree
-
         try:
             tree_entry = repo[tree_id].lookup_path(lambda x: repo[x], path)
         except KeyError:
             # if tree_entry didnt exist, this file was being added, so remove index entry
+            tree_entry = None
             try:
                 del index[path]
                 index.write()
             except KeyError:
                 raise KeyError("file '%s' not in index" % (path.decode()))
 
+        try:
+            st = os.lstat(os.path.join(repo.path, path.decode()))
+        except FileNotFoundError:
+            st = None
+
         index_entry = IndexEntry(
             ctime=(repo[b'HEAD'].commit_time, 0),
             mtime=(repo[b'HEAD'].commit_time, 0),
-            dev=15,
-            ino=0,
-            mode=tree_entry[0],
-            uid=1000,
-            gid=1000,
-            size=len(repo[tree_entry[1]].data),
-            sha=tree_entry[1],
+            dev=st.st_dev if st else 0,
+            ino=st.st_ino if st else 0,
+            mode=tree_entry[0] if tree_entry else 0,
+            uid=st.st_uid if st else 0,
+            gid=st.st_gid if st else 0,
+            size=len(repo[tree_entry[1]].data) if tree_entry else 0,
+            sha=tree_entry[1] if tree_entry else 0,
             flags=0,
             extended_flags=0
         )

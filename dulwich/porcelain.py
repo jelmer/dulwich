@@ -75,6 +75,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    List,
 )
 
 from dulwich.archive import (
@@ -1755,7 +1756,7 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
-def unstage(repo: Repo, paths: list[bytes] = []):
+def unstage(repo: Repo, paths: List[bytes] = []):
     """
     unstage specific file in the index
     Args:

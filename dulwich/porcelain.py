@@ -75,7 +75,6 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    List,
 )
 
 from dulwich.archive import (
@@ -106,7 +105,6 @@ from dulwich.index import (
     blob_from_path_and_stat,
     get_unstaged_changes,
     build_file_from_blob,
-    IndexEntry,
 )
 from dulwich.object_store import (
     tree_lookup_path,

@@ -1755,33 +1755,13 @@ def update_head(repo, target, detached=False, new_branch=None):
         if new_branch is not None:
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
-def unstage_all(repo: Repo):
-    """
-    unstage all file in the index
-    Args:
-        repo: dulwich Repo object
-        paths: a list of file to unstage
-    """
-    index = repo.open_index()
-    tree_id = repo[b'HEAD'].tree
-    files_path = []
-
-    for entry in repo.object_store.iter_tree_contents(tree_id):
-        files_path.append(entry.path)
-    for entry in index:
-        files_path.append(entry)
-    # remove the same files
-    files_path = list(set(files_path))
-
-    unstage(repo, files_path)
-
 
 def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
     """
     reset the file to specific commit or branch
     Args:
         repo: dulwich Repo object
-        file_path: file to reset
+        file_path: file to reset, relative to the repository path
         target: branch or commit or b'HEAD' to reset
     """
     if target in branch_list(repo):
@@ -1813,21 +1793,6 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
     build_file_from_blob(blob, mode, full_path.encode())
 
 
-def reset_all_file(repo, target: bytes = b'HEAD'):
-    """
-    reset all unstaged file to target
-    Args:
-        repo: dulwich Repo object
-        target: branch or commit or b'HEAD' to reset
-    """
-
-    normalizer = repo.get_blob_normalizer()
-    filter_callback = normalizer.checkin_normalize
-    unstaged_files = list(get_unstaged_changes(repo.open_index(), repo.path, filter_callback))
-    for file in unstaged_files:
-        reset_file(repo, file.decode(), target)
-
-
 def checkout(repo, branch: bytes):
     """
     switch branches or restore working tree files
@@ -1837,11 +1802,22 @@ def checkout(repo, branch: bytes):
     """
 
     update_head(repo, branch)
-    unstage_all(repo)
-    reset_all_file(repo, target=b'HEAD')
 
-    untracked_file = (list(get_untracked_paths(repo.path, repo.path, repo.open_index())))
+    # unstage all files in the index
+    tracked_changes = []
+    for file in get_tree_changes(repo).values():
+        tracked_changes += file
+    repo.unstage(tracked_changes)
+
+    # reset all unstaged file to target
+    normalizer = repo.get_blob_normalizer()
+    filter_callback = normalizer.checkin_normalize
+    unstaged_files = list(get_unstaged_changes(repo.open_index(), repo.path, filter_callback))
+    for file in unstaged_files:
+        reset_file(repo, file.decode(), b'HEAD')
+
     # remove untrack file
+    untracked_file = (list(get_untracked_paths(repo.path, repo.path, repo.open_index())))
     for file in untracked_file:
         os.remove(os.path.join(repo.path, file))
 

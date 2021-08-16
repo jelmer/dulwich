@@ -1317,6 +1317,126 @@ class ResetTests(PorcelainTestCase):
         self.assertEqual([], changes)
 
 
+class StageTests(PorcelainTestCase):
+    def test_unstage_add_file(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, 'foo')
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        self.repo.unstage([file.encode()])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['foo']], status)
+
+    def test_unstage_modify_file(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, 'foo')
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        with open(full_path, 'a') as f:
+            f.write('broken')
+        porcelain.add(self.repo, paths=[full_path])
+        self.repo.unstage([file.encode()])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
+
+    
+    def test_unstage_remove_file(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, 'foo')
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        os.remove(full_path)
+        self.repo.unstage([file.encode()])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
+
+
+class ResetFileTests(PorcelainTestCase):
+    def test_reset_modify_file_to_commit(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, 'foo')
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        sha = porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        with open(full_path, 'a') as f:
+            f.write('something new')
+        porcelain.reset_file(self.repo, file, target=sha)
+
+        with open(full_path, 'r') as f:
+            self.assertEqual(f.read(),'hello')
+
+    def test_reset_remove_file_to_commit(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, 'foo')
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        sha = porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        os.remove(full_path)
+        porcelain.reset_file(self.repo, file, target=sha)
+
+        with open(full_path, 'r') as f:
+            self.assertEqual(f.read(),'hello')
+            
+
+    def test_resetfile_to_branch(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, 'foo')
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # create a new branch and do commit
+        porcelain.branch_create(self.repo, 'uni')
+        porcelain.checkout(self.repo, b'uni')
+        with open(full_path, 'a') as f:
+            f.write('something new')
+        porcelain.commit(
+            self.repo,
+            message=b"unitest in branch uni",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        porcelain.reset_file(self.repo, file, target=b'uni')
+        with open(full_path, 'r') as f:
+            self.assertEqual(f.read(),'hello')
+
 class PushTests(PorcelainTestCase):
     def test_simple(self):
         """

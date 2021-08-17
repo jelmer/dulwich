@@ -1347,7 +1347,6 @@ class StageTests(PorcelainTestCase):
         status = list(porcelain.status(self.repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 
-    
     def test_unstage_remove_file(self):
         file = 'foo'
         full_path = os.path.join(self.repo.path, 'foo')
@@ -1385,7 +1384,7 @@ class ResetFileTests(PorcelainTestCase):
         porcelain.reset_file(self.repo, file, target=sha)
 
         with open(full_path, 'r') as f:
-            self.assertEqual(f.read(),'hello')
+            self.assertEqual(f.read(), 'hello')
 
     def test_reset_remove_file_to_commit(self):
         file = 'foo'
@@ -1404,9 +1403,8 @@ class ResetFileTests(PorcelainTestCase):
         porcelain.reset_file(self.repo, file, target=sha)
 
         with open(full_path, 'r') as f:
-            self.assertEqual(f.read(),'hello')
+            self.assertEqual(f.read(), 'hello')
             
-
     def test_resetfile_to_branch(self):
         file = 'foo'
         full_path = os.path.join(self.repo.path, 'foo')
@@ -1435,7 +1433,7 @@ class ResetFileTests(PorcelainTestCase):
 
         porcelain.reset_file(self.repo, file, target=b'uni')
         with open(full_path, 'r') as f:
-            self.assertEqual(f.read(),'hello')
+            self.assertEqual(f.read(), 'hello')
 
 class PushTests(PorcelainTestCase):
     def test_simple(self):

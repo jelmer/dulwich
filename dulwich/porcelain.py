@@ -1791,7 +1791,7 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
     build_file_from_blob(blob, mode, full_path.encode())
 
 
-def checkout(repo, branch: bytes):
+def checkout(repo, branch: bytes, force: bool = False):
     """
     switch branches or restore working tree files
     Args:
@@ -1799,6 +1799,10 @@ def checkout(repo, branch: bytes):
         branch: branch name to checkout
     """
 
+    # check repo status
+    if not force:
+        if status(repo) != GitStatus(staged={'add': [], 'delete': [], 'modify': []}, unstaged=[], untracked=[]):
+            raise Exception('working directory not clean')
     update_head(repo, branch)
 
     # unstage all files in the index

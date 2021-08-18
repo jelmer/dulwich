@@ -1320,10 +1320,45 @@ class ResetTests(PorcelainTestCase):
         self.assertEqual([], changes)
 
 
-class StageTests(PorcelainTestCase):
+class UnstageTests(PorcelainTestCase):
+    def test_unstage_midify_file_with_dir(self):
+        os.mkdir(os.path.join(self.repo.path, 'new_dir'))
+        full_path = os.path.join(self.repo.path, 'new_dir', 'foo')
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        with open(full_path, 'a') as f:
+            f.write('something new')
+        self.repo.unstage(['new_dir/foo'.encode()])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'new_dir/foo'], []], status)
+
+    def test_unstage_while_no_commit(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, file)
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        self.repo.unstage([file.encode()])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['foo']], status)
+
     def test_unstage_add_file(self):
         file = 'foo'
         full_path = os.path.join(self.repo.path, file)
+        porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
         with open(full_path, 'w') as f:
             f.write('hello')
         porcelain.add(self.repo, paths=[full_path])
@@ -1435,6 +1470,31 @@ class ResetFileTests(PorcelainTestCase):
         )
 
         porcelain.reset_file(self.repo, file, target=b'uni')
+        with open(full_path, 'r') as f:
+            self.assertEqual(f.read(), 'hello')
+    
+    def test_resetfile_with_dir(self):
+        os.mkdir(os.path.join(self.repo.path, 'new_dir'))
+        full_path = os.path.join(self.repo.path, 'new_dir', 'foo')
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        sha = porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        with open(full_path, 'a') as f:
+            f.write('something new')
+        porcelain.commit(
+            self.repo,
+            message=b"unitest 2",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.reset_file(self.repo, os.path.join('new_dir', 'foo'), target=sha)
         with open(full_path, 'r') as f:
             self.assertEqual(f.read(), 'hello')
 

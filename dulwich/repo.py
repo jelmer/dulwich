@@ -28,7 +28,6 @@ local disk (Repo).
 
 """
 
-from dulwich import porcelain
 from io import BytesIO
 import os
 import sys
@@ -1314,14 +1313,15 @@ class Repo(BaseRepo):
             paths: a list of file to unstage, relative to the repository path
         """
 
-        from dulwich.index import IndexEntry 
+        from dulwich.index import IndexEntry
+        from dulwich.porcelain import remove
 
         index = self.open_index()
         try:
             tree_id = self[b'HEAD'].tree
         # no head mean no commit in the repo
         except KeyError:
-            porcelain.remove(self, paths=[os.path.join(self.path, path.decode()) for path in relpaths], cached=True)
+            remove(self, paths=[os.path.join(self.path, path.decode()) for path in relpaths], cached=True)
             return
 
         for path in relpaths:

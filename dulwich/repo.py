@@ -1334,11 +1334,12 @@ class Repo(BaseRepo):
                     continue
                 except KeyError:
                     raise KeyError("file '%s' not in index" % (path.decode()))
-
+                    
+            st = None
             try:
                 st = os.lstat(os.path.join(self.path, path.decode()))
             except FileNotFoundError:
-                st = None
+                pass
 
             index_entry = IndexEntry(
                 ctime=(self[b'HEAD'].commit_time, 0),

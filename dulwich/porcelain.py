@@ -96,6 +96,7 @@ from dulwich.diff_tree import (
 )
 from dulwich.errors import (
     SendPackError,
+    CheckoutError,
 )
 from dulwich.graph import (
     can_fast_forward,
@@ -1802,7 +1803,7 @@ def checkout(repo, branch: bytes, force: bool = False):
     # check repo status
     if not force:
         if status(repo) != GitStatus(staged={'add': [], 'delete': [], 'modify': []}, unstaged=[], untracked=[]):
-            raise Exception('working directory not clean')
+            raise CheckoutError('working directory not clean')
     update_head(repo, branch)
 
     # unstage all files in the index

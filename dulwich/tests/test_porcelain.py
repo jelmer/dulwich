@@ -35,7 +35,10 @@ from unittest import skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
-from dulwich.errors import CommitError
+from dulwich.errors import (
+    CommitError,
+    CheckoutError,
+)
 from dulwich.objects import (
     Blob,
     Tag,
@@ -1320,7 +1323,7 @@ class ResetTests(PorcelainTestCase):
 class StageTests(PorcelainTestCase):
     def test_unstage_add_file(self):
         file = 'foo'
-        full_path = os.path.join(self.repo.path, 'foo')
+        full_path = os.path.join(self.repo.path, file)
         with open(full_path, 'w') as f:
             f.write('hello')
         porcelain.add(self.repo, paths=[full_path])
@@ -1330,7 +1333,7 @@ class StageTests(PorcelainTestCase):
 
     def test_unstage_modify_file(self):
         file = 'foo'
-        full_path = os.path.join(self.repo.path, 'foo')
+        full_path = os.path.join(self.repo.path, file)
         with open(full_path, 'w') as f:
             f.write('hello')
         porcelain.add(self.repo, paths=[full_path])
@@ -1349,7 +1352,7 @@ class StageTests(PorcelainTestCase):
 
     def test_unstage_remove_file(self):
         file = 'foo'
-        full_path = os.path.join(self.repo.path, 'foo')
+        full_path = os.path.join(self.repo.path, file)
         with open(full_path, 'w') as f:
             f.write('hello')
         porcelain.add(self.repo, paths=[full_path])
@@ -1368,7 +1371,7 @@ class StageTests(PorcelainTestCase):
 class ResetFileTests(PorcelainTestCase):
     def test_reset_modify_file_to_commit(self):
         file = 'foo'
-        full_path = os.path.join(self.repo.path, 'foo')
+        full_path = os.path.join(self.repo.path, file)
 
         with open(full_path, 'w') as f:
             f.write('hello')
@@ -1388,7 +1391,7 @@ class ResetFileTests(PorcelainTestCase):
 
     def test_reset_remove_file_to_commit(self):
         file = 'foo'
-        full_path = os.path.join(self.repo.path, 'foo')
+        full_path = os.path.join(self.repo.path, file)
 
         with open(full_path, 'w') as f:
             f.write('hello')
@@ -1407,7 +1410,7 @@ class ResetFileTests(PorcelainTestCase):
             
     def test_resetfile_to_branch(self):
         file = 'foo'
-        full_path = os.path.join(self.repo.path, 'foo')
+        full_path = os.path.join(self.repo.path, file)
 
         with open(full_path, 'w') as f:
             f.write('hello')
@@ -1435,6 +1438,44 @@ class ResetFileTests(PorcelainTestCase):
         with open(full_path, 'r') as f:
             self.assertEqual(f.read(), 'hello')
 
+
+class CheckoutTests(PorcelainTestCase):
+    def test_checkout_with_modified_file(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, file)
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        porcelain.branch_create(self.repo, 'uni')
+        with open(full_path, 'a') as f:
+            f.write('new message')
+        porcelain.add(self.repo, paths=[full_path])
+
+        # raise error when working directory is not clean
+        with self.assertRaises(CheckoutError):
+            porcelain.checkout(self.repo, b'uni')
+
+        # force checkout to branch 'uni'
+        porcelain.checkout(self.repo, b'uni', force=True)
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+        self.assertEqual(b'uni', porcelain.active_branch(self.repo))
+
+        # checkout to branch 'master' and check if the working directory is clean
+        porcelain.checkout(self.repo, b'master')
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+        self.assertEqual(b'master', porcelain.active_branch(self.repo))
+
+    
 class PushTests(PorcelainTestCase):
     def test_simple(self):
         """

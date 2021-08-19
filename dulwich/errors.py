@@ -84,7 +84,7 @@ class NotBlobError(WrongObjectException):
     type_name = "blob"
 
 
-class CheckoutError(Exception):
+class DirNotCleanError(Exception):
     """Indicates that the working directory is not clean while trying to checkout."""
 
 

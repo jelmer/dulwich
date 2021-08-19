@@ -37,7 +37,7 @@ from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import (
     CommitError,
-    CheckoutError,
+    DirNotCleanError,
 )
 from dulwich.objects import (
     Blob,
@@ -1520,7 +1520,7 @@ class CheckoutTests(PorcelainTestCase):
         porcelain.add(self.repo, paths=[full_path])
 
         # raise error when working directory is not clean
-        with self.assertRaises(CheckoutError):
+        with self.assertRaises(DirNotCleanError):
             porcelain.checkout(self.repo, b'uni')
 
         # force checkout to branch 'uni'

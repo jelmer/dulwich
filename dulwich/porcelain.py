@@ -96,7 +96,7 @@ from dulwich.diff_tree import (
 )
 from dulwich.errors import (
     SendPackError,
-    CheckoutError,
+    DirNotCleanError,
 )
 from dulwich.graph import (
     can_fast_forward,
@@ -1804,7 +1804,7 @@ def checkout(repo, branch: bytes, force: bool = False):
     if not force:
         for files in get_tree_changes(repo)['modify']:
             if files in repo.open_index():
-                raise CheckoutError('working directory not clean')
+                raise DirNotCleanError('trying to checkout when working directory not clean')
         
         index = repo.open_index()
         normalizer = repo.get_blob_normalizer()
@@ -1812,7 +1812,7 @@ def checkout(repo, branch: bytes, force: bool = False):
         unstaged_changes = list(get_unstaged_changes(index, repo.path, filter_callback))
         for file in unstaged_changes:
             if file in repo.open_index():
-                raise CheckoutError('working directory not clean')
+                raise DirNotCleanError('working directory not clean')
                 
     update_head(repo, branch)
 

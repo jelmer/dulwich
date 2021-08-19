@@ -1756,12 +1756,11 @@ def update_head(repo, target, detached=False, new_branch=None):
 
 
 def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
-    """
-    reset the file to specific commit or branch
+    """reset the file to specific commit or branch
     Args:
-        repo: dulwich Repo object
-        file_path: file to reset, relative to the repository path
-        target: branch or commit or b'HEAD' to reset
+      repo: dulwich Repo object
+      file_path: file to reset, relative to the repository path
+      target: branch or commit or b'HEAD' to reset
     """
     if target in branch_list(repo):
         sha = repo.refs[b'refs/heads/' + target]
@@ -1793,11 +1792,10 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
 
 
 def checkout(repo, branch: bytes, force: bool = False):
-    """
-    switch branches or restore working tree files
+    """switch branches or restore working tree files
     Args:
-        repo: dulwich Repo object
-        branch: branch name to checkout
+      repo: dulwich Repo object
+      branch: branch name to checkout
     """
 
     # check repo status

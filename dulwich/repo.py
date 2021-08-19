@@ -1306,11 +1306,10 @@ class Repo(BaseRepo):
         index.write()
 
     def unstage(self, relpaths: List[bytes] = []):
-        """
-        unstage specific file in the index
+        """unstage specific file in the index
         Args:
-            repo: dulwich Repo object
-            paths: a list of file to unstage, relative to the repository path
+          repo: dulwich Repo object
+          paths: a list of file to unstage, relative to the repository path
         """
 
         from dulwich.index import IndexEntry

@@ -1802,27 +1802,32 @@ def checkout(repo, branch: bytes, force: bool = False):
 
     # check repo status
     if not force:
-        if status(repo) != GitStatus(staged={'add': [], 'delete': [], 'modify': []}, unstaged=[], untracked=[]):
-            raise CheckoutError('working directory not clean')
+        for files in get_tree_changes(repo)['modify']:
+            if files in repo.open_index():
+                raise CheckoutError('working directory not clean')
+        
+        index = repo.open_index()
+        normalizer = repo.get_blob_normalizer()
+        filter_callback = normalizer.checkin_normalize
+        unstaged_changes = list(get_unstaged_changes(index, repo.path, filter_callback))
+        for file in unstaged_changes:
+            if file in repo.open_index():
+                raise CheckoutError('working directory not clean')
+                
     update_head(repo, branch)
 
-    # unstage all files in the index
+    # unstage modify files in the index
     tracked_changes = []
-    for file in get_tree_changes(repo).values():
-        tracked_changes += file
+    for file in get_tree_changes(repo)['modify']:
+        tracked_changes.append(file)
     repo.unstage(tracked_changes)
 
-    # reset all unstaged file to target
+    # reset tracked and unstaged file to target
     normalizer = repo.get_blob_normalizer()
     filter_callback = normalizer.checkin_normalize
     unstaged_files = list(get_unstaged_changes(repo.open_index(), repo.path, filter_callback))
     for file in unstaged_files:
         reset_file(repo, file.decode(), b'HEAD')
-
-    # remove untrack file
-    untracked_file = (list(get_untracked_paths(repo.path, repo.path, repo.open_index())))
-    for file in untracked_file:
-        os.remove(os.path.join(repo.path, file))
 
 
 def check_mailmap(repo, contact):

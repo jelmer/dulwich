@@ -1500,7 +1500,7 @@ class ResetFileTests(PorcelainTestCase):
 
 
 class CheckoutTests(PorcelainTestCase):
-    def test_checkout_with_modified_file(self):
+    def test_checkout_with_modified_files(self):
         file = 'foo'
         full_path = os.path.join(self.repo.path, file)
 
@@ -1533,6 +1533,37 @@ class CheckoutTests(PorcelainTestCase):
         porcelain.checkout(self.repo, b'master')
         status = list(porcelain.status(self.repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+        self.assertEqual(b'master', porcelain.active_branch(self.repo))
+
+    def test_checkout_with_untrack_files(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, file)
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.branch_create(self.repo, 'uni')
+
+        # add new file `bar`
+        with open(os.path.join(self.repo.path, 'bar'), 'w') as f:
+            f.write('b')
+
+        porcelain.checkout(self.repo, b'uni')
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['bar']], status)
+        self.assertEqual(b'uni', porcelain.active_branch(self.repo))
+
+        # stage the file `bar` and checkout to master
+        porcelain.add(self.repo, [os.path.join(self.repo.path, 'bar')])
+        porcelain.checkout(self.repo, b'master')
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [b'bar'], 'delete': [], 'modify': []}, [], []], status)
         self.assertEqual(b'master', porcelain.active_branch(self.repo))
 
     

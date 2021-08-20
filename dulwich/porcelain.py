@@ -1762,8 +1762,6 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
       file_path: file to reset, relative to the repository path
       target: branch or commit or b'HEAD' to reset
     """
-    if target in branch_list(repo):
-        target = b'refs/heads/' + target
     tree = parse_tree(repo, treeish=target)
 
     file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path.encode())

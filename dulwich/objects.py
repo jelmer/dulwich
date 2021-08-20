@@ -1179,8 +1179,7 @@ class Tree(ShaFile):
           path: Path to lookup
         Returns: A tuple of (mode, SHA) of the resulting path.
         """
-        parts = os.path.split(path)
-        # parts = path.split(b"/")
+        parts = path.split(os.sep.encode())
         sha = self.id
         mode = None
         for p in parts:

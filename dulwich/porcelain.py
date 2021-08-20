@@ -1763,28 +1763,10 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
       target: branch or commit or b'HEAD' to reset
     """
     if target in branch_list(repo):
-        sha = repo.refs[b'refs/heads/' + target]
-    elif target == b'HEAD':
-        sha = repo.head()
-    else:
-        sha = target
-    tree = parse_tree(repo, treeish=sha)
+        target = b'refs/heads/' + target
+    tree = parse_tree(repo, treeish=target)
 
-    def get_entry(repo, tree, file_path: str):
-        if os.path.split(file_path)[0] != '':  # file_path with directory
-            par_dir_tree_id = get_entry(repo, tree, os.path.split(file_path)[0])[1]
-            tree = parse_tree(repo, treeish=par_dir_tree_id)
-            tree_id = tree[os.path.split(file_path)[1].encode()]
-            return tree_id
-        else:
-            try:
-                return tree[file_path.encode()]
-            except KeyError:
-                # untracked file not in tree.
-                raise KeyError("file '%s' not in tree" % (file_path))
-
-    file_entry = get_entry(repo, tree, file_path)
-    
+    file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path.encode())
     full_path = os.path.join(repo.path, file_path)
     blob = repo.object_store[file_entry[1]]
     mode = file_entry[0]

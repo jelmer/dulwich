@@ -1805,7 +1805,7 @@ def checkout(repo, branch: bytes, force: bool = False):
     # reset tracked and unstaged file to target
     normalizer = repo.get_blob_normalizer()
     filter_callback = normalizer.checkin_normalize
-    unstaged_files = list(get_unstaged_changes(repo.open_index(), repo.path, filter_callback))
+    unstaged_files = get_unstaged_changes(repo.open_index(), repo.path, filter_callback)
     for file in unstaged_files:
         reset_file(repo, file.decode(), b'HEAD')
 

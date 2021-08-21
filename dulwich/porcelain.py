@@ -106,6 +106,7 @@ from dulwich.index import (
     blob_from_path_and_stat,
     get_unstaged_changes,
     build_file_from_blob,
+    index_entry_from_stat,
 )
 from dulwich.object_store import (
     tree_lookup_path,
@@ -1763,12 +1764,29 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
       target: branch or commit or b'HEAD' to reset
     """
     tree = parse_tree(repo, treeish=target)
+    index = repo.open_index()
 
-    file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path.encode())
+    file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path.encode())   # (mode, sha)
     full_path = os.path.join(repo.path, file_path)
     blob = repo.object_store[file_entry[1]]
     mode = file_entry[0]
-    build_file_from_blob(blob, mode, full_path.encode())
+    st = build_file_from_blob(blob, mode, full_path.encode())
+    st_tuple = (
+        file_entry[0],
+        st.st_ino,
+        st.st_dev,
+        st.st_nlink,
+        st.st_uid,
+        st.st_gid,
+        st.st_size,
+        st.st_atime,
+        st.st_mtime,
+        st.st_ctime,
+    )
+    st = st.__class__(st_tuple)
+    index[file_path.encode()] = index_entry_from_stat(st, file_entry[1], 0)
+
+    index.write()
 
 
 def checkout(repo, branch: bytes, force: bool = False):

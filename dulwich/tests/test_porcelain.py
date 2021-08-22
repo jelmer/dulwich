@@ -1483,7 +1483,35 @@ class CheckoutTests(PorcelainTestCase):
         self.assertEqual([{'add': [b'bar'], 'delete': [], 'modify': []}, [], []], status)
         self.assertEqual(b'master', porcelain.active_branch(self.repo))
 
-    
+    def test_checkout_to_commit_sha(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, file)
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        sha = porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        with open(full_path, 'a') as f:
+            f.write('something wrong')
+        porcelain.add(self.repo, paths=[full_path])
+        porcelain.commit(
+            self.repo,
+            message=b"I may added something wrong",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.checkout(self.repo, sha)
+        self.assertEqual(sha, self.repo.head())
+        with open(full_path) as f:
+            self.assertEqual('hello', f.read())
+
+
 class PushTests(PorcelainTestCase):
     def test_simple(self):
         """

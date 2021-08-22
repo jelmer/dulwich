@@ -1789,11 +1789,11 @@ def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
     index.write()
 
 
-def checkout(repo, branch: bytes, force: bool = False):
+def checkout(repo, target: bytes, force: bool = False):
     """switch branches or restore working tree files
     Args:
       repo: dulwich Repo object
-      branch: branch name to checkout
+      target: branch name or commit sha to checkout
     """
 
     # check repo status
@@ -1809,8 +1809,11 @@ def checkout(repo, branch: bytes, force: bool = False):
         for file in unstaged_changes:
             if file in repo.open_index():
                 raise DirNotCleanError('working directory not clean')
-                
-    update_head(repo, branch)
+    
+    if target in repo.refs.keys(base=LOCAL_BRANCH_PREFIX):
+        update_head(repo, target)
+    else:
+        update_head(repo, target, detached=True)
 
     # unstage modify files in the index
     tracked_changes = []

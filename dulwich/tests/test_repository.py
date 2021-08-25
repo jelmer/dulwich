@@ -21,10 +21,11 @@
 
 """Tests for the repository."""
 
+import glob
 import locale
 import os
-import stat
 import shutil
+import stat
 import sys
 import tempfile
 import warnings
@@ -79,6 +80,21 @@ class CreateRepositoryTests(TestCase):
         with repo.get_named_file("config") as f:
             config_text = f.read()
             self.assertTrue(barestr in config_text, "%r" % config_text)
+
+        if isinstance(repo, Repo):
+            expected_mode = '0o100644' if expect_filemode else '0o100666'
+            expected = {
+                'HEAD': expected_mode,
+                'config': expected_mode,
+                'description': expected_mode,
+            }
+            actual = {
+                f[len(repo._controldir) + 1:]: oct(os.stat(f).st_mode)
+                for f in glob.glob(os.path.join(repo._controldir, '*'))
+                if os.path.isfile(f)
+            }
+
+            self.assertEqual(expected, actual)
 
     def test_create_memory(self):
         repo = MemoryRepo.init_bare([], {})

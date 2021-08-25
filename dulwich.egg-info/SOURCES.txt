@@ -15,7 +15,6 @@ README.rst
 README.swift.rst
 SECURITY.md
 TODO
-build.cmd
 dulwich.cfg
 releaser.conf
 requirements.txt
@@ -51,6 +50,7 @@ docs/tutorial/remote.txt
 docs/tutorial/repo.txt
 docs/tutorial/tag.txt
 dulwich/__init__.py
+dulwich/__main__.py
 dulwich/_diff_tree.c
 dulwich/_objects.c
 dulwich/_pack.c
@@ -93,6 +93,7 @@ dulwich.egg-info/PKG-INFO
 dulwich.egg-info/SOURCES.txt
 dulwich.egg-info/dependency_links.txt
 dulwich.egg-info/entry_points.txt
+dulwich.egg-info/not-zip-safe
 dulwich.egg-info/requires.txt
 dulwich.egg-info/top_level.txt
 dulwich/cloud/__init__.py

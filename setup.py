@@ -23,7 +23,7 @@ if sys.version_info < (3, 5):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.23'
+dulwich_version_string = '0.20.24'
 
 
 class DulwichDistribution(Distribution):
@@ -116,6 +116,7 @@ setup(name='dulwich',
       package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
       scripts=scripts,
       ext_modules=ext_modules,
+      zip_safe=False,
       distclass=DulwichDistribution,
       classifiers=[
           'Development Status :: 4 - Beta',

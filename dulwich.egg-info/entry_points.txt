@@ -1,3 +1,0 @@
-[console_scripts]
-dulwich = dulwich.cli:main
-

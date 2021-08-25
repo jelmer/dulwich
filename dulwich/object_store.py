@@ -70,6 +70,11 @@ from dulwich.refs import ANNOTATED_TAG_SUFFIX
 INFODIR = "info"
 PACKDIR = "pack"
 
+# use permissions consistent with Git; just readable by everyone
+# TODO: should packs also be non-writable on Windows? if so, that
+# would requite some rather significant adjustments to the test suite
+PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
+
 
 class BaseObjectStore(object):
     """Object store interface."""
@@ -805,7 +810,7 @@ class DiskObjectStore(PackBasedObjectStore):
         os.rename(path, target_pack)
 
         # Write the index.
-        index_file = GitFile(pack_base_name + ".idx", "wb")
+        index_file = GitFile(pack_base_name + ".idx", "wb", mask=PACK_MODE)
         try:
             write_pack_index_v2(index_file, entries, pack_sha)
             index_file.close()
@@ -837,6 +842,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         fd, path = tempfile.mkstemp(dir=self.path, prefix="tmp_pack_")
         with os.fdopen(fd, "w+b") as f:
+            os.chmod(path, PACK_MODE)
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
             copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
             copier.verify()
@@ -856,7 +862,7 @@ class DiskObjectStore(PackBasedObjectStore):
             basename = self._get_pack_basepath(entries)
             index_name = basename + ".idx"
             if not os.path.exists(index_name):
-                with GitFile(index_name, "wb") as f:
+                with GitFile(index_name, "wb", mask=PACK_MODE) as f:
                     write_pack_index_v2(f, entries, p.get_stored_checksum())
         for pack in self.packs:
             if pack._basename == basename:
@@ -885,6 +891,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, "wb")
+        os.chmod(path, PACK_MODE)
 
         def commit():
             f.flush()
@@ -916,7 +923,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pass
         if os.path.exists(path):
             return  # Already there, no need to write again
-        with GitFile(path, "wb") as f:
+        with GitFile(path, "wb", mask=PACK_MODE) as f:
             f.write(
                 obj.as_legacy_object(compression_level=self.loose_compression_level)
             )

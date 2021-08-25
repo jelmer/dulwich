@@ -1,3 +1,24 @@
+0.20.25	2021-08-23
+
+ * Fix ``dulwich`` script when installed via setup.py.
+   (Dan Villiom Podlaski Christiansen)
+
+ * Make default file mask consistent
+   with Git. (Dan Villiom Podlaski Christiansen, #884)
+
+0.20.24	2021-07-18
+
+ * config: disregard UTF-8 BOM when reading file.
+   (Dan Villiom Podlaski Christiansen)
+
+ * Skip lines with spaces only in .gitignore. (Andrey Torsunov, #878)
+
+ * Add a separate HTTPProxyUnauthorized exception for 407 errors.
+   (Jelmer Vernooĳ, #822)
+
+ * Split out a AbstractHTTPGitClient class.
+   (Jelmer Vernooĳ)
+
 0.20.23	2021-05-24
 
  * Fix installation of GPG during package publishing.
@@ -282,7 +303,7 @@
  BUG FIXES
 
  * Avoid ``PermissionError``, since it is Python3-specific.
-  (Jelmer Vernooĳ)
+   (Jelmer Vernooĳ)
 
  * Fix regression that added a dependency on C git for the
    test suite. (Jelmer Vernooĳ, #720)

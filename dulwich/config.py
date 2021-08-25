@@ -41,7 +41,7 @@ try:
         MutableMapping,
     )
 except ImportError:  # python < 3.7
-    from collections import (
+    from collections import (  # type: ignore
         Iterable,
         MutableMapping,
     )
@@ -387,14 +387,16 @@ class ConfigFile(ConfigDict):
         super(ConfigFile, self).__init__(values=values, encoding=encoding)
         self.path = None
 
-    @classmethod
-    def from_file(cls, f: BinaryIO) -> "ConfigFile":
+    @classmethod  # noqa: C901
+    def from_file(cls, f: BinaryIO) -> "ConfigFile":  # noqa: C901
         """Read configuration from a file-like object."""
         ret = cls()
         section = None  # type: Optional[Tuple[bytes, ...]]
         setting = None
         continuation = None
         for lineno, line in enumerate(f.readlines()):
+            if lineno == 0 and line.startswith(b'\xef\xbb\xbf'):
+                line = line[3:]
             line = line.lstrip()
             if setting is None:
                 # Parse section header ("[bla]")

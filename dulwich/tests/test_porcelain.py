@@ -1339,7 +1339,7 @@ class ResetFileTests(PorcelainTestCase):
         porcelain.reset_file(self.repo, file, target=sha)
 
         with open(full_path, 'r') as f:
-            self.assertEqual(f.read(), 'hello')
+            self.assertEqual('hello', f.read())
 
     def test_reset_remove_file_to_commit(self):
         file = 'foo'
@@ -1358,7 +1358,7 @@ class ResetFileTests(PorcelainTestCase):
         porcelain.reset_file(self.repo, file, target=sha)
 
         with open(full_path, 'r') as f:
-            self.assertEqual(f.read(), 'hello')
+            self.assertEqual('hello', f.read())
             
     def test_resetfile_to_branch(self):
         file = 'foo'
@@ -1388,7 +1388,7 @@ class ResetFileTests(PorcelainTestCase):
 
         porcelain.reset_file(self.repo, file, target=b'uni')
         with open(full_path, 'r') as f:
-            self.assertEqual(f.read(), 'hello')
+            self.assertEqual('hello', f.read())
     
     def test_resetfile_with_dir(self):
         os.mkdir(os.path.join(self.repo.path, 'new_dir'))
@@ -1413,10 +1413,35 @@ class ResetFileTests(PorcelainTestCase):
         )
         porcelain.reset_file(self.repo, os.path.join('new_dir', 'foo'), target=sha)
         with open(full_path, 'r') as f:
-            self.assertEqual(f.read(), 'hello')
+            self.assertEqual('hello', f.read())
 
 
 class CheckoutTests(PorcelainTestCase):
+    def test_checkout_to_branch_with_different_file(self):
+        foo_path = os.path.join(self.repo.path, 'foo')
+        with open(foo_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[foo_path])
+        porcelain.commit(
+            self.repo,
+            message=b"add foo",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.branch_create(self.repo, 'uni')
+        os.remove(foo_path)
+        porcelain.add(self.repo, paths=[foo_path])
+        porcelain.commit(
+            self.repo,
+            message=b"remove foo",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.checkout(self.repo, b'uni')
+        self.assertEqual(['.git', 'foo'], sorted(os.listdir(self.repo.path)))
+        porcelain.checkout(self.repo, b'master')
+        self.assertEqual(['.git'], sorted(os.listdir(self.repo.path)))
+
     def test_checkout_with_modified_files(self):
         file = 'foo'
         full_path = os.path.join(self.repo.path, file)

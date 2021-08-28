@@ -1798,8 +1798,8 @@ def checkout(repo, target: bytes, force: bool = False):
 
     # check repo status
     if not force:
-        for files in get_tree_changes(repo)['modify']:
-            if files in repo.open_index():
+        for file in get_tree_changes(repo)['modify']:
+            if file in repo.open_index():
                 raise DirNotCleanError('trying to checkout when working directory not clean')
         
         index = repo.open_index()
@@ -1808,17 +1808,24 @@ def checkout(repo, target: bytes, force: bool = False):
         unstaged_changes = list(get_unstaged_changes(index, repo.path, filter_callback))
         for file in unstaged_changes:
             if file in repo.open_index():
-                raise DirNotCleanError('working directory not clean')
-    
-    if target in repo.refs.keys(base=LOCAL_BRANCH_PREFIX):
+                raise DirNotCleanError('trying to checkout when working directory not clean')
+ 
+    current_file_set = set(parse_tree(repo, repo.head()))
+    target_file_set = set(parse_tree(repo, target))
+
+    if target == b'HEAD':  # do not update head while trying to checkout to HEAD
+        target = repo.head()
+    elif target in repo.refs.keys(base=LOCAL_BRANCH_PREFIX):
         update_head(repo, target)
+        target = repo.refs[LOCAL_BRANCH_PREFIX + target]
     else:
         update_head(repo, target, detached=True)
 
-    # unstage modify files in the index
     tracked_changes = []
-    for file in get_tree_changes(repo)['modify']:
-        tracked_changes.append(file)
+    # unstage files in the current_file_set or target_file_set
+    for files in get_tree_changes(repo).values():
+        if set(files) & (current_file_set | target_file_set):
+            tracked_changes += files
     repo.unstage(tracked_changes)
 
     # reset tracked and unstaged file to target
@@ -1827,6 +1834,11 @@ def checkout(repo, target: bytes, force: bool = False):
     unstaged_files = get_unstaged_changes(repo.open_index(), repo.path, filter_callback)
     for file in unstaged_files:
         reset_file(repo, file.decode(), b'HEAD')
+    
+    # remove the untracked file which in the current_file_set
+    for file in get_untracked_paths(repo.path, repo.path, repo.open_index(), exclude_ignored=True):
+        if file.encode() in current_file_set:
+            os.remove(os.path.join(repo.path, file))
 
 
 def check_mailmap(repo, contact):

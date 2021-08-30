@@ -1756,7 +1756,7 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
-def reset_file(repo, file_path: str , target: bytes = b'HEAD'):
+def reset_file(repo, file_path: str, target: bytes = b'HEAD'):
     """reset the file to specific commit or branch
     Args:
       repo: dulwich Repo object
@@ -1809,10 +1809,11 @@ def checkout(repo, target: bytes, force: bool = False):
         for file in unstaged_changes:
             if file in repo.open_index():
                 raise DirNotCleanError('trying to checkout when working directory not clean')
- 
-    current_file_set = set(parse_tree(repo, repo.head()))
-    target_file_set = set(parse_tree(repo, target))
 
+    current_tree = parse_tree(repo, repo.head())
+    target_tree = parse_tree(repo, target)
+
+    # update head
     if target == b'HEAD':  # do not update head while trying to checkout to HEAD
         target = repo.head()
     elif target in repo.refs.keys(base=LOCAL_BRANCH_PREFIX):
@@ -1821,11 +1822,21 @@ def checkout(repo, target: bytes, force: bool = False):
     else:
         update_head(repo, target, detached=True)
 
+    # unstage files in the current_tree or target_tree
     tracked_changes = []
-    # unstage files in the current_file_set or target_file_set
-    for files in get_tree_changes(repo).values():
-        if set(files) & (current_file_set | target_file_set):
-            tracked_changes += files
+    for change in repo.open_index().changes_from_tree(repo.object_store, target_tree.id):
+        file = change[0][0] or change[0][1]   # no matter the file is added, modified or deleted.
+        try:
+            current_entry = current_tree.lookup_path(repo.object_store.__getitem__, file)
+        except KeyError:
+            current_entry = None
+        try:
+            target_entry = target_tree.lookup_path(repo.object_store.__getitem__, file)
+        except KeyError:
+            target_entry = None
+        
+        if current_entry or target_entry:
+            tracked_changes.append(file)
     repo.unstage(tracked_changes)
 
     # reset tracked and unstaged file to target
@@ -1837,7 +1848,11 @@ def checkout(repo, target: bytes, force: bool = False):
     
     # remove the untracked file which in the current_file_set
     for file in get_untracked_paths(repo.path, repo.path, repo.open_index(), exclude_ignored=True):
-        if file.encode() in current_file_set:
+        try:
+            current_tree.lookup_path(repo.object_store.__getitem__, file.encode())
+        except KeyError:
+            pass
+        else:
             os.remove(os.path.join(repo.path, file))
 
 

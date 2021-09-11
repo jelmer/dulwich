@@ -1787,9 +1787,11 @@ def checkout(repo, target: bytes, force: bool = False):
         index = repo.open_index()
         normalizer = repo.get_blob_normalizer()
         filter_callback = normalizer.checkin_normalize
+        
         unstaged_changes = list(get_unstaged_changes(index, repo.path, filter_callback))
+        file_list = list(repo.open_index())
         for file in unstaged_changes:
-            if file in repo.open_index():
+            if file in file_list:
                 raise DirNotCleanError('trying to checkout when working directory not clean')
 
     current_tree = parse_tree(repo, repo.head())

@@ -1313,14 +1313,15 @@ class Repo(BaseRepo):
         """
 
         from dulwich.index import IndexEntry
-        from dulwich.porcelain import remove
 
         index = self.open_index()
         try:
             tree_id = self[b'HEAD'].tree
         # no head mean no commit in the repo
         except KeyError:
-            remove(self, paths=[os.path.join(self.path, path.decode()) for path in relpaths], cached=True)
+            for path in relpaths:
+                del index[path]
+            index.write()
             return
 
         for path in relpaths:

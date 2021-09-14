@@ -873,12 +873,12 @@ class Tag(ShaFile):
             if keyid is not None:
                 key = c.get_key(keyid)
                 with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.signature, unused_result = ctx.sign(
+                    self._signature, unused_result = ctx.sign(
                         self.as_raw_string(),
                         mode=gpg.constants.sig.mode.DETACH,
                     )
             else:
-                self.signature, unused_result = c.sign(
+                self._signature, unused_result = c.sign(
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 

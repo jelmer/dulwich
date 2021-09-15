@@ -1467,6 +1467,7 @@ class SSHVendor(object):
         port=None,
         password=None,
         key_filename=None,
+        ssh_command=None,
     ):
         """Connect to an SSH server.
 
@@ -1480,6 +1481,7 @@ class SSHVendor(object):
           port: Optional SSH port to use
           password: Optional ssh password for login or private key
           key_filename: Optional path to private keyfile
+          ssh_command: Optional SSH command
 
         Returns:
 
@@ -1505,6 +1507,7 @@ class SubprocessSSHVendor(SSHVendor):
         port=None,
         password=None,
         key_filename=None,
+        ssh_command=None,
     ):
 
         if password is not None:
@@ -1512,7 +1515,7 @@ class SubprocessSSHVendor(SSHVendor):
                 "Setting password not supported by SubprocessSSHVendor."
             )
 
-        args = ["ssh", "-x"]
+        args = [ssh_command or "ssh", "-x"]
 
         if port:
             args.extend(["-p", str(port)])
@@ -1547,9 +1550,12 @@ class PLinkSSHVendor(SSHVendor):
         port=None,
         password=None,
         key_filename=None,
+        ssh_command=None,
     ):
 
-        if sys.platform == "win32":
+        if ssh_command:
+            args = [ssh_command, "-ssh"]
+        elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]
         else:
             args = ["plink", "-ssh"]
@@ -1611,6 +1617,7 @@ class SSHGitClient(TraditionalGitClient):
         config=None,
         password=None,
         key_filename=None,
+        ssh_command=None,
         **kwargs
     ):
         self.host = host
@@ -1618,6 +1625,9 @@ class SSHGitClient(TraditionalGitClient):
         self.username = username
         self.password = password
         self.key_filename = key_filename
+        self.ssh_command = ssh_command or os.environ.get(
+            "GIT_SSH_COMMAND", os.environ.get("GIT_SSH")
+        )
         super(SSHGitClient, self).__init__(**kwargs)
         self.alternative_paths = {}
         if vendor is not None:
@@ -1667,6 +1677,9 @@ class SSHGitClient(TraditionalGitClient):
             kwargs["password"] = self.password
         if self.key_filename is not None:
             kwargs["key_filename"] = self.key_filename
+        # GIT_SSH_COMMAND takes precendence over GIT_SSH
+        if self.ssh_command is not None:
+            kwargs["ssh_command"] = self.ssh_command
         con = self.ssh_vendor.run_command(
             self.host, argv, port=self.port, username=self.username, **kwargs
         )

@@ -1515,7 +1515,10 @@ class SubprocessSSHVendor(SSHVendor):
                 "Setting password not supported by SubprocessSSHVendor."
             )
 
-        args = [ssh_command or "ssh", "-x"]
+        if ssh_command:
+            args = ssh_command.split() + ["-x"]
+        else:
+            args = ["ssh", "-x"]
 
         if port:
             args.extend(["-p", str(port)])
@@ -1554,7 +1557,7 @@ class PLinkSSHVendor(SSHVendor):
     ):
 
         if ssh_command:
-            args = [ssh_command, "-ssh"]
+            args = ssh_command.split() + ["-ssh"]
         elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]
         else:

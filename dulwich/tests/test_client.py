@@ -1249,7 +1249,9 @@ class SubprocessSSHVendorTests(TestCase):
 
     def test_run_with_ssh_command(self):
         expected = [
-            "/path/to/ssh -o Option=Value",
+            "/path/to/ssh",
+            "-o",
+            "Option=Value",
             "-x",
             "host",
             "git-clone-url",

@@ -6,7 +6,7 @@ Uploaders: Jelmer Vernooĳ <jelmer@debian.org>
 Homepage: https://www.dulwich.io/
 Build-Depends: debhelper-compat (= 12),
                dh-python,
-               git [!alpha !ppc64 !sparc64 !x32 !ia64],
+               git [!kfreebsd-amd64 !kfreebsd-i386],
                gnupg,
                python3-all-dbg,
                python3-all-dev,

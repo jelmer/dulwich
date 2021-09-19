@@ -54,8 +54,10 @@ def parse_tree(repo, treeish):
       KeyError: If the object can not be found
     """
     treeish = to_bytes(treeish)
-    if treeish not in repo.object_store.__iter__():
+    try:
         treeish = parse_ref(repo.refs.keys(), treeish)
+    except KeyError:  # treeish is commit sha
+        pass
     o = repo[treeish]
     if o.type_name == b"commit":
         return repo[o.tree]

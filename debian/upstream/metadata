@@ -2,3 +2,4 @@ Repository: https://github.com/dulwich/dulwich.git
 Repository-Browse: https://github.com/dulwich/dulwich
 Bug-Database: https://github.com/dulwich/dulwich/issues
 Bug-Submit: https://github.com/dulwich/dulwich/issues/new
+Security-Contact: https://github.com/dulwich/dulwich/tree/HEAD/SECURITY.md

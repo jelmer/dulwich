@@ -3,6 +3,7 @@ dulwich (0.20.25-2) UNRELEASED; urgency=medium
   * Bump debhelper from old 12 to 13.
   * Set upstream metadata fields: Security-Contact.
   * Drop transition for old debug package migration.
+  * Update standards version to 4.5.1, no changes needed.
 
  -- Debian Janitor <janitor@jelmer.uk>  Sun, 19 Sep 2021 14:38:03 -0000
 

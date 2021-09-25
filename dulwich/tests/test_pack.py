@@ -1032,7 +1032,8 @@ class DeltaChainIteratorTests(TestCase):
                 (OFS_DELTA, (0, b"blob2")),
             ],
         )
-        self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([0, 2, 1], entries, self.make_pack_iter(f))
 
     def test_ofs_deltas_chain(self):
         f = BytesIO()
@@ -1056,7 +1057,8 @@ class DeltaChainIteratorTests(TestCase):
                 (REF_DELTA, (1, b"blob2")),
             ],
         )
-        self.assertEntriesMatch([1, 0, 2], entries, self.make_pack_iter(f))
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([1, 2, 0], entries, self.make_pack_iter(f))
 
     def test_ref_deltas_chain(self):
         f = BytesIO()
@@ -1082,7 +1084,9 @@ class DeltaChainIteratorTests(TestCase):
                 (OFS_DELTA, (1, b"blob2")),
             ],
         )
-        self.assertEntriesMatch([1, 2, 0], entries, self.make_pack_iter(f))
+
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([1, 0, 2], entries, self.make_pack_iter(f))
 
     def test_mixed_chain(self):
         f = BytesIO()
@@ -1094,9 +1098,9 @@ class DeltaChainIteratorTests(TestCase):
                 (OFS_DELTA, (0, b"blob1")),
                 (OFS_DELTA, (1, b"blob3")),
                 (OFS_DELTA, (0, b"bob")),
-            ],
-        )
-        self.assertEntriesMatch([0, 2, 4, 1, 3], entries, self.make_pack_iter(f))
+            ])
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([0, 4, 2, 1, 3], entries, self.make_pack_iter(f))
 
     def test_long_chain(self):
         n = 100
@@ -1114,7 +1118,9 @@ class DeltaChainIteratorTests(TestCase):
             objects_spec.append((OFS_DELTA, (0, b"blob" + str(i).encode("ascii"))))
         f = BytesIO()
         entries = build_pack(f, objects_spec)
-        self.assertEntriesMatch(range(n + 1), entries, self.make_pack_iter(f))
+        # Delta resolution changed to DFS
+        indices = [0] + list(range(100, 0, -1))
+        self.assertEntriesMatch(indices, entries, self.make_pack_iter(f))
 
     def test_ext_ref(self):
         (blob,) = self.store_blobs([b"blob"])

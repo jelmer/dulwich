@@ -1439,7 +1439,8 @@ class DeltaChainIterator(object):
         # Unlike PackData.get_object_at, there is no need to cache offsets as
         # this approach by design inflates each object exactly once.
         todo = [(offset, obj_type_num, base_chunks)]
-        for offset, obj_type_num, base_chunks in todo:
+        while todo:
+            (offset, obj_type_num, base_chunks) = todo.pop()
             unpacked = self._resolve_object(offset, obj_type_num, base_chunks)
             yield self._result(unpacked)
 

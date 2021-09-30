@@ -49,6 +49,9 @@ from dulwich.repo import (
     NoIndexPresent,
     Repo,
 )
+from dulwich.index import (
+    _fs_to_tree_path,
+)
 from dulwich.tests import (
     TestCase,
 )
@@ -1430,7 +1433,7 @@ class CheckoutTests(PorcelainTestCase):
         )
         porcelain.branch_create(self.repo, 'uni')
         os.remove(foo_path)
-        porcelain.add(self.repo, paths=[foo_path])
+        porcelain.add(self.repo, paths=[_fs_to_tree_path(foo_path).decode()])
         porcelain.commit(
             self.repo,
             message=b"remove foo",

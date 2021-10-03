@@ -108,6 +108,8 @@ from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (
     blob_from_path_and_stat,
     get_unstaged_changes,
+    build_file_from_blob,
+    _fs_to_tree_path,
 )
 from dulwich.object_store import (
     tree_lookup_path,
@@ -1739,6 +1741,24 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(to_set, parse_ref(r, target))
         if new_branch is not None:
             r.refs.set_symbolic_ref(b"HEAD", to_set)
+
+
+def reset_file(repo, file_path: str, target: bytes = b'HEAD'):
+    """Reset the file to specific commit or branch.
+
+    Args:
+      repo: dulwich Repo object
+      file_path: file to reset, relative to the repository path
+      target: branch or commit or b'HEAD' to reset
+    """
+    tree = parse_tree(repo, treeish=target)
+    file_path = _fs_to_tree_path(file_path)
+
+    file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path)
+    full_path = os.path.join(repo.path.encode(), file_path)
+    blob = repo.object_store[file_entry[1]]
+    mode = file_entry[0]
+    build_file_from_blob(blob, mode, full_path)
 
 
 def check_mailmap(repo, contact):

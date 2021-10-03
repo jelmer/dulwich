@@ -1305,6 +1305,59 @@ class Repo(BaseRepo):
                     index[tree_path] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
+    def unstage(self, relpaths: List[bytes] = []):
+        """unstage specific file in the index
+        Args:
+          repo: dulwich Repo object
+          paths: a list of file to unstage, relative to the repository path
+        """
+
+        from dulwich.index import IndexEntry
+
+        index = self.open_index()
+        try:
+            tree_id = self[b'HEAD'].tree
+        # no head mean no commit in the repo
+        except KeyError:
+            for path in relpaths:
+                del index[path]
+            index.write()
+            return
+
+        for path in relpaths:
+            try:
+                tree_entry = self[tree_id].lookup_path(lambda x: self[x], path)
+            except KeyError:
+                # if tree_entry didnt exist, this file was being added, so remove index entry
+                try:
+                    del index[path]
+                    continue
+                except KeyError:
+                    raise KeyError("file '%s' not in index" % (path.decode()))
+
+            st = None
+            try:
+                st = os.lstat(os.path.join(self.path, path.decode()))
+            except FileNotFoundError:
+                pass
+
+            index_entry = IndexEntry(
+                ctime=(self[b'HEAD'].commit_time, 0),
+                mtime=(self[b'HEAD'].commit_time, 0),
+                dev=st.st_dev if st else 0,
+                ino=st.st_ino if st else 0,
+                mode=tree_entry[0],
+                uid=st.st_uid if st else 0,
+                gid=st.st_gid if st else 0,
+                size=len(self[tree_entry[1]].data),
+                sha=tree_entry[1],
+                flags=0,
+                extended_flags=0
+            )
+
+            index[path] = index_entry
+        index.write()
+
     def clone(
         self,
         target_path,

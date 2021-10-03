@@ -35,7 +35,9 @@ from unittest import skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
-from dulwich.errors import CommitError
+from dulwich.errors import (
+    CommitError,
+)
 from dulwich.objects import (
     Blob,
     Tag,
@@ -45,6 +47,9 @@ from dulwich.objects import (
 from dulwich.repo import (
     NoIndexPresent,
     Repo,
+)
+from dulwich.index import (
+    _fs_to_tree_path,
 )
 from dulwich.tests import (
     TestCase,
@@ -1315,6 +1320,73 @@ class ResetTests(PorcelainTestCase):
         )
 
         self.assertEqual([], changes)
+
+
+class ResetFileTests(PorcelainTestCase):
+
+    def test_reset_modify_file_to_commit(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, file)
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        sha = porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        with open(full_path, 'a') as f:
+            f.write('something new')
+        porcelain.reset_file(self.repo, file, target=sha)
+
+        with open(full_path, 'r') as f:
+            self.assertEqual('hello', f.read())
+
+    def test_reset_remove_file_to_commit(self):
+        file = 'foo'
+        full_path = os.path.join(self.repo.path, file)
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        sha = porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        os.remove(full_path)
+        porcelain.reset_file(self.repo, file, target=sha)
+
+        with open(full_path, 'r') as f:
+            self.assertEqual('hello', f.read())
+
+    def test_resetfile_with_dir(self):
+        os.mkdir(os.path.join(self.repo.path, 'new_dir'))
+        full_path = os.path.join(self.repo.path, 'new_dir', 'foo')
+
+        with open(full_path, 'w') as f:
+            f.write('hello')
+        porcelain.add(self.repo, paths=[full_path])
+        sha = porcelain.commit(
+            self.repo,
+            message=b"unitest",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        with open(full_path, 'a') as f:
+            f.write('something new')
+        porcelain.commit(
+            self.repo,
+            message=b"unitest 2",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.reset_file(self.repo, os.path.join('new_dir', 'foo'), target=sha)
+        with open(full_path, 'r') as f:
+            self.assertEqual('hello', f.read())
 
 
 class PushTests(PorcelainTestCase):

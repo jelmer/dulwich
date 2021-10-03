@@ -1242,7 +1242,7 @@ class BuildRepoRootTests(TestCase):
         )
         with open(full_path, 'a') as f:
             f.write('something new')
-        self._repo.unstage(['new_dir/foo'.encode()])
+        self._repo.unstage(['new_dir/foo'])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'new_dir/foo'], []], status)
 
@@ -1252,7 +1252,7 @@ class BuildRepoRootTests(TestCase):
         with open(full_path, 'w') as f:
             f.write('hello')
         porcelain.add(self._repo, paths=[full_path])
-        self._repo.unstage([file.encode()])
+        self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['foo']], status)
 
@@ -1268,7 +1268,7 @@ class BuildRepoRootTests(TestCase):
         with open(full_path, 'w') as f:
             f.write('hello')
         porcelain.add(self._repo, paths=[full_path])
-        self._repo.unstage([file.encode()])
+        self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['foo']], status)
 
@@ -1287,7 +1287,7 @@ class BuildRepoRootTests(TestCase):
         with open(full_path, 'a') as f:
             f.write('broken')
         porcelain.add(self._repo, paths=[full_path])
-        self._repo.unstage([file.encode()])
+        self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 
@@ -1304,7 +1304,7 @@ class BuildRepoRootTests(TestCase):
             author=b"John <john@example.com>",
         )
         os.remove(full_path)
-        self._repo.unstage([file.encode()])
+        self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 

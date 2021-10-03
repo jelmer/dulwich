@@ -1305,39 +1305,45 @@ class Repo(BaseRepo):
                     index[tree_path] = index_entry_from_stat(st, blob.id, 0)
         index.write()
 
-    def unstage(self, relpaths: List[bytes] = []):
+    def unstage(self, fs_paths: List[str]):
         """unstage specific file in the index
         Args:
-          repo: dulwich Repo object
-          paths: a list of file to unstage, relative to the repository path
+          fs_paths: a list of files to unstage,
+            relative to the repository path
         """
-
-        from dulwich.index import IndexEntry
+        from dulwich.index import (
+            IndexEntry,
+            _fs_to_tree_path,
+            )
 
         index = self.open_index()
         try:
             tree_id = self[b'HEAD'].tree
-        # no head mean no commit in the repo
         except KeyError:
-            for path in relpaths:
-                del index[path]
+            # no head mean no commit in the repo
+            for fs_path in fs_paths:
+                tree_path = _fs_to_tree_path(fs_path)
+                del index[tree_path]
             index.write()
             return
 
-        for path in relpaths:
+        for fs_path in fs_paths:
+            tree_path = _fs_to_tree_path(fs_path)
             try:
-                tree_entry = self[tree_id].lookup_path(lambda x: self[x], path)
+                tree_entry = self.object_store[tree_id].lookup_path(
+                    self.object_store.__getitem__, tree_path)
             except KeyError:
-                # if tree_entry didnt exist, this file was being added, so remove index entry
+                # if tree_entry didnt exist, this file was being added, so
+                # remove index entry
                 try:
-                    del index[path]
+                    del index[tree_path]
                     continue
                 except KeyError:
-                    raise KeyError("file '%s' not in index" % (path.decode()))
+                    raise KeyError("file '%s' not in index" % (tree_path.decode()))
 
             st = None
             try:
-                st = os.lstat(os.path.join(self.path, path.decode()))
+                st = os.lstat(os.path.join(self.path, fs_path))
             except FileNotFoundError:
                 pass
 
@@ -1355,7 +1361,7 @@ class Repo(BaseRepo):
                 extended_flags=0
             )
 
-            index[path] = index_entry
+            index[tree_path] = index_entry
         index.write()
 
     def clone(

@@ -11,6 +11,9 @@
 
  * Drop support for Python 3.5.  (Jelmer Vernooĳ)
 
+ * Add ``dulwich.porcelain._reset_file``.
+   (Ded_Secer)
+
 0.20.24	2021-07-18
 
  * config: disregard UTF-8 BOM when reading file.

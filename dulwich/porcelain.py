@@ -87,6 +87,9 @@ from dulwich.archive import (
 from dulwich.client import (
     get_transport_and_path,
 )
+from dulwich.clone import (
+    do_clone,
+)
 from dulwich.config import (
     StackedConfig,
 )
@@ -463,7 +466,7 @@ def clone(
         return head_ref, head_sha
 
     try:
-        return Repo.do_clone(
+        return do_clone(
             source,
             target,
             clone_refs=clone_refs,

@@ -42,6 +42,9 @@ if TYPE_CHECKING:
     from dulwich.config import StackedConfig, ConfigFile
     from dulwich.index import Index
 
+from dulwich.clone import (
+    do_clone,
+)
 from dulwich.errors import (
     NoIndexPresent,
     NotBlobError,
@@ -1407,7 +1410,7 @@ class Repo(BaseRepo):
         if not isinstance(encoded_path, bytes):
             encoded_path = os.fsencode(encoded_path)
 
-        return self.do_clone(
+        return do_clone(
             encoded_path,
             target_path,
             clone_refs=clone_refs,
@@ -1417,133 +1420,6 @@ class Repo(BaseRepo):
             checkout=checkout,
             branch=branch,
         )
-
-    @classmethod
-    def do_clone(
-        cls,
-        source_path,
-        target_path,
-        clone_refs=None,
-        mkdir=True,
-        bare=False,
-        origin=b"origin",
-        checkout=None,
-        errstream=None,
-        branch=None,
-    ):
-        if not clone_refs:
-            raise ValueError("clone_refs callback is required")
-
-        if not bare:
-            target = cls.init(target_path, mkdir=mkdir)
-            if checkout is None:
-                checkout = True
-        else:
-            if checkout:
-                raise ValueError("checkout and bare are incompatible")
-            target = cls.init_bare(target_path, mkdir=mkdir)
-
-        try:
-            target_config = target.get_config()
-            target_config.set((b"remote", origin), b"url", source_path)
-            target_config.set(
-                (b"remote", origin),
-                b"fetch",
-                b"+refs/heads/*:refs/remotes/" + origin + b"/*",
-            )
-            target_config.write_to_path()
-
-            ref_message = b"clone: from " + source_path
-            origin_head, origin_sha = clone_refs(target, ref_message)
-            if origin_sha and not origin_head:
-                # set detached HEAD
-                target.refs[b"HEAD"] = origin_sha
-
-            cls._clone_set_origin_head(target, origin, origin_head)
-            head_ref = cls._clone_set_default_branch(
-                target, origin, origin_head, branch, ref_message
-            )
-
-            # Update target head
-            if head_ref:
-                head = cls._clone_set_head(target, head_ref, ref_message)
-            else:
-                head = None
-
-            if checkout and head is not None:
-                if errstream:
-                    errstream.write(b"Checking out " + head + b"\n")
-                target.reset_index()
-        except BaseException:
-            target.close()
-            raise
-
-        return target
-
-    @staticmethod
-    def _clone_set_origin_head(r, origin, origin_head):
-        # set refs/remotes/origin/HEAD
-        origin_base = b"refs/remotes/" + origin + b"/"
-        if origin_head and origin_head.startswith(LOCAL_BRANCH_PREFIX):
-            origin_ref = origin_base + b"HEAD"
-            target_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
-            if target_ref in r.refs:
-                r.refs.set_symbolic_ref(origin_ref, target_ref)
-
-    @staticmethod
-    def _clone_set_default_branch(r, origin, origin_head, branch, ref_message):
-        origin_base = b"refs/remotes/" + origin + b"/"
-        if branch:
-            origin_ref = origin_base + branch
-            if origin_ref in r.refs:
-                local_ref = LOCAL_BRANCH_PREFIX + branch
-                r.refs.add_if_new(
-                    local_ref, r.refs[origin_ref], ref_message
-                )
-                head_ref = local_ref
-            elif LOCAL_TAG_PREFIX + branch in r.refs:
-                head_ref = LOCAL_TAG_PREFIX + branch
-            else:
-                raise ValueError(
-                    "%s is not a valid branch or tag" % os.fsencode(branch)
-                )
-        elif origin_head:
-            head_ref = origin_head
-            if origin_head.startswith(LOCAL_BRANCH_PREFIX):
-                origin_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
-            else:
-                origin_ref = origin_head
-            try:
-                r.refs.add_if_new(
-                    head_ref, r.refs[origin_ref], ref_message
-                )
-            except KeyError:
-                pass
-        return head_ref
-
-    @staticmethod
-    def _clone_set_head(r, head_ref, ref_message):
-        if head_ref.startswith(LOCAL_TAG_PREFIX):
-            # detach HEAD at specified tag
-            head = r.refs[head_ref]
-            if isinstance(head, Tag):
-                _cls, obj = head.object
-                head = obj.get_object(obj).id
-            del r.refs[b"HEAD"]
-            r.refs.set_if_equals(
-                b"HEAD", None, head, message=ref_message
-            )
-        else:
-            # set HEAD to specific branch
-            try:
-                head = r.refs[head_ref]
-                r.refs.set_symbolic_ref(b"HEAD", head_ref)
-                r.refs.set_if_equals(
-                    b"HEAD", None, head, message=ref_message
-                )
-            except KeyError:
-                head = None
-        return head
 
     def reset_index(self, tree=None):
         """Reset the index back to a specific tree.

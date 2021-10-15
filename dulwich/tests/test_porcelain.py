@@ -48,9 +48,6 @@ from dulwich.repo import (
     NoIndexPresent,
     Repo,
 )
-from dulwich.index import (
-    _fs_to_tree_path,
-)
 from dulwich.tests import (
     TestCase,
 )

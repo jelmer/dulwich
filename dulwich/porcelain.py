@@ -53,6 +53,10 @@ Currently implemented:
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
 
+Note: one of the consequences of this is that paths tend to be
+interpreted relative to the current working directory rather than relative
+to the repository root.
+
 Functions should generally accept both unicode strings and bytestrings
 """
 

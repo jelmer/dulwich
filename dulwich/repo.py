@@ -1253,7 +1253,7 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, fs_paths):
+    def stage(self, fs_paths: Union[str, bytes, os.PathLike, Iterable[Union[str, bytes, os.PathLike]]]) -> None:
         """Stage a set of paths.
 
         Args:
@@ -1262,7 +1262,7 @@ class Repo(BaseRepo):
 
         root_path_bytes = os.fsencode(self.path)
 
-        if isinstance(fs_paths, str):
+        if isinstance(fs_paths, (str, bytes, os.PathLike)):
             fs_paths = [fs_paths]
         fs_paths = list(fs_paths)
 

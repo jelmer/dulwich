@@ -222,52 +222,36 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
       path: A path, absolute or relative to the cwd
     Returns: A path formatted for use in e.g. an index
     """
-    # Pathlib resolve before Python 3.6 could raises FileNotFoundError in case
-    # there is no file matching the path so we reuse the old implementation for
-    # Python 3.5
-    if sys.version_info < (3, 6):
-        if not isinstance(path, bytes):
-            path = os.fsencode(path)
-        if not isinstance(repopath, bytes):
-            repopath = os.fsencode(repopath)
-        treepath = os.path.relpath(path, repopath)
-        if treepath.startswith(b".."):
-            err_msg = "Path %r not in repo path (%r)" % (path, repopath)
-            raise ValueError(err_msg)
-        if os.path.sep != "/":
-            treepath = treepath.replace(os.path.sep.encode("ascii"), b"/")
-        return treepath
-    else:
-        # Resolve might returns a relative path on Windows
-        # https://bugs.python.org/issue38671
-        if sys.platform == "win32":
-            path = os.path.abspath(path)
+    # Resolve might returns a relative path on Windows
+    # https://bugs.python.org/issue38671
+    if sys.platform == "win32":
+        path = os.path.abspath(path)
 
-        path = Path(path)
-        resolved_path = path.resolve()
+    path = Path(path)
+    resolved_path = path.resolve()
 
-        # Resolve and abspath seems to behave differently regarding symlinks,
-        # as we are doing abspath on the file path, we need to do the same on
-        # the repo path or they might not match
-        if sys.platform == "win32":
-            repopath = os.path.abspath(repopath)
+    # Resolve and abspath seems to behave differently regarding symlinks,
+    # as we are doing abspath on the file path, we need to do the same on
+    # the repo path or they might not match
+    if sys.platform == "win32":
+        repopath = os.path.abspath(repopath)
 
-        repopath = Path(repopath).resolve()
+    repopath = Path(repopath).resolve()
 
-        try:
-            relpath = resolved_path.relative_to(repopath)
-        except ValueError:
-            # If path is a symlink that points to a file outside the repo, we
-            # want the relpath for the link itself, not the resolved target
-            if path.is_symlink():
-                parent = path.parent.resolve()
-                relpath = (parent / path.name).relative_to(repopath)
-            else:
-                raise
-        if sys.platform == "win32":
-            return str(relpath).replace(os.path.sep, "/").encode(tree_encoding)
+    try:
+        relpath = resolved_path.relative_to(repopath)
+    except ValueError:
+        # If path is a symlink that points to a file outside the repo, we
+        # want the relpath for the link itself, not the resolved target
+        if path.is_symlink():
+            parent = path.parent.resolve()
+            relpath = (parent / path.name).relative_to(repopath)
         else:
-            return bytes(relpath)
+            raise
+    if sys.platform == "win32":
+        return str(relpath).replace(os.path.sep, "/").encode(tree_encoding)
+    else:
+        return bytes(relpath)
 
 
 class DivergedBranches(Error):

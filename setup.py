@@ -17,9 +17,9 @@ import sys
 from typing import Dict, Any
 
 
-if sys.version_info < (3, 5):
+if sys.version_info < (3, 6):
     raise Exception(
-        'Dulwich only supports Python 3.5 and later. '
+        'Dulwich only supports Python 3.6 and later. '
         'For 2.7 support, please install a version prior to 0.20')
 
 
@@ -88,7 +88,7 @@ if has_setuptools:
         "console_scripts": [
             "dulwich=dulwich.cli:main",
         ]}
-    setup_kwargs['python_requires'] = '>=3.5'
+    setup_kwargs['python_requires'] = '>=3.6'
 else:
     scripts.append('bin/dulwich')
 
@@ -121,11 +121,11 @@ setup(name='dulwich',
       classifiers=[
           'Development Status :: 4 - Beta',
           'License :: OSI Approved :: Apache Software License',
-          'Programming Language :: Python :: 3.5',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7',
           'Programming Language :: Python :: 3.8',
           'Programming Language :: Python :: 3.9',
+          'Programming Language :: Python :: 3.10',
           'Programming Language :: Python :: Implementation :: CPython',
           'Programming Language :: Python :: Implementation :: PyPy',
           'Operating System :: POSIX',

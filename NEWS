@@ -6,6 +6,9 @@
  * Make default file mask consistent
    with Git. (Dan Villiom Podlaski Christiansen, #884)
 
+ * Support os.PathLike arguments to Repo.stage().
+   (Jan Wiśniewski, #907)
+
 0.20.24	2021-07-18
 
  * config: disregard UTF-8 BOM when reading file.

@@ -72,18 +72,24 @@ def check_ref_format(refname):
     """
     # These could be combined into one big expression, but are listed
     # separately to parallel [1].
-    if b"/." in refname or refname.startswith(b"."):
+    if b"/." in refname:
         return False
     if b"/" not in refname:
+        return False
+    if b"//" in refname:
         return False
     if b".." in refname:
         return False
     for i, c in enumerate(refname):
         if ord(refname[i : i + 1]) < 0o40 or c in BAD_REF_CHARS:
             return False
+    if refname[0] in b"/.":
+        return False
     if refname[-1] in b"/.":
         return False
     if refname.endswith(b".lock"):
+        return False
+    if b".lock/" in refname:
         return False
     if b"@{" in refname:
         return False
@@ -714,7 +720,8 @@ class DiskRefsContainer(RefsContainer):
                 refname = b"/".join(([dir] if dir else []) + [filename])
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
-                if check_ref_format(base + b"/" + refname):
+
+                if check_ref_format(base.strip(b"/") + b"/" + refname):
                     subkeys.add(refname)
         for key in self.get_packed_refs():
             if key.startswith(base):

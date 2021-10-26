@@ -64,7 +64,6 @@ class CheckRefFormatTests(TestCase):
     def test_valid(self):
         self.assertTrue(check_ref_format(b"heads/foo"))
         self.assertTrue(check_ref_format(b"foo/bar/baz"))
-        self.assertTrue(check_ref_format(b"refs///heads/foo"))
         self.assertTrue(check_ref_format(b"foo./bar"))
         self.assertTrue(check_ref_format(b"heads/foo@bar"))
         self.assertTrue(check_ref_format(b"heads/fix.lock.error"))
@@ -72,11 +71,14 @@ class CheckRefFormatTests(TestCase):
     def test_invalid(self):
         self.assertFalse(check_ref_format(b"foo"))
         self.assertFalse(check_ref_format(b"heads/foo/"))
+        self.assertFalse(check_ref_format(b"/heads/foo"))
+        self.assertFalse(check_ref_format(b"refs///heads/foo"))
         self.assertFalse(check_ref_format(b"./foo"))
         self.assertFalse(check_ref_format(b".refs/foo"))
         self.assertFalse(check_ref_format(b"heads/foo..bar"))
         self.assertFalse(check_ref_format(b"heads/foo?bar"))
         self.assertFalse(check_ref_format(b"heads/foo.lock"))
+        self.assertFalse(check_ref_format(b"heads/foo.lock/bar"))
         self.assertFalse(check_ref_format(b"heads/v@{ation"))
         self.assertFalse(check_ref_format(b"heads/foo\bar"))
 

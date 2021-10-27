@@ -90,6 +90,3 @@ Supported versions of Python
 
 At the moment, Dulwich supports (and is tested on) CPython 3.6 and later and
 Pypy.
-
-The latest release series to support Python 2.x was the 0.19 series. See
-the 0.19 branch in the Dulwich git repository.

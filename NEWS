@@ -1,10 +1,4 @@
-0.20.25	UNRELEASED
-
- * Fix ``dulwich`` script when installed via setup.py.
-   (Dan Villiom Podlaski Christiansen)
-
- * Make default file mask consistent
-   with Git. (Dan Villiom Podlaski Christiansen, #884)
+0.20.26	UNRELEASED
 
  * Support os.PathLike arguments to Repo.stage().
    (Jan Wiśniewski, #907)
@@ -15,6 +9,14 @@
    (Ded_Secer)
 
  * Add ``Repo.unstage``. (Ded_Secer)
+
+0.20.25	2021-08-23
+
+ * Fix ``dulwich`` script when installed via setup.py.
+   (Dan Villiom Podlaski Christiansen)
+
+ * Make default file mask consistent
+   with Git. (Dan Villiom Podlaski Christiansen, #884)
 
 0.20.24	2021-07-18
 

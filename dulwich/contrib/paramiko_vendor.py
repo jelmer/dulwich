@@ -44,7 +44,7 @@ class _ParamikoWrapper(object):
 
     @property
     def stderr(self):
-        return self.channel.makefile_stderr()
+        return self.channel.makefile_stderr('rb')
 
     def can_read(self):
         return self.channel.recv_ready()

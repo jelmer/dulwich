@@ -705,6 +705,7 @@ class TestSSHVendor(object):
         port=None,
         password=None,
         key_filename=None,
+        ssh_command=None,
     ):
         self.host = host
         self.command = command
@@ -712,6 +713,7 @@ class TestSSHVendor(object):
         self.port = port
         self.password = password
         self.key_filename = key_filename
+        self.ssh_command = ssh_command
 
         class Subprocess:
             pass
@@ -784,6 +786,21 @@ class SSHGitClientTests(TestCase):
 
         client._connect(b"relative-command", b"/~/path/to/repo")
         self.assertEqual("git-relative-command '~/path/to/repo'", server.command)
+
+    def test_ssh_command_precedence(self):
+        os.environ["GIT_SSH"] = "/path/to/ssh"
+        test_client = SSHGitClient("git.samba.org")
+        self.assertEqual(test_client.ssh_command, "/path/to/ssh")
+
+        os.environ["GIT_SSH_COMMAND"] = "/path/to/ssh -o Option=Value"
+        test_client = SSHGitClient("git.samba.org")
+        self.assertEqual(test_client.ssh_command, "/path/to/ssh -o Option=Value")
+
+        test_client = SSHGitClient("git.samba.org", ssh_command="ssh -o Option1=Value1")
+        self.assertEqual(test_client.ssh_command, "ssh -o Option1=Value1")
+
+        del os.environ["GIT_SSH"]
+        del os.environ["GIT_SSH_COMMAND"]
 
 
 class ReportStatusParserTests(TestCase):
@@ -1230,6 +1247,26 @@ class SubprocessSSHVendorTests(TestCase):
 
         self.assertListEqual(expected, args[0])
 
+    def test_run_with_ssh_command(self):
+        expected = [
+            "/path/to/ssh",
+            "-o",
+            "Option=Value",
+            "-x",
+            "host",
+            "git-clone-url",
+        ]
+
+        vendor = SubprocessSSHVendor()
+        command = vendor.run_command(
+            "host",
+            "git-clone-url",
+            ssh_command="/path/to/ssh -o Option=Value",
+        )
+
+        args = command.proc.args
+        self.assertListEqual(expected, args[0])
+
 
 class PLinkSSHVendorTests(TestCase):
     def setUp(self):
@@ -1351,6 +1388,24 @@ class PLinkSSHVendorTests(TestCase):
 
         args = command.proc.args
 
+        self.assertListEqual(expected, args[0])
+
+    def test_run_with_ssh_command(self):
+        expected = [
+            "/path/to/plink",
+            "-x",
+            "host",
+            "git-clone-url",
+        ]
+
+        vendor = SubprocessSSHVendor()
+        command = vendor.run_command(
+            "host",
+            "git-clone-url",
+            ssh_command="/path/to/plink",
+        )
+
+        args = command.proc.args
         self.assertListEqual(expected, args[0])
 
 

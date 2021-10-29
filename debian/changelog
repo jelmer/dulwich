@@ -1,10 +1,18 @@
 dulwich (0.20.26-1) UNRELEASED; urgency=low
 
+  [ Jelmer Vernooĳ ]
   * New upstream release.
+    + Fixes handling of os.PathLike arguments to Repo.stage. Closes: #997303
   * Bump debhelper from old 12 to 13.
   * Set upstream metadata fields: Security-Contact.
   * Drop transition for old debug package migration.
   * Update standards version to 4.6.0, no changes needed.
+
+  [ Matthias Klose ]
+  * Run the autopkg tests for all supported Python3 versions. Closes: #976592
+
+  [ Balint Reczey ]
+  * debian/tests/testsuite3: Unset http(s)_proxy because they break the tests.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 29 Oct 2021 01:42:53 -0000
 

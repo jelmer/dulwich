@@ -1,3 +1,14 @@
 #!/bin/sh
 set -e
-python3 -m unittest dulwich.tests.test_suite
+
+unset http_proxy
+unset https_proxy
+
+rv=0
+for py in $(py3versions -s); do
+  echo "========= Running tests with $py =========="
+  if ! $py3 -m unittest dulwich.tests.test_suite; then
+    rv=1
+  fi
+done
+exit $rv

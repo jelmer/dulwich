@@ -3,6 +3,7 @@ dulwich (0.20.26-1) UNRELEASED; urgency=low
   * New upstream release.
   * Bump debhelper from old 12 to 13.
   * Set upstream metadata fields: Security-Contact.
+  * Drop transition for old debug package migration.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 29 Oct 2021 01:42:53 -0000
 

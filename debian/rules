@@ -20,7 +20,7 @@ override_dh_installdocs:
 	dh_installdocs -ppython3-dulwich docs/tutorial -X.gitignore -XMakefile
 
 override_dh_strip:
-	dh_strip -p python3-dulwich --dbgsym-migration='python3-dulwich-dbg (<< 0.16.4-1)'
+	dh_strip -p python3-dulwich
 
 override_dh_installchangelogs:
 	dh_installchangelogs NEWS

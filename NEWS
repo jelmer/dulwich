@@ -1,3 +1,5 @@
+0.20.27	UNRELEASED
+
 0.20.26	2021-10-29
 
  * Support os.PathLike arguments to Repo.stage().

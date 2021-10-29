@@ -1,4 +1,4 @@
-dulwich (0.20.26-1) UNRELEASED; urgency=low
+dulwich (0.20.26-1) unstable; urgency=low
 
   [ Jelmer Vernooĳ ]
   * New upstream release.
@@ -14,7 +14,7 @@ dulwich (0.20.26-1) UNRELEASED; urgency=low
   [ Balint Reczey ]
   * debian/tests/testsuite3: Unset http(s)_proxy because they break the tests.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 29 Oct 2021 01:42:53 -0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 29 Oct 2021 01:49:02 +0100
 
 dulwich (0.20.25-1) unstable; urgency=low
 

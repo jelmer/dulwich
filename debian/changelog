@@ -1,3 +1,9 @@
+dulwich (0.20.26-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Fri, 29 Oct 2021 01:42:53 -0000
+
 dulwich (0.20.25-1) unstable; urgency=low
 
   * New upstream release.

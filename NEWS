@@ -1,3 +1,15 @@
+0.20.26	2021-10-29
+
+ * Support os.PathLike arguments to Repo.stage().
+   (Jan Wiśniewski, #907)
+
+ * Drop support for Python 3.5.  (Jelmer Vernooĳ)
+
+ * Add ``dulwich.porcelain._reset_file``.
+   (Ded_Secer)
+
+ * Add ``Repo.unstage``. (Ded_Secer)
+
 0.20.25	2021-08-23
 
  * Fix ``dulwich`` script when installed via setup.py.

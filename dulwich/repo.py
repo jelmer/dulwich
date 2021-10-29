@@ -1253,7 +1253,7 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    def stage(self, fs_paths):
+    def stage(self, fs_paths: Union[str, bytes, os.PathLike, Iterable[Union[str, bytes, os.PathLike]]]) -> None:
         """Stage a set of paths.
 
         Args:
@@ -1262,7 +1262,7 @@ class Repo(BaseRepo):
 
         root_path_bytes = os.fsencode(self.path)
 
-        if isinstance(fs_paths, str):
+        if isinstance(fs_paths, (str, bytes, os.PathLike)):
             fs_paths = [fs_paths]
         fs_paths = list(fs_paths)
 
@@ -1303,6 +1303,65 @@ class Repo(BaseRepo):
                     blob = blob_normalizer.checkin_normalize(blob, fs_path)
                     self.object_store.add_object(blob)
                     index[tree_path] = index_entry_from_stat(st, blob.id, 0)
+        index.write()
+
+    def unstage(self, fs_paths: List[str]):
+        """unstage specific file in the index
+        Args:
+          fs_paths: a list of files to unstage,
+            relative to the repository path
+        """
+        from dulwich.index import (
+            IndexEntry,
+            _fs_to_tree_path,
+            )
+
+        index = self.open_index()
+        try:
+            tree_id = self[b'HEAD'].tree
+        except KeyError:
+            # no head mean no commit in the repo
+            for fs_path in fs_paths:
+                tree_path = _fs_to_tree_path(fs_path)
+                del index[tree_path]
+            index.write()
+            return
+
+        for fs_path in fs_paths:
+            tree_path = _fs_to_tree_path(fs_path)
+            try:
+                tree_entry = self.object_store[tree_id].lookup_path(
+                    self.object_store.__getitem__, tree_path)
+            except KeyError:
+                # if tree_entry didnt exist, this file was being added, so
+                # remove index entry
+                try:
+                    del index[tree_path]
+                    continue
+                except KeyError:
+                    raise KeyError("file '%s' not in index" % (tree_path.decode()))
+
+            st = None
+            try:
+                st = os.lstat(os.path.join(self.path, fs_path))
+            except FileNotFoundError:
+                pass
+
+            index_entry = IndexEntry(
+                ctime=(self[b'HEAD'].commit_time, 0),
+                mtime=(self[b'HEAD'].commit_time, 0),
+                dev=st.st_dev if st else 0,
+                ino=st.st_ino if st else 0,
+                mode=tree_entry[0],
+                uid=st.st_uid if st else 0,
+                gid=st.st_gid if st else 0,
+                size=len(self[tree_entry[1]].data),
+                sha=tree_entry[1],
+                flags=0,
+                extended_flags=0
+            )
+
+            index[tree_path] = index_entry
         index.write()
 
     def clone(

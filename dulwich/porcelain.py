@@ -53,6 +53,10 @@ Currently implemented:
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
 
+Note: one of the consequences of this is that paths tend to be
+interpreted relative to the current working directory rather than relative
+to the repository root.
+
 Functions should generally accept both unicode strings and bytestrings
 """
 
@@ -104,6 +108,8 @@ from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (
     blob_from_path_and_stat,
     get_unstaged_changes,
+    build_file_from_blob,
+    _fs_to_tree_path,
 )
 from dulwich.object_store import (
     tree_lookup_path,
@@ -218,52 +224,36 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
       path: A path, absolute or relative to the cwd
     Returns: A path formatted for use in e.g. an index
     """
-    # Pathlib resolve before Python 3.6 could raises FileNotFoundError in case
-    # there is no file matching the path so we reuse the old implementation for
-    # Python 3.5
-    if sys.version_info < (3, 6):
-        if not isinstance(path, bytes):
-            path = os.fsencode(path)
-        if not isinstance(repopath, bytes):
-            repopath = os.fsencode(repopath)
-        treepath = os.path.relpath(path, repopath)
-        if treepath.startswith(b".."):
-            err_msg = "Path %r not in repo path (%r)" % (path, repopath)
-            raise ValueError(err_msg)
-        if os.path.sep != "/":
-            treepath = treepath.replace(os.path.sep.encode("ascii"), b"/")
-        return treepath
-    else:
-        # Resolve might returns a relative path on Windows
-        # https://bugs.python.org/issue38671
-        if sys.platform == "win32":
-            path = os.path.abspath(path)
+    # Resolve might returns a relative path on Windows
+    # https://bugs.python.org/issue38671
+    if sys.platform == "win32":
+        path = os.path.abspath(path)
 
-        path = Path(path)
-        resolved_path = path.resolve()
+    path = Path(path)
+    resolved_path = path.resolve()
 
-        # Resolve and abspath seems to behave differently regarding symlinks,
-        # as we are doing abspath on the file path, we need to do the same on
-        # the repo path or they might not match
-        if sys.platform == "win32":
-            repopath = os.path.abspath(repopath)
+    # Resolve and abspath seems to behave differently regarding symlinks,
+    # as we are doing abspath on the file path, we need to do the same on
+    # the repo path or they might not match
+    if sys.platform == "win32":
+        repopath = os.path.abspath(repopath)
 
-        repopath = Path(repopath).resolve()
+    repopath = Path(repopath).resolve()
 
-        try:
-            relpath = resolved_path.relative_to(repopath)
-        except ValueError:
-            # If path is a symlink that points to a file outside the repo, we
-            # want the relpath for the link itself, not the resolved target
-            if path.is_symlink():
-                parent = path.parent.resolve()
-                relpath = (parent / path.name).relative_to(repopath)
-            else:
-                raise
-        if sys.platform == "win32":
-            return str(relpath).replace(os.path.sep, "/").encode(tree_encoding)
+    try:
+        relpath = resolved_path.relative_to(repopath)
+    except ValueError:
+        # If path is a symlink that points to a file outside the repo, we
+        # want the relpath for the link itself, not the resolved target
+        if path.is_symlink():
+            parent = path.parent.resolve()
+            relpath = (parent / path.name).relative_to(repopath)
         else:
-            return bytes(relpath)
+            raise
+    if sys.platform == "win32":
+        return str(relpath).replace(os.path.sep, "/").encode(tree_encoding)
+    else:
+        return bytes(relpath)
 
 
 class DivergedBranches(Error):
@@ -1751,6 +1741,24 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(to_set, parse_ref(r, target))
         if new_branch is not None:
             r.refs.set_symbolic_ref(b"HEAD", to_set)
+
+
+def reset_file(repo, file_path: str, target: bytes = b'HEAD'):
+    """Reset the file to specific commit or branch.
+
+    Args:
+      repo: dulwich Repo object
+      file_path: file to reset, relative to the repository path
+      target: branch or commit or b'HEAD' to reset
+    """
+    tree = parse_tree(repo, treeish=target)
+    file_path = _fs_to_tree_path(file_path)
+
+    file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path)
+    full_path = os.path.join(repo.path.encode(), file_path)
+    blob = repo.object_store[file_entry[1]]
+    mode = file_entry[0]
+    build_file_from_blob(blob, mode, full_path)
 
 
 def check_mailmap(repo, contact):

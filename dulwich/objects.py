@@ -100,7 +100,7 @@ def _decompress(string):
 def sha_to_hex(sha):
     """Takes a string and returns the hex of the sha within"""
     hexsha = binascii.hexlify(sha)
-    assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % hexsha
+    assert len(hexsha) == 40, "Incorrect length of sha1 string: %s" % hexsha
     return hexsha
 
 

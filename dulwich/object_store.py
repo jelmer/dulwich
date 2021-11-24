@@ -331,8 +331,8 @@ class BaseObjectStore(object):
     def _collect_ancestors(
         self,
         heads,
-        common=set(),
-        shallow=set(),
+        common=frozenset(),
+        shallow=frozenset(),
         get_parents=lambda commit: commit.parents,
     ):
         """Collect all ancestors of heads up to (excluding) those in common.

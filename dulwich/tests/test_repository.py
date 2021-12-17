@@ -647,7 +647,8 @@ exit 0
             self.skipTest("shell hook tests requires POSIX shell")
 
         pre_commit_contents = """#!%(executable)s
-import os
+import sys
+sys.path.extend(':'.join(%(path)s))
 from dulwich.repo import Repo
 
 with open('foo', 'w') as f:
@@ -655,7 +656,7 @@ with open('foo', 'w') as f:
 
 r = Repo('.')
 r.stage(['foo'])
-""" % {'executable': sys.executable}
+""" % {'executable': sys.executable, 'path': repr(sys.path)}
 
         repo_dir = os.path.join(self.mkdtemp())
         self.addCleanup(shutil.rmtree, repo_dir)

@@ -117,10 +117,10 @@ class ShellHook(Hook):
 class PreCommitShellHook(ShellHook):
     """pre-commit shell hook"""
 
-    def __init__(self, controldir):
+    def __init__(self, cwd, controldir):
         filepath = os.path.join(controldir, "hooks", "pre-commit")
 
-        ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=controldir)
+        ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=cwd)
 
 
 class PostCommitShellHook(ShellHook):

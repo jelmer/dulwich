@@ -71,7 +71,7 @@ exit 0
         )
 
         pre_commit = os.path.join(repo_dir, "hooks", "pre-commit")
-        hook = PreCommitShellHook(repo_dir)
+        hook = PreCommitShellHook(repo_dir, repo_dir)
 
         with open(pre_commit, "w") as f:
             f.write(pre_commit_fail)

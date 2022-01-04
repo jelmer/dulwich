@@ -42,6 +42,8 @@ from dulwich.objects import (
     Tree,
     TreeEntry,
     EmptyFileException,
+    SubmoduleEncountered,
+    S_IFGITLINK,
 )
 from dulwich.object_store import (
     DiskObjectStore,
@@ -582,6 +584,7 @@ class TreeLookupPathTests(TestCase):
             (b"ad/bd/c", blob_c.id, 0o100755),
             (b"ad/c", blob_c.id, 0o100644),
             (b"c", blob_c.id, 0o100644),
+            (b"d", blob_c.id, S_IFGITLINK),
         ]
         self.tree_id = commit_tree(self.store, blobs)
 
@@ -599,6 +602,12 @@ class TreeLookupPathTests(TestCase):
         self.assertTrue(isinstance(self.store[o_id], Tree))
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad/bd/")[1]
         self.assertTrue(isinstance(self.store[o_id], Tree))
+
+    def test_lookup_submodule(self):
+        tree_lookup_path(self.get_object, self.tree_id, b"d")[1]
+        self.assertRaises(
+            SubmoduleEncountered, tree_lookup_path, self.get_object,
+            self.tree_id, b"d/a")
 
     def test_lookup_nonexistent(self):
         self.assertRaises(

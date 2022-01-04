@@ -70,7 +70,6 @@ import datetime
 import os
 from pathlib import Path
 import posixpath
-import shutil
 import stat
 import sys
 import time
@@ -443,8 +442,7 @@ def clone(
     if target is None:
         target = source.split("/")[-1]
 
-    if not os.path.exists(target):
-        os.mkdir(target)
+    mkdir = not os.path.exists(target)
 
     if not isinstance(source, bytes):
         source = source.encode(DEFAULT_ENCODING)
@@ -465,21 +463,17 @@ def clone(
             head_sha = None
         return head_ref, head_sha
 
-    try:
-        return do_clone(
-            source,
-            target,
-            clone_refs=clone_refs,
-            mkdir=False,
-            bare=bare,
-            origin=origin,
-            checkout=checkout,
-            errstream=errstream,
-            branch=branch,
-        )
-    except BaseException:
-        shutil.rmtree(target)
-        raise
+    return do_clone(
+        source,
+        target,
+        clone_refs=clone_refs,
+        mkdir=mkdir,
+        bare=bare,
+        origin=origin,
+        checkout=checkout,
+        errstream=errstream,
+        branch=branch,
+    )
 
 
 def add(repo=".", paths=None):

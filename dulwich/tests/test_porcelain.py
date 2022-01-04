@@ -630,9 +630,12 @@ class CloneTests(PorcelainTestCase):
         r.close()
 
     def test_source_broken(self):
-        target_path = tempfile.mkdtemp()
-        self.assertRaises(Exception, porcelain.clone, "/nonexistant/repo", target_path)
-        self.assertFalse(os.path.exists(target_path))
+        with tempfile.TemporaryDirectory() as parent:
+            target_path = os.path.join(parent, "target")
+            self.assertRaises(
+                Exception, porcelain.clone, "/nonexistant/repo", target_path
+            )
+            self.assertFalse(os.path.exists(target_path))
 
     def test_fetch_symref(self):
         f1_1 = make_object(Blob, data=b"f1")

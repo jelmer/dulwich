@@ -21,6 +21,7 @@
 """Repository clone handling."""
 
 import os
+import shutil
 from typing import TYPE_CHECKING, Callable, Tuple
 
 from dulwich.objects import (
@@ -67,16 +68,20 @@ def do_clone(
     if not clone_refs:
         raise ValueError("clone_refs callback is required")
 
-    if not bare:
-        target = Repo.init(target_path, mkdir=mkdir)
-        if checkout is None:
-            checkout = True
-    else:
-        if checkout:
-            raise ValueError("checkout and bare are incompatible")
-        target = Repo.init_bare(target_path, mkdir=mkdir)
+    if mkdir:
+        os.mkdir(target_path)
 
     try:
+        target = None
+        if not bare:
+            target = Repo.init(target_path)
+            if checkout is None:
+                checkout = True
+        else:
+            if checkout:
+                raise ValueError("checkout and bare are incompatible")
+            target = Repo.init_bare(target_path)
+
         target_config = target.get_config()
         target_config.set((b"remote", origin), b"url", source_path)
         target_config.set(
@@ -108,7 +113,10 @@ def do_clone(
                 errstream.write(b"Checking out " + head + b"\n")
             target.reset_index()
     except BaseException:
-        target.close()
+        if target is not None:
+            target.close()
+        if mkdir:
+            shutil.rmtree(target_path)
         raise
 
     return target

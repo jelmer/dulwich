@@ -117,10 +117,10 @@ class ShellHook(Hook):
 class PreCommitShellHook(ShellHook):
     """pre-commit shell hook"""
 
-    def __init__(self, controldir):
+    def __init__(self, cwd, controldir):
         filepath = os.path.join(controldir, "hooks", "pre-commit")
 
-        ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=controldir)
+        ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=cwd)
 
 
 class PostCommitShellHook(ShellHook):
@@ -173,7 +173,7 @@ class PostReceiveShellHook(ShellHook):
     def __init__(self, controldir):
         self.controldir = controldir
         filepath = os.path.join(controldir, "hooks", "post-receive")
-        ShellHook.__init__(self, "post-receive", filepath, 0)
+        ShellHook.__init__(self, "post-receive", path=filepath, numparam=0)
 
     def execute(self, client_refs):
         # do nothing if the script doesn't exist

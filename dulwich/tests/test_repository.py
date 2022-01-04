@@ -568,9 +568,9 @@ exit 0
         self.assertRaises(
             errors.CommitError,
             r.do_commit,
-            "failed commit",
-            committer="Test Committer <test@nodomain.com>",
-            author="Test Author <test@nodomain.com>",
+            b"failed commit",
+            committer=b"Test Committer <test@nodomain.com>",
+            author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
             commit_timezone=0,
             author_timestamp=12345,
@@ -641,6 +641,52 @@ exit 0
             author_timezone=0,
         )
         self.assertEqual([], r[commit_sha].parents)
+
+    def test_shell_hook_pre_commit_add_files(self):
+        if os.name != "posix":
+            self.skipTest("shell hook tests requires POSIX shell")
+
+        pre_commit_contents = """#!%(executable)s
+import sys
+sys.path.extend(':'.join(%(path)s))
+from dulwich.repo import Repo
+
+with open('foo', 'w') as f:
+    f.write('newfile')
+
+r = Repo('.')
+r.stage(['foo'])
+""" % {'executable': sys.executable, 'path': repr(sys.path)}
+
+        repo_dir = os.path.join(self.mkdtemp())
+        self.addCleanup(shutil.rmtree, repo_dir)
+        r = Repo.init(repo_dir)
+        self.addCleanup(r.close)
+
+        with open(os.path.join(repo_dir, 'blah'), 'w') as f:
+            f.write('blah')
+
+        r.stage(['blah'])
+
+        pre_commit = os.path.join(r.controldir(), "hooks", "pre-commit")
+
+        with open(pre_commit, "w") as f:
+            f.write(pre_commit_contents)
+        os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+
+        commit_sha = r.do_commit(
+            b"new commit",
+            committer=b"Test Committer <test@nodomain.com>",
+            author=b"Test Author <test@nodomain.com>",
+            commit_timestamp=12395,
+            commit_timezone=0,
+            author_timestamp=12395,
+            author_timezone=0,
+        )
+        self.assertEqual([], r[commit_sha].parents)
+
+        tree = r[r[commit_sha].tree]
+        self.assertEqual(set([b'blah', b'foo']), set(tree))
 
     def test_shell_hook_post_commit(self):
         if os.name != "posix":

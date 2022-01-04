@@ -895,6 +895,14 @@ class BaseRepo(object):
           New commit SHA1
         """
 
+        try:
+            if not no_verify:
+                self.hooks["pre-commit"].execute()
+        except HookError as e:
+            raise CommitError(e)
+        except KeyError:  # no hook defined, silent fallthrough
+            pass
+
         c = Commit()
         if tree is None:
             index = self.open_index()
@@ -903,14 +911,6 @@ class BaseRepo(object):
             if len(tree) != 40:
                 raise ValueError("tree must be a 40-byte hex sha string")
             c.tree = tree
-
-        try:
-            if not no_verify:
-                self.hooks["pre-commit"].execute()
-        except HookError as e:
-            raise CommitError(e)
-        except KeyError:  # no hook defined, silent fallthrough
-            pass
 
         config = self.get_config_stack()
         if merge_heads is None:
@@ -1057,7 +1057,6 @@ class Repo(BaseRepo):
             if os.path.isfile(hidden_path):
                 with open(hidden_path, "r") as f:
                     path = read_gitfile(f)
-                self.bare = False
                 self._controldir = os.path.join(root, path)
             else:
                 self._controldir = hidden_path
@@ -1101,7 +1100,7 @@ class Repo(BaseRepo):
             with graft_file:
                 self._graftpoints.update(parse_graftpoints(graft_file))
 
-        self.hooks["pre-commit"] = PreCommitShellHook(self.controldir())
+        self.hooks["pre-commit"] = PreCommitShellHook(self.path, self.controldir())
         self.hooks["commit-msg"] = CommitMsgShellHook(self.controldir())
         self.hooks["post-commit"] = PostCommitShellHook(self.controldir())
         self.hooks["post-receive"] = PostReceiveShellHook(self.controldir())

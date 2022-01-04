@@ -1,3 +1,11 @@
+0.20.27	2022-01-04
+
+ * Allow adding files to repository in pre-commit hook.
+   (Jelmer Vernooĳ, #916)
+
+ * Raise SubmoduleEncountered in ``tree_lookup_path``.
+   (Jelmer Vernooĳ)
+
 0.20.26	2021-10-29
 
  * Support os.PathLike arguments to Repo.stage().

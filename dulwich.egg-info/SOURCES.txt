@@ -3,6 +3,7 @@
 .flake8
 .gitignore
 .mailmap
+.stestr.conf
 .testr.conf
 AUTHORS
 CODE_OF_CONDUCT.md
@@ -96,6 +97,16 @@ dulwich.egg-info/entry_points.txt
 dulwich.egg-info/not-zip-safe
 dulwich.egg-info/requires.txt
 dulwich.egg-info/top_level.txt
+dulwich/../docs/tutorial/conclusion.txt
+dulwich/../docs/tutorial/encoding.txt
+dulwich/../docs/tutorial/file-format.txt
+dulwich/../docs/tutorial/index.txt
+dulwich/../docs/tutorial/introduction.txt
+dulwich/../docs/tutorial/object-store.txt
+dulwich/../docs/tutorial/porcelain.txt
+dulwich/../docs/tutorial/remote.txt
+dulwich/../docs/tutorial/repo.txt
+dulwich/../docs/tutorial/tag.txt
 dulwich/cloud/__init__.py
 dulwich/cloud/gcs.py
 dulwich/contrib/README.md

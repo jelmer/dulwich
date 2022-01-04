@@ -13,7 +13,8 @@ Build-Depends: debhelper-compat (= 13),
                python3-certifi,
                python3-fastimport,
                python3-gpg,
-               python3-urllib3 (>= 1.24.1)
+               python3-urllib3 (>= 1.24.1),
+               debhelper
 Standards-Version: 4.6.0
 Vcs-Git: https://salsa.debian.org/python-team/packages/dulwich.git
 Vcs-Browser: https://salsa.debian.org/python-team/packages/dulwich

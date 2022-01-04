@@ -1,6 +1,7 @@
 dulwich (0.20.27-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Add missing build dependency on dh addon.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 04 Jan 2022 22:54:09 -0000
 

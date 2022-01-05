@@ -648,7 +648,7 @@ exit 0
 
         pre_commit_contents = """#!%(executable)s
 import sys
-sys.path.extend(':'.join(%(path)s))
+sys.path.extend(%(path)r)
 from dulwich.repo import Repo
 
 with open('foo', 'w') as f:
@@ -656,7 +656,7 @@ with open('foo', 'w') as f:
 
 r = Repo('.')
 r.stage(['foo'])
-""" % {'executable': sys.executable, 'path': repr(sys.path)}
+""" % {'executable': sys.executable, 'path': sys.path}
 
         repo_dir = os.path.join(self.mkdtemp())
         self.addCleanup(shutil.rmtree, repo_dir)

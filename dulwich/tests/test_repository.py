@@ -656,7 +656,9 @@ with open('foo', 'w') as f:
 
 r = Repo('.')
 r.stage(['foo'])
-""" % {'executable': sys.executable, 'path': sys.path}
+""" % {
+            'executable': sys.executable,
+            'path': [os.path.join(os.path.dirname(__file__), '..', '..')] + sys.path }
 
         repo_dir = os.path.join(self.mkdtemp())
         self.addCleanup(shutil.rmtree, repo_dir)

@@ -146,7 +146,10 @@ def _get_default_identity() -> Tuple[str, str]:
         except KeyError:
             fullname = None
         else:
-            fullname = gecos.split(",")[0]
+            if gecos:
+                fullname = gecos.split(",")[0]
+            else:
+                fullname = None
     if not fullname:
         fullname = username
     email = os.environ.get("EMAIL")

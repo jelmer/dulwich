@@ -1,4 +1,4 @@
-0.20.28	UNRELEASED
+0.20.28	2022-01-05
 
  * Fix hook test on Mac OSX / Linux when dulwich is
    not installed system-wide. (Jelmer Vernooĳ, #919)

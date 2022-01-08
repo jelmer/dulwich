@@ -23,6 +23,7 @@ setup.cfg
 setup.py
 status.yaml
 tox.ini
+.github/FUNDING.yml
 .github/workflows/pythonpackage.yml
 .github/workflows/pythonpublish.yml
 bin/dul-receive-pack

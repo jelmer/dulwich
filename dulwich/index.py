@@ -379,12 +379,6 @@ class Index(object):
             entry = self[path]
             yield path, entry.sha, cleanup_mode(entry.mode)
 
-    def iterblobs(self):
-        import warnings
-
-        warnings.warn("Use iterobjects() instead.", PendingDeprecationWarning)
-        return self.iterobjects()
-
     def clear(self):
         """Remove all contents from this index."""
         self._byname = {}
@@ -878,6 +872,15 @@ def _fs_to_tree_path(fs_path):
     return tree_path
 
 
+def index_entry_from_directory(st, path):
+    if os.path.exists(os.path.join(path, b".git")):
+        head = read_submodule_head(path)
+        if head is None:
+            return None
+        return index_entry_from_stat(st, head, 0, mode=S_IFGITLINK)
+    return None
+
+
 def index_entry_from_path(path, object_store=None):
     """Create an index from a filesystem path.
 
@@ -894,12 +897,7 @@ def index_entry_from_path(path, object_store=None):
     assert isinstance(path, bytes)
     st = os.lstat(path)
     if stat.S_ISDIR(st.st_mode):
-        if os.path.exists(os.path.join(path, b".git")):
-            head = read_submodule_head(path)
-            if head is None:
-                return None
-            return index_entry_from_stat(st, head, 0, mode=S_IFGITLINK)
-        return None
+        return index_entry_from_directory(st, path)
 
     if stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode):
         blob = blob_from_path_and_stat(path, st)
@@ -928,28 +926,6 @@ def iter_fresh_entries(
         except (FileNotFoundError, IsADirectoryError):
             entry = None
         yield path, entry
-
-
-def iter_fresh_blobs(index, root_path):
-    """Iterate over versions of blobs on disk referenced by index.
-
-    Don't use this function; it removes missing entries from index.
-
-    Args:
-      index: Index file
-      root_path: Root path to access from
-      include_deleted: Include deleted entries with sha and
-        mode set to None
-    Returns: Iterator over path, sha, mode
-    """
-    import warnings
-
-    warnings.warn(PendingDeprecationWarning, "Use iter_fresh_objects instead.")
-    for entry in iter_fresh_objects(index, root_path, include_deleted=True):
-        if entry[1] is None:
-            del index[entry[0]]
-        else:
-            yield entry
 
 
 def iter_fresh_objects(paths, root_path, include_deleted=False, object_store=None):

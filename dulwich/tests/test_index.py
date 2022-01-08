@@ -30,7 +30,6 @@ import stat
 import struct
 import sys
 import tempfile
-import warnings
 
 from dulwich.index import (
     Index,
@@ -63,9 +62,6 @@ from dulwich.repo import Repo
 from dulwich.tests import (
     TestCase,
     skipIf,
-)
-from dulwich.tests.utils import (
-    setup_warning_catcher,
 )
 
 
@@ -108,26 +104,6 @@ class SimpleIndexTestCase(IndexTestCase):
             [(b"bla", b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", 33188)],
             list(self.get_simple_index("index").iterobjects()),
         )
-
-    def test_iterblobs(self):
-        warnings.simplefilter("always", UserWarning)
-        self.addCleanup(warnings.resetwarnings)
-        warnings_list, restore_warnings = setup_warning_catcher()
-        self.addCleanup(restore_warnings)
-
-        self.assertEqual(
-            [(b"bla", b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", 33188)],
-            list(self.get_simple_index("index").iterblobs()),
-        )
-
-        expected_warning = PendingDeprecationWarning("Use iterobjects() instead.")
-        for w in warnings_list:
-            if type(w) == type(expected_warning) and w.args == expected_warning.args:
-                break
-        else:
-            raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
-            )
 
     def test_getitem(self):
         self.assertEqual(

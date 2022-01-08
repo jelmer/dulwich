@@ -878,6 +878,15 @@ def _fs_to_tree_path(fs_path):
     return tree_path
 
 
+def index_entry_from_directory(st, path):
+    if os.path.exists(os.path.join(path, b".git")):
+        head = read_submodule_head(path)
+        if head is None:
+            return None
+        return index_entry_from_stat(st, head, 0, mode=S_IFGITLINK)
+    return None
+
+
 def index_entry_from_path(path, object_store=None):
     """Create an index from a filesystem path.
 
@@ -894,12 +903,7 @@ def index_entry_from_path(path, object_store=None):
     assert isinstance(path, bytes)
     st = os.lstat(path)
     if stat.S_ISDIR(st.st_mode):
-        if os.path.exists(os.path.join(path, b".git")):
-            head = read_submodule_head(path)
-            if head is None:
-                return None
-            return index_entry_from_stat(st, head, 0, mode=S_IFGITLINK)
-        return None
+        return index_entry_from_directory(st, path)
 
     if stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode):
         blob = blob_from_path_and_stat(path, st)

@@ -1271,6 +1271,7 @@ class Repo(BaseRepo):
         from dulwich.index import (
             blob_from_path_and_stat,
             index_entry_from_stat,
+            index_entry_from_directory,
             _fs_to_tree_path,
         )
 
@@ -1295,7 +1296,16 @@ class Repo(BaseRepo):
                 except KeyError:
                     pass  # already removed
             else:
-                if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+                if stat.S_ISDIR(st.st_mode):
+                    entry = index_entry_from_directory(st, full_path)
+                    if entry:
+                        index[tree_path] = entry
+                    else:
+                        try:
+                            del index[tree_path]
+                        except KeyError:
+                            pass
+                elif not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
                     try:
                         del index[tree_path]
                     except KeyError:

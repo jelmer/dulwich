@@ -1268,12 +1268,20 @@ class BuildRepoRootTests(TestCase):
         os.remove(os.path.join(r.path, "a"))
         r.stage(["a"])
         r.stage(["a"])  # double-stage a deleted path
+        self.assertEqual([], list(r.open_index()))
 
     def test_stage_directory(self):
         r = self._repo
         os.mkdir(os.path.join(r.path, "c"))
         r.stage(["c"])
         self.assertEqual([b"a"], list(r.open_index()))
+
+    def test_stage_submodule(self):
+        r = self._repo
+        s = Repo.init(os.path.join(r.path, "sub"), mkdir=True)
+        s.do_commit(b'message')
+        r.stage(["sub"])
+        self.assertEqual([b"a", b"sub"], list(r.open_index()))
 
     def test_unstage_midify_file_with_dir(self):
         os.mkdir(os.path.join(self._repo.path, 'new_dir'))

@@ -87,6 +87,8 @@ from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
 
 from dulwich.refs import (  # noqa: F401
     ANNOTATED_TAG_SUFFIX,
+    LOCAL_BRANCH_PREFIX,
+    LOCAL_TAG_PREFIX,
     check_ref_format,
     RefsContainer,
     DictRefsContainer,
@@ -96,6 +98,9 @@ from dulwich.refs import (  # noqa: F401
     read_packed_refs_with_peeled,
     write_packed_refs,
     SYMREF,
+    _set_default_branch,
+    _set_head,
+    _set_origin_head,
 )
 
 
@@ -146,7 +151,10 @@ def _get_default_identity() -> Tuple[str, str]:
         except KeyError:
             fullname = None
         else:
-            fullname = gecos.split(",")[0]
+            if gecos:
+                fullname = gecos.split(",")[0]
+            else:
+                fullname = None
     if not fullname:
         fullname = username
     email = os.environ.get("EMAIL")
@@ -1268,6 +1276,7 @@ class Repo(BaseRepo):
         from dulwich.index import (
             blob_from_path_and_stat,
             index_entry_from_stat,
+            index_entry_from_directory,
             _fs_to_tree_path,
         )
 
@@ -1292,7 +1301,16 @@ class Repo(BaseRepo):
                 except KeyError:
                     pass  # already removed
             else:
-                if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+                if stat.S_ISDIR(st.st_mode):
+                    entry = index_entry_from_directory(st, full_path)
+                    if entry:
+                        index[tree_path] = entry
+                    else:
+                        try:
+                            del index[tree_path]
+                        except KeyError:
+                            pass
+                elif not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
                     try:
                         del index[tree_path]
                     except KeyError:
@@ -1370,6 +1388,7 @@ class Repo(BaseRepo):
         bare=False,
         origin=b"origin",
         checkout=None,
+        branch=None,
     ):
         """Clone this repository.
 
@@ -1377,56 +1396,78 @@ class Repo(BaseRepo):
           target_path: Target path
           mkdir: Create the target directory
           bare: Whether to create a bare repository
+          checkout: Whether or not to check-out HEAD after cloning
           origin: Base name for refs in target repository
             cloned from this repository
+          branch: Optional branch or tag to be used as HEAD in the new repository
+            instead of this repository's HEAD.
         Returns: Created repository as `Repo`
         """
-        if not bare:
-            target = self.init(target_path, mkdir=mkdir)
-        else:
-            if checkout:
-                raise ValueError("checkout and bare are incompatible")
-            target = self.init_bare(target_path, mkdir=mkdir)
-        self.fetch(target)
+
         encoded_path = self.path
         if not isinstance(encoded_path, bytes):
             encoded_path = os.fsencode(encoded_path)
-        ref_message = b"clone: from " + encoded_path
-        target.refs.import_refs(
-            b"refs/remotes/" + origin,
-            self.refs.as_dict(b"refs/heads"),
-            message=ref_message,
-        )
-        target.refs.import_refs(
-            b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
-        )
+
+        if mkdir:
+            os.mkdir(target_path)
+
         try:
-            target.refs.add_if_new(
-                DEFAULT_REF, self.refs[DEFAULT_REF], message=ref_message
+            target = None
+            if not bare:
+                target = Repo.init(target_path)
+                if checkout is None:
+                    checkout = True
+            else:
+                if checkout:
+                    raise ValueError("checkout and bare are incompatible")
+                target = Repo.init_bare(target_path)
+
+            target_config = target.get_config()
+            target_config.set((b"remote", origin), b"url", encoded_path)
+            target_config.set(
+                (b"remote", origin),
+                b"fetch",
+                b"+refs/heads/*:refs/remotes/" + origin + b"/*",
             )
-        except KeyError:
-            pass
-        target_config = target.get_config()
-        target_config.set(("remote", "origin"), "url", encoded_path)
-        target_config.set(
-            ("remote", "origin"),
-            "fetch",
-            "+refs/heads/*:refs/remotes/origin/*",
-        )
-        target_config.write_to_path()
+            target_config.write_to_path()
 
-        # Update target head
-        head_chain, head_sha = self.refs.follow(b"HEAD")
-        if head_chain and head_sha is not None:
-            target.refs.set_symbolic_ref(b"HEAD", head_chain[-1], message=ref_message)
-            target[b"HEAD"] = head_sha
+            ref_message = b"clone: from " + encoded_path
+            self.fetch(target)
+            target.refs.import_refs(
+                b"refs/remotes/" + origin,
+                self.refs.as_dict(b"refs/heads"),
+                message=ref_message,
+            )
+            target.refs.import_refs(
+                b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
+            )
 
-            if checkout is None:
-                checkout = not bare
-            if checkout:
-                # Checkout HEAD to target dir
+            head_chain, origin_sha = self.refs.follow(b"HEAD")
+            origin_head = head_chain[-1] if head_chain else None
+            if origin_sha and not origin_head:
+                # set detached HEAD
+                target.refs[b"HEAD"] = origin_sha
+
+            _set_origin_head(target.refs, origin, origin_head)
+            head_ref = _set_default_branch(
+                target.refs, origin, origin_head, branch, ref_message
+            )
+
+            # Update target head
+            if head_ref:
+                head = _set_head(target.refs, head_ref, ref_message)
+            else:
+                head = None
+
+            if checkout and head is not None:
                 target.reset_index()
-
+        except BaseException:
+            if target is not None:
+                target.close()
+            if mkdir:
+                import shutil
+                shutil.rmtree(target_path)
+            raise
         return target
 
     def reset_index(self, tree=None):
@@ -1442,7 +1483,11 @@ class Repo(BaseRepo):
         )
 
         if tree is None:
-            tree = self[b"HEAD"].tree
+            head = self[b"HEAD"]
+            if isinstance(head, Tag):
+                _cls, obj = head.object
+                head = self.get_object(obj)
+            tree = head.tree
         config = self.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
         if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):

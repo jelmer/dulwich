@@ -385,6 +385,7 @@ class RepositoryRootTests(TestCase):
                 {
                     b"HEAD": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
                     b"refs/remotes/origin/master": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
+                    b"refs/remotes/origin/HEAD": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
                     b"refs/heads/master": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
                     b"refs/tags/mytag": b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a",
                     b"refs/tags/mytag-packed": b"b0931cadc54336e78a1d980420e3268903b57a50",
@@ -449,6 +450,48 @@ class RepositoryRootTests(TestCase):
         self.addCleanup(shutil.rmtree, tmp_dir)
         self.assertRaises(
             ValueError, r.clone, tmp_dir, mkdir=False, checkout=True, bare=True
+        )
+
+    def test_clone_branch(self):
+        r = self.open_repo("a.git")
+        r.refs[b"refs/heads/mybranch"] = b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a"
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with r.clone(tmp_dir, mkdir=False, branch=b"mybranch") as t:
+            # HEAD should point to specified branch and not origin HEAD
+            chain, sha = t.refs.follow(b"HEAD")
+            self.assertEqual(chain[-1], b"refs/heads/mybranch")
+            self.assertEqual(sha, b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a")
+            self.assertEqual(
+                t.refs[b"refs/remotes/origin/HEAD"],
+                b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
+            )
+
+    def test_clone_tag(self):
+        r = self.open_repo("a.git")
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with r.clone(tmp_dir, mkdir=False, branch=b"mytag") as t:
+            # HEAD should be detached (and not a symbolic ref) at tag
+            self.assertEqual(
+                t.refs.read_ref(b"HEAD"),
+                b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a",
+            )
+            self.assertEqual(
+                t.refs[b"refs/remotes/origin/HEAD"],
+                b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
+            )
+
+    def test_clone_invalid_branch(self):
+        r = self.open_repo("a.git")
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        self.assertRaises(
+            ValueError,
+            r.clone,
+            tmp_dir,
+            mkdir=False,
+            branch=b"mybranch",
         )
 
     def test_merge_history(self):
@@ -648,7 +691,7 @@ exit 0
 
         pre_commit_contents = """#!%(executable)s
 import sys
-sys.path.extend(':'.join(%(path)s))
+sys.path.extend(%(path)r)
 from dulwich.repo import Repo
 
 with open('foo', 'w') as f:
@@ -656,7 +699,9 @@ with open('foo', 'w') as f:
 
 r = Repo('.')
 r.stage(['foo'])
-""" % {'executable': sys.executable, 'path': repr(sys.path)}
+""" % {
+            'executable': sys.executable,
+            'path': [os.path.join(os.path.dirname(__file__), '..', '..')] + sys.path}
 
         repo_dir = os.path.join(self.mkdtemp())
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -1266,12 +1311,20 @@ class BuildRepoRootTests(TestCase):
         os.remove(os.path.join(r.path, "a"))
         r.stage(["a"])
         r.stage(["a"])  # double-stage a deleted path
+        self.assertEqual([], list(r.open_index()))
 
     def test_stage_directory(self):
         r = self._repo
         os.mkdir(os.path.join(r.path, "c"))
         r.stage(["c"])
         self.assertEqual([b"a"], list(r.open_index()))
+
+    def test_stage_submodule(self):
+        r = self._repo
+        s = Repo.init(os.path.join(r.path, "sub"), mkdir=True)
+        s.do_commit(b'message')
+        r.stage(["sub"])
+        self.assertEqual([b"a", b"sub"], list(r.open_index()))
 
     def test_unstage_midify_file_with_dir(self):
         os.mkdir(os.path.join(self._repo.path, 'new_dir'))

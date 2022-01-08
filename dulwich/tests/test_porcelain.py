@@ -630,9 +630,12 @@ class CloneTests(PorcelainTestCase):
         r.close()
 
     def test_source_broken(self):
-        target_path = tempfile.mkdtemp()
-        self.assertRaises(Exception, porcelain.clone, "/nonexistant/repo", target_path)
-        self.assertFalse(os.path.exists(target_path))
+        with tempfile.TemporaryDirectory() as parent:
+            target_path = os.path.join(parent, "target")
+            self.assertRaises(
+                Exception, porcelain.clone, "/nonexistant/repo", target_path
+            )
+            self.assertFalse(os.path.exists(target_path))
 
     def test_fetch_symref(self):
         f1_1 = make_object(Blob, data=b"f1")
@@ -652,7 +655,10 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c1.id, target_repo.refs[b"refs/heads/else"])
         self.assertEqual(c1.id, target_repo.refs[b"HEAD"])
-        self.assertEqual({b"HEAD": b"refs/heads/else"}, target_repo.refs.get_symrefs())
+        self.assertEqual(
+            {b"HEAD": b"refs/heads/else", b"refs/remotes/origin/HEAD": b"refs/remotes/origin/else"},
+            target_repo.refs.get_symrefs(),
+        )
 
 
 class InitTests(TestCase):
@@ -2385,6 +2391,8 @@ class FetchTests(PorcelainTestCase):
             for k, v in remote_refs.items()
             if k.startswith(local_ref_prefix)
         }
+        if b"HEAD" in locally_known_remote_refs and b"HEAD" in remote_refs:
+            normalized_remote_refs[b"HEAD"] = remote_refs[b"HEAD"]
 
         self.assertEqual(locally_known_remote_refs, normalized_remote_refs)
 

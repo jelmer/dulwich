@@ -30,7 +30,6 @@ import stat
 import struct
 import sys
 import tempfile
-import warnings
 
 from dulwich.index import (
     Index,
@@ -63,9 +62,6 @@ from dulwich.repo import Repo
 from dulwich.tests import (
     TestCase,
     skipIf,
-)
-from dulwich.tests.utils import (
-    setup_warning_catcher,
 )
 
 

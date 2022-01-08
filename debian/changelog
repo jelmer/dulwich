@@ -1,8 +1,8 @@
-dulwich (0.20.30-1) UNRELEASED; urgency=low
+dulwich (0.20.30-1) unstable; urgency=low
 
   * New upstream release.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 08 Jan 2022 02:10:07 -0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Sat, 08 Jan 2022 02:10:38 +0000
 
 dulwich (0.20.27-1) unstable; urgency=low
 

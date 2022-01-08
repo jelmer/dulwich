@@ -42,6 +42,9 @@ if TYPE_CHECKING:
     from dulwich.config import StackedConfig, ConfigFile
     from dulwich.index import Index
 
+from dulwich.clone import (
+    do_clone,
+)
 from dulwich.errors import (
     NoIndexPresent,
     NotBlobError,
@@ -87,6 +90,8 @@ from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
 
 from dulwich.refs import (  # noqa: F401
     ANNOTATED_TAG_SUFFIX,
+    LOCAL_BRANCH_PREFIX,
+    LOCAL_TAG_PREFIX,
     check_ref_format,
     RefsContainer,
     DictRefsContainer,
@@ -1383,6 +1388,7 @@ class Repo(BaseRepo):
         bare=False,
         origin=b"origin",
         checkout=None,
+        branch=None,
     ):
         """Clone this repository.
 
@@ -1390,57 +1396,43 @@ class Repo(BaseRepo):
           target_path: Target path
           mkdir: Create the target directory
           bare: Whether to create a bare repository
+          checkout: Whether or not to check-out HEAD after cloning
           origin: Base name for refs in target repository
             cloned from this repository
+          branch: Optional branch or tag to be used as HEAD in the new repository
+            instead of this repository's HEAD.
         Returns: Created repository as `Repo`
         """
-        if not bare:
-            target = self.init(target_path, mkdir=mkdir)
-        else:
-            if checkout:
-                raise ValueError("checkout and bare are incompatible")
-            target = self.init_bare(target_path, mkdir=mkdir)
-        self.fetch(target)
+
+        def clone_refs(target_repo, ref_message):
+            self.fetch(target_repo)
+            target_repo.refs.import_refs(
+                b"refs/remotes/" + origin,
+                self.refs.as_dict(b"refs/heads"),
+                message=ref_message,
+            )
+            target_repo.refs.import_refs(
+                b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
+            )
+
+            head_chain, sha = self.refs.follow(b"HEAD")
+            head_chain = head_chain[-1] if head_chain else None
+            return head_chain, sha
+
         encoded_path = self.path
         if not isinstance(encoded_path, bytes):
             encoded_path = os.fsencode(encoded_path)
-        ref_message = b"clone: from " + encoded_path
-        target.refs.import_refs(
-            b"refs/remotes/" + origin,
-            self.refs.as_dict(b"refs/heads"),
-            message=ref_message,
-        )
-        target.refs.import_refs(
-            b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
-        )
-        try:
-            target.refs.add_if_new(
-                DEFAULT_REF, self.refs[DEFAULT_REF], message=ref_message
-            )
-        except KeyError:
-            pass
-        target_config = target.get_config()
-        target_config.set(("remote", "origin"), "url", encoded_path)
-        target_config.set(
-            ("remote", "origin"),
-            "fetch",
-            "+refs/heads/*:refs/remotes/origin/*",
-        )
-        target_config.write_to_path()
 
-        # Update target head
-        head_chain, head_sha = self.refs.follow(b"HEAD")
-        if head_chain and head_sha is not None:
-            target.refs.set_symbolic_ref(b"HEAD", head_chain[-1], message=ref_message)
-            target[b"HEAD"] = head_sha
-
-            if checkout is None:
-                checkout = not bare
-            if checkout:
-                # Checkout HEAD to target dir
-                target.reset_index()
-
-        return target
+        return do_clone(
+            encoded_path,
+            target_path,
+            clone_refs=clone_refs,
+            mkdir=mkdir,
+            bare=bare,
+            origin=origin,
+            checkout=checkout,
+            branch=branch,
+        )
 
     def reset_index(self, tree=None):
         """Reset the index back to a specific tree.
@@ -1455,7 +1447,11 @@ class Repo(BaseRepo):
         )
 
         if tree is None:
-            tree = self[b"HEAD"].tree
+            head = self[b"HEAD"]
+            if isinstance(head, Tag):
+                _cls, obj = head.object
+                head = self.get_object(obj)
+            tree = head.tree
         config = self.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
         if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):

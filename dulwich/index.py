@@ -379,12 +379,6 @@ class Index(object):
             entry = self[path]
             yield path, entry.sha, cleanup_mode(entry.mode)
 
-    def iterblobs(self):
-        import warnings
-
-        warnings.warn("Use iterobjects() instead.", PendingDeprecationWarning)
-        return self.iterobjects()
-
     def clear(self):
         """Remove all contents from this index."""
         self._byname = {}
@@ -932,28 +926,6 @@ def iter_fresh_entries(
         except (FileNotFoundError, IsADirectoryError):
             entry = None
         yield path, entry
-
-
-def iter_fresh_blobs(index, root_path):
-    """Iterate over versions of blobs on disk referenced by index.
-
-    Don't use this function; it removes missing entries from index.
-
-    Args:
-      index: Index file
-      root_path: Root path to access from
-      include_deleted: Include deleted entries with sha and
-        mode set to None
-    Returns: Iterator over path, sha, mode
-    """
-    import warnings
-
-    warnings.warn(PendingDeprecationWarning, "Use iter_fresh_objects instead.")
-    for entry in iter_fresh_objects(index, root_path, include_deleted=True):
-        if entry[1] is None:
-            del index[entry[0]]
-        else:
-            yield entry
 
 
 def iter_fresh_objects(paths, root_path, include_deleted=False, object_store=None):

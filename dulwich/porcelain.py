@@ -429,7 +429,7 @@ def clone(
             DeprecationWarning,
             stacklevel=3,
         )
-        errstream = outstream
+        # TODO(jelmer): Capture logging output and stream to errstream
 
     if checkout is None:
         checkout = not bare

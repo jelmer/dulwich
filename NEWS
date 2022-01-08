@@ -3,6 +3,13 @@
  * Support staging submodules.
    (Jelmer Vernooĳ)
 
+ * Drop deprecated Index.iterblobs and iter_fresh_blobs.
+   (Jelmer Vernooĳ)
+
+ * Unify clone behaviour of ``Repo.clone`` and
+   ``porcelain.clone``, and add branch parameter for
+   clone. (Peter Rowlands, #851)
+
 0.20.28	2022-01-05
 
  * Fix hook test on Mac OSX / Linux when dulwich is

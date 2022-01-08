@@ -86,9 +86,6 @@ from dulwich.archive import (
 from dulwich.client import (
     get_transport_and_path,
 )
-from dulwich.clone import (
-    do_clone,
-)
 from dulwich.config import (
     StackedConfig,
 )
@@ -444,36 +441,15 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
-    if not isinstance(source, bytes):
-        source = source.encode(DEFAULT_ENCODING)
-
-    def clone_refs(target_repo, ref_message):
-        fetch_result = fetch(
-            target_repo,
-            origin,
-            errstream=errstream,
-            message=ref_message,
-            depth=depth,
-            **kwargs
+    with open_repo_closing(source) as r:
+        return r.clone(
+            target,
+            mkdir=mkdir,
+            bare=bare,
+            origin=origin,
+            checkout=checkout,
+            branch=branch,
         )
-        head_ref = fetch_result.symrefs.get(b"HEAD", None)
-        try:
-            head_sha = target_repo[fetch_result.refs[b"HEAD"]].id
-        except KeyError:
-            head_sha = None
-        return head_ref, head_sha
-
-    return do_clone(
-        source,
-        target,
-        clone_refs=clone_refs,
-        mkdir=mkdir,
-        bare=bare,
-        origin=origin,
-        checkout=checkout,
-        errstream=errstream,
-        branch=branch,
-    )
 
 
 def add(repo=".", paths=None):

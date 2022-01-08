@@ -32,6 +32,7 @@ from dulwich.objects import (
     git_line,
     valid_hexsha,
     ZERO_SHA,
+    Tag,
 )
 from dulwich.file import (
     GitFile,
@@ -1203,3 +1204,68 @@ def strip_peeled_refs(refs):
         for (ref, sha) in refs.items()
         if not ref.endswith(ANNOTATED_TAG_SUFFIX)
     }
+
+
+def _set_origin_head(refs, origin, origin_head):
+    # set refs/remotes/origin/HEAD
+    origin_base = b"refs/remotes/" + origin + b"/"
+    if origin_head and origin_head.startswith(LOCAL_BRANCH_PREFIX):
+        origin_ref = origin_base + b"HEAD"
+        target_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
+        if target_ref in refs:
+            refs.set_symbolic_ref(origin_ref, target_ref)
+
+
+def _set_default_branch(refs, origin, origin_head, branch, ref_message):
+    origin_base = b"refs/remotes/" + origin + b"/"
+    if branch:
+        origin_ref = origin_base + branch
+        if origin_ref in refs:
+            local_ref = LOCAL_BRANCH_PREFIX + branch
+            refs.add_if_new(
+                local_ref, refs[origin_ref], ref_message
+            )
+            head_ref = local_ref
+        elif LOCAL_TAG_PREFIX + branch in refs:
+            head_ref = LOCAL_TAG_PREFIX + branch
+        else:
+            raise ValueError(
+                "%s is not a valid branch or tag" % os.fsencode(branch)
+            )
+    elif origin_head:
+        head_ref = origin_head
+        if origin_head.startswith(LOCAL_BRANCH_PREFIX):
+            origin_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
+        else:
+            origin_ref = origin_head
+        try:
+            refs.add_if_new(
+                head_ref, refs[origin_ref], ref_message
+            )
+        except KeyError:
+            pass
+    return head_ref
+
+
+def _set_head(refs, head_ref, ref_message):
+    if head_ref.startswith(LOCAL_TAG_PREFIX):
+        # detach HEAD at specified tag
+        head = refs[head_ref]
+        if isinstance(head, Tag):
+            _cls, obj = head.object
+            head = obj.get_object(obj).id
+        del refs[b"HEAD"]
+        refs.set_if_equals(
+            b"HEAD", None, head, message=ref_message
+        )
+    else:
+        # set HEAD to specific branch
+        try:
+            head = refs[head_ref]
+            refs.set_symbolic_ref(b"HEAD", head_ref)
+            refs.set_if_equals(
+                b"HEAD", None, head, message=ref_message
+            )
+        except KeyError:
+            head = None
+    return head

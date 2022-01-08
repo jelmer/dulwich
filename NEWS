@@ -1,5 +1,8 @@
 0.20.29	UNRELEASED
 
+ * Support staging submodules.
+   (Jelmer Vernooĳ)
+
 0.20.28	2022-01-05
 
  * Fix hook test on Mac OSX / Linux when dulwich is

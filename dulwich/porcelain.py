@@ -70,7 +70,6 @@ import datetime
 import os
 from pathlib import Path
 import posixpath
-import shutil
 import stat
 import sys
 import time
@@ -86,6 +85,9 @@ from dulwich.archive import (
 )
 from dulwich.client import (
     get_transport_and_path,
+)
+from dulwich.clone import (
+    do_clone,
 )
 from dulwich.config import (
     StackedConfig,
@@ -140,6 +142,7 @@ from dulwich.protocol import (
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
     LOCAL_BRANCH_PREFIX,
+    LOCAL_TAG_PREFIX,
     strip_peeled_refs,
     RefsContainer,
 )
@@ -403,6 +406,7 @@ def clone(
     outstream=None,
     origin=b"origin",
     depth=None,
+    branch=None,
     **kwargs
 ):
     """Clone a local or remote git repository.
@@ -416,9 +420,10 @@ def clone(
       outstream: Optional stream to write progress to (deprecated)
       origin: Name of remote from the repository used to clone
       depth: Depth to fetch at
+      branch: Optional branch or tag to be used as HEAD in the new repository
+        instead of the cloned repository's HEAD.
     Returns: The new repository
     """
-    # TODO(jelmer): This code overlaps quite a bit with Repo.clone
     if outstream is not None:
         import warnings
 
@@ -437,51 +442,38 @@ def clone(
     if target is None:
         target = source.split("/")[-1]
 
-    if not os.path.exists(target):
-        os.mkdir(target)
+    mkdir = not os.path.exists(target)
 
-    if bare:
-        r = Repo.init_bare(target)
-    else:
-        r = Repo.init(target)
+    if not isinstance(source, bytes):
+        source = source.encode(DEFAULT_ENCODING)
 
-    reflog_message = b"clone: from " + source.encode("utf-8")
-    try:
-        target_config = r.get_config()
-        if not isinstance(source, bytes):
-            source = source.encode(DEFAULT_ENCODING)
-        target_config.set((b"remote", origin), b"url", source)
-        target_config.set(
-            (b"remote", origin),
-            b"fetch",
-            b"+refs/heads/*:refs/remotes/" + origin + b"/*",
-        )
-        target_config.write_to_path()
+    def clone_refs(target_repo, ref_message):
         fetch_result = fetch(
-            r,
+            target_repo,
             origin,
             errstream=errstream,
-            message=reflog_message,
+            message=ref_message,
             depth=depth,
             **kwargs
         )
-        for key, target in fetch_result.symrefs.items():
-            r.refs.set_symbolic_ref(key, target)
+        head_ref = fetch_result.symrefs.get(b"HEAD", None)
         try:
-            head = r[fetch_result.refs[b"HEAD"]]
+            head_sha = target_repo[fetch_result.refs[b"HEAD"]].id
         except KeyError:
-            head = None
-        else:
-            r[b"HEAD"] = head.id
-        if checkout and not bare and head is not None:
-            errstream.write(b"Checking out " + head.id + b"\n")
-            r.reset_index(head.tree)
-    except BaseException:
-        shutil.rmtree(target)
-        r.close()
-        raise
+            head_sha = None
+        return head_ref, head_sha
 
-    return r
+    return do_clone(
+        source,
+        target,
+        clone_refs=clone_refs,
+        mkdir=mkdir,
+        bare=bare,
+        origin=origin,
+        checkout=checkout,
+        errstream=errstream,
+        branch=branch,
+    )
 
 
 def add(repo=".", paths=None):
@@ -1430,7 +1422,7 @@ def _make_branch_ref(name):
 def _make_tag_ref(name):
     if getattr(name, "encode", None):
         name = name.encode(DEFAULT_ENCODING)
-    return b"refs/tags/" + name
+    return LOCAL_TAG_PREFIX + name
 
 
 def branch_delete(repo, name):

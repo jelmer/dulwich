@@ -74,7 +74,6 @@ import stat
 import sys
 import time
 from typing import (
-    Dict,
     Optional,
     Tuple,
     Union,

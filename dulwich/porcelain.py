@@ -74,7 +74,6 @@ import stat
 import sys
 import time
 from typing import (
-    Dict,
     Optional,
     Tuple,
     Union,
@@ -402,7 +401,7 @@ def clone(
     checkout=None,
     errstream=default_bytes_err_stream,
     outstream=None,
-    origin=b"origin",
+    origin="origin",
     depth=None,
     branch=None,
     **kwargs
@@ -442,15 +441,18 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
-    with open_repo_closing(source) as r:
-        return r.clone(
-            target,
-            mkdir=mkdir,
-            bare=bare,
-            origin=origin,
-            checkout=checkout,
-            branch=branch,
-        )
+    (client, path) = get_transport_and_path(source)
+
+    return client.clone(
+        path,
+        target,
+        mkdir=mkdir,
+        bare=bare,
+        origin=origin,
+        checkout=checkout,
+        branch=branch,
+        depth=depth,
+    )
 
 
 def add(repo=".", paths=None):

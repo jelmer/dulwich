@@ -110,6 +110,7 @@ from dulwich.pack import (
 from dulwich.refs import (
     read_info_refs,
     ANNOTATED_TAG_SUFFIX,
+    _import_remote_refs,
 )
 
 
@@ -494,6 +495,74 @@ class GitClient(object):
 
         """
         raise NotImplementedError(self.send_pack)
+
+    def clone(self, path, target_path, mkdir: bool = True, bare=False, origin="origin",
+              checkout=None, branch=None, depth=None):
+        """Clone a repository."""
+        from .refs import _set_origin_head, _set_default_branch, _set_head
+        from .repo import Repo
+
+        if mkdir:
+            os.mkdir(target_path)
+
+        try:
+            target = None
+            if not bare:
+                target = Repo.init(target_path)
+                if checkout is None:
+                    checkout = True
+            else:
+                if checkout:
+                    raise ValueError("checkout and bare are incompatible")
+                target = Repo.init_bare(target_path)
+
+            # TODO(jelmer): abstract method for get_location?
+            if isinstance(self, (LocalGitClient, SubprocessGitClient)):
+                encoded_path = path.encode('utf-8')
+            else:
+                encoded_path = self.get_url(path).encode('utf-8')
+
+            target_config = target.get_config()
+            target_config.set((b"remote", origin.encode('utf-8')), b"url", encoded_path)
+            target_config.set(
+                (b"remote", origin.encode('utf-8')),
+                b"fetch",
+                b"+refs/heads/*:refs/remotes/" + origin.encode('utf-8') + b"/*",
+            )
+            target_config.write_to_path()
+
+            ref_message = b"clone: from " + encoded_path
+            result = self.fetch(path, target, depth=depth)
+            _import_remote_refs(
+                target.refs, origin, result.refs, message=ref_message)
+
+            origin_head = result.symrefs.get(b"HEAD")
+            origin_sha = result.refs.get(b'HEAD')
+            if origin_sha and not origin_head:
+                # set detached HEAD
+                target.refs[b"HEAD"] = origin_sha
+
+            _set_origin_head(target.refs, origin.encode('utf-8'), origin_head)
+            head_ref = _set_default_branch(
+                target.refs, origin.encode('utf-8'), origin_head, branch, ref_message
+            )
+
+            # Update target head
+            if head_ref:
+                head = _set_head(target.refs, head_ref, ref_message)
+            else:
+                head = None
+
+            if checkout and head is not None:
+                target.reset_index()
+        except BaseException:
+            if target is not None:
+                target.close()
+            if mkdir:
+                import shutil
+                shutil.rmtree(target_path)
+            raise
+        return target
 
     def fetch(self, path, target, determine_wants=None, progress=None, depth=None):
         """Fetch into a target repository.

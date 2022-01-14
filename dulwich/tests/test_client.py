@@ -841,6 +841,18 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)
 
+    def test_clone(self):
+        c = LocalGitClient()
+        s = open_repo("a.git")
+        self.addCleanup(tear_down_repo, s)
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        result_repo = c.clone(s.path, target, mkdir=False)
+        expected = dict(s.get_refs())
+        expected[b'refs/remotes/origin/HEAD'] = expected[b'HEAD']
+        expected[b'refs/remotes/origin/master'] = expected[b'refs/heads/master']
+        self.assertEqual(expected, result_repo.get_refs())
+
     def test_fetch_empty(self):
         c = LocalGitClient()
         s = open_repo("a.git")

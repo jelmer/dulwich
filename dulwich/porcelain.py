@@ -74,7 +74,6 @@ import stat
 import sys
 import time
 from typing import (
-    Dict,
     Optional,
     Tuple,
     Union,
@@ -137,11 +136,8 @@ from dulwich.protocol import (
     ZERO_SHA,
 )
 from dulwich.refs import (
-    ANNOTATED_TAG_SUFFIX,
     LOCAL_BRANCH_PREFIX,
     LOCAL_TAG_PREFIX,
-    strip_peeled_refs,
-    RefsContainer,
     _import_remote_refs,
 )
 from dulwich.repo import BaseRepo, Repo

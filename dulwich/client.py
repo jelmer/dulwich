@@ -516,7 +516,11 @@ class GitClient(object):
                     raise ValueError("checkout and bare are incompatible")
                 target = Repo.init_bare(target_path)
 
-            encoded_path = self.get_url(path).encode('utf-8')
+            # TODO(jelmer): abstract method for get_location?
+            if isinstance(self, (LocalGitClient, SubprocessGitClient)):
+                encoded_path = path.encode('utf-8')
+            else:
+                encoded_path = self.get_url(path).encode('utf-8')
 
             target_config = target.get_config()
             target_config.set((b"remote", origin.encode('utf-8')), b"url", encoded_path)

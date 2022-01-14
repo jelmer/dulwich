@@ -496,7 +496,7 @@ class GitClient(object):
         """
         raise NotImplementedError(self.send_pack)
 
-    def clone(self, path, target_path, mkdir=True, bare=False, origin="origin",
+    def clone(self, path, target_path, mkdir: bool = True, bare=False, origin="origin",
               checkout=None, branch=None, depth=None):
         """Clone a repository."""
         from .refs import _set_origin_head, _set_default_branch, _set_head

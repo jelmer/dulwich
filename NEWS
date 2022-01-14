@@ -1,5 +1,7 @@
 0.20.31	UNRELEASED
 
+ * Add GitClient.clone(). (Jelmer Vernooĳ)
+
 0.20.30	2022-01-08
 
 0.20.29	2022-01-08

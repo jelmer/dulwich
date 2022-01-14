@@ -142,6 +142,7 @@ from dulwich.refs import (
     LOCAL_TAG_PREFIX,
     strip_peeled_refs,
     RefsContainer,
+    _import_remote_refs,
 )
 from dulwich.repo import BaseRepo, Repo
 from dulwich.server import (
@@ -1485,34 +1486,6 @@ def get_branch_remote(repo):
         except KeyError:
             remote_name = b"origin"
     return remote_name
-
-
-def _import_remote_refs(
-    refs_container: RefsContainer,
-    remote_name: str,
-    refs: Dict[str, str],
-    message: Optional[bytes] = None,
-    prune: bool = False,
-    prune_tags: bool = False,
-):
-    stripped_refs = strip_peeled_refs(refs)
-    branches = {
-        n[len(LOCAL_BRANCH_PREFIX) :]: v
-        for (n, v) in stripped_refs.items()
-        if n.startswith(LOCAL_BRANCH_PREFIX)
-    }
-    refs_container.import_refs(
-        b"refs/remotes/" + remote_name.encode(),
-        branches,
-        message=message,
-        prune=prune,
-    )
-    tags = {
-        n[len(b"refs/tags/") :]: v
-        for (n, v) in stripped_refs.items()
-        if n.startswith(b"refs/tags/") and not n.endswith(ANNOTATED_TAG_SUFFIX)
-    }
-    refs_container.import_refs(b"refs/tags", tags, message=message, prune=prune_tags)
 
 
 def fetch(

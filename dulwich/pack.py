@@ -1729,6 +1729,7 @@ def write_pack_data(f, num_records, records, progress=None, compression_level=-1
     entries = {}
     f = SHA1Writer(f)
     write_pack_header(f, num_records)
+    actual_num_records = 0
     for i, (type_num, object_id, delta_base, raw) in enumerate(records):
         if progress is not None:
             progress(("writing pack data: %d/%d\r" % (i, num_records)).encode("ascii"))
@@ -1743,7 +1744,12 @@ def write_pack_data(f, num_records, records, progress=None, compression_level=-1
                 type_num = OFS_DELTA
                 raw = (offset - base_offset, raw)
         crc32 = write_pack_object(f, type_num, raw, compression_level=compression_level)
+        actual_num_records += 1
         entries[object_id] = (offset, crc32)
+    if actual_num_records != num_records:
+        raise AssertionError(
+            'actual records written differs: %d != %d' % (
+                actual_num_records, num_records))
     return entries, f.write_sha()
 
 

@@ -1714,12 +1714,12 @@ def write_pack_objects(
     )
 
 
-def write_pack_data(f, num_records, records, progress=None, compression_level=-1):
+def write_pack_data(f, num_records=None, records=None, progress=None, compression_level=-1):
     """Write a new pack data file.
 
     Args:
       f: File to write to
-      num_records: Number of records
+      num_records: Number of records (defaults to len(records) if None)
       records: Iterator over type_num, object_id, delta_base, raw
       progress: Function to report progress to
       compression_level: the zlib compression level

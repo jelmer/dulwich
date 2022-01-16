@@ -1728,6 +1728,8 @@ def write_pack_data(f, num_records, records, progress=None, compression_level=-1
     # Write the pack
     entries = {}
     f = SHA1Writer(f)
+    if num_records is None:
+        num_records = len(records)
     write_pack_header(f, num_records)
     actual_num_records = 0
     for i, (type_num, object_id, delta_base, raw) in enumerate(records):

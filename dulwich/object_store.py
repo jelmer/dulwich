@@ -1350,8 +1350,9 @@ class MissingObjectFinder(object):
 class ObjectStoreGraphWalker(object):
     """Graph walker that finds what commits are missing from an object store.
 
-    :ivar heads: Revisions without descendants in the local repo
-    :ivar get_parents: Function to retrieve parents in the local repo
+    Attributes:
+      heads: Revisions without descendants in the local repo
+      get_parents: Function to retrieve parents in the local repo
     """
 
     def __init__(self, local_heads, get_parents, shallow=None):

@@ -1389,6 +1389,7 @@ class Repo(BaseRepo):
         origin=b"origin",
         checkout=None,
         branch=None,
+        depth=None,
     ):
         """Clone this repository.
 
@@ -1401,6 +1402,7 @@ class Repo(BaseRepo):
             cloned from this repository
           branch: Optional branch or tag to be used as HEAD in the new repository
             instead of this repository's HEAD.
+          depth: Depth at which to fetch
         Returns: Created repository as `Repo`
         """
 
@@ -1432,7 +1434,7 @@ class Repo(BaseRepo):
             target_config.write_to_path()
 
             ref_message = b"clone: from " + encoded_path
-            self.fetch(target)
+            self.fetch(target, depth=depth)
             target.refs.import_refs(
                 b"refs/remotes/" + origin,
                 self.refs.as_dict(b"refs/heads"),

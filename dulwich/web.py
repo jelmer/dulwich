@@ -286,7 +286,8 @@ def handle_service_request(req, backend, mat):
 class HTTPGitRequest(object):
     """Class encapsulating the state of a single git HTTP request.
 
-    :ivar environ: the WSGI environment for the request.
+    Attributes:
+      environ: the WSGI environment for the request.
     """
 
     def __init__(self, environ, start_response, dumb: bool = False, handlers=None):
@@ -358,7 +359,8 @@ class HTTPGitRequest(object):
 class HTTPGitApplication(object):
     """Class encapsulating the state of a git WSGI application.
 
-    :ivar backend: the Backend object backing this application
+    Attributes:
+      backend: the Backend object backing this application
     """
 
     services = {

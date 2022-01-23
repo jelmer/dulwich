@@ -327,9 +327,10 @@ class ParentsProvider(object):
 class BaseRepo(object):
     """Base class for a git repository.
 
-    :ivar object_store: Dictionary-like object for accessing
+    Attributes:
+      object_store: Dictionary-like object for accessing
         the objects
-    :ivar refs: Dictionary-like object with the refs in this
+      refs: Dictionary-like object with the refs in this
         repository
     """
 

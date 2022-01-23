@@ -1045,6 +1045,10 @@ class Repo(BaseRepo):
     the path of the repository.
 
     To create a new repository, use the Repo.init class method.
+
+    Note that a repository object may hold on to resources such
+    as file handles for performance reasons; call .close() to free
+    up those resources.
     """
 
     def __init__(self, root, object_store=None, bare=None):

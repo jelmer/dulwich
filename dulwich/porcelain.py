@@ -74,7 +74,6 @@ import stat
 import sys
 import time
 from typing import (
-    Dict,
     Optional,
     Tuple,
     Union,
@@ -137,11 +136,9 @@ from dulwich.protocol import (
     ZERO_SHA,
 )
 from dulwich.refs import (
-    ANNOTATED_TAG_SUFFIX,
     LOCAL_BRANCH_PREFIX,
     LOCAL_TAG_PREFIX,
-    strip_peeled_refs,
-    RefsContainer,
+    _import_remote_refs,
 )
 from dulwich.repo import BaseRepo, Repo
 from dulwich.server import (
@@ -401,7 +398,7 @@ def clone(
     checkout=None,
     errstream=default_bytes_err_stream,
     outstream=None,
-    origin=b"origin",
+    origin="origin",
     depth=None,
     branch=None,
     **kwargs
@@ -441,15 +438,18 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
-    with open_repo_closing(source) as r:
-        return r.clone(
-            target,
-            mkdir=mkdir,
-            bare=bare,
-            origin=origin,
-            checkout=checkout,
-            branch=branch,
-        )
+    (client, path) = get_transport_and_path(source)
+
+    return client.clone(
+        path,
+        target,
+        mkdir=mkdir,
+        bare=bare,
+        origin=origin,
+        checkout=checkout,
+        branch=branch,
+        depth=depth,
+    )
 
 
 def add(repo=".", paths=None):
@@ -1485,34 +1485,6 @@ def get_branch_remote(repo):
         except KeyError:
             remote_name = b"origin"
     return remote_name
-
-
-def _import_remote_refs(
-    refs_container: RefsContainer,
-    remote_name: str,
-    refs: Dict[str, str],
-    message: Optional[bytes] = None,
-    prune: bool = False,
-    prune_tags: bool = False,
-):
-    stripped_refs = strip_peeled_refs(refs)
-    branches = {
-        n[len(LOCAL_BRANCH_PREFIX) :]: v
-        for (n, v) in stripped_refs.items()
-        if n.startswith(LOCAL_BRANCH_PREFIX)
-    }
-    refs_container.import_refs(
-        b"refs/remotes/" + remote_name.encode(),
-        branches,
-        message=message,
-        prune=prune,
-    )
-    tags = {
-        n[len(b"refs/tags/") :]: v
-        for (n, v) in stripped_refs.items()
-        if n.startswith(b"refs/tags/") and not n.endswith(ANNOTATED_TAG_SUFFIX)
-    }
-    refs_container.import_refs(b"refs/tags", tags, message=message, prune=prune_tags)
 
 
 def fetch(

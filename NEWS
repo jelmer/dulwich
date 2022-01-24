@@ -1,4 +1,9 @@
-0.20.31	UNRELEASED
+0.20.32	UNRELEASED
+
+ * Properly close result repository during test.
+   (Jelmer Vernooĳ, #928)
+
+0.20.31	2022-01-21
 
  * Add GitClient.clone(). (Jelmer Vernooĳ, #920)
 

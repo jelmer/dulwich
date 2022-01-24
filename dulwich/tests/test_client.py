@@ -848,6 +848,7 @@ class LocalGitClientTests(TestCase):
         target = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target)
         result_repo = c.clone(s.path, target, mkdir=False)
+        self.addCleanup(result_repo.close)
         expected = dict(s.get_refs())
         expected[b'refs/remotes/origin/HEAD'] = expected[b'HEAD']
         expected[b'refs/remotes/origin/master'] = expected[b'refs/heads/master']

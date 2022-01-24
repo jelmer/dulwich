@@ -27,6 +27,7 @@ from collections import namedtuple
 import os
 import posixpath
 import stat
+import re
 from typing import (
     Optional,
     Dict,
@@ -69,6 +70,11 @@ _TAGGER_HEADER = b"tagger"
 
 
 S_IFGITLINK = 0o160000
+
+# Intentionally flexible to support various types of brokenness
+_TIME_ENTRY_RE = re.compile(
+    b"^(?P<person>.*) (?P<time>-?[0-9]+) (?P<timezone>[+-]{0,2}[0-9]+)$"
+)
 
 
 MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
@@ -1211,11 +1217,13 @@ def parse_timezone(text):
         and a boolean indicating whether this was a UTC timezone
         prefixed with a negative sign (-0000).
     """
+    if text[0] not in b"+-":
+        # Some (broken) commits do not have a sign
+        text = b"+" + text
+
     # cgit parses the first character as the sign, and the rest
     #  as an integer (using strtol), which could also be negative.
     #  We do the same for compatibility. See #697828.
-    if not text[0] in b"+-":
-        raise ValueError("Timezone must start with + or - (%(text)s)" % vars())
     sign = text[:1]
     offset = int(text[1:])
     if sign == b"-":
@@ -1259,18 +1267,16 @@ def parse_time_entry(value):
       field date)
     Returns: Tuple of (author, time, (timezone, timezone_neg_utc))
     """
-    try:
-        sep = value.rindex(b"> ")
-    except ValueError:
-        return (value, None, (None, False))
-    try:
-        person = value[0 : sep + 1]
-        rest = value[sep + 2 :]
-        timetext, timezonetext = rest.rsplit(b" ", 1)
-        time = int(timetext)
-        timezone, timezone_neg_utc = parse_timezone(timezonetext)
-    except ValueError as e:
-        raise ObjectFormatException(e)
+    m = _TIME_ENTRY_RE.match(value)
+    if not m:
+        raise ObjectFormatException("foo")
+
+    person = m.group("person")
+    timetext = m.group("time")
+    timezonetext = m.group("timezone")
+    time = int(timetext)
+    timezone, timezone_neg_utc = parse_timezone(timezonetext)
+
     return person, time, (timezone, timezone_neg_utc)
 
 

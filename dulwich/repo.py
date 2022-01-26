@@ -1394,6 +1394,7 @@ class Repo(BaseRepo):
         origin=b"origin",
         checkout=None,
         branch=None,
+        progress=None,
         depth=None,
     ):
         """Clone this repository.
@@ -1407,6 +1408,7 @@ class Repo(BaseRepo):
             cloned from this repository
           branch: Optional branch or tag to be used as HEAD in the new repository
             instead of this repository's HEAD.
+          progress: Optional progress function
           depth: Depth at which to fetch
         Returns: Created repository as `Repo`
         """

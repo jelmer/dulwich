@@ -448,6 +448,7 @@ def clone(
         origin=origin,
         checkout=checkout,
         branch=branch,
+        progress=errstream.write,
         depth=depth,
     )
 

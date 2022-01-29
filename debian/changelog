@@ -1,3 +1,10 @@
+dulwich (0.20.31-1.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Fix variable name in testsuite (Closes: #1003017)
+
+ -- Nilesh Patra <nilesh@debian.org>  Sat, 29 Jan 2022 23:36:01 +0000
+
 dulwich (0.20.31-1) unstable; urgency=low
 
   * New upstream release.

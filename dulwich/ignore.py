@@ -52,6 +52,9 @@ def _translate_segment(segment: bytes) -> bytes:
             res += b"[^/]*"
         elif c == b"?":
             res += b"[^/]"
+        elif c == b"\\":
+            res += re.escape(segment[i : i + 1])
+            i += 1
         elif c == b"[":
             j = i
             if j < n and segment[j : j + 1] == b"!":

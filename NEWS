@@ -1,5 +1,8 @@
 0.20.33	UNRELEASED
 
+ * Fix handling of escaped characters in ignore patterns.
+   (Jelmer Vernooĳ, #930)
+
 0.20.32	2022-01-24
 
  * Properly close result repository during test.

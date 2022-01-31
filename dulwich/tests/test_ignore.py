@@ -82,9 +82,7 @@ TRANSLATE_TESTS = [
     (b"**/bla.c", b"(?ms)(.*/)?bla\\.c/?\\Z"),
     (b"foo/**/bar", b"(?ms)foo(/.*)?\\/bar/?\\Z"),
     (b"foo/bar/*", b"(?ms)foo\\/bar\\/[^/]+/?\\Z"),
-    (b"/foo\[bar\]", b"(?ms)foo\\[bar\\]/?\\Z"),
-    (b"/foo\[bar\]", b"(?ms)foo\\[bar\\]/?\\Z"),
-    (b"/foo\[bar\]", b"(?ms)foo\\[bar\\]/?\\Z"),
+    (b"/foo\\[bar\\]", b"(?ms)foo\\[bar\\]/?\\Z"),
     (b"/foo[bar]", b"(?ms)foo[bar]/?\\Z"),
     (b"/foo[0-9]", b"(?ms)foo[0-9]/?\\Z"),
 ]

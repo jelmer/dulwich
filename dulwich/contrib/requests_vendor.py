@@ -130,7 +130,7 @@ def get_session(config):
     # Verify is True by default
     if ca_certs:
         session.verify = ca_certs
-    elif not ssl_verify:
+    elif ssl_verify is False:
         session.verify = ssl_verify
 
     if proxy_server:

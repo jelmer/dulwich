@@ -73,11 +73,6 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         else:
             resp = self.session.get(url, headers=req_headers)
 
-        # Add required fields as stated in AbstractHttpGitClient._http_request
-        # Since requests follows redirects by default - redirect_location is always empty
-        resp.content_type = resp.headers.get("Content-Type")
-        resp.redirect_location = ""
-
         if resp.status_code == 404:
             raise NotGitRepository()
         if resp.status_code == 401:
@@ -88,6 +83,12 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
             raise GitProtocolError(
                 "unexpected http resp %d for %s" % (resp.status_code, url)
             )
+
+        # Add required fields as stated in AbstractHttpGitClient._http_request
+        resp.content_type = resp.headers.get("Content-Type")
+        resp.redirect_location = ""
+        if resp.history:
+            resp.redirect_location = resp.url
 
         read = BytesIO(resp.content).read
 
@@ -110,6 +111,8 @@ def get_session(config):
 
         try:
             user_agent = config.get(b"http", b"useragent")
+            if isinstance(user_agent, bytes):
+                user_agent = user_agent.decode()
         except KeyError:
             pass
 
@@ -120,6 +123,8 @@ def get_session(config):
 
         try:
             ca_certs = config.get(b"http", b"sslCAInfo")
+            if isinstance(ca_certs, bytes):
+                ca_certs = ca_certs.decode()
         except KeyError:
             ca_certs = None
 
@@ -127,14 +132,12 @@ def get_session(config):
         user_agent = default_user_agent_string()
     session.headers.update({"User-agent": user_agent})
 
-    # Verify is True by default
     if ca_certs:
         session.verify = ca_certs
     elif ssl_verify is False:
         session.verify = ssl_verify
 
     if proxy_server:
-        # Assuming git config is referring to both http and https
         session.proxies.update({
             "http": proxy_server,
             "https": proxy_server

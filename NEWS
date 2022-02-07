@@ -3,6 +3,8 @@
  * Fix handling of escaped characters in ignore patterns.
    (Jelmer Vernooĳ, #930)
 
+ * Add ``dulwich.contrib.requests_vendor``. (epopcon)
+
 0.20.32	2022-01-24
 
  * Properly close result repository during test.

@@ -831,7 +831,7 @@ def show(
             show_object(r, o, decode, outstream)
 
 
-def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout):
+def diff_tree(repo, old_tree, new_tree, outstream=sys.stdout.buffer):
     """Compares the content and mode of blobs found via two tree objects.
 
     Args:

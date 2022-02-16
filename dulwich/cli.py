@@ -40,8 +40,8 @@ from dulwich import porcelain
 from dulwich.client import get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
+from dulwich.objectspec import parse_commit
 from dulwich.pack import Pack, sha_to_hex
-from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
 
 
@@ -172,15 +172,15 @@ class cmd_diff(Command):
     def run(self, args):
         opts, args = getopt(args, "", [])
 
-        if args == []:
-            print("Usage: dulwich diff COMMITID")
-            sys.exit(1)
-
         r = Repo(".")
-        commit_id = args[0]
-        commit = r[commit_id]
+        if args == []:
+            commit_id = b'HEAD'
+        else:
+            commit_id = args[0]
+        commit = parse_commit(r, commit_id)
         parent_commit = r[commit.parents[0]]
-        write_tree_diff(sys.stdout, r.object_store, parent_commit.tree, commit.tree)
+        porcelain.diff_tree(
+            r, parent_commit.tree, commit.tree, outstream=sys.stdout.buffer)
 
 
 class cmd_dump_pack(Command):

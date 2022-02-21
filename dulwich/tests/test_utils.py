@@ -43,20 +43,20 @@ class BuildCommitGraphTest(TestCase):
     def test_linear(self):
         c1, c2 = build_commit_graph(self.store, [[1], [2, 1]])
         for obj_id in [c1.id, c2.id, c1.tree, c2.tree]:
-            self.assertTrue(obj_id in self.store)
+            self.assertIn(obj_id, self.store)
         self.assertEqual([], c1.parents)
         self.assertEqual([c1.id], c2.parents)
         self.assertEqual(c1.tree, c2.tree)
         self.assertEqual([], self.store[c1.tree].items())
-        self.assertTrue(c2.commit_time > c1.commit_time)
+        self.assertGreater(c2.commit_time, c1.commit_time)
 
     def test_merge(self):
         c1, c2, c3, c4 = build_commit_graph(
             self.store, [[1], [2, 1], [3, 1], [4, 2, 3]]
         )
         self.assertEqual([c2.id, c3.id], c4.parents)
-        self.assertTrue(c4.commit_time > c2.commit_time)
-        self.assertTrue(c4.commit_time > c3.commit_time)
+        self.assertGreater(c4.commit_time, c2.commit_time)
+        self.assertGreater(c4.commit_time, c3.commit_time)
 
     def test_missing_parent(self):
         self.assertRaises(

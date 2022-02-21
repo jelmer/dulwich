@@ -197,8 +197,8 @@ M 100644 :1 a
             )
         )
         self.assertEqual(2, len(markers))
-        self.assertTrue(isinstance(self.repo[markers[b"1"]], Blob))
-        self.assertTrue(isinstance(self.repo[markers[b"2"]], Commit))
+        self.assertIsInstance(self.repo[markers[b"1"]], Blob)
+        self.assertIsInstance(self.repo[markers[b"2"]], Commit)
 
     def test_file_add(self):
         from fastimport import commands

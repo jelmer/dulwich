@@ -390,7 +390,7 @@ class TestPack(PackTests):
 
     def test_contains(self):
         with self.get_pack(pack1_sha) as p:
-            self.assertTrue(tree_sha in p)
+            self.assertIn(tree_sha, p)
 
     def test_get(self):
         with self.get_pack(pack1_sha) as p:
@@ -527,9 +527,9 @@ class TestPack(PackTests):
             objs = {o.id: o for o in p.iterobjects()}
             self.assertEqual(3, len(objs))
             self.assertEqual(sorted(objs), sorted(p.index))
-            self.assertTrue(isinstance(objs[a_sha], Blob))
-            self.assertTrue(isinstance(objs[tree_sha], Tree))
-            self.assertTrue(isinstance(objs[commit_sha], Commit))
+            self.assertIsInstance(objs[a_sha], Blob)
+            self.assertIsInstance(objs[tree_sha], Tree)
+            self.assertIsInstance(objs[commit_sha], Commit)
 
 
 class TestThinPack(PackTests):
@@ -703,7 +703,7 @@ class BaseTestPackIndexWriting(object):
             if self._has_crc32_checksum:
                 self.assertEqual(my_crc, actual_crc)
             else:
-                self.assertTrue(actual_crc is None)
+                self.assertIsNone(actual_crc)
 
     def test_single(self):
         entry_sha = hex_to_sha("6f670c0fb53f9463760b7295fbb814e965fb20c8")
@@ -721,7 +721,7 @@ class BaseTestPackIndexWriting(object):
             if self._has_crc32_checksum:
                 self.assertEqual(my_crc, actual_crc)
             else:
-                self.assertTrue(actual_crc is None)
+                self.assertIsNone(actual_crc)
 
 
 class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
@@ -992,9 +992,10 @@ class DeltaChainIteratorTests(TestCase):
     def get_raw_no_repeat(self, bin_sha):
         """Wrapper around store.get_raw that doesn't allow repeat lookups."""
         hex_sha = sha_to_hex(bin_sha)
-        self.assertFalse(
-            hex_sha in self.fetched,
-            "Attempted to re-fetch object %s" % hex_sha,
+        self.assertNotIn(
+            hex_sha,
+            self.fetched,
+            "Attempted to re-fetch object %s" % hex_sha
         )
         self.fetched.add(hex_sha)
         return self.store.get_raw(hex_sha)

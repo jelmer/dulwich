@@ -138,7 +138,7 @@ class ObjectStoreTests(object):
         self.assertRaises(KeyError, lambda: self.store[b"a" * 40])
 
     def test_contains_nonexistant(self):
-        self.assertFalse((b"a" * 40) in self.store)
+        self.assertNotIn(b"a" * 40, self.store)
 
     def test_add_objects_empty(self):
         self.store.add_objects([])
@@ -165,7 +165,7 @@ class ObjectStoreTests(object):
     def test_add_object(self):
         self.store.add_object(testobject)
         self.assertEqual(set([testobject.id]), set(self.store))
-        self.assertTrue(testobject.id in self.store)
+        self.assertIn(testobject.id, self.store)
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
 
@@ -173,7 +173,7 @@ class ObjectStoreTests(object):
         data = [(testobject, "mypath")]
         self.store.add_objects(data)
         self.assertEqual(set([testobject.id]), set(self.store))
-        self.assertTrue(testobject.id in self.store)
+        self.assertIn(testobject.id, self.store)
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
 
@@ -593,15 +593,15 @@ class TreeLookupPathTests(TestCase):
 
     def test_lookup_blob(self):
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"a")[1]
-        self.assertTrue(isinstance(self.store[o_id], Blob))
+        self.assertIsInstance(self.store[o_id], Blob)
 
     def test_lookup_tree(self):
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad")[1]
-        self.assertTrue(isinstance(self.store[o_id], Tree))
+        self.assertIsInstance(self.store[o_id], Tree)
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad/bd")[1]
-        self.assertTrue(isinstance(self.store[o_id], Tree))
+        self.assertIsInstance(self.store[o_id], Tree)
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad/bd/")[1]
-        self.assertTrue(isinstance(self.store[o_id], Tree))
+        self.assertIsInstance(self.store[o_id], Tree)
 
     def test_lookup_submodule(self):
         tree_lookup_path(self.get_object, self.tree_id, b"d")[1]

@@ -131,7 +131,7 @@ class WebTestCase(TestCase):
         return None
 
     def assertContentTypeEquals(self, expected):
-        self.assertTrue(("Content-Type", expected) in self._headers)
+        self.assertIn(("Content-Type", expected), self._headers)
 
 
 def _test_backend(objects, refs=None, named_files=None):
@@ -355,7 +355,7 @@ class SmartHandlersTestCase(WebTestCase):
         mat = re.search(".*", "/git-evil-handler")
         content = list(handle_service_request(self._req, "backend", mat))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
-        self.assertFalse(b"git-evil-handler" in b"".join(content))
+        self.assertNotIn(b"git-evil-handler", b"".join(content))
         self.assertFalse(self._req.cached)
 
     def _run_handle_service_request(self, content_length=None):
@@ -396,7 +396,7 @@ class SmartHandlersTestCase(WebTestCase):
 
         mat = re.search(".*", "/git-evil-pack")
         content = list(get_info_refs(self._req, Backend(), mat))
-        self.assertFalse(b"git-evil-handler" in b"".join(content))
+        self.assertNotIn(b"git-evil-handler", b"".join(content))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertFalse(self._req.cached)
 

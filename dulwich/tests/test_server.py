@@ -148,7 +148,7 @@ class HandlerTestCase(TestCase):
 
         # ignore innocuous but unknown capabilities
         self.assertRaises(GitProtocolError, set_caps, [b"cap2", b"ignoreme"])
-        self.assertFalse(b"ignoreme" in self._handler.capabilities())
+        self.assertNotIn(b"ignoreme", self._handler.capabilities())
         self._handler.innocuous_capabilities = lambda: (b"ignoreme",)
         self.assertSucceeds(set_caps, [b"cap2", b"ignoreme"])
 

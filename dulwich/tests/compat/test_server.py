@@ -59,7 +59,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
     def _check_server(self, dul_server):
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertFalse(b"side-band-64k" in caps)
+        self.assertNotIn(b"side-band-64k", caps)
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
@@ -94,4 +94,4 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
     def _check_server(self, server):
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertTrue(b"side-band-64k" in caps)
+        self.assertIn(b"side-band-64k", caps)

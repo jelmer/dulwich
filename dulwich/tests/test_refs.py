@@ -274,7 +274,7 @@ class RefsContainerTests(object):
 
     def test_set_symbolic_ref_overwrite(self):
         nines = b"9" * 40
-        self.assertFalse(b"refs/heads/symbolic" in self._refs)
+        self.assertNotIn(b"refs/heads/symbolic", self._refs)
         self._refs[b"refs/heads/symbolic"] = nines
         self.assertEqual(nines, self._refs.read_loose_ref(b"refs/heads/symbolic"))
         self._refs.set_symbolic_ref(b"refs/heads/symbolic", b"refs/heads/master")
@@ -298,8 +298,8 @@ class RefsContainerTests(object):
         )
 
     def test_contains(self):
-        self.assertTrue(b"refs/heads/master" in self._refs)
-        self.assertFalse(b"refs/heads/bar" in self._refs)
+        self.assertIn(b"refs/heads/master", self._refs)
+        self.assertNotIn(b"refs/heads/bar", self._refs)
 
     def test_delitem(self):
         self.assertEqual(
@@ -321,7 +321,7 @@ class RefsContainerTests(object):
             )
         )
         self.assertTrue(self._refs.remove_if_equals(b"refs/tags/refs-0.2", ZERO_SHA))
-        self.assertFalse(b"refs/tags/refs-0.2" in self._refs)
+        self.assertNotIn(b"refs/tags/refs-0.2", self._refs)
 
     def test_import_refs_name(self):
         self._refs[
@@ -526,7 +526,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         nines = b"9" * 40
         self.assertEqual(b"ref: refs/heads/master", refs.read_ref(b"HEAD"))
-        self.assertFalse(b"refs/heads/master" in refs)
+        self.assertNotIn(b"refs/heads/master", refs)
         self.assertTrue(refs.add_if_new(b"HEAD", nines))
         self.assertEqual(b"ref: refs/heads/master", refs.read_ref(b"HEAD"))
         self.assertEqual(nines, refs[b"HEAD"])
@@ -556,7 +556,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         RefsContainerTests.test_delitem(self)
         ref_file = os.path.join(self._refs.path, b"refs", b"heads", b"master")
         self.assertFalse(os.path.exists(ref_file))
-        self.assertFalse(b"refs/heads/master" in self._refs.get_packed_refs())
+        self.assertNotIn(b"refs/heads/master", self._refs.get_packed_refs())
 
     def test_delitem_symbolic(self):
         self.assertEqual(b"ref: refs/heads/master", self._refs.read_loose_ref(b"HEAD"))
@@ -745,8 +745,8 @@ class InfoRefsContainerTests(TestCase):
 
     def test_contains(self):
         refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
-        self.assertTrue(b"refs/heads/master" in refs)
-        self.assertFalse(b"refs/heads/bar" in refs)
+        self.assertIn(b"refs/heads/master", refs)
+        self.assertNotIn(b"refs/heads/bar", refs)
 
     def test_get_peeled(self):
         refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))

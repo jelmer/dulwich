@@ -327,7 +327,7 @@ class CommitTests(PorcelainTestCase):
             author=b"Joe <joe@example.com>",
             committer=b"Bob <bob@example.com>",
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
     def test_unicode(self):
@@ -341,7 +341,7 @@ class CommitTests(PorcelainTestCase):
             author="Joe <joe@example.com>",
             committer="Bob <bob@example.com>",
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
     def test_no_verify(self):
@@ -395,7 +395,7 @@ class CommitTests(PorcelainTestCase):
             committer="Bob <bob@example.com>",
             no_verify=True,
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
 
@@ -519,8 +519,8 @@ class CloneTests(PorcelainTestCase):
         target_repo = Repo(target_path)
         self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c3.id, target_repo.refs[b"refs/tags/foo"])
-        self.assertTrue(b"f1" not in os.listdir(target_path))
-        self.assertTrue(b"f2" not in os.listdir(target_path))
+        self.assertNotIn(b"f1", os.listdir(target_path))
+        self.assertNotIn(b"f2", os.listdir(target_path))
         c = r.get_config()
         encoded_path = self.repo.path
         if not isinstance(encoded_path, bytes):
@@ -551,8 +551,8 @@ class CloneTests(PorcelainTestCase):
             self.assertEqual(r.path, target_path)
         with Repo(target_path) as r:
             self.assertEqual(r.head(), c3.id)
-        self.assertTrue("f1" in os.listdir(target_path))
-        self.assertTrue("f2" in os.listdir(target_path))
+        self.assertIn("f1", os.listdir(target_path))
+        self.assertIn("f2", os.listdir(target_path))
 
     def test_bare_local_with_checkout(self):
         f1_1 = make_object(Blob, data=b"f1")
@@ -575,8 +575,8 @@ class CloneTests(PorcelainTestCase):
         with Repo(target_path) as r:
             r.head()
             self.assertRaises(NoIndexPresent, r.open_index)
-        self.assertFalse(b"f1" in os.listdir(target_path))
-        self.assertFalse(b"f2" in os.listdir(target_path))
+        self.assertNotIn(b"f1", os.listdir(target_path))
+        self.assertNotIn(b"f2", os.listdir(target_path))
 
     def test_no_checkout_with_bare(self):
         f1_1 = make_object(Blob, data=b"f1")
@@ -1094,7 +1094,7 @@ class CommitTreeTests(PorcelainTestCase):
             author=b"Joe <joe@example.com>",
             committer=b"Jane <jane@example.com>",
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
 
@@ -1135,7 +1135,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tags = self.repo.refs.as_dict(b"refs/tags")
         self.assertEqual(list(tags.keys()), [b"tryme"])
         tag = self.repo[b"refs/tags/tryme"]
-        self.assertTrue(isinstance(tag, Tag))
+        self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
         self.assertLess(time.time() - tag.tag_time, 5)
@@ -1178,7 +1178,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tags = self.repo.refs.as_dict(b"refs/tags")
         self.assertEqual(list(tags.keys()), [b"tryme"])
         tag = self.repo[b"refs/tags/tryme"]
-        self.assertTrue(isinstance(tag, Tag))
+        self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
         self.assertLess(time.time() - tag.tag_time, 5)
@@ -1205,7 +1205,7 @@ class TagCreateTests(PorcelainTestCase):
         tags = self.repo.refs.as_dict(b"refs/tags")
         self.assertEqual(list(tags.keys()), [b"tryme"])
         tag = self.repo[b"refs/tags/tryme"]
-        self.assertTrue(isinstance(tag, Tag))
+        self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
         self.assertLess(time.time() - tag.tag_time, 5)
@@ -1255,9 +1255,9 @@ class TagDeleteTests(PorcelainTestCase):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.tag_create(self.repo, b"foo")
-        self.assertTrue(b"foo" in porcelain.tag_list(self.repo))
+        self.assertIn(b"foo", porcelain.tag_list(self.repo))
         porcelain.tag_delete(self.repo, b"foo")
-        self.assertFalse(b"foo" in porcelain.tag_list(self.repo))
+        self.assertNotIn(b"foo", porcelain.tag_list(self.repo))
 
 
 class ResetTests(PorcelainTestCase):
@@ -2254,17 +2254,17 @@ class BranchDeleteTests(PorcelainTestCase):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, b"foo")
-        self.assertTrue(b"foo" in porcelain.branch_list(self.repo))
+        self.assertIn(b"foo", porcelain.branch_list(self.repo))
         porcelain.branch_delete(self.repo, b"foo")
-        self.assertFalse(b"foo" in porcelain.branch_list(self.repo))
+        self.assertNotIn(b"foo", porcelain.branch_list(self.repo))
 
     def test_simple_unicode(self):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, "foo")
-        self.assertTrue(b"foo" in porcelain.branch_list(self.repo))
+        self.assertIn(b"foo", porcelain.branch_list(self.repo))
         porcelain.branch_delete(self.repo, "foo")
-        self.assertFalse(b"foo" in porcelain.branch_list(self.repo))
+        self.assertNotIn(b"foo", porcelain.branch_list(self.repo))
 
 
 class FetchTests(PorcelainTestCase):
@@ -2301,7 +2301,7 @@ class FetchTests(PorcelainTestCase):
             committer=b"test2 <email>",
         )
 
-        self.assertFalse(self.repo[b"HEAD"].id in target_repo)
+        self.assertNotIn(self.repo[b"HEAD"].id, target_repo)
         target_repo.close()
 
         # Fetch changes into the cloned repo
@@ -2312,7 +2312,7 @@ class FetchTests(PorcelainTestCase):
 
         # Check the target repo for pushed changes
         with Repo(target_path) as r:
-            self.assertTrue(self.repo[b"HEAD"].id in r)
+            self.assertIn(self.repo[b"HEAD"].id, r)
 
     def test_with_remote_name(self):
         remote_name = "origin"
@@ -2351,7 +2351,7 @@ class FetchTests(PorcelainTestCase):
             committer=b"test2 <email>",
         )
 
-        self.assertFalse(self.repo[b"HEAD"].id in target_repo)
+        self.assertNotIn(self.repo[b"HEAD"].id, target_repo)
 
         target_config = target_repo.get_config()
         target_config.set(
@@ -2370,7 +2370,7 @@ class FetchTests(PorcelainTestCase):
         # Check the target repo for pushed changes, as well as updates
         # for the refs
         with Repo(target_path) as r:
-            self.assertTrue(self.repo[b"HEAD"].id in r)
+            self.assertIn(self.repo[b"HEAD"].id, r)
             self.assertNotEqual(self.repo.get_refs(), target_refs)
 
     def assert_correct_remote_refs(

@@ -112,7 +112,7 @@ class GitFileTests(TestCase):
 
     def test_readonly(self):
         f = GitFile(self.path("foo"), "rb")
-        self.assertTrue(isinstance(f, io.IOBase))
+        self.assertIsInstance(f, io.IOBase)
         self.assertEqual(b"foo contents", f.read())
         self.assertEqual(b"", f.read())
         f.seek(4)

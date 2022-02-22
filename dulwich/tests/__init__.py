@@ -145,12 +145,12 @@ def self_test_suite():
 
 
 def tutorial_test_suite():
-    import dulwich.client  # noqa: F401
-    import dulwich.config  # noqa: F401
-    import dulwich.index  # noqa: F401
-    import dulwich.reflog  # noqa: F401
-    import dulwich.repo  # noqa: F401
-    import dulwich.server  # noqa: F401
+    import dulwich.client
+    import dulwich.config
+    import dulwich.index
+    import dulwich.reflog
+    import dulwich.repo
+    import dulwich.server
     import dulwich.patch  # noqa: F401
 
     tutorial = [

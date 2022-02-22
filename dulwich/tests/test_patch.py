@@ -93,7 +93,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(StringIO(text.decode("utf-8")), "utf-8")
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
@@ -125,7 +125,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
@@ -160,7 +160,7 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(
             b"""\
@@ -192,7 +192,7 @@ From: Jelmer Vernooij <jelmer@debian.org>
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(b"Jelmer Vernooij <jelmer@debian.org>", c.author)
         self.assertEqual(
@@ -242,7 +242,7 @@ diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
  
  
  class DiffTests(TestCase):
-"""  # noqa: W291,W293
+"""
         text = (
             """\
 From dulwich-users-bounces+jelmer=samba.org@lists.launchpad.net \
@@ -265,7 +265,7 @@ More help   : https://help.launchpad.net/ListHelp
 
 """
             % expected_diff
-        )  # noqa: W291
+        )
         c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(expected_diff, diff)
         self.assertEqual(None, version)

@@ -387,7 +387,7 @@ class ConfigFile(ConfigDict):
         super(ConfigFile, self).__init__(values=values, encoding=encoding)
         self.path = None
 
-    @classmethod  # noqa: C901
+    @classmethod
     def from_file(cls, f: BinaryIO) -> "ConfigFile":  # noqa: C901
         """Read configuration from a file-like object."""
         ret = cls()

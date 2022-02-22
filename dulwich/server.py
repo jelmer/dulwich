@@ -70,7 +70,7 @@ from dulwich.objects import (
 from dulwich.pack import (
     write_pack_objects,
 )
-from dulwich.protocol import (  # noqa: F401
+from dulwich.protocol import (
     BufferedPktLineWriter,
     capability_agent,
     CAPABILITIES_REF,

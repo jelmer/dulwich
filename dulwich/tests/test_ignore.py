@@ -116,7 +116,7 @@ class ReadIgnorePatterns(TestCase):
 with trailing whitespace 
 with escaped trailing whitespace\\ 
 """
-        )  # noqa: W291
+        )
         self.assertEqual(
             list(read_ignore_patterns(f)),
             [

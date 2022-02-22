@@ -434,7 +434,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 Merge ../b
 """,
             commit.as_raw_string(),
-        )  # noqa: W291,W293
+        )
 
     def test_serialize_mergetag(self):
         tag = make_object(
@@ -472,7 +472,7 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
 Merge ../b
 """,
             commit.as_raw_string(),
-        )  # noqa: W291,W293
+        )
 
     def test_serialize_mergetags(self):
         tag = make_object(
@@ -523,7 +523,7 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
 Merge ../b
 """,
             commit.as_raw_string(),
-        )  # noqa: W291,W293
+        )
 
     def test_deserialize_mergetag(self):
         tag = make_object(
@@ -756,7 +756,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 
 foo
 """
-        )  # noqa: W291,W293
+        )
         self.assertEqual(b"foo\n", c.message)
         self.assertEqual([], c.extra)
         self.assertEqual(
@@ -801,7 +801,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 
 3.3.0 version bump and docs
 """
-        )  # noqa: W291,W293
+        )
         self.assertEqual([], c.extra)
         self.assertEqual(
             b"""\

@@ -66,15 +66,15 @@ else:
 if sys.platform == "Plan9":
     has_mmap = False
 
-from dulwich.errors import (  # noqa: E402
+from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
 )
-from dulwich.file import GitFile  # noqa: E402
-from dulwich.lru_cache import (  # noqa: E402
+from dulwich.file import GitFile
+from dulwich.lru_cache import (
     LRUSizeCache,
 )
-from dulwich.objects import (  # noqa: E402
+from dulwich.objects import (
     ShaFile,
     hex_to_sha,
     sha_to_hex,

@@ -323,14 +323,14 @@ index 3b41fd80..64914c78 100644
  2. open Sigil.app to the normal nearly blank template epub it generates when opened
  3. use Plugins->Manage Plugins menu and make sure the "Use Bundled Python" checkbox is checked
  4. use the "Add Plugin" button to navigate to and add testplugin.zip and then hit "Okay" to exit the Manage Plugins Dialog
-"""  # noqa: E501 W293
+"""
 
     testoutput = b""" docs/qt512.7_remove_bad_workaround.patch            | 15 ++++++++++++
  docs/testplugin_v017.zip                            | Bin
  ci_scripts/macgddeploy.py => ci_scripts/gddeploy.py |  0 
  docs/qt512.6_backport_009abcd_fix.patch             | 26 ---------------------
  docs/Building_Sigil_On_MacOSX.txt                   |  2 +-
- 5 files changed, 16 insertions(+), 27 deletions(-)"""  # noqa: W291
+ 5 files changed, 16 insertions(+), 27 deletions(-)"""
 
     # return 0 on success otherwise return -1
     result = diffstat(selftest.split(b"\n"))

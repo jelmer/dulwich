@@ -30,14 +30,14 @@ from dulwich.objects import (
     Tag,
     ZERO_SHA,
 )
-from fastimport import (  # noqa: E402
+from fastimport import (
     commands,
     errors as fastimport_errors,
     parser,
     processor,
 )
 
-import stat  # noqa: E402
+import stat
 
 
 def split_email(text):

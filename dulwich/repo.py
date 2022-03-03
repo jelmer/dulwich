@@ -1517,7 +1517,7 @@ class Repo(BaseRepo):
         """
         from dulwich.config import ConfigFile
 
-        path = os.path.join(self._controldir, "config")
+        path = os.path.join(self._commondir, "config")
         try:
             return ConfigFile.from_path(path)
         except FileNotFoundError:

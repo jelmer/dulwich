@@ -192,6 +192,32 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self.assertEqual(worktrees[0][1], "(bare)")
         self.assertTrue(os.path.samefile(worktrees[0][0], self._mainworktree_repo.path))
 
+    def test_git_worktree_config(self):
+        """Test that git worktree config parsing matches the git CLI's behavior."""
+        # Set some config value in the main repo using the git CLI
+        require_git_version((2, 7, 0))
+        test_name = "Jelmer"
+        test_email = "jelmer@apache.org"
+        run_git_or_fail(["config", "user.name", test_name], cwd=self._repo.path)
+        run_git_or_fail(["config", "user.email", test_email], cwd=self._repo.path)
+
+        worktree_cfg = self._worktree_repo.get_config()
+        main_cfg = self._repo.get_config()
+
+        # Assert that both the worktree repo and main repo have the same view of the config,
+        # and that the config matches what we set with the git cli
+        self.assertEqual(worktree_cfg, main_cfg)
+        for c in [worktree_cfg, main_cfg]:
+            self.assertEqual(test_name.encode(), c.get((b"user",), b"name"))
+            self.assertEqual(test_email.encode(), c.get((b"user",), b"email"))
+
+        # Read the config values in the worktree with the git cli and assert they match
+        # the dulwich-parsed configs
+        output_name = run_git_or_fail(["config", "user.name"], cwd=self._mainworktree_repo.path).decode().rstrip("\n")
+        output_email = run_git_or_fail(["config", "user.email"], cwd=self._mainworktree_repo.path).decode().rstrip("\n")
+        self.assertEqual(test_name, output_name)
+        self.assertEqual(test_email, output_email)
+
 
 class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
     """Test compatibility of Repo.init_new_working_directory."""

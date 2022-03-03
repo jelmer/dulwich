@@ -5,6 +5,9 @@
 
  * Add ``dulwich.contrib.requests_vendor``. (epopcon)
 
+ * Ensure git config is available in a linked working tree.
+   (Jesse Cureton, #926)
+
 0.20.32	2022-01-24
 
  * Properly close result repository during test.

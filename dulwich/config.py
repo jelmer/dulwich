@@ -28,6 +28,7 @@ TODO:
 
 import os
 import sys
+import warnings
 
 from typing import BinaryIO, Tuple, Optional
 
@@ -128,6 +129,19 @@ class Config(object):
         """
         raise NotImplementedError(self.get)
 
+    def get_multivar(self, section, name):
+        """Retrieve the contents of a multivar configuration setting.
+
+        Args:
+          section: Tuple with section name and optional subsection namee
+          subsection: Subsection name
+        Returns:
+          Contents of the setting as iterable
+        Raises:
+          KeyError: if the value is not set
+        """
+        raise NotImplementedError(self.get_multivar)
+
     def get_boolean(self, section, name, default=None):
         """Retrieve a configuration setting as boolean.
 
@@ -161,6 +175,16 @@ class Config(object):
         """
         raise NotImplementedError(self.set)
 
+    def items(self, section):
+        """Iterate over the configuration pairs for a specific section.
+
+        Args:
+          section: Tuple with section name and optional subsection namee
+        Returns:
+          Iterator over (name, value) pairs
+        """
+        raise NotImplementedError(self.items)
+
     def iteritems(self, section):
         """Iterate over the configuration pairs for a specific section.
 
@@ -169,14 +193,27 @@ class Config(object):
         Returns:
           Iterator over (name, value) pairs
         """
-        raise NotImplementedError(self.iteritems)
+        warnings.warn(
+            "Use %s.items instead." % type(self).__name__,
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return self.items(section)
 
     def itersections(self):
+        warnings.warn(
+            "Use %s.items instead." % type(self).__name__,
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return self.sections()
+
+    def sections(self):
         """Iterate over the sections.
 
         Returns: Iterator over section tuples
         """
-        raise NotImplementedError(self.itersections)
+        raise NotImplementedError(self.sections)
 
     def has_section(self, name):
         """Check if a specified section exists.
@@ -186,7 +223,7 @@ class Config(object):
         Returns:
           boolean indicating whether the section exists
         """
-        return name in self.itersections()
+        return name in self.sections()
 
 
 class ConfigDict(Config, MutableMapping):
@@ -265,10 +302,10 @@ class ConfigDict(Config, MutableMapping):
 
         self._values.setdefault(section)[name] = value
 
-    def iteritems(self, section):
+    def items(self, section):
         return self._values.get(section).items()
 
-    def itersections(self):
+    def sections(self):
         return self._values.keys()
 
 

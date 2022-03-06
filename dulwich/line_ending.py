@@ -17,7 +17,7 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 #
-""" All line-ending related functions, from conversions to config processing
+"""All line-ending related functions, from conversions to config processing
 
 Line-ending normalization is a complex beast. Here is some notes and details
 about how it seems to work.
@@ -25,10 +25,10 @@ about how it seems to work.
 The normalization is a two-fold process that happens at two moments:
 
 - When reading a file from the index and to the working directory. For example
-  when doing a `git clone` or `git checkout` call. We call this process the
+  when doing a ``git clone`` or ``git checkout`` call. We call this process the
   read filter in this module.
 - When writing a file to the index from the working directory. For example
-  when doing a `git add` call. We call this process the write filter in this
+  when doing a ``git add`` call. We call this process the write filter in this
   module.
 
 Note that when checking status (getting unstaged changes), whether or not
@@ -51,47 +51,47 @@ The code for this heuristic is here:
 https://git.kernel.org/pub/scm/git/git.git/tree/convert.c#n46
 
 Dulwich have an implementation with a slightly different heuristic, the
-`is_binary` function in `dulwich.patch`.
+`dulwich.patch.is_binary` function.
 
 The binary detection heuristic implementation is close to the one in JGit:
 https://github.com/eclipse/jgit/blob/f6873ffe522bbc3536969a3a3546bf9a819b92bf/org.eclipse.jgit/src/org/eclipse/jgit/diff/RawText.java#L300
 
 There is multiple variables that impact the normalization.
 
-First, a repository can contains a `.gitattributes` file (or more than one...)
+First, a repository can contains a ``.gitattributes`` file (or more than one...)
 that can further customize the operation on some file patterns, for example:
 
-    *.txt text
+    \*.txt text
 
-Force all `.txt` files to be treated as text files and to have their lines
+Force all ``.txt`` files to be treated as text files and to have their lines
 endings normalized.
 
-    *.jpg -text
+    \*.jpg -text
 
-Force all `.jpg` files to be treated as binary files and to not have their
+Force all ``.jpg`` files to be treated as binary files and to not have their
 lines endings converted.
 
-    *.vcproj text eol=crlf
+    \*.vcproj text eol=crlf
 
-Force all `.vcproj` files to be treated as text files and to have their lines
-endings converted into `CRLF` in working directory no matter the native EOL of
+Force all ``.vcproj`` files to be treated as text files and to have their lines
+endings converted into ``CRLF`` in working directory no matter the native EOL of
 the platform.
 
-    *.sh text eol=lf
+    \*.sh text eol=lf
 
-Force all `.sh` files to be treated as text files and to have their lines
-endings converted into `LF` in working directory no matter the native EOL of
+Force all ``.sh`` files to be treated as text files and to have their lines
+endings converted into ``LF`` in working directory no matter the native EOL of
 the platform.
 
-If the `eol` attribute is not defined, Git uses the `core.eol` configuration
+If the ``eol`` attribute is not defined, Git uses the ``core.eol`` configuration
 value described later.
 
-    * text=auto
+    \* text=auto
 
 Force all files to be scanned by the text file heuristic detection and to have
 their line endings normalized in case they are detected as text files.
 
-Git also have a obsolete attribute named `crlf` that can be translated to the
+Git also have a obsolete attribute named ``crlf`` that can be translated to the
 corresponding text attribute value.
 
 Then there are some configuration option (that can be defined at the
@@ -100,30 +100,30 @@ repository or user level):
 - core.autocrlf
 - core.eol
 
-`core.autocrlf` is taken into account for all files that doesn't have a `text`
-attribute defined in `.gitattributes`; it takes three possible values:
+``core.autocrlf`` is taken into account for all files that doesn't have a ``text``
+attribute defined in ``.gitattributes``; it takes three possible values:
 
-    - `true`: This forces all files on the working directory to have CRLF
+    - ``true``: This forces all files on the working directory to have CRLF
       line-endings in the working directory and convert line-endings to LF
       when writing to the index. When autocrlf is set to true, eol value is
       ignored.
-    - `input`: Quite similar to the `true` value but only force the write
+    - ``input``: Quite similar to the ``true`` value but only force the write
       filter, ie line-ending of new files added to the index will get their
       line-endings converted to LF.
-    - `false` (default): No normalization is done.
+    - ``false`` (default): No normalization is done.
 
 `core.eol` is the top-level configuration to define the line-ending to use
 when applying the read_filer. It takes three possible values:
 
-    - `lf`: When normalization is done, force line-endings to be `LF` in the
+    - ``lf``: When normalization is done, force line-endings to be ``LF`` in the
       working directory.
-    - `crlf`: When normalization is done, force line-endings to be `CRLF` in
+    - ``crlf``: When normalization is done, force line-endings to be ``CRLF`` in
       the working directory.
-    - `native` (default): When normalization is done, force line-endings to be
+    - ``native`` (default): When normalization is done, force line-endings to be
       the platform's native line ending.
 
 One thing to remember is when line-ending normalization is done on a file, Git
-always normalize line-ending to `LF` when writing to the index.
+always normalize line-ending to ``LF`` when writing to the index.
 
 There are sources that seems to indicate that Git won't do line-ending
 normalization when a file contains mixed line-endings. I think this logic

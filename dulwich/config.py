@@ -151,7 +151,7 @@ class Config(object):
 
         Args:
           section: Tuple with section name and optional subsection namee
-          subsection: Subsection name
+          name: Variable name
         Returns:
           Contents of the setting
         Raises:
@@ -164,7 +164,7 @@ class Config(object):
 
         Args:
           section: Tuple with section name and optional subsection namee
-          subsection: Subsection name
+          name: Variable name
         Returns:
           Contents of the setting as iterable
         Raises:
@@ -201,7 +201,7 @@ class Config(object):
           section: Tuple with section name and optional subsection namee
           name: Name of the configuration value, including section
             and optional subsection
-           value: value of the setting
+          value: value of the setting
         """
         raise NotImplementedError(self.set)
 

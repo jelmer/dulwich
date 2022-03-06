@@ -879,7 +879,7 @@ class BaseRepo(object):
     ):
         """Create a new commit.
 
-        If not specified, `committer` and `author` default to
+        If not specified, committer and author default to
         get_user_identity(..., 'COMMITTER')
         and get_user_identity(..., 'AUTHOR') respectively.
 

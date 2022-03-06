@@ -134,11 +134,6 @@ class PostCommitShellHook(ShellHook):
 
 class CommitMsgShellHook(ShellHook):
     """commit-msg shell hook
-
-    Args:
-      args[0]: commit message
-    Returns:
-      new commit message or None
     """
 
     def __init__(self, controldir):

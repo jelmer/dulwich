@@ -67,3 +67,8 @@ coverage:
 
 coverage-html: coverage
 	$(COVERAGE) html
+
+.PHONY: apidocs
+
+apidocs:
+	pydoctor --docformat=google dulwich --project-url=https://www.dulwich.io/

@@ -257,24 +257,24 @@ class ConfigDictTests(TestCase):
         cd[b"a"] = b"b"
         self.assertEqual(cd[b"a"], b"b")
 
-    def test_iteritems(self):
+    def test_items(self):
         cd = ConfigDict()
         cd.set((b"core",), b"foo", b"bla")
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"foo", b"bla")], list(cd.iteritems((b"core",))))
+        self.assertEqual([(b"foo", b"bla")], list(cd.items((b"core",))))
 
-    def test_iteritems_nonexistant(self):
+    def test_items_nonexistant(self):
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([], list(cd.iteritems((b"core",))))
+        self.assertEqual([], list(cd.items((b"core",))))
 
-    def test_itersections(self):
+    def test_sections(self):
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"core2",)], list(cd.itersections()))
+        self.assertEqual([(b"core2",)], list(cd.sections()))
 
 
 class StackedConfigTests(TestCase):

@@ -56,15 +56,11 @@ _GIT_UNCHANGED_START = b" "
 
 
 def _parse_patch(lines):
-    """An internal routine to parse a git style diff or patch to generate
-       diff stats
+    """Parse a git style diff or patch to generate diff stats.
+
     Args:
-      lines: list of byte strings "lines" from the diff to be parsed
-    Returns: A tuple (names, nametypes, counts) of three lists:
-             names = list of repo relative file paths
-             nametypes - list of booolean values indicating if file
-                         is binary (True means binary file)
-             counts = list of tuples of (added, deleted) counts for that file
+      lines: list of byte string lines from the diff to be parsed
+    Returns: A tuple (names, is_binary, counts) of three lists
     """
     names = []
     nametypes = []

@@ -508,7 +508,7 @@ def _is_subdir(subdir, parentdir):
 def clean(repo=".", target_dir=None):
     """Remove any untracked files from the target directory recursively
 
-    Equivalent to running `git clean -fd` in target_dir.
+    Equivalent to running ``git clean -fd`` in target_dir.
 
     Args:
       repo: Repository where the files may be tracked
@@ -1107,7 +1107,7 @@ def pull(
     Args:
       repo: Path to repository
       remote_location: Location of the remote
-      refspec: refspecs to fetch
+      refspecs: refspecs to fetch
       outstream: A stream file to write to output
       errstream: A stream file to write to errors
     """
@@ -1159,7 +1159,7 @@ def status(repo=".", ignored=False):
 
     Args:
       repo: Path to repository or repository object
-      ignored: Whether to include ignored files in `untracked`
+      ignored: Whether to include ignored files in untracked
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
@@ -1591,7 +1591,7 @@ def ls_tree(
 
     Args:
       repo: Path to the repository
-      tree_ish: Tree id to list
+      treeish: Tree id to list
       outstream: Output stream (defaults to stdout)
       recursive: Whether to recursively list files
       name_only: Only print item name
@@ -1662,7 +1662,7 @@ def update_head(repo, target, detached=False, new_branch=None):
 
     Args:
       repo: Path to the repository
-      detach: Create a detached head
+      detached: Create a detached head
       target: Branch or committish to switch to
       new_branch: New branch to create
     """
@@ -1784,7 +1784,7 @@ def describe(repo):
     """Describe the repository version.
 
     Args:
-      projdir: git repository root
+      repo: git repository
     Returns: a string description of the current git revision
 
     Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".

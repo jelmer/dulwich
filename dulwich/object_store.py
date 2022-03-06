@@ -158,7 +158,7 @@ class BaseObjectStore(object):
         """Add pack data to this object store.
 
         Args:
-          num_items: Number of items to add
+          count: Number of items to add
           pack_data: Iterator over pack data tuples
         """
         if count == 0:

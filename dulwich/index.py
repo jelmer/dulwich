@@ -579,7 +579,7 @@ def build_file_from_blob(
     """Build a file or symlink on disk based on a Git object.
 
     Args:
-      obj: The git object
+      blob: The git object
       mode: File mode
       target_path: Path to write to
       honor_filemode: An optional flag to honor core.filemode setting in
@@ -718,7 +718,7 @@ def blob_from_path_and_mode(fs_path, mode, tree_encoding="utf-8"):
 
     Args:
       fs_path: Full file system path to file
-      st: A stat object
+      mode: File mode
     Returns: A `Blob` object
     """
     assert isinstance(fs_path, bytes)
@@ -916,7 +916,7 @@ def iter_fresh_entries(
     Args:
       paths: Paths to iterate over
       root_path: Root path to access from
-      store: Optional store to save new blobs in
+      object_store: Optional store to save new blobs in
     Returns: Iterator over path, index_entry
     """
     for path in paths:

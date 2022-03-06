@@ -112,7 +112,7 @@ attribute defined in ``.gitattributes``; it takes three possible values:
       line-endings converted to LF.
     - ``false`` (default): No normalization is done.
 
-`core.eol` is the top-level configuration to define the line-ending to use
+``core.eol`` is the top-level configuration to define the line-ending to use
 when applying the read_filer. It takes three possible values:
 
     - ``lf``: When normalization is done, force line-endings to be ``LF`` in the

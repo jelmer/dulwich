@@ -350,13 +350,13 @@ class RefsContainer(object):
         """
         raise NotImplementedError(self.set_if_equals)
 
-    def add_if_new(self, name, ref):
+    def add_if_new(self, name, ref, committer=None, timestamp=None,
+                   timezone=None, message=None):
         """Add a new reference only if it does not already exist.
 
         Args:
           name: Ref name
           ref: Ref value
-          message: Message for reflog
         """
         raise NotImplementedError(self.add_if_new)
 

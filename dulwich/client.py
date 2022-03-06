@@ -1782,8 +1782,8 @@ def default_urllib3_manager(   # noqa: C901
     Honour detected proxy configurations.
 
     Args:
-      config: dulwich.config.ConfigDict` instance with Git configuration.
-      kwargs: Additional arguments for urllib3.ProxyManager
+      config: `dulwich.config.ConfigDict` instance with Git configuration.
+      override_kwargs: Additional arguments for `urllib3.ProxyManager`
 
     Returns:
       `pool_manager_cls` (defaults to `urllib3.ProxyManager`) instance for

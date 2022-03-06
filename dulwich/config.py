@@ -63,7 +63,12 @@ def lower_key(key):
     return key
 
 
-class CaseInsensitiveDict(OrderedDict):
+class CaseInsensitiveOrderedMultiDict(MutableMapping):
+
+    def __init__(self):
+        self._real = []
+        self._keyed = {}
+
     @classmethod
     def make(cls, dict_in=None):
 
@@ -83,15 +88,34 @@ class CaseInsensitiveDict(OrderedDict):
 
         return out
 
-    def __setitem__(self, key, value, **kwargs):
-        key = lower_key(key)
+    def __len__(self):
+        return len(self._keyed)
 
-        super(CaseInsensitiveDict, self).__setitem__(key, value, **kwargs)
+    def keys(self):
+        return self._keyed.keys()
+
+    def items(self):
+        return iter(self._real)
+
+    def __iter__(self):
+        return self._keyed.__iter__()
+
+    def values(self):
+        return self._keyed.values()
+
+    def __setitem__(self, key, value):
+        self._real.append((key, value))
+        self._keyed[lower_key(key)] = value
+
+    def __delitem__(self, key):
+        key = lower_key(key)
+        del self._keyed[key]
+        for i, (actual, unused_value) in reversed(enumerate(self._real)):
+            if lower_key(actual) == key:
+                del self._real[i]
 
     def __getitem__(self, item):
-        key = lower_key(item)
-
-        return super(CaseInsensitiveDict, self).__getitem__(key)
+        return self._keyed[lower_key(item)]
 
     def get(self, key, default=SENTINAL):
         try:
@@ -103,6 +127,12 @@ class CaseInsensitiveDict(OrderedDict):
             return type(self)()
 
         return default
+
+    def get_all(self, key):
+        key = lower_key(key)
+        for actual, value in self._real:
+            if lower_key(actual) == key:
+                yield value
 
     def setdefault(self, key, default=SENTINAL):
         try:
@@ -234,7 +264,7 @@ class ConfigDict(Config, MutableMapping):
         if encoding is None:
             encoding = sys.getdefaultencoding()
         self.encoding = encoding
-        self._values = CaseInsensitiveDict.make(values)
+        self._values = CaseInsensitiveOrderedMultiDict.make(values)
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, self._values)
@@ -282,6 +312,17 @@ class ConfigDict(Config, MutableMapping):
             name = name.encode(self.encoding)
 
         return section, name
+
+    def get_multivar(self, section, name):
+        section, name = self._check_section_and_name(section, name)
+
+        if len(section) > 1:
+            try:
+                return self._values[section][name]
+            except KeyError:
+                pass
+
+        return self._values[(section[0],)].get_all(name)
 
     def get(self, section, name):
         section, name = self._check_section_and_name(section, name)

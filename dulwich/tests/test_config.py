@@ -108,6 +108,11 @@ class ConfigFileTests(TestCase):
         self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
+    def test_from_file_multiple(self):
+        cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
+        self.assertEqual([b"bar", b"blah"], list(cf.get_multivar((b"core",), b"foo")))
+        self.assertEqual([], list(cf.get_multivar((b"core", ), b"blah")))
+
     def test_from_file_utf8_bom(self):
         text = "[core]\nfoo = b\u00e4r\n".encode("utf-8-sig")
         cf = self.from_file(text)
@@ -155,6 +160,12 @@ class ConfigFileTests(TestCase):
     def test_from_file_subsection_not_quoted(self):
         cf = self.from_file(b"[branch.foo]\nfoo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
+
+    def test_write_preserve_multivar(self):
+        cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
+        f = BytesIO()
+        cf.write_to_file(f)
+        self.assertEqual(b"[core]\n\tfoo = bar\n\tfoo = blah\n", f.getvalue())
 
     def test_write_to_file_empty(self):
         c = ConfigFile()

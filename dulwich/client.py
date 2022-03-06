@@ -2154,6 +2154,8 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             basic_auth = urllib3.util.make_headers(basic_auth=credentials)
             self.pool_manager.headers.update(basic_auth)
 
+        self.config = config
+
         super(Urllib3HttpGitClient, self).__init__(
             base_url=base_url, dumb=dumb, **kwargs)
 

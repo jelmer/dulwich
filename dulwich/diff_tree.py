@@ -130,7 +130,7 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
       store: An ObjectStore for looking up objects.
       tree1_id: The SHA of the first Tree object to iterate, or None.
       tree2_id: The SHA of the second Tree object to iterate, or None.
-      param prune_identical: If True, identical subtrees will not be walked.
+      prune_identical: If True, identical subtrees will not be walked.
     Returns:
       Iterator over Pairs of TreeEntry objects for each pair of entries
         in the trees and their subtrees recursively. If an entry exists in one
@@ -345,8 +345,8 @@ def _common_bytes(blocks1, blocks2):
     """Count the number of common bytes in two block count dicts.
 
     Args:
-      block1: The first dict of block hashcode -> total bytes.
-      block2: The second dict of block hashcode -> total bytes.
+      blocks1: The first dict of block hashcode -> total bytes.
+      blocks2: The second dict of block hashcode -> total bytes.
     Returns:
       The number of bytes in common between blocks1 and blocks2. This is
       only approximate due to possible hash collisions.

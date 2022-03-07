@@ -32,10 +32,6 @@ import warnings
 
 from typing import BinaryIO, Tuple, Optional
 
-from collections import (
-    OrderedDict,
-)
-
 try:
     from collections.abc import (
         Iterable,

@@ -958,3 +958,29 @@ def refresh_index(index, root_path):
     """
     for path, entry in iter_fresh_entries(index, root_path):
         index[path] = path
+
+
+class locked_index(object):
+    """Lock the index while making modifications.
+
+    Works as a context manager.
+    """
+    def __init__(self, path):
+        self._path = path
+
+    def __enter__(self):
+        self._file = GitFile(self._path, "wb")
+        self._index = Index(self._path)
+        return self._index
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is not None:
+            self._file.abort()
+            return
+        try:
+            f = SHA1Writer(self._file)
+            write_index_dict(f, self._index._byname)
+        except BaseException:
+            self._file.abort()
+        else:
+            f.close()

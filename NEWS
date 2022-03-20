@@ -1,5 +1,8 @@
 0.20.35	UNRELEASED
 
+ * Document the ``path`` attribute for ``Repo``.
+   (Jelmer Vernooĳ, #854)
+
 0.20.34	2022-03-14
 
  * Add support for multivars in configuration.

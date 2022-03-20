@@ -1,3 +1,28 @@
+0.20.35	2022-03-20
+
+ * Document the ``path`` attribute for ``Repo``.
+   (Jelmer Vernooĳ, #854)
+
+0.20.34	2022-03-14
+
+ * Add support for multivars in configuration.
+   (Jelmer Vernooĳ, #718)
+
+0.20.33	2022-03-05
+
+ * Fix handling of escaped characters in ignore patterns.
+   (Jelmer Vernooĳ, #930)
+
+ * Add ``dulwich.contrib.requests_vendor``. (epopcon)
+
+ * Ensure git config is available in a linked working tree.
+   (Jesse Cureton, #926)
+
+0.20.32	2022-01-24
+
+ * Properly close result repository during test.
+   (Jelmer Vernooĳ, #928)
+
 0.20.31	2022-01-21
 
  * Add GitClient.clone(). (Jelmer Vernooĳ, #920)

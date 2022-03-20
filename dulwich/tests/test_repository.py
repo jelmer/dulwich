@@ -75,12 +75,12 @@ class CreateRepositoryTests(TestCase):
         barestr = b"bare = " + str(expect_bare).lower().encode("ascii")
         with repo.get_named_file("config") as f:
             config_text = f.read()
-            self.assertTrue(barestr in config_text, "%r" % config_text)
+            self.assertIn(barestr, config_text, "%r" % config_text)
         expect_filemode = sys.platform != "win32"
         barestr = b"filemode = " + str(expect_filemode).lower().encode("ascii")
         with repo.get_named_file("config") as f:
             config_text = f.read()
-            self.assertTrue(barestr in config_text, "%r" % config_text)
+            self.assertIn(barestr, config_text, "%r" % config_text)
 
         if isinstance(repo, Repo):
             expected_mode = '0o100644' if expect_filemode else '0o100666'
@@ -224,12 +224,12 @@ class RepositoryRootTests(TestCase):
 
     def test_contains_object(self):
         r = self.open_repo("a.git")
-        self.assertTrue(r.head() in r)
-        self.assertFalse(b"z" * 40 in r)
+        self.assertIn(r.head(), r)
+        self.assertNotIn(b"z" * 40, r)
 
     def test_contains_ref(self):
         r = self.open_repo("a.git")
-        self.assertTrue(b"HEAD" in r)
+        self.assertIn(b"HEAD", r)
 
     def test_get_no_description(self):
         r = self.open_repo("a.git")
@@ -249,7 +249,7 @@ class RepositoryRootTests(TestCase):
 
     def test_contains_missing(self):
         r = self.open_repo("a.git")
-        self.assertFalse(b"bar" in r)
+        self.assertNotIn(b"bar", r)
 
     def test_get_peeled(self):
         # unpacked ref
@@ -1210,7 +1210,7 @@ class BuildRepoRootTests(TestCase):
         self.assertEqual(self._root_commit, r[b"HEAD"].id)
         self.assertEqual(commit_sha, r[b"refs/heads/new_branch"].id)
         self.assertEqual([], r[commit_sha].parents)
-        self.assertTrue(b"refs/heads/new_branch" in r)
+        self.assertIn(b"refs/heads/new_branch", r)
 
         new_branch_head = commit_sha
 

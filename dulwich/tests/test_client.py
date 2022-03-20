@@ -427,21 +427,21 @@ class GitClientTests(TestCase):
 class TestGetTransportAndPath(TestCase):
     def test_tcp(self):
         c, path = get_transport_and_path("git://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(TCP_GIT_PORT, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_tcp_port(self):
         c, path = get_transport_and_path("git://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(1234, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_git_ssh_explicit(self):
         c, path = get_transport_and_path("git+ssh://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -449,7 +449,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_explicit(self):
         c, path = get_transport_and_path("ssh://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -457,20 +457,20 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_port_explicit(self):
         c, path = get_transport_and_path("git+ssh://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/bar/baz", path)
 
     def test_username_and_port_explicit_unknown_scheme(self):
         c, path = get_transport_and_path("unknown://git@server:7999/dply/stuff.git")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("unknown", c.host)
         self.assertEqual("//git@server:7999/dply/stuff.git", path)
 
     def test_username_and_port_explicit(self):
         c, path = get_transport_and_path("ssh://git@server:7999/dply/stuff.git")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("git", c.username)
         self.assertEqual("server", c.host)
         self.assertEqual(7999, c.port)
@@ -478,7 +478,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_abspath_doubleslash(self):
         c, path = get_transport_and_path("git+ssh://foo.com//bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -486,14 +486,14 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_port(self):
         c, path = get_transport_and_path("git+ssh://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_implicit(self):
         c, path = get_transport_and_path("foo:/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -501,7 +501,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_host(self):
         c, path = get_transport_and_path("foo.com:/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -509,7 +509,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_user_host(self):
         c, path = get_transport_and_path("user@foo.com:/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual("user", c.username)
@@ -517,7 +517,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_relpath(self):
         c, path = get_transport_and_path("foo:bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -525,7 +525,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_host_relpath(self):
         c, path = get_transport_and_path("foo.com:bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -533,7 +533,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_user_host_relpath(self):
         c, path = get_transport_and_path("user@foo.com:bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual("user", c.username)
@@ -541,25 +541,25 @@ class TestGetTransportAndPath(TestCase):
 
     def test_local(self):
         c, path = get_transport_and_path("foo.bar/baz")
-        self.assertTrue(isinstance(c, LocalGitClient))
+        self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("foo.bar/baz", path)
 
     @skipIf(sys.platform != "win32", "Behaviour only happens on windows.")
     def test_local_abs_windows_path(self):
         c, path = get_transport_and_path("C:\\foo.bar\\baz")
-        self.assertTrue(isinstance(c, LocalGitClient))
+        self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("C:\\foo.bar\\baz", path)
 
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
         c, path = get_transport_and_path("prospero://bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
 
     def test_http(self):
         url = "https://github.com/jelmer/dulwich"
         c, path = get_transport_and_path(url)
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
 
     def test_http_auth(self):
@@ -567,7 +567,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url)
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertEqual("user", c._username)
         self.assertEqual("passwd", c._password)
@@ -577,7 +577,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url, username="user2", password="blah")
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertEqual("user2", c._username)
         self.assertEqual("blah", c._password)
@@ -587,7 +587,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url, username="user2", password="blah")
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertEqual("user", c._username)
         self.assertEqual("passwd", c._password)
@@ -597,7 +597,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url)
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
@@ -606,21 +606,21 @@ class TestGetTransportAndPath(TestCase):
 class TestGetTransportAndPathFromUrl(TestCase):
     def test_tcp(self):
         c, path = get_transport_and_path_from_url("git://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(TCP_GIT_PORT, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_tcp_port(self):
         c, path = get_transport_and_path_from_url("git://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(1234, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_explicit(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -628,14 +628,14 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_ssh_port_explicit(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_homepath(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com/~/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -643,7 +643,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_ssh_port_homepath(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com:1234/~/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/~/bar/baz", path)
@@ -671,7 +671,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
     def test_http(self):
         url = "https://github.com/jelmer/dulwich"
         c, path = get_transport_and_path_from_url(url)
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("https://github.com", c.get_url(b"/"))
         self.assertEqual("/jelmer/dulwich", path)
 
@@ -679,12 +679,12 @@ class TestGetTransportAndPathFromUrl(TestCase):
         url = "https://github.com:9090/jelmer/dulwich"
         c, path = get_transport_and_path_from_url(url)
         self.assertEqual("https://github.com:9090", c.get_url(b"/"))
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
 
     def test_file(self):
         c, path = get_transport_and_path_from_url("file:///home/jelmer/foo")
-        self.assertTrue(isinstance(c, LocalGitClient))
+        self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("/home/jelmer/foo", path)
 
 
@@ -848,6 +848,7 @@ class LocalGitClientTests(TestCase):
         target = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target)
         result_repo = c.clone(s.path, target, mkdir=False)
+        self.addCleanup(result_repo.close)
         expected = dict(s.get_refs())
         expected[b'refs/remotes/origin/HEAD'] = expected[b'HEAD']
         expected[b'refs/remotes/origin/master'] = expected[b'refs/heads/master']

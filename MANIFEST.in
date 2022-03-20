@@ -14,6 +14,4 @@ recursive-include examples *.py
 graft dulwich/tests/data
 include tox.ini
 include dulwich.cfg
-include appveyor.yml
 include .testr.conf
-include .travis.yml

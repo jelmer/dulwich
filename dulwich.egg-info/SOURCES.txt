@@ -115,6 +115,7 @@ dulwich/contrib/__init__.py
 dulwich/contrib/diffstat.py
 dulwich/contrib/paramiko_vendor.py
 dulwich/contrib/release_robot.py
+dulwich/contrib/requests_vendor.py
 dulwich/contrib/swift.py
 dulwich/contrib/test_paramiko_vendor.py
 dulwich/contrib/test_release_robot.py

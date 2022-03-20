@@ -106,7 +106,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def __delitem__(self, key):
         key = lower_key(key)
         del self._keyed[key]
-        for i, (actual, unused_value) in reversed(enumerate(self._real)):
+        for i, (actual, unused_value) in reversed(list(enumerate(self._real))):
             if lower_key(actual) == key:
                 del self._real[i]
 

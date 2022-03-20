@@ -1049,6 +1049,12 @@ class Repo(BaseRepo):
     Note that a repository object may hold on to resources such
     as file handles for performance reasons; call .close() to free
     up those resources.
+
+    Attributes:
+
+      path (str): Path to the working copy (if it exists) or repository control
+        directory (if the repository is bare)
+      bare (bool): Whether this is a bare repository
     """
 
     def __init__(self, root, object_store=None, bare=None):
@@ -1175,8 +1181,8 @@ class Repo(BaseRepo):
         For a main working tree, it is identical to controldir().
 
         For a linked working tree, it is the control directory of the
-        main working tree."""
-
+        main working tree.
+        """
         return self._commondir
 
     def _determine_file_mode(self):

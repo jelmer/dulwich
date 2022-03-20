@@ -66,15 +66,15 @@ else:
 if sys.platform == "Plan9":
     has_mmap = False
 
-from dulwich.errors import (  # noqa: E402
+from dulwich.errors import (
     ApplyDeltaError,
     ChecksumMismatch,
 )
-from dulwich.file import GitFile  # noqa: E402
-from dulwich.lru_cache import (  # noqa: E402
+from dulwich.file import GitFile
+from dulwich.lru_cache import (
     LRUSizeCache,
 )
-from dulwich.objects import (  # noqa: E402
+from dulwich.objects import (
     ShaFile,
     hex_to_sha,
     sha_to_hex,
@@ -274,7 +274,7 @@ def load_pack_index(path):
     """Load an index file by path.
 
     Args:
-      filename: Path to the index file
+      path: Path to the index file
     Returns: A PackIndex loaded from the given path
     """
     with GitFile(path, "rb") as f:
@@ -1599,9 +1599,8 @@ def write_pack(
 
     Args:
       filename: Path to the new pack file (without .pack extension)
-      objects: Iterable of (object, path) tuples to write.
-        Should provide __len__
-      window_size: Delta window size
+      objects: (object, path) tuple iterable to write. Should provide __len__
+      delta_window_size: Delta window size
       deltify: Whether to deltify pack objects
       compression_level: the zlib compression level
     Returns: Tuple with checksum of pack file and index file
@@ -1688,10 +1687,10 @@ def write_pack_objects(
 
     Args:
       f: File to write to
-      objects: Iterable of (object, path) tuples to write.
-        Should provide __len__
-      window_size: Sliding window size for searching for deltas;
-                        Set to None for default window size.
+      objects: Iterable of (object, path) tuples to write. Should provide
+         __len__
+      delta_window_size: Sliding window size for searching for deltas;
+                         Set to None for default window size.
       deltify: Whether to deltify objects
       compression_level: the zlib compression level to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum

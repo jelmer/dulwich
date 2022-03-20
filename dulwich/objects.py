@@ -222,7 +222,7 @@ def check_time(time_seconds):
     This will raise an exception if the time is not valid.
 
     Args:
-      time_info: author/committer/tagger info
+      time_seconds: time in seconds
 
     """
     # Prevent overflow error

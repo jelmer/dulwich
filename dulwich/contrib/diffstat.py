@@ -56,15 +56,11 @@ _GIT_UNCHANGED_START = b" "
 
 
 def _parse_patch(lines):
-    """An internal routine to parse a git style diff or patch to generate
-       diff stats
+    """Parse a git style diff or patch to generate diff stats.
+
     Args:
-      lines: list of byte strings "lines" from the diff to be parsed
-    Returns: A tuple (names, nametypes, counts) of three lists:
-             names = list of repo relative file paths
-             nametypes - list of booolean values indicating if file
-                         is binary (True means binary file)
-             counts = list of tuples of (added, deleted) counts for that file
+      lines: list of byte string lines from the diff to be parsed
+    Returns: A tuple (names, is_binary, counts) of three lists
     """
     names = []
     nametypes = []
@@ -323,14 +319,14 @@ index 3b41fd80..64914c78 100644
  2. open Sigil.app to the normal nearly blank template epub it generates when opened
  3. use Plugins->Manage Plugins menu and make sure the "Use Bundled Python" checkbox is checked
  4. use the "Add Plugin" button to navigate to and add testplugin.zip and then hit "Okay" to exit the Manage Plugins Dialog
-"""  # noqa: E501 W293
+"""
 
     testoutput = b""" docs/qt512.7_remove_bad_workaround.patch            | 15 ++++++++++++
  docs/testplugin_v017.zip                            | Bin
  ci_scripts/macgddeploy.py => ci_scripts/gddeploy.py |  0 
  docs/qt512.6_backport_009abcd_fix.patch             | 26 ---------------------
  docs/Building_Sigil_On_MacOSX.txt                   |  2 +-
- 5 files changed, 16 insertions(+), 27 deletions(-)"""  # noqa: W291
+ 5 files changed, 16 insertions(+), 27 deletions(-)"""
 
     # return 0 on success otherwise return -1
     result = diffstat(selftest.split(b"\n"))

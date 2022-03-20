@@ -337,7 +337,7 @@ class DulwichClientTestBase(object):
             c = self._client()
             self.assertEqual(dest.refs[b"refs/heads/abranch"], dummy_commit)
             c.send_pack(self._build_path("/dest"), lambda _: sendrefs, gen_pack)
-            self.assertFalse(b"refs/heads/abranch" in dest.refs)
+            self.assertNotIn(b"refs/heads/abranch", dest.refs)
 
     def test_send_new_branch_empty_pack(self):
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:

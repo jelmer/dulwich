@@ -82,6 +82,9 @@ TRANSLATE_TESTS = [
     (b"**/bla.c", b"(?ms)(.*/)?bla\\.c/?\\Z"),
     (b"foo/**/bar", b"(?ms)foo(/.*)?\\/bar/?\\Z"),
     (b"foo/bar/*", b"(?ms)foo\\/bar\\/[^/]+/?\\Z"),
+    (b"/foo\\[bar\\]", b"(?ms)foo\\[bar\\]/?\\Z"),
+    (b"/foo[bar]", b"(?ms)foo[bar]/?\\Z"),
+    (b"/foo[0-9]", b"(?ms)foo[0-9]/?\\Z"),
 ]
 
 
@@ -113,7 +116,7 @@ class ReadIgnorePatterns(TestCase):
 with trailing whitespace 
 with escaped trailing whitespace\\ 
 """
-        )  # noqa: W291
+        )
         self.assertEqual(
             list(read_ignore_patterns(f)),
             [
@@ -183,6 +186,12 @@ class IgnoreFilterTests(TestCase):
         self.assertFalse(filter.is_ignored(b"foo/bar/"))
         self.assertFalse(filter.is_ignored(b"foo/bar/bloe"))
 
+    def test_regex_special(self):
+        # See https://github.com/dulwich/dulwich/issues/930#issuecomment-1026166429
+        filter = IgnoreFilter([b"/foo\\[bar\\]", b"/foo"])
+        self.assertTrue(filter.is_ignored("foo"))
+        self.assertTrue(filter.is_ignored("foo[bar]"))
+
 
 class IgnoreFilterStackTests(TestCase):
     def test_stack_first(self):
@@ -239,7 +248,7 @@ class IgnoreFilterManagerTests(TestCase):
 
         with open(os.path.join(repo.path, 'foo', 'bar'), 'wb') as f:
             f.write(b'IGNORED')
-        
+
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored('foo/bar'))
 

@@ -147,8 +147,8 @@ def _get_default_identity() -> Tuple[str, str]:
         fullname = None
     else:
         try:
-            gecos = pwd.getpwnam(username).pw_gecos
-        except KeyError:
+            gecos = pwd.getpwnam(username).pw_gecos  # type: ignore
+        except (KeyError, AttributeError):
             fullname = None
         else:
             if gecos:
@@ -327,9 +327,10 @@ class ParentsProvider(object):
 class BaseRepo(object):
     """Base class for a git repository.
 
-    :ivar object_store: Dictionary-like object for accessing
+    Attributes:
+      object_store: Dictionary-like object for accessing
         the objects
-    :ivar refs: Dictionary-like object with the refs in this
+      refs: Dictionary-like object with the refs in this
         repository
     """
 
@@ -878,7 +879,7 @@ class BaseRepo(object):
     ):
         """Create a new commit.
 
-        If not specified, `committer` and `author` default to
+        If not specified, committer and author default to
         get_user_identity(..., 'COMMITTER')
         and get_user_identity(..., 'AUTHOR') respectively.
 
@@ -1044,6 +1045,16 @@ class Repo(BaseRepo):
     the path of the repository.
 
     To create a new repository, use the Repo.init class method.
+
+    Note that a repository object may hold on to resources such
+    as file handles for performance reasons; call .close() to free
+    up those resources.
+
+    Attributes:
+
+      path (str): Path to the working copy (if it exists) or repository control
+        directory (if the repository is bare)
+      bare (bool): Whether this is a bare repository
     """
 
     def __init__(self, root, object_store=None, bare=None):
@@ -1170,8 +1181,8 @@ class Repo(BaseRepo):
         For a main working tree, it is identical to controldir().
 
         For a linked working tree, it is the control directory of the
-        main working tree."""
-
+        main working tree.
+        """
         return self._commondir
 
     def _determine_file_mode(self):
@@ -1389,6 +1400,7 @@ class Repo(BaseRepo):
         origin=b"origin",
         checkout=None,
         branch=None,
+        progress=None,
         depth=None,
     ):
         """Clone this repository.
@@ -1402,6 +1414,7 @@ class Repo(BaseRepo):
             cloned from this repository
           branch: Optional branch or tag to be used as HEAD in the new repository
             instead of this repository's HEAD.
+          progress: Optional progress function
           depth: Depth at which to fetch
         Returns: Created repository as `Repo`
         """
@@ -1512,7 +1525,7 @@ class Repo(BaseRepo):
         """
         from dulwich.config import ConfigFile
 
-        path = os.path.join(self._controldir, "config")
+        path = os.path.join(self._commondir, "config")
         try:
             return ConfigFile.from_path(path)
         except FileNotFoundError:

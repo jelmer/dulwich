@@ -267,7 +267,7 @@ class BlobReadTests(TestCase):
     def test_stub_sha(self):
         sha = b"5" * 40
         c = make_commit(id=sha, message=b"foo")
-        self.assertTrue(isinstance(c, Commit))
+        self.assertIsInstance(c, Commit)
         self.assertEqual(sha, c.id)
         self.assertNotEqual(sha, c.sha())
 
@@ -333,7 +333,7 @@ class CommitSerializationTests(TestCase):
 
     def test_encoding(self):
         c = self.make_commit(encoding=b"iso8859-1")
-        self.assertTrue(b"encoding iso8859-1\n" in c.as_raw_string())
+        self.assertIn(b"encoding iso8859-1\n", c.as_raw_string())
 
     def test_short_timestamp(self):
         c = self.make_commit(commit_time=30)
@@ -373,11 +373,11 @@ class CommitSerializationTests(TestCase):
 
     def test_timezone(self):
         c = self.make_commit(commit_timezone=(5 * 60))
-        self.assertTrue(b" +0005\n" in c.as_raw_string())
+        self.assertIn(b" +0005\n", c.as_raw_string())
 
     def test_neg_timezone(self):
         c = self.make_commit(commit_timezone=(-1 * 3600))
-        self.assertTrue(b" -0100\n" in c.as_raw_string())
+        self.assertIn(b" -0100\n", c.as_raw_string())
 
     def test_deserialize(self):
         c = self.make_commit()
@@ -434,7 +434,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 Merge ../b
 """,
             commit.as_raw_string(),
-        )  # noqa: W291,W293
+        )
 
     def test_serialize_mergetag(self):
         tag = make_object(
@@ -472,7 +472,7 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
 Merge ../b
 """,
             commit.as_raw_string(),
-        )  # noqa: W291,W293
+        )
 
     def test_serialize_mergetags(self):
         tag = make_object(
@@ -523,7 +523,7 @@ mergetag object a38d6181ff27824c79fc7df825164a212eff6a3f
 Merge ../b
 """,
             commit.as_raw_string(),
-        )  # noqa: W291,W293
+        )
 
     def test_deserialize_mergetag(self):
         tag = make_object(
@@ -756,7 +756,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 
 foo
 """
-        )  # noqa: W291,W293
+        )
         self.assertEqual(b"foo\n", c.message)
         self.assertEqual([], c.extra)
         self.assertEqual(
@@ -801,7 +801,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 
 3.3.0 version bump and docs
 """
-        )  # noqa: W291,W293
+        )
         self.assertEqual([], c.extra)
         self.assertEqual(
             b"""\
@@ -904,7 +904,7 @@ class TreeTests(ShaFileCheckTests):
 
         actual = do_sort(_TREE_ITEMS)
         self.assertEqual(_SORTED_TREE_ITEMS, actual)
-        self.assertTrue(isinstance(actual[0], TreeEntry))
+        self.assertIsInstance(actual[0], TreeEntry)
 
         # C/Python implementations may differ in specific error types, but
         # should all error on invalid inputs.
@@ -1295,9 +1295,9 @@ class ShaFileCopyTests(TestCase):
         oclass = object_class(orig.type_num)
 
         copy = orig.copy()
-        self.assertTrue(isinstance(copy, oclass))
+        self.assertIsInstance(copy, oclass)
         self.assertEqual(copy, orig)
-        self.assertTrue(copy is not orig)
+        self.assertIsNot(copy, orig)
 
     def test_commit_copy(self):
         attrs = {

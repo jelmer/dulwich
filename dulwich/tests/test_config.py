@@ -108,6 +108,11 @@ class ConfigFileTests(TestCase):
         self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
+    def test_from_file_multiple(self):
+        cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
+        self.assertEqual([b"bar", b"blah"], list(cf.get_multivar((b"core",), b"foo")))
+        self.assertEqual([], list(cf.get_multivar((b"core", ), b"blah")))
+
     def test_from_file_utf8_bom(self):
         text = "[core]\nfoo = b\u00e4r\n".encode("utf-8-sig")
         cf = self.from_file(text)
@@ -155,6 +160,12 @@ class ConfigFileTests(TestCase):
     def test_from_file_subsection_not_quoted(self):
         cf = self.from_file(b"[branch.foo]\nfoo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
+
+    def test_write_preserve_multivar(self):
+        cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
+        f = BytesIO()
+        cf.write_to_file(f)
+        self.assertEqual(b"[core]\n\tfoo = bar\n\tfoo = blah\n", f.getvalue())
 
     def test_write_to_file_empty(self):
         c = ConfigFile()
@@ -257,24 +268,24 @@ class ConfigDictTests(TestCase):
         cd[b"a"] = b"b"
         self.assertEqual(cd[b"a"], b"b")
 
-    def test_iteritems(self):
+    def test_items(self):
         cd = ConfigDict()
         cd.set((b"core",), b"foo", b"bla")
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"foo", b"bla")], list(cd.iteritems((b"core",))))
+        self.assertEqual([(b"foo", b"bla")], list(cd.items((b"core",))))
 
-    def test_iteritems_nonexistant(self):
+    def test_items_nonexistant(self):
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([], list(cd.iteritems((b"core",))))
+        self.assertEqual([], list(cd.items((b"core",))))
 
-    def test_itersections(self):
+    def test_sections(self):
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"core2",)], list(cd.itersections()))
+        self.assertEqual([(b"core2",)], list(cd.sections()))
 
 
 class StackedConfigTests(TestCase):

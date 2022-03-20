@@ -1781,6 +1781,13 @@ def ls_files(repo):
         return sorted(r.open_index())
 
 
+def find_unique_abbrev(object_store, object_id):
+    """For now, just return 7 characters."""
+    # TODO(jelmer): Add some logic here to return a number of characters that
+    # scales relative with the size of the repository
+    return object_id.decode("ascii")[:7]
+
+
 def describe(repo):
     """Describe the repository version.
 
@@ -1818,7 +1825,7 @@ def describe(repo):
 
         # If there are no tags, return the current commit
         if len(sorted_tags) == 0:
-            return "g{}".format(r[r.head()].id.decode("ascii")[:7])
+            return "g{}".format(find_unique_abbrev(r.object_store, r[r.head()].id))
 
         # We're now 0 commits from the top
         commit_count = 0

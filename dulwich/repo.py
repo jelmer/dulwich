@@ -147,8 +147,8 @@ def _get_default_identity() -> Tuple[str, str]:
         fullname = None
     else:
         try:
-            gecos = pwd.getpwnam(username).pw_gecos
-        except KeyError:
+            gecos = pwd.getpwnam(username).pw_gecos  # type: ignore
+        except (KeyError, AttributeError):
             fullname = None
         else:
             if gecos:

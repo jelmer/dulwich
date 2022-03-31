@@ -21,6 +21,7 @@
 """Merge support."""
 
 from collections import namedtuple
+import stat
 from typing import Union, Iterable, List, Callable, Optional
 
 
@@ -108,7 +109,7 @@ def merge_tree(
             try:
                 this_entry = changes_this_by_this_path[other_change.new.path]
             except KeyError:
-                yield other_change.new.path
+                yield other_change.new
             else:
                 if this_entry != other_change.new:
                     # TODO(jelmer): Three way merge instead, with empty common
@@ -179,15 +180,23 @@ def merge_tree(
 
 class MergeResults(object):
 
-    def __init__(self, conflicts):
-        self.conflicts = conflicts
+    def __init__(self, conflicts=None):
+        self.conflicts = conflicts or []
+
+    def __eq__(self, other):
+        return (
+            isinstance(self, MergeResults) and
+            self.conflicts == other.conflicts)
 
 
 def merge(
         repo, commit_ids: List[bytes], rename_detector=None,
-        file_merger: Optional[FileMerger] = None) -> MergeResults:
+        file_merger: Optional[FileMerger] = None,
+        tree_encoding: str = "utf-8") -> MergeResults:
     """Perform a merge.
     """
+    from .index import index_entry_from_stat
+    import os
     conflicts = []
     [merge_base] = find_merge_base(repo, [repo.head()] + commit_ids)
     [other_id] = commit_ids
@@ -203,7 +212,23 @@ def merge(
 
         if isinstance(entry, MergeConflict):
             conflicts.append(entry)
-
-        # TODO(jelmer): apply the change to the tree
+            # TODO(jelmer): Need to still write something
+        else:
+            if stat.S_ISDIR(entry.mode):
+                continue
+            blob = repo.object_store[entry.sha]
+            fs_path = os.path.join(
+                repo.path,
+                os.fsdecode(entry.path.decode(tree_encoding)))
+            if stat.S_ISREG(entry.mode):
+                with open(fs_path, 'wb') as f:
+                    f.write(blob.as_raw_string())
+                os.chmod(fs_path, entry.mode & 0o777)
+            elif stat.S_ISLNK(entry.mode):
+                os.symlink(blob.as_raw_string(), fs_path)
+            else:
+                raise NotImplementedError("unknown file mode %s" % entry.mode)
+            index[entry.path] = index_entry_from_stat(
+                os.stat(fs_path), entry.sha, 0, entry.mode)
 
     return MergeResults(conflicts=conflicts)

@@ -29,7 +29,7 @@ import tempfile
 from dulwich.tests import TestCase
 from dulwich.tests.utils import build_commit_graph
 
-from dulwich.merge import merge, find_merge_base
+from dulwich.merge import merge, find_merge_base, MergeResults
 from dulwich.repo import Repo
 
 
@@ -42,52 +42,52 @@ class MergeTests(TestCase):
         self.repo1_path = os.path.join(self.test_dir, 'repo1')
         self.repo2_path = os.path.join(self.test_dir, 'repo2')
         self.repo1 = Repo.init(self.repo1_path, mkdir=True)
-        self.common_cid = self._add_file(self.repo1, 'a')
+        self.common_cid = self._add_file(self.repo1, 'a', 'added a\n')
         self.repo2 = self.repo1.clone(self.repo2_path, mkdir=True)
         self.addCleanup(self.repo2.close)
         self.addCleanup(self.repo1.close)
 
-    def _add_file(self, repo, name, contents='a line\n'):
+    def _add_file(self, repo, name, contents):
         with open(os.path.join(repo.path, name), 'w') as f:
-            f.write('Added in repo 1')
+            f.write(contents)
         repo.stage([name])
         return repo.do_commit(('Add file %s' % name).encode('ascii'))
 
     def test_both_adds(self):
         # Two trees both add a new file
-        cid1 = self._add_file(self.repo1, 'b')
-        cid2 = self._add_file(self.repo2, 'c')
+        cid1 = self._add_file(self.repo1, 'b', 'added in repo 1\n')
+        cid2 = self._add_file(self.repo2, 'c', 'added in repo 2\n')
         self.repo2.fetch(self.repo1)
         self.assertEqual(cid1, self.repo1.head())
-        conflicts = merge(self.repo1, [cid2])
-        self.assertEqual([], conflicts)
+        result = merge(self.repo1, [cid2])
+        self.assertEqual(MergeResults(), result)
 
     def test_fast_forward(self):
         # Other tree is ahead of us
         cid1 = self.common_cid
-        cid2 = self._add_file(self.repo2, 'c')
+        cid2 = self._add_file(self.repo2, 'c', 'added in repo 2\n')
         self.repo2.fetch(self.repo1)
         self.assertEqual(cid1, self.repo1.head())
-        conflicts = merge(self.repo1, [cid2])
-        self.assertEqual([], conflicts)
+        result = merge(self.repo1, [cid2])
+        self.assertEqual(MergeResults(), result)
 
     def test_already_ahead(self):
         # We're ahead of the other tree
-        cid1 = self._add_file(self.repo1, 'b')
+        cid1 = self._add_file(self.repo1, 'b', 'added in repo 1\n')
         cid2 = self.common_cid
         self.repo2.fetch(self.repo1)
         self.assertEqual(cid1, self.repo1.head())
-        conflicts = merge(self.repo1, [cid2])
-        self.assertEqual([], conflicts)
+        result = merge(self.repo1, [cid2])
+        self.assertEqual(MergeResults(), result)
 
     def test_changed(self):
         # Two trees both add a new file
-        cid1 = self._add_file(self.repo1, 'a', contents='a new line\n')
-        cid2 = self._add_file(self.repo2, 'c')
+        cid1 = self._add_file(self.repo1, 'a', 'a new line\n')
+        cid2 = self._add_file(self.repo2, 'c', 'added in repo 2\n')
         self.repo2.fetch(self.repo1)
         self.assertEqual(cid1, self.repo1.head())
-        conflicts = merge(self.repo1, [cid2])
-        self.assertEqual([], conflicts)
+        result = merge(self.repo1, [cid2])
+        self.assertEqual(MergeResults(), result)
 
 
 class FindMergeBaseTests(TestCase):

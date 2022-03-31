@@ -248,12 +248,13 @@ def _all_same(seq, key):
 
 
 def tree_changes_for_merge(
-        store, parent_tree_ids, tree_id: bytes, rename_detector=None):
+        store, parent_tree_ids: List[bytes],
+        tree_id: bytes, rename_detector=None) -> Iterable[List[TreeChange]]:
     """Get the tree changes for a merge tree relative to all its parents.
 
     Args:
       store: An ObjectStore for looking up objects.
-      parent_tree_ids: An iterable of the SHAs of the parent trees.
+      parent_tree_ids: A list of the SHAs of the parent trees.
       tree_id: The SHA of the merge tree.
       rename_detector: RenameDetector object for detecting renames.
 

@@ -28,6 +28,7 @@ from collections import (
 from io import BytesIO
 from itertools import chain
 import stat
+from typing import Iterable, Tuple, List
 
 from dulwich.objects import (
     S_ISGITLINK,
@@ -114,14 +115,17 @@ def _merge_entries(path, tree1, tree2):
     return result
 
 
-def _is_tree(entry):
+def _is_tree(entry: TreeEntry) -> bool:
     mode = entry.mode
     if mode is None:
         return False
     return stat.S_ISDIR(mode)
 
 
-def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
+def walk_trees(
+        store, tree1_id: bytes, tree2_id: bytes,
+        prune_identical: bool = False) -> Iterable[
+            Tuple[TreeEntry, TreeEntry]]:
     """Recursively walk all the entries of two trees.
 
     Iteration is depth-first pre-order, as in e.g. os.walk.
@@ -157,7 +161,7 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
         yield entry1, entry2
 
 
-def _skip_tree(entry, include_trees):
+def _skip_tree(entry: TreeEntry, include_trees: bool):
     if entry.mode is None or (not include_trees and stat.S_ISDIR(entry.mode)):
         return _NULL_ENTRY
     return entry
@@ -165,12 +169,12 @@ def _skip_tree(entry, include_trees):
 
 def tree_changes(
     store,
-    tree1_id,
-    tree2_id,
-    want_unchanged=False,
+    tree1_id: bytes,
+    tree2_id: bytes,
+    want_unchanged: bool = False,
     rename_detector=None,
-    include_trees=False,
-    change_type_same=False,
+    include_trees: bool = False,
+    change_type_same: bool = False,
 ):
     """Find the differences between the contents of two trees.
 
@@ -243,7 +247,8 @@ def _all_same(seq, key):
     return _all_eq(seq[1:], key, key(seq[0]))
 
 
-def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None):
+def tree_changes_for_merge(
+        store, parent_tree_ids, tree_id: bytes, rename_detector=None):
     """Get the tree changes for a merge tree relative to all its parents.
 
     Args:
@@ -389,7 +394,7 @@ def _similarity_score(obj1, obj2, block_cache=None):
     return int(float(common_bytes) * _MAX_SCORE / max_size)
 
 
-def _tree_change_key(entry):
+def _tree_change_key(entry: TreeChange) -> Tuple[str, str]:
     # Sort by old path then new path. If only one exists, use it for both keys.
     path1 = entry.old.path
     path2 = entry.new.path
@@ -406,10 +411,10 @@ class RenameDetector(object):
     def __init__(
         self,
         store,
-        rename_threshold=RENAME_THRESHOLD,
-        max_files=MAX_FILES,
-        rewrite_threshold=REWRITE_THRESHOLD,
-        find_copies_harder=False,
+        rename_threshold: int = RENAME_THRESHOLD,
+        max_files: int = MAX_FILES,
+        rewrite_threshold: int = REWRITE_THRESHOLD,
+        find_copies_harder: bool = False,
     ):
         """Initialize the rename detector.
 
@@ -618,8 +623,9 @@ class RenameDetector(object):
         self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]
 
     def changes_with_renames(
-        self, tree1_id, tree2_id, want_unchanged=False, include_trees=False
-    ):
+        self, tree1_id: bytes, tree2_id: bytes, want_unchanged: bool = False,
+        include_trees: bool = False
+    ) -> List[TreeChange]:
         """Iterate TreeChanges between two tree SHAs, with rename detection."""
         self._reset()
         self._want_unchanged = want_unchanged

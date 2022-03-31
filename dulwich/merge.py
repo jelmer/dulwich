@@ -21,6 +21,7 @@
 """Merge support."""
 
 from collections import namedtuple
+from typing import Union, Iterable, List
 
 
 from .diff_tree import (
@@ -34,7 +35,7 @@ from .diff_tree import (
     CHANGE_UNCHANGED,
     )
 from .merge_base import find_merge_base
-from .objects import Blob
+from .objects import Blob, Tree
 
 
 class MergeConflict(namedtuple(
@@ -43,13 +44,14 @@ class MergeConflict(namedtuple(
     """A merge conflict."""
 
 
-def _merge_entry(new_path, object_store, this_entry, other_entry, base_entry,
-                 file_merger):
+def _merge_entry(
+        new_path: str, object_store, this_entry: TreeEntry,
+        other_entry: TreeEntry, base_entry: TreeEntry,
+        file_merger):
     """Run a per entry-merge."""
     if file_merger is None:
         return MergeConflict(
-            this_entry, other_entry,
-            other_entry.old,
+            this_entry, other_entry, base_entry,
             'Conflict in %s but no file merger provided'
             % new_path)
     merged_text = file_merger(
@@ -69,8 +71,10 @@ def _merge_entry(new_path, object_store, this_entry, other_entry, base_entry,
     return TreeEntry(new_path, mode, merged_text_blob.id)
 
 
-def merge_tree(object_store, this_tree, other_tree, common_tree,
-               rename_detector=None, file_merger=None):
+def merge_tree(
+        object_store, this_tree: bytes, other_tree: bytes, common_tree: bytes,
+        rename_detector=None, file_merger=None) -> Iterable[
+            Union[TreeEntry, MergeConflict]]:
     """Merge two trees.
 
     Args:
@@ -84,12 +88,15 @@ def merge_tree(object_store, this_tree, other_tree, common_tree,
       iterator over objects, either TreeEntry (updating an entry)
         or MergeConflict (indicating a conflict)
     """
-    changes_this = tree_changes(object_store, common_tree, this_tree)
+    changes_this = tree_changes(
+        object_store, common_tree, this_tree, rename_detector=rename_detector)
     changes_this_by_common_path = {
         change.old.path: change for change in changes_this if change.old}
     changes_this_by_this_path = {
         change.new.path: change for change in changes_this if change.new}
-    for other_change in tree_changes(object_store, common_tree, other_tree):
+    for other_change in tree_changes(
+            object_store, common_tree, other_tree,
+            rename_detector=rename_detector):
         this_change = changes_this_by_common_path.get(other_change.old.path)
         if this_change == other_change:
             continue
@@ -172,7 +179,9 @@ class MergeResults(object):
         self.conflicts = conflicts
 
 
-def merge(repo, commit_ids, rename_detector=None, file_merger=None):
+def merge(
+        repo, commit_ids: List[bytes], rename_detector=None,
+        file_merger=None) -> MergeResults:
     """Perform a merge.
     """
     conflicts = []
@@ -193,4 +202,4 @@ def merge(repo, commit_ids, rename_detector=None, file_merger=None):
 
         # TODO(jelmer): apply the change to the tree
 
-    return conflicts
+    return MergeResults(conflicts=conflicts)

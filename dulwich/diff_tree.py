@@ -28,7 +28,7 @@ from collections import (
 from io import BytesIO
 from itertools import chain
 import stat
-from typing import Iterable, Tuple, List
+from typing import Iterable, Tuple, List, Optional, Dict
 
 from dulwich.objects import (
     S_ISGITLINK,
@@ -274,7 +274,7 @@ def tree_changes_for_merge(
         for t in parent_tree_ids
     ]
     num_parents = len(parent_tree_ids)
-    changes_by_path = defaultdict(lambda: [None] * num_parents)
+    changes_by_path = defaultdict(lambda: [None] * num_parents)  # type: Dict[str, List[Optional[TreeChange]]]
 
     # Organize by path.
     for i, parent_changes in enumerate(all_parent_changes):
@@ -413,7 +413,7 @@ class RenameDetector(object):
         store,
         rename_threshold: int = RENAME_THRESHOLD,
         max_files: int = MAX_FILES,
-        rewrite_threshold: int = REWRITE_THRESHOLD,
+        rewrite_threshold: Optional[int] = REWRITE_THRESHOLD,
         find_copies_harder: bool = False,
     ):
         """Initialize the rename detector.

@@ -21,7 +21,7 @@
 """Merge support."""
 
 from collections import namedtuple
-from typing import Union, Iterable, List
+from typing import Union, Iterable, List, Callable, Optional
 
 
 from .diff_tree import (
@@ -38,6 +38,9 @@ from .merge_base import find_merge_base
 from .objects import Blob, Tree
 
 
+FileMerger = Callable[[bytes, bytes, bytes], bytes]
+
+
 class MergeConflict(namedtuple(
         'MergeConflict',
         ['this_entry', 'other_entry', 'base_entry', 'message'])):
@@ -47,7 +50,7 @@ class MergeConflict(namedtuple(
 def _merge_entry(
         new_path: str, object_store, this_entry: TreeEntry,
         other_entry: TreeEntry, base_entry: TreeEntry,
-        file_merger):
+        file_merger: Optional[FileMerger]):
     """Run a per entry-merge."""
     if file_merger is None:
         return MergeConflict(
@@ -73,7 +76,8 @@ def _merge_entry(
 
 def merge_tree(
         object_store, this_tree: bytes, other_tree: bytes, common_tree: bytes,
-        rename_detector=None, file_merger=None) -> Iterable[
+        rename_detector=None,
+        file_merger: Optional[FileMerger] = None) -> Iterable[
             Union[TreeEntry, MergeConflict]]:
     """Merge two trees.
 
@@ -181,7 +185,7 @@ class MergeResults(object):
 
 def merge(
         repo, commit_ids: List[bytes], rename_detector=None,
-        file_merger=None) -> MergeResults:
+        file_merger: Optional[FileMerger] = None) -> MergeResults:
     """Perform a merge.
     """
     conflicts = []

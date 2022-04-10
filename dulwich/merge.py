@@ -230,5 +230,6 @@ def merge(
                 raise NotImplementedError("unknown file mode %s" % entry.mode)
             index[entry.path] = index_entry_from_stat(
                 os.stat(fs_path), entry.sha, 0, entry.mode)
+    index.write()
 
     return MergeResults(conflicts=conflicts)

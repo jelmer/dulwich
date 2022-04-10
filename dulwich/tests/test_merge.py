@@ -47,11 +47,19 @@ class MergeTests(TestCase):
         self.addCleanup(self.repo2.close)
         self.addCleanup(self.repo1.close)
 
+    def assertFileEqual(self, repo, path, contents):
+        with open(os.path.join(repo.path, path), 'r') as f:
+            self.assertEqual(contents, f.read())
+
     def _add_file(self, repo, name, contents):
         with open(os.path.join(repo.path, name), 'w') as f:
             f.write(contents)
         repo.stage([name])
         return repo.do_commit(('Add file %s' % name).encode('ascii'))
+
+    def assertIndexEqual(self, expected):
+        index = self.repo1.open_index()
+        self.assertEqual(expected, [n.decode() for n in index])
 
     def test_both_adds(self):
         # Two trees both add a new file
@@ -61,6 +69,10 @@ class MergeTests(TestCase):
         self.assertEqual(cid1, self.repo1.head())
         result = merge(self.repo1, [cid2])
         self.assertEqual(MergeResults(), result)
+        self.assertFileEqual(self.repo1, 'a', 'added a\n')
+        self.assertFileEqual(self.repo1, 'b', 'added in repo 1\n')
+        self.assertFileEqual(self.repo1, 'c', 'added in repo 2\n')
+        self.assertIndexEqual(['a', 'b', 'c'])
 
     def test_fast_forward(self):
         # Other tree is ahead of us
@@ -70,6 +82,9 @@ class MergeTests(TestCase):
         self.assertEqual(cid1, self.repo1.head())
         result = merge(self.repo1, [cid2])
         self.assertEqual(MergeResults(), result)
+        self.assertFileEqual(self.repo1, 'a', 'added a\n')
+        self.assertFileEqual(self.repo1, 'c', 'added in repo 2\n')
+        self.assertIndexEqual(['a', 'c'])
 
     def test_already_ahead(self):
         # We're ahead of the other tree
@@ -79,6 +94,9 @@ class MergeTests(TestCase):
         self.assertEqual(cid1, self.repo1.head())
         result = merge(self.repo1, [cid2])
         self.assertEqual(MergeResults(), result)
+        self.assertFileEqual(self.repo1, 'a', 'added a\n')
+        self.assertFileEqual(self.repo1, 'b', 'added in repo 1\n')
+        self.assertIndexEqual(['a', 'b'])
 
     def test_changed(self):
         # Two trees both add a new file
@@ -88,6 +106,9 @@ class MergeTests(TestCase):
         self.assertEqual(cid1, self.repo1.head())
         result = merge(self.repo1, [cid2])
         self.assertEqual(MergeResults(), result)
+        self.assertFileEqual(self.repo1, 'a', 'a new line\n')
+        self.assertFileEqual(self.repo1, 'c', 'added in repo 2\n')
+        self.assertIndexEqual(['a', 'c'])
 
 
 class FindMergeBaseTests(TestCase):

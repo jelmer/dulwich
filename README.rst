@@ -73,9 +73,8 @@ Help
 ----
 
 There is a *#dulwich* IRC channel on the `OFTC <https://www.oftc.net/>`_, and
-`dulwich-announce <https://groups.google.com/forum/#!forum/dulwich-announce>`_
-and `dulwich-discuss <https://groups.google.com/forum/#!forum/dulwich-discuss>`_
-mailing lists.
+a `dulwich-discuss <https://groups.google.com/forum/#!forum/dulwich-discuss>`_
+mailing list.
 
 Contributing
 ------------

@@ -438,7 +438,7 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
-    (client, path) = get_transport_and_path(source)
+    (client, path) = get_transport_and_path(source, **kwargs)
 
     return client.clone(
         path,

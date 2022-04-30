@@ -1874,7 +1874,12 @@ class StatusTests(PorcelainTestCase):
             results.staged,
         )
         self.assertListEqual(results.unstaged, [b"blye"])
-        self.assertListEqual(results.untracked, ["blyat"])
+        results_no_untracked = porcelain.status(self.repo.path, untracked_files="no")
+        self.assertListEqual(results_no_untracked.untracked, [])
+
+    def test_status_wrong_untracked_files_value(self):
+        with self.assertRaises(ValueError):
+            porcelain.status(self.repo.path, untracked_files="antani")
 
     def test_status_crlf_mismatch(self):
         # First make a commit as if the file has been added on a Linux system
@@ -2170,6 +2175,22 @@ class StatusTests(PorcelainTestCase):
             )
         )
 
+    def test_get_untracked_paths_invalid_untracked_files(self):
+        with self.assertRaises(ValueError):
+            list(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    untracked_files="invalid_value",
+                )
+            )
+
+    def test_get_untracked_paths_normal(self):
+        with self.assertRaises(NotImplementedError):
+            _, _, _ = porcelain.status(
+                repo=self.repo.path, untracked_files="normal"
+            )
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 

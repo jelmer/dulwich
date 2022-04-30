@@ -1156,12 +1156,16 @@ def pull(
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 
 
-def status(repo=".", ignored=False):
+def status(repo=".", ignored=False, walk_untracked=True):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     Args:
       repo: Path to repository or repository object
       ignored: Whether to include ignored files in untracked
+      walk_untracked: Whether to walk untracked directories
+            When True, behaves like `git status -uall`.
+            When False, behaves like to `git status -unormal` (git default).
+
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
@@ -1177,7 +1181,7 @@ def status(repo=".", ignored=False):
         unstaged_changes = list(get_unstaged_changes(index, r.path, filter_callback))
 
         untracked_paths = get_untracked_paths(
-            r.path, r.path, index, exclude_ignored=not ignored
+            r.path, r.path, index, exclude_ignored=not ignored, walk=walk_untracked
         )
         untracked_changes = list(untracked_paths)
 
@@ -1216,7 +1220,13 @@ def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
             dirnames[:] = prune_dirnames(dirpath, dirnames)
 
 
-def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
+def get_untracked_paths(
+    frompath,
+    basepath,
+    index,
+    exclude_ignored=False,
+    walk=True,
+):
     """Get untracked paths.
 
     Args:
@@ -1224,6 +1234,7 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
       basepath: Path to compare to
       index: Index to check against
       exclude_ignored: Whether to exclude ignored paths
+      walk: Whether to walk untracked paths.
 
     Note: ignored directories will never be walked for performance reasons.
       If exclude_ignored is False, only the path to an ignored directory will
@@ -1233,6 +1244,7 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
         ignore_manager = IgnoreFilterManager.from_repo(r)
 
     ignored_dirs = []
+    untracked_dirs = []
 
     def prune_dirnames(dirpath, dirnames):
         for i in range(len(dirnames) - 1, -1, -1):
@@ -1244,6 +1256,15 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
                         os.path.join(os.path.relpath(path, frompath), "")
                     )
                 del dirnames[i]
+            elif not walk:
+                if not any(
+                    os.fsdecode(index_path).startswith(dirnames[i])
+                    for index_path, _, in index.items()
+                ):
+                    untracked_dirs.append(
+                        os.path.join(os.path.relpath(path, frompath)) + os.sep
+                    )
+                    del dirnames[i]
         return dirnames
 
     for ap, is_dir in _walk_working_dir_paths(
@@ -1252,15 +1273,13 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
-                if (
-                    not exclude_ignored
-                    or not ignore_manager.is_ignored(
-                        os.path.relpath(ap, basepath)
-                    )
+                if not exclude_ignored or not ignore_manager.is_ignored(
+                    os.path.relpath(ap, basepath)
                 ):
                     yield os.path.relpath(ap, frompath)
 
     yield from ignored_dirs
+    yield from untracked_dirs
 
 
 def get_tree_changes(repo):

@@ -1156,12 +1156,20 @@ def pull(
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 
 
-def status(repo=".", ignored=False):
+def status(repo=".", ignored=False, untracked_files="all"):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     Args:
       repo: Path to repository or repository object
       ignored: Whether to include ignored files in untracked
+      untracked_files: How to handle untracked files, defaults to "all":
+          "no": do not return untracked files
+          "all": include all files in untracked directories
+        Using `untracked_files="no"` can be faster than "all" when the worktreee
+          contains many untracked files/directories.
+
+    Note: `untracked_files="normal" (`git`'s default) is not implemented.
+
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)
         unstaged -  list of unstaged paths (diff index/working-tree)
@@ -1177,7 +1185,11 @@ def status(repo=".", ignored=False):
         unstaged_changes = list(get_unstaged_changes(index, r.path, filter_callback))
 
         untracked_paths = get_untracked_paths(
-            r.path, r.path, index, exclude_ignored=not ignored
+            r.path,
+            r.path,
+            index,
+            exclude_ignored=not ignored,
+            untracked_files=untracked_files,
         )
         untracked_changes = list(untracked_paths)
 
@@ -1216,7 +1228,9 @@ def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
             dirnames[:] = prune_dirnames(dirpath, dirnames)
 
 
-def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
+def get_untracked_paths(
+    frompath, basepath, index, exclude_ignored=False, untracked_files="all"
+):
     """Get untracked paths.
 
     Args:
@@ -1224,11 +1238,24 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
       basepath: Path to compare to
       index: Index to check against
       exclude_ignored: Whether to exclude ignored paths
+      untracked_files: How to handle untracked files:
+        - "no": return an empty list
+        - "all": return all files in untracked directories
+        - "normal": Not implemented
 
     Note: ignored directories will never be walked for performance reasons.
       If exclude_ignored is False, only the path to an ignored directory will
       be yielded, no files inside the directory will be returned
     """
+    if untracked_files == "normal":
+        raise NotImplementedError("normal is not yet supported")
+
+    if untracked_files not in ("no", "all"):
+        raise ValueError("untracked_files must be one of (no, all)")
+
+    if untracked_files == "no":
+        return
+
     with open_repo_closing(basepath) as r:
         ignore_manager = IgnoreFilterManager.from_repo(r)
 
@@ -1252,11 +1279,8 @@ def get_untracked_paths(frompath, basepath, index, exclude_ignored=False):
         if not is_dir:
             ip = path_to_tree_path(basepath, ap)
             if ip not in index:
-                if (
-                    not exclude_ignored
-                    or not ignore_manager.is_ignored(
-                        os.path.relpath(ap, basepath)
-                    )
+                if not exclude_ignored or not ignore_manager.is_ignored(
+                    os.path.relpath(ap, basepath)
                 ):
                     yield os.path.relpath(ap, frompath)
 

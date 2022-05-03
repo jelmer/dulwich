@@ -1,5 +1,8 @@
 0.20.36	UNRELEASED
 
+ * Add ``walk_untracked`` argument to ``porcelain.status``.
+   (Daniele Trifirò)
+
 0.20.35	2022-03-20
 
  * Document the ``path`` attribute for ``Repo``.

@@ -1880,11 +1880,13 @@ class StatusTests(PorcelainTestCase):
         )
         self.assertListEqual(results.unstaged, [b"blye"])
         self.assertListEqual(
-            results.untracked, ["untracked_file", "untracked_dir/file"]
+            results.untracked, [
+                "untracked_file", os.path.join("untracked_dir", "file")]
         )
         results_no_walk = porcelain.status(self.repo.path, walk_untracked=False)
         self.assertListEqual(
-            results_no_walk.untracked, ["untracked_file", "untracked_dir/"]
+            results_no_walk.untracked,
+            ["untracked_file", "untracked_dir" + os.path.sep]
         )
 
     def test_status_crlf_mismatch(self):
@@ -2190,7 +2192,7 @@ class StatusTests(PorcelainTestCase):
             f.write("foo")
 
         self.assertEqual(
-            {"dir/"},
+            {"dir" + os.path.sep},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index(), walk=False
@@ -2198,7 +2200,8 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set(["dir/file", "dir/subdir/subfile"]),
+            set([os.path.join("dir", "file"),
+                 os.path.join("dir", "subdir", "subfile")]),
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index(), walk=True

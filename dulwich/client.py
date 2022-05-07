@@ -47,7 +47,7 @@ import shlex
 import socket
 import subprocess
 import sys
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from urllib.parse import (
     quote as urlquote,

@@ -47,7 +47,7 @@ import shlex
 import socket
 import subprocess
 import sys
-from typing import Optional, Dict, Callable, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
 
 from urllib.parse import (
     quote as urlquote,
@@ -112,6 +112,7 @@ from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
     _import_remote_refs,
 )
+from dulwich.repo import Repo
 
 
 logger = logging.getLogger(__name__)
@@ -500,7 +501,6 @@ class GitClient(object):
               checkout=None, branch=None, progress=None, depth=None):
         """Clone a repository."""
         from .refs import _set_origin_head, _set_default_branch, _set_head
-        from .repo import Repo
 
         if mkdir:
             os.mkdir(target_path)
@@ -522,6 +522,7 @@ class GitClient(object):
             else:
                 encoded_path = self.get_url(path).encode('utf-8')
 
+            assert target is not None
             target_config = target.get_config()
             target_config.set((b"remote", origin.encode('utf-8')), b"url", encoded_path)
             target_config.set(
@@ -564,7 +565,16 @@ class GitClient(object):
             raise
         return target
 
-    def fetch(self, path, target, determine_wants=None, progress=None, depth=None):
+    def fetch(
+        self,
+        path: str,
+        target: Repo,
+        determine_wants: Optional[
+            Callable[[Dict[bytes, bytes], Optional[int]], List[bytes]]
+        ] = None,
+        progress: Optional[Callable[[bytes], None]] = None,
+        depth: Optional[int] = None
+    ) -> FetchPackResult:
         """Fetch into a target repository.
 
         Args:
@@ -1285,7 +1295,7 @@ class SubprocessWrapper(object):
         self.proc.wait()
 
 
-def find_git_command():
+def find_git_command() -> List[str]:
     """Find command to run for system Git (usually C Git)."""
     if sys.platform == "win32":  # support .exe, .bat and .cmd
         try:  # to avoid overhead
@@ -1359,7 +1369,6 @@ class LocalGitClient(GitClient):
 
     @classmethod
     def _open_repo(cls, path):
-        from dulwich.repo import Repo
 
         if not isinstance(path, str):
             path = os.fsdecode(path)
@@ -2268,7 +2277,10 @@ def parse_rsync_url(location):
     return (user, host, path)
 
 
-def get_transport_and_path(location, **kwargs):
+def get_transport_and_path(
+    location: str,
+    **kwargs: Any
+) -> Tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
     Args:

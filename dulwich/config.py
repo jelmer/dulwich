@@ -30,7 +30,7 @@ import os
 import sys
 import warnings
 
-from typing import BinaryIO, Tuple, Optional
+from typing import BinaryIO, Iterator, KeysView, Optional, Tuple, Union
 
 try:
     from collections.abc import (
@@ -87,7 +87,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def __len__(self):
         return len(self._keyed)
 
-    def keys(self):
+    def keys(self) -> KeysView[Tuple[bytes, ...]]:
         return self._keyed.keys()
 
     def items(self):
@@ -241,7 +241,7 @@ class Config(object):
         """
         raise NotImplementedError(self.sections)
 
-    def has_section(self, name):
+    def has_section(self, name: Tuple[bytes, ...]) -> bool:
         """Check if a specified section exists.
 
         Args:
@@ -320,7 +320,11 @@ class ConfigDict(Config, MutableMapping):
 
         return self._values[(section[0],)].get_all(name)
 
-    def get(self, section, name):
+    def get(  # type: ignore[override]
+        self,
+        section: Union[bytes, str, Tuple[Union[bytes, str], ...]],
+        name: Union[str, bytes]
+    ) -> Optional[bytes]:
         section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
@@ -679,7 +683,7 @@ class StackedConfig(Config):
         return self.writable.set(section, name, value)
 
 
-def parse_submodules(config):
+def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]:
     """Parse a gitmodules GitConfig file, returning submodules.
 
     Args:
@@ -692,5 +696,7 @@ def parse_submodules(config):
         section_kind, section_name = section
         if section_kind == b"submodule":
             sm_path = config.get(section, b"path")
+            assert sm_path is not None
             sm_url = config.get(section, b"url")
+            assert sm_url is not None
             yield (sm_path, sm_url, section_name)

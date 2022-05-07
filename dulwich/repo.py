@@ -1057,7 +1057,12 @@ class Repo(BaseRepo):
       bare (bool): Whether this is a bare repository
     """
 
-    def __init__(self, root, object_store=None, bare=None):
+    def __init__(
+        self,
+        root: str,
+        object_store: Optional[BaseObjectStore] = None,
+        bare: Optional[bool] = None
+    ) -> None:
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
             if (os.path.isfile(hidden_path) or
@@ -1093,9 +1098,18 @@ class Repo(BaseRepo):
         self.path = root
         config = self.get_config()
         try:
-            format_version = int(config.get("core", "repositoryformatversion"))
+            repository_format_version = config.get(
+                "core",
+                "repositoryformatversion"
+            )
+            format_version = (
+                0
+                if repository_format_version is None
+                else int(repository_format_version)
+            )
         except KeyError:
             format_version = 0
+
         if format_version != 0:
             raise UnsupportedVersion(format_version)
         if object_store is None:
@@ -1485,7 +1499,7 @@ class Repo(BaseRepo):
             raise
         return target
 
-    def reset_index(self, tree=None):
+    def reset_index(self, tree: Optional[Tree] = None):
         """Reset the index back to a specific tree.
 
         Args:
@@ -1569,7 +1583,7 @@ class Repo(BaseRepo):
         return ret
 
     @classmethod
-    def init(cls, path, mkdir=False):
+    def init(cls, path: str, mkdir: bool = False) -> "Repo":
         """Create a new repository.
 
         Args:

@@ -1002,6 +1002,7 @@ def get_remote_repo(
     if config.has_section(section):
         remote_name = encoded_location.decode()
         url = config.get(section, "url")
+        assert url is not None
         encoded_location = url
     else:
         remote_name = None
@@ -1614,7 +1615,7 @@ def ls_tree(
         list_tree(r.object_store, tree.id, "")
 
 
-def remote_add(repo, name, url):
+def remote_add(repo: Repo, name: Union[bytes, str], url: Union[bytes, str]):
     """Add a remote.
 
     Args:

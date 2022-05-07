@@ -158,13 +158,13 @@ class RefsContainer(object):
 
     def import_refs(
         self,
-        base,
-        other,
-        committer=None,
-        timestamp=None,
-        timezone=None,
-        message=None,
-        prune=False,
+        base: bytes,
+        other: Dict[bytes, bytes],
+        committer: Optional[bytes] = None,
+        timestamp: Optional[bytes] = None,
+        timezone: Optional[bytes] = None,
+        message: Optional[bytes] = None,
+        prune: bool = False,
     ):
         if prune:
             to_delete = set(self.subkeys(base))

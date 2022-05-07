@@ -27,6 +27,8 @@ import os
 import stat
 import sys
 
+from typing import Callable, Dict, List, Optional, Tuple
+
 from dulwich.diff_tree import (
     tree_changes,
     walk_trees,
@@ -79,7 +81,11 @@ PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
 class BaseObjectStore(object):
     """Object store interface."""
 
-    def determine_wants_all(self, refs, depth=None):
+    def determine_wants_all(
+        self,
+        refs: Dict[bytes, bytes],
+        depth: Optional[int] = None
+    ) -> List[bytes]:
         def _want_deepen(sha):
             if not depth:
                 return False
@@ -141,6 +147,12 @@ class BaseObjectStore(object):
     def __iter__(self):
         """Iterate over the SHAs that are present in this store."""
         raise NotImplementedError(self.__iter__)
+
+    def add_pack(
+        self
+    ) -> Tuple[BytesIO, Callable[[], None], Callable[[], None]]:
+        """Add a new pack to this object store."""
+        raise NotImplementedError(self.add_pack)
 
     def add_object(self, obj):
         """Add a single object to this object store."""

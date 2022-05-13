@@ -57,6 +57,8 @@ from urllib.parse import (
     urlunsplit,
     urlunparse,
 )
+from urllib.request import url2pathname
+
 
 import dulwich
 from dulwich.config import get_xdg_config_home_path
@@ -2236,6 +2238,33 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
 HttpGitClient = Urllib3HttpGitClient
 
 
+def _win32_url_to_path(parsed) -> str:
+    """
+    Convert a file: URL to a path.
+
+    https://datatracker.ietf.org/doc/html/rfc8089
+    """
+    assert sys.platform == "win32" or os.name == "nt"
+    assert parsed.scheme == "file"
+
+    _, netloc, path, _, _, _ = parsed
+
+    if netloc == "localhost" or not netloc:
+        netloc = ""
+    elif (
+        netloc
+        and len(netloc) >= 2
+        and netloc[0].isalpha()
+        and netloc[1:2] in (":", ":/")
+    ):
+        # file://C:/foo.bar/baz or file://C://foo.bar//baz
+        netloc = netloc[:2]
+    else:
+        raise NotImplementedError("Non-local file URLs are not supported")
+
+    return url2pathname(netloc + path)
+
+
 def get_transport_and_path_from_url(url, config=None, **kwargs):
     """Obtain a git client from a URL.
 
@@ -2261,6 +2290,8 @@ def get_transport_and_path_from_url(url, config=None, **kwargs):
             parsed.path,
         )
     elif parsed.scheme == "file":
+        if sys.platform == "win32" or os.name == "nt":
+            return default_local_git_client_cls(**kwargs), _win32_url_to_path(parsed)
         return (
             default_local_git_client_cls.from_parsedurl(parsed, **kwargs),
             parsed.path,

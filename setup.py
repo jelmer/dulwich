@@ -79,6 +79,7 @@ if has_setuptools:
         'https': ['urllib3[secure]>=1.24.1'],
         'pgp': ['gpg'],
         'watch': ['pyinotify'],
+        'paramiko': ['paramiko'],
         }
     setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']
     setup_kwargs['include_package_data'] = True

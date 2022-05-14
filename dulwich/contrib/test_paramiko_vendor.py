@@ -26,10 +26,7 @@ import threading
 from dulwich.tests import TestCase
 from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
 
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
+from io import StringIO
 
 
 USER = 'testuser'
@@ -60,7 +57,8 @@ cNj+6W2guZ2tyHuPhZ64/4SJVyE2hKDSKD4xTb2nVjsMeN0bLD2UWXC9mwbx8nWa
 R6legDG2e/50ph7yc8gwAaA1kUXMiuLi8Nfkw/3yyvmJwklNegi4aRzRbA2Mzhi2
 4q9WMQKBgQCb0JNyxHG4pvLWCF/j0Sm1FfvrpnqSv5678n1j4GX7Ka/TubOK1Y4K
 U+Oib7dKa/zQMWehVFNTayrsq6bKVZ6q7zG+IHiRLw4wjeAxREFH6WUjDrn9vl2l
-D48DKbBuBwuVOJWyq3qbfgJXojscgNQklrsPdXVhDwOF0dYxP89HnA=="""
+D48DKbBuBwuVOJWyq3qbfgJXojscgNQklrsPdXVhDwOF0dYxP89HnA==
+-----END RSA PRIVATE KEY-----"""
 CLIENT_KEY = """\
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAxvREKSElPOm/0z/nPO+j5rk2tjdgGcGc7We1QZ6TRXYLu7nN
@@ -122,6 +120,7 @@ class Server(paramiko.ServerInterface):
 
 
 class ParamikoSSHVendorTests(TestCase):
+
     def setUp(self):
         self.commands = []
         socket.setdefaulttimeout(10)
@@ -135,7 +134,7 @@ class ParamikoSSHVendorTests(TestCase):
         self.thread.start()
 
     def tearDown(self):
-        pass
+        self.thread.join()
 
     def _run(self):
         try:

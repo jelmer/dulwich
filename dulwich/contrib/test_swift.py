@@ -49,17 +49,17 @@ missing_libs = []
 
 try:
     import gevent  # noqa:F401
-except ImportError:
+except ModuleNotFoundError:
     missing_libs.append("gevent")
 
 try:
     import geventhttpclient  # noqa:F401
-except ImportError:
+except ModuleNotFoundError:
     missing_libs.append("geventhttpclient")
 
 try:
     from unittest.mock import patch
-except ImportError:
+except ModuleNotFoundError:
     missing_libs.append("mock")
 
 skipmsg = "Required libraries are not installed (%r)" % missing_libs

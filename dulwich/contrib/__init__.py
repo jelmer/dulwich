@@ -23,6 +23,7 @@ def test_suite():
     import unittest
 
     names = [
+        "paramiko_vendor",
         "release_robot",
         "swift",
     ]

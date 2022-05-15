@@ -1762,9 +1762,9 @@ class PackChunkGenerator(object):
             crc32 = write_pack_object(f, type_num, raw, compression_level=compression_level)
             self.cs.update(f.getvalue())
             yield f.getvalue()
-            offset += f.tell()
             actual_num_records += 1
             self.entries[object_id] = (offset, crc32)
+            offset += f.tell()
         if actual_num_records != num_records:
             raise AssertionError(
                 'actual records written differs: %d != %d' % (
@@ -1784,34 +1784,12 @@ def write_pack_data(f, num_records=None, records=None, progress=None, compressio
       compression_level: the zlib compression level
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
-    # Write the pack
-    entries = {}
-    f = SHA1Writer(f)
-    if num_records is None:
-        num_records = len(records)
-    write_pack_header(f, num_records)
-    actual_num_records = 0
-    for i, (type_num, object_id, delta_base, raw) in enumerate(records):
-        if progress is not None:
-            progress(("writing pack data: %d/%d\r" % (i, num_records)).encode("ascii"))
-        offset = f.offset()
-        if delta_base is not None:
-            try:
-                base_offset, base_crc32 = entries[delta_base]
-            except KeyError:
-                type_num = REF_DELTA
-                raw = (delta_base, raw)
-            else:
-                type_num = OFS_DELTA
-                raw = (offset - base_offset, raw)
-        crc32 = write_pack_object(f, type_num, raw, compression_level=compression_level)
-        actual_num_records += 1
-        entries[object_id] = (offset, crc32)
-    if actual_num_records != num_records:
-        raise AssertionError(
-            'actual records written differs: %d != %d' % (
-                actual_num_records, num_records))
-    return entries, f.write_sha()
+    chunk_generator = PackChunkGenerator(
+        num_records=num_records, records=records, progress=progress,
+        compression_level=compression_level)
+    for chunk in chunk_generator:
+        f.write(chunk)
+    return chunk_generator.entries, chunk_generator.sha1digest()
 
 
 def write_pack_index_v1(f, entries, pack_checksum):

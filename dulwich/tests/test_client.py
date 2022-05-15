@@ -1048,7 +1048,7 @@ class HttpGitClientTests(TestCase):
             def __init__(self):
                 self.headers = {}
 
-            def request(self, method, url, fields=None, headers=None, redirect=True):
+            def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
                 base_url = url[: -len(tail)]
                 redirect_base_url = test_data[base_url]["redirect_url"]
                 redirect_url = redirect_base_url + tail
@@ -1063,14 +1063,15 @@ class HttpGitClientTests(TestCase):
                 if redirect is False:
                     request_url = url
                     if redirect_base_url != base_url:
-                        body = ""
+                        body = b""
                         headers["location"] = redirect_url
                         status = 301
                 return HTTPResponse(
-                    body=body,
+                    body=BytesIO(body),
                     headers=headers,
                     request_method=method,
                     request_url=request_url,
+                    preload_content=preload_content,
                     status=status,
                 )
 

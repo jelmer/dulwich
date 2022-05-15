@@ -2186,10 +2186,10 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             req_headers["Accept-Encoding"] = "identity"
 
         if data is None:
-            resp = self.pool_manager.request("GET", url, headers=req_headers)
+            resp = self.pool_manager.request("GET", url, headers=req_headers, preload_content=False)
         else:
             resp = self.pool_manager.request(
-                "POST", url, headers=req_headers, body=data
+                "POST", url, headers=req_headers, body=data, preload_content=False
             )
 
         if resp.status == 404:
@@ -2203,13 +2203,6 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
                 "unexpected http resp %d for %s" % (resp.status, url)
             )
 
-        # TODO: Optimization available by adding `preload_content=False` to the
-        # request and just passing the `read` method on instead of going via
-        # `BytesIO`, if we can guarantee that the entire response is consumed
-        # before issuing the next to still allow for connection reuse from the
-        # pool.
-        read = BytesIO(resp.data).read
-
         resp.content_type = resp.getheader("Content-Type")
         # Check if geturl() is available (urllib3 version >= 1.23)
         try:
@@ -2219,7 +2212,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             resp.redirect_location = resp.get_redirect_location()
         else:
             resp.redirect_location = resp_url if resp_url != url else ""
-        return resp, read
+        return resp, resp.read
 
 
 HttpGitClient = Urllib3HttpGitClient

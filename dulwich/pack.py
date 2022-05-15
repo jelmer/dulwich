@@ -1713,6 +1713,66 @@ def write_pack_objects(
     )
 
 
+class PackChunkGenerator(object):
+
+    def __init__(self, num_records=None, records=None, progress=None, compression_level=-1):
+        self.cs = sha1(b"")
+        self.entries = {}
+        self._it = self._pack_data_chunks(
+            num_records=num_records, records=records, progress=progress, compression_level=compression_level)
+
+    def sha1digest(self):
+        return self.cs.digest()
+
+    def __iter__(self):
+        return self._it
+
+    def _pack_data_chunks(self, num_records=None, records=None, progress=None, compression_level=-1):
+        """Iterate pack data file chunks..
+
+        Args:
+          num_records: Number of records (defaults to len(records) if None)
+          records: Iterator over type_num, object_id, delta_base, raw
+          progress: Function to report progress to
+          compression_level: the zlib compression level
+        Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
+        """
+        # Write the pack
+        if num_records is None:
+            num_records = len(records)
+        f = BytesIO()
+        write_pack_header(f, num_records)
+        self.cs.update(f.getvalue())
+        yield f.getvalue()
+        offset = f.tell()
+        actual_num_records = 0
+        for i, (type_num, object_id, delta_base, raw) in enumerate(records):
+            if progress is not None:
+                progress(("writing pack data: %d/%d\r" % (i, num_records)).encode("ascii"))
+            if delta_base is not None:
+                try:
+                    base_offset, base_crc32 = self.entries[delta_base]
+                except KeyError:
+                    type_num = REF_DELTA
+                    raw = (delta_base, raw)
+                else:
+                    type_num = OFS_DELTA
+                    raw = (offset - base_offset, raw)
+            f = BytesIO()
+            crc32 = write_pack_object(f, type_num, raw, compression_level=compression_level)
+            self.cs.update(f.getvalue())
+            yield f.getvalue()
+            offset += f.tell()
+            actual_num_records += 1
+            self.entries[object_id] = (offset, crc32)
+        if actual_num_records != num_records:
+            raise AssertionError(
+                'actual records written differs: %d != %d' % (
+                    actual_num_records, num_records))
+
+        yield self.cs.digest()
+
+
 def write_pack_data(f, num_records=None, records=None, progress=None, compression_level=-1):
     """Write a new pack data file.
 

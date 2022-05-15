@@ -106,6 +106,7 @@ from dulwich.protocol import (
 from dulwich.pack import (
     write_pack_data,
     write_pack_objects,
+    PackChunkGenerator,
 )
 from dulwich.refs import (
     read_info_refs,
@@ -1074,7 +1075,8 @@ class TraditionalGitClient(GitClient):
             )
 
             if self._should_send_pack(new_refs):
-                write_pack_data(proto.write_file(), pack_data_count, pack_data)
+                for chunk in PackChunkGenerator(pack_data_count, pack_data):
+                    proto.write(chunk)
 
             ref_status = self._handle_receive_pack_tail(
                 proto, negotiated_capabilities, progress
@@ -2027,7 +2029,8 @@ class AbstractHttpGitClient(GitClient):
             ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
         )
         if self._should_send_pack(new_refs):
-            write_pack_data(req_proto.write_file(), pack_data_count, pack_data)
+            for chunk in PackChunkGenerator(pack_data_count, pack_data):
+                req_proto.write(chunk)
         resp, read = self._smart_request(
             "git-receive-pack", url, data=req_data.getvalue()
         )

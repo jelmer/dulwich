@@ -478,6 +478,27 @@ class _v1ReceivePackHeader(object):
         yield None
 
 
+def _read_side_band64k_data(pkt_seq, channel_callbacks):
+    """Read per-channel data.
+
+    This requires the side-band-64k capability.
+
+    Args:
+      pkt_seq: Sequence of packets to read
+      channel_callbacks: Dictionary mapping channels to packet
+        handlers to use. None for a callback discards channel data.
+    """
+    for pkt in pkt_seq:
+        channel = ord(pkt[:1])
+        pkt = pkt[1:]
+        try:
+            cb = channel_callbacks[channel]
+        except KeyError:
+            raise AssertionError("Invalid sideband channel %d" % channel)
+        else:
+            if cb is not None:
+                cb(pkt)
+
 
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
@@ -724,27 +745,6 @@ class GitClient(object):
         """
         raise NotImplementedError(self.get_refs)
 
-    def _read_side_band64k_data(self, proto, channel_callbacks):
-        """Read per-channel data.
-
-        This requires the side-band-64k capability.
-
-        Args:
-          proto: Protocol object to read from
-          channel_callbacks: Dictionary mapping channels to packet
-            handlers to use. None for a callback discards channel data.
-        """
-        for pkt in proto.read_pkt_seq():
-            channel = ord(pkt[:1])
-            pkt = pkt[1:]
-            try:
-                cb = channel_callbacks[channel]
-            except KeyError:
-                raise AssertionError("Invalid sideband channel %d" % channel)
-            else:
-                if cb is not None:
-                    cb(pkt)
-
     @staticmethod
     def _should_send_pack(new_refs):
         # The packfile MUST NOT be sent if the only command used is delete.
@@ -792,7 +792,7 @@ class GitClient(object):
                 channel_callbacks[1] = PktLineParser(
                     self._report_status_parser.handle_packet
                 ).parse
-            self._read_side_band64k_data(proto, channel_callbacks)
+            _read_side_band64k_data(proto.read_pkt_seq(), channel_callbacks)
         else:
             if CAPABILITY_REPORT_STATUS in capabilities:
                 for pkt in proto.read_pkt_seq():
@@ -928,8 +928,8 @@ class GitClient(object):
                 def progress(x):
                     pass
 
-            self._read_side_band64k_data(
-                proto,
+            _read_side_band64k_data(
+                proto.read_pkt_seq(),
                 {
                     SIDE_BAND_CHANNEL_DATA: pack_data,
                     SIDE_BAND_CHANNEL_PROGRESS: progress,
@@ -1201,8 +1201,8 @@ class TraditionalGitClient(GitClient):
             ret = proto.read_pkt_line()
             if ret is not None:
                 raise AssertionError("expected pkt tail")
-            self._read_side_band64k_data(
-                proto,
+            _read_side_band64k_data(
+                proto.read_pkt_seq(),
                 {
                     SIDE_BAND_CHANNEL_DATA: write_data,
                     SIDE_BAND_CHANNEL_PROGRESS: progress,

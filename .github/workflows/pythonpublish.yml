@@ -34,7 +34,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine fastimport
+        pip install setuptools wheel twine fastimport paramiko
     - name: Install gpg on supported platforms
       run: pip install -U gpg
       if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"

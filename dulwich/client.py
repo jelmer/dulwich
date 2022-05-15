@@ -47,7 +47,7 @@ import shlex
 import socket
 import subprocess
 import sys
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, IO
 
 from urllib.parse import (
     quote as urlquote,
@@ -680,7 +680,7 @@ class GitClient(object):
             # TODO(jelmer): Avoid reading entire file into memory and
             # only processing it after the whole file has been fetched.
             from tempfile import SpooledTemporaryFile
-            f = SpooledTemporaryFile()
+            f = SpooledTemporaryFile()  # type: IO[bytes]
 
             def commit():
                 if f.tell():

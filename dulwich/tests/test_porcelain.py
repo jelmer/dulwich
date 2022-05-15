@@ -2563,6 +2563,20 @@ class RemoteAddTests(PorcelainTestCase):
         )
 
 
+class RemoteRemoveTests(PorcelainTestCase):
+    def test_remove(self):
+        porcelain.remote_add(self.repo, "jelmer", "git://jelmer.uk/code/dulwich")
+        c = self.repo.get_config()
+        self.assertEqual(
+            c.get((b"remote", b"jelmer"), b"url"),
+            b"git://jelmer.uk/code/dulwich",
+        )
+        porcelain.remote_remove(self.repo, "jelmer")
+        self.assertRaises(KeyError, porcelain.remote_remove, self.repo, "jelmer")
+        c = self.repo.get_config()
+        self.assertRaises(KeyError, c.get, (b"remote", b"jelmer"), b"url")
+
+
 class CheckIgnoreTests(PorcelainTestCase):
     def test_check_ignored(self):
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:

@@ -105,7 +105,6 @@ from dulwich.protocol import (
     pkt_line,
 )
 from dulwich.pack import (
-    write_pack_data,
     write_pack_objects,
     PackChunkGenerator,
 )

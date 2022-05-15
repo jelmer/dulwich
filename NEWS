@@ -3,6 +3,9 @@
  * Avoid making an extra copy when fetching pack files.
    (Jelmer Vernooĳ)
 
+ * Add ``porcelain.remote_remove``.
+   (Jelmer Vernooĳ, #923)
+
 0.20.36	2022-05-15
 
  * Add ``walk_untracked`` argument to ``porcelain.status``.

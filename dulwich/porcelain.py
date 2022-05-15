@@ -1655,6 +1655,22 @@ def remote_add(repo: Repo, name: Union[bytes, str], url: Union[bytes, str]):
         c.write_to_path()
 
 
+def remote_remove(repo: Repo, name: Union[bytes, str]):
+    """Remove a remote
+
+    Args:
+      repo: Path to the repository
+      name: Remote name
+    """
+    if not isinstance(name, bytes):
+        name = name.encode(DEFAULT_ENCODING)
+    with open_repo_closing(repo) as r:
+        c = r.get_config()
+        section = (b"remote", name)
+        del c[section]
+        c.write_to_path()
+
+
 def check_ignore(repo, paths, no_index=False):
     """Debug gitignore files.
 

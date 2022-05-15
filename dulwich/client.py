@@ -680,15 +680,17 @@ class GitClient(object):
         if CAPABILITY_THIN_PACK in self._fetch_capabilities:
             # TODO(jelmer): Avoid reading entire file into memory and
             # only processing it after the whole file has been fetched.
-            f = BytesIO()
+            from tempfile import SpooledTemporaryFile
+            f = SpooledTemporaryFile()
 
             def commit():
                 if f.tell():
                     f.seek(0)
                     target.object_store.add_thin_pack(f.read, None)
+                f.close()
 
             def abort():
-                pass
+                f.close()
 
         else:
             f, commit, abort = target.object_store.add_pack()

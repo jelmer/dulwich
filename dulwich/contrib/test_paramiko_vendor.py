@@ -20,13 +20,19 @@
 """Tests for paramiko_vendor."""
 
 import socket
-import paramiko
 import threading
 
 from dulwich.tests import TestCase
-from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
 
 from io import StringIO
+from unittest import skipIf
+
+try:
+    import paramiko
+except ImportError:
+    paramiko = None
+else:
+    from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
 
 
 USER = 'testuser'
@@ -89,36 +95,38 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 -----END RSA PRIVATE KEY-----"""
 
 
-class Server(paramiko.ServerInterface):
-    """http://docs.paramiko.org/en/2.4/api/server.html"""
-    def __init__(self, commands, *args, **kwargs):
-        super(Server, self).__init__(*args, **kwargs)
-        self.commands = commands
+if paramiko is not None:
+    class Server(paramiko.ServerInterface):
+        """http://docs.paramiko.org/en/2.4/api/server.html"""
+        def __init__(self, commands, *args, **kwargs):
+            super(Server, self).__init__(*args, **kwargs)
+            self.commands = commands
 
-    def check_channel_exec_request(self, channel, command):
-        self.commands.append(command)
-        return True
+        def check_channel_exec_request(self, channel, command):
+            self.commands.append(command)
+            return True
 
-    def check_auth_password(self, username, password):
-        if username == USER and password == PASSWORD:
-            return paramiko.AUTH_SUCCESSFUL
-        return paramiko.AUTH_FAILED
+        def check_auth_password(self, username, password):
+            if username == USER and password == PASSWORD:
+                return paramiko.AUTH_SUCCESSFUL
+            return paramiko.AUTH_FAILED
 
-    def check_auth_publickey(self, username, key):
-        pubkey = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
-        if username == USER and key == pubkey:
-            return paramiko.AUTH_SUCCESSFUL
-        return paramiko.AUTH_FAILED
+        def check_auth_publickey(self, username, key):
+            pubkey = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
+            if username == USER and key == pubkey:
+                return paramiko.AUTH_SUCCESSFUL
+            return paramiko.AUTH_FAILED
 
-    def check_channel_request(self, kind, chanid):
-        if kind == "session":
-            return paramiko.OPEN_SUCCEEDED
-        return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+        def check_channel_request(self, kind, chanid):
+            if kind == "session":
+                return paramiko.OPEN_SUCCEEDED
+            return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
-    def get_allowed_auths(self, username):
-        return "password,publickey"
+        def get_allowed_auths(self, username):
+            return "password,publickey"
 
 
+@skipIf(paramiko is None, "paramiko is not installed")
 class ParamikoSSHVendorTests(TestCase):
 
     def setUp(self):

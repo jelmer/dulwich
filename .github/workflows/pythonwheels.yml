@@ -1,4 +1,4 @@
-name: Build Python Package
+name: Build Python Wheels
 
 on:
   push:

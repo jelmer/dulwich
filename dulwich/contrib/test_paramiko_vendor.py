@@ -122,6 +122,12 @@ class Server(paramiko.ServerInterface):
 class ParamikoSSHVendorTests(TestCase):
 
     def setUp(self):
+        import paramiko.transport
+
+        # reenable server functionality for tests
+        if hasattr(paramiko.transport, "SERVER_DISABLED_BY_GENTOO"):
+            paramiko.transport.SERVER_DISABLED_BY_GENTOO = False
+
         self.commands = []
         socket.setdefaulttimeout(10)
         self.addCleanup(socket.setdefaulttimeout, None)

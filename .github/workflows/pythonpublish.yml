@@ -1,12 +1,13 @@
-name: Upload Python Package
+name: Build Python Package
 
 on:
   push:
-    tags:
-      - dulwich-*
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'  # Daily 6AM UTC build
 
 jobs:
-  deploy:
+  build:
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -48,12 +49,12 @@ jobs:
     - uses: docker/setup-qemu-action@v1
       name: Set up QEMU
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Build and publish (Linux aarch64)
+    - name: Build (Linux aarch64)
       uses: RalfG/python-wheels-manylinux-build@v0.3.3-manylinux2014_aarch64
       with:
         python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310'
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Build and publish (Linux)
+    - name: Build (Linux)
       uses: RalfG/python-wheels-manylinux-build@v0.3.1
       with:
         python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310'
@@ -62,6 +63,22 @@ jobs:
         # https://github.com/RalfG/python-wheels-manylinux-build/issues/26
         LD_LIBRARY_PATH: /usr/local/lib:${{ env.LD_LIBRARY_PATH }}
       if: "matrix.os == 'ubuntu-latest'"
+
+  publish:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10']
+        include:
+          - os: ubuntu-latest
+            python-version: '3.x'
+          # path encoding
+      fail-fast: false
+
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/dulwich-')
+    steps:
     - name: Publish (Linux)
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -71,7 +88,7 @@ jobs:
         # rejected by pip.
         twine upload dist/*manylinux*.whl
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Publish
+    - name: Publish (non-Linux)
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

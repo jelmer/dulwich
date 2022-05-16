@@ -1,4 +1,4 @@
-0.20.37	UNRELEASED
+0.20.37	2022-05-16
 
  * Avoid making an extra copy when fetching pack files.
    (Jelmer Vernooĳ)

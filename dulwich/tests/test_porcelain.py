@@ -1849,17 +1849,12 @@ class StatusTests(PorcelainTestCase):
         mod_path = os.path.join(self.repo.path, "bar")
         add_path = os.path.join(self.repo.path, "baz")
         us_path = os.path.join(self.repo.path, "blye")
-        ut_path = os.path.join(self.repo.path, "untracked_file")
-        os.mkdir(os.path.join(self.repo.path, "untracked_dir"))
-        ut_subfile_path = os.path.join(self.repo.path, "untracked_dir/file")
-
+        ut_path = os.path.join(self.repo.path, "blyat")
         with open(del_path, "w") as f:
             f.write("origstuff")
         with open(mod_path, "w") as f:
             f.write("origstuff")
         with open(us_path, "w") as f:
-            f.write("origstuff")
-        with open(ut_subfile_path, "w") as f:
             f.write("origstuff")
         porcelain.add(repo=self.repo.path, paths=[del_path, mod_path, us_path])
         porcelain.commit(
@@ -1886,15 +1881,12 @@ class StatusTests(PorcelainTestCase):
             results.staged,
         )
         self.assertListEqual(results.unstaged, [b"blye"])
-        self.assertListEqual(
-            results.untracked, [
-                "untracked_file", os.path.join("untracked_dir", "file")]
-        )
-        results_no_walk = porcelain.status(self.repo.path, walk_untracked=False)
-        self.assertListEqual(
-            results_no_walk.untracked,
-            ["untracked_file", "untracked_dir" + os.path.sep]
-        )
+        results_no_untracked = porcelain.status(self.repo.path, untracked_files="no")
+        self.assertListEqual(results_no_untracked.untracked, [])
+
+    def test_status_wrong_untracked_files_value(self):
+        with self.assertRaises(ValueError):
+            porcelain.status(self.repo.path, untracked_files="antani")
 
     def test_status_crlf_mismatch(self):
         # First make a commit as if the file has been added on a Linux system
@@ -2187,35 +2179,25 @@ class StatusTests(PorcelainTestCase):
                     self.repo.open_index(),
                     exclude_ignored=True,
                 )
-            ),
+            )
         )
 
-    def test_get_untracked_paths_walk(self):
-        os.mkdir(os.path.join(self.repo.path, "dir"))
-        os.mkdir(os.path.join(self.repo.path, "dir/subdir"))
-        with open(os.path.join(self.repo.path, "dir", "file"), "w") as f:
-            f.write("foo")
-        with open(os.path.join(self.repo.path, "dir/subdir/subfile"), "w") as f:
-            f.write("foo")
-
-        self.assertEqual(
-            {"dir" + os.path.sep},
-            set(
+    def test_get_untracked_paths_invalid_untracked_files(self):
+        with self.assertRaises(ValueError):
+            list(
                 porcelain.get_untracked_paths(
-                    self.repo.path, self.repo.path, self.repo.open_index(), walk=False
+                    self.repo.path,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    untracked_files="invalid_value",
                 )
-            ),
-        )
-        self.assertEqual(
-            set([os.path.join("dir", "file"),
-                 os.path.join("dir", "subdir", "subfile")]),
-            set(
-                porcelain.get_untracked_paths(
-                    self.repo.path, self.repo.path, self.repo.open_index(), walk=True
-                )
-            ),
-        )
+            )
 
+    def test_get_untracked_paths_normal(self):
+        with self.assertRaises(NotImplementedError):
+            _, _, _ = porcelain.status(
+                repo=self.repo.path, untracked_files="normal"
+            )
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 

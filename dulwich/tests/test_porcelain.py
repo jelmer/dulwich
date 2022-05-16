@@ -79,6 +79,11 @@ class PorcelainTestCase(TestCase):
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
+    def assertRecentTimestamp(self, ts):
+        # On some slow CIs it does actually take more than 5 seconds to go from
+        # creating the tag to here.
+        self.assertLess(time.time() - ts, 50)
+
 
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """
@@ -1112,6 +1117,7 @@ class RevListTests(PorcelainTestCase):
 
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTests(PorcelainGpgTestCase):
+
     def test_default_key(self):
         import gpg
 
@@ -1138,7 +1144,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
@@ -1181,13 +1187,14 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
 
 
 class TagCreateTests(PorcelainTestCase):
+
     def test_annotated(self):
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
@@ -1208,7 +1215,7 @@ class TagCreateTests(PorcelainTestCase):
         self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
 
     def test_unannotated(self):
         c1, c2, c3 = build_commit_graph(

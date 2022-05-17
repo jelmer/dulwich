@@ -8,6 +8,10 @@
  * Increase tolerance when comparing time stamps; fixes some
    spurious test failures on slow CI systems. (Jelmer Vernooĳ)
 
+ * Revert removal of caching of full HTTP response. This breaks
+   access to some HTTP servers.
+   (Jelmer Vernooĳ)
+
 0.20.37	2022-05-16
 
  * Avoid making an extra copy when fetching pack files.

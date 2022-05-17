@@ -1,5 +1,13 @@
 0.20.38	UNRELEASED
 
+ * Disable paramiko tests if paramiko is not available. (Michał Górny)
+
+ * Set flag to re-enable paramiko server side on gentoo for running paramiko
+   tests. (Michał Górny)
+
+ * Increase tolerance when comparing time stamps; fixes some
+   spurious test failures on slow CI systems. (Jelmer Vernooĳ)
+
 0.20.37	2022-05-16
 
  * Avoid making an extra copy when fetching pack files.

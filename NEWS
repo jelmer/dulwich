@@ -1,3 +1,5 @@
+0.20.39	UNRELEASED
+
 0.20.38	2022-05-17
 
  * Disable paramiko tests if paramiko is not available. (Michał Górny)

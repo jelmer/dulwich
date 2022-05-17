@@ -2232,7 +2232,9 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             resp.redirect_location = resp.get_redirect_location()
         else:
             resp.redirect_location = resp_url if resp_url != url else ""
-        return resp, resp.read
+        # TODO(jelmer): Remove BytesIO() call that caches entire response in
+        # memory. See https://github.com/jelmer/dulwich/issues/966
+        return resp, BytesIO(resp.data).read
 
 
 HttpGitClient = Urllib3HttpGitClient

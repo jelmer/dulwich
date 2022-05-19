@@ -1,3 +1,7 @@
+0.20.40	UNRELEASED
+
+ * Fix wheel uploading. (Daniele Trifirò, Jelmer Vernooĳ)
+
 0.20.39	2022-05-19
 
 0.20.38	2022-05-17

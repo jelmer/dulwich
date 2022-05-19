@@ -22,4 +22,4 @@
 
 """Python implementation of the Git file formats and protocols."""
 
-__version__ = (0, 20, 39)
+__version__ = (0, 20, 40)

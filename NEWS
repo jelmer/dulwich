@@ -1,5 +1,7 @@
 0.20.41	UNRELEASED
 
+ * Fix wheel uploading, properly. (Ruslan Kuprieiev)
+
 0.20.40	2022-05-19
 
  * Fix wheel uploading. (Daniele Trifirò, Jelmer Vernooĳ)

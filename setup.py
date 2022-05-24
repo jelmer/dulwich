@@ -78,7 +78,6 @@ if has_setuptools:
         'fastimport': ['fastimport'],
         'https': ['urllib3[secure]>=1.24.1'],
         'pgp': ['gpg'],
-        'watch': ['pyinotify'],
         'paramiko': ['paramiko'],
         }
     setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']

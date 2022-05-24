@@ -1,5 +1,8 @@
 0.20.42	UNRELEASED
 
+ * Drop ``RefsContainer.watch`` that was always flaky.
+   (Jelmer Vernooĳ, #886)
+
 0.20.41	2022-05-24
 
  * Fix wheel uploading, properly. (Ruslan Kuprieiev)

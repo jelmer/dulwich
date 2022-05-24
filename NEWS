@@ -1,4 +1,4 @@
-0.20.42	UNRELEASED
+0.20.42	2022-05-24
 
  * Drop ``RefsContainer.watch`` that was always flaky.
    (Jelmer Vernooĳ, #886)

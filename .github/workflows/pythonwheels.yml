@@ -1,12 +1,13 @@
-name: Upload Python Package
+name: Build Python Wheels
 
 on:
   push:
-    tags:
-      - dulwich-*
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'  # Daily 6AM UTC build
 
 jobs:
-  deploy:
+  build:
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -17,7 +18,7 @@ jobs:
           - os: ubuntu-latest
             python-version: '3.x'
           # path encoding
-      fail-fast: false
+      fail-fast: true
 
     steps:
     - uses: actions/checkout@v2
@@ -34,7 +35,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine fastimport
+        pip install setuptools wheel fastimport paramiko urllib3
     - name: Install gpg on supported platforms
       run: pip install -U gpg
       if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
@@ -48,12 +49,12 @@ jobs:
     - uses: docker/setup-qemu-action@v1
       name: Set up QEMU
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Build and publish (Linux aarch64)
+    - name: Build (Linux aarch64)
       uses: RalfG/python-wheels-manylinux-build@v0.3.3-manylinux2014_aarch64
       with:
         python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310'
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Build and publish (Linux)
+    - name: Build (Linux)
       uses: RalfG/python-wheels-manylinux-build@v0.3.1
       with:
         python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310'
@@ -62,19 +63,39 @@ jobs:
         # https://github.com/RalfG/python-wheels-manylinux-build/issues/26
         LD_LIBRARY_PATH: /usr/local/lib:${{ env.LD_LIBRARY_PATH }}
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Publish (Linux)
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        # Only include *manylinux* wheels; the other wheels files are built but
-        # rejected by pip.
-        twine upload dist/*manylinux*.whl
+    - name: Upload wheels (Linux)
+      uses: actions/upload-artifact@v2
+      # Only include *manylinux* wheels; the other wheels files are built but
+      # rejected by pip.
       if: "matrix.os == 'ubuntu-latest'"
-    - name: Publish
+      with:
+        name: dist
+        path: dist/*manylinux*.whl
+    - name: Upload wheels (non-Linux)
+      uses: actions/upload-artifact@v2
+      with:
+        name: dist
+        path: dist/*.whl
+      if: "matrix.os != 'ubuntu-latest'"
+
+  publish:
+    runs-on: ubuntu-latest
+
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/dulwich-')
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.x"
+    - name: Install twine
+      run: |
+        python -m pip install --upgrade pip
+        pip install twine
+    - name: Download wheels
+      uses: actions/download-artifact@v2
+    - name: Publish wheels
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*.whl
-      if: "matrix.os != 'ubuntu-latest'"
+      run: twine upload dist/*.whl

@@ -31,6 +31,8 @@ from urllib.parse import (
     urlparse,
 )
 
+from unittest.mock import patch
+
 import dulwich
 from dulwich import (
     client,
@@ -682,10 +684,40 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
 
+    @patch("os.name", "posix")
+    @patch("sys.platform", "linux")
     def test_file(self):
         c, path = get_transport_and_path_from_url("file:///home/jelmer/foo")
         self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("/home/jelmer/foo", path)
+
+    @patch("os.name", "nt")
+    @patch("sys.platform", "win32")
+    def test_file_win(self):
+        # `_win32_url_to_path` uses urllib.request.url2pathname, which is set to
+        # `ntutl2path.url2pathname`  when `os.name==nt`
+        from nturl2path import url2pathname
+
+        with patch("dulwich.client.url2pathname", url2pathname):
+            expected = "C:\\foo.bar\\baz"
+            for file_url in [
+                "file:C:/foo.bar/baz",
+                "file:/C:/foo.bar/baz",
+                "file://C:/foo.bar/baz",
+                "file://C://foo.bar//baz",
+                "file:///C:/foo.bar/baz",
+            ]:
+                c, path = get_transport_and_path(file_url)
+                self.assertIsInstance(c, LocalGitClient)
+                self.assertEqual(path, expected)
+
+            for remote_url in [
+                "file://host.example.com/C:/foo.bar/baz"
+                "file://host.example.com/C:/foo.bar/baz"
+                "file:////host.example/foo.bar/baz",
+            ]:
+                with self.assertRaises(NotImplementedError):
+                    c, path = get_transport_and_path(remote_url)
 
 
 class TestSSHVendor(object):
@@ -1048,7 +1080,7 @@ class HttpGitClientTests(TestCase):
             def __init__(self):
                 self.headers = {}
 
-            def request(self, method, url, fields=None, headers=None, redirect=True):
+            def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
                 base_url = url[: -len(tail)]
                 redirect_base_url = test_data[base_url]["redirect_url"]
                 redirect_url = redirect_base_url + tail
@@ -1063,14 +1095,15 @@ class HttpGitClientTests(TestCase):
                 if redirect is False:
                     request_url = url
                     if redirect_base_url != base_url:
-                        body = ""
+                        body = b""
                         headers["location"] = redirect_url
                         status = 301
                 return HTTPResponse(
-                    body=body,
+                    body=BytesIO(body),
                     headers=headers,
                     request_method=method,
                     request_url=request_url,
+                    preload_content=preload_content,
                     status=status,
                 )
 

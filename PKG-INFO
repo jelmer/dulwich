@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.20.35
+Version: 0.20.42
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
@@ -26,8 +26,8 @@ Classifier: Topic :: Software Development :: Version Control
 Requires-Python: >=3.6
 Provides-Extra: fastimport
 Provides-Extra: https
+Provides-Extra: paramiko
 Provides-Extra: pgp
-Provides-Extra: watch
 License-File: COPYING
 License-File: AUTHORS
 
@@ -106,9 +106,8 @@ Help
 ----
 
 There is a *#dulwich* IRC channel on the `OFTC <https://www.oftc.net/>`_, and
-`dulwich-announce <https://groups.google.com/forum/#!forum/dulwich-announce>`_
-and `dulwich-discuss <https://groups.google.com/forum/#!forum/dulwich-discuss>`_
-mailing lists.
+a `dulwich-discuss <https://groups.google.com/forum/#!forum/dulwich-discuss>`_
+mailing list.
 
 Contributing
 ------------

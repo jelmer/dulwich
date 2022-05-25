@@ -1,3 +1,9 @@
+dulwich (0.20.42-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Wed, 25 May 2022 19:57:50 -0000
+
 dulwich (0.20.35-1) unstable; urgency=medium
 
   * Re-export upstream signing key without extra signatures.

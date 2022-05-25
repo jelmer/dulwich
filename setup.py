@@ -23,7 +23,7 @@ if sys.version_info < (3, 6):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.35'
+dulwich_version_string = '0.20.42'
 
 
 class DulwichDistribution(Distribution):
@@ -78,7 +78,7 @@ if has_setuptools:
         'fastimport': ['fastimport'],
         'https': ['urllib3[secure]>=1.24.1'],
         'pgp': ['gpg'],
-        'watch': ['pyinotify'],
+        'paramiko': ['paramiko'],
         }
     setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']
     setup_kwargs['include_package_data'] = True

@@ -564,12 +564,6 @@ class ShaFile(object):
             raise TypeError
         return self.id <= other.id
 
-    def __cmp__(self, other):
-        """Compare the SHA of this object with that of the other object."""
-        if not isinstance(other, ShaFile):
-            raise TypeError
-        return cmp(self.id, other.id)  # noqa: F821
-
 
 class Blob(ShaFile):
     """A Git Blob object."""

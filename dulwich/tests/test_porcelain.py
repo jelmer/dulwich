@@ -79,6 +79,11 @@ class PorcelainTestCase(TestCase):
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
+    def assertRecentTimestamp(self, ts):
+        # On some slow CIs it does actually take more than 5 seconds to go from
+        # creating the tag to here.
+        self.assertLess(time.time() - ts, 50)
+
 
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """
@@ -1112,6 +1117,7 @@ class RevListTests(PorcelainTestCase):
 
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTests(PorcelainGpgTestCase):
+
     def test_default_key(self):
         import gpg
 
@@ -1138,7 +1144,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
@@ -1181,13 +1187,14 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
 
 
 class TagCreateTests(PorcelainTestCase):
+
     def test_annotated(self):
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
@@ -1208,7 +1215,7 @@ class TagCreateTests(PorcelainTestCase):
         self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
 
     def test_unannotated(self):
         c1, c2, c3 = build_commit_graph(
@@ -1874,7 +1881,12 @@ class StatusTests(PorcelainTestCase):
             results.staged,
         )
         self.assertListEqual(results.unstaged, [b"blye"])
-        self.assertListEqual(results.untracked, ["blyat"])
+        results_no_untracked = porcelain.status(self.repo.path, untracked_files="no")
+        self.assertListEqual(results_no_untracked.untracked, [])
+
+    def test_status_wrong_untracked_files_value(self):
+        with self.assertRaises(ValueError):
+            porcelain.status(self.repo.path, untracked_files="antani")
 
     def test_status_crlf_mismatch(self):
         # First make a commit as if the file has been added on a Linux system
@@ -2170,6 +2182,22 @@ class StatusTests(PorcelainTestCase):
             )
         )
 
+    def test_get_untracked_paths_invalid_untracked_files(self):
+        with self.assertRaises(ValueError):
+            list(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    untracked_files="invalid_value",
+                )
+            )
+
+    def test_get_untracked_paths_normal(self):
+        with self.assertRaises(NotImplementedError):
+            _, _, _ = porcelain.status(
+                repo=self.repo.path, untracked_files="normal"
+            )
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
@@ -2522,6 +2550,20 @@ class RemoteAddTests(PorcelainTestCase):
             "jelmer",
             "git://jelmer.uk/code/dulwich",
         )
+
+
+class RemoteRemoveTests(PorcelainTestCase):
+    def test_remove(self):
+        porcelain.remote_add(self.repo, "jelmer", "git://jelmer.uk/code/dulwich")
+        c = self.repo.get_config()
+        self.assertEqual(
+            c.get((b"remote", b"jelmer"), b"url"),
+            b"git://jelmer.uk/code/dulwich",
+        )
+        porcelain.remote_remove(self.repo, "jelmer")
+        self.assertRaises(KeyError, porcelain.remote_remove, self.repo, "jelmer")
+        c = self.repo.get_config()
+        self.assertRaises(KeyError, c.get, (b"remote", b"jelmer"), b"url")
 
 
 class CheckIgnoreTests(PorcelainTestCase):

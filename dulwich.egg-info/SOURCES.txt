@@ -25,7 +25,7 @@ status.yaml
 tox.ini
 .github/FUNDING.yml
 .github/workflows/pythonpackage.yml
-.github/workflows/pythonpublish.yml
+.github/workflows/pythonwheels.yml
 bin/dul-receive-pack
 bin/dul-upload-pack
 bin/dulwich

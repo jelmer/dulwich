@@ -1,3 +1,48 @@
+0.20.42	2022-05-24
+
+ * Drop ``RefsContainer.watch`` that was always flaky.
+   (Jelmer Vernooĳ, #886)
+
+0.20.41	2022-05-24
+
+ * Fix wheel uploading, properly. (Ruslan Kuprieiev)
+
+0.20.40	2022-05-19
+
+ * Fix wheel uploading. (Daniele Trifirò, Jelmer Vernooĳ)
+
+0.20.39	2022-05-19
+
+0.20.38	2022-05-17
+
+ * Disable paramiko tests if paramiko is not available. (Michał Górny)
+
+ * Set flag to re-enable paramiko server side on gentoo for running paramiko
+   tests. (Michał Górny)
+
+ * Increase tolerance when comparing time stamps; fixes some
+   spurious test failures on slow CI systems. (Jelmer Vernooĳ)
+
+ * Revert removal of caching of full HTTP response. This breaks
+   access to some HTTP servers.
+   (Jelmer Vernooĳ)
+
+0.20.37	2022-05-16
+
+ * Avoid making an extra copy when fetching pack files.
+   (Jelmer Vernooĳ)
+
+ * Add ``porcelain.remote_remove``.
+   (Jelmer Vernooĳ, #923)
+
+0.20.36	2022-05-15
+
+ * Add ``walk_untracked`` argument to ``porcelain.status``.
+   (Daniele Trifirò)
+
+ * Add tests for paramiko SSH Vendor.
+   (Filipp Frizzy)
+
 0.20.35	2022-03-20
 
  * Document the ``path`` attribute for ``Repo``.

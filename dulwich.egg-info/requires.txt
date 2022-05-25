@@ -7,8 +7,8 @@ fastimport
 [https]
 urllib3[secure]>=1.24.1
 
+[paramiko]
+paramiko
+
 [pgp]
 gpg
-
-[watch]
-pyinotify

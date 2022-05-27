@@ -503,6 +503,129 @@ def _read_side_band64k_data(pkt_seq, channel_callbacks):
                 cb(pkt)
 
 
+def _handle_upload_pack_head(
+    proto, capabilities, graph_walker, wants, can_read, depth
+):
+    """Handle the head of a 'git-upload-pack' request.
+
+    Args:
+      proto: Protocol object to read from
+      capabilities: List of negotiated capabilities
+      graph_walker: GraphWalker instance to call .ack() on
+      wants: List of commits to fetch
+      can_read: function that returns a boolean that indicates
+    whether there is extra graph data to read on proto
+      depth: Depth for request
+
+    Returns:
+
+    """
+    assert isinstance(wants, list) and isinstance(wants[0], bytes)
+    proto.write_pkt_line(
+        COMMAND_WANT
+        + b" "
+        + wants[0]
+        + b" "
+        + b" ".join(sorted(capabilities))
+        + b"\n"
+    )
+    for want in wants[1:]:
+        proto.write_pkt_line(COMMAND_WANT + b" " + want + b"\n")
+    if depth not in (0, None) or getattr(graph_walker, "shallow", None):
+        if CAPABILITY_SHALLOW not in capabilities:
+            raise GitProtocolError(
+                "server does not support shallow capability required for " "depth"
+            )
+        for sha in graph_walker.shallow:
+            proto.write_pkt_line(COMMAND_SHALLOW + b" " + sha + b"\n")
+        if depth is not None:
+            proto.write_pkt_line(
+                COMMAND_DEEPEN + b" " + str(depth).encode("ascii") + b"\n"
+            )
+        proto.write_pkt_line(None)
+        if can_read is not None:
+            (new_shallow, new_unshallow) = _read_shallow_updates(proto.read_pkt_seq())
+        else:
+            new_shallow = new_unshallow = None
+    else:
+        new_shallow = new_unshallow = set()
+        proto.write_pkt_line(None)
+    have = next(graph_walker)
+    while have:
+        proto.write_pkt_line(COMMAND_HAVE + b" " + have + b"\n")
+        if can_read is not None and can_read():
+            pkt = proto.read_pkt_line()
+            parts = pkt.rstrip(b"\n").split(b" ")
+            if parts[0] == b"ACK":
+                graph_walker.ack(parts[1])
+                if parts[2] in (b"continue", b"common"):
+                    pass
+                elif parts[2] == b"ready":
+                    break
+                else:
+                    raise AssertionError(
+                        "%s not in ('continue', 'ready', 'common)" % parts[2]
+                    )
+        have = next(graph_walker)
+    proto.write_pkt_line(COMMAND_DONE + b"\n")
+    return (new_shallow, new_unshallow)
+
+
+def _handle_upload_pack_tail(
+    proto,
+    capabilities,
+    graph_walker,
+    pack_data,
+    progress=None,
+    rbufsize=_RBUFSIZE,
+):
+    """Handle the tail of a 'git-upload-pack' request.
+
+    Args:
+      proto: Protocol object to read from
+      capabilities: List of negotiated capabilities
+      graph_walker: GraphWalker instance to call .ack() on
+      pack_data: Function to call with pack data
+      progress: Optional progress reporting function
+      rbufsize: Read buffer size
+
+    Returns:
+
+    """
+    pkt = proto.read_pkt_line()
+    while pkt:
+        parts = pkt.rstrip(b"\n").split(b" ")
+        if parts[0] == b"ACK":
+            graph_walker.ack(parts[1])
+        if len(parts) < 3 or parts[2] not in (
+            b"ready",
+            b"continue",
+            b"common",
+        ):
+            break
+        pkt = proto.read_pkt_line()
+    if CAPABILITY_SIDE_BAND_64K in capabilities:
+        if progress is None:
+            # Just ignore progress data
+
+            def progress(x):
+                pass
+
+        _read_side_band64k_data(
+            proto.read_pkt_seq(),
+            {
+                SIDE_BAND_CHANNEL_DATA: pack_data,
+                SIDE_BAND_CHANNEL_PROGRESS: progress,
+            },
+        )
+    else:
+        while True:
+            data = proto.read(rbufsize)
+            if data == b"":
+                break
+            pack_data(data)
+
+
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
@@ -825,128 +948,6 @@ class GitClient(object):
         negotiated_capabilities = self._fetch_capabilities & server_capabilities
         return (negotiated_capabilities, symrefs, agent)
 
-    def _handle_upload_pack_head(
-        self, proto, capabilities, graph_walker, wants, can_read, depth
-    ):
-        """Handle the head of a 'git-upload-pack' request.
-
-        Args:
-          proto: Protocol object to read from
-          capabilities: List of negotiated capabilities
-          graph_walker: GraphWalker instance to call .ack() on
-          wants: List of commits to fetch
-          can_read: function that returns a boolean that indicates
-        whether there is extra graph data to read on proto
-          depth: Depth for request
-
-        Returns:
-
-        """
-        assert isinstance(wants, list) and isinstance(wants[0], bytes)
-        proto.write_pkt_line(
-            COMMAND_WANT
-            + b" "
-            + wants[0]
-            + b" "
-            + b" ".join(sorted(capabilities))
-            + b"\n"
-        )
-        for want in wants[1:]:
-            proto.write_pkt_line(COMMAND_WANT + b" " + want + b"\n")
-        if depth not in (0, None) or getattr(graph_walker, "shallow", None):
-            if CAPABILITY_SHALLOW not in capabilities:
-                raise GitProtocolError(
-                    "server does not support shallow capability required for " "depth"
-                )
-            for sha in graph_walker.shallow:
-                proto.write_pkt_line(COMMAND_SHALLOW + b" " + sha + b"\n")
-            if depth is not None:
-                proto.write_pkt_line(
-                    COMMAND_DEEPEN + b" " + str(depth).encode("ascii") + b"\n"
-                )
-            proto.write_pkt_line(None)
-            if can_read is not None:
-                (new_shallow, new_unshallow) = _read_shallow_updates(proto.read_pkt_seq())
-            else:
-                new_shallow = new_unshallow = None
-        else:
-            new_shallow = new_unshallow = set()
-            proto.write_pkt_line(None)
-        have = next(graph_walker)
-        while have:
-            proto.write_pkt_line(COMMAND_HAVE + b" " + have + b"\n")
-            if can_read is not None and can_read():
-                pkt = proto.read_pkt_line()
-                parts = pkt.rstrip(b"\n").split(b" ")
-                if parts[0] == b"ACK":
-                    graph_walker.ack(parts[1])
-                    if parts[2] in (b"continue", b"common"):
-                        pass
-                    elif parts[2] == b"ready":
-                        break
-                    else:
-                        raise AssertionError(
-                            "%s not in ('continue', 'ready', 'common)" % parts[2]
-                        )
-            have = next(graph_walker)
-        proto.write_pkt_line(COMMAND_DONE + b"\n")
-        return (new_shallow, new_unshallow)
-
-    def _handle_upload_pack_tail(
-        self,
-        proto,
-        capabilities,
-        graph_walker,
-        pack_data,
-        progress=None,
-        rbufsize=_RBUFSIZE,
-    ):
-        """Handle the tail of a 'git-upload-pack' request.
-
-        Args:
-          proto: Protocol object to read from
-          capabilities: List of negotiated capabilities
-          graph_walker: GraphWalker instance to call .ack() on
-          pack_data: Function to call with pack data
-          progress: Optional progress reporting function
-          rbufsize: Read buffer size
-
-        Returns:
-
-        """
-        pkt = proto.read_pkt_line()
-        while pkt:
-            parts = pkt.rstrip(b"\n").split(b" ")
-            if parts[0] == b"ACK":
-                graph_walker.ack(parts[1])
-            if len(parts) < 3 or parts[2] not in (
-                b"ready",
-                b"continue",
-                b"common",
-            ):
-                break
-            pkt = proto.read_pkt_line()
-        if CAPABILITY_SIDE_BAND_64K in capabilities:
-            if progress is None:
-                # Just ignore progress data
-
-                def progress(x):
-                    pass
-
-            _read_side_band64k_data(
-                proto.read_pkt_seq(),
-                {
-                    SIDE_BAND_CHANNEL_DATA: pack_data,
-                    SIDE_BAND_CHANNEL_PROGRESS: progress,
-                },
-            )
-        else:
-            while True:
-                data = proto.read(rbufsize)
-                if data == b"":
-                    break
-                pack_data(data)
-
 
 def check_wants(wants, refs):
     """Check that a set of wants is valid.
@@ -1141,7 +1142,7 @@ class TraditionalGitClient(GitClient):
             if not wants:
                 proto.write_pkt_line(None)
                 return FetchPackResult(refs, symrefs, agent)
-            (new_shallow, new_unshallow) = self._handle_upload_pack_head(
+            (new_shallow, new_unshallow) = _handle_upload_pack_head(
                 proto,
                 negotiated_capabilities,
                 graph_walker,
@@ -1149,7 +1150,7 @@ class TraditionalGitClient(GitClient):
                 can_read,
                 depth=depth,
             )
-            self._handle_upload_pack_tail(
+            _handle_upload_pack_tail(
                 proto,
                 negotiated_capabilities,
                 graph_walker,
@@ -2092,7 +2093,7 @@ class AbstractHttpGitClient(GitClient):
             raise NotImplementedError(self.fetch_pack)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
-        (new_shallow, new_unshallow) = self._handle_upload_pack_head(
+        (new_shallow, new_unshallow) = _handle_upload_pack_head(
             req_proto,
             negotiated_capabilities,
             graph_walker,
@@ -2106,8 +2107,9 @@ class AbstractHttpGitClient(GitClient):
         try:
             resp_proto = Protocol(read, None)
             if new_shallow is None and new_unshallow is None:
-                (new_shallow, new_unshallow) = _read_shallow_updates(resp_proto.read_pkt_seq())
-            self._handle_upload_pack_tail(
+                (new_shallow, new_unshallow) = _read_shallow_updates(
+                    resp_proto.read_pkt_seq())
+            _handle_upload_pack_tail(
                 resp_proto,
                 negotiated_capabilities,
                 graph_walker,

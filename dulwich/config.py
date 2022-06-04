@@ -30,18 +30,16 @@ import os
 import sys
 import warnings
 
-from typing import BinaryIO, Iterator, KeysView, Optional, Tuple, Union
-
-try:
-    from collections.abc import (
-        Iterable,
-        MutableMapping,
-    )
-except ImportError:  # python < 3.7
-    from collections import (  # type: ignore
-        Iterable,
-        MutableMapping,
-    )
+from typing import (
+    BinaryIO,
+    Iterable,
+    Iterator,
+    KeysView,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from dulwich.file import GitFile
 
@@ -252,35 +250,52 @@ class Config(object):
         return name in self.sections()
 
 
-class ConfigDict(Config, MutableMapping):
+BytesLike = Union[bytes, str]
+Key = Tuple[bytes, ...]
+KeyLike = Union[bytes, str, Tuple[BytesLike, ...]]
+Value = Union[bytes, bool]
+ValueLike = Union[bytes, str, bool]
+
+
+class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
     """Git configuration stored in a dictionary."""
 
-    def __init__(self, values=None, encoding=None):
+    def __init__(
+        self,
+        values: Union[
+            MutableMapping[Key, MutableMapping[bytes, Value]], None
+        ] = None,
+        encoding: Union[str, None] = None
+    ) -> None:
         """Create a new ConfigDict."""
         if encoding is None:
             encoding = sys.getdefaultencoding()
         self.encoding = encoding
         self._values = CaseInsensitiveOrderedMultiDict.make(values)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "%s(%r)" % (self.__class__.__name__, self._values)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, self.__class__) and other._values == self._values
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Key) -> MutableMapping[bytes, Value]:
         return self._values.__getitem__(key)
 
-    def __setitem__(self, key, value):
+    def __setitem__(
+        self,
+        key: Key,
+        value: MutableMapping[bytes, Value]
+    ) -> None:
         return self._values.__setitem__(key, value)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: Key) -> None:
         return self._values.__delitem__(key)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Key]:
         return self._values.__iter__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._values.__len__()
 
     @classmethod
@@ -291,11 +306,15 @@ class ConfigDict(Config, MutableMapping):
         else:
             return (parts[0], None, parts[1])
 
-    def _check_section_and_name(self, section, name):
+    def _check_section_and_name(
+        self,
+        section: KeyLike,
+        name: BytesLike
+    ) -> Tuple[Key, bytes]:
         if not isinstance(section, tuple):
             section = (section,)
 
-        section = tuple(
+        checked_section = tuple(
             [
                 subsection.encode(self.encoding)
                 if not isinstance(subsection, bytes)
@@ -307,9 +326,13 @@ class ConfigDict(Config, MutableMapping):
         if not isinstance(name, bytes):
             name = name.encode(self.encoding)
 
-        return section, name
+        return checked_section, name
 
-    def get_multivar(self, section, name):
+    def get_multivar(
+        self,
+        section: KeyLike,
+        name: BytesLike
+    ) -> Iterator[Value]:
         section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
@@ -322,9 +345,9 @@ class ConfigDict(Config, MutableMapping):
 
     def get(  # type: ignore[override]
         self,
-        section: Union[bytes, str, Tuple[Union[bytes, str], ...]],
-        name: Union[str, bytes]
-    ) -> Optional[bytes]:
+        section: KeyLike,
+        name: BytesLike,
+    ) -> Optional[Value]:
         section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
@@ -335,18 +358,26 @@ class ConfigDict(Config, MutableMapping):
 
         return self._values[(section[0],)][name]
 
-    def set(self, section, name, value):
+    def set(
+        self,
+        section: KeyLike,
+        name: BytesLike,
+        value: ValueLike,
+    ) -> None:
         section, name = self._check_section_and_name(section, name)
 
-        if type(value) not in (bool, bytes):
+        if not isinstance(value, (bytes, bool)):
             value = value.encode(self.encoding)
 
         self._values.setdefault(section)[name] = value
 
-    def items(self, section):
+    def items(  # type: ignore[override]
+        self,
+        section: Key
+    ) -> Iterator[Value]:
         return self._values.get(section).items()
 
-    def sections(self):
+    def sections(self) -> Iterator[Key]:
         return self._values.keys()
 
 
@@ -696,7 +727,9 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
         section_kind, section_name = section
         if section_kind == b"submodule":
             sm_path = config.get(section, b"path")
+            assert isinstance(sm_path, bytes)
             assert sm_path is not None
             sm_url = config.get(section, b"url")
             assert sm_url is not None
+            assert isinstance(sm_url, bytes)
             yield (sm_path, sm_url, section_name)

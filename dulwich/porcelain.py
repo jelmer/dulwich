@@ -1003,6 +1003,7 @@ def get_remote_repo(
         remote_name = encoded_location.decode()
         url = config.get(section, "url")
         assert url is not None
+        assert isinstance(url, bytes)
         encoded_location = url
     else:
         remote_name = None

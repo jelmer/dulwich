@@ -1906,14 +1906,13 @@ class AbstractHttpGitClient(GitClient):
         self.dumb = dumb
         GitClient.__init__(self, **kwargs)
 
-    def _http_request(self, url, headers=None, data=None, allow_compression=False):
+    def _http_request(self, url, headers=None, data=None):
         """Perform HTTP request.
 
         Args:
           url: Request URL.
           headers: Optional custom headers to override defaults.
           data: Request data.
-          allow_compression: Allow GZipped communication.
 
         Returns:
           Tuple (`response`, `read`), where response is an `urllib3`
@@ -1932,7 +1931,7 @@ class AbstractHttpGitClient(GitClient):
         if self.dumb is not True:
             tail += "?service=%s" % service.decode("ascii")
         url = urljoin(base_url, tail)
-        resp, read = self._http_request(url, headers, allow_compression=True)
+        resp, read = self._http_request(url, headers)
 
         if resp.redirect_location:
             # Something changed (redirect!), so let's update the base URL
@@ -2196,15 +2195,11 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             path = path.decode("utf-8")
         return urljoin(self._base_url, path).rstrip("/") + "/"
 
-    def _http_request(self, url, headers=None, data=None, allow_compression=False):
+    def _http_request(self, url, headers=None, data=None):
         req_headers = self.pool_manager.headers.copy()
         if headers is not None:
             req_headers.update(headers)
         req_headers["Pragma"] = "no-cache"
-        if allow_compression:
-            req_headers["Accept-Encoding"] = "gzip"
-        else:
-            req_headers["Accept-Encoding"] = "identity"
 
         if data is None:
             resp = self.pool_manager.request(
@@ -2234,9 +2229,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             resp.redirect_location = resp.get_redirect_location()
         else:
             resp.redirect_location = resp_url if resp_url != url else ""
-        # TODO(jelmer): Remove BytesIO() call that caches entire response in
-        # memory. See https://github.com/jelmer/dulwich/issues/966
-        return resp, BytesIO(resp.data).read
+        return resp, resp.read
 
 
 HttpGitClient = Urllib3HttpGitClient

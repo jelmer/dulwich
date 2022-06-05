@@ -43,7 +43,6 @@ from io import BytesIO, BufferedReader
 import logging
 import os
 import select
-import shlex
 import socket
 import subprocess
 import sys
@@ -1613,6 +1612,7 @@ class SubprocessSSHVendor(SSHVendor):
             )
 
         if ssh_command:
+            import shlex
             args = shlex.split(ssh_command) + ["-x"]
         else:
             args = ["ssh", "-x"]
@@ -1654,6 +1654,7 @@ class PLinkSSHVendor(SSHVendor):
     ):
 
         if ssh_command:
+            import shlex
             args = shlex.split(ssh_command) + ["-ssh"]
         elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]

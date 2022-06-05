@@ -56,7 +56,6 @@ from urllib.parse import (
     urlunsplit,
     urlunparse,
 )
-from urllib.request import url2pathname
 
 
 import dulwich
@@ -115,6 +114,10 @@ from dulwich.refs import (
     _import_remote_refs,
 )
 from dulwich.repo import Repo
+
+
+# url2pathname is lazily imported
+url2pathname = None
 
 
 logger = logging.getLogger(__name__)
@@ -2237,8 +2240,7 @@ HttpGitClient = Urllib3HttpGitClient
 
 
 def _win32_url_to_path(parsed) -> str:
-    """
-    Convert a file: URL to a path.
+    """Convert a file: URL to a path.
 
     https://datatracker.ietf.org/doc/html/rfc8089
     """
@@ -2260,6 +2262,9 @@ def _win32_url_to_path(parsed) -> str:
     else:
         raise NotImplementedError("Non-local file URLs are not supported")
 
+    global url2pathname
+    if url2pathname is None:
+        from urllib.request import url2pathname
     return url2pathname(netloc + path)
 
 

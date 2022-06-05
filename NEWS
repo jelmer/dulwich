@@ -1,5 +1,8 @@
 0.20.43	UNRELEASED
 
+ * Lazily import url2pathname.
+   (Jelmer Vernooĳ)
+
  * Drop caching of full HTTP response. Attempt #2.
    (jelmer Vernooĳ, Antoine Lambert, #966)
 

@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.20.42
+Version: 0.20.43
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij

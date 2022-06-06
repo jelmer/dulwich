@@ -1,8 +1,9 @@
-dulwich (0.20.43-1) UNRELEASED; urgency=low
+dulwich (0.20.43-1) unstable; urgency=low
 
   * New upstream release.
+   + Drops unnecessary imports. Closes: #1012373
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 07 Jun 2022 00:25:54 -0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 07 Jun 2022 00:26:44 +0100
 
 dulwich (0.20.42-1) unstable; urgency=low
 

@@ -1,3 +1,11 @@
+0.20.43	2022-06-07
+
+ * Lazily import url2pathname.
+   (Jelmer Vernooĳ)
+
+ * Drop caching of full HTTP response. Attempt #2.
+   (jelmer Vernooĳ, Antoine Lambert, #966)
+
 0.20.42	2022-05-24
 
  * Drop ``RefsContainer.watch`` that was always flaky.

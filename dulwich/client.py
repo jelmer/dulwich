@@ -2264,8 +2264,8 @@ def _win32_url_to_path(parsed) -> str:
 
     global url2pathname
     if url2pathname is None:
-        from urllib.request import url2pathname
-    return url2pathname(netloc + path)
+        from urllib.request import url2pathname  # type: ignore
+    return url2pathname(netloc + path)  # type: ignore
 
 
 def get_transport_and_path_from_url(url, config=None, **kwargs):

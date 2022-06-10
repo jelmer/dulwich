@@ -50,7 +50,9 @@ from dulwich.repo import (
     NoIndexPresent,
     Repo,
 )
-from dulwich import server
+from dulwich.server import (
+    DictBackend,
+)
 from dulwich.tests import (
     TestCase,
 )
@@ -2906,3 +2908,10 @@ class ServerTests(PorcelainTestCase):
 
         with self._serving() as url:
             porcelain.pull(self.repo, url, "master")
+
+    def test_push(self):
+        c1, = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/heads/master"] = c1.id
+
+        with self._serving() as url:
+            porcelain.push(self.repo, url, "master")

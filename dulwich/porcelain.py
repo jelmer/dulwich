@@ -1141,7 +1141,7 @@ def pull(
         for (lh, rh, force_ref) in selected_refs:
             if not force_ref and rh in r.refs:
                 try:
-                    check_diverged(r, r.refs.get(rh), fetch_result.refs[lh])
+                    check_diverged(r, r.refs.follow(rh)[1], fetch_result.refs[lh])
                 except DivergedBranches:
                     if fast_forward:
                         raise

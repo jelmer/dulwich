@@ -20,6 +20,7 @@
 
 """Tests for dulwich.porcelain."""
 
+import contextlib
 from io import BytesIO, StringIO
 import os
 import platform
@@ -30,6 +31,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 from unittest import skipIf
 
@@ -48,6 +50,9 @@ from dulwich.repo import (
     NoIndexPresent,
     Repo,
 )
+from dulwich.server import (
+    DictBackend,
+)
 from dulwich.tests import (
     TestCase,
 )
@@ -55,6 +60,10 @@ from dulwich.tests.utils import (
     build_commit_graph,
     make_commit,
     make_object,
+)
+from dulwich.web import (
+    make_server,
+    make_wsgi_chain,
 )
 
 
@@ -2867,3 +2876,42 @@ class FindUniqueAbbrevTests(PorcelainTestCase):
         self.assertEqual(
             c1.id.decode('ascii')[:7],
             porcelain.find_unique_abbrev(self.repo.object_store, c1.id))
+
+
+class ServerTests(PorcelainTestCase):
+    @contextlib.contextmanager
+    def _serving(self):
+        with make_server('localhost', 0, self.app) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                yield f"http://localhost:{server.server_port}"
+
+            finally:
+                server.shutdown()
+                thread.join(10)
+
+    def setUp(self):
+        super().setUp()
+
+        self.served_repo_path = os.path.join(self.test_dir, "served_repo.git")
+        self.served_repo = Repo.init_bare(self.served_repo_path, mkdir=True)
+        self.addCleanup(self.served_repo.close)
+
+        backend = DictBackend({"/": self.served_repo})
+        self.app = make_wsgi_chain(backend)
+
+    def test_pull(self):
+        c1, = build_commit_graph(self.served_repo.object_store, [[1]])
+        self.served_repo.refs[b"refs/heads/master"] = c1.id
+
+        with self._serving() as url:
+            porcelain.pull(self.repo, url, "master")
+
+    def test_push(self):
+        c1, = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/heads/master"] = c1.id
+
+        with self._serving() as url:
+            porcelain.push(self.repo, url, "master")

@@ -1977,9 +1977,8 @@ class AbstractHttpGitClient(GitClient):
         headers = {
             "Content-Type": "application/x-%s-request" % service,
             "Accept": result_content_type,
+            "Content-Length": str(len(data)),
         }
-        if isinstance(data, bytes):
-            headers["Content-Length"] = str(len(data))
         resp, read = self._http_request(url, headers, data)
         if resp.content_type != result_content_type:
             raise GitProtocolError(
@@ -2041,7 +2040,7 @@ class AbstractHttpGitClient(GitClient):
                 yield from PackChunkGenerator(pack_data_count, pack_data)
 
         resp, read = self._smart_request(
-            "git-receive-pack", url, data=body_generator()
+            "git-receive-pack", url, data=b"".join(body_generator())
         )
         try:
             resp_proto = Protocol(read, None)

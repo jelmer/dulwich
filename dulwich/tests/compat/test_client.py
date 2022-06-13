@@ -602,23 +602,9 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         try:
             nbytes = int(length)
         except (TypeError, ValueError):
-            nbytes = -1
-        if self.command.lower() == "post":
-            if nbytes > 0:
-                data = self.rfile.read(nbytes)
-            elif self.headers.get('transfer-encoding') == 'chunked':
-                chunks = []
-                while True:
-                    line = self.rfile.readline()
-                    length = int(line.rstrip(), 16)
-                    chunk = self.rfile.read(length + 2)
-                    chunks.append(chunk[:-2])
-                    if length == 0:
-                        break
-                data = b''.join(chunks)
-                env["CONTENT_LENGTH"] = str(len(data))
-            else:
-                raise AssertionError
+            nbytes = 0
+        if self.command.lower() == "post" and nbytes > 0:
+            data = self.rfile.read(nbytes)
         else:
             data = None
             env["CONTENT_LENGTH"] = "0"

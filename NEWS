@@ -1,5 +1,7 @@
 0.20.44	UNRELEASED
 
+ * Fix reading of chunks in server. (Jelmer Vernooĳ, #977)
+
 0.20.43	2022-06-07
 
  * Lazily import url2pathname.

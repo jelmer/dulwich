@@ -20,6 +20,14 @@
 
 """Tests for Dulwich."""
 
+__all__ = [
+    'SkipTest',
+    'TestCase',
+    'BlackboxTestCase',
+    'skipIf',
+    'expectedFailure',
+]
+
 import doctest
 import os
 import shutil

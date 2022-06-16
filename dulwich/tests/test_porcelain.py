@@ -33,7 +33,7 @@ import tarfile
 import tempfile
 import threading
 import time
-from unittest import skipIf, expectedFailure
+from unittest import skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
@@ -2909,8 +2909,6 @@ class ServerTests(PorcelainTestCase):
         with self._serving() as url:
             porcelain.pull(self.repo, url, "master")
 
-    # TODO: See https://github.com/jelmer/dulwich/issues/977
-    @expectedFailure
     def test_push(self):
         c1, = build_commit_graph(self.repo.object_store, [[1]])
         self.repo.refs[b"refs/heads/master"] = c1.id

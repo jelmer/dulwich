@@ -2181,7 +2181,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         if username is not None:
             # No escaping needed: ":" is not allowed in username:
             # https://tools.ietf.org/html/rfc2617#section-2
-            credentials = "%s:%s" % (username, password)
+            credentials = f"{username}:{password or ''}"
             import urllib3.util
 
             basic_auth = urllib3.util.make_headers(basic_auth=credentials)

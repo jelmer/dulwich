@@ -1021,6 +1021,19 @@ class HttpGitClientTests(TestCase):
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
         self.assertEqual(basic_auth, expected_basic_auth)
 
+    def test_init_username_set_no_password(self):
+        url = "https://github.com/jelmer/dulwich"
+
+        c = HttpGitClient(url, config=None, username="user")
+        self.assertEqual("user", c._username)
+        self.assertIs(c._password, None)
+
+        basic_auth = c.pool_manager.headers["authorization"]
+        auth_string = b"user:"
+        b64_credentials = base64.b64encode(auth_string)
+        expected_basic_auth = f"Basic {b64_credentials.decode('ascii')}"
+        self.assertEqual(basic_auth, expected_basic_auth)
+
     def test_init_no_username_passwd(self):
         url = "https://github.com/jelmer/dulwich"
 
@@ -1028,6 +1041,20 @@ class HttpGitClientTests(TestCase):
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
         self.assertNotIn("authorization", c.pool_manager.headers)
+
+    def test_from_parsedurl_username_only(self):
+        username = "user"
+        url = f"https://{username}@github.com/jelmer/dulwich"
+
+        c = HttpGitClient.from_parsedurl(urlparse(url))
+        self.assertEqual(c._username, username)
+        self.assertEqual(c._password, None)
+
+        basic_auth = c.pool_manager.headers["authorization"]
+        auth_string = username.encode('ascii') + b":"
+        b64_credentials = base64.b64encode(auth_string)
+        expected_basic_auth = f"Basic {b64_credentials.decode('ascii')}"
+        self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_from_parsedurl_on_url_with_quoted_credentials(self):
         original_username = "john|the|first"

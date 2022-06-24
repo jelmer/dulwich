@@ -337,7 +337,7 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
 
         if len(section) > 1:
             try:
-                return self._values[section][name]
+                return self._values[section].get_all(name)
             except KeyError:
                 pass
 
@@ -708,10 +708,27 @@ class StackedConfig(Config):
                 pass
         raise KeyError(name)
 
+    def get_multivar(self, section, name):
+        if not isinstance(section, tuple):
+            section = (section,)
+        for backend in self.backends:
+            try:
+                yield from backend.get_multivar(section, name)
+            except KeyError:
+                pass
+
     def set(self, section, name, value):
         if self.writable is None:
             raise NotImplementedError(self.set)
         return self.writable.set(section, name, value)
+
+    def sections(self):
+        seen = set()
+        for backend in self.backends:
+            for section in backend.sections():
+                if section not in seen:
+                    seen.add(section)
+                    yield section
 
 
 def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]:

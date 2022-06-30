@@ -2285,6 +2285,7 @@ def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, s
             except KeyError:
                 pass
         for needle in needles:
+            assert isinstance(needle, bytes)
             yield needle.decode('utf-8'), replacement.decode('utf-8')
 
 

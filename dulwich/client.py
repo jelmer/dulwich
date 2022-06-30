@@ -46,7 +46,7 @@ import select
 import socket
 import subprocess
 import sys
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, IO, Iterable
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, IO
 
 from urllib.parse import (
     quote as urlquote,

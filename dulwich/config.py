@@ -199,8 +199,6 @@ class Config(object):
             value = self.get(section, name)
         except KeyError:
             return default
-        if isinstance(value, bool):
-            return value
         if value.lower() == b"true":
             return True
         elif value.lower() == b"false":
@@ -401,7 +399,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
         return self._values.keys()
 
 
-def _format_string(value):
+def _format_string(value: bytes) -> bytes:
     if (
         value.startswith(b" ")
         or value.startswith(b"\t")
@@ -618,12 +616,7 @@ class ConfigFile(ConfigDict):
             else:
                 f.write(b"[" + section_name + b' "' + subsection_name + b'"]\n')
             for key, value in values.items():
-                if value is True:
-                    value = b"true"
-                elif value is False:
-                    value = b"false"
-                else:
-                    value = _format_string(value)
+                value = _format_string(value)
                 f.write(b"\t" + key + b" = " + value + b"\n")
 
 

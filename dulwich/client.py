@@ -59,7 +59,7 @@ from urllib.parse import (
 
 
 import dulwich
-from dulwich.config import get_xdg_config_home_path, Config
+from dulwich.config import get_xdg_config_home_path, Config, apply_instead_of
 from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
@@ -2266,40 +2266,6 @@ def _win32_url_to_path(parsed) -> str:
     if url2pathname is None:
         from urllib.request import url2pathname  # type: ignore
     return url2pathname(netloc + path)  # type: ignore
-
-
-def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:
-    """Iterate over insteadOf / pushInsteadOf values.
-    """
-    for section in config.sections():
-        if section[0] != b'url':
-            continue
-        replacement = section[1]
-        try:
-            needles = list(config.get_multivar(section, "insteadOf"))
-        except KeyError:
-            needles = []
-        if push:
-            try:
-                needles += list(config.get_multivar(section, "pushInsteadOf"))
-            except KeyError:
-                pass
-        for needle in needles:
-            yield needle.decode('utf-8'), replacement.decode('utf-8')
-
-
-def apply_instead_of(config: Config, orig_url: str, push: bool = False) -> str:
-    """Apply insteadOf / pushInsteadOf to a URL.
-    """
-    longest_needle = ""
-    updated_url = orig_url
-    for needle, replacement in iter_instead_of(config, push):
-        if not orig_url.startswith(needle):
-            continue
-        if len(longest_needle) < len(needle):
-            longest_needle = needle
-            updated_url = replacement + orig_url[len(needle):]
-    return updated_url
 
 
 def get_transport_and_path_from_url(

@@ -772,3 +772,38 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
             sm_path = config.get(section, b"path")
             sm_url = config.get(section, b"url")
             yield (sm_path, sm_url, section_name)
+
+
+def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:
+    """Iterate over insteadOf / pushInsteadOf values.
+    """
+    for section in config.sections():
+        if section[0] != b'url':
+            continue
+        replacement = section[1]
+        try:
+            needles = list(config.get_multivar(section, "insteadOf"))
+        except KeyError:
+            needles = []
+        if push:
+            try:
+                needles += list(config.get_multivar(section, "pushInsteadOf"))
+            except KeyError:
+                pass
+        for needle in needles:
+            assert isinstance(needle, bytes)
+            yield needle.decode('utf-8'), replacement.decode('utf-8')
+
+
+def apply_instead_of(config: Config, orig_url: str, push: bool = False) -> str:
+    """Apply insteadOf / pushInsteadOf to a URL.
+    """
+    longest_needle = ""
+    updated_url = orig_url
+    for needle, replacement in iter_instead_of(config, push):
+        if not orig_url.startswith(needle):
+            continue
+        if len(longest_needle) < len(needle):
+            longest_needle = needle
+            updated_url = replacement + orig_url[len(needle):]
+    return updated_url

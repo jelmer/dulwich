@@ -138,9 +138,10 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
         return self[key]
 
 
-BytesLike = Union[bytes, str]
-Key = Tuple[bytes, ...]
-KeyLike = Union[bytes, str, Tuple[BytesLike, ...]]
+Name = bytes
+NameLike = Union[bytes, str]
+Section = Tuple[bytes, ...]
+SectionLike = Union[bytes, str, Tuple[Union[bytes, str], ...]]
 Value = bytes
 ValueLike = Union[bytes, str]
 
@@ -148,7 +149,7 @@ ValueLike = Union[bytes, str]
 class Config(object):
     """A Git configuration."""
 
-    def get(self, section: KeyLike, name: BytesLike) -> Value:
+    def get(self, section: SectionLike, name: NameLike) -> Value:
         """Retrieve the contents of a configuration setting.
 
         Args:
@@ -161,7 +162,7 @@ class Config(object):
         """
         raise NotImplementedError(self.get)
 
-    def get_multivar(self, section: KeyLike, name: BytesLike) -> Iterator[Value]:
+    def get_multivar(self, section: SectionLike, name: NameLike) -> Iterator[Value]:
         """Retrieve the contents of a multivar configuration setting.
 
         Args:
@@ -175,11 +176,16 @@ class Config(object):
         raise NotImplementedError(self.get_multivar)
 
     @overload
-    def get_boolean(self, section: KeyLike, name: BytesLike, default: bool) -> bool: ...
-    @overload
-    def get_boolean(self, section: KeyLike, name: BytesLike) -> Optional[bool]: ...
+    def get_boolean(self, section: SectionLike, name: NameLike, default: bool) -> bool:
+        ...
 
-    def get_boolean(self, section: KeyLike, name: BytesLike, default: Optional[bool] = None) -> Optional[bool]:
+    @overload
+    def get_boolean(self, section: SectionLike, name: NameLike) -> Optional[bool]:
+        ...
+
+    def get_boolean(
+        self, section: SectionLike, name: NameLike, default: Optional[bool] = None
+    ) -> Optional[bool]:
         """Retrieve a configuration setting as boolean.
 
         Args:
@@ -203,8 +209,8 @@ class Config(object):
 
     def set(
         self,
-        section: KeyLike,
-        name: BytesLike,
+        section: SectionLike,
+        name: NameLike,
         value: Union[ValueLike, bool]
     ) -> None:
         """Set a configuration value.
@@ -217,7 +223,7 @@ class Config(object):
         """
         raise NotImplementedError(self.set)
 
-    def items(self, section: KeyLike) -> Iterator[Tuple[bytes, Value]]:
+    def items(self, section: SectionLike) -> Iterator[Tuple[Name, Value]]:
         """Iterate over the configuration pairs for a specific section.
 
         Args:
@@ -227,7 +233,7 @@ class Config(object):
         """
         raise NotImplementedError(self.items)
 
-    def iteritems(self, section: KeyLike) -> Iterator[Tuple[bytes, Value]]:
+    def iteritems(self, section: SectionLike) -> Iterator[Tuple[Name, Value]]:
         """Iterate over the configuration pairs for a specific section.
 
         Args:
@@ -242,7 +248,7 @@ class Config(object):
         )
         return self.items(section)
 
-    def itersections(self) -> Iterator[Key]:
+    def itersections(self) -> Iterator[Section]:
         warnings.warn(
             "Use %s.items instead." % type(self).__name__,
             DeprecationWarning,
@@ -250,14 +256,14 @@ class Config(object):
         )
         return self.sections()
 
-    def sections(self) -> Iterator[Key]:
+    def sections(self) -> Iterator[Section]:
         """Iterate over the sections.
 
         Returns: Iterator over section tuples
         """
         raise NotImplementedError(self.sections)
 
-    def has_section(self, name: Key) -> bool:
+    def has_section(self, name: Section) -> bool:
         """Check if a specified section exists.
 
         Args:
@@ -268,13 +274,13 @@ class Config(object):
         return name in self.sections()
 
 
-class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
+class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
     """Git configuration stored in a dictionary."""
 
     def __init__(
         self,
         values: Union[
-            MutableMapping[Key, MutableMapping[bytes, Value]], None
+            MutableMapping[Section, MutableMapping[Name, Value]], None
         ] = None,
         encoding: Union[str, None] = None
     ) -> None:
@@ -290,20 +296,20 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, self.__class__) and other._values == self._values
 
-    def __getitem__(self, key: Key) -> MutableMapping[bytes, Value]:
+    def __getitem__(self, key: Section) -> MutableMapping[Name, Value]:
         return self._values.__getitem__(key)
 
     def __setitem__(
         self,
-        key: Key,
-        value: MutableMapping[bytes, Value]
+        key: Section,
+        value: MutableMapping[Name, Value]
     ) -> None:
         return self._values.__setitem__(key, value)
 
-    def __delitem__(self, key: Key) -> None:
+    def __delitem__(self, key: Section) -> None:
         return self._values.__delitem__(key)
 
-    def __iter__(self) -> Iterator[Key]:
+    def __iter__(self) -> Iterator[Section]:
         return self._values.__iter__()
 
     def __len__(self) -> int:
@@ -319,9 +325,9 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
 
     def _check_section_and_name(
         self,
-        section: KeyLike,
-        name: BytesLike
-    ) -> Tuple[Key, bytes]:
+        section: SectionLike,
+        name: NameLike
+    ) -> Tuple[Section, Name]:
         if not isinstance(section, tuple):
             section = (section,)
 
@@ -341,8 +347,8 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
 
     def get_multivar(
         self,
-        section: KeyLike,
-        name: BytesLike
+        section: SectionLike,
+        name: NameLike
     ) -> Iterator[Value]:
         section, name = self._check_section_and_name(section, name)
 
@@ -356,8 +362,8 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
 
     def get(  # type: ignore[override]
         self,
-        section: KeyLike,
-        name: BytesLike,
+        section: SectionLike,
+        name: NameLike,
     ) -> Value:
         section, name = self._check_section_and_name(section, name)
 
@@ -371,8 +377,8 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
 
     def set(
         self,
-        section: KeyLike,
-        name: BytesLike,
+        section: SectionLike,
+        name: NameLike,
         value: Union[ValueLike, bool],
     ) -> None:
         section, name = self._check_section_and_name(section, name)
@@ -387,11 +393,11 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
 
     def items(  # type: ignore[override]
         self,
-        section: Key
-    ) -> Iterator[Tuple[bytes, Value]]:
+        section: Section
+    ) -> Iterator[Tuple[Name, Value]]:
         return self._values.get(section).items()
 
-    def sections(self) -> Iterator[Key]:
+    def sections(self) -> Iterator[Section]:
         return self._values.keys()
 
 
@@ -509,7 +515,7 @@ class ConfigFile(ConfigDict):
     def __init__(
         self,
         values: Union[
-            MutableMapping[Key, MutableMapping[bytes, Value]], None
+            MutableMapping[Section, MutableMapping[Name, Value]], None
         ] = None,
         encoding: Union[str, None] = None
     ) -> None:
@@ -520,7 +526,7 @@ class ConfigFile(ConfigDict):
     def from_file(cls, f: BinaryIO) -> "ConfigFile":  # noqa: C901
         """Read configuration from a file-like object."""
         ret = cls()
-        section = None  # type: Optional[Tuple[bytes, ...]]
+        section: Optional[Section] = None
         setting = None
         continuation = None
         for lineno, line in enumerate(f.readlines()):
@@ -720,7 +726,7 @@ class StackedConfig(Config):
             backends.append(cf)
         return backends
 
-    def get(self, section: KeyLike, name: BytesLike) -> Value:
+    def get(self, section: SectionLike, name: NameLike) -> Value:
         if not isinstance(section, tuple):
             section = (section,)
         for backend in self.backends:
@@ -730,7 +736,7 @@ class StackedConfig(Config):
                 pass
         raise KeyError(name)
 
-    def get_multivar(self, section: KeyLike, name: BytesLike) -> Iterator[Value]:
+    def get_multivar(self, section: SectionLike, name: NameLike) -> Iterator[Value]:
         if not isinstance(section, tuple):
             section = (section,)
         for backend in self.backends:
@@ -741,15 +747,15 @@ class StackedConfig(Config):
 
     def set(
         self,
-        section: KeyLike,
-        name: BytesLike,
+        section: SectionLike,
+        name: NameLike,
         value: Union[ValueLike, bool]
     ) -> None:
         if self.writable is None:
             raise NotImplementedError(self.set)
         return self.writable.set(section, name, value)
 
-    def sections(self) -> Iterator[Key]:
+    def sections(self) -> Iterator[Section]:
         seen = set()
         for backend in self.backends:
             for section in backend.sections():

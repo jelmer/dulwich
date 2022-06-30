@@ -286,7 +286,9 @@ def default_user_ignore_filter_path(config: Config) -> str:
       Path to a global ignore file
     """
     try:
-        return config.get((b"core",), b"excludesFile")
+        value = config.get((b"core",), b"excludesFile")
+        assert isinstance(value, bytes)
+        return value.decode(encoding="utf-8")
     except KeyError:
         pass
 

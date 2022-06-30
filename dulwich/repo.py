@@ -195,12 +195,16 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
             email = email_uc.encode("utf-8")
     if user is None:
         try:
-            user = config.get(("user",), "name")
+            config_value = config.get(("user",), "name")
+            assert isinstance(config_value, bytes)
+            user = config_value
         except KeyError:
             user = None
     if email is None:
         try:
-            email = config.get(("user",), "email")
+            config_value = config.get(("user",), "email")
+            assert isinstance(config_value, bytes)
+            email = config_value
         except KeyError:
             email = None
     default_user, default_email = _get_default_identity()

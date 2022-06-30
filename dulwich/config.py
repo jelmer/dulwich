@@ -34,11 +34,13 @@ from typing import (
     BinaryIO,
     Iterable,
     Iterator,
+    List,
     KeysView,
     MutableMapping,
     Optional,
     Tuple,
     Union,
+    overload,
 )
 
 from dulwich.file import GitFile
@@ -137,14 +139,21 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
         return self[key]
 
 
+BytesLike = Union[bytes, str]
+Key = Tuple[bytes, ...]
+KeyLike = Union[bytes, str, Tuple[BytesLike, ...]]
+Value = Union[bytes, bool]
+ValueLike = Union[bytes, str, bool]
+
+
 class Config(object):
     """A Git configuration."""
 
-    def get(self, section, name):
+    def get(self, section: KeyLike, name: BytesLike) -> Value:
         """Retrieve the contents of a configuration setting.
 
         Args:
-          section: Tuple with section name and optional subsection namee
+          section: Tuple with section name and optional subsection name
           name: Variable name
         Returns:
           Contents of the setting
@@ -153,7 +162,7 @@ class Config(object):
         """
         raise NotImplementedError(self.get)
 
-    def get_multivar(self, section, name):
+    def get_multivar(self, section: KeyLike, name: BytesLike) -> Iterator[Value]:
         """Retrieve the contents of a multivar configuration setting.
 
         Args:
@@ -166,7 +175,12 @@ class Config(object):
         """
         raise NotImplementedError(self.get_multivar)
 
-    def get_boolean(self, section, name, default=None):
+    @overload
+    def get_boolean(self, section: KeyLike, name: BytesLike, default: bool) -> bool: ...
+    @overload
+    def get_boolean(self, section: KeyLike, name: BytesLike) -> Optional[bool]: ...
+
+    def get_boolean(self, section: KeyLike, name: BytesLike, default: Optional[bool] = None) -> Optional[bool]:
         """Retrieve a configuration setting as boolean.
 
         Args:
@@ -175,20 +189,20 @@ class Config(object):
             subsection.
         Returns:
           Contents of the setting
-        Raises:
-          KeyError: if the value is not set
         """
         try:
             value = self.get(section, name)
         except KeyError:
             return default
+        if isinstance(value, bool):
+            return value
         if value.lower() == b"true":
             return True
         elif value.lower() == b"false":
             return False
         raise ValueError("not a valid boolean string: %r" % value)
 
-    def set(self, section, name, value):
+    def set(self, section: KeyLike, name: BytesLike, value: ValueLike) -> None:
         """Set a configuration value.
 
         Args:
@@ -199,7 +213,7 @@ class Config(object):
         """
         raise NotImplementedError(self.set)
 
-    def items(self, section):
+    def items(self, section: KeyLike) -> Iterator[Tuple[bytes, Value]]:
         """Iterate over the configuration pairs for a specific section.
 
         Args:
@@ -209,7 +223,7 @@ class Config(object):
         """
         raise NotImplementedError(self.items)
 
-    def iteritems(self, section):
+    def iteritems(self, section: KeyLike) -> Iterator[Tuple[bytes, Value]]:
         """Iterate over the configuration pairs for a specific section.
 
         Args:
@@ -224,7 +238,7 @@ class Config(object):
         )
         return self.items(section)
 
-    def itersections(self):
+    def itersections(self) -> Iterator[Key]:
         warnings.warn(
             "Use %s.items instead." % type(self).__name__,
             DeprecationWarning,
@@ -232,14 +246,14 @@ class Config(object):
         )
         return self.sections()
 
-    def sections(self):
+    def sections(self) -> Iterator[Key]:
         """Iterate over the sections.
 
         Returns: Iterator over section tuples
         """
         raise NotImplementedError(self.sections)
 
-    def has_section(self, name: Tuple[bytes, ...]) -> bool:
+    def has_section(self, name: Key) -> bool:
         """Check if a specified section exists.
 
         Args:
@@ -248,13 +262,6 @@ class Config(object):
           boolean indicating whether the section exists
         """
         return name in self.sections()
-
-
-BytesLike = Union[bytes, str]
-Key = Tuple[bytes, ...]
-KeyLike = Union[bytes, str, Tuple[BytesLike, ...]]
-Value = Union[bytes, bool]
-ValueLike = Union[bytes, str, bool]
 
 
 class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
@@ -299,7 +306,7 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
         return self._values.__len__()
 
     @classmethod
-    def _parse_setting(cls, name):
+    def _parse_setting(cls, name: str):
         parts = name.split(".")
         if len(parts) == 3:
             return (parts[0], parts[1], parts[2])
@@ -347,7 +354,7 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
         self,
         section: KeyLike,
         name: BytesLike,
-    ) -> Optional[Value]:
+    ) -> Value:
         section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
@@ -374,7 +381,7 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
     def items(  # type: ignore[override]
         self,
         section: Key
-    ) -> Iterator[Value]:
+    ) -> Iterator[Tuple[bytes, Value]]:
         return self._values.get(section).items()
 
     def sections(self) -> Iterator[Key]:
@@ -405,7 +412,7 @@ _COMMENT_CHARS = [ord(b"#"), ord(b";")]
 _WHITESPACE_CHARS = [ord(b"\t"), ord(b" ")]
 
 
-def _parse_string(value):
+def _parse_string(value: bytes) -> bytes:
     value = bytearray(value.strip())
     ret = bytearray()
     whitespace = bytearray()
@@ -450,7 +457,7 @@ def _parse_string(value):
     return bytes(ret)
 
 
-def _escape_value(value):
+def _escape_value(value: bytes) -> bytes:
     """Escape a value."""
     value = value.replace(b"\\", b"\\\\")
     value = value.replace(b"\n", b"\\n")
@@ -459,7 +466,7 @@ def _escape_value(value):
     return value
 
 
-def _check_variable_name(name):
+def _check_variable_name(name: bytes) -> bool:
     for i in range(len(name)):
         c = name[i : i + 1]
         if not c.isalnum() and c != b"-":
@@ -467,7 +474,7 @@ def _check_variable_name(name):
     return True
 
 
-def _check_section_name(name):
+def _check_section_name(name: bytes) -> bool:
     for i in range(len(name)):
         c = name[i : i + 1]
         if not c.isalnum() and c not in (b"-", b"."):
@@ -475,7 +482,7 @@ def _check_section_name(name):
     return True
 
 
-def _strip_comments(line):
+def _strip_comments(line: bytes) -> bytes:
     comment_bytes = {ord(b"#"), ord(b";")}
     quote = ord(b'"')
     string_open = False
@@ -492,9 +499,15 @@ def _strip_comments(line):
 class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig."""
 
-    def __init__(self, values=None, encoding=None):
+    def __init__(
+        self,
+        values: Union[
+            MutableMapping[Key, MutableMapping[bytes, Value]], None
+        ] = None,
+        encoding: Union[str, None] = None
+    ) -> None:
         super(ConfigFile, self).__init__(values=values, encoding=encoding)
-        self.path = None
+        self.path: Optional[str] = None
 
     @classmethod  # noqa: C901
     def from_file(cls, f: BinaryIO) -> "ConfigFile":  # noqa: C901
@@ -565,14 +578,14 @@ class ConfigFile(ConfigDict):
         return ret
 
     @classmethod
-    def from_path(cls, path) -> "ConfigFile":
+    def from_path(cls, path: str) -> "ConfigFile":
         """Read configuration from a file on disk."""
         with GitFile(path, "rb") as f:
             ret = cls.from_file(f)
             ret.path = path
             return ret
 
-    def write_to_path(self, path=None) -> None:
+    def write_to_path(self, path: Optional[str] = None) -> None:
         """Write configuration to a file on disk."""
         if path is None:
             path = self.path
@@ -663,19 +676,21 @@ def get_win_system_paths():
 class StackedConfig(Config):
     """Configuration which reads from multiple config files.."""
 
-    def __init__(self, backends, writable=None):
+    def __init__(
+        self, backends: List[ConfigFile], writable: Optional[ConfigFile] = None
+    ):
         self.backends = backends
         self.writable = writable
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<%s for %r>" % (self.__class__.__name__, self.backends)
 
     @classmethod
-    def default(cls):
+    def default(cls) -> "StackedConfig":
         return cls(cls.default_backends())
 
     @classmethod
-    def default_backends(cls):
+    def default_backends(cls) -> List[ConfigFile]:
         """Retrieve the default configuration.
 
         See git-config(1) for details on the files searched.
@@ -698,7 +713,7 @@ class StackedConfig(Config):
             backends.append(cf)
         return backends
 
-    def get(self, section, name):
+    def get(self, section: KeyLike, name: BytesLike) -> Value:
         if not isinstance(section, tuple):
             section = (section,)
         for backend in self.backends:
@@ -708,7 +723,7 @@ class StackedConfig(Config):
                 pass
         raise KeyError(name)
 
-    def get_multivar(self, section, name):
+    def get_multivar(self, section: KeyLike, name: BytesLike) -> Iterator[Value]:
         if not isinstance(section, tuple):
             section = (section,)
         for backend in self.backends:
@@ -717,12 +732,12 @@ class StackedConfig(Config):
             except KeyError:
                 pass
 
-    def set(self, section, name, value):
+    def set(self, section: KeyLike, name: BytesLike, value: ValueLike) -> None:
         if self.writable is None:
             raise NotImplementedError(self.set)
         return self.writable.set(section, name, value)
 
-    def sections(self):
+    def sections(self) -> Iterator[Key]:
         seen = set()
         for backend in self.backends:
             for section in backend.sections():

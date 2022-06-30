@@ -1001,10 +1001,7 @@ def get_remote_repo(
 
     if config.has_section(section):
         remote_name = encoded_location.decode()
-        url = config.get(section, "url")
-        assert url is not None
-        assert isinstance(url, bytes)
-        encoded_location = url
+        encoded_location = config.get(section, "url")
     else:
         remote_name = None
 
@@ -1139,13 +1136,14 @@ def pull(
             path, r, progress=errstream.write, determine_wants=determine_wants
         )
         for (lh, rh, force_ref) in selected_refs:
-            try:
-                check_diverged(r, r.refs[rh], fetch_result.refs[lh])
-            except DivergedBranches:
-                if fast_forward:
-                    raise
-                else:
-                    raise NotImplementedError("merge is not yet supported")
+            if not force_ref and rh in r.refs:
+                try:
+                    check_diverged(r, r.refs.follow(rh)[1], fetch_result.refs[lh])
+                except DivergedBranches:
+                    if fast_forward:
+                        raise
+                    else:
+                        raise NotImplementedError("merge is not yet supported")
             r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
             r[b"HEAD"] = fetch_result.refs[selected_refs[0][1]]

@@ -52,7 +52,6 @@ from dulwich.client import (
     PLinkSSHVendor,
     HangupException,
     GitProtocolError,
-    apply_instead_of,
     check_wants,
     default_urllib3_manager,
     get_credentials_from_store,
@@ -1616,31 +1615,3 @@ And this line is just random noise, too.
                 ]
             ),
         )
-
-
-class ApplyInsteadOfTests(TestCase):
-    def test_none(self):
-        config = ConfigDict()
-        self.assertEqual(
-            'https://example.com/', apply_instead_of(config, 'https://example.com/'))
-
-    def test_apply(self):
-        config = ConfigDict()
-        config.set(
-            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
-        self.assertEqual(
-            'https://samba.org/',
-            apply_instead_of(config, 'https://example.com/'))
-
-    def test_apply_multiple(self):
-        config = ConfigDict()
-        config.set(
-            ('url', 'https://samba.org/'), 'insteadOf', 'https://blah.com/')
-        config.set(
-            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
-        self.assertEqual(
-            [b'https://blah.com/', b'https://example.com/'],
-            list(config.get_multivar(('url', 'https://samba.org/'), 'insteadOf')))
-        self.assertEqual(
-            'https://samba.org/',
-            apply_instead_of(config, 'https://example.com/'))

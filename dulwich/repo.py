@@ -195,16 +195,12 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
             email = email_uc.encode("utf-8")
     if user is None:
         try:
-            config_value = config.get(("user",), "name")
-            assert isinstance(config_value, bytes)
-            user = config_value
+            user = config.get(("user",), "name")
         except KeyError:
             user = None
     if email is None:
         try:
-            config_value = config.get(("user",), "email")
-            assert isinstance(config_value, bytes)
-            email = config_value
+            email = config.get(("user",), "email")
         except KeyError:
             email = None
     default_user, default_email = _get_default_identity()
@@ -370,12 +366,12 @@ class BaseRepo(object):
         cf = ConfigFile()
         cf.set("core", "repositoryformatversion", "0")
         if self._determine_file_mode():
-            cf.set("core", "filemode", True)
+            cf.set_boolean("core", "filemode", True)
         else:
-            cf.set("core", "filemode", False)
+            cf.set_boolean("core", "filemode", False)
 
-        cf.set("core", "bare", bare)
-        cf.set("core", "logallrefupdates", True)
+        cf.set_boolean("core", "bare", bare)
+        cf.set_boolean("core", "logallrefupdates", True)
         cf.write_to_file(f)
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")

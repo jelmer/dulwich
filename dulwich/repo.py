@@ -366,12 +366,12 @@ class BaseRepo(object):
         cf = ConfigFile()
         cf.set("core", "repositoryformatversion", "0")
         if self._determine_file_mode():
-            cf.set_boolean("core", "filemode", True)
+            cf.set("core", "filemode", True)
         else:
-            cf.set_boolean("core", "filemode", False)
+            cf.set("core", "filemode", False)
 
-        cf.set_boolean("core", "bare", bare)
-        cf.set_boolean("core", "logallrefupdates", True)
+        cf.set("core", "bare", bare)
+        cf.set("core", "logallrefupdates", True)
         cf.write_to_file(f)
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")

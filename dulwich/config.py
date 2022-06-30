@@ -29,13 +29,12 @@ TODO:
 import os
 import sys
 import warnings
-
 from typing import (
     BinaryIO,
     Iterable,
     Iterator,
-    List,
     KeysView,
+    List,
     MutableMapping,
     Optional,
     Tuple,
@@ -202,7 +201,12 @@ class Config(object):
             return False
         raise ValueError("not a valid boolean string: %r" % value)
 
-    def set(self, section: KeyLike, name: BytesLike, value: ValueLike) -> None:
+    def set(
+        self,
+        section: KeyLike,
+        name: BytesLike,
+        value: Union[ValueLike, bool]
+    ) -> None:
         """Set a configuration value.
 
         Args:
@@ -212,18 +216,6 @@ class Config(object):
           value: value of the setting
         """
         raise NotImplementedError(self.set)
-
-    def set_boolean(self, section: KeyLike, name: BytesLike, value: bool) -> None:
-        """Set a boolean configuration value.
-
-        Args:
-          section: Tuple with section name and optional subsection namee
-          name: Name of the configuration value, including section
-            and optional subsection
-          value: value of the setting
-        """
-        text = b"true" if value else b"false"
-        self.set(section, name, text)
 
     def items(self, section: KeyLike) -> Iterator[Tuple[bytes, Value]]:
         """Iterate over the configuration pairs for a specific section.
@@ -381,11 +373,14 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
         self,
         section: KeyLike,
         name: BytesLike,
-        value: ValueLike,
+        value: Union[ValueLike, bool],
     ) -> None:
         section, name = self._check_section_and_name(section, name)
 
-        if not isinstance(value, (bytes, bool)):
+        if isinstance(value, bool):
+            value = b"true" if value else b"false"
+
+        if not isinstance(value, bytes):
             value = value.encode(self.encoding)
 
         self._values.setdefault(section)[name] = value
@@ -744,7 +739,12 @@ class StackedConfig(Config):
             except KeyError:
                 pass
 
-    def set(self, section: KeyLike, name: BytesLike, value: ValueLike) -> None:
+    def set(
+        self,
+        section: KeyLike,
+        name: BytesLike,
+        value: Union[ValueLike, bool]
+    ) -> None:
         if self.writable is None:
             raise NotImplementedError(self.set)
         return self.writable.set(section, name, value)

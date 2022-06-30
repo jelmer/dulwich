@@ -29,13 +29,12 @@ TODO:
 import os
 import sys
 import warnings
-
 from typing import (
     BinaryIO,
     Iterable,
     Iterator,
-    List,
     KeysView,
+    List,
     MutableMapping,
     Optional,
     Tuple,
@@ -142,8 +141,8 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
 BytesLike = Union[bytes, str]
 Key = Tuple[bytes, ...]
 KeyLike = Union[bytes, str, Tuple[BytesLike, ...]]
-Value = Union[bytes, bool]
-ValueLike = Union[bytes, str, bool]
+Value = bytes
+ValueLike = Union[bytes, str]
 
 
 class Config(object):
@@ -202,7 +201,12 @@ class Config(object):
             return False
         raise ValueError("not a valid boolean string: %r" % value)
 
-    def set(self, section: KeyLike, name: BytesLike, value: ValueLike) -> None:
+    def set(
+        self,
+        section: KeyLike,
+        name: BytesLike,
+        value: Union[ValueLike, bool]
+    ) -> None:
         """Set a configuration value.
 
         Args:
@@ -369,11 +373,14 @@ class ConfigDict(Config, MutableMapping[Key, MutableMapping[bytes, Value]]):
         self,
         section: KeyLike,
         name: BytesLike,
-        value: ValueLike,
+        value: Union[ValueLike, bool],
     ) -> None:
         section, name = self._check_section_and_name(section, name)
 
-        if not isinstance(value, (bytes, bool)):
+        if isinstance(value, bool):
+            value = b"true" if value else b"false"
+
+        if not isinstance(value, bytes):
             value = value.encode(self.encoding)
 
         self._values.setdefault(section)[name] = value
@@ -732,7 +739,12 @@ class StackedConfig(Config):
             except KeyError:
                 pass
 
-    def set(self, section: KeyLike, name: BytesLike, value: ValueLike) -> None:
+    def set(
+        self,
+        section: KeyLike,
+        name: BytesLike,
+        value: Union[ValueLike, bool]
+    ) -> None:
         if self.writable is None:
             raise NotImplementedError(self.set)
         return self.writable.set(section, name, value)
@@ -759,9 +771,5 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
         section_kind, section_name = section
         if section_kind == b"submodule":
             sm_path = config.get(section, b"path")
-            assert isinstance(sm_path, bytes)
-            assert sm_path is not None
             sm_url = config.get(section, b"url")
-            assert sm_url is not None
-            assert isinstance(sm_url, bytes)
             yield (sm_path, sm_url, section_name)

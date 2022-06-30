@@ -239,6 +239,34 @@ def get_info_packs(req, backend, mat):
     return generate_objects_info_packs(get_repo(backend, mat))
 
 
+def _chunk_iter(f):
+    while True:
+        line = f.readline()
+        length = int(line.rstrip(), 16)
+        chunk = f.read(length + 2)
+        if length == 0:
+            break
+        yield chunk[:-2]
+
+
+class ChunkReader(object):
+
+    def __init__(self, f):
+        self._iter = _chunk_iter(f)
+        self._buffer = []
+
+    def read(self, n):
+        while sum(map(len, self._buffer)) < n:
+            try:
+                self._buffer.append(next(self._iter))
+            except StopIteration:
+                break
+        f = b''.join(self._buffer)
+        ret = f[:n]
+        self._buffer = [f[n:]]
+        return ret
+
+
 class _LengthLimitedFile(object):
     """Wrapper class to limit the length of reads from a file-like object.
 
@@ -276,7 +304,11 @@ def handle_service_request(req, backend, mat):
         return
     req.nocache()
     write = req.respond(HTTP_OK, "application/x-%s-result" % service)
-    proto = ReceivableProtocol(req.environ["wsgi.input"].read, write)
+    if req.environ.get('HTTP_TRANSFER_ENCODING') == 'chunked':
+        read = ChunkReader(req.environ["wsgi.input"]).read
+    else:
+        read = req.environ["wsgi.input"].read
+    proto = ReceivableProtocol(read, write)
     # TODO(jelmer): Find a way to pass in repo, rather than having handler_cls
     # reopen.
     handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=req)

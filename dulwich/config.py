@@ -142,8 +142,8 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
 BytesLike = Union[bytes, str]
 Key = Tuple[bytes, ...]
 KeyLike = Union[bytes, str, Tuple[BytesLike, ...]]
-Value = Union[bytes, bool]
-ValueLike = Union[bytes, str, bool]
+Value = bytes
+ValueLike = Union[bytes, str]
 
 
 class Config(object):
@@ -212,6 +212,18 @@ class Config(object):
           value: value of the setting
         """
         raise NotImplementedError(self.set)
+
+    def set_boolean(self, section: KeyLike, name: BytesLike, value: bool) -> None:
+        """Set a boolean configuration value.
+
+        Args:
+          section: Tuple with section name and optional subsection namee
+          name: Name of the configuration value, including section
+            and optional subsection
+          value: value of the setting
+        """
+        text = b"true" if value else b"false"
+        self.set(section, name, text)
 
     def items(self, section: KeyLike) -> Iterator[Tuple[bytes, Value]]:
         """Iterate over the configuration pairs for a specific section.
@@ -759,9 +771,5 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
         section_kind, section_name = section
         if section_kind == b"submodule":
             sm_path = config.get(section, b"path")
-            assert isinstance(sm_path, bytes)
-            assert sm_path is not None
             sm_url = config.get(section, b"url")
-            assert sm_url is not None
-            assert isinstance(sm_url, bytes)
             yield (sm_path, sm_url, section_name)

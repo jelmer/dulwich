@@ -100,7 +100,9 @@ class ShellHook(Hook):
             args = self.pre_exec_callback(*args)
 
         try:
-            ret = subprocess.call([self.filepath] + list(args), cwd=self.cwd)
+            ret = subprocess.call(
+                [os.path.relpath(self.filepath, self.cwd)] + list(args),
+                cwd=self.cwd)
             if ret != 0:
                 if self.post_exec_callback is not None:
                     self.post_exec_callback(0, *args)

@@ -511,12 +511,12 @@ class DictRefsContainer(RefsContainer):
 
     def add_if_new(
         self,
-        name,
-        ref,
+        name: bytes,
+        ref: bytes,
         committer=None,
         timestamp=None,
         timezone=None,
-        message=None,
+        message: Optional[bytes] = None,
     ):
         if name in self._refs:
             return False
@@ -883,12 +883,12 @@ class DiskRefsContainer(RefsContainer):
 
     def add_if_new(
         self,
-        name,
-        ref,
+        name: bytes,
+        ref: bytes,
         committer=None,
         timestamp=None,
         timezone=None,
-        message=None,
+        message: Optional[bytes] = None,
     ):
         """Add a new reference only if it does not already exist.
 
@@ -1137,7 +1137,11 @@ def _set_origin_head(refs, origin, origin_head):
             refs.set_symbolic_ref(origin_ref, target_ref)
 
 
-def _set_default_branch(refs, origin, origin_head, branch, ref_message):
+def _set_default_branch(
+        refs: RefsContainer, origin: bytes, origin_head: bytes, branch: bytes,
+        ref_message: Optional[bytes]) -> bytes:
+    """Set the default branch.
+    """
     origin_base = b"refs/remotes/" + origin + b"/"
     if branch:
         origin_ref = origin_base + branch
@@ -1165,6 +1169,8 @@ def _set_default_branch(refs, origin, origin_head, branch, ref_message):
             )
         except KeyError:
             pass
+    else:
+        raise ValueError('neither origin_head nor branch are provided')
     return head_ref
 
 

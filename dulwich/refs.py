@@ -1155,7 +1155,7 @@ def _set_default_branch(
             head_ref = LOCAL_TAG_PREFIX + branch
         else:
             raise ValueError(
-                "%s is not a valid branch or tag" % os.fsencode(branch)
+                "%r is not a valid branch or tag" % os.fsencode(branch)
             )
     elif origin_head:
         head_ref = origin_head

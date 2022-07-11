@@ -43,6 +43,7 @@ Currently implemented:
  * remote{_add}
  * receive-pack
  * reset
+ * submodule_list
  * rev-list
  * tag{_create,_delete,_list}
  * upload-pack
@@ -86,6 +87,7 @@ from dulwich.client import (
     get_transport_and_path,
 )
 from dulwich.config import (
+    ConfigFile,
     StackedConfig,
 )
 from dulwich.diff_tree import (
@@ -858,6 +860,51 @@ def rev_list(repo, commits, outstream=sys.stdout):
             outstream.write(entry.commit.id + b"\n")
 
 
+def _canonical_part(url: str) -> str:
+    name = url.rsplit('/', 1)[-1]
+    if name.endswith('.git'):
+        name = name[:-4]
+    return name
+
+
+def submodule_add(repo, url, path=None, name=None):
+    """Add a new submodule.
+
+    Args:
+      repo: Path to repository
+      url: URL of repository to add as submodule
+      path: Path where submodule should live
+    """
+    with open_repo_closing(repo) as r:
+        if path is None:
+            path = os.path.relpath(canonical_part(url), repo.path)
+        if name is None:
+            name = path
+
+        # TODO(jelmer): Move this logic to dulwich.submodule
+        gitmodules_path = os.path.join(repo.path, ".gitmodules")
+        try:
+            config = ConfigFile.from_path(gitmodules_path)
+        except FileNotFoundError:
+            config = ConfigFile()
+            config.path = gitmodules_path
+        config.set(("submodule", name), "url", url)
+        config.set(("submodule", name), "path", path)
+        config.write_to_path()
+
+
+def submodule_list(repo):
+    """List submodules.
+
+    Args:
+      repo: Path to repository
+    """
+    from .submodule import iter_cached_submodules
+    with open_repo_closing(repo) as r:
+        for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
+            yield path.decode(DEFAULT_ENCODING), sha.decode(DEFAULT_ENCODING)
+
+
 def tag(*args, **kwargs):
     import warnings
 
@@ -1456,7 +1503,7 @@ def branch_create(repo, name, objectish=None, force=False):
             objectish = "HEAD"
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
-        ref_message = b"branch: Created from " + objectish.encode("utf-8")
+        ref_message = b"branch: Created from " + objectish.encode(DEFAULT_ENCODING)
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
@@ -1541,7 +1588,7 @@ def fetch(
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
         if message is None:
-            message = b"fetch: from " + remote_location.encode("utf-8")
+            message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
         client, path = get_transport_and_path(
             remote_location, config=r.get_config_stack(), **kwargs
         )

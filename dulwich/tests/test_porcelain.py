@@ -1408,6 +1408,28 @@ class ResetFileTests(PorcelainTestCase):
             self.assertEqual('hello', f.read())
 
 
+class SubmoduleTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        self.assertEqual([], list(porcelain.submodule_list(self.repo)))
+
+    def test_add(self):
+        porcelain.submodule_add(self.repo, "../bar.git", "bar")
+        with open('%s/.gitmodules' % self.repo.path, 'r') as f:
+            self.assertEqual("""\
+[submodule "bar"]
+\turl = ../bar.git
+\tpath = bar
+""", f.read())
+
+
 class PushTests(PorcelainTestCase):
     def test_simple(self):
         """

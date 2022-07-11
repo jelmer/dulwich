@@ -877,12 +877,12 @@ def submodule_add(repo, url, path=None, name=None):
     """
     with open_repo_closing(repo) as r:
         if path is None:
-            path = os.path.relpath(canonical_part(url), repo.path)
+            path = os.path.relpath(_canonical_part(url), r.path)
         if name is None:
             name = path
 
         # TODO(jelmer): Move this logic to dulwich.submodule
-        gitmodules_path = os.path.join(repo.path, ".gitmodules")
+        gitmodules_path = os.path.join(r.path, ".gitmodules")
         try:
             config = ConfigFile.from_path(gitmodules_path)
         except FileNotFoundError:

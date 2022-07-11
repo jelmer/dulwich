@@ -329,7 +329,6 @@ class cmd_submodule(Command):
             sys.stdout.write(' %s %s\n' % (sha, path))
 
 
-
 class cmd_tag(Command):
     def run(self, args):
         parser = optparse.OptionParser()

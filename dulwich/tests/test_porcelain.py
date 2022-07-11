@@ -1425,8 +1425,8 @@ class SubmoduleTests(PorcelainTestCase):
         with open('%s/.gitmodules' % self.repo.path, 'r') as f:
             self.assertEqual("""\
 [submodule "bar"]
-	url = ../bar.git
-	path = bar
+\turl = ../bar.git
+\tpath = bar
 """, f.read())
 
 

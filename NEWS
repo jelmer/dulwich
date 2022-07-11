@@ -1,5 +1,8 @@
 0.20.45	UNRELEASED
 
+ * Add basic ``dulwich.porcelain.submodule_list`` and ``dulwich.porcelain.submodule_add``
+  (Jelmer Vernooĳ)
+
 0.20.44	2022-06-30
 
  * Fix reading of chunks in server. (Jelmer Vernooĳ, #977)

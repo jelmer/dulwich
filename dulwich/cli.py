@@ -321,6 +321,14 @@ class cmd_rev_list(Command):
         porcelain.rev_list(".", args)
 
 
+class cmd_submodule(Command):
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        for path, sha in porcelain.submodule_list("."):
+            sys.stdout.write(' %s %s\n' % (sha, path))
+
+
 class cmd_tag(Command):
     def run(self, args):
         parser = optparse.OptionParser()
@@ -721,6 +729,7 @@ commands = {
     "stash": cmd_stash,
     "status": cmd_status,
     "symbolic-ref": cmd_symbolic_ref,
+    "submodule": cmd_submodule,
     "tag": cmd_tag,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,

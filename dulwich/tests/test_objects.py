@@ -87,7 +87,7 @@ class BlobReadTests(TestCase):
     """Test decompression of blobs"""
 
     def get_sha_file(self, cls, base, sha):
-        dir = os.path.join(os.path.dirname(__file__), "data", base)
+        dir = os.path.join(os.path.dirname(__file__), "..", "..", "testdata", base)
         return cls.from_path(hex_to_filename(dir, sha))
 
     def get_blob(self, sha):
@@ -878,7 +878,7 @@ class TreeTests(ShaFileCheckTests):
         self.assertEqual(_SORTED_TREE_ITEMS, x.items())
 
     def _do_test_parse_tree(self, parse_tree):
-        dir = os.path.join(os.path.dirname(__file__), "data", "trees")
+        dir = os.path.join(os.path.dirname(__file__), "..", "..", "testdata", "trees")
         o = Tree.from_path(hex_to_filename(dir, tree_sha))
         self.assertEqual(
             [(b"a", 0o100644, a_sha), (b"b", 0o100644, b_sha)],

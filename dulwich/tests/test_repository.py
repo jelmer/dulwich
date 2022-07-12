@@ -409,7 +409,7 @@ class RepositoryRootTests(TestCase):
     def test_clone_no_head(self):
         temp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, temp_dir)
-        repo_dir = os.path.join(os.path.dirname(__file__), "data", "repos")
+        repo_dir = os.path.join(os.path.dirname(__file__), "..", "..", "testdata", "repos")
         dest_dir = os.path.join(temp_dir, "a.git")
         shutil.copytree(os.path.join(repo_dir, "a.git"), dest_dir, symlinks=True)
         r = Repo(dest_dir)

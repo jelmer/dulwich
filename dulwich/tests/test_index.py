@@ -86,7 +86,7 @@ def can_symlink():
 
 class IndexTestCase(TestCase):
 
-    datadir = os.path.join(os.path.dirname(__file__), "data/indexes")
+    datadir = os.path.join(os.path.dirname(__file__), "../../testdata/indexes")
 
     def get_simple_index(self, name):
         return Index(os.path.join(self.datadir, name))

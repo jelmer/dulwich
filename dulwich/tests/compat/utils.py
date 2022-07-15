@@ -43,7 +43,9 @@ from dulwich.tests import (
 _DEFAULT_GIT = "git"
 _VERSION_LEN = 4
 _REPOS_DATA_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), os.pardir, "data", "repos")
+    os.path.join(
+        os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
+        "testdata", "repos")
 )
 
 

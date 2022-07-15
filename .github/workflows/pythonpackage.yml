@@ -38,7 +38,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -U pip coverage codecov flake8 fastimport paramiko
+        pip install -U pip coverage flake8 fastimport paramiko
     - name: Install gpg on supported platforms
       run: pip install -U gpg
       if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
@@ -59,6 +59,3 @@ jobs:
     - name: Coverage test suite run
       run: |
         python -m coverage run -p -m unittest dulwich.tests.test_suite
-    - name: Upload coverage details
-      run: |
-        codecov

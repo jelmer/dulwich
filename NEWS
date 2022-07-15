@@ -1,4 +1,4 @@
-0.20.45	UNRELEASED
+0.20.45	2022-07-15
 
  * Add basic ``dulwich.porcelain.submodule_list`` and ``dulwich.porcelain.submodule_add``
   (Jelmer Vernooĳ)

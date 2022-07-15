@@ -561,10 +561,15 @@ class cmd_push(Command):
 
     def run(self, argv):
         parser = argparse.ArgumentParser()
+        parser.add_argument('-f', '--force', action='store_true', help='Force')
         parser.add_argument('to_location', type=str)
         parser.add_argument('refspec', type=str, nargs='*')
         args = parser.parse_args(argv)
-        porcelain.push('.', args.to_location, args.refspec or None)
+        try:
+            porcelain.push('.', args.to_location, args.refspec or None, force=args.force)
+        except porcelain.DivergedBranches:
+            sys.stderr.write('Diverged branches; specify --force to override')
+            return 1
 
 
 class cmd_remote_add(Command):

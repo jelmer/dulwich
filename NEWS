@@ -1,5 +1,8 @@
 0.20.46	UNRELEASED
 
+ * Move various long-deprecated methods.
+   (Jelmer Vernooĳ)
+
 0.20.45	2022-07-15
 
  * Add basic ``dulwich.porcelain.submodule_list`` and ``dulwich.porcelain.submodule_add``

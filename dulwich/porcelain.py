@@ -905,15 +905,6 @@ def submodule_list(repo):
             yield path.decode(DEFAULT_ENCODING), sha.decode(DEFAULT_ENCODING)
 
 
-def tag(*args, **kwargs):
-    import warnings
-
-    warnings.warn(
-        "tag has been deprecated in favour of tag_create.", DeprecationWarning
-    )
-    return tag_create(*args, **kwargs)
-
-
 def tag_create(
     repo,
     tag,
@@ -972,16 +963,6 @@ def tag_create(
             tag_id = object.id
 
         r.refs[_make_tag_ref(tag)] = tag_id
-
-
-def list_tags(*args, **kwargs):
-    import warnings
-
-    warnings.warn(
-        "list_tags has been deprecated in favour of tag_list.",
-        DeprecationWarning,
-    )
-    return tag_list(*args, **kwargs)
 
 
 def tag_list(repo, outstream=sys.stdout):

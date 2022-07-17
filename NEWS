@@ -1,5 +1,9 @@
 0.20.46	UNRELEASED
 
+ * Add a separate Exception for symbolic
+   reference loops - dulwich.refs.SymrefLoop.
+   (Jelmer Vernooĳ)
+
 0.20.45	2022-07-15
 
  * Add basic ``dulwich.porcelain.submodule_list`` and ``dulwich.porcelain.submodule_add``
@@ -66,6 +70,10 @@
    (Filipp Frizzy)
 
 0.20.35	2022-03-20
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
  * Document the ``path`` attribute for ``Repo``.
    (Jelmer Vernooĳ, #854)

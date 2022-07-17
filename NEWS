@@ -2,6 +2,8 @@
 
  * Add a separate Exception for symbolic
    reference loops - dulwich.refs.SymrefLoop.
+
+ * Move various long-deprecated methods.
    (Jelmer Vernooĳ)
 
 0.20.45	2022-07-15
@@ -70,10 +72,6 @@
    (Filipp Frizzy)
 
 0.20.35	2022-03-20
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 
  * Document the ``path`` attribute for ``Repo``.
    (Jelmer Vernooĳ, #854)

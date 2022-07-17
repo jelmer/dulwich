@@ -1152,12 +1152,6 @@ class ObjectStoreIterator(ObjectIterator):
         """Return the number of objects."""
         return len(list(self.itershas()))
 
-    def empty(self):
-        import warnings
-
-        warnings.warn("Use bool() instead.", DeprecationWarning)
-        return self._empty()
-
     def _empty(self):
         it = self.itershas()
         try:

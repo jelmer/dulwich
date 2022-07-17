@@ -28,7 +28,6 @@ TODO:
 
 import os
 import sys
-import warnings
 from typing import (
     BinaryIO,
     Iterable,
@@ -230,29 +229,6 @@ class Config(object):
           Iterator over (name, value) pairs
         """
         raise NotImplementedError(self.items)
-
-    def iteritems(self, section: SectionLike) -> Iterator[Tuple[Name, Value]]:
-        """Iterate over the configuration pairs for a specific section.
-
-        Args:
-          section: Tuple with section name and optional subsection namee
-        Returns:
-          Iterator over (name, value) pairs
-        """
-        warnings.warn(
-            "Use %s.items instead." % type(self).__name__,
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return self.items(section)
-
-    def itersections(self) -> Iterator[Section]:
-        warnings.warn(
-            "Use %s.items instead." % type(self).__name__,
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return self.sections()
 
     def sections(self) -> Iterator[Section]:
         """Iterate over the sections.

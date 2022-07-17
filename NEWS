@@ -1,5 +1,8 @@
 0.20.46	UNRELEASED
 
+ * Add a separate Exception for symbolic
+   reference loops - dulwich.refs.SymrefLoop.
+
  * Move various long-deprecated methods.
    (Jelmer Vernooĳ)
 

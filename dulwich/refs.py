@@ -239,7 +239,7 @@ class RefsContainer(object):
         for key in keys:
             try:
                 ret[key] = self[(base + b"/" + key).strip(b"/")]
-            except SymrefLoop:
+            except (SymrefLoop, KeyError):
                 continue  # Unable to resolve
 
         return ret

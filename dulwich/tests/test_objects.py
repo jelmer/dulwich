@@ -30,7 +30,6 @@ from itertools import (
 )
 import os
 import stat
-import warnings
 from contextlib import contextmanager
 
 from dulwich.errors import (
@@ -837,17 +836,6 @@ class TreeTests(ShaFileCheckTests):
         myhexsha = b"d80c186a03f423a81b39df39dc87fd269736ca86"
         x = Tree()
         x.add(b"myname", 0o100755, myhexsha)
-        self.assertEqual(x[b"myname"], (0o100755, myhexsha))
-        self.assertEqual(b"100755 myname\0" + hex_to_sha(myhexsha), x.as_raw_string())
-
-    def test_add_old_order(self):
-        myhexsha = b"d80c186a03f423a81b39df39dc87fd269736ca86"
-        x = Tree()
-        warnings.simplefilter("ignore", DeprecationWarning)
-        try:
-            x.add(0o100755, b"myname", myhexsha)
-        finally:
-            warnings.resetwarnings()
         self.assertEqual(x[b"myname"], (0o100755, myhexsha))
         self.assertEqual(b"100755 myname\0" + hex_to_sha(myhexsha), x.as_raw_string())
 

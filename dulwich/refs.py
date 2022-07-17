@@ -297,18 +297,6 @@ class RefsContainer(object):
                 raise KeyError(name)
         return refnames, contents
 
-    def _follow(self, name):
-        import warnings
-
-        warnings.warn(
-            "RefsContainer._follow is deprecated. Use RefsContainer.follow " "instead.",
-            DeprecationWarning,
-        )
-        refnames, contents = self.follow(name)
-        if not refnames:
-            return (None, contents)
-        return (refnames[-1], contents)
-
     def __contains__(self, refname):
         if self.read_ref(refname):
             return True

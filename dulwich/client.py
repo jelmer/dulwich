@@ -1533,31 +1533,6 @@ default_local_git_client_cls = LocalGitClient
 class SSHVendor(object):
     """A client side SSH implementation."""
 
-    def connect_ssh(
-        self,
-        host,
-        command,
-        username=None,
-        port=None,
-        password=None,
-        key_filename=None,
-    ):
-        # This function was deprecated in 0.9.1
-        import warnings
-
-        warnings.warn(
-            "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",
-            DeprecationWarning,
-        )
-        return self.run_command(
-            host,
-            command,
-            username=username,
-            port=port,
-            password=password,
-            key_filename=key_filename,
-        )
-
     def run_command(
         self,
         host,

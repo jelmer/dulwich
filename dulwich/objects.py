@@ -34,7 +34,6 @@ from typing import (
     Union,
     Type,
 )
-import warnings
 import zlib
 from hashlib import sha1
 
@@ -1091,13 +1090,6 @@ class Tree(ShaFile):
           name: The name of the entry, as a string.
           hexsha: The hex SHA of the entry as a string.
         """
-        if isinstance(name, int) and isinstance(mode, bytes):
-            (name, mode) = (mode, name)
-            warnings.warn(
-                "Please use Tree.add(name, mode, hexsha)",
-                category=DeprecationWarning,
-                stacklevel=2,
-            )
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
 

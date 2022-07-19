@@ -1218,7 +1218,12 @@ def status(repo=".", ignored=False, untracked_files="all"):
             exclude_ignored=not ignored,
             untracked_files=untracked_files,
         )
-        untracked_changes = list(untracked_paths)
+        if sys.platform == "win32":
+            untracked_changes = [
+                path.replace(os.path.sep, "/") for path in untracked_paths
+            ]
+        else:
+            untracked_changes = list(untracked_paths)
 
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 

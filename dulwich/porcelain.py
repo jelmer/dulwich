@@ -71,7 +71,6 @@ from contextlib import (
 from io import BytesIO, RawIOBase
 import datetime
 import os
-from pathlib import Path
 import posixpath
 import stat
 import sys
@@ -306,8 +305,7 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
     if sys.platform == "win32":
         path = os.path.abspath(path)
 
-    path = Path(path)
-    resolved_path = path.resolve()
+    resolved_path = os.path.realpath(path)
 
     # Resolve and abspath seems to behave differently regarding symlinks,
     # as we are doing abspath on the file path, we need to do the same on
@@ -315,22 +313,25 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
     if sys.platform == "win32":
         repopath = os.path.abspath(repopath)
 
-    repopath = Path(repopath).resolve()
+    repopath = os.path.realpath(repopath)
 
-    try:
-        relpath = resolved_path.relative_to(repopath)
-    except ValueError:
+    if not resolved_path.startswith(repopath):
         # If path is a symlink that points to a file outside the repo, we
         # want the relpath for the link itself, not the resolved target
-        if path.is_symlink():
-            parent = path.parent.resolve()
-            relpath = (parent / path.name).relative_to(repopath)
-        else:
-            raise
-    if sys.platform == "win32":
-        return str(relpath).replace(os.path.sep, "/").encode(tree_encoding)
+        if not os.path.islink(path):
+            raise ValueError(resolved_path)
+
+        parent = os.path.realpath(os.path.basename(os.path.normpath(path)))
+        relpath = os.path.relpath(
+            os.path.join(parent, os.path.basename(path)),
+            repopath
+        )
     else:
-        return bytes(relpath)
+        relpath = os.path.relpath(resolved_path, repopath)
+
+    if sys.platform == "win32":
+        return relpath.replace(os.path.sep, "/").encode(tree_encoding)
+    return os.fsencode(relpath)
 
 
 class DivergedBranches(Error):
@@ -587,12 +588,12 @@ def add(repo=".", paths=None):
     """
     ignored = set()
     with open_repo_closing(repo) as r:
-        repo_path = Path(r.path).resolve()
+        repo_path = os.path.realpath(r.path)
         ignore_manager = IgnoreFilterManager.from_repo(r)
         if not paths:
             paths = list(
                 get_untracked_paths(
-                    str(Path(os.getcwd()).resolve()),
+                    os.getcwd(),
                     str(repo_path),
                     r.open_index(),
                 )
@@ -601,10 +602,12 @@ def add(repo=".", paths=None):
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
-            path = Path(p)
-            relpath = str(path.resolve().relative_to(repo_path))
+            resolved_path = os.path.realpath(p)
+            if not resolved_path.startswith(repo_path):
+                raise ValueError("Not in repository: " + str(p))
+            relpath = os.path.relpath(os.path.realpath(p), repo_path)
             # FIXME: Support patterns
-            if path.is_dir():
+            if os.path.isdir(p):
                 relpath = os.path.join(relpath, "")
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)

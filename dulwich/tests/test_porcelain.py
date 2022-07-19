@@ -1919,6 +1919,16 @@ class StatusTests(PorcelainTestCase):
         with self.assertRaises(ValueError):
             porcelain.status(self.repo.path, untracked_files="antani")
 
+    def test_status_untracked_path(self):
+        untracked_dir = os.path.join(self.repo_path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        untracked_file = os.path.join(untracked_dir, "untracked_file")
+        with open(untracked_file, "w") as fh:
+            fh.write("untracked")
+
+        _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
+        self.assertEqual(untracked, ["untracked_dir/untracked_file"])
+
     def test_status_crlf_mismatch(self):
         # First make a commit as if the file has been added on a Linux system
         # or with core.autocrlf=True

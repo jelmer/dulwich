@@ -66,6 +66,11 @@ from dulwich.web import (
     make_wsgi_chain,
 )
 
+try:
+    import gpg
+except ImportError:
+    gpg = None
+
 
 def flat_walk_dir(dir_to_walk):
     for dirpath, _, filenames in os.walk(dir_to_walk):
@@ -94,6 +99,7 @@ class PorcelainTestCase(TestCase):
         self.assertLess(time.time() - ts, 50)
 
 
+@skipIf(gpg is None, "gpg is not available")
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """
 -----BEGIN PGP PRIVATE KEY BLOCK-----
@@ -1128,8 +1134,6 @@ class RevListTests(PorcelainTestCase):
 class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_default_key(self):
-        import gpg
-
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )

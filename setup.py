@@ -76,7 +76,7 @@ scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
 if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
-        'https': ['urllib3[secure]>=1.24.1'],
+        'https': ['urllib3>=1.24.1'],
         'pgp': ['gpg'],
         'paramiko': ['paramiko'],
         }

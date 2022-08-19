@@ -94,7 +94,7 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
                 'GNUPGHOME': os.environ['GNUPGHOME'],
                 'GIT_COMMITTER_NAME': 'Joe Example',
                 'GIT_COMMITTER_EMAIL': 'joe@example.com',
-                },
+            },
         )
         tag = self.repo[b"refs/tags/verifyme"]
         self.assertNotEqual(tag.signature, None)

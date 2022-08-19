@@ -53,8 +53,8 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     for line in out.splitlines():
         line = line.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
-        if (line.startswith('Xcode') and
-                int(line.split()[1].split('.')[0]) >= 4):
+        if (line.startswith('Xcode')
+                and int(line.split()[1].split('.')[0]) >= 4):
             os.environ['ARCHFLAGS'] = ''
 
 tests_require = ['fastimport']
@@ -79,7 +79,7 @@ if has_setuptools:
         'https': ['urllib3>=1.24.1'],
         'pgp': ['gpg'],
         'paramiko': ['paramiko'],
-        }
+    }
     setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'

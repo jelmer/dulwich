@@ -1065,11 +1065,11 @@ class Repo(BaseRepo):
     ) -> None:
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
-            if (os.path.isfile(hidden_path) or
-                    os.path.isdir(os.path.join(hidden_path, OBJECTDIR))):
+            if (os.path.isfile(hidden_path)
+                    or os.path.isdir(os.path.join(hidden_path, OBJECTDIR))):
                 bare = False
-            elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
-                    os.path.isdir(os.path.join(root, REFSDIR))):
+            elif (os.path.isdir(os.path.join(root, OBJECTDIR))
+                    and os.path.isdir(os.path.join(root, REFSDIR))):
                 bare = True
             else:
                 raise NotGitRepository(
@@ -1356,7 +1356,7 @@ class Repo(BaseRepo):
         from dulwich.index import (
             IndexEntry,
             _fs_to_tree_path,
-            )
+        )
 
         index = self.open_index()
         try:

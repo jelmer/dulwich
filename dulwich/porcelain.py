@@ -1192,10 +1192,10 @@ def status(repo=".", ignored=False, untracked_files="all"):
       untracked_files: How to handle untracked files, defaults to "all":
           "no": do not return untracked files
           "all": include all files in untracked directories
-        Using `untracked_files="no"` can be faster than "all" when the worktreee
+        Using untracked_files="no" can be faster than "all" when the worktreee
           contains many untracked files/directories.
 
-    Note: `untracked_files="normal" (`git`'s default) is not implemented.
+    Note: untracked_files="normal" (git's default) is not implemented.
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)

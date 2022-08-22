@@ -57,7 +57,7 @@ from typing import (
     IO,
     Union,
     TYPE_CHECKING,
-    )
+)
 
 from urllib.parse import (
     quote as urlquote,

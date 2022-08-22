@@ -1052,10 +1052,13 @@ class Repo(BaseRepo):
 
     Attributes:
 
-      path (str): Path to the working copy (if it exists) or repository control
+      path: Path to the working copy (if it exists) or repository control
         directory (if the repository is bare)
-      bare (bool): Whether this is a bare repository
+      bare: Whether this is a bare repository
     """
+
+    path: str
+    bare: bool
 
     def __init__(
         self,

@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", pypy3]
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11.0-rc - 3.11", pypy3]
         exclude:
           # sqlite3 exit handling seems to get in the way
           - os: macos-latest

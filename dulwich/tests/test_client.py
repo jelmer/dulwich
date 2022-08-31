@@ -1481,6 +1481,24 @@ class PLinkSSHVendorTests(TestCase):
         args = command.proc.args
         self.assertListEqual(expected, args[0])
 
+    def test_run_with_ssh_command_windows(self):
+        expected = [
+            r"C:\Windows\System32\OpenSSH\ssh.exe",
+            "-x",
+            "host",
+            "git-clone-url",
+        ]
+
+        vendor = SubprocessSSHVendor()
+        command = vendor.run_command(
+            "host",
+            "git-clone-url",
+            ssh_command=r"C:\Windows\System32\OpenSSH\ssh.exe",
+        )
+
+        args = command.proc.args
+        self.assertListEqual(expected, args[0])
+
 
 class RsyncUrlTests(TestCase):
     def test_simple(self):

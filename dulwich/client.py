@@ -1603,8 +1603,7 @@ class SubprocessSSHVendor(SSHVendor):
             )
 
         if ssh_command:
-            import shlex
-            args = shlex.split(ssh_command) + ["-x"]
+            args = _split_command(ssh_command) + ["-x"]
         else:
             args = ["ssh", "-x"]
 
@@ -1645,8 +1644,7 @@ class PLinkSSHVendor(SSHVendor):
     ):
 
         if ssh_command:
-            import shlex
-            args = shlex.split(ssh_command) + ["-ssh"]
+            args = _split_command(ssh_command) + ["-ssh"]
         elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]
         else:
@@ -2254,6 +2252,12 @@ def _win32_url_to_path(parsed) -> str:
     if url2pathname is None:
         from urllib.request import url2pathname  # type: ignore
     return url2pathname(netloc + path)  # type: ignore
+
+
+def _split_command(command):
+    import shlex
+    is_posix = (os.name == "posix")
+    return shlex.split(command, posix=is_posix)
 
 
 def get_transport_and_path_from_url(

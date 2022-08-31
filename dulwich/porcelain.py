@@ -332,6 +332,7 @@ def commit(
     committer=None,
     encoding=None,
     no_verify=False,
+    signoff=False,
 ):
     """Create a new commit.
 
@@ -341,10 +342,12 @@ def commit(
       author: Optional author name and email
       committer: Optional committer name and email
       no_verify: Skip pre-commit and commit-msg hooks
+      signoff: GPG Sign the commit (bool, defaults to False,
+        pass True to use default GPG key,
+        pass a str containing Key ID to use a specific GPG key)
     Returns: SHA1 of the new commit
     """
     # FIXME: Support --all argument
-    # FIXME: Support --signoff argument
     if getattr(message, "encode", None):
         message = message.encode(encoding or DEFAULT_ENCODING)
     if getattr(author, "encode", None):
@@ -358,6 +361,7 @@ def commit(
             committer=committer,
             encoding=encoding,
             no_verify=no_verify,
+            sign=signoff if isinstance(signoff, (str, bool)) else None,
         )
 
 
@@ -1192,10 +1196,10 @@ def status(repo=".", ignored=False, untracked_files="all"):
       untracked_files: How to handle untracked files, defaults to "all":
           "no": do not return untracked files
           "all": include all files in untracked directories
-        Using `untracked_files="no"` can be faster than "all" when the worktreee
+        Using untracked_files="no" can be faster than "all" when the worktreee
           contains many untracked files/directories.
 
-    Note: `untracked_files="normal" (`git`'s default) is not implemented.
+    Note: untracked_files="normal" (git's default) is not implemented.
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)

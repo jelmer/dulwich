@@ -963,6 +963,21 @@ class GitClient(object):
         negotiated_capabilities = self._fetch_capabilities & server_capabilities
         return (negotiated_capabilities, symrefs, agent)
 
+    def archive(
+        self,
+        path,
+        committish,
+        write_data,
+        progress=None,
+        write_error=None,
+        format=None,
+        subdirs=None,
+        prefix=None,
+    ):
+        """Retrieve an archive of the specified tree.
+        """
+        raise NotImplementedError(self.archive)
+
 
 def check_wants(wants, refs):
     """Check that a set of wants is valid.

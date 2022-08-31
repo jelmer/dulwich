@@ -321,6 +321,14 @@ class cmd_rev_list(Command):
         porcelain.rev_list(".", args)
 
 
+class cmd_submodule(Command):
+    def run(self, args):
+        parser = optparse.OptionParser()
+        options, args = parser.parse_args(args)
+        for path, sha in porcelain.submodule_list("."):
+            sys.stdout.write(' %s %s\n' % (sha, path))
+
+
 class cmd_tag(Command):
     def run(self, args):
         parser = optparse.OptionParser()
@@ -553,10 +561,15 @@ class cmd_push(Command):
 
     def run(self, argv):
         parser = argparse.ArgumentParser()
+        parser.add_argument('-f', '--force', action='store_true', help='Force')
         parser.add_argument('to_location', type=str)
         parser.add_argument('refspec', type=str, nargs='*')
         args = parser.parse_args(argv)
-        porcelain.push('.', args.to_location, args.refspec or None)
+        try:
+            porcelain.push('.', args.to_location, args.refspec or None, force=args.force)
+        except porcelain.DivergedBranches:
+            sys.stderr.write('Diverged branches; specify --force to override')
+            return 1
 
 
 class cmd_remote_add(Command):
@@ -721,6 +734,7 @@ commands = {
     "stash": cmd_stash,
     "status": cmd_status,
     "symbolic-ref": cmd_symbolic_ref,
+    "submodule": cmd_submodule,
     "tag": cmd_tag,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,

@@ -46,7 +46,18 @@ import select
 import socket
 import subprocess
 import sys
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, IO
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    IO,
+    Union,
+    TYPE_CHECKING,
+)
 
 from urllib.parse import (
     quote as urlquote,
@@ -56,6 +67,9 @@ from urllib.parse import (
     urlunsplit,
     urlunparse,
 )
+
+if TYPE_CHECKING:
+    import urllib3
 
 
 import dulwich
@@ -437,7 +451,6 @@ class _v1ReceivePackHeader(object):
         """Handle the head of a 'git-receive-pack' request.
 
         Args:
-          proto: Protocol object to read from
           capabilities: List of negotiated capabilities
           old_refs: Old refs, as received from the server
           new_refs: Refs to change
@@ -1533,31 +1546,6 @@ default_local_git_client_cls = LocalGitClient
 class SSHVendor(object):
     """A client side SSH implementation."""
 
-    def connect_ssh(
-        self,
-        host,
-        command,
-        username=None,
-        port=None,
-        password=None,
-        key_filename=None,
-    ):
-        # This function was deprecated in 0.9.1
-        import warnings
-
-        warnings.warn(
-            "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",
-            DeprecationWarning,
-        )
-        return self.run_command(
-            host,
-            command,
-            username=username,
-            port=port,
-            password=password,
-            key_filename=key_filename,
-        )
-
     def run_command(
         self,
         host,
@@ -1809,8 +1797,8 @@ def default_user_agent_string():
 
 def default_urllib3_manager(   # noqa: C901
     config, pool_manager_cls=None, proxy_manager_cls=None, **override_kwargs
-):
-    """Return `urllib3` connection pool manager.
+) -> Union["urllib3.ProxyManager", "urllib3.PoolManager"]:
+    """Return urllib3 connection pool manager.
 
     Honour detected proxy configurations.
 
@@ -1819,9 +1807,9 @@ def default_urllib3_manager(   # noqa: C901
       override_kwargs: Additional arguments for `urllib3.ProxyManager`
 
     Returns:
-      `pool_manager_cls` (defaults to `urllib3.ProxyManager`) instance for
-      proxy configurations, `proxy_manager_cls` (defaults to
-      `urllib3.PoolManager`) instance otherwise.
+      Either pool_manager_cls (defaults to `urllib3.ProxyManager`) instance for
+      proxy configurations, proxy_manager_cls
+      (defaults to `urllib3.PoolManager`) instance otherwise
 
     """
     proxy_server = user_agent = None
@@ -1921,9 +1909,9 @@ class AbstractHttpGitClient(GitClient):
           data: Request data.
 
         Returns:
-          Tuple (`response`, `read`), where response is an `urllib3`
-          response object with additional `content_type` and
-          `redirect_location` properties, and `read` is a consumable read
+          Tuple (response, read), where response is an urllib3
+          response object with additional content_type and
+          redirect_location properties, and read is a consumable read
           method for the response data.
 
         """

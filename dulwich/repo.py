@@ -876,6 +876,7 @@ class BaseRepo(object):
         ref=b"HEAD",
         merge_heads=None,
         no_verify=False,
+        sign=False,
     ):
         """Create a new commit.
 
@@ -899,6 +900,9 @@ class BaseRepo(object):
           ref: Optional ref to commit to (defaults to current branch)
           merge_heads: Merge heads (defaults to .git/MERGE_HEAD)
           no_verify: Skip pre-commit and commit-msg hooks
+          sign: GPG Sign the commit (bool, defaults to False,
+            pass True to use default GPG key,
+            pass a str containing Key ID to use a specific GPG key)
 
         Returns:
           New commit SHA1
@@ -970,14 +974,20 @@ class BaseRepo(object):
         except KeyError:  # no hook defined, message not modified
             c.message = message
 
+        keyid = sign if isinstance(sign, str) else None
+
         if ref is None:
             # Create a dangling commit
             c.parents = merge_heads
+            if sign:
+                c.sign(keyid)
             self.object_store.add_object(c)
         else:
             try:
                 old_head = self.refs[ref]
                 c.parents = [old_head] + merge_heads
+                if sign:
+                    c.sign(keyid)
                 self.object_store.add_object(c)
                 ok = self.refs.set_if_equals(
                     ref,
@@ -990,6 +1000,8 @@ class BaseRepo(object):
                 )
             except KeyError:
                 c.parents = merge_heads
+                if sign:
+                    c.sign(keyid)
                 self.object_store.add_object(c)
                 ok = self.refs.add_if_new(
                     ref,
@@ -1052,10 +1064,13 @@ class Repo(BaseRepo):
 
     Attributes:
 
-      path (str): Path to the working copy (if it exists) or repository control
+      path: Path to the working copy (if it exists) or repository control
         directory (if the repository is bare)
-      bare (bool): Whether this is a bare repository
+      bare: Whether this is a bare repository
     """
+
+    path: str
+    bare: bool
 
     def __init__(
         self,
@@ -1065,11 +1080,11 @@ class Repo(BaseRepo):
     ) -> None:
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
-            if (os.path.isfile(hidden_path) or
-                    os.path.isdir(os.path.join(hidden_path, OBJECTDIR))):
+            if (os.path.isfile(hidden_path)
+                    or os.path.isdir(os.path.join(hidden_path, OBJECTDIR))):
                 bare = False
-            elif (os.path.isdir(os.path.join(root, OBJECTDIR)) and
-                    os.path.isdir(os.path.join(root, REFSDIR))):
+            elif (os.path.isdir(os.path.join(root, OBJECTDIR))
+                    and os.path.isdir(os.path.join(root, REFSDIR))):
                 bare = True
             else:
                 raise NotGitRepository(
@@ -1356,7 +1371,7 @@ class Repo(BaseRepo):
         from dulwich.index import (
             IndexEntry,
             _fs_to_tree_path,
-            )
+        )
 
         index = self.open_index()
         try:

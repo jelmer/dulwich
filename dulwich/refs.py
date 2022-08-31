@@ -49,6 +49,14 @@ BAD_REF_CHARS = set(b"\177 ~^:?*[")
 ANNOTATED_TAG_SUFFIX = b"^{}"
 
 
+class SymrefLoop(Exception):
+    """There is a loop between one or more symrefs."""
+
+    def __init__(self, ref, depth):
+        self.ref = ref
+        self.depth = depth
+
+
 def parse_symref_value(contents):
     """Parse a symref value.
 
@@ -231,7 +239,7 @@ class RefsContainer(object):
         for key in keys:
             try:
                 ret[key] = self[(base + b"/" + key).strip(b"/")]
-            except KeyError:
+            except (SymrefLoop, KeyError):
                 continue  # Unable to resolve
 
         return ret
@@ -294,20 +302,8 @@ class RefsContainer(object):
                 break
             depth += 1
             if depth > 5:
-                raise KeyError(name)
+                raise SymrefLoop(name, depth)
         return refnames, contents
-
-    def _follow(self, name):
-        import warnings
-
-        warnings.warn(
-            "RefsContainer._follow is deprecated. Use RefsContainer.follow " "instead.",
-            DeprecationWarning,
-        )
-        refnames, contents = self.follow(name)
-        if not refnames:
-            return (None, contents)
-        return (refnames[-1], contents)
 
     def __contains__(self, refname):
         if self.read_ref(refname):

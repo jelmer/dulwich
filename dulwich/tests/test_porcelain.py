@@ -66,6 +66,11 @@ from dulwich.web import (
     make_wsgi_chain,
 )
 
+try:
+    import gpg
+except ImportError:
+    gpg = None
+
 
 def flat_walk_dir(dir_to_walk):
     for dirpath, _, filenames in os.walk(dir_to_walk):
@@ -94,6 +99,7 @@ class PorcelainTestCase(TestCase):
         self.assertLess(time.time() - ts, 50)
 
 
+@skipIf(gpg is None, "gpg is not available")
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """
 -----BEGIN PGP PRIVATE KEY BLOCK-----
@@ -411,6 +417,70 @@ class CommitTests(PorcelainTestCase):
         )
         self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
+
+
+@skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
+class CommitSignTests(PorcelainGpgTestCase):
+
+    def test_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_default_key()
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=True,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        commit.verify()
+        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+        self.import_non_default_key()
+        self.assertRaises(
+            gpg.errors.MissingSignatures,
+            commit.verify,
+            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
+        )
+
+        commit.committer = b"Alice <alice@example.com>"
+        self.assertRaises(
+            gpg.errors.BadSignatures,
+            commit.verify,
+        )
+
+    def test_non_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_non_default_key()
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        commit.verify()
 
 
 class CleanTests(PorcelainTestCase):
@@ -1128,8 +1198,6 @@ class RevListTests(PorcelainTestCase):
 class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_default_key(self):
-        import gpg
-
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
@@ -1406,6 +1474,28 @@ class ResetFileTests(PorcelainTestCase):
         porcelain.reset_file(self.repo, os.path.join('new_dir', 'foo'), target=sha)
         with open(full_path, 'r') as f:
             self.assertEqual('hello', f.read())
+
+
+class SubmoduleTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        self.assertEqual([], list(porcelain.submodule_list(self.repo)))
+
+    def test_add(self):
+        porcelain.submodule_add(self.repo, "../bar.git", "bar")
+        with open('%s/.gitmodules' % self.repo.path, 'r') as f:
+            self.assertEqual("""\
+[submodule "bar"]
+\turl = ../bar.git
+\tpath = bar
+""", f.read())
 
 
 class PushTests(PorcelainTestCase):
@@ -1896,6 +1986,16 @@ class StatusTests(PorcelainTestCase):
     def test_status_wrong_untracked_files_value(self):
         with self.assertRaises(ValueError):
             porcelain.status(self.repo.path, untracked_files="antani")
+
+    def test_status_untracked_path(self):
+        untracked_dir = os.path.join(self.repo_path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        untracked_file = os.path.join(untracked_dir, "untracked_file")
+        with open(untracked_file, "w") as fh:
+            fh.write("untracked")
+
+        _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
+        self.assertEqual(untracked, ["untracked_dir/untracked_file"])
 
     def test_status_crlf_mismatch(self):
         # First make a commit as if the file has been added on a Linux system

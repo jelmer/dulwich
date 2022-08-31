@@ -31,7 +31,7 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.intersphinx',
     'sphinx.ext.napoleon',
-    ]
+]
 
 autoclass_content = "both"
 
@@ -186,8 +186,8 @@ htmlhelp_basename = 'dulwichdoc'
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-  ('index', 'dulwich.tex', u'dulwich Documentation',
-   u'Jelmer Vernooij', 'manual'),
+    ('index', 'dulwich.tex', u'dulwich Documentation',
+     'Jelmer Vernooij', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -206,3 +206,9 @@ latex_documents = [
 
 # If false, no module index is generated.
 # latex_use_modindex = True
+
+# Add mappings
+intersphinx_mapping = {
+    'urllib3': ('http://urllib3.readthedocs.org/en/latest', None),
+    'python': ('http://docs.python.org/3', None),
+}

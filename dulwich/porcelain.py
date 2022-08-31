@@ -43,6 +43,7 @@ Currently implemented:
  * remote{_add}
  * receive-pack
  * reset
+ * submodule_list
  * rev-list
  * tag{_create,_delete,_list}
  * upload-pack
@@ -86,6 +87,7 @@ from dulwich.client import (
     get_transport_and_path,
 )
 from dulwich.config import (
+    ConfigFile,
     StackedConfig,
 )
 from dulwich.diff_tree import (
@@ -330,6 +332,7 @@ def commit(
     committer=None,
     encoding=None,
     no_verify=False,
+    signoff=False,
 ):
     """Create a new commit.
 
@@ -339,10 +342,12 @@ def commit(
       author: Optional author name and email
       committer: Optional committer name and email
       no_verify: Skip pre-commit and commit-msg hooks
+      signoff: GPG Sign the commit (bool, defaults to False,
+        pass True to use default GPG key,
+        pass a str containing Key ID to use a specific GPG key)
     Returns: SHA1 of the new commit
     """
     # FIXME: Support --all argument
-    # FIXME: Support --signoff argument
     if getattr(message, "encode", None):
         message = message.encode(encoding or DEFAULT_ENCODING)
     if getattr(author, "encode", None):
@@ -356,6 +361,7 @@ def commit(
             committer=committer,
             encoding=encoding,
             no_verify=no_verify,
+            sign=signoff if isinstance(signoff, (str, bool)) else None,
         )
 
 
@@ -858,13 +864,49 @@ def rev_list(repo, commits, outstream=sys.stdout):
             outstream.write(entry.commit.id + b"\n")
 
 
-def tag(*args, **kwargs):
-    import warnings
+def _canonical_part(url: str) -> str:
+    name = url.rsplit('/', 1)[-1]
+    if name.endswith('.git'):
+        name = name[:-4]
+    return name
 
-    warnings.warn(
-        "tag has been deprecated in favour of tag_create.", DeprecationWarning
-    )
-    return tag_create(*args, **kwargs)
+
+def submodule_add(repo, url, path=None, name=None):
+    """Add a new submodule.
+
+    Args:
+      repo: Path to repository
+      url: URL of repository to add as submodule
+      path: Path where submodule should live
+    """
+    with open_repo_closing(repo) as r:
+        if path is None:
+            path = os.path.relpath(_canonical_part(url), r.path)
+        if name is None:
+            name = path
+
+        # TODO(jelmer): Move this logic to dulwich.submodule
+        gitmodules_path = os.path.join(r.path, ".gitmodules")
+        try:
+            config = ConfigFile.from_path(gitmodules_path)
+        except FileNotFoundError:
+            config = ConfigFile()
+            config.path = gitmodules_path
+        config.set(("submodule", name), "url", url)
+        config.set(("submodule", name), "path", path)
+        config.write_to_path()
+
+
+def submodule_list(repo):
+    """List submodules.
+
+    Args:
+      repo: Path to repository
+    """
+    from .submodule import iter_cached_submodules
+    with open_repo_closing(repo) as r:
+        for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
+            yield path.decode(DEFAULT_ENCODING), sha.decode(DEFAULT_ENCODING)
 
 
 def tag_create(
@@ -925,16 +967,6 @@ def tag_create(
             tag_id = object.id
 
         r.refs[_make_tag_ref(tag)] = tag_id
-
-
-def list_tags(*args, **kwargs):
-    import warnings
-
-    warnings.warn(
-        "list_tags has been deprecated in favour of tag_list.",
-        DeprecationWarning,
-    )
-    return tag_list(*args, **kwargs)
 
 
 def tag_list(repo, outstream=sys.stdout):
@@ -1164,10 +1196,10 @@ def status(repo=".", ignored=False, untracked_files="all"):
       untracked_files: How to handle untracked files, defaults to "all":
           "no": do not return untracked files
           "all": include all files in untracked directories
-        Using `untracked_files="no"` can be faster than "all" when the worktreee
+        Using untracked_files="no" can be faster than "all" when the worktreee
           contains many untracked files/directories.
 
-    Note: `untracked_files="normal" (`git`'s default) is not implemented.
+    Note: untracked_files="normal" (git's default) is not implemented.
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)
@@ -1190,7 +1222,12 @@ def status(repo=".", ignored=False, untracked_files="all"):
             exclude_ignored=not ignored,
             untracked_files=untracked_files,
         )
-        untracked_changes = list(untracked_paths)
+        if sys.platform == "win32":
+            untracked_changes = [
+                path.replace(os.path.sep, "/") for path in untracked_paths
+            ]
+        else:
+            untracked_changes = list(untracked_paths)
 
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
@@ -1456,7 +1493,7 @@ def branch_create(repo, name, objectish=None, force=False):
             objectish = "HEAD"
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
-        ref_message = b"branch: Created from " + objectish.encode("utf-8")
+        ref_message = b"branch: Created from " + objectish.encode(DEFAULT_ENCODING)
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
@@ -1541,7 +1578,7 @@ def fetch(
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
         if message is None:
-            message = b"fetch: from " + remote_location.encode("utf-8")
+            message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
         client, path = get_transport_and_path(
             remote_location, config=r.get_config_stack(), **kwargs
         )

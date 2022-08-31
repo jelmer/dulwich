@@ -34,6 +34,7 @@ from dulwich.objects import ZERO_SHA
 from dulwich.refs import (
     DictRefsContainer,
     InfoRefsContainer,
+    SymrefLoop,
     check_ref_format,
     _split_ref_line,
     parse_symref_value,
@@ -518,7 +519,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             ),
             self._refs.follow(b"refs/heads/master"),
         )
-        self.assertRaises(KeyError, self._refs.follow, b"refs/heads/loop")
+        self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
 
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)

@@ -23,7 +23,7 @@ if sys.version_info < (3, 6):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.44'
+dulwich_version_string = '0.20.45'
 
 
 class DulwichDistribution(Distribution):
@@ -53,8 +53,8 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     for line in out.splitlines():
         line = line.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
-        if (line.startswith('Xcode') and
-                int(line.split()[1].split('.')[0]) >= 4):
+        if (line.startswith('Xcode')
+                and int(line.split()[1].split('.')[0]) >= 4):
             os.environ['ARCHFLAGS'] = ''
 
 tests_require = ['fastimport']
@@ -76,10 +76,10 @@ scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
 if has_setuptools:
     setup_kwargs['extras_require'] = {
         'fastimport': ['fastimport'],
-        'https': ['urllib3[secure]>=1.24.1'],
+        'https': ['urllib3>=1.24.1'],
         'pgp': ['gpg'],
         'paramiko': ['paramiko'],
-        }
+    }
     setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']
     setup_kwargs['include_package_data'] = True
     setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
@@ -111,8 +111,8 @@ setup(name='dulwich',
           "GitHub": "https://github.com/dulwich/dulwich",
       },
       keywords="git vcs",
-      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
-                'dulwich.contrib'],
+      packages=['dulwich', 'dulwich.cloud', 'dulwich.tests',
+                'dulwich.tests.compat', 'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
       scripts=scripts,
       ext_modules=ext_modules,
@@ -126,6 +126,7 @@ setup(name='dulwich',
           'Programming Language :: Python :: 3.8',
           'Programming Language :: Python :: 3.9',
           'Programming Language :: Python :: 3.10',
+          'Programming Language :: Python :: 3.11',
           'Programming Language :: Python :: Implementation :: CPython',
           'Programming Language :: Python :: Implementation :: PyPy',
           'Operating System :: POSIX',

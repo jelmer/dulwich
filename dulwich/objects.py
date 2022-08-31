@@ -34,7 +34,6 @@ from typing import (
     Union,
     Type,
 )
-import warnings
 import zlib
 from hashlib import sha1
 
@@ -1091,13 +1090,6 @@ class Tree(ShaFile):
           name: The name of the entry, as a string.
           hexsha: The hex SHA of the entry as a string.
         """
-        if isinstance(name, int) and isinstance(mode, bytes):
-            (name, mode) = (mode, name)
-            warnings.warn(
-                "Please use Tree.add(name, mode, hexsha)",
-                category=DeprecationWarning,
-                stacklevel=2,
-            )
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
 
@@ -1427,6 +1419,62 @@ class Commit(ShaFile):
             last = field
 
         # TODO: optionally check for duplicate parents
+
+    def sign(self, keyid: Optional[str] = None):
+        import gpg
+        with gpg.Context(armor=True) as c:
+            if keyid is not None:
+                key = c.get_key(keyid)
+                with gpg.Context(armor=True, signers=[key]) as ctx:
+                    self.gpgsig, unused_result = ctx.sign(
+                        self.as_raw_string(),
+                        mode=gpg.constants.sig.mode.DETACH,
+                    )
+            else:
+                self.gpgsig, unused_result = c.sign(
+                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
+                )
+
+    def verify(self, keyids: Optional[Iterable[str]] = None):
+        """Verify GPG signature for this commit (if it is signed).
+
+        Args:
+          keyids: Optional iterable of trusted keyids for this commit.
+            If this commit is not signed by any key in keyids verification will
+            fail. If not specified, this function only verifies that the commit
+            has a valid signature.
+
+        Raises:
+          gpg.errors.BadSignatures: if GPG signature verification fails
+          gpg.errors.MissingSignatures: if commit was not signed by a key
+            specified in keyids
+        """
+        if self._gpgsig is None:
+            return
+
+        import gpg
+
+        with gpg.Context() as ctx:
+            self_without_gpgsig = self.copy()
+            self_without_gpgsig._gpgsig = None
+            self_without_gpgsig.gpgsig = None
+            data, result = ctx.verify(
+                self_without_gpgsig.as_raw_string(),
+                signature=self._gpgsig,
+            )
+            if keyids:
+                keys = [
+                    ctx.get_key(key)
+                    for key in keyids
+                ]
+                for key in keys:
+                    for subkey in keys:
+                        for sig in result.signatures:
+                            if subkey.can_sign and subkey.fpr == sig.fpr:
+                                return
+                raise gpg.errors.MissingSignatures(
+                    result, keys, results=(data, result)
+                )
 
     def _serialize(self):
         chunks = []

@@ -131,7 +131,7 @@ class ParamikoSSHVendorTests(TestCase):
     def setUp(self):
         import paramiko.transport
 
-        # reenable server functionality for tests
+        # re-enable server functionality for tests
         if hasattr(paramiko.transport, "SERVER_DISABLED_BY_GENTOO"):
             paramiko.transport.SERVER_DISABLED_BY_GENTOO = False
 

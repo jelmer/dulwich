@@ -1786,7 +1786,7 @@ class SSHGitClient(TraditionalGitClient):
             kwargs["password"] = self.password
         if self.key_filename is not None:
             kwargs["key_filename"] = self.key_filename
-        # GIT_SSH_COMMAND takes precendence over GIT_SSH
+        # GIT_SSH_COMMAND takes precedence over GIT_SSH
         if self.ssh_command is not None:
             kwargs["ssh_command"] = self.ssh_command
         con = self.ssh_vendor.run_command(

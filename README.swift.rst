@@ -46,7 +46,7 @@ be used as template::
 
 
 Note that for now we use the same tenant to perform the requests
-against Swift. Therefor there is only one Swift account used
+against Swift. Therefore there is only one Swift account used
 for storing repositories. Each repository will be contained in
 a Swift container.
 
@@ -118,7 +118,7 @@ The other Git commands can be used the way you do usually against
 a regular repository.
 
 Note the daemon subcommands starts a Git server listening for the
-Git protocol. Therefor there is no authentication or encryption
+Git protocol. Therefore there is no authentication or encryption
 at all between the cGIT client and the GIT server (Dulwich).
 
 Note on the .info file for pack object

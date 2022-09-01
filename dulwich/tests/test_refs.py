@@ -247,9 +247,9 @@ class RefsContainerTests(object):
         self.assertEqual(nines, self._refs[b"refs/heads/master"])
 
         self.assertTrue(
-            self._refs.set_if_equals(b"refs/heads/nonexistant", ZERO_SHA, nines)
+            self._refs.set_if_equals(b"refs/heads/nonexistent", ZERO_SHA, nines)
         )
-        self.assertEqual(nines, self._refs[b"refs/heads/nonexistant"])
+        self.assertEqual(nines, self._refs[b"refs/heads/nonexistent"])
 
     def test_add_if_new(self):
         nines = b"9" * 40
@@ -623,7 +623,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
             self._refs.read_ref(b"refs/heads/packed"),
         )
-        self.assertEqual(None, self._refs.read_ref(b"nonexistant"))
+        self.assertEqual(None, self._refs.read_ref(b"nonexistent"))
 
     def test_read_loose_ref(self):
         self._refs[b"refs/heads/foo"] = b"df6800012397fb85c56e7418dd4eb9405dee075c"

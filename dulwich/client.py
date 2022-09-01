@@ -1619,7 +1619,8 @@ class SubprocessSSHVendor(SSHVendor):
 
         if ssh_command:
             import shlex
-            args = shlex.split(ssh_command) + ["-x"]
+            args = shlex.split(
+                ssh_command, posix=(sys.platform != 'win32')) + ["-x"]
         else:
             args = ["ssh", "-x"]
 
@@ -1661,7 +1662,8 @@ class PLinkSSHVendor(SSHVendor):
 
         if ssh_command:
             import shlex
-            args = shlex.split(ssh_command) + ["-ssh"]
+            args = shlex.split(
+                ssh_command, posix=(sys.platform != 'win32')) + ["-ssh"]
         elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]
         else:

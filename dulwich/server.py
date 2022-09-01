@@ -1068,7 +1068,7 @@ class ReceivePackHandler(PackHandler):
         client_refs = []
         ref = self.proto.read_pkt_line()
 
-        # if ref is none then client doesnt want to send us anything..
+        # if ref is none then client doesn't want to send us anything..
         if ref is None:
             return
 

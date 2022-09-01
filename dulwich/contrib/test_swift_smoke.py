@@ -123,7 +123,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)
         remote_refs = tcp_client.fetch(self.fakerepo, local_repo)
-        # The remote repo is empty (no refs retreived)
+        # The remote repo is empty (no refs retrieved)
         self.assertEqual(remote_refs, None)
 
     def test_push_commit(self):

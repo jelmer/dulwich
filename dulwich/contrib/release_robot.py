@@ -29,7 +29,7 @@ Copy the following into the package ``__init__.py`` module::
     __version__ = get_current_version()
 
 This example assumes the tags have a leading "v" like "v0.3", and that the
-``.git`` folder is in a project folder that containts the package folder.
+``.git`` folder is in a project folder that contains the package folder.
 
 EG::
 

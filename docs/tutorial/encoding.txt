@@ -12,7 +12,7 @@ and commit messages.
 .. _C git: https://github.com/git/git/blob/master/Documentation/i18n.txt
 
 The library should be able to read *all* existing git repositories,
-irregardless of what encoding they use. This is the main reason why Dulwich
+regardless of what encoding they use. This is the main reason why Dulwich
 does not convert paths to unicode strings.
 
 A further consideration is that converting back and forth to unicode

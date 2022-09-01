@@ -4,16 +4,16 @@ on:
   push:
   pull_request:
   schedule:
-    - cron: '0 6 * * *'  # Daily 6AM UTC build
+    - cron: "0 6 * * *" # Daily 6AM UTC build
 
 jobs:
   build:
-
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11.0-rc - 3.11", pypy3]
+        python-version:
+          ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11.0-rc - 3.11", pypy3]
         exclude:
           # sqlite3 exit handling seems to get in the way
           - os: macos-latest
@@ -24,38 +24,38 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install native dependencies (Ubuntu)
-      run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
-      if: "matrix.os == 'ubuntu-latest'"
-    - name: Install native dependencies (MacOS)
-      run: brew install swig gpgme
-      if: "matrix.os == 'macos-latest'"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -U pip coverage flake8 fastimport paramiko urllib3
-    - name: Install gpg on supported platforms
-      run: pip install -U gpg
-      if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
-    - name: Install mypy
-      run: |
-        pip install -U mypy types-paramiko types-certifi types-requests
-      if: "matrix.python-version != 'pypy3'"
-    - name: Style checks
-      run: |
-        python -m flake8
-    - name: Typing checks
-      run: |
-        python -m mypy dulwich
-      if: "matrix.python-version != 'pypy3'"
-    - name: Build
-      run: |
-        python setup.py build_ext -i
-    - name: Coverage test suite run
-      run: |
-        python -m coverage run -p -m unittest dulwich.tests.test_suite
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install native dependencies (Ubuntu)
+        run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
+        if: "matrix.os == 'ubuntu-latest'"
+      - name: Install native dependencies (MacOS)
+        run: brew install swig gpgme
+        if: "matrix.os == 'macos-latest'"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -U pip coverage flake8 fastimport paramiko urllib3
+      - name: Install gpg on supported platforms
+        run: pip install -U gpg
+        if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
+      - name: Install mypy
+        run: |
+          pip install -U mypy types-paramiko types-certifi types-requests
+        if: "matrix.python-version != 'pypy3'"
+      - name: Style checks
+        run: |
+          python -m flake8
+      - name: Typing checks
+        run: |
+          python -m mypy dulwich
+        if: "matrix.python-version != 'pypy3'"
+      - name: Build
+        run: |
+          python setup.py build_ext -i
+      - name: Coverage test suite run
+        run: |
+          python -m coverage run -p -m unittest dulwich.tests.test_suite

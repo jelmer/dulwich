@@ -189,6 +189,7 @@ class _GitFile(object):
         """
         if self._closed:
             return
+        self._file.flush()
         os.fsync(self._file.fileno())
         self._file.close()
         try:

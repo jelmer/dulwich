@@ -130,6 +130,6 @@ class TestGreenThreadsMissingObjectFinder(TestCase):
         finder = GreenThreadsMissingObjectFinder(
             self.store, wants[0 : int(self.cmt_amount / 2)], wants
         )
-        # sha_done will contains commit id and sha of blob refered in tree
+        # sha_done will contains commit id and sha of blob referred in tree
         self.assertEqual(len(finder.sha_done), (self.cmt_amount / 2) * 2)
         self.assertEqual(len(finder.objects_to_send), self.cmt_amount / 2)

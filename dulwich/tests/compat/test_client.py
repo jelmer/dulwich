@@ -1,4 +1,4 @@
-# test_client.py -- Compatibilty tests for git client.
+# test_client.py -- Compatibility tests for git client.
 # Copyright (C) 2010 Google, Inc.
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -18,7 +18,7 @@
 # License, Version 2.0.
 #
 
-"""Compatibilty tests between the Dulwich client and the cgit server."""
+"""Compatibility tests between the Dulwich client and the cgit server."""
 
 import copy
 from io import BytesIO

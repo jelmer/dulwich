@@ -993,7 +993,7 @@
     probing the filesystem for trustable permissions.
     (Koen Martens)
 
-  * Fix ``porcelain.reset`` to respect the comittish argument.
+  * Fix ``porcelain.reset`` to respect the committish argument.
     (Koen Martens)
 
   * Fix dulwich.porcelain.ls_remote() on Python 3.
@@ -2030,7 +2030,7 @@ FEATURES
 
   * Provide strnlen() on mingw32 which doesn't have it. (Hans Kolek)
 
-  * Set bare=true in the configuratin for bare repositories. (Dirk Neumann)
+  * Set bare=true in the configuration for bare repositories. (Dirk Neumann)
 
  FEATURES
 
@@ -2114,7 +2114,7 @@ FEATURES
 
  FEATURES
 
-  * Move named file initilization to BaseRepo. (Dave Borowitz)
+  * Move named file initialization to BaseRepo. (Dave Borowitz)
 
   * Add logging utilities and git/HTTP server logging. (Dave Borowitz)
 
@@ -2195,7 +2195,7 @@ note: This list is most likely incomplete for 0.6.0.
   * Fix RefsContainer.add_if_new to support dangling symrefs.
     (Dave Borowitz)
 
-  * Non-existant index files in non-bare repositories are now treated as 
+  * Non-existent index files in non-bare repositories are now treated as 
     empty. (Dave Borowitz)
 
   * Always update ShaFile.id when the contents of the object get changed. 

@@ -886,7 +886,7 @@ def index_entry_from_path(path, object_store=None):
 
     This returns an index value for files, symlinks
     and tree references. for directories and
-    non-existant files it returns None
+    non-existent files it returns None
 
     Args:
       path: Path to create an index entry for
@@ -929,7 +929,7 @@ def iter_fresh_entries(
 
 
 def iter_fresh_objects(paths, root_path, include_deleted=False, object_store=None):
-    """Iterate over versions of objecs on disk referenced by index.
+    """Iterate over versions of objects on disk referenced by index.
 
     Args:
       root_path: Root path to access from

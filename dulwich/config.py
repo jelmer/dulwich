@@ -44,7 +44,7 @@ from typing import (
 from dulwich.file import GitFile
 
 
-SENTINAL = object()
+SENTINEL = object()
 
 
 def lower_key(key):
@@ -111,13 +111,13 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def __getitem__(self, item):
         return self._keyed[lower_key(item)]
 
-    def get(self, key, default=SENTINAL):
+    def get(self, key, default=SENTINEL):
         try:
             return self[key]
         except KeyError:
             pass
 
-        if default is SENTINAL:
+        if default is SENTINEL:
             return type(self)()
 
         return default
@@ -128,7 +128,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
             if lower_key(actual) == key:
                 yield value
 
-    def setdefault(self, key, default=SENTINAL):
+    def setdefault(self, key, default=SENTINEL):
         try:
             return self[key]
         except KeyError:

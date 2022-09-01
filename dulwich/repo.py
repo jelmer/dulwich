@@ -303,7 +303,7 @@ def _set_filesystem_hidden(path):
         if not SetFileAttributesW(path, FILE_ATTRIBUTE_HIDDEN):
             pass  # Could raise or log `ctypes.WinError()` here
 
-    # Could implement other platform specific filesytem hiding here
+    # Could implement other platform specific filesystem hiding here
 
 
 class ParentsProvider(object):
@@ -399,7 +399,7 @@ class BaseRepo(object):
         raise NotImplementedError(self._put_named_file)
 
     def _del_named_file(self, path):
-        """Delete a file in the contrl directory with the given name."""
+        """Delete a file in the control directory with the given name."""
         raise NotImplementedError(self._del_named_file)
 
     def open_index(self):
@@ -1053,7 +1053,7 @@ class UnsupportedVersion(Exception):
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
-    To open an existing repository, call the contructor with
+    To open an existing repository, call the constructor with
     the path of the repository.
 
     To create a new repository, use the Repo.init class method.
@@ -1390,7 +1390,7 @@ class Repo(BaseRepo):
                 tree_entry = self.object_store[tree_id].lookup_path(
                     self.object_store.__getitem__, tree_path)
             except KeyError:
-                # if tree_entry didnt exist, this file was being added, so
+                # if tree_entry didn't exist, this file was being added, so
                 # remove index entry
                 try:
                     del index[tree_path]

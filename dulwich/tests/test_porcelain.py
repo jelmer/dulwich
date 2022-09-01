@@ -717,7 +717,7 @@ class CloneTests(PorcelainTestCase):
         with tempfile.TemporaryDirectory() as parent:
             target_path = os.path.join(parent, "target")
             self.assertRaises(
-                Exception, porcelain.clone, "/nonexistant/repo", target_path
+                Exception, porcelain.clone, "/nonexistent/repo", target_path
             )
             self.assertFalse(os.path.exists(target_path))
 

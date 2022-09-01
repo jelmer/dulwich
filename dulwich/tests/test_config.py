@@ -301,7 +301,7 @@ class StackedConfigTests(TestCase):
     def test_default_backends(self):
         StackedConfig.default_backends()
 
-    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_path(self):
         from dulwich.config import get_win_system_paths
 
@@ -317,7 +317,7 @@ class StackedConfigTests(TestCase):
             paths,
         )
 
-    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_reg(self):
         import winreg
 

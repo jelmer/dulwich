@@ -507,7 +507,7 @@ class cmd_ls_tree(Command):
             "-r",
             "--recursive",
             action="store_true",
-            help="Recusively list tree contents.",
+            help="Recursively list tree contents.",
         )
         parser.add_option("--name-only", action="store_true", help="Only display name.")
         options, args = parser.parse_args(args)

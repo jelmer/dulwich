@@ -504,9 +504,9 @@ class SwiftPackReader(object):
     """A SwiftPackReader that mimic read and sync method
 
     The reader allows to read a specified amount of bytes from
-    a given offset of a Swift object. A read offset is kept internaly.
+    a given offset of a Swift object. A read offset is kept internally.
     The reader will read from Swift a specified amount of data to complete
-    its internal buffer. chunk_length specifiy the amount of data
+    its internal buffer. chunk_length specify the amount of data
     to read from Swift.
     """
 

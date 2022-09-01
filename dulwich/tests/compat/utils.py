@@ -84,7 +84,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
 
     Args:
       required_version: A tuple of ints of the form (major, minor, point,
-        sub-point); ommitted components default to 0.
+        sub-point); omitted components default to 0.
       git_path: Path to the git executable; defaults to the version in
         the system path.
     Raises:

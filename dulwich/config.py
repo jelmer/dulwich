@@ -483,6 +483,46 @@ def _strip_comments(line: bytes) -> bytes:
     return line
 
 
+def _parse_section_header_line(line: bytes) -> Tuple[Section, bytes]:
+    # Parse section header ("[bla]")
+    line = _strip_comments(line).rstrip()
+    in_quotes = False
+    escaped = False
+    for i, c in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if c == ord(b'"'):
+            in_quotes = not in_quotes
+        if c == ord(b'\\'):
+            escaped = True
+        if c == ord(b']') and not in_quotes:
+            last = i
+            break
+    else:
+        raise ValueError("expected trailing ]")
+    pts = line[1:last].split(b" ", 1)
+    line = line[last + 1:]
+    section: Section
+    if len(pts) == 2:
+        if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
+            raise ValueError("Invalid subsection %r" % pts[1])
+        else:
+            pts[1] = pts[1][1:-1]
+        if not _check_section_name(pts[0]):
+            raise ValueError("invalid section name %r" % pts[0])
+        section = (pts[0], pts[1])
+    else:
+        if not _check_section_name(pts[0]):
+            raise ValueError("invalid section name %r" % pts[0])
+        pts = pts[0].split(b".", 1)
+        if len(pts) == 2:
+            section = (pts[0], pts[1])
+        else:
+            section = (pts[0],)
+    return section, line
+
+
 class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig."""
 
@@ -508,31 +548,8 @@ class ConfigFile(ConfigDict):
                 line = line[3:]
             line = line.lstrip()
             if setting is None:
-                # Parse section header ("[bla]")
                 if len(line) > 0 and line[:1] == b"[":
-                    line = _strip_comments(line).rstrip()
-                    try:
-                        last = line.index(b"]")
-                    except ValueError:
-                        raise ValueError("expected trailing ]")
-                    pts = line[1:last].split(b" ", 1)
-                    line = line[last + 1 :]
-                    if len(pts) == 2:
-                        if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
-                            raise ValueError("Invalid subsection %r" % pts[1])
-                        else:
-                            pts[1] = pts[1][1:-1]
-                        if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" % pts[0])
-                        section = (pts[0], pts[1])
-                    else:
-                        if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" % pts[0])
-                        pts = pts[0].split(b".", 1)
-                        if len(pts) == 2:
-                            section = (pts[0], pts[1])
-                        else:
-                            section = (pts[0],)
+                    section, line = _parse_section_header_line(line)
                     ret._values.setdefault(section)
                 if _strip_comments(line).strip() == b"":
                     continue

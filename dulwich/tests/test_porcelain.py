@@ -277,6 +277,9 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
         super(PorcelainGpgTestCase, self).setUp()
         self.gpg_dir = os.path.join(self.test_dir, "gpg")
         os.mkdir(self.gpg_dir, mode=0o700)
+        # Ignore errors when deleting GNUPGHOME, because of race conditions
+        # (e.g. the gpg-agent socket having been deleted). See
+        # https://github.com/jelmer/dulwich/issues/1000
         self.addCleanup(shutil.rmtree, self.gpg_dir, ignore_errors=True)
         self._old_gnupghome = os.environ.get("GNUPGHOME")
         os.environ["GNUPGHOME"] = self.gpg_dir

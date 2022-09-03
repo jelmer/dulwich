@@ -407,6 +407,7 @@ def clone(
     origin="origin",
     depth=None,
     branch=None,
+    config=None,
     **kwargs
 ):
     """Clone a local or remote git repository.
@@ -422,6 +423,7 @@ def clone(
       depth: Depth to fetch at
       branch: Optional branch or tag to be used as HEAD in the new repository
         instead of the cloned repository's HEAD.
+      config: Configuration to use
     Returns: The new repository
     """
     if outstream is not None:
@@ -434,6 +436,9 @@ def clone(
         )
         # TODO(jelmer): Capture logging output and stream to errstream
 
+    if config is None:
+        config = StackedConfig.default()
+
     if checkout is None:
         checkout = not bare
     if checkout and bare:
@@ -444,7 +449,8 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
-    (client, path) = get_transport_and_path(source, **kwargs)
+    (client, path) = get_transport_and_path(
+        source, config=config, **kwargs)
 
     return client.clone(
         path,

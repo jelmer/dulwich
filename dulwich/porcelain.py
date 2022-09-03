@@ -448,7 +448,7 @@ def commit(
         author = author.encode(encoding or DEFAULT_ENCODING)
     if getattr(committer, "encode", None):
         committer = committer.encode(encoding or DEFAULT_ENCODING)
-    author_timezone, commit_timezone = get_user_timezone()
+    author_timezone, commit_timezone = get_user_timezones()
     with open_repo_closing(repo) as r:
         return r.do_commit(
             message=message,
@@ -1056,7 +1056,7 @@ def tag_create(
                 tag_time = int(time.time())
             tag_obj.tag_time = tag_time
             if tag_timezone is None:
-                tag_timezone = get_user_timezone()[1]
+                tag_timezone = get_user_timezones()[1]
             elif isinstance(tag_timezone, str):
                 tag_timezone = parse_timezone(tag_timezone)
             tag_obj.tag_timezone = tag_timezone

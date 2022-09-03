@@ -486,6 +486,74 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit.verify()
 
 
+class TimezoneTests(PorcelainTestCase):
+
+    def put_envs(self, value):
+        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = value
+
+    def fallback(self, value):
+        self.put_envs(value)
+        self.assertTupleEqual((0, 0), porcelain.get_user_timezone())
+
+    def test_internal_format(self):
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezone())
+
+    def test_rfc_2822(self):
+        self.put_envs("Mon, 20 Nov 1995 19:12:08 -0500")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezone())
+
+    def test_iso8601(self):
+        self.put_envs("1995-11-20T19:12:08-0501")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezone())
+
+        self.put_envs("1995-11-20T19:12:08+0501")
+        self.assertTupleEqual((18060, 18060), porcelain.get_user_timezone())
+
+        self.put_envs("1995-11-20T19:12:08-05:01")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezone())
+
+        self.put_envs("1995-11-20 19:12:08-05")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezone())
+
+    def test_missing_or_malformed(self):
+        # TODO: add more here
+        self.fallback("0 + 0500")
+        self.fallback("a +0500")
+
+        self.fallback("Mon, 20 Nov 1995 19:12:08")
+
+        self.fallback("1995-11-20T19:12:08")
+        self.fallback("1995-11-20T19:12:08-05:")
+
+        self.fallback("1995.11.20")
+        self.fallback("11/20/1995")
+        self.fallback("20.11.1995")
+
+    def test_different_envs(self):
+        os.environ["GIT_AUTHOR_DATE"] = "0 +0500"
+        os.environ["GIT_COMMITTER_DATE"] = "0 +0501"
+        self.assertTupleEqual((18000, 18060), porcelain.get_user_timezone())
+
+    def test_no_envs(self):
+        local_timezone = time.localtime().tm_gmtoff
+
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezone())
+
+        del os.environ["GIT_COMMITTER_DATE"]
+        self.assertTupleEqual((18000, local_timezone), porcelain.get_user_timezone())
+
+        self.put_envs("0 +0500")
+        del os.environ["GIT_AUTHOR_DATE"]
+        self.assertTupleEqual((local_timezone, 18000), porcelain.get_user_timezone())
+
+        self.put_envs("0 +0500")
+        del os.environ["GIT_AUTHOR_DATE"]
+        del os.environ["GIT_COMMITTER_DATE"]
+        self.assertTupleEqual((local_timezone, local_timezone), porcelain.get_user_timezone())
+
+
 class CleanTests(PorcelainTestCase):
     def put_files(self, tracked, ignored, untracked, empty_dirs):
         """Put the described files in the wd"""

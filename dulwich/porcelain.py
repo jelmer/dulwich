@@ -191,6 +191,87 @@ class RemoteExists(Error):
     """Raised when the remote already exists."""
 
 
+def _parse_timezone_format(tz_str):
+    """Parse given string and attempt to return a timezone offset.
+    Different formats are considered in the following order:
+        - Git internal format: <unix timestamp> <timezone offset>
+        - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
+        - ISO 8601: e.g. 1995-11-20T19:12:08-0500
+            - uses regex if dateutil is not available
+    Will default to UTC if timezone cannot be determined.
+    Args:
+      tz_str: datetime string
+    Returns: Timezone offset as integer
+    """
+    import re
+
+    # Git internal format
+    internal_format_pattern = re.compile("^[0-9]+ [+-][0-9]{,4}$")
+    if re.match(internal_format_pattern, tz_str):
+        try:
+            tz_internal = parse_timezone(tz_str.split(" ")[1].encode(DEFAULT_ENCODING))
+            return tz_internal[0]
+        except ValueError:
+            pass
+
+    # RFC 2822
+    import email.utils
+    rfc_2822 = email.utils.parsedate_tz(tz_str)
+    if rfc_2822:
+        return rfc_2822[9]
+
+    # ISO 8601
+    try:
+        from dateutil.parser import isoparse
+        try:
+            iso_8601 = isoparse(tz_str)
+            delta = iso_8601.tzinfo._offset
+            if delta:
+                # From dateutil doc:
+                # `The time zone offset in seconds, or (since version 2.6.0, represented as a datetime.timedelta object).`
+                if isinstance(delta, int):
+                    return delta
+                return int(delta.total_seconds())
+        except (AttributeError, TypeError, ValueError):
+            pass
+    except (ModuleNotFoundError, ImportError):
+        # Supported offsets:
+        # sHHMM, sHH:MM, sHH
+        iso_8601_pattern = re.compile("[0-9]([+-])([0-9]{2})(?::(?=[0-9]{2}))?([0-9]{2})?$")
+        match = re.search(iso_8601_pattern, tz_str)
+        total_secs = 0
+        if match:
+            sign, hours, minutes = match.groups()
+            total_secs += int(hours) * 3600
+            if minutes:
+                total_secs += int(minutes) * 60
+            total_secs = -total_secs if sign == "-" else total_secs
+            return total_secs
+
+    # YYYY.MM.DD, MM/DD/YYYY, DD.MM.YYYY contain no timezone information
+
+    return 0
+
+
+def get_user_timezone():
+    """Retrieve local timezone as described in
+    https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
+    Returns: A tuple containing author timezone, committer timezone
+    """
+    local_timezone = time.localtime().tm_gmtoff
+
+    if os.environ.get("GIT_AUTHOR_DATE"):
+        author_timezone = _parse_timezone_format(os.environ["GIT_AUTHOR_DATE"])
+    else:
+        author_timezone = local_timezone
+    if os.environ.get("GIT_COMMITTER_DATE"):
+        commit_timezone = _parse_timezone_format(os.environ["GIT_COMMITTER_DATE"])
+    else:
+        commit_timezone = local_timezone
+
+    return author_timezone, commit_timezone
+
+
 def open_repo(path_or_repo):
     """Open an argument that can be a repository or a path for a repository."""
     if isinstance(path_or_repo, BaseRepo):
@@ -354,11 +435,14 @@ def commit(
         author = author.encode(encoding or DEFAULT_ENCODING)
     if getattr(committer, "encode", None):
         committer = committer.encode(encoding or DEFAULT_ENCODING)
+    author_timezone, commit_timezone = get_user_timezone()
     with open_repo_closing(repo) as r:
         return r.do_commit(
             message=message,
             author=author,
+            author_timezone=author_timezone,
             committer=committer,
+            commit_timezone=commit_timezone,
             encoding=encoding,
             no_verify=no_verify,
             sign=signoff if isinstance(signoff, (str, bool)) else None,
@@ -959,8 +1043,7 @@ def tag_create(
                 tag_time = int(time.time())
             tag_obj.tag_time = tag_time
             if tag_timezone is None:
-                # TODO(jelmer) Use current user timezone rather than UTC
-                tag_timezone = 0
+                tag_timezone = get_user_timezone()[1]
             elif isinstance(tag_timezone, str):
                 tag_timezone = parse_timezone(tag_timezone)
             tag_obj.tag_timezone = tag_timezone

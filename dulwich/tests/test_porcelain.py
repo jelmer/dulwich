@@ -493,7 +493,7 @@ class TimezoneTests(PorcelainTestCase):
 
     def fallback(self, value):
         self.put_envs(value)
-        self.assertTupleEqual((0, 0), porcelain.get_user_timezone())
+        self.assertRaises(porcelain.TimezoneFormatError, porcelain.get_user_timezone)
 
     def test_internal_format(self):
         self.put_envs("0 +0500")
@@ -502,6 +502,9 @@ class TimezoneTests(PorcelainTestCase):
     def test_rfc_2822(self):
         self.put_envs("Mon, 20 Nov 1995 19:12:08 -0500")
         self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezone())
+
+        self.put_envs("Mon, 20 Nov 1995 19:12:08")
+        self.assertTupleEqual((0, 0), porcelain.get_user_timezone())
 
     def test_iso8601(self):
         self.put_envs("1995-11-20T19:12:08-0501")
@@ -524,8 +527,6 @@ class TimezoneTests(PorcelainTestCase):
         # TODO: add more here
         self.fallback("0 + 0500")
         self.fallback("a +0500")
-
-        self.fallback("Mon, 20 Nov 1995 19:12:08")
 
         self.fallback("1995-11-20T19:12:08")
         self.fallback("1995-11-20T19:12:08-05:")

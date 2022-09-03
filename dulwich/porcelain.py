@@ -191,18 +191,23 @@ class RemoteExists(Error):
     """Raised when the remote already exists."""
 
 
-def _parse_timezone_format(tz_str):
+class TimezoneFormatError(Error):
+    """Raised when the timezone cannot be determined from a given string."""
+
+
+def parse_timezone_format(tz_str):
     """Parse given string and attempt to return a timezone offset.
     Different formats are considered in the following order:
         - Git internal format: <unix timestamp> <timezone offset>
         - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
         - ISO 8601: e.g. 1995-11-20T19:12:08-0500
             - uses regex if dateutil is not available
-    Will default to UTC if timezone cannot be determined.
     Args:
       tz_str: datetime string
     Returns: Timezone offset as integer
-    """
+    Raises:
+      TimezoneFormatError: if timezone information cannot be extracted
+   """
     import re
 
     # Git internal format
@@ -258,7 +263,7 @@ def _parse_timezone_format(tz_str):
 
     # YYYY.MM.DD, MM/DD/YYYY, DD.MM.YYYY contain no timezone information
 
-    return 0
+    raise TimezoneFormatError(tz_str)
 
 
 def get_user_timezone():
@@ -269,11 +274,11 @@ def get_user_timezone():
     local_timezone = time.localtime().tm_gmtoff
 
     if os.environ.get("GIT_AUTHOR_DATE"):
-        author_timezone = _parse_timezone_format(os.environ["GIT_AUTHOR_DATE"])
+        author_timezone = parse_timezone_format(os.environ["GIT_AUTHOR_DATE"])
     else:
         author_timezone = local_timezone
     if os.environ.get("GIT_COMMITTER_DATE"):
-        commit_timezone = _parse_timezone_format(os.environ["GIT_COMMITTER_DATE"])
+        commit_timezone = parse_timezone_format(os.environ["GIT_COMMITTER_DATE"])
     else:
         commit_timezone = local_timezone
 

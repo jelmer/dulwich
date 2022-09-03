@@ -201,7 +201,6 @@ def parse_timezone_format(tz_str):
         - Git internal format: <unix timestamp> <timezone offset>
         - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
         - ISO 8601: e.g. 1995-11-20T19:12:08-0500
-            - uses regex if dateutil is not available
     Args:
       tz_str: datetime string
     Returns: Timezone offset as integer
@@ -226,40 +225,19 @@ def parse_timezone_format(tz_str):
         return rfc_2822[9]
 
     # ISO 8601
-    try:
-        from dateutil.parser import isoparse, parse
 
-        try:
-            iso_8601 = isoparse(tz_str)
-            delta = iso_8601.tzinfo._offset
-        except (AttributeError, TypeError, ValueError):
-            try:
-                # 2006-07-03 17:18:44 +0200
-                iso_8601 = parse(tz_str)
-                delta = iso_8601.tzinfo._offset
-            except (AttributeError, TypeError, ValueError):
-                delta = None
-
-        if delta:
-            # From dateutil doc:
-            # `The time zone offset in seconds, or (since version 2.6.0, represented as a datetime.timedelta object).`
-            if isinstance(delta, int):
-                return delta
-            return int(delta.total_seconds())
-
-    except (ModuleNotFoundError, ImportError):
-        # Supported offsets:
-        # sHHMM, sHH:MM, sHH
-        iso_8601_pattern = re.compile("[0-9] ?([+-])([0-9]{2})(?::(?=[0-9]{2}))?([0-9]{2})?$")
-        match = re.search(iso_8601_pattern, tz_str)
-        total_secs = 0
-        if match:
-            sign, hours, minutes = match.groups()
-            total_secs += int(hours) * 3600
-            if minutes:
-                total_secs += int(minutes) * 60
-            total_secs = -total_secs if sign == "-" else total_secs
-            return total_secs
+    # Supported offsets:
+    # sHHMM, sHH:MM, sHH
+    iso_8601_pattern = re.compile("[0-9] ?([+-])([0-9]{2})(?::(?=[0-9]{2}))?([0-9]{2})?$")
+    match = re.search(iso_8601_pattern, tz_str)
+    total_secs = 0
+    if match:
+        sign, hours, minutes = match.groups()
+        total_secs += int(hours) * 3600
+        if minutes:
+            total_secs += int(minutes) * 60
+        total_secs = -total_secs if sign == "-" else total_secs
+        return total_secs
 
     # YYYY.MM.DD, MM/DD/YYYY, DD.MM.YYYY contain no timezone information
 

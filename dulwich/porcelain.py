@@ -266,7 +266,7 @@ def parse_timezone_format(tz_str):
     raise TimezoneFormatError(tz_str)
 
 
-def get_user_timezone():
+def get_user_timezones():
     """Retrieve local timezone as described in
     https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
     Returns: A tuple containing author timezone, committer timezone

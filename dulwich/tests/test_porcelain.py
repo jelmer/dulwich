@@ -421,6 +421,58 @@ class CommitTests(PorcelainTestCase):
         self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
+    def test_timezone(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"refs/heads/foo"] = c3.id
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            author_timezone=18000,
+            committer="Bob <bob@example.com>",
+            commit_timezone=18000,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, 18000)
+        self.assertEqual(commit._commit_timezone, 18000)
+
+        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = "1995-11-20T19:12:08-0501"
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, -18060)
+        self.assertEqual(commit._commit_timezone, -18060)
+
+        del os.environ["GIT_AUTHOR_DATE"]
+        del os.environ["GIT_COMMITTER_DATE"]
+        local_timezone = time.localtime().tm_gmtoff
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, local_timezone)
+        self.assertEqual(commit._commit_timezone, local_timezone)
+
 
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class CommitSignTests(PorcelainGpgTestCase):

@@ -401,7 +401,9 @@ def commit(
     repo=".",
     message=None,
     author=None,
+    author_timezone=None,
     committer=None,
+    commit_timezone=None,
     encoding=None,
     no_verify=False,
     signoff=False,
@@ -412,7 +414,9 @@ def commit(
       repo: Path to repository
       message: Optional commit message
       author: Optional author name and email
+      author_timezone: Author timestamp timezone
       committer: Optional committer name and email
+      commit_timezone: Commit timestamp timezone
       no_verify: Skip pre-commit and commit-msg hooks
       signoff: GPG Sign the commit (bool, defaults to False,
         pass True to use default GPG key,
@@ -426,7 +430,11 @@ def commit(
         author = author.encode(encoding or DEFAULT_ENCODING)
     if getattr(committer, "encode", None):
         committer = committer.encode(encoding or DEFAULT_ENCODING)
-    author_timezone, commit_timezone = get_user_timezones()
+    local_timezone = get_user_timezones()
+    if author_timezone is None:
+        author_timezone = local_timezone[0]
+    if commit_timezone is None:
+        commit_timezone = local_timezone[1]
     with open_repo_closing(repo) as r:
         return r.do_commit(
             message=message,

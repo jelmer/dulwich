@@ -516,6 +516,10 @@ class TimezoneTests(PorcelainTestCase):
         self.put_envs("1995-11-20 19:12:08-05")
         self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezone())
 
+        # https://github.com/git/git/blob/96b2d4fa927c5055adc5b1d08f10a5d7352e2989/t/t6300-for-each-ref.sh#L128
+        self.put_envs("2006-07-03 17:18:44 +0200")
+        self.assertTupleEqual((7200, 7200), porcelain.get_user_timezone())
+
     def test_missing_or_malformed(self):
         # TODO: add more here
         self.fallback("0 + 0500")

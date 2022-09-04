@@ -91,7 +91,7 @@ setup(name='dulwich',
       ext_modules=ext_modules,
       zip_safe=False,
       distclass=DulwichDistribution,  # type: ignore
-      install_requires=['urllib3>=1.24.1', 'certifi'],
+      install_requires=['urllib3>=1.25'],
       include_package_data=True,
       test_suite='dulwich.tests.test_suite',
       tests_require=tests_require,

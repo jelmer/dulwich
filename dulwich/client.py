@@ -1863,7 +1863,9 @@ def default_urllib3_manager(   # noqa: C901
 
     headers = {"User-agent": user_agent}
 
-    kwargs = {}
+    kwargs = {
+        "ca_certs" : ca_certs,
+    }
     if ssl_verify is True:
         kwargs["cert_reqs"] = "CERT_REQUIRED"
     elif ssl_verify is False:
@@ -1872,18 +1874,7 @@ def default_urllib3_manager(   # noqa: C901
         # Default to SSL verification
         kwargs["cert_reqs"] = "CERT_REQUIRED"
 
-    if ca_certs is not None:
-        kwargs["ca_certs"] = ca_certs
     kwargs.update(override_kwargs)
-
-    # Try really hard to find a SSL certificate path
-    if "ca_certs" not in kwargs and kwargs.get("cert_reqs") != "CERT_NONE":
-        try:
-            import certifi
-        except ImportError:
-            pass
-        else:
-            kwargs["ca_certs"] = certifi.where()
 
     import urllib3
 

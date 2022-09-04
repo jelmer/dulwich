@@ -421,6 +421,58 @@ class CommitTests(PorcelainTestCase):
         self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
+    def test_timezone(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"refs/heads/foo"] = c3.id
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            author_timezone=18000,
+            committer="Bob <bob@example.com>",
+            commit_timezone=18000,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, 18000)
+        self.assertEqual(commit._commit_timezone, 18000)
+
+        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = "1995-11-20T19:12:08-0501"
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, -18060)
+        self.assertEqual(commit._commit_timezone, -18060)
+
+        del os.environ["GIT_AUTHOR_DATE"]
+        del os.environ["GIT_COMMITTER_DATE"]
+        local_timezone = time.localtime().tm_gmtoff
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, local_timezone)
+        self.assertEqual(commit._commit_timezone, local_timezone)
+
 
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class CommitSignTests(PorcelainGpgTestCase):
@@ -484,6 +536,79 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit = self.repo.get_object(sha)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         commit.verify()
+
+
+class TimezoneTests(PorcelainTestCase):
+
+    def put_envs(self, value):
+        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = value
+
+    def fallback(self, value):
+        self.put_envs(value)
+        self.assertRaises(porcelain.TimezoneFormatError, porcelain.get_user_timezones)
+
+    def test_internal_format(self):
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezones())
+
+    def test_rfc_2822(self):
+        self.put_envs("Mon, 20 Nov 1995 19:12:08 -0500")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezones())
+
+        self.put_envs("Mon, 20 Nov 1995 19:12:08")
+        self.assertTupleEqual((0, 0), porcelain.get_user_timezones())
+
+    def test_iso8601(self):
+        self.put_envs("1995-11-20T19:12:08-0501")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20T19:12:08+0501")
+        self.assertTupleEqual((18060, 18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20T19:12:08-05:01")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20 19:12:08-05")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezones())
+
+        # https://github.com/git/git/blob/96b2d4fa927c5055adc5b1d08f10a5d7352e2989/t/t6300-for-each-ref.sh#L128
+        self.put_envs("2006-07-03 17:18:44 +0200")
+        self.assertTupleEqual((7200, 7200), porcelain.get_user_timezones())
+
+    def test_missing_or_malformed(self):
+        # TODO: add more here
+        self.fallback("0 + 0500")
+        self.fallback("a +0500")
+
+        self.fallback("1995-11-20T19:12:08")
+        self.fallback("1995-11-20T19:12:08-05:")
+
+        self.fallback("1995.11.20")
+        self.fallback("11/20/1995")
+        self.fallback("20.11.1995")
+
+    def test_different_envs(self):
+        os.environ["GIT_AUTHOR_DATE"] = "0 +0500"
+        os.environ["GIT_COMMITTER_DATE"] = "0 +0501"
+        self.assertTupleEqual((18000, 18060), porcelain.get_user_timezones())
+
+    def test_no_envs(self):
+        local_timezone = time.localtime().tm_gmtoff
+
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezones())
+
+        del os.environ["GIT_COMMITTER_DATE"]
+        self.assertTupleEqual((18000, local_timezone), porcelain.get_user_timezones())
+
+        self.put_envs("0 +0500")
+        del os.environ["GIT_AUTHOR_DATE"]
+        self.assertTupleEqual((local_timezone, 18000), porcelain.get_user_timezones())
+
+        self.put_envs("0 +0500")
+        del os.environ["GIT_AUTHOR_DATE"]
+        del os.environ["GIT_COMMITTER_DATE"]
+        self.assertTupleEqual((local_timezone, local_timezone), porcelain.get_user_timezones())
 
 
 class CleanTests(PorcelainTestCase):

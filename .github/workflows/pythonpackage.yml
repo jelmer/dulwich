@@ -44,7 +44,7 @@ jobs:
         if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
       - name: Install mypy
         run: |
-          pip install -U mypy types-paramiko types-certifi types-requests
+          pip install -U mypy types-paramiko types-requests
         if: "matrix.python-version != 'pypy3'"
       - name: Style checks
         run: |

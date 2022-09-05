@@ -2283,6 +2283,12 @@ def get_transport_and_path_from_url(
     """
     if config is not None:
         url = apply_instead_of(config, url, push=(operation == "push"))
+
+    return _get_transport_and_path_from_url(
+        url, config=config, operation=operation, **kwargs)
+
+
+def _get_transport_and_path_from_url(url, config, operation, **kwargs):
     parsed = urlparse(url)
     if parsed.scheme == "git":
         return (TCPGitClient.from_parsedurl(parsed, **kwargs), parsed.path)
@@ -2325,6 +2331,7 @@ def parse_rsync_url(location: str) -> Tuple[Optional[str], str, str]:
 
 def get_transport_and_path(
     location: str,
+    config: Optional[Config] = None,
     operation: Optional[str] = None,
     **kwargs: Any
 ) -> Tuple[GitClient, str]:
@@ -2342,9 +2349,13 @@ def get_transport_and_path(
       Tuple with client instance and relative path.
 
     """
+    if config is not None:
+        location = apply_instead_of(config, location, push=(operation == "push"))
+
     # First, try to parse it as a URL
     try:
-        return get_transport_and_path_from_url(location, operation=operation, **kwargs)
+        return _get_transport_and_path_from_url(
+            location, config=config, operation=operation, **kwargs)
     except ValueError:
         pass
 

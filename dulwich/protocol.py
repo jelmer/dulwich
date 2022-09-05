@@ -238,6 +238,8 @@ class Protocol(object):
             if self.report_activity:
                 self.report_activity(size, "read")
             pkt_contents = read(size - 4)
+        except ConnectionResetError:
+            raise HangupException()
         except socket.error as e:
             raise GitProtocolError(e)
         else:

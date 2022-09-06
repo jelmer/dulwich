@@ -1,11 +1,11 @@
-dulwich (0.20.46-1) UNRELEASED; urgency=medium
+dulwich (0.20.46-1) unstable; urgency=medium
 
   * New upstream release.
    + Drop dependency on certifi - no longer used upstream.
    + Add build-dependency on python3-setuptools.
   * Update standards version to 4.6.1, no changes needed.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 06 Sep 2022 17:59:53 +0100
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 06 Sep 2022 18:04:48 +0100
 
 dulwich (0.20.44-1) unstable; urgency=low
 

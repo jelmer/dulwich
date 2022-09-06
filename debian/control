@@ -10,10 +10,10 @@ Build-Depends: debhelper-compat (= 13),
                gnupg,
                python3-all-dbg,
                python3-all-dev,
-               python3-certifi,
                python3-fastimport,
                python3-gpg,
-               python3-urllib3 (>= 1.24.1)
+               python3-urllib3 (>= 1.25),
+	       python3-setuptools
 Standards-Version: 4.6.1
 Vcs-Git: https://salsa.debian.org/python-team/packages/dulwich.git
 Vcs-Browser: https://salsa.debian.org/python-team/packages/dulwich
@@ -21,8 +21,7 @@ Rules-Requires-Root: no
 
 Package: python3-dulwich
 Architecture: any
-Depends: python3-certifi,
-         python3-urllib3 (>= 1.24.1),
+Depends: python3-urllib3 (>= 1.25),
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}

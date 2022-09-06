@@ -1,10 +1,58 @@
 0.20.46	UNRELEASED
 
- * Add a separate Exception for symbolic
-   reference loops - dulwich.refs.SymrefLoop.
+ * Apply insteadOf to rsync-style location strings
+   (previously it was just applied to URLs).
+   (Jelmer Vernooĳ, python-poetry/poetry#6329)
+
+ * Drop use of certifi, instead relying on urllib3's default
+   code to find system CAs. (Jelmer Vernooĳ, #1025)
+
+ * Implement timezone parsing in porcelain.
+   (springheeledjack0, #1026)
+
+ * Drop support for running without setuptools.
+   (Jelmer Vernooĳ)
+
+ * Ensure configuration is loaded when
+   running "dulwich clone".
+   (Jelmer Vernooĳ)
+
+ * Build 32 bit wheels for Windows.
+   (Benjamin Parzella)
+
+ * tests: Ignore errors when deleting GNUPG 
+   home directory. Fixes spurious errors racing
+   gnupg-agent. Thanks, Matěj Cepl. Fixes #1000
+
+ * config: Support closing brackets in quotes in section
+   names. (Jelmer Vernooĳ, #10124)
+
+ * Various and formatting fixes. (Kian-Meng Ang)
+
+ * Document basic authentication in dulwich.porcelain.clone.
+   (TuringTux)
+
+ * Flush before calling fsync, ensuring buffers
+   are filled. (wernha)
+
+ * Support GPG commit signing. (springheeledjack0)
+
+ * Add python 3.11 support. (Saugat Pachhai)
+
+ * Allow missing GPG during tests. (Jakub Kulík)
+
+ * status: return posix-style untracked paths instead of nt-style paths on
+   win32 (Daniele Trifirò)
+
+ * Honour PATH environment when running C Git for testing.
+   (Stefan Sperling)
+
+ * Split out exception for symbolic reference loops.
+   (Jelmer Vernooĳ)
 
  * Move various long-deprecated methods.
    (Jelmer Vernooĳ)
+
 
 0.20.45	2022-07-15
 

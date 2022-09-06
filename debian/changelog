@@ -1,6 +1,7 @@
 dulwich (0.20.46-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Update standards version to 4.6.1, no changes needed.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Tue, 06 Sep 2022 17:59:53 +0100
 

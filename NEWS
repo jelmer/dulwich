@@ -1,4 +1,4 @@
-0.20.46	UNRELEASED
+0.20.46	2022-09-06
 
  * Apply insteadOf to rsync-style location strings
    (previously it was just applied to URLs).

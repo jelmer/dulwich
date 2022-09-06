@@ -46,7 +46,18 @@ import select
 import socket
 import subprocess
 import sys
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, IO, Iterable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    IO,
+    Union,
+    TYPE_CHECKING,
+)
 
 from urllib.parse import (
     quote as urlquote,
@@ -57,9 +68,12 @@ from urllib.parse import (
     urlunparse,
 )
 
+if TYPE_CHECKING:
+    import urllib3
+
 
 import dulwich
-from dulwich.config import get_xdg_config_home_path, Config
+from dulwich.config import get_xdg_config_home_path, Config, apply_instead_of
 from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
@@ -437,7 +451,6 @@ class _v1ReceivePackHeader(object):
         """Handle the head of a 'git-receive-pack' request.
 
         Args:
-          proto: Protocol object to read from
           capabilities: List of negotiated capabilities
           old_refs: Old refs, as received from the server
           new_refs: Refs to change
@@ -949,6 +962,21 @@ class GitClient(object):
 
         negotiated_capabilities = self._fetch_capabilities & server_capabilities
         return (negotiated_capabilities, symrefs, agent)
+
+    def archive(
+        self,
+        path,
+        committish,
+        write_data,
+        progress=None,
+        write_error=None,
+        format=None,
+        subdirs=None,
+        prefix=None,
+    ):
+        """Retrieve an archive of the specified tree.
+        """
+        raise NotImplementedError(self.archive)
 
 
 def check_wants(wants, refs):
@@ -1533,31 +1561,6 @@ default_local_git_client_cls = LocalGitClient
 class SSHVendor(object):
     """A client side SSH implementation."""
 
-    def connect_ssh(
-        self,
-        host,
-        command,
-        username=None,
-        port=None,
-        password=None,
-        key_filename=None,
-    ):
-        # This function was deprecated in 0.9.1
-        import warnings
-
-        warnings.warn(
-            "SSHVendor.connect_ssh has been renamed to SSHVendor.run_command",
-            DeprecationWarning,
-        )
-        return self.run_command(
-            host,
-            command,
-            username=username,
-            port=port,
-            password=password,
-            key_filename=key_filename,
-        )
-
     def run_command(
         self,
         host,
@@ -1616,7 +1619,8 @@ class SubprocessSSHVendor(SSHVendor):
 
         if ssh_command:
             import shlex
-            args = shlex.split(ssh_command) + ["-x"]
+            args = shlex.split(
+                ssh_command, posix=(sys.platform != 'win32')) + ["-x"]
         else:
             args = ["ssh", "-x"]
 
@@ -1658,7 +1662,8 @@ class PLinkSSHVendor(SSHVendor):
 
         if ssh_command:
             import shlex
-            args = shlex.split(ssh_command) + ["-ssh"]
+            args = shlex.split(
+                ssh_command, posix=(sys.platform != 'win32')) + ["-ssh"]
         elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]
         else:
@@ -1781,7 +1786,7 @@ class SSHGitClient(TraditionalGitClient):
             kwargs["password"] = self.password
         if self.key_filename is not None:
             kwargs["key_filename"] = self.key_filename
-        # GIT_SSH_COMMAND takes precendence over GIT_SSH
+        # GIT_SSH_COMMAND takes precedence over GIT_SSH
         if self.ssh_command is not None:
             kwargs["ssh_command"] = self.ssh_command
         con = self.ssh_vendor.run_command(
@@ -1807,8 +1812,8 @@ def default_user_agent_string():
 
 def default_urllib3_manager(   # noqa: C901
     config, pool_manager_cls=None, proxy_manager_cls=None, **override_kwargs
-):
-    """Return `urllib3` connection pool manager.
+) -> Union["urllib3.ProxyManager", "urllib3.PoolManager"]:
+    """Return urllib3 connection pool manager.
 
     Honour detected proxy configurations.
 
@@ -1817,9 +1822,9 @@ def default_urllib3_manager(   # noqa: C901
       override_kwargs: Additional arguments for `urllib3.ProxyManager`
 
     Returns:
-      `pool_manager_cls` (defaults to `urllib3.ProxyManager`) instance for
-      proxy configurations, `proxy_manager_cls` (defaults to
-      `urllib3.PoolManager`) instance otherwise.
+      Either pool_manager_cls (defaults to `urllib3.ProxyManager`) instance for
+      proxy configurations, proxy_manager_cls
+      (defaults to `urllib3.PoolManager`) instance otherwise
 
     """
     proxy_server = user_agent = None
@@ -1858,7 +1863,9 @@ def default_urllib3_manager(   # noqa: C901
 
     headers = {"User-agent": user_agent}
 
-    kwargs = {}
+    kwargs = {
+        "ca_certs" : ca_certs,
+    }
     if ssl_verify is True:
         kwargs["cert_reqs"] = "CERT_REQUIRED"
     elif ssl_verify is False:
@@ -1867,18 +1874,7 @@ def default_urllib3_manager(   # noqa: C901
         # Default to SSL verification
         kwargs["cert_reqs"] = "CERT_REQUIRED"
 
-    if ca_certs is not None:
-        kwargs["ca_certs"] = ca_certs
     kwargs.update(override_kwargs)
-
-    # Try really hard to find a SSL certificate path
-    if "ca_certs" not in kwargs and kwargs.get("cert_reqs") != "CERT_NONE":
-        try:
-            import certifi
-        except ImportError:
-            pass
-        else:
-            kwargs["ca_certs"] = certifi.where()
 
     import urllib3
 
@@ -1919,9 +1915,9 @@ class AbstractHttpGitClient(GitClient):
           data: Request data.
 
         Returns:
-          Tuple (`response`, `read`), where response is an `urllib3`
-          response object with additional `content_type` and
-          `redirect_location` properties, and `read` is a consumable read
+          Tuple (response, read), where response is an urllib3
+          response object with additional content_type and
+          redirect_location properties, and read is a consumable read
           method for the response data.
 
         """
@@ -2268,40 +2264,6 @@ def _win32_url_to_path(parsed) -> str:
     return url2pathname(netloc + path)  # type: ignore
 
 
-def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:
-    """Iterate over insteadOf / pushInsteadOf values.
-    """
-    for section in config.sections():
-        if section[0] != b'url':
-            continue
-        replacement = section[1]
-        try:
-            needles = list(config.get_multivar(section, "insteadOf"))
-        except KeyError:
-            needles = []
-        if push:
-            try:
-                needles += list(config.get_multivar(section, "pushInsteadOf"))
-            except KeyError:
-                pass
-        for needle in needles:
-            yield needle.decode('utf-8'), replacement.decode('utf-8')
-
-
-def apply_instead_of(config: Config, orig_url: str, push: bool = False) -> str:
-    """Apply insteadOf / pushInsteadOf to a URL.
-    """
-    longest_needle = ""
-    updated_url = orig_url
-    for needle, replacement in iter_instead_of(config, push):
-        if not orig_url.startswith(needle):
-            continue
-        if len(longest_needle) < len(needle):
-            longest_needle = needle
-            updated_url = replacement + orig_url[len(needle):]
-    return updated_url
-
-
 def get_transport_and_path_from_url(
         url: str, config: Optional[Config] = None,
         operation: Optional[str] = None, **kwargs) -> Tuple[GitClient, str]:
@@ -2321,6 +2283,12 @@ def get_transport_and_path_from_url(
     """
     if config is not None:
         url = apply_instead_of(config, url, push=(operation == "push"))
+
+    return _get_transport_and_path_from_url(
+        url, config=config, operation=operation, **kwargs)
+
+
+def _get_transport_and_path_from_url(url, config, operation, **kwargs):
     parsed = urlparse(url)
     if parsed.scheme == "git":
         return (TCPGitClient.from_parsedurl(parsed, **kwargs), parsed.path)
@@ -2363,6 +2331,7 @@ def parse_rsync_url(location: str) -> Tuple[Optional[str], str, str]:
 
 def get_transport_and_path(
     location: str,
+    config: Optional[Config] = None,
     operation: Optional[str] = None,
     **kwargs: Any
 ) -> Tuple[GitClient, str]:
@@ -2380,9 +2349,13 @@ def get_transport_and_path(
       Tuple with client instance and relative path.
 
     """
+    if config is not None:
+        location = apply_instead_of(config, location, push=(operation == "push"))
+
     # First, try to parse it as a URL
     try:
-        return get_transport_and_path_from_url(location, operation=operation, **kwargs)
+        return _get_transport_and_path_from_url(
+            location, config=config, operation=operation, **kwargs)
     except ValueError:
         pass
 

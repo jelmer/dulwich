@@ -202,7 +202,7 @@ def write_object_diff(f, store, old_file, new_file, diff_binary=False):
       diff_binary: Whether to diff files even if they
         are considered binary files by is_binary().
 
-    Note: the tuple elements should be None for nonexistant files
+    Note: the tuple elements should be None for nonexistent files
     """
     (old_path, old_mode, old_id) = old_file
     (new_path, new_mode, new_id) = new_file

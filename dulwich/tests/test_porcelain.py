@@ -66,6 +66,11 @@ from dulwich.web import (
     make_wsgi_chain,
 )
 
+try:
+    import gpg
+except ImportError:
+    gpg = None
+
 
 def flat_walk_dir(dir_to_walk):
     for dirpath, _, filenames in os.walk(dir_to_walk):
@@ -94,6 +99,7 @@ class PorcelainTestCase(TestCase):
         self.assertLess(time.time() - ts, 50)
 
 
+@skipIf(gpg is None, "gpg is not available")
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """
 -----BEGIN PGP PRIVATE KEY BLOCK-----
@@ -271,7 +277,10 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
         super(PorcelainGpgTestCase, self).setUp()
         self.gpg_dir = os.path.join(self.test_dir, "gpg")
         os.mkdir(self.gpg_dir, mode=0o700)
-        self.addCleanup(shutil.rmtree, self.gpg_dir)
+        # Ignore errors when deleting GNUPGHOME, because of race conditions
+        # (e.g. the gpg-agent socket having been deleted). See
+        # https://github.com/jelmer/dulwich/issues/1000
+        self.addCleanup(shutil.rmtree, self.gpg_dir, ignore_errors=True)
         self._old_gnupghome = os.environ.get("GNUPGHOME")
         os.environ["GNUPGHOME"] = self.gpg_dir
         if self._old_gnupghome is None:
@@ -411,6 +420,195 @@ class CommitTests(PorcelainTestCase):
         )
         self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
+
+    def test_timezone(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"refs/heads/foo"] = c3.id
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            author_timezone=18000,
+            committer="Bob <bob@example.com>",
+            commit_timezone=18000,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, 18000)
+        self.assertEqual(commit._commit_timezone, 18000)
+
+        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = "1995-11-20T19:12:08-0501"
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, -18060)
+        self.assertEqual(commit._commit_timezone, -18060)
+
+        del os.environ["GIT_AUTHOR_DATE"]
+        del os.environ["GIT_COMMITTER_DATE"]
+        local_timezone = time.localtime().tm_gmtoff
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, local_timezone)
+        self.assertEqual(commit._commit_timezone, local_timezone)
+
+
+@skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
+class CommitSignTests(PorcelainGpgTestCase):
+
+    def test_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_default_key()
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=True,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        commit.verify()
+        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+        self.import_non_default_key()
+        self.assertRaises(
+            gpg.errors.MissingSignatures,
+            commit.verify,
+            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
+        )
+
+        commit.committer = b"Alice <alice@example.com>"
+        self.assertRaises(
+            gpg.errors.BadSignatures,
+            commit.verify,
+        )
+
+    def test_non_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_non_default_key()
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        commit.verify()
+
+
+class TimezoneTests(PorcelainTestCase):
+
+    def put_envs(self, value):
+        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = value
+
+    def fallback(self, value):
+        self.put_envs(value)
+        self.assertRaises(porcelain.TimezoneFormatError, porcelain.get_user_timezones)
+
+    def test_internal_format(self):
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezones())
+
+    def test_rfc_2822(self):
+        self.put_envs("Mon, 20 Nov 1995 19:12:08 -0500")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezones())
+
+        self.put_envs("Mon, 20 Nov 1995 19:12:08")
+        self.assertTupleEqual((0, 0), porcelain.get_user_timezones())
+
+    def test_iso8601(self):
+        self.put_envs("1995-11-20T19:12:08-0501")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20T19:12:08+0501")
+        self.assertTupleEqual((18060, 18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20T19:12:08-05:01")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20 19:12:08-05")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezones())
+
+        # https://github.com/git/git/blob/96b2d4fa927c5055adc5b1d08f10a5d7352e2989/t/t6300-for-each-ref.sh#L128
+        self.put_envs("2006-07-03 17:18:44 +0200")
+        self.assertTupleEqual((7200, 7200), porcelain.get_user_timezones())
+
+    def test_missing_or_malformed(self):
+        # TODO: add more here
+        self.fallback("0 + 0500")
+        self.fallback("a +0500")
+
+        self.fallback("1995-11-20T19:12:08")
+        self.fallback("1995-11-20T19:12:08-05:")
+
+        self.fallback("1995.11.20")
+        self.fallback("11/20/1995")
+        self.fallback("20.11.1995")
+
+    def test_different_envs(self):
+        os.environ["GIT_AUTHOR_DATE"] = "0 +0500"
+        os.environ["GIT_COMMITTER_DATE"] = "0 +0501"
+        self.assertTupleEqual((18000, 18060), porcelain.get_user_timezones())
+
+    def test_no_envs(self):
+        local_timezone = time.localtime().tm_gmtoff
+
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezones())
+
+        del os.environ["GIT_COMMITTER_DATE"]
+        self.assertTupleEqual((18000, local_timezone), porcelain.get_user_timezones())
+
+        self.put_envs("0 +0500")
+        del os.environ["GIT_AUTHOR_DATE"]
+        self.assertTupleEqual((local_timezone, 18000), porcelain.get_user_timezones())
+
+        self.put_envs("0 +0500")
+        del os.environ["GIT_AUTHOR_DATE"]
+        del os.environ["GIT_COMMITTER_DATE"]
+        self.assertTupleEqual((local_timezone, local_timezone), porcelain.get_user_timezones())
 
 
 class CleanTests(PorcelainTestCase):
@@ -647,7 +845,7 @@ class CloneTests(PorcelainTestCase):
         with tempfile.TemporaryDirectory() as parent:
             target_path = os.path.join(parent, "target")
             self.assertRaises(
-                Exception, porcelain.clone, "/nonexistant/repo", target_path
+                Exception, porcelain.clone, "/nonexistent/repo", target_path
             )
             self.assertFalse(os.path.exists(target_path))
 
@@ -1128,8 +1326,6 @@ class RevListTests(PorcelainTestCase):
 class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_default_key(self):
-        import gpg
-
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
@@ -1406,6 +1602,28 @@ class ResetFileTests(PorcelainTestCase):
         porcelain.reset_file(self.repo, os.path.join('new_dir', 'foo'), target=sha)
         with open(full_path, 'r') as f:
             self.assertEqual('hello', f.read())
+
+
+class SubmoduleTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        self.assertEqual([], list(porcelain.submodule_list(self.repo)))
+
+    def test_add(self):
+        porcelain.submodule_add(self.repo, "../bar.git", "bar")
+        with open('%s/.gitmodules' % self.repo.path, 'r') as f:
+            self.assertEqual("""\
+[submodule "bar"]
+\turl = ../bar.git
+\tpath = bar
+""", f.read())
 
 
 class PushTests(PorcelainTestCase):
@@ -1896,6 +2114,16 @@ class StatusTests(PorcelainTestCase):
     def test_status_wrong_untracked_files_value(self):
         with self.assertRaises(ValueError):
             porcelain.status(self.repo.path, untracked_files="antani")
+
+    def test_status_untracked_path(self):
+        untracked_dir = os.path.join(self.repo_path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        untracked_file = os.path.join(untracked_dir, "untracked_file")
+        with open(untracked_file, "w") as fh:
+            fh.write("untracked")
+
+        _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
+        self.assertEqual(untracked, ["untracked_dir/untracked_file"])
 
     def test_status_crlf_mismatch(self):
         # First make a commit as if the file has been added on a Linux system

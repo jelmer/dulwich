@@ -50,7 +50,7 @@ class TestCase(_TestCase):
     def setUp(self):
         super(TestCase, self).setUp()
         self._old_home = os.environ.get("HOME")
-        os.environ["HOME"] = "/nonexistant"
+        os.environ["HOME"] = "/nonexistent"
         os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
 
     def tearDown(self):

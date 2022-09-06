@@ -1,20 +1,12 @@
 #!/usr/bin/python3
 # encoding: utf-8
 # Setup file for dulwich
-# Copyright (C) 2008-2016 Jelmer Vernooĳ <jelmer@jelmer.uk>
+# Copyright (C) 2008-2022 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
-try:
-    from setuptools import setup, Extension
-except ImportError:
-    from distutils.core import setup, Extension
-    has_setuptools = False
-else:
-    has_setuptools = True
-from distutils.core import Distribution
+from setuptools import setup, Extension, Distribution
 import io
 import os
 import sys
-from typing import Dict, Any
 
 
 if sys.version_info < (3, 6):
@@ -23,7 +15,7 @@ if sys.version_info < (3, 6):
         'For 2.7 support, please install a version prior to 0.20')
 
 
-dulwich_version_string = '0.20.44'
+dulwich_version_string = '0.20.46'
 
 
 class DulwichDistribution(Distribution):
@@ -53,8 +45,8 @@ if sys.platform == 'darwin' and os.path.exists('/usr/bin/xcodebuild'):
     for line in out.splitlines():
         line = line.decode("utf8")
         # Also parse only first digit, because 3.2.1 can't be parsed nicely
-        if (line.startswith('Xcode') and
-                int(line.split()[1].split('.')[0]) >= 4):
+        if (line.startswith('Xcode')
+                and int(line.split()[1].split('.')[0]) >= 4):
             os.environ['ARCHFLAGS'] = ''
 
 tests_require = ['fastimport']
@@ -71,26 +63,7 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c']),
 ]
 
-setup_kwargs = {}  # type: Dict[str, Any]
 scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
-if has_setuptools:
-    setup_kwargs['extras_require'] = {
-        'fastimport': ['fastimport'],
-        'https': ['urllib3[secure]>=1.24.1'],
-        'pgp': ['gpg'],
-        'paramiko': ['paramiko'],
-        }
-    setup_kwargs['install_requires'] = ['urllib3>=1.24.1', 'certifi']
-    setup_kwargs['include_package_data'] = True
-    setup_kwargs['test_suite'] = 'dulwich.tests.test_suite'
-    setup_kwargs['tests_require'] = tests_require
-    setup_kwargs['entry_points'] = {
-        "console_scripts": [
-            "dulwich=dulwich.cli:main",
-        ]}
-    setup_kwargs['python_requires'] = '>=3.6'
-else:
-    scripts.append('bin/dulwich')
 
 
 with io.open(os.path.join(os.path.dirname(__file__), "README.rst"),
@@ -111,13 +84,21 @@ setup(name='dulwich',
           "GitHub": "https://github.com/dulwich/dulwich",
       },
       keywords="git vcs",
-      packages=['dulwich', 'dulwich.tests', 'dulwich.tests.compat',
-                'dulwich.contrib'],
+      packages=['dulwich', 'dulwich.cloud', 'dulwich.tests',
+                'dulwich.tests.compat', 'dulwich.contrib'],
       package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
       scripts=scripts,
       ext_modules=ext_modules,
       zip_safe=False,
-      distclass=DulwichDistribution,
+      distclass=DulwichDistribution,  # type: ignore
+      install_requires=['urllib3>=1.25'],
+      include_package_data=True,
+      test_suite='dulwich.tests.test_suite',
+      tests_require=tests_require,
+      entry_points={
+          "console_scripts": ["dulwich=dulwich.cli:main"]
+      },
+      python_requires='>=3.6',
       classifiers=[
           'Development Status :: 4 - Beta',
           'License :: OSI Approved :: Apache Software License',
@@ -126,11 +107,16 @@ setup(name='dulwich',
           'Programming Language :: Python :: 3.8',
           'Programming Language :: Python :: 3.9',
           'Programming Language :: Python :: 3.10',
+          'Programming Language :: Python :: 3.11',
           'Programming Language :: Python :: Implementation :: CPython',
           'Programming Language :: Python :: Implementation :: PyPy',
           'Operating System :: POSIX',
           'Operating System :: Microsoft :: Windows',
           'Topic :: Software Development :: Version Control',
       ],
-      **setup_kwargs
-      )
+      extras_require={
+          'fastimport': ['fastimport'],
+          'https': ['urllib3>=1.24.1'],
+          'pgp': ['gpg'],
+          'paramiko': ['paramiko'],
+      })

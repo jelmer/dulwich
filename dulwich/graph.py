@@ -74,7 +74,7 @@ def _find_lcas(lookup_parents, c1, c2s):
                     cstates[pcmt] = flags
                 wlst.append(pcmt)
 
-    # walk final candidates removing any superceded by _DNC by later lower LCAs
+    # walk final candidates removing any superseded by _DNC by later lower LCAs
     results = []
     for cmt in cands:
         if not (cstates[cmt] & _DNC):

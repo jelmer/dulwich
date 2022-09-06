@@ -43,7 +43,9 @@ from dulwich.tests import (
 _DEFAULT_GIT = "git"
 _VERSION_LEN = 4
 _REPOS_DATA_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), os.pardir, "data", "repos")
+    os.path.join(
+        os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
+        "testdata", "repos")
 )
 
 
@@ -82,7 +84,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
 
     Args:
       required_version: A tuple of ints of the form (major, minor, point,
-        sub-point); ommitted components default to 0.
+        sub-point); omitted components default to 0.
       git_path: Path to the git executable; defaults to the version in
         the system path.
     Raises:
@@ -137,6 +139,7 @@ def run_git(
 
     env = popen_kwargs.pop("env", {})
     env["LC_ALL"] = env["LANG"] = "C"
+    env["PATH"] = os.getenv("PATH")
 
     args = [git_path] + args
     popen_kwargs["stdin"] = subprocess.PIPE

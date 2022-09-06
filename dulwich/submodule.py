@@ -1,6 +1,5 @@
-# __init__.py -- The git module of dulwich
-# Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
-# Copyright (C) 2008 Jelmer Vernooij <jelmer@jelmer.uk>
+# config.py - Reading and writing Git config files
+# Copyright (C) 2011-2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -19,7 +18,23 @@
 # License, Version 2.0.
 #
 
+"""Working with Git submodules.
+"""
 
-"""Python implementation of the Git file formats and protocols."""
+from typing import Iterator, Tuple
+from .objects import S_ISGITLINK
 
-__version__ = (0, 20, 46)
+
+def iter_cached_submodules(store, root_tree_id: bytes) -> Iterator[Tuple[str, bytes]]:
+    """iterate over cached submodules.
+
+    Args:
+      store: Object store to iterate
+      root_tree_id: SHA of root tree
+
+    Returns:
+      Iterator over over (path, sha) tuples
+    """
+    for entry in store.iter_tree_contents(root_tree_id):
+        if S_ISGITLINK(entry.mode):
+            yield entry.path, entry.sha

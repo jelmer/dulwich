@@ -28,7 +28,6 @@ TODO:
 
 import os
 import sys
-import warnings
 from typing import (
     BinaryIO,
     Iterable,
@@ -45,7 +44,7 @@ from typing import (
 from dulwich.file import GitFile
 
 
-SENTINAL = object()
+SENTINEL = object()
 
 
 def lower_key(key):
@@ -112,13 +111,13 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def __getitem__(self, item):
         return self._keyed[lower_key(item)]
 
-    def get(self, key, default=SENTINAL):
+    def get(self, key, default=SENTINEL):
         try:
             return self[key]
         except KeyError:
             pass
 
-        if default is SENTINAL:
+        if default is SENTINEL:
             return type(self)()
 
         return default
@@ -129,7 +128,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
             if lower_key(actual) == key:
                 yield value
 
-    def setdefault(self, key, default=SENTINAL):
+    def setdefault(self, key, default=SENTINEL):
         try:
             return self[key]
         except KeyError:
@@ -230,29 +229,6 @@ class Config(object):
           Iterator over (name, value) pairs
         """
         raise NotImplementedError(self.items)
-
-    def iteritems(self, section: SectionLike) -> Iterator[Tuple[Name, Value]]:
-        """Iterate over the configuration pairs for a specific section.
-
-        Args:
-          section: Tuple with section name and optional subsection namee
-        Returns:
-          Iterator over (name, value) pairs
-        """
-        warnings.warn(
-            "Use %s.items instead." % type(self).__name__,
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return self.items(section)
-
-    def itersections(self) -> Iterator[Section]:
-        warnings.warn(
-            "Use %s.items instead." % type(self).__name__,
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return self.sections()
 
     def sections(self) -> Iterator[Section]:
         """Iterate over the sections.
@@ -507,6 +483,46 @@ def _strip_comments(line: bytes) -> bytes:
     return line
 
 
+def _parse_section_header_line(line: bytes) -> Tuple[Section, bytes]:
+    # Parse section header ("[bla]")
+    line = _strip_comments(line).rstrip()
+    in_quotes = False
+    escaped = False
+    for i, c in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if c == ord(b'"'):
+            in_quotes = not in_quotes
+        if c == ord(b'\\'):
+            escaped = True
+        if c == ord(b']') and not in_quotes:
+            last = i
+            break
+    else:
+        raise ValueError("expected trailing ]")
+    pts = line[1:last].split(b" ", 1)
+    line = line[last + 1:]
+    section: Section
+    if len(pts) == 2:
+        if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
+            raise ValueError("Invalid subsection %r" % pts[1])
+        else:
+            pts[1] = pts[1][1:-1]
+        if not _check_section_name(pts[0]):
+            raise ValueError("invalid section name %r" % pts[0])
+        section = (pts[0], pts[1])
+    else:
+        if not _check_section_name(pts[0]):
+            raise ValueError("invalid section name %r" % pts[0])
+        pts = pts[0].split(b".", 1)
+        if len(pts) == 2:
+            section = (pts[0], pts[1])
+        else:
+            section = (pts[0],)
+    return section, line
+
+
 class ConfigFile(ConfigDict):
     """A Git configuration file, like .git/config or ~/.gitconfig."""
 
@@ -532,31 +548,8 @@ class ConfigFile(ConfigDict):
                 line = line[3:]
             line = line.lstrip()
             if setting is None:
-                # Parse section header ("[bla]")
                 if len(line) > 0 and line[:1] == b"[":
-                    line = _strip_comments(line).rstrip()
-                    try:
-                        last = line.index(b"]")
-                    except ValueError:
-                        raise ValueError("expected trailing ]")
-                    pts = line[1:last].split(b" ", 1)
-                    line = line[last + 1 :]
-                    if len(pts) == 2:
-                        if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
-                            raise ValueError("Invalid subsection %r" % pts[1])
-                        else:
-                            pts[1] = pts[1][1:-1]
-                        if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" % pts[0])
-                        section = (pts[0], pts[1])
-                    else:
-                        if not _check_section_name(pts[0]):
-                            raise ValueError("invalid section name %r" % pts[0])
-                        pts = pts[0].split(b".", 1)
-                        if len(pts) == 2:
-                            section = (pts[0], pts[1])
-                        else:
-                            section = (pts[0],)
+                    section, line = _parse_section_header_line(line)
                     ret._values.setdefault(section)
                 if _strip_comments(line).strip() == b"":
                     continue
@@ -772,3 +765,38 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
             sm_path = config.get(section, b"path")
             sm_url = config.get(section, b"url")
             yield (sm_path, sm_url, section_name)
+
+
+def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:
+    """Iterate over insteadOf / pushInsteadOf values.
+    """
+    for section in config.sections():
+        if section[0] != b'url':
+            continue
+        replacement = section[1]
+        try:
+            needles = list(config.get_multivar(section, "insteadOf"))
+        except KeyError:
+            needles = []
+        if push:
+            try:
+                needles += list(config.get_multivar(section, "pushInsteadOf"))
+            except KeyError:
+                pass
+        for needle in needles:
+            assert isinstance(needle, bytes)
+            yield needle.decode('utf-8'), replacement.decode('utf-8')
+
+
+def apply_instead_of(config: Config, orig_url: str, push: bool = False) -> str:
+    """Apply insteadOf / pushInsteadOf to a URL.
+    """
+    longest_needle = ""
+    updated_url = orig_url
+    for needle, replacement in iter_instead_of(config, push):
+        if not orig_url.startswith(needle):
+            continue
+        if len(longest_needle) < len(needle):
+            longest_needle = needle
+            updated_url = replacement + orig_url[len(needle):]
+    return updated_url

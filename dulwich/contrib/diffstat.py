@@ -184,7 +184,7 @@ def diffstat(lines, max_width=80):
 
 def main():
     argv = sys.argv
-    # allow diffstat.py to also be used from the comand line
+    # allow diffstat.py to also be used from the command line
     if len(sys.argv) > 1:
         diffpath = argv[1]
         data = b""
@@ -197,7 +197,7 @@ def main():
 
     # if no path argument to a diff file is passed in, run
     # a self test. The test case includes tricky things like
-    # a diff of diff, binary files, renames with futher changes
+    # a diff of diff, binary files, renames with further changes
     # added files and removed files.
     # All extracted from Sigil-Ebook/Sigil's github repo with
     # full permission to use under this license.

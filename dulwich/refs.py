@@ -49,6 +49,14 @@ BAD_REF_CHARS = set(b"\177 ~^:?*[")
 ANNOTATED_TAG_SUFFIX = b"^{}"
 
 
+class SymrefLoop(Exception):
+    """There is a loop between one or more symrefs."""
+
+    def __init__(self, ref, depth):
+        self.ref = ref
+        self.depth = depth
+
+
 def parse_symref_value(contents):
     """Parse a symref value.
 
@@ -231,7 +239,7 @@ class RefsContainer(object):
         for key in keys:
             try:
                 ret[key] = self[(base + b"/" + key).strip(b"/")]
-            except KeyError:
+            except (SymrefLoop, KeyError):
                 continue  # Unable to resolve
 
         return ret
@@ -294,20 +302,8 @@ class RefsContainer(object):
                 break
             depth += 1
             if depth > 5:
-                raise KeyError(name)
+                raise SymrefLoop(name, depth)
         return refnames, contents
-
-    def _follow(self, name):
-        import warnings
-
-        warnings.warn(
-            "RefsContainer._follow is deprecated. Use RefsContainer.follow " "instead.",
-            DeprecationWarning,
-        )
-        refnames, contents = self.follow(name)
-        if not refnames:
-            return (None, contents)
-        return (refnames[-1], contents)
 
     def __contains__(self, refname):
         if self.read_ref(refname):
@@ -511,12 +507,12 @@ class DictRefsContainer(RefsContainer):
 
     def add_if_new(
         self,
-        name,
-        ref,
+        name: bytes,
+        ref: bytes,
         committer=None,
         timestamp=None,
         timezone=None,
-        message=None,
+        message: Optional[bytes] = None,
     ):
         if name in self._refs:
             return False
@@ -883,12 +879,12 @@ class DiskRefsContainer(RefsContainer):
 
     def add_if_new(
         self,
-        name,
-        ref,
+        name: bytes,
+        ref: bytes,
         committer=None,
         timestamp=None,
         timezone=None,
-        message=None,
+        message: Optional[bytes] = None,
     ):
         """Add a new reference only if it does not already exist.
 
@@ -1137,7 +1133,11 @@ def _set_origin_head(refs, origin, origin_head):
             refs.set_symbolic_ref(origin_ref, target_ref)
 
 
-def _set_default_branch(refs, origin, origin_head, branch, ref_message):
+def _set_default_branch(
+        refs: RefsContainer, origin: bytes, origin_head: bytes, branch: bytes,
+        ref_message: Optional[bytes]) -> bytes:
+    """Set the default branch.
+    """
     origin_base = b"refs/remotes/" + origin + b"/"
     if branch:
         origin_ref = origin_base + branch
@@ -1151,7 +1151,7 @@ def _set_default_branch(refs, origin, origin_head, branch, ref_message):
             head_ref = LOCAL_TAG_PREFIX + branch
         else:
             raise ValueError(
-                "%s is not a valid branch or tag" % os.fsencode(branch)
+                "%r is not a valid branch or tag" % os.fsencode(branch)
             )
     elif origin_head:
         head_ref = origin_head
@@ -1165,6 +1165,8 @@ def _set_default_branch(refs, origin, origin_head, branch, ref_message):
             )
         except KeyError:
             pass
+    else:
+        raise ValueError('neither origin_head nor branch are provided')
     return head_ref
 
 

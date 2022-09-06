@@ -43,6 +43,7 @@ Currently implemented:
  * remote{_add}
  * receive-pack
  * reset
+ * submodule_list
  * rev-list
  * tag{_create,_delete,_list}
  * upload-pack
@@ -86,6 +87,7 @@ from dulwich.client import (
     get_transport_and_path,
 )
 from dulwich.config import (
+    ConfigFile,
     StackedConfig,
 )
 from dulwich.diff_tree import (
@@ -187,6 +189,78 @@ class Error(Exception):
 
 class RemoteExists(Error):
     """Raised when the remote already exists."""
+
+
+class TimezoneFormatError(Error):
+    """Raised when the timezone cannot be determined from a given string."""
+
+
+def parse_timezone_format(tz_str):
+    """Parse given string and attempt to return a timezone offset.
+    Different formats are considered in the following order:
+        - Git internal format: <unix timestamp> <timezone offset>
+        - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
+        - ISO 8601: e.g. 1995-11-20T19:12:08-0500
+    Args:
+      tz_str: datetime string
+    Returns: Timezone offset as integer
+    Raises:
+      TimezoneFormatError: if timezone information cannot be extracted
+   """
+    import re
+
+    # Git internal format
+    internal_format_pattern = re.compile("^[0-9]+ [+-][0-9]{,4}$")
+    if re.match(internal_format_pattern, tz_str):
+        try:
+            tz_internal = parse_timezone(tz_str.split(" ")[1].encode(DEFAULT_ENCODING))
+            return tz_internal[0]
+        except ValueError:
+            pass
+
+    # RFC 2822
+    import email.utils
+    rfc_2822 = email.utils.parsedate_tz(tz_str)
+    if rfc_2822:
+        return rfc_2822[9]
+
+    # ISO 8601
+
+    # Supported offsets:
+    # sHHMM, sHH:MM, sHH
+    iso_8601_pattern = re.compile("[0-9] ?([+-])([0-9]{2})(?::(?=[0-9]{2}))?([0-9]{2})?$")
+    match = re.search(iso_8601_pattern, tz_str)
+    total_secs = 0
+    if match:
+        sign, hours, minutes = match.groups()
+        total_secs += int(hours) * 3600
+        if minutes:
+            total_secs += int(minutes) * 60
+        total_secs = -total_secs if sign == "-" else total_secs
+        return total_secs
+
+    # YYYY.MM.DD, MM/DD/YYYY, DD.MM.YYYY contain no timezone information
+
+    raise TimezoneFormatError(tz_str)
+
+
+def get_user_timezones():
+    """Retrieve local timezone as described in
+    https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
+    Returns: A tuple containing author timezone, committer timezone
+    """
+    local_timezone = time.localtime().tm_gmtoff
+
+    if os.environ.get("GIT_AUTHOR_DATE"):
+        author_timezone = parse_timezone_format(os.environ["GIT_AUTHOR_DATE"])
+    else:
+        author_timezone = local_timezone
+    if os.environ.get("GIT_COMMITTER_DATE"):
+        commit_timezone = parse_timezone_format(os.environ["GIT_COMMITTER_DATE"])
+    else:
+        commit_timezone = local_timezone
+
+    return author_timezone, commit_timezone
 
 
 def open_repo(path_or_repo):
@@ -327,9 +401,12 @@ def commit(
     repo=".",
     message=None,
     author=None,
+    author_timezone=None,
     committer=None,
+    commit_timezone=None,
     encoding=None,
     no_verify=False,
+    signoff=False,
 ):
     """Create a new commit.
 
@@ -337,25 +414,37 @@ def commit(
       repo: Path to repository
       message: Optional commit message
       author: Optional author name and email
+      author_timezone: Author timestamp timezone
       committer: Optional committer name and email
+      commit_timezone: Commit timestamp timezone
       no_verify: Skip pre-commit and commit-msg hooks
+      signoff: GPG Sign the commit (bool, defaults to False,
+        pass True to use default GPG key,
+        pass a str containing Key ID to use a specific GPG key)
     Returns: SHA1 of the new commit
     """
     # FIXME: Support --all argument
-    # FIXME: Support --signoff argument
     if getattr(message, "encode", None):
         message = message.encode(encoding or DEFAULT_ENCODING)
     if getattr(author, "encode", None):
         author = author.encode(encoding or DEFAULT_ENCODING)
     if getattr(committer, "encode", None):
         committer = committer.encode(encoding or DEFAULT_ENCODING)
+    local_timezone = get_user_timezones()
+    if author_timezone is None:
+        author_timezone = local_timezone[0]
+    if commit_timezone is None:
+        commit_timezone = local_timezone[1]
     with open_repo_closing(repo) as r:
         return r.do_commit(
             message=message,
             author=author,
+            author_timezone=author_timezone,
             committer=committer,
+            commit_timezone=commit_timezone,
             encoding=encoding,
             no_verify=no_verify,
+            sign=signoff if isinstance(signoff, (str, bool)) else None,
         )
 
 
@@ -401,6 +490,7 @@ def clone(
     origin="origin",
     depth=None,
     branch=None,
+    config=None,
     **kwargs
 ):
     """Clone a local or remote git repository.
@@ -416,6 +506,7 @@ def clone(
       depth: Depth to fetch at
       branch: Optional branch or tag to be used as HEAD in the new repository
         instead of the cloned repository's HEAD.
+      config: Configuration to use
     Returns: The new repository
     """
     if outstream is not None:
@@ -428,6 +519,9 @@ def clone(
         )
         # TODO(jelmer): Capture logging output and stream to errstream
 
+    if config is None:
+        config = StackedConfig.default()
+
     if checkout is None:
         checkout = not bare
     if checkout and bare:
@@ -438,7 +532,8 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
-    (client, path) = get_transport_and_path(source, **kwargs)
+    (client, path) = get_transport_and_path(
+        source, config=config, **kwargs)
 
     return client.clone(
         path,
@@ -858,13 +953,49 @@ def rev_list(repo, commits, outstream=sys.stdout):
             outstream.write(entry.commit.id + b"\n")
 
 
-def tag(*args, **kwargs):
-    import warnings
+def _canonical_part(url: str) -> str:
+    name = url.rsplit('/', 1)[-1]
+    if name.endswith('.git'):
+        name = name[:-4]
+    return name
 
-    warnings.warn(
-        "tag has been deprecated in favour of tag_create.", DeprecationWarning
-    )
-    return tag_create(*args, **kwargs)
+
+def submodule_add(repo, url, path=None, name=None):
+    """Add a new submodule.
+
+    Args:
+      repo: Path to repository
+      url: URL of repository to add as submodule
+      path: Path where submodule should live
+    """
+    with open_repo_closing(repo) as r:
+        if path is None:
+            path = os.path.relpath(_canonical_part(url), r.path)
+        if name is None:
+            name = path
+
+        # TODO(jelmer): Move this logic to dulwich.submodule
+        gitmodules_path = os.path.join(r.path, ".gitmodules")
+        try:
+            config = ConfigFile.from_path(gitmodules_path)
+        except FileNotFoundError:
+            config = ConfigFile()
+            config.path = gitmodules_path
+        config.set(("submodule", name), "url", url)
+        config.set(("submodule", name), "path", path)
+        config.write_to_path()
+
+
+def submodule_list(repo):
+    """List submodules.
+
+    Args:
+      repo: Path to repository
+    """
+    from .submodule import iter_cached_submodules
+    with open_repo_closing(repo) as r:
+        for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
+            yield path.decode(DEFAULT_ENCODING), sha.decode(DEFAULT_ENCODING)
 
 
 def tag_create(
@@ -911,8 +1042,7 @@ def tag_create(
                 tag_time = int(time.time())
             tag_obj.tag_time = tag_time
             if tag_timezone is None:
-                # TODO(jelmer) Use current user timezone rather than UTC
-                tag_timezone = 0
+                tag_timezone = get_user_timezones()[1]
             elif isinstance(tag_timezone, str):
                 tag_timezone = parse_timezone(tag_timezone)
             tag_obj.tag_timezone = tag_timezone
@@ -925,16 +1055,6 @@ def tag_create(
             tag_id = object.id
 
         r.refs[_make_tag_ref(tag)] = tag_id
-
-
-def list_tags(*args, **kwargs):
-    import warnings
-
-    warnings.warn(
-        "list_tags has been deprecated in favour of tag_list.",
-        DeprecationWarning,
-    )
-    return tag_list(*args, **kwargs)
 
 
 def tag_list(repo, outstream=sys.stdout):
@@ -1164,10 +1284,10 @@ def status(repo=".", ignored=False, untracked_files="all"):
       untracked_files: How to handle untracked files, defaults to "all":
           "no": do not return untracked files
           "all": include all files in untracked directories
-        Using `untracked_files="no"` can be faster than "all" when the worktreee
+        Using untracked_files="no" can be faster than "all" when the worktreee
           contains many untracked files/directories.
 
-    Note: `untracked_files="normal" (`git`'s default) is not implemented.
+    Note: untracked_files="normal" (git's default) is not implemented.
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)
@@ -1190,7 +1310,12 @@ def status(repo=".", ignored=False, untracked_files="all"):
             exclude_ignored=not ignored,
             untracked_files=untracked_files,
         )
-        untracked_changes = list(untracked_paths)
+        if sys.platform == "win32":
+            untracked_changes = [
+                path.replace(os.path.sep, "/") for path in untracked_paths
+            ]
+        else:
+            untracked_changes = list(untracked_paths)
 
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
@@ -1456,7 +1581,7 @@ def branch_create(repo, name, objectish=None, force=False):
             objectish = "HEAD"
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
-        ref_message = b"branch: Created from " + objectish.encode("utf-8")
+        ref_message = b"branch: Created from " + objectish.encode(DEFAULT_ENCODING)
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
@@ -1541,7 +1666,7 @@ def fetch(
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
         if message is None:
-            message = b"fetch: from " + remote_location.encode("utf-8")
+            message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
         client, path = get_transport_and_path(
             remote_location, config=r.get_config_stack(), **kwargs
         )

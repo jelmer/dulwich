@@ -1,11 +1,10 @@
-certifi
-urllib3>=1.24.1
+urllib3>=1.25
 
 [fastimport]
 fastimport
 
 [https]
-urllib3[secure]>=1.24.1
+urllib3>=1.24.1
 
 [paramiko]
 paramiko

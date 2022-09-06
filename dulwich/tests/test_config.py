@@ -36,6 +36,7 @@ from dulwich.config import (
     _escape_value,
     _parse_string,
     parse_submodules,
+    apply_instead_of,
 )
 from dulwich.tests import (
     TestCase,
@@ -102,6 +103,10 @@ class ConfigFileTests(TestCase):
     def test_comment_character_within_section_string(self):
         cf = self.from_file(b'[branch "foo#bar"] # a comment\nbar= foo\n')
         self.assertEqual(ConfigFile({(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
+
+    def test_closing_bracket_within_section_string(self):
+        cf = self.from_file(b'[branch "foo]bar"] # a comment\nbar= foo\n')
+        self.assertEqual(ConfigFile({(b"branch", b"foo]bar"): {b"bar": b"foo"}}), cf)
 
     def test_from_file_section(self):
         cf = self.from_file(b"[core]\nfoo = bar\n")
@@ -300,7 +305,7 @@ class StackedConfigTests(TestCase):
     def test_default_backends(self):
         StackedConfig.default_backends()
 
-    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_path(self):
         from dulwich.config import get_win_system_paths
 
@@ -316,7 +321,7 @@ class StackedConfigTests(TestCase):
             paths,
         )
 
-    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_reg(self):
         import winreg
 
@@ -428,3 +433,31 @@ class SubmodulesTests(TestCase):
             ],
             got,
         )
+
+
+class ApplyInsteadOfTests(TestCase):
+    def test_none(self):
+        config = ConfigDict()
+        self.assertEqual(
+            'https://example.com/', apply_instead_of(config, 'https://example.com/'))
+
+    def test_apply(self):
+        config = ConfigDict()
+        config.set(
+            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
+        self.assertEqual(
+            'https://samba.org/',
+            apply_instead_of(config, 'https://example.com/'))
+
+    def test_apply_multiple(self):
+        config = ConfigDict()
+        config.set(
+            ('url', 'https://samba.org/'), 'insteadOf', 'https://blah.com/')
+        config.set(
+            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
+        self.assertEqual(
+            [b'https://blah.com/', b'https://example.com/'],
+            list(config.get_multivar(('url', 'https://samba.org/'), 'insteadOf')))
+        self.assertEqual(
+            'https://samba.org/',
+            apply_instead_of(config, 'https://example.com/'))

@@ -95,7 +95,7 @@ class PackTests(TestCase):
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
-    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data/packs"))
+    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../testdata/packs"))
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha"""

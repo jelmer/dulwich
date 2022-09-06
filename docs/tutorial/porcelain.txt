@@ -24,6 +24,13 @@ Clone a repository
 ------------------
 
   >>> porcelain.clone("git://github.com/jelmer/dulwich", "dulwich-clone")
+  
+Basic authentication works using the ``username`` and ``password`` parameters:
+
+  >>> porcelain.clone(
+      "https://example.com/a-private-repo.git",
+      "a-private-repo-clone",
+      username="user", password="password")
 
 Commit changes
 --------------

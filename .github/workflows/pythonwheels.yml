@@ -2,7 +2,6 @@ name: Build Python Wheels
 
 on:
   push:
-  pull_request:
   schedule:
     - cron: "0 6 * * *" # Daily 6AM UTC build
 
@@ -69,12 +68,12 @@ jobs:
         if: "matrix.os == 'ubuntu-latest'"
       - name: Upload wheels (Linux)
         uses: actions/upload-artifact@v2
-        # Only include *manylinux* wheels; the other wheels files are built but
-        # rejected by pip.
+        # Only include *-manylinux* wheels; the other wheels files are built but
+        # rejected by pip (unsupported platform tag)
         if: "matrix.os == 'ubuntu-latest'"
         with:
           name: dist
-          path: dist/*manylinux*.whl
+          path: dist/*-manylinux*.whl
       - name: Upload wheels (non-Linux)
         uses: actions/upload-artifact@v2
         with:

@@ -1,13 +1,12 @@
-name: Python package
+name: Python tests
 
 on:
   push:
-  pull_request:
   schedule:
     - cron: "0 6 * * *" # Daily 6AM UTC build
 
 jobs:
-  build:
+  test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

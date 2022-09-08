@@ -33,6 +33,10 @@ jobs:
         run: python -m unittest dulwich.tests.test_suite
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_ARCHS_LINUX: x86_64 aarch64
+          CIBW_ARCHS_MACOS: x86_64 arm64 universal2
+          CIBW_ARCHS_WINDOWS: AMD64
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:

@@ -1060,7 +1060,6 @@ class PackData(object):
         self._offset_cache = LRUSizeCache(
             1024 * 1024 * 20, compute_size=_compute_object_size
         )
-        self.pack = None
 
     @property
     def filename(self):
@@ -1123,65 +1122,6 @@ class PackData(object):
         """
         return compute_file_sha(self._file, end_ofs=-20).digest()
 
-    def get_ref(self, sha) -> Tuple[int, int, UnpackedObject]:
-        """Get the object for a ref SHA, only looking in this pack."""
-        # TODO: cache these results
-        if self.pack is None:
-            raise KeyError(sha)
-        try:
-            offset = self.pack.index.object_index(sha)
-        except KeyError:
-            offset = None
-        if offset:
-            type, obj = self.get_object_at(offset)
-        elif self.pack is not None and self.pack.resolve_ext_ref:
-            type, obj = self.pack.resolve_ext_ref(sha)
-        else:
-            raise KeyError(sha)
-        return offset, type, obj
-
-    def resolve_object(self, offset, type, obj, get_ref=None):
-        """Resolve an object, possibly resolving deltas when necessary.
-
-        Returns: Tuple with object type and contents.
-        """
-        # Walk down the delta chain, building a stack of deltas to reach
-        # the requested object.
-        base_offset = offset
-        base_type = type
-        base_obj = obj
-        delta_stack = []
-        while base_type in DELTA_TYPES:
-            prev_offset = base_offset
-            if get_ref is None:
-                get_ref = self.get_ref
-            if base_type == OFS_DELTA:
-                (delta_offset, delta) = base_obj
-                # TODO: clean up asserts and replace with nicer error messages
-                base_offset = base_offset - delta_offset
-                base_type, base_obj = self.get_object_at(base_offset)
-                assert isinstance(base_type, int)
-            elif base_type == REF_DELTA:
-                (basename, delta) = base_obj
-                assert isinstance(basename, bytes) and len(basename) == 20
-                base_offset, base_type, base_obj = get_ref(basename)
-                assert isinstance(base_type, int)
-            delta_stack.append((prev_offset, base_type, delta))
-
-        # Now grab the base object (mustn't be a delta) and apply the
-        # deltas all the way up the stack.
-        chunks = base_obj
-        for prev_offset, delta_type, delta in reversed(delta_stack):
-            chunks = apply_delta(chunks, delta)
-            # TODO(dborowitz): This can result in poor performance if
-            # large base objects are separated from deltas in the pack.
-            # We should reorganize so that we apply deltas to all
-            # objects in a chain one after the other to optimize cache
-            # performance.
-            if prev_offset is not None:
-                self._offset_cache[prev_offset] = base_type, chunks
-        return base_type, chunks
-
     def iterobjects(self, progress=None, compute_crc32=True):
         self._file.seek(self._header_size)
         for i in range(1, self._num_objects + 1):
@@ -1216,7 +1156,7 @@ class PackData(object):
             # Back up over unused data.
             self._file.seek(-len(unused), SEEK_CUR)
 
-    def iterentries(self, progress=None):
+    def iterentries(self, progress=None, resolve_ext_ref=None):
         """Yield entries summarizing the contents of this pack.
 
         Args:
@@ -1225,25 +1165,24 @@ class PackData(object):
         Returns: iterator of tuples with (sha, offset, crc32)
         """
         num_objects = self._num_objects
-        resolve_ext_ref = self.pack.resolve_ext_ref if self.pack is not None else None
         indexer = PackIndexer.for_pack_data(self, resolve_ext_ref=resolve_ext_ref)
         for i, result in enumerate(indexer):
             if progress is not None:
                 progress(i, num_objects)
             yield result
 
-    def sorted_entries(self, progress=None):
+    def sorted_entries(self, progress=None, resolve_ext_ref=None):
         """Return entries in this pack, sorted by SHA.
 
         Args:
           progress: Progress function, called with current and total
             object count
-        Returns: List of tuples with (sha, offset, crc32)
+        Returns: Iterator of tuples with (sha, offset, crc32)
         """
-        ret = sorted(self.iterentries(progress=progress))
-        return ret
+        return sorted(self.iterentries(
+            progress=progress, resolve_ext_ref=resolve_ext_ref))
 
-    def create_index_v1(self, filename, progress=None):
+    def create_index_v1(self, filename, progress=None, resolve_ext_ref=None):
         """Create a version 1 file for this data file.
 
         Args:
@@ -1251,11 +1190,12 @@ class PackData(object):
           progress: Progress report function
         Returns: Checksum of index file
         """
-        entries = self.sorted_entries(progress=progress)
+        entries = self.sorted_entries(
+            progress=progress, resolve_ext_ref=resolve_ext_ref)
         with GitFile(filename, "wb") as f:
             return write_pack_index_v1(f, entries, self.calculate_checksum())
 
-    def create_index_v2(self, filename, progress=None):
+    def create_index_v2(self, filename, progress=None, resolve_ext_ref=None):
         """Create a version 2 index file for this data file.
 
         Args:
@@ -1263,11 +1203,12 @@ class PackData(object):
           progress: Progress report function
         Returns: Checksum of index file
         """
-        entries = self.sorted_entries(progress=progress)
+        entries = self.sorted_entries(
+            progress=progress, resolve_ext_ref=resolve_ext_ref)
         with GitFile(filename, "wb") as f:
             return write_pack_index_v2(f, entries, self.calculate_checksum())
 
-    def create_index(self, filename, progress=None, version=2):
+    def create_index(self, filename, progress=None, version=2, resolve_ext_ref=None):
         """Create an  index file for this data file.
 
         Args:
@@ -1276,9 +1217,11 @@ class PackData(object):
         Returns: Checksum of index file
         """
         if version == 1:
-            return self.create_index_v1(filename, progress)
+            return self.create_index_v1(
+                filename, progress, resolve_ext_ref=resolve_ext_ref)
         elif version == 2:
-            return self.create_index_v2(filename, progress)
+            return self.create_index_v2(
+                filename, progress, resolve_ext_ref=resolve_ext_ref)
         else:
             raise ValueError("unknown index format %d" % version)
 
@@ -2036,7 +1979,6 @@ class Pack(object):
         """Create a new pack object from pack data and index objects."""
         ret = cls("")
         ret._data = data
-        ret._data.pack = ret
         ret._data_load = None
         ret._idx = idx
         ret._idx_load = None
@@ -2052,7 +1994,6 @@ class Pack(object):
         """The pack data object being used."""
         if self._data is None:
             self._data = self._data_load()
-            self._data.pack = self
             self.check_length_and_checksum()
         return self._data
 
@@ -2144,7 +2085,7 @@ class Pack(object):
     def get_raw(self, sha1):
         offset = self.index.object_index(sha1)
         obj_type, obj = self.data.get_object_at(offset)
-        type_num, chunks = self.data.resolve_object(offset, obj_type, obj)
+        type_num, chunks = self.resolve_object(offset, obj_type, obj)
         return type_num, b"".join(chunks)
 
     def __getitem__(self, sha1):
@@ -2191,6 +2132,71 @@ class Pack(object):
                 keepfile.write(msg)
                 keepfile.write(b"\n")
         return keepfile_name
+
+    def get_ref(self, sha) -> Tuple[int, int, UnpackedObject]:
+        """Get the object for a ref SHA, only looking in this pack."""
+        # TODO: cache these results
+        try:
+            offset = self.index.object_index(sha)
+        except KeyError:
+            offset = None
+        if offset:
+            type, obj = self.data.get_object_at(offset)
+        elif self.resolve_ext_ref:
+            type, obj = self.resolve_ext_ref(sha)
+        else:
+            raise KeyError(sha)
+        return offset, type, obj
+
+    def resolve_object(self, offset, type, obj, get_ref=None):
+        """Resolve an object, possibly resolving deltas when necessary.
+
+        Returns: Tuple with object type and contents.
+        """
+        # Walk down the delta chain, building a stack of deltas to reach
+        # the requested object.
+        base_offset = offset
+        base_type = type
+        base_obj = obj
+        delta_stack = []
+        while base_type in DELTA_TYPES:
+            prev_offset = base_offset
+            if get_ref is None:
+                get_ref = self.get_ref
+            if base_type == OFS_DELTA:
+                (delta_offset, delta) = base_obj
+                # TODO: clean up asserts and replace with nicer error messages
+                base_offset = base_offset - delta_offset
+                base_type, base_obj = self.data.get_object_at(base_offset)
+                assert isinstance(base_type, int)
+            elif base_type == REF_DELTA:
+                (basename, delta) = base_obj
+                assert isinstance(basename, bytes) and len(basename) == 20
+                base_offset, base_type, base_obj = get_ref(basename)
+                assert isinstance(base_type, int)
+            delta_stack.append((prev_offset, base_type, delta))
+
+        # Now grab the base object (mustn't be a delta) and apply the
+        # deltas all the way up the stack.
+        chunks = base_obj
+        for prev_offset, delta_type, delta in reversed(delta_stack):
+            chunks = apply_delta(chunks, delta)
+            # TODO(dborowitz): This can result in poor performance if
+            # large base objects are separated from deltas in the pack.
+            # We should reorganize so that we apply deltas to all
+            # objects in a chain one after the other to optimize cache
+            # performance.
+            if prev_offset is not None:
+                self.data._offset_cache[prev_offset] = base_type, chunks
+        return base_type, chunks
+
+    def entries(self, progress=None):
+        return self.data.iterentries(
+            progress=progress, resolve_ext_ref=self.resolve_ext_ref)
+
+    def sorted_entries(self, progress=None):
+        return self.data.sorted_entries(
+            progress=progress, resolve_ext_ref=self.resolve_ext_ref)
 
 
 try:

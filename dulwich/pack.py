@@ -46,6 +46,7 @@ from itertools import chain
 
 import os
 import sys
+from typing import Optional, Callable, Tuple
 
 from hashlib import sha1
 from os import (
@@ -1122,7 +1123,7 @@ class PackData(object):
         """
         return compute_file_sha(self._file, end_ofs=-20).digest()
 
-    def get_ref(self, sha):
+    def get_ref(self, sha) -> Tuple[int, int, UnpackedObject]:
         """Get the object for a ref SHA, only looking in this pack."""
         # TODO: cache these results
         if self.pack is None:
@@ -2010,7 +2011,8 @@ write_pack_index = write_pack_index_v2
 class Pack(object):
     """A Git pack object."""
 
-    def __init__(self, basename, resolve_ext_ref=None):
+    def __init__(self, basename, resolve_ext_ref: Optional[
+            Callable[[bytes], Tuple[int, UnpackedObject]]] = None):
         self._basename = basename
         self._data = None
         self._idx = None

@@ -2204,10 +2204,24 @@ class Pack(object):
         return base_type, chunks
 
     def entries(self, progress=None):
+        """Yield entries summarizing the contents of this pack.
+
+        Args:
+          progress: Progress function, called with current and total
+            object count.
+        Returns: iterator of tuples with (sha, offset, crc32)
+        """
         return self.data.iterentries(
             progress=progress, resolve_ext_ref=self.resolve_ext_ref)
 
     def sorted_entries(self, progress=None):
+        """Return entries in this pack, sorted by SHA.
+
+        Args:
+          progress: Progress function, called with current and total
+            object count
+        Returns: Iterator of tuples with (sha, offset, crc32)
+        """
         return self.data.sorted_entries(
             progress=progress, resolve_ext_ref=self.resolve_ext_ref)
 

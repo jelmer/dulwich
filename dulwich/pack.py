@@ -46,7 +46,7 @@ from itertools import chain
 
 import os
 import sys
-from typing import Optional, Callable, Tuple
+from typing import Optional, Callable, Tuple, List
 
 from hashlib import sha1
 from os import (
@@ -397,15 +397,7 @@ class PackIndex(object):
         lives at within the corresponding pack file. If the pack file doesn't
         have the object then None will be returned.
         """
-        if len(sha) == 40:
-            sha = hex_to_sha(sha)
-        try:
-            return self._object_index(sha)
-        except ValueError:
-            closed = getattr(self._contents, "closed", None)
-            if closed in (None, True):
-                raise PackFileDisappeared(self)
-            raise
+        raise NotImplementedError(self.object_index)
 
     def object_sha1(self, index):
         """Return the SHA1 corresponding to the index in the pack file."""
@@ -460,7 +452,9 @@ class MemoryPackIndex(PackIndex):
     def __len__(self):
         return len(self._entries)
 
-    def _object_index(self, sha):
+    def object_index(self, sha):
+        if len(sha) == 40:
+            sha = hex_to_sha(sha)
         return self._by_sha[sha][0]
 
     def object_sha1(self, index):
@@ -484,6 +478,8 @@ class FilePackIndex(PackIndex):
     the start and end offset and then bisect in to find if the value is
     present.
     """
+
+    _fan_out_table: List[int]
 
     def __init__(self, filename, file=None, contents=None, size=None):
         """Create a pack index object.
@@ -595,6 +591,23 @@ class FilePackIndex(PackIndex):
         Returns: 20-byte binary digest
         """
         return bytes(self._contents[-20:])
+
+    def object_index(self, sha):
+        """Return the index in to the corresponding packfile for the object.
+
+        Given the name of an object it will return the offset that object
+        lives at within the corresponding pack file. If the pack file doesn't
+        have the object then None will be returned.
+        """
+        if len(sha) == 40:
+            sha = hex_to_sha(sha)
+        try:
+            return self._object_index(sha)
+        except ValueError:
+            closed = getattr(self._contents, "closed", None)
+            if closed in (None, True):
+                raise PackFileDisappeared(self)
+            raise
 
     def _object_index(self, sha):
         """See object_index.

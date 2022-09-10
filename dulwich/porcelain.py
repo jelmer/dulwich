@@ -197,10 +197,13 @@ class TimezoneFormatError(Error):
 
 def parse_timezone_format(tz_str):
     """Parse given string and attempt to return a timezone offset.
+
     Different formats are considered in the following order:
-        - Git internal format: <unix timestamp> <timezone offset>
-        - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
-        - ISO 8601: e.g. 1995-11-20T19:12:08-0500
+
+     - Git internal format: <unix timestamp> <timezone offset>
+     - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
+     - ISO 8601: e.g. 1995-11-20T19:12:08-0500
+
     Args:
       tz_str: datetime string
     Returns: Timezone offset as integer

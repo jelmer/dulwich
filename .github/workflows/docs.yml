@@ -16,6 +16,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
       - name: Install pydoctor
-        run: sudo apt-get update && sudo apt-get install -y pydoctor
+        run: |
+          sudo apt-get update && sudo apt -y install -y pydoctor python3-pip
+          pip3 install pydoctor
       - name: Generate docs
         run: make apidocs

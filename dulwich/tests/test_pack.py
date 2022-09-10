@@ -562,8 +562,8 @@ class TestThinPack(PackTests):
         # Index the new pack.
         with self.make_pack(True) as pack:
             with PackData(pack._data_path) as data:
-                data.pack = pack
-                data.create_index(self.pack_prefix + ".idx")
+                data.create_index(
+                    self.pack_prefix + ".idx", resolve_ext_ref=pack.resolve_ext_ref)
 
         del self.store[self.blobs[b"bar"].id]
 

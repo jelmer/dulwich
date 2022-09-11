@@ -1,0 +1,23 @@
+
+name: API Docs
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * *" # Daily 6AM UTC build
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+      - name: Install pydoctor
+        run: |
+          sudo apt-get update && sudo apt -y install -y pydoctor python3-pip
+          pip3 install pydoctor
+      - name: Generate docs
+        run: make apidocs

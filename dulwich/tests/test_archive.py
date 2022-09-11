@@ -81,8 +81,7 @@ class ArchiveTests(TestCase):
         t1.add("ő".encode('utf-8'), 0o100644, b1.id)
         store.add_object(t1)
         stream = b"".join(tar_stream(store, t1, mtime=0))
-        BytesIO(stream)
-        tf = tarfile.TarFile(fileobj=stream)
+        tf = tarfile.TarFile(fileobj=BytesIO(stream))
         self.addCleanup(tf.close)
         self.assertEqual(["ő"], tf.getnames())
 

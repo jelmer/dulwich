@@ -1964,6 +1964,20 @@ def write_pack_index_v2(f, entries, pack_checksum):
 write_pack_index = write_pack_index_v2
 
 
+class _PackTupleIterable(object):
+    """Helper for Pack.pack_tuples."""
+
+    def __init__(self, iterobjects, length):
+        self._iterobjects = iterobjects
+        self._length = length
+
+    def __len__(self):
+        return self._length
+
+    def __iter__(self):
+        return ((o, None) for o in self._iterobjects())
+
+
 class Pack(object):
     """A Git pack object."""
 
@@ -2119,17 +2133,7 @@ class Pack(object):
             and provides __len__
         """
 
-        class PackTupleIterable(object):
-            def __init__(self, pack):
-                self.pack = pack
-
-            def __len__(self):
-                return len(self.pack)
-
-            def __iter__(self):
-                return ((o, None) for o in self.pack.iterobjects())
-
-        return PackTupleIterable(self)
+        return _PackTupleIterable(self.iterobjects, len(self))
 
     def keep(self, msg=None):
         """Add a .keep file for the pack, preventing git from garbage collecting it.

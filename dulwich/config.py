@@ -750,6 +750,12 @@ class StackedConfig(Config):
                     yield section
 
 
+def read_submodules(path: str) -> Iterator[Tuple[bytes, bytes, bytes]]:
+    """read a .gitmodules file."""
+    cfg = ConfigFile.from_path(path)
+    return parse_submodules(cfg)
+
+
 def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]:
     """Parse a gitmodules GitConfig file, returning submodules.
 

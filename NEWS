@@ -1,5 +1,8 @@
 0.20.47	UNRELEASED
 
+ * Fix handling of SymrefLoop in RefsContainer.__setitem__.
+   (Dominic Davis-Foster, Jelmer Vernooĳ)
+
 0.20.46	2022-09-06
 
  * Apply insteadOf to rsync-style location strings

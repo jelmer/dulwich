@@ -521,6 +521,14 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         )
         self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
 
+    def test_set_overwrite_loop(self):
+        self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
+        self._refs[b'refs/heads/loop'] = (
+            b"42d06bd4b77fed026b154d16493e5deab78f02ec")
+        self.assertEqual(
+            ([b'refs/heads/loop'], b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
+            self._refs.follow(b"refs/heads/loop"))
+
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)
         ref_file = os.path.join(self._refs.path, b"refs", b"heads", b"master")

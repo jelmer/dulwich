@@ -34,7 +34,7 @@ from getopt import getopt
 import argparse
 import optparse
 import signal
-from typing import Dict, Type
+from typing import Dict, Type, Optional
 
 from dulwich import porcelain
 from dulwich.client import get_transport_and_path
@@ -321,14 +321,6 @@ class cmd_rev_list(Command):
         porcelain.rev_list(".", args)
 
 
-class cmd_submodule(Command):
-    def run(self, args):
-        parser = optparse.OptionParser()
-        options, args = parser.parse_args(args)
-        for path, sha in porcelain.submodule_list("."):
-            sys.stdout.write(' %s %s\n' % (sha, path))
-
-
 class cmd_tag(Command):
     def run(self, args):
         parser = optparse.OptionParser()
@@ -581,10 +573,11 @@ class cmd_remote_add(Command):
 
 class SuperCommand(Command):
 
-    subcommands = {}  # type: Dict[str, Type[Command]]
+    subcommands: Dict[str, Type[Command]] = {}
+    default_command: Optional[Type[Command]] = None
 
     def run(self, args):
-        if not args:
+        if not args and not self.default_command:
             print("Supported subcommands: %s" % ", ".join(self.subcommands.keys()))
             return False
         cmd = args[0]
@@ -601,6 +594,30 @@ class cmd_remote(SuperCommand):
     subcommands = {
         "add": cmd_remote_add,
     }
+
+
+class cmd_submodule_list(Command):
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.parse_args(argv)
+        for path, sha in porcelain.submodule_list("."):
+            sys.stdout.write(' %s %s\n' % (sha, path))
+
+
+class cmd_submodule_init(Command):
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.parse_args(argv)
+        porcelain.submodule_init(".")
+
+
+class cmd_submodule(SuperCommand):
+
+    subcommands = {
+        "init": cmd_submodule_init,
+    }
+
+    default_command = cmd_submodule_init
 
 
 class cmd_check_ignore(Command):

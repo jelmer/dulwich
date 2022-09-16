@@ -1625,6 +1625,10 @@ class SubmoduleTests(PorcelainTestCase):
 \tpath = bar
 """, f.read())
 
+    def test_init(self):
+        porcelain.submodule_add(self.repo, "../bar.git", "bar")
+        porcelain.submodule_init(self.repo)
+
 
 class PushTests(PorcelainTestCase):
     def test_simple(self):

@@ -43,6 +43,8 @@ Currently implemented:
  * remote{_add}
  * receive-pack
  * reset
+ * submodule_add
+ * submodule_init
  * submodule_list
  * rev-list
  * tag{_create,_delete,_list}
@@ -89,6 +91,7 @@ from dulwich.client import (
 from dulwich.config import (
     ConfigFile,
     StackedConfig,
+    read_submodules,
 )
 from dulwich.diff_tree import (
     CHANGE_ADD,
@@ -986,6 +989,21 @@ def submodule_add(repo, url, path=None, name=None):
             config.path = gitmodules_path
         config.set(("submodule", name), "url", url)
         config.set(("submodule", name), "path", path)
+        config.write_to_path()
+
+
+def submodule_init(repo):
+    """Initialize submodules.
+
+    Args:
+      repo: Path to repository
+    """
+    with open_repo_closing(repo) as r:
+        config = r.get_config()
+        gitmodules_path = os.path.join(r.path, '.gitmodules')
+        for path, url, name in read_submodules(gitmodules_path):
+            config.set((b'submodule', name), b'active', True)
+            config.set((b'submodule', name), b'url', url)
         config.write_to_path()
 
 

@@ -1,5 +1,8 @@
 0.20.47	UNRELEASED
 
+ * Support \r\n line endings with continuations when parsing
+   configuration files.  (Jelmer Vernooĳ)
+
  * Fix handling of SymrefLoop in RefsContainer.__setitem__.
    (Dominic Davis-Foster, Jelmer Vernooĳ)
 

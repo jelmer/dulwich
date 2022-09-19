@@ -117,7 +117,8 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
 
 
 def run_git(
-    args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False, **popen_kwargs
+    args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
+    capture_stderr=False, **popen_kwargs
 ):
     """Run a git command.
 
@@ -131,8 +132,9 @@ def run_git(
       capture_stdout: Whether to capture and return stdout.
       popen_kwargs: Additional kwargs for subprocess.Popen;
         stdin/stdout args are ignored.
-    Returns: A tuple of (returncode, stdout contents). If capture_stdout is
-        False, None will be returned as stdout contents.
+    Returns: A tuple of (returncode, stdout contents, stderr contents).
+        If capture_stdout is False, None will be returned as stdout contents.
+        If capture_stderr is False, None will be returned as stderr contents.
     Raises:
       OSError: if the git executable was not found.
     """
@@ -147,21 +149,26 @@ def run_git(
         popen_kwargs["stdout"] = subprocess.PIPE
     else:
         popen_kwargs.pop("stdout", None)
+    if capture_stderr:
+        popen_kwargs["stderr"] = subprocess.PIPE
+    else:
+        popen_kwargs.pop("stderr", None)
     p = subprocess.Popen(args, env=env, **popen_kwargs)
     stdout, stderr = p.communicate(input=input)
-    return (p.returncode, stdout)
+    return (p.returncode, stdout, stderr)
 
 
 def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     """Run a git command, capture stdout/stderr, and fail if git fails."""
     if "stderr" not in popen_kwargs:
         popen_kwargs["stderr"] = subprocess.STDOUT
-    returncode, stdout = run_git(
-        args, git_path=git_path, input=input, capture_stdout=True, **popen_kwargs
+    returncode, stdout, stderr = run_git(
+        args, git_path=git_path, input=input, capture_stdout=True,
+        capture_stderr=True, **popen_kwargs
     )
     if returncode != 0:
         raise AssertionError(
-            "git with args %r failed with %d: %r" % (args, returncode, stdout)
+            "git with args %r failed with %d: stdout=%r stderr=%r" % (args, returncode, stdout, stderr)
         )
     return stdout
 

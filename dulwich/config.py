@@ -447,6 +447,7 @@ def _parse_string(value: bytes) -> bytes:
 def _escape_value(value: bytes) -> bytes:
     """Escape a value."""
     value = value.replace(b"\\", b"\\\\")
+    value = value.replace(b"\r", b"\\r")
     value = value.replace(b"\n", b"\\n")
     value = value.replace(b"\t", b"\\t")
     value = value.replace(b'"', b'\\"')
@@ -565,6 +566,8 @@ class ConfigFile(ConfigDict):
                     raise ValueError("invalid variable name %r" % setting)
                 if value.endswith(b"\\\n"):
                     continuation = value[:-2]
+                elif value.endswith(b"\\\r\n"):
+                    continuation = value[:-3]
                 else:
                     continuation = None
                     value = _parse_string(value)
@@ -573,6 +576,8 @@ class ConfigFile(ConfigDict):
             else:  # continuation line
                 if line.endswith(b"\\\n"):
                     continuation += line[:-2]
+                elif line.endswith(b"\\\r\n"):
+                    continuation += line[:-3]
                 else:
                     continuation += line
                     value = _parse_string(continuation)

@@ -196,6 +196,19 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
+    def test_quoted_newlines_windows(self):
+        cf = self.from_file(
+            b"[alias]\r\n"
+            b"c = '!f() { \\\r\n"
+            b" printf '[git commit -m \\\"%s\\\"]\\n' \\\"$*\\\" && \\\r\n"
+            b" git commit -m \\\"$*\\\"; \\\r\n"
+            b" }; f'\r\n")
+        self.assertEqual(list(cf.sections()), [(b'alias', )])
+        self.assertEqual(
+            b'\'!f() { printf \'[git commit -m "%s"]\n\' '
+            b'"$*" && git commit -m "$*"',
+            cf.get((b"alias", ), b"c"))
+
     def test_quoted(self):
         cf = self.from_file(
             b"""[gui]

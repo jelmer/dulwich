@@ -549,6 +549,93 @@ class BaseRepo(object):
             )
         )
 
+    async def fetch_objects_async(
+        self,
+        determine_wants,
+        graph_walker,
+        progress,
+        get_tagged=None,
+        depth=None,
+    ):
+        """Fetch the missing objects required for a set of revisions.
+
+        Args:
+          determine_wants: Function that takes a dictionary with heads
+            and returns the list of heads to fetch.
+          graph_walker: Object that can iterate over the list of revisions
+            to fetch and has an "ack" method that will be called to acknowledge
+            that a revision is present.
+          progress: Simple progress function that will be called with
+            updated progress strings.
+          get_tagged: Function that returns a dict of pointed-to sha ->
+            tag sha for including tags.
+          depth: Shallow fetch depth
+        Returns: iterator over objects, with __len__ implemented
+        """
+        if depth not in (None, 0):
+            raise NotImplementedError("depth not supported yet")
+
+        refs = {}
+        for ref, sha in self.get_refs().items():
+            try:
+                obj = self.object_store[sha]
+            except KeyError:
+                warnings.warn(
+                    "ref %s points at non-present sha %s"
+                    % (ref.decode("utf-8", "replace"), sha.decode("ascii")),
+                    UserWarning,
+                )
+                continue
+            else:
+                if isinstance(obj, Tag):
+                    refs[ref + ANNOTATED_TAG_SUFFIX] = obj.object[1]
+                refs[ref] = sha
+
+        wants = await determine_wants(refs)
+        if not isinstance(wants, list):
+            raise TypeError("determine_wants() did not return a list")
+
+        shallows = getattr(graph_walker, "shallow", frozenset())
+        unshallows = getattr(graph_walker, "unshallow", frozenset())
+
+        if wants == []:
+            # TODO(dborowitz): find a way to short-circuit that doesn't change
+            # this interface.
+
+            if shallows or unshallows:
+                # Do not send a pack in shallow short-circuit path
+                return None
+
+            return []
+
+        # If the graph walker is set up with an implementation that can
+        # ACK/NAK to the wire, it will write data to the client through
+        # this call as a side-effect.
+        haves = await self.object_store.find_common_revisions_async(graph_walker)
+
+        # Deal with shallow requests separately because the haves do
+        # not reflect what objects are missing
+        if shallows or unshallows:
+            # TODO: filter the haves commits from iter_shas. the specific
+            # commits aren't missing.
+            haves = []
+
+        parents_provider = ParentsProvider(self.object_store, shallows=shallows)
+
+        def get_parents(commit):
+            return parents_provider.get_parents(commit.id, commit)
+
+        return self.object_store.iter_shas(
+            self.object_store.find_missing_objects(
+                haves,
+                wants,
+                self.get_shallow(),
+                progress,
+                get_tagged,
+                get_parents=get_parents,
+            )
+        )
+
     def generate_pack_data(self, have, want, progress=None, ofs_delta=None):
         """Generate pack data objects for a set of wants/haves.
 

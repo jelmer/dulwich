@@ -69,6 +69,7 @@ from dulwich.objects import (
 )
 from dulwich.pack import (
     write_pack_objects,
+    write_pack_objects_async,
 )
 from dulwich.protocol import (
     BufferedPktLineWriter,
@@ -182,6 +183,17 @@ class BackendRepo(object):
         """
         raise NotImplementedError
 
+    async def fetch_objects_async(self, determine_wants, graph_walker, progress, get_tagged=None):
+        """
+        Yield the objects required for a list of commits.
+
+        Args:
+          progress: is a callback to send progress messages to the client
+          get_tagged: Function that returns a dict of pointed-to sha ->
+            tag sha for including tags.
+        """
+        raise NotImplementedError
+
 
 class DictBackend(Backend):
     """Trivial backend that looks up Git repositories in a dictionary."""
@@ -226,6 +238,9 @@ class Handler(object):
 
     def handle(self):
         raise NotImplementedError(self.handle)
+
+    async def handle_async(self):
+        raise NotImplementedError(self.handle_async)
 
 
 class PackHandler(Handler):
@@ -327,6 +342,11 @@ class UploadPackHandler(PackHandler):
             return
         self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, message)
 
+    async def progress_async(self, message):
+        if self.has_capability(CAPABILITY_NO_PROGRESS) or self._processing_have_lines:
+            return
+        await self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, message)
+
     def get_tagged(self, refs=None, repo=None):
         """Get a dict of peeled values of tags to their original tag shas.
 
@@ -411,6 +431,59 @@ class UploadPackHandler(PackHandler):
         write_pack_objects(write, objects_iter)
         # we are done
         self.proto.write_pkt_line(None)
+
+    async def handle_async(self):
+        async def write(x):
+            return await self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
+
+        graph_walker = _AsyncProtocolGraphWalker(
+            self,
+            self.repo.object_store,
+            self.repo.get_peeled,
+            self.repo.refs.get_symrefs,
+        )
+        wants = []
+
+        async def wants_wrapper(refs, **kwargs):
+            wants.extend(await graph_walker.determine_wants(refs, **kwargs))
+            return wants
+
+        objects_iter = await self.repo.fetch_objects_async(
+            wants_wrapper,
+            graph_walker,
+            self.progress_async,
+            get_tagged=self.get_tagged,
+        )
+
+        # Note the fact that client is only processing responses related
+        # to the have lines it sent, and any other data (including side-
+        # band) will be be considered a fatal error.
+        self._processing_have_lines = True
+
+        # Did the process short-circuit (e.g. in a stateless RPC call)? Note
+        # that the client still expects a 0-object pack in most cases.
+        # Also, if it also happens that the object_iter is instantiated
+        # with a graph walker with an implementation that talks over the
+        # wire (which is this instance of this class) this will actually
+        # iterate through everything and write things out to the wire.
+        if len(wants) == 0:
+            return
+
+        # The provided haves are processed, and it is safe to send side-
+        # band data now.
+        self._processing_have_lines = False
+
+        if not await graph_walker.handle_done(
+            not self.has_capability(CAPABILITY_NO_DONE), self._done_received
+        ):
+            return
+
+        await self.progress_async(
+            ("counting objects: %d, done.\n" % len(objects_iter)).encode("ascii")
+        )
+        await write_pack_objects_async(write, objects_iter)
+        # we are done
+        await self.proto.write_pkt_line(None)
 
 
 def _split_proto_line(line, allowed):
@@ -796,6 +869,49 @@ class SingleAckGraphWalkerImpl(object):
         return True
 
 
+class AsyncSingleAckGraphWalkerImpl(object):
+    """Graph walker implementation that speaks the single-ack protocol."""
+
+    def __init__(self, walker):
+        self.walker = walker
+        self._common = []
+
+    async def ack(self, have_ref):
+        if not self._common:
+            await self.walker.send_ack(have_ref)
+            self._common.append(have_ref)
+
+    async def next(self):
+        command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
+        if command in (None, COMMAND_DONE):
+            # defer the handling of done
+            self.walker.notify_done()
+            return None
+        elif command == COMMAND_HAVE:
+            return sha
+
+    async def handle_done(self, done_required, done_received):
+        if not self._common:
+            await self.walker.send_nak()
+
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
+        return True
+
+
+
 class MultiAckGraphWalkerImpl(object):
     """Graph walker implementation that speaks the multi-ack protocol."""
 
@@ -855,6 +971,63 @@ class MultiAckGraphWalkerImpl(object):
         return True
 
 
+class AsyncMultiAckGraphWalkerImpl(object):
+    """Graph walker implementation that speaks the multi-ack protocol."""
+
+    def __init__(self, walker):
+        self.walker = walker
+        self._found_base = False
+        self._common = []
+
+    async def ack(self, have_ref):
+        self._common.append(have_ref)
+        if not self._found_base:
+            await self.walker.send_ack(have_ref, b"continue")
+            if self.walker.all_wants_satisfied(self._common):
+                self._found_base = True
+        # else we blind ack within next
+
+    async def next(self):
+        while True:
+            command, sha = await self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
+            if command is None:
+                await self.walker.send_nak()
+                # in multi-ack mode, a flush-pkt indicates the client wants to
+                # flush but more have lines are still coming
+                continue
+            elif command == COMMAND_DONE:
+                self.walker.notify_done()
+                return None
+            elif command == COMMAND_HAVE:
+                if self._found_base:
+                    # blind ack
+                    await self.walker.send_ack(sha, b"continue")
+                return sha
+
+    async def handle_done(self, done_required, done_received):
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+        if self._common:
+            await self.walker.send_ack(self._common[-1])
+        else:
+            await self.walker.send_nak()
+        return True
+
+
 class MultiAckDetailedGraphWalkerImpl(object):
     """Graph walker implementation speaking the multi-ack-detailed protocol."""
 
@@ -862,18 +1035,18 @@ class MultiAckDetailedGraphWalkerImpl(object):
         self.walker = walker
         self._common = []
 
-    def ack(self, have_ref):
+    async def ack(self, have_ref):
         # Should only be called iff have_ref is common
         self._common.append(have_ref)
-        self.walker.send_ack(have_ref, b"common")
+        await self.walker.send_ack(have_ref, b"common")
 
-    def next(self):
+    async def next(self):
         while True:
-            command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
+            command, sha = await self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
                 if self.walker.all_wants_satisfied(self._common):
                     self.walker.send_ack(self._common[-1], b"ready")
-                self.walker.send_nak()
+                await self.walker.send_nak()
                 if self.walker.stateless_rpc:
                     # The HTTP version of this request a flush-pkt always
                     # signifies an end of request, so we also return
@@ -893,8 +1066,6 @@ class MultiAckDetailedGraphWalkerImpl(object):
                 return sha
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
-
-    __next__ = next
 
     def handle_done(self, done_required, done_received):
         if done_required and not done_received:
@@ -918,6 +1089,275 @@ class MultiAckDetailedGraphWalkerImpl(object):
         else:
             self.walker.send_nak()
         return True
+
+
+class AsyncMultiAckDetailedGraphWalkerImpl(object):
+    """Graph walker implementation speaking the multi-ack-detailed protocol."""
+
+    def __init__(self, walker):
+        self.walker = walker
+        self._common = []
+
+    async def ack(self, have_ref):
+        # Should only be called iff have_ref is common
+        self._common.append(have_ref)
+        await self.walker.send_ack(have_ref, b"common")
+
+    async def next(self):
+        while True:
+            command, sha = await self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
+            if command is None:
+                if self.walker.all_wants_satisfied(self._common):
+                    await self.walker.send_ack(self._common[-1], b"ready")
+                await self.walker.send_nak()
+                if self.walker.stateless_rpc:
+                    # The HTTP version of this request a flush-pkt always
+                    # signifies an end of request, so we also return
+                    # nothing here as if we are done (but not really, as
+                    # it depends on whether no-done capability was
+                    # specified and that's handled in handle_done which
+                    # may or may not call post_nodone_check depending on
+                    # that).
+                    return None
+            elif command == COMMAND_DONE:
+                # Let the walker know that we got a done.
+                self.walker.notify_done()
+                break
+            elif command == COMMAND_HAVE:
+                # return the sha and let the caller ACK it with the
+                # above ack method.
+                return sha
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+
+    async def handle_done(self, done_required, done_received):
+        if done_required and not done_received:
+            # we are not done, especially when done is required; skip
+            # the pack for this request and especially do not handle
+            # the done.
+            return False
+
+        if not done_received and not self._common:
+            # Okay we are not actually done then since the walker picked
+            # up no haves.  This is usually triggered when client attempts
+            # to pull from a source that has no common base_commit.
+            # See: test_server.MultiAckDetailedGraphWalkerImplTestCase.\
+            #          test_multi_ack_stateless_nodone
+            return False
+
+        # don't nak unless no common commits were found, even if not
+        # everything is satisfied
+        if self._common:
+            await self.walker.send_ack(self._common[-1])
+        else:
+            await self.walker.send_nak()
+        return True
+
+
+class _AsyncProtocolGraphWalker(object):
+    """A graph walker that knows the git protocol.
+
+    As a graph walker, this class implements ack(), next(), and reset(). It
+    also contains some base methods for interacting with the wire and walking
+    the commit tree.
+
+    The work of determining which acks to send is passed on to the
+    implementation instance stored in _impl. The reason for this is that we do
+    not know at object creation time what ack level the protocol requires. A
+    call to set_ack_type() is required to set up the implementation, before
+    any calls to next() or ack() are made.
+    """
+
+    def __init__(self, handler, object_store, get_peeled, get_symrefs):
+        self.handler = handler
+        self.store = object_store
+        self.get_peeled = get_peeled
+        self.get_symrefs = get_symrefs
+        self.proto = handler.proto
+        self.stateless_rpc = handler.stateless_rpc
+        self.advertise_refs = handler.advertise_refs
+        self._wants = []
+        self.shallow = set()
+        self.client_shallow = set()
+        self.unshallow = set()
+        self._cached = False
+        self._cache = []
+        self._cache_index = 0
+        self._impl = None
+
+    async def determine_wants(self, heads, depth=None):
+        """Determine the wants for a set of heads.
+
+        The given heads are advertised to the client, who then specifies which
+        refs they want using 'want' lines. This portion of the protocol is the
+        same regardless of ack type, and in fact is used to set the ack type of
+        the ProtocolGraphWalker.
+
+        If the client has the 'shallow' capability, this method also reads and
+        responds to the 'shallow' and 'deepen' lines from the client. These are
+        not part of the wants per se, but they set up necessary state for
+        walking the graph. Additionally, later code depends on this method
+        consuming everything up to the first 'have' line.
+
+        Args:
+          heads: a dict of refname->SHA1 to advertise
+        Returns: a list of SHA1s requested by the client
+        """
+        symrefs = self.get_symrefs()
+        values = set(heads.values())
+        if self.advertise_refs or not self.stateless_rpc:
+            for i, (ref, sha) in enumerate(sorted(heads.items())):
+                try:
+                    peeled_sha = self.get_peeled(ref)
+                except KeyError:
+                    # Skip refs that are inaccessible
+                    # TODO(jelmer): Integrate with Repo.fetch_objects refs
+                    # logic.
+                    continue
+                if i == 0:
+                    logger.info(
+                        "Sending capabilities: %s", self.handler.capabilities())
+                    line = format_ref_line(
+                        ref, sha,
+                        self.handler.capabilities()
+                        + symref_capabilities(symrefs.items()))
+                else:
+                    line = format_ref_line(ref, sha)
+                await self.proto.write_pkt_line(line)
+                if peeled_sha != sha:
+                    await self.proto.write_pkt_line(
+                        format_ref_line(ref + ANNOTATED_TAG_SUFFIX, peeled_sha))
+
+            # i'm done..
+            await self.proto.write_pkt_line(None)
+
+            if self.advertise_refs:
+                return []
+
+        # Now client will sending want want want commands
+        want = await self.proto.read_pkt_line()
+        if not want:
+            return []
+        line, caps = extract_want_line_capabilities(want)
+        self.handler.set_client_capabilities(caps)
+        self.set_ack_type(ack_type(caps))
+        allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, None)
+        command, sha = _split_proto_line(line, allowed)
+
+        want_revs = []
+        while command == COMMAND_WANT:
+            if sha not in values:
+                raise GitProtocolError("Client wants invalid object %s" % sha)
+            want_revs.append(sha)
+            command, sha = await self.read_proto_line(allowed)
+
+        self.set_wants(want_revs)
+        if command in (COMMAND_SHALLOW, COMMAND_DEEPEN):
+            self.unread_proto_line(command, sha)
+            await self._handle_shallow_request(want_revs)
+
+        if self.stateless_rpc and await self.proto.eof():
+            # The client may close the socket at this point, expecting a
+            # flush-pkt from the server. We might be ready to send a packfile
+            # at this point, so we need to explicitly short-circuit in this
+            # case.
+            return []
+
+        return want_revs
+
+    def unread_proto_line(self, command, value):
+        if isinstance(value, int):
+            value = str(value).encode("ascii")
+        self.proto.unread_pkt_line(command + b" " + value)
+
+    async def ack(self, have_ref):
+        if len(have_ref) != 40:
+            raise ValueError("invalid sha %r" % have_ref)
+        return await self._impl.ack(have_ref)
+
+    def reset(self):
+        self._cached = True
+        self._cache_index = 0
+
+    async def next(self):
+        if not self._cached:
+            if not self._impl and self.stateless_rpc:
+                return None
+            return await self._impl.next()
+        self._cache_index += 1
+        if self._cache_index > len(self._cache):
+            return None
+        return self._cache[self._cache_index]
+
+    async def read_proto_line(self, allowed):
+        """Read a line from the wire.
+
+        Args:
+          allowed: An iterable of command names that should be allowed.
+        Returns: A tuple of (command, value); see _split_proto_line.
+        Raises:
+          UnexpectedCommandError: If an error occurred reading the line.
+        """
+        return _split_proto_line(await self.proto.read_pkt_line(), allowed)
+
+    async def _handle_shallow_request(self, wants):
+        while True:
+            command, val = await self.read_proto_line((COMMAND_DEEPEN, COMMAND_SHALLOW))
+            if command == COMMAND_DEEPEN:
+                depth = val
+                break
+            self.client_shallow.add(val)
+        await self.read_proto_line((None,))  # consume client's flush-pkt
+
+        shallow, not_shallow = _find_shallow(self.store, wants, depth)
+
+        # Update self.shallow instead of reassigning it since we passed a
+        # reference to it before this method was called.
+        self.shallow.update(shallow - not_shallow)
+        new_shallow = self.shallow - self.client_shallow
+        unshallow = self.unshallow = not_shallow & self.client_shallow
+
+        for sha in sorted(new_shallow):
+            await self.proto.write_pkt_line(format_shallow_line(sha))
+        for sha in sorted(unshallow):
+            await self.proto.write_pkt_line(format_unshallow_line(sha))
+
+        await self.proto.write_pkt_line(None)
+
+    def notify_done(self):
+        # relay the message down to the handler.
+        self.handler.notify_done()
+
+    async def send_ack(self, sha, ack_type=b""):
+        await self.proto.write_pkt_line(format_ack_line(sha, ack_type))
+
+    async def send_nak(self):
+        await self.proto.write_pkt_line(NAK_LINE)
+
+    async def handle_done(self, done_required, done_received):
+        # Delegate this to the implementation.
+        return await self._impl.handle_done(done_required, done_received)
+
+    def set_wants(self, wants):
+        self._wants = wants
+
+    def all_wants_satisfied(self, haves):
+        """Check whether all the current wants are satisfied by a set of haves.
+
+        Args:
+          haves: A set of commits we know the client has.
+        Note: Wants are specified with set_wants rather than passed in since
+            in the current interface they are determined outside this class.
+        """
+        return _all_wants_satisfied(self.store, haves, self._wants)
+
+    def set_ack_type(self, ack_type):
+        impl_classes = {
+            MULTI_ACK: AsyncMultiAckGraphWalkerImpl,
+            MULTI_ACK_DETAILED: AsyncMultiAckDetailedGraphWalkerImpl,
+            SINGLE_ACK: AsyncSingleAckGraphWalkerImpl,
+        }
+        self._impl = impl_classes[ack_type](self)
 
 
 class ReceivePackHandler(PackHandler):
@@ -1028,6 +1468,29 @@ class ReceivePackHandler(PackHandler):
         write(None)
         flush()
 
+    async def _report_status_async(self, status: List[Tuple[bytes, bytes]]) -> None:
+        if self.has_capability(CAPABILITY_SIDE_BAND_64K):
+            async def write(d):
+                return await self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, d)
+
+            async def flush():
+                await self.proto.write_pkt_line(None)
+        else:
+            write = self.proto.write_pkt_line
+
+            async def flush():
+                pass
+
+        for name, msg in status:
+            if name == b"unpack":
+                await write(b"unpack " + msg + b"\n")
+            elif msg == b"ok":
+                await write(b"ok " + name + b"\n")
+            else:
+                await write(b"ng " + name + b" " + msg + b"\n")
+        await write(None)
+        await flush()
+
     def _on_post_receive(self, client_refs):
         hook = self.repo.hooks.get("post-receive", None)
         if not hook:
@@ -1038,6 +1501,17 @@ class ReceivePackHandler(PackHandler):
                 self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, output)
         except HookError as err:
             self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, str(err).encode('utf-8'))
+
+    async def _on_post_receive_async(self, client_refs):
+        hook = self.repo.hooks.get("post-receive", None)
+        if not hook:
+            return
+        try:
+            output = hook.execute(client_refs)
+            if output:
+                await self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, output)
+        except HookError as err:
+            await self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, str(err).encode('utf-8'))
 
     def handle(self) -> None:
         if self.advertise_refs or not self.stateless_rpc:
@@ -1085,6 +1559,52 @@ class ReceivePackHandler(PackHandler):
         if self.has_capability(CAPABILITY_REPORT_STATUS):
             self._report_status(status)
 
+    async def handle_async(self) -> None:
+        if self.advertise_refs or not self.stateless_rpc:
+            refs = sorted(self.repo.get_refs().items())
+            symrefs = sorted(self.repo.refs.get_symrefs().items())
+
+            if not refs:
+                refs = [(CAPABILITIES_REF, ZERO_SHA)]
+            logger.info(
+                "Sending capabilities: %s", self.capabilities())
+            await self.proto.write_pkt_line(
+                format_ref_line(
+                    refs[0][0], refs[0][1],
+                    self.capabilities() + symref_capabilities(symrefs)))
+            for i in range(1, len(refs)):
+                ref = refs[i]
+                await self.proto.write_pkt_line(format_ref_line(ref[0], ref[1]))
+
+            await self.proto.write_pkt_line(None)
+            if self.advertise_refs:
+                return
+
+        client_refs = []
+        ref = self.proto.read_pkt_line()
+
+        # if ref is none then client doesn't want to send us anything..
+        if ref is None:
+            return
+
+        ref, caps = extract_capabilities(ref)
+        self.set_client_capabilities(caps)
+
+        # client will now send us a list of (oldsha, newsha, ref)
+        while ref:
+            client_refs.append(ref.split())
+            ref = await self.proto.read_pkt_line()
+
+        # backend can now deal with this refs and read a pack using self.read
+        status = self._apply_pack(client_refs)
+
+        await self._on_post_receive(client_refs)
+
+        # when we have read all the pack from the client, send a status report
+        # if the client asked for it
+        if self.has_capability(CAPABILITY_REPORT_STATUS):
+            await self._report_status_async(status)
+
 
 class UploadArchiveHandler(Handler):
     def __init__(self, backend, args, proto, stateless_rpc=False):
@@ -1092,6 +1612,40 @@ class UploadArchiveHandler(Handler):
         self.repo = backend.open_repository(args[0])
 
     def handle(self):
+        def write(x):
+            return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
+
+        arguments = []
+        for pkt in self.proto.read_pkt_seq():
+            (key, value) = pkt.split(b" ", 1)
+            if key != b"argument":
+                raise GitProtocolError("unknown command %s" % key)
+            arguments.append(value.rstrip(b"\n"))
+        prefix = b""
+        format = "tar"
+        i = 0
+        store = self.repo.object_store
+        while i < len(arguments):
+            argument = arguments[i]
+            if argument == b"--prefix":
+                i += 1
+                prefix = arguments[i]
+            elif argument == b"--format":
+                i += 1
+                format = arguments[i].decode("ascii")
+            else:
+                commit_sha = self.repo.refs[argument]
+                tree = store[store[commit_sha].tree]
+            i += 1
+        self.proto.write_pkt_line(b"ACK")
+        self.proto.write_pkt_line(None)
+        for chunk in tar_stream(
+            store, tree, mtime=time.time(), prefix=prefix, format=format
+        ):
+            write(chunk)
+        self.proto.write_pkt_line(None)
+
+    async def handle_async(self):
         def write(x):
             return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
 

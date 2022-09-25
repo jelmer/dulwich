@@ -1674,7 +1674,42 @@ def write_pack_objects(
     """Write a new pack data file.
 
     Args:
-      write: write function to use
+      write: Write function to use
+      objects: Iterable of (object, path) tuples to write. Should provide
+         __len__
+      delta_window_size: Sliding window size for searching for deltas;
+                         Set to None for default window size.
+      deltify: Whether to deltify objects
+      compression_level: the zlib compression level to use
+    Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
+    """
+    if hasattr(write, 'write'):
+        write = write.write
+    if deltify is None:
+        # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too
+        # slow at the moment.
+        deltify = False
+    if deltify:
+        pack_contents = deltify_pack_objects(objects, delta_window_size)
+        pack_contents_count = len(objects)
+    else:
+        pack_contents_count, pack_contents = pack_objects_to_data(objects)
+
+    return write_pack_data(
+        write,
+        pack_contents_count,
+        pack_contents,
+        compression_level=compression_level,
+    )
+
+
+async def write_pack_objects_async(
+    write, objects, delta_window_size=None, deltify=None, compression_level=-1
+):
+    """Write a new pack data file.
+
+    Args:
+      write: Write function to use
       objects: Iterable of (object, path) tuples to write. Should provide
          __len__
       delta_window_size: Sliding window size for searching for deltas;
@@ -1699,7 +1734,7 @@ def write_pack_objects(
     else:
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
 
-    return write_pack_data(
+    return await write_pack_data_async(
         write,
         pack_contents_count,
         pack_contents,
@@ -1794,6 +1829,26 @@ def write_pack_data(write, num_records=None, records=None, progress=None, compre
     return chunk_generator.entries, chunk_generator.sha1digest()
 
 
+async def write_pack_data_async(write, num_records=None, records=None, progress=None, compression_level=-1):
+    """Write a new pack data file.
+
+    Args:
+      write: Write function to use
+      num_records: Number of records (defaults to len(records) if None)
+      records: Iterator over type_num, object_id, delta_base, raw
+      progress: Function to report progress to
+      compression_level: the zlib compression level
+    Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
+    """
+    chunk_generator = PackChunkGenerator(
+        num_records=num_records, records=records, progress=progress,
+        compression_level=compression_level)
+    for chunk in chunk_generator:
+        await write(chunk)
+    return chunk_generator.entries, chunk_generator.sha1digest()
+
+
+
 def write_pack_index_v1(f, entries, pack_checksum):
     """Write a new pack index file.
 
@@ -1867,7 +1922,11 @@ def create_delta(base_buf, target_buf):
     out_buf += _delta_encode_size(len(base_buf))
     out_buf += _delta_encode_size(len(target_buf))
     # write out delta opcodes
-    seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
+    try:
+        from patiencediff import PatienceSequenceMatcher as SequenceMatcher
+    except ImportError:
+        from difflib import SequenceMatcher
+    seq = SequenceMatcher(a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
         # Git patch opcodes don't care about deletes!
         # if opcode == 'replace' or opcode == 'delete':

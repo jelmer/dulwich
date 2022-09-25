@@ -64,6 +64,7 @@ from dulwich.tests.utils import (
 )
 from dulwich.protocol import (
     ZERO_SHA,
+    format_capability_line,
 )
 
 ONE = b"1" * 40
@@ -131,7 +132,7 @@ class HandlerTestCase(TestCase):
     def test_capability_line(self):
         self.assertEqual(
             b" cap1 cap2 cap3",
-            self._handler.capability_line([b"cap1", b"cap2", b"cap3"]),
+            format_capability_line([b"cap1", b"cap2", b"cap3"]),
         )
 
     def test_set_client_capabilities(self):

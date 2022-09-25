@@ -1694,7 +1694,7 @@ def write_pack_objects(
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
 
     return write_pack_data(
-        f,
+        f.write,
         pack_contents_count,
         pack_contents,
         compression_level=compression_level,
@@ -1764,22 +1764,27 @@ class PackChunkGenerator(object):
         yield self.cs.digest()
 
 
-def write_pack_data(f, num_records=None, records=None, progress=None, compression_level=-1):
+def write_pack_data(write, num_records=None, records=None, progress=None, compression_level=-1):
     """Write a new pack data file.
 
     Args:
-      f: File to write to
+      write: Write function to use
       num_records: Number of records (defaults to len(records) if None)
       records: Iterator over type_num, object_id, delta_base, raw
       progress: Function to report progress to
       compression_level: the zlib compression level
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
+    if hasattr(write, 'write'):
+        warnings.warn(
+            'write_pack_data() now takes a write rather than file argument',
+            DeprecationWarning, stacklevel=2)
+        write = write.write
     chunk_generator = PackChunkGenerator(
         num_records=num_records, records=records, progress=progress,
         compression_level=compression_level)
     for chunk in chunk_generator:
-        f.write(chunk)
+        write(chunk)
     return chunk_generator.entries, chunk_generator.sha1digest()
 
 

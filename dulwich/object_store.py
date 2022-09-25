@@ -179,7 +179,7 @@ class BaseObjectStore(object):
         f, commit, abort = self.add_pack()
         try:
             write_pack_data(
-                f,
+                f.write,
                 count,
                 pack_data,
                 progress,

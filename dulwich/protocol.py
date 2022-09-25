@@ -147,20 +147,6 @@ COMMAND_WANT = b"want"
 COMMAND_HAVE = b"have"
 
 
-class ProtocolFile(object):
-    """A dummy file for network ops that expect file-like objects."""
-
-    def __init__(self, read, write):
-        self.read = read
-        self.write = write
-
-    def tell(self):
-        pass
-
-    def close(self):
-        pass
-
-
 def format_cmd_pkt(cmd, *args):
     return cmd + b" " + b"".join([(a + b"\0") for a in args])
 
@@ -307,26 +293,6 @@ class Protocol(object):
                 self.report_activity(len(line), "write")
         except socket.error as e:
             raise GitProtocolError(e)
-
-    def write_file(self):
-        """Return a writable file-like object for this protocol."""
-
-        class ProtocolFile(object):
-            def __init__(self, proto):
-                self._proto = proto
-                self._offset = 0
-
-            def write(self, data):
-                self._proto.write(data)
-                self._offset += len(data)
-
-            def tell(self):
-                return self._offset
-
-            def close(self):
-                pass
-
-        return ProtocolFile(self)
 
     def write_sideband(self, channel, blob):
         """Write multiplexed data to the sideband.

@@ -47,6 +47,7 @@ from itertools import chain
 import os
 import sys
 from typing import Optional, Callable, Tuple, List
+import warnings
 
 from hashlib import sha1
 from os import (
@@ -1520,15 +1521,14 @@ def pack_object_header(type_num, delta_base, size):
     return bytearray(header)
 
 
-def write_pack_object(f, type, object, sha=None, compression_level=-1):
-    """Write pack object to a file.
+def pack_object_chunks(type, object, compression_level=-1):
+    """Generate chunks for a pack object.
 
     Args:
-      f: File to write to
       type: Numeric type of the object
       object: Object to write
       compression_level: the zlib compression level
-    Returns: Tuple with offset at which the object was written, and crc32
+    Returns: Chunks
     """
     if type in DELTA_TYPES:
         delta_base, object = object
@@ -1536,12 +1536,32 @@ def write_pack_object(f, type, object, sha=None, compression_level=-1):
         delta_base = None
     header = bytes(pack_object_header(type, delta_base, len(object)))
     comp_data = zlib.compress(object, compression_level)
-    crc32 = 0
     for data in (header, comp_data):
-        f.write(data)
+        yield data
+
+
+def write_pack_object(write, type, object, sha=None, compression_level=-1):
+    """Write pack object to a file.
+
+    Args:
+      write: Write function to use
+      type: Numeric type of the object
+      object: Object to write
+      compression_level: the zlib compression level
+    Returns: Tuple with offset at which the object was written, and crc32
+    """
+    if hasattr(write, 'write'):
+        warnings.warn(
+            'write_pack_object() now takes a write rather than file argument',
+            DeprecationWarning, stacklevel=2)
+        write = write.write
+    crc32 = 0
+    for chunk in pack_object_chunks(
+            type, object, compression_level=compression_level):
+        write(chunk)
         if sha is not None:
-            sha.update(data)
-        crc32 = binascii.crc32(data, crc32)
+            sha.update(chunk)
+        crc32 = binascii.crc32(chunk, crc32)
     return crc32 & 0xFFFFFFFF
 
 
@@ -1564,7 +1584,7 @@ def write_pack(
     """
     with GitFile(filename + ".pack", "wb") as f:
         entries, data_sum = write_pack_objects(
-            f,
+            f.write,
             objects,
             delta_window_size=delta_window_size,
             deltify=deltify,
@@ -1575,11 +1595,22 @@ def write_pack(
         return data_sum, write_pack_index_v2(f, entries, data_sum)
 
 
-def write_pack_header(f, num_objects):
+def pack_header_chunks(num_objects):
+    """Yield chunks for a pack header."""
+    yield b"PACK"  # Pack header
+    yield struct.pack(b">L", 2)  # Pack version
+    yield struct.pack(b">L", num_objects)  # Number of objects in pack
+
+
+def write_pack_header(write, num_objects):
     """Write a pack header for the given number of objects."""
-    f.write(b"PACK")  # Pack header
-    f.write(struct.pack(b">L", 2))  # Pack version
-    f.write(struct.pack(b">L", num_objects))  # Number of objects in pack
+    if hasattr(write, 'write'):
+        write = write.write
+        warnings.warn(
+            'write_pack_header() now takes a write rather than file argument',
+            DeprecationWarning, stacklevel=2)
+    for chunk in pack_header_chunks(num_objects):
+        write(chunk)
 
 
 def deltify_pack_objects(objects, window_size=None):
@@ -1638,12 +1669,12 @@ def pack_objects_to_data(objects):
 
 
 def write_pack_objects(
-    f, objects, delta_window_size=None, deltify=None, compression_level=-1
+    write, objects, delta_window_size=None, deltify=None, compression_level=-1
 ):
     """Write a new pack data file.
 
     Args:
-      f: File to write to
+      write: write function to use
       objects: Iterable of (object, path) tuples to write. Should provide
          __len__
       delta_window_size: Sliding window size for searching for deltas;
@@ -1652,6 +1683,12 @@ def write_pack_objects(
       compression_level: the zlib compression level to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
+    if hasattr(write, 'write'):
+        warnings.warn(
+            'write_pack_objects() now takes a write rather than file argument',
+            DeprecationWarning, stacklevel=2)
+        write = write.write
+
     if deltify is None:
         # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too
         # slow at the moment.
@@ -1663,7 +1700,7 @@ def write_pack_objects(
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
 
     return write_pack_data(
-        f,
+        write,
         pack_contents_count,
         pack_contents,
         compression_level=compression_level,
@@ -1697,11 +1734,11 @@ class PackChunkGenerator(object):
         # Write the pack
         if num_records is None:
             num_records = len(records)
-        f = BytesIO()
-        write_pack_header(f, num_records)
-        self.cs.update(f.getvalue())
-        yield f.getvalue()
-        offset = f.tell()
+        offset = 0
+        for chunk in pack_header_chunks(num_records):
+            yield chunk
+            self.cs.update(chunk)
+            offset += len(chunk)
         actual_num_records = 0
         for i, (type_num, object_id, delta_base, raw) in enumerate(records):
             if progress is not None:
@@ -1715,13 +1752,16 @@ class PackChunkGenerator(object):
                 else:
                     type_num = OFS_DELTA
                     raw = (offset - base_offset, raw)
-            f = BytesIO()
-            crc32 = write_pack_object(f, type_num, raw, compression_level=compression_level)
-            self.cs.update(f.getvalue())
-            yield f.getvalue()
+            crc32 = 0
+            object_size = 0
+            for chunk in pack_object_chunks(type_num, raw, compression_level=compression_level):
+                yield chunk
+                crc32 = binascii.crc32(chunk, crc32)
+                self.cs.update(chunk)
+                object_size += len(chunk)
             actual_num_records += 1
             self.entries[object_id] = (offset, crc32)
-            offset += f.tell()
+            offset += object_size
         if actual_num_records != num_records:
             raise AssertionError(
                 'actual records written differs: %d != %d' % (
@@ -1730,22 +1770,27 @@ class PackChunkGenerator(object):
         yield self.cs.digest()
 
 
-def write_pack_data(f, num_records=None, records=None, progress=None, compression_level=-1):
+def write_pack_data(write, num_records=None, records=None, progress=None, compression_level=-1):
     """Write a new pack data file.
 
     Args:
-      f: File to write to
+      write: Write function to use
       num_records: Number of records (defaults to len(records) if None)
       records: Iterator over type_num, object_id, delta_base, raw
       progress: Function to report progress to
       compression_level: the zlib compression level
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
+    if hasattr(write, 'write'):
+        warnings.warn(
+            'write_pack_data() now takes a write rather than file argument',
+            DeprecationWarning, stacklevel=2)
+        write = write.write
     chunk_generator = PackChunkGenerator(
         num_records=num_records, records=records, progress=progress,
         compression_level=compression_level)
     for chunk in chunk_generator:
-        f.write(chunk)
+        write(chunk)
     return chunk_generator.entries, chunk_generator.sha1digest()
 
 

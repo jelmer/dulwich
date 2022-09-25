@@ -108,6 +108,7 @@ from dulwich.protocol import (
     extract_capabilities,
     extract_want_line_capabilities,
     symref_capabilities,
+    format_ref_line,
 )
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
@@ -232,11 +233,6 @@ class PackHandler(Handler):
         self._client_capabilities = None
         # Flags needed for the no-done capability
         self._done_received = False
-
-    @classmethod
-    def capability_line(cls, capabilities):
-        logger.info("Sending capabilities: %s", capabilities)
-        return b"".join([b" " + c for c in capabilities])
 
     @classmethod
     def capabilities(cls) -> Iterable[bytes]:
@@ -602,17 +598,19 @@ class _ProtocolGraphWalker(object):
                     # TODO(jelmer): Integrate with Repo.fetch_objects refs
                     # logic.
                     continue
-                line = sha + b" " + ref
-                if not i:
-                    line += b"\x00" + self.handler.capability_line(
+                if i == 0:
+                    logger.info(
+                        "Sending capabilities: %s", self.handler.capabilities())
+                    line = format_ref_line(
+                        ref, sha,
                         self.handler.capabilities()
-                        + symref_capabilities(symrefs.items())
-                    )
-                self.proto.write_pkt_line(line + b"\n")
+                        + symref_capabilities(symrefs.items()))
+                else:
+                    line = format_ref_line(ref, sha)
+                self.proto.write_pkt_line(line)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line(
-                        peeled_sha + b" " + ref + ANNOTATED_TAG_SUFFIX + b"\n"
-                    )
+                        format_ref_line(ref + ANNOTATED_TAG_SUFFIX, peeled_sha))
 
             # i'm done..
             self.proto.write_pkt_line(None)
@@ -1047,19 +1045,15 @@ class ReceivePackHandler(PackHandler):
 
             if not refs:
                 refs = [(CAPABILITIES_REF, ZERO_SHA)]
+            logger.info(
+                "Sending capabilities: %s", self.capabilities())
             self.proto.write_pkt_line(
-                refs[0][1]
-                + b" "
-                + refs[0][0]
-                + b"\0"
-                + self.capability_line(
-                    self.capabilities() + symref_capabilities(symrefs)
-                )
-                + b"\n"
-            )
+                format_ref_line(
+                    refs[0][0], refs[0][1],
+                    self.capabilities() + symref_capabilities(symrefs)))
             for i in range(1, len(refs)):
                 ref = refs[i]
-                self.proto.write_pkt_line(ref[1] + b" " + ref[0] + b"\n")
+                self.proto.write_pkt_line(format_ref_line(ref[0], ref[1]))
 
             self.proto.write_pkt_line(None)
             if self.advertise_refs:

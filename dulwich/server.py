@@ -215,7 +215,7 @@ class FileSystemBackend(Backend):
 class Handler(object):
     """Smart protocol command handler base class."""
 
-    def __init__(self, backend, proto, stateless_rpc=None):
+    def __init__(self, backend, proto, stateless_rpc=False):
         self.backend = backend
         self.proto = proto
         self.stateless_rpc = stateless_rpc
@@ -227,7 +227,7 @@ class Handler(object):
 class PackHandler(Handler):
     """Protocol handler for packs."""
 
-    def __init__(self, backend, proto, stateless_rpc=None):
+    def __init__(self, backend, proto, stateless_rpc=False):
         super(PackHandler, self).__init__(backend, proto, stateless_rpc)
         self._client_capabilities = None
         # Flags needed for the no-done capability
@@ -289,7 +289,7 @@ class PackHandler(Handler):
 class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=None, advertise_refs=False):
+    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
         super(UploadPackHandler, self).__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
@@ -924,7 +924,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
 class ReceivePackHandler(PackHandler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=None, advertise_refs=False):
+    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
         super(ReceivePackHandler, self).__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
@@ -1092,7 +1092,7 @@ class ReceivePackHandler(PackHandler):
 
 
 class UploadArchiveHandler(Handler):
-    def __init__(self, backend, args, proto, stateless_rpc=None):
+    def __init__(self, backend, args, proto, stateless_rpc=False):
         super(UploadArchiveHandler, self).__init__(backend, proto, stateless_rpc)
         self.repo = backend.open_repository(args[0])
 

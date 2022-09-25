@@ -585,3 +585,17 @@ class PktLineParser(object):
     def get_tail(self):
         """Read back any unused data."""
         return self._readahead.getvalue()
+
+
+def format_capability_line(capabilities):
+    return b"".join([b" " + c for c in capabilities])
+
+
+def format_ref_line(ref, sha, capabilities=None):
+    if capabilities is None:
+        return sha + b" " + ref + b"\n"
+    else:
+        return (
+            sha + b" " + ref + b"\0"
+            + format_capability_line(capabilities)
+            + b"\n")

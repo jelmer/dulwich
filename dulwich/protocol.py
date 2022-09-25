@@ -440,6 +440,153 @@ class ReceivableProtocol(Protocol):
         return buf.read(size)
 
 
+class AsyncProtocol(object):
+    """Async version of protocol.
+
+    """
+
+    def __init__(self, read, write, close=None, report_activity=None):
+        self.read = read
+        self.write = write
+        self._close = close
+        self.report_activity = report_activity
+        self._readahead = []
+
+    def close(self):
+        if self._close:
+            self._close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    async def read_pkt_line(self):
+        """Reads a pkt-line from the remote git process.
+
+        This method may read from the readahead buffer; see unread_pkt_line.
+
+        Returns: The next string from the stream, without the length prefix, or
+            None for a flush-pkt ('0000').
+        """
+        if self._readahead:
+            return self._readahead.pop(0)
+
+        try:
+            sizestr = await self.read(4)
+            if not sizestr:
+                raise HangupException()
+            size = int(sizestr, 16)
+            if size == 0:
+                if self.report_activity:
+                    self.report_activity(4, "read")
+                return None
+            if self.report_activity:
+                self.report_activity(size, "read")
+            pkt_contents = await self.read(size - 4)
+        except ConnectionResetError:
+            raise HangupException()
+        except socket.error as e:
+            raise GitProtocolError(e)
+        else:
+            if len(pkt_contents) + 4 != size:
+                raise GitProtocolError(
+                    "Length of pkt read %04x does not match length prefix %04x"
+                    % (len(pkt_contents) + 4, size)
+                )
+            return pkt_contents
+
+    async def eof(self):
+        """Test whether the protocol stream has reached EOF.
+
+        Note that this refers to the actual stream EOF and not just a
+        flush-pkt.
+
+        Returns: True if the stream is at EOF, False otherwise.
+        """
+        try:
+            next_line = await self.read_pkt_line()
+        except HangupException:
+            return True
+        self.unread_pkt_line(next_line)
+        return False
+
+    def unread_pkt_line(self, data):
+        """Unread a single line of data into the readahead buffer.
+
+        This method can be used to unread a single pkt-line into a fixed
+        readahead buffer.
+
+        Args:
+          data: The data to unread, without the length prefix.
+        Raises:
+          ValueError: If more than one pkt-line is unread.
+        """
+        self._readahead.append(data)
+
+    async def read_pkt_seq(self):
+        """Read a sequence of pkt-lines from the remote git process.
+
+        Returns: Yields each line of data up to but not including the next
+            flush-pkt.
+        """
+        pkt = self.read_pkt_line()
+        while pkt:
+            yield pkt
+            pkt = await self.read_pkt_line()
+
+    async def write_pkt_line(self, line):
+        """Sends a pkt-line to the remote git process.
+
+        Args:
+          line: A string containing the data to send, without the length
+            prefix.
+        """
+        try:
+            line = pkt_line(line)
+            await self.write(line)
+            if self.report_activity:
+                self.report_activity(len(line), "write")
+        except socket.error as e:
+            raise GitProtocolError(e)
+
+    async def write_sideband(self, channel, blob):
+        """Write multiplexed data to the sideband.
+
+        Args:
+          channel: An int specifying the channel to write to.
+          blob: A blob of data (as a string) to send on this channel.
+        """
+        # a pktline can be a max of 65520. a sideband line can therefore be
+        # 65520-5 = 65515
+        # WTF: Why have the len in ASCII, but the channel in binary.
+        while blob:
+            await self.write_pkt_line(bytes(bytearray([channel])) + blob[:65515])
+            blob = blob[65515:]
+
+    async def send_cmd(self, cmd, *args):
+        """Send a command and some arguments to a git server.
+
+        Only used for the TCP git protocol (git://).
+
+        Args:
+          cmd: The remote service to access.
+          args: List of arguments to send to remove service.
+        """
+        await self.write_pkt_line(format_cmd_pkt(cmd, *args))
+
+    async def read_cmd(self):
+        """Read a command and some arguments from the git client
+
+        Only used for the TCP git protocol (git://).
+
+        Returns: A tuple of (command, [list of arguments]).
+        """
+        line = await self.read_pkt_line()
+        return parse_cmd_pkt(line)
+
+
 def extract_capabilities(text):
     """Extract a capabilities list from a string, if present.
 

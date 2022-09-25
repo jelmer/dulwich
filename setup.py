@@ -119,4 +119,5 @@ setup(name='dulwich',
           'https': ['urllib3>=1.24.1'],
           'pgp': ['gpg'],
           'paramiko': ['paramiko'],
+          'aiohttp': ['aiohttp'],
       })

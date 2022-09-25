@@ -295,6 +295,22 @@ class BaseObjectStore(object):
             sha = next(graphwalker)
         return haves
 
+    async def find_common_revisions_async(self, graphwalker):
+        """Find which revisions this store has in common using graphwalker.
+
+        Args:
+          graphwalker: A graphwalker object.
+        Returns: List of SHAs that are in common
+        """
+        haves = []
+        sha = await graphwalker.next()
+        while sha:
+            if sha in self:
+                haves.append(sha)
+                await graphwalker.ack(sha)
+            sha = await graphwalker.next()
+        return haves
+
     def generate_pack_contents(self, have, want, shallow=None, progress=None):
         """Iterate over the contents of a pack file.
 

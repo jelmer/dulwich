@@ -96,7 +96,6 @@ from dulwich.protocol import (
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     Protocol,
-    ProtocolFile,
     ReceivableProtocol,
     SIDE_BAND_CHANNEL_DATA,
     SIDE_BAND_CHANNEL_PROGRESS,
@@ -409,7 +408,7 @@ class UploadPackHandler(PackHandler):
         self.progress(
             ("counting objects: %d, done.\n" % len(objects_iter)).encode("ascii")
         )
-        write_pack_objects(ProtocolFile(None, write), objects_iter)
+        write_pack_objects(write, objects_iter)
         # we are done
         self.proto.write_pkt_line(None)
 

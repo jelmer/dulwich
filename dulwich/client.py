@@ -111,7 +111,6 @@ from dulwich.protocol import (
     SIDE_BAND_CHANNEL_FATAL,
     PktLineParser,
     Protocol,
-    ProtocolFile,
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,
@@ -1543,8 +1542,7 @@ class LocalGitClient(GitClient):
             # Note that the client still expects a 0-object pack in most cases.
             if objects_iter is None:
                 return FetchPackResult(None, symrefs, agent)
-            protocol = ProtocolFile(None, pack_data)
-            write_pack_objects(protocol, objects_iter)
+            write_pack_objects(pack_data, objects_iter)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):

@@ -498,7 +498,7 @@ class TestPack(PackTests):
 
             data._file.seek(12)
             bad_file = BytesIO()
-            write_pack_header(bad_file, 9999)
+            write_pack_header(bad_file.write, 9999)
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
             bad_data = PackData("", file=bad_file)
@@ -618,14 +618,14 @@ class TestThinPack(PackTests):
 class WritePackTests(TestCase):
     def test_write_pack_header(self):
         f = BytesIO()
-        write_pack_header(f, 42)
+        write_pack_header(f.write, 42)
         self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00*", f.getvalue())
 
     def test_write_pack_object(self):
         f = BytesIO()
         f.write(b"header")
         offset = f.tell()
-        crc32 = write_pack_object(f, Blob.type_num, b"blob")
+        crc32 = write_pack_object(f.write, Blob.type_num, b"blob")
         self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xFFFFFFFF)
 
         f.write(b"x")  # unpack_object needs extra trailing data.
@@ -643,7 +643,7 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f, Blob.type_num, b"blob", sha=sha_a)
+        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a)
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -654,7 +654,7 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f, Blob.type_num, b"blob", sha=sha_a, compression_level=6)
+        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a, compression_level=6)
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())

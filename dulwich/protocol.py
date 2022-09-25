@@ -109,6 +109,8 @@ KNOWN_RECEIVE_CAPABILITIES = set(
 
 DEPTH_INFINITE = 0x7FFFFFFF
 
+NAK_LINE = b"NAK\n"
+
 
 def agent_string():
     return ("dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
@@ -599,3 +601,17 @@ def format_ref_line(ref, sha, capabilities=None):
             sha + b" " + ref + b"\0"
             + format_capability_line(capabilities)
             + b"\n")
+
+
+def format_shallow_line(sha):
+    return COMMAND_SHALLOW + b" " + sha
+
+
+def format_unshallow_line(sha):
+    return COMMAND_UNSHALLOW + b" " + sha
+
+
+def format_ack_line(sha, ack_type=b""):
+    if ack_type:
+        ack_type = b" " + ack_type
+    return b"ACK " + sha + ack_type + b"\n"

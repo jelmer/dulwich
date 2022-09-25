@@ -109,6 +109,10 @@ from dulwich.protocol import (
     extract_want_line_capabilities,
     symref_capabilities,
     format_ref_line,
+    format_shallow_line,
+    format_unshallow_line,
+    format_ack_line,
+    NAK_LINE,
 )
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
@@ -704,9 +708,9 @@ class _ProtocolGraphWalker(object):
         unshallow = self.unshallow = not_shallow & self.client_shallow
 
         for sha in sorted(new_shallow):
-            self.proto.write_pkt_line(COMMAND_SHALLOW + b" " + sha)
+            self.proto.write_pkt_line(format_shallow_line(sha))
         for sha in sorted(unshallow):
-            self.proto.write_pkt_line(COMMAND_UNSHALLOW + b" " + sha)
+            self.proto.write_pkt_line(format_unshallow_line(sha))
 
         self.proto.write_pkt_line(None)
 
@@ -715,12 +719,10 @@ class _ProtocolGraphWalker(object):
         self.handler.notify_done()
 
     def send_ack(self, sha, ack_type=b""):
-        if ack_type:
-            ack_type = b" " + ack_type
-        self.proto.write_pkt_line(b"ACK " + sha + ack_type + b"\n")
+        self.proto.write_pkt_line(format_ack_line(sha, ack_type))
 
     def send_nak(self):
-        self.proto.write_pkt_line(b"NAK\n")
+        self.proto.write_pkt_line(NAK_LINE)
 
     def handle_done(self, done_required, done_received):
         # Delegate this to the implementation.

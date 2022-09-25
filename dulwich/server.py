@@ -96,7 +96,6 @@ from dulwich.protocol import (
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     Protocol,
-    ProtocolFile,
     ReceivableProtocol,
     SIDE_BAND_CHANNEL_DATA,
     SIDE_BAND_CHANNEL_PROGRESS,

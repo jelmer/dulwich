@@ -111,7 +111,6 @@ from dulwich.protocol import (
     SIDE_BAND_CHANNEL_FATAL,
     PktLineParser,
     Protocol,
-    ProtocolFile,
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,

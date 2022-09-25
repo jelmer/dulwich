@@ -292,7 +292,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         f, commit, abort = o.add_pack()
         try:
             b = make_object(Blob, data=b"more yummy data")
-            write_pack_objects(f, [(b, None)])
+            write_pack_objects(f.write, [(b, None)])
         except BaseException:
             abort()
             raise
@@ -525,7 +525,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         f, commit, abort = o.add_pack()
         try:
             b = make_object(Blob, data=b"more yummy data")
-            write_pack_objects(f, [(b, None)])
+            write_pack_objects(f.write, [(b, None)])
         except BaseException:
             abort()
             raise

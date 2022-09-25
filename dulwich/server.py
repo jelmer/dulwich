@@ -409,7 +409,7 @@ class UploadPackHandler(PackHandler):
         self.progress(
             ("counting objects: %d, done.\n" % len(objects_iter)).encode("ascii")
         )
-        write_pack_objects(ProtocolFile(None, write), objects_iter)
+        write_pack_objects(write, objects_iter)
         # we are done
         self.proto.write_pkt_line(None)
 

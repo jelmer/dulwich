@@ -1584,7 +1584,7 @@ def write_pack(
     """
     with GitFile(filename + ".pack", "wb") as f:
         entries, data_sum = write_pack_objects(
-            f,
+            f.write,
             objects,
             delta_window_size=delta_window_size,
             deltify=deltify,
@@ -1669,12 +1669,12 @@ def pack_objects_to_data(objects):
 
 
 def write_pack_objects(
-    f, objects, delta_window_size=None, deltify=None, compression_level=-1
+    write, objects, delta_window_size=None, deltify=None, compression_level=-1
 ):
     """Write a new pack data file.
 
     Args:
-      f: File to write to
+      write: write function to use
       objects: Iterable of (object, path) tuples to write. Should provide
          __len__
       delta_window_size: Sliding window size for searching for deltas;
@@ -1683,6 +1683,12 @@ def write_pack_objects(
       compression_level: the zlib compression level to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
+    if hasattr(write, 'write'):
+        warnings.warn(
+            'write_pack_objects() now takes a write rather than file argument',
+            DeprecationWarning, stacklevel=2)
+        write = write.write
+
     if deltify is None:
         # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too
         # slow at the moment.
@@ -1694,7 +1700,7 @@ def write_pack_objects(
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
 
     return write_pack_data(
-        f.write,
+        write,
         pack_contents_count,
         pack_contents,
         compression_level=compression_level,

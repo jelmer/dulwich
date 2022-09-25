@@ -1742,7 +1742,7 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
     """
     with open_repo_closing(repo) as r:
         entries, data_sum = write_pack_objects(
-            packf,
+            packf.write,
             r.object_store.iter_shas((oid, None) for oid in object_ids),
             delta_window_size=delta_window_size,
         )

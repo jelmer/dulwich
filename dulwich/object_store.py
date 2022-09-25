@@ -780,7 +780,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Update the header with the new number of objects.
         f.seek(0)
-        write_pack_header(f, len(entries) + len(indexer.ext_refs()))
+        write_pack_header(f.write, len(entries) + len(indexer.ext_refs()))
 
         # Must flush before reading (http://bugs.python.org/issue3207)
         f.flush()
@@ -797,7 +797,7 @@ class DiskObjectStore(PackBasedObjectStore):
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
             crc32 = write_pack_object(
-                f,
+                f.write,
                 type_num,
                 data,
                 sha=new_sha,
@@ -1047,7 +1047,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         # Update the header with the new number of objects.
         f.seek(0)
-        write_pack_header(f, len(entries) + len(indexer.ext_refs()))
+        write_pack_header(f.write, len(entries) + len(indexer.ext_refs()))
 
         # Rescan the rest of the pack, computing the SHA with the new header.
         new_sha = compute_file_sha(f, end_ofs=-20)
@@ -1056,7 +1056,7 @@ class MemoryObjectStore(BaseObjectStore):
         for ext_sha in indexer.ext_refs():
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
-            write_pack_object(f, type_num, data, sha=new_sha)
+            write_pack_object(f.write, type_num, data, sha=new_sha)
         pack_sha = new_sha.digest()
         f.write(pack_sha)
 

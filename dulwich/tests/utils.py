@@ -230,7 +230,7 @@ def build_pack(f, objects_spec, store=None):
     """
     sf = SHA1Writer(f)
     num_objects = len(objects_spec)
-    write_pack_header(sf, num_objects)
+    write_pack_header(sf.write, num_objects)
 
     full_objects = {}
     offsets = {}
@@ -270,7 +270,7 @@ def build_pack(f, objects_spec, store=None):
                 base = obj_sha(base_type_num, base_data)
             obj = (base, create_delta(base_data, data))
 
-        crc32 = write_pack_object(sf, type_num, obj)
+        crc32 = write_pack_object(sf.write, type_num, obj)
         offsets[i] = offset
         crc32s[i] = crc32
 

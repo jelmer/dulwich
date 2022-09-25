@@ -873,17 +873,17 @@ class DeltifyTests(TestCase):
     def test_single(self):
         b = Blob.from_string(b"foo")
         self.assertEqual(
-            [(b.type_num, b.sha().digest(), None, b.as_raw_string())],
+            [(b.type_num, b.sha().digest(), None, b.as_raw_chunks())],
             list(deltify_pack_objects([(b, b"")])),
         )
 
     def test_simple_delta(self):
         b1 = Blob.from_string(b"a" * 101)
         b2 = Blob.from_string(b"a" * 100)
-        delta = create_delta(b1.as_raw_string(), b2.as_raw_string())
+        delta = create_delta(b1.as_raw_chunks(), b2.as_raw_chunks())
         self.assertEqual(
             [
-                (b1.type_num, b1.sha().digest(), None, b1.as_raw_string()),
+                (b1.type_num, b1.sha().digest(), None, b1.as_raw_chunks()),
                 (b2.type_num, b2.sha().digest(), b1.sha().digest(), delta),
             ],
             list(deltify_pack_objects([(b1, b""), (b2, b"")])),
@@ -927,7 +927,7 @@ class TestPackStreamReader(TestCase):
             unpacked_delta.delta_base,
         )
         delta = create_delta(b"blob", b"blob1")
-        self.assertEqual(delta, b"".join(unpacked_delta.decomp_chunks))
+        self.assertEqual(b''.join(delta), b"".join(unpacked_delta.decomp_chunks))
         self.assertEqual(entries[1][4], unpacked_delta.crc32)
 
     def test_read_objects_buffered(self):

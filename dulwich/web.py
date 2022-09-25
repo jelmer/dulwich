@@ -67,6 +67,23 @@ HTTP_FORBIDDEN = "403 Forbidden"
 HTTP_ERROR = "500 Internal Server Error"
 
 
+NO_CACHE_HEADERS = [
+    ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
+    ("Pragma", "no-cache"),
+    ("Cache-Control", "no-cache, max-age=0, must-revalidate"),
+]
+
+
+def cache_forever_headers(now=None):
+    if now is None:
+        now = time.time()
+    return [
+        ("Date", date_time_string(now)),
+        ("Expires", date_time_string(now + 31536000)),
+        ("Cache-Control", "public, max-age=31536000"),
+    ]
+
+
 def date_time_string(timestamp: Optional[float] = None) -> str:
     # From BaseHTTPRequestHandler.date_time_string in BaseHTTPServer.py in the
     # Python 2.6.5 standard library, following modifications:
@@ -216,7 +233,7 @@ def get_info_refs(req, backend, mat):
             backend,
             [url_prefix(mat)],
             proto,
-            stateless_rpc=req,
+            stateless_rpc=True,
             advertise_refs=True,
         )
         handler.proto.write_pkt_line(b"# service=" + service.encode("ascii") + b"\n")
@@ -311,7 +328,7 @@ def handle_service_request(req, backend, mat):
     proto = ReceivableProtocol(read, write)
     # TODO(jelmer): Find a way to pass in repo, rather than having handler_cls
     # reopen.
-    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=req)
+    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
     handler.handle()
 
 
@@ -372,20 +389,11 @@ class HTTPGitRequest(object):
 
     def nocache(self) -> None:
         """Set the response to never be cached by the client."""
-        self._cache_headers = [
-            ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
-            ("Pragma", "no-cache"),
-            ("Cache-Control", "no-cache, max-age=0, must-revalidate"),
-        ]
+        self._cache_headers = NO_CACHE_HEADERS
 
     def cache_forever(self) -> None:
         """Set the response to be cached forever by the client."""
-        now = time.time()
-        self._cache_headers = [
-            ("Date", date_time_string(now)),
-            ("Expires", date_time_string(now + 31536000)),
-            ("Cache-Control", "public, max-age=31536000"),
-        ]
+        self._cache_headers = cache_forever_headers()
 
 
 class HTTPGitApplication(object):

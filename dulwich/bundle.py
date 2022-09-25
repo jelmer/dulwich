@@ -119,4 +119,4 @@ def write_bundle(f, bundle):
     for ref, obj_id in bundle.references.items():
         f.write(b"%s %s\n" % (obj_id, ref))
     f.write(b"\n")
-    write_pack_data(f, records=bundle.pack_data)
+    write_pack_data(f.write, records=bundle.pack_data)

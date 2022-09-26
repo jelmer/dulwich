@@ -39,7 +39,10 @@ from io import BytesIO, UnsupportedOperation
 from collections import (
     deque,
 )
-import difflib
+try:
+    from cdifflib import CSequenceMatcher as SequenceMatcher
+except ModuleNotFoundError:
+    from difflib import SequenceMatcher
 import struct
 
 from itertools import chain
@@ -1341,8 +1344,7 @@ class DeltaChainIterator(object):
 
     def _walk_all_chains(self):
         for offset, type_num in self._full_ofs:
-            for result in self._follow_chain(offset, type_num, None):
-                yield result
+            yield from self._follow_chain(offset, type_num, None)
         for result in self._walk_ref_chains():
             yield result
         assert not self._pending_ofs
@@ -1534,10 +1536,13 @@ def pack_object_chunks(type, object, compression_level=-1):
         delta_base, object = object
     else:
         delta_base = None
-    header = bytes(pack_object_header(type, delta_base, len(object)))
-    comp_data = zlib.compress(object, compression_level)
-    for data in (header, comp_data):
-        yield data
+    if isinstance(object, bytes):
+        object = [object]
+    yield bytes(pack_object_header(type, delta_base, sum(map(len, object))))
+    compressor = zlib.compressobj(level=compression_level)
+    for data in object:
+        yield compressor.compress(data)
+    yield compressor.flush()
 
 
 def write_pack_object(write, type, object, sha=None, compression_level=-1):
@@ -1635,18 +1640,21 @@ def deltify_pack_objects(objects, window_size=None):
     possible_bases = deque()
 
     for type_num, path, neg_length, o in magic:
-        raw = o.as_raw_string()
+        raw = o.as_raw_chunks()
         winner = raw
+        winner_len = sum(map(len, winner))
         winner_base = None
-        for base in possible_bases:
-            if base.type_num != type_num:
+        for base_id, base_type_num, base in possible_bases:
+            if base_type_num != type_num:
                 continue
-            delta = create_delta(base.as_raw_string(), raw)
-            if len(delta) < len(winner):
-                winner_base = base.sha().digest()
+            delta = create_delta(base, raw)
+            delta_len = sum(map(len, delta))
+            if delta_len < winner_len:
+                winner_base = base_id
                 winner = delta
+                winner_len = sum(map(len, winner))
         yield type_num, o.sha().digest(), winner_base, winner
-        possible_bases.appendleft(o)
+        possible_bases.appendleft((o.sha().digest(), type_num, raw))
         while len(possible_bases) > window_size:
             possible_bases.pop()
 
@@ -1662,7 +1670,7 @@ def pack_objects_to_data(objects):
     return (
         count,
         (
-            (o.type_num, o.sha().digest(), None, o.as_raw_string())
+            (o.type_num, o.sha().digest(), None, o.as_raw_chunks())
             for (o, path) in objects
         ),
     )
@@ -1821,7 +1829,7 @@ def write_pack_index_v1(f, entries, pack_checksum):
     return f.write_sha()
 
 
-def _delta_encode_size(size):
+def _delta_encode_size(size) -> bytes:
     ret = bytearray()
     c = size & 0x7F
     size >>= 7
@@ -1830,7 +1838,7 @@ def _delta_encode_size(size):
         c = size & 0x7F
         size >>= 7
     ret.append(c)
-    return ret
+    return bytes(ret)
 
 
 # The length of delta compression copy operations in version 2 packs is limited
@@ -1840,17 +1848,16 @@ _MAX_COPY_LEN = 0xFFFF
 
 
 def _encode_copy_operation(start, length):
-    scratch = []
-    op = 0x80
+    scratch = bytearray([0x80])
     for i in range(4):
         if start & 0xFF << i * 8:
             scratch.append((start >> i * 8) & 0xFF)
-            op |= 1 << i
+            scratch[0] |= 1 << i
     for i in range(2):
         if length & 0xFF << i * 8:
             scratch.append((length >> i * 8) & 0xFF)
-            op |= 1 << (4 + i)
-    return bytearray([op] + scratch)
+            scratch[0] |= 1 << (4 + i)
+    return bytes(scratch)
 
 
 def create_delta(base_buf, target_buf):
@@ -1860,14 +1867,18 @@ def create_delta(base_buf, target_buf):
       base_buf: Base buffer
       target_buf: Target buffer
     """
+    if isinstance(base_buf, list):
+        base_buf = b''.join(base_buf)
+    if isinstance(target_buf, list):
+        target_buf = b''.join(target_buf)
     assert isinstance(base_buf, bytes)
     assert isinstance(target_buf, bytes)
-    out_buf = bytearray()
+    out_buf = []
     # write delta header
-    out_buf += _delta_encode_size(len(base_buf))
-    out_buf += _delta_encode_size(len(target_buf))
+    out_buf.append(_delta_encode_size(len(base_buf)))
+    out_buf.append(_delta_encode_size(len(target_buf)))
     # write out delta opcodes
-    seq = difflib.SequenceMatcher(a=base_buf, b=target_buf)
+    seq = SequenceMatcher(isjunk=None, a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
         # Git patch opcodes don't care about deletes!
         # if opcode == 'replace' or opcode == 'delete':
@@ -1879,7 +1890,7 @@ def create_delta(base_buf, target_buf):
             copy_len = i2 - i1
             while copy_len > 0:
                 to_copy = min(copy_len, _MAX_COPY_LEN)
-                out_buf += _encode_copy_operation(copy_start, to_copy)
+                out_buf.append(_encode_copy_operation(copy_start, to_copy))
                 copy_start += to_copy
                 copy_len -= to_copy
         if opcode == "replace" or opcode == "insert":
@@ -1888,13 +1899,13 @@ def create_delta(base_buf, target_buf):
             s = j2 - j1
             o = j1
             while s > 127:
-                out_buf.append(127)
-                out_buf += bytearray(target_buf[o : o + 127])
+                out_buf.append(bytes([127]))
+                out_buf.append(memoryview(target_buf)[o:o + 127])
                 s -= 127
                 o += 127
-            out_buf.append(s)
-            out_buf += bytearray(target_buf[o : o + s])
-    return bytes(out_buf)
+            out_buf.append(bytes([s]))
+            out_buf.append(memoryview(target_buf)[o:o + s])
+    return out_buf
 
 
 def apply_delta(src_buf, delta):

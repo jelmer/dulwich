@@ -260,7 +260,7 @@ def build_pack(f, objects_spec, store=None):
             base_index, data = obj
             base = offset - offsets[base_index]
             _, base_data, _ = full_objects[base_index]
-            obj = (base, create_delta(base_data, data))
+            obj = (base, list(create_delta(base_data, data)))
         elif type_num == REF_DELTA:
             base_ref, data = obj
             if isinstance(base_ref, int):
@@ -268,7 +268,7 @@ def build_pack(f, objects_spec, store=None):
             else:
                 base_type_num, base_data = store.get_raw(base_ref)
                 base = obj_sha(base_type_num, base_data)
-            obj = (base, create_delta(base_data, data))
+            obj = (base, list(create_delta(base_data, data)))
 
         crc32 = write_pack_object(sf.write, type_num, obj)
         offsets[i] = offset

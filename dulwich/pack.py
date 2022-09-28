@@ -1645,9 +1645,14 @@ def deltify_pack_objects(objects, window_size=None):
         for base_id, base_type_num, base in possible_bases:
             if base_type_num != type_num:
                 continue
-            delta = create_delta(base, raw)
-            delta_len = sum(map(len, delta))
-            if delta_len < winner_len:
+            delta_len = 0
+            delta = []
+            for chunk in create_delta(base, raw):
+                delta_len += len(chunk)
+                if delta_len >= winner_len:
+                    break
+                delta.append(chunk)
+            else:
                 winner_base = base_id
                 winner = delta
                 winner_len = sum(map(len, winner))
@@ -1871,10 +1876,9 @@ def create_delta(base_buf, target_buf):
         target_buf = b''.join(target_buf)
     assert isinstance(base_buf, bytes)
     assert isinstance(target_buf, bytes)
-    out_buf = []
     # write delta header
-    out_buf.append(_delta_encode_size(len(base_buf)))
-    out_buf.append(_delta_encode_size(len(target_buf)))
+    yield _delta_encode_size(len(base_buf))
+    yield _delta_encode_size(len(target_buf))
     # write out delta opcodes
     seq = SequenceMatcher(isjunk=None, a=base_buf, b=target_buf)
     for opcode, i1, i2, j1, j2 in seq.get_opcodes():
@@ -1888,7 +1892,7 @@ def create_delta(base_buf, target_buf):
             copy_len = i2 - i1
             while copy_len > 0:
                 to_copy = min(copy_len, _MAX_COPY_LEN)
-                out_buf.append(_encode_copy_operation(copy_start, to_copy))
+                yield _encode_copy_operation(copy_start, to_copy)
                 copy_start += to_copy
                 copy_len -= to_copy
         if opcode == "replace" or opcode == "insert":
@@ -1897,13 +1901,12 @@ def create_delta(base_buf, target_buf):
             s = j2 - j1
             o = j1
             while s > 127:
-                out_buf.append(bytes([127]))
-                out_buf.append(memoryview(target_buf)[o:o + 127])
+                yield bytes([127])
+                yield memoryview(target_buf)[o:o + 127]
                 s -= 127
                 o += 127
-            out_buf.append(bytes([s]))
-            out_buf.append(memoryview(target_buf)[o:o + s])
-    return out_buf
+            yield bytes([s])
+            yield memoryview(target_buf)[o:o + s]
 
 
 def apply_delta(src_buf, delta):

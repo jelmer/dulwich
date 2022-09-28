@@ -1645,9 +1645,14 @@ def deltify_pack_objects(objects, window_size=None):
         for base_id, base_type_num, base in possible_bases:
             if base_type_num != type_num:
                 continue
-            delta = list(create_delta(base, raw))
-            delta_len = sum(map(len, delta))
-            if delta_len < winner_len:
+            delta_len = 0
+            delta = []
+            for chunk in create_delta(base, raw):
+                delta_len += len(chunk)
+                if delta_len >= winner_len:
+                    break
+                delta.append(chunk)
+            else:
                 winner_base = base_id
                 winner = delta
                 winner_len = sum(map(len, winner))

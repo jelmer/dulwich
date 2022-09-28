@@ -186,7 +186,8 @@ class TestPackDeltas(TestCase):
 
     def _test_roundtrip(self, base, target):
         self.assertEqual(
-            target, b"".join(apply_delta(base, create_delta(base, target)))
+            target,
+            b"".join(apply_delta(base, list(create_delta(base, target))))
         )
 
     def test_nochange(self):
@@ -880,7 +881,7 @@ class DeltifyTests(TestCase):
     def test_simple_delta(self):
         b1 = Blob.from_string(b"a" * 101)
         b2 = Blob.from_string(b"a" * 100)
-        delta = create_delta(b1.as_raw_chunks(), b2.as_raw_chunks())
+        delta = list(create_delta(b1.as_raw_chunks(), b2.as_raw_chunks()))
         self.assertEqual(
             [
                 (b1.type_num, b1.sha().digest(), None, b1.as_raw_chunks()),

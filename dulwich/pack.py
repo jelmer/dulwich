@@ -1345,8 +1345,7 @@ class DeltaChainIterator(object):
     def _walk_all_chains(self):
         for offset, type_num in self._full_ofs:
             yield from self._follow_chain(offset, type_num, None)
-        for result in self._walk_ref_chains():
-            yield result
+        yield from self._walk_ref_chains()
         assert not self._pending_ofs
 
     def _ensure_no_pending(self):
@@ -1371,8 +1370,7 @@ class DeltaChainIterator(object):
             self._ext_refs.append(base_sha)
             self._pending_ref.pop(base_sha)
             for new_offset in pending:
-                for result in self._follow_chain(new_offset, type_num, chunks):
-                    yield result
+                yield from self._follow_chain(new_offset, type_num, chunks)
 
         self._ensure_no_pending()
 

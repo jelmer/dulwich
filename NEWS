@@ -1,5 +1,8 @@
 0.20.47	UNRELEASED
 
+ * Support repository format version 1.
+   (Jelmer Vernooĳ, #1056)
+
  * Support \r\n line endings with continuations when parsing
    configuration files.  (Jelmer Vernooĳ)
 

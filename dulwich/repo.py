@@ -1050,6 +1050,13 @@ class UnsupportedVersion(Exception):
         self.version = version
 
 
+class UnsupportedExtension(Exception):
+    """Unsupported repository extension."""
+
+    def __init__(self, extension):
+        self.extension = extension
+
+
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -1125,8 +1132,12 @@ class Repo(BaseRepo):
         except KeyError:
             format_version = 0
 
-        if format_version != 0:
+        if format_version not in (0, 1):
             raise UnsupportedVersion(format_version)
+
+        for extension in config.items((b"extensions", )):
+            raise UnsupportedExtension(extension)
+
         if object_store is None:
             object_store = DiskObjectStore.from_config(
                 os.path.join(self.commondir(), OBJECTDIR), config

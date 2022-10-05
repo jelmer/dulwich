@@ -139,11 +139,11 @@ class InvalidUserIdentity(Exception):
 def _get_default_identity() -> Tuple[str, str]:
     import getpass
     import socket
-
-    username = getpass.getuser()
     try:
+        username = getpass.getuser()
         import pwd
     except ImportError:
+        username = os.getlogin()
         fullname = None
     else:
         try:

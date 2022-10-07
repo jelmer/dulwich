@@ -230,13 +230,21 @@ def write_cache_entry(f, name, entry, version):
         f.write(b"\0" * ((beginoffset + real_size) - f.tell()))
 
 
+class UnsupportedIndexFormat(Exception):
+    """An unsupported index format was encountered."""
+
+    def __init__(self, version):
+        self.index_format_version = version
+
+
 def read_index(f: BinaryIO):
     """Read an index file, yielding the individual entries."""
     header = f.read(4)
     if header != b"DIRC":
         raise AssertionError("Invalid index file header: %r" % header)
     (version, num_entries) = struct.unpack(b">LL", f.read(4 * 2))
-    assert version in (1, 2, 3), "index version is %r" % version
+    if version not in (1, 2, 3):
+        raise UnsupportedIndexFormat(version)
     for i in range(num_entries):
         yield read_cache_entry(f, version)
 

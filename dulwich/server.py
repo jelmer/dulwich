@@ -193,10 +193,10 @@ class DictBackend(Backend):
         logger.debug("Opening repository at %s", path)
         try:
             return self.repos[path]
-        except KeyError:
+        except KeyError as exc:
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=path)
-            )
+            ) from exc
 
 
 class FileSystemBackend(Backend):

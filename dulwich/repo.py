@@ -223,8 +223,8 @@ def check_user_identity(identity):
     """
     try:
         fst, snd = identity.split(b" <", 1)
-    except ValueError:
-        raise InvalidUserIdentity(identity)
+    except ValueError as exc:
+        raise InvalidUserIdentity(identity) from exc
     if b">" not in snd:
         raise InvalidUserIdentity(identity)
 
@@ -785,8 +785,8 @@ class BaseRepo(object):
                 pass
         try:
             return self.object_store[self.refs[name]]
-        except RefFormatError:
-            raise KeyError(name)
+        except RefFormatError as exc:
+            raise KeyError(name) from exc
 
     def __contains__(self, name: bytes) -> bool:
         """Check if a specific Git object or ref is present.
@@ -911,8 +911,8 @@ class BaseRepo(object):
         try:
             if not no_verify:
                 self.hooks["pre-commit"].execute()
-        except HookError as e:
-            raise CommitError(e)
+        except HookError as exc:
+            raise CommitError(exc) from exc
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
@@ -969,8 +969,8 @@ class BaseRepo(object):
                 c.message = self.hooks["commit-msg"].execute(message)
                 if c.message is None:
                     c.message = message
-        except HookError as e:
-            raise CommitError(e)
+        except HookError as exc:
+            raise CommitError(exc) from exc
         except KeyError:  # no hook defined, message not modified
             c.message = message
 
@@ -1406,8 +1406,10 @@ class Repo(BaseRepo):
                 try:
                     del index[tree_path]
                     continue
-                except KeyError:
-                    raise KeyError("file '%s' not in index" % (tree_path.decode()))
+                except KeyError as exc:
+                    raise KeyError(
+                        "file '%s' not in index" % (tree_path.decode())
+                    ) from exc
 
             st = None
             try:

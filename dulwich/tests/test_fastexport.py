@@ -52,8 +52,8 @@ class GitFastExporterTests(TestCase):
         self.stream = BytesIO()
         try:
             from dulwich.fastexport import GitFastExporter
-        except ImportError:
-            raise SkipTest("python-fastimport not available")
+        except ImportError as exc:
+            raise SkipTest("python-fastimport not available") from exc
         self.fastexporter = GitFastExporter(self.stream, self.store)
 
     def test_emit_blob(self):
@@ -100,8 +100,8 @@ class GitImportProcessorTests(TestCase):
         self.repo = MemoryRepo()
         try:
             from dulwich.fastexport import GitImportProcessor
-        except ImportError:
-            raise SkipTest("python-fastimport not available")
+        except ImportError as exc:
+            raise SkipTest("python-fastimport not available") from exc
         self.processor = GitImportProcessor(self.repo)
 
     def test_reset_handler(self):

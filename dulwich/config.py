@@ -411,15 +411,15 @@ def _parse_string(value: bytes) -> bytes:
             i += 1
             try:
                 v = _ESCAPE_TABLE[value[i]]
-            except IndexError:
+            except IndexError as exc:
                 raise ValueError(
                     "escape character in %r at %d before end of string" % (value, i)
-                )
-            except KeyError:
+                ) from exc
+            except KeyError as exc:
                 raise ValueError(
                     "escape character followed by unknown character "
                     "%s at %d in %r" % (value[i], i, value)
-                )
+                ) from exc
             if whitespace:
                 ret.extend(whitespace)
                 whitespace = bytearray()

@@ -226,10 +226,10 @@ class Protocol(object):
             if self.report_activity:
                 self.report_activity(size, "read")
             pkt_contents = read(size - 4)
-        except ConnectionResetError:
-            raise HangupException()
-        except socket.error as e:
-            raise GitProtocolError(e)
+        except ConnectionResetError as exc:
+            raise HangupException() from exc
+        except socket.error as exc:
+            raise GitProtocolError(exc) from exc
         else:
             if len(pkt_contents) + 4 != size:
                 raise GitProtocolError(
@@ -291,8 +291,8 @@ class Protocol(object):
             self.write(line)
             if self.report_activity:
                 self.report_activity(len(line), "write")
-        except socket.error as e:
-            raise GitProtocolError(e)
+        except socket.error as exc:
+            raise GitProtocolError(exc) from exc
 
     def write_sideband(self, channel, blob):
         """Write multiplexed data to the sideband.

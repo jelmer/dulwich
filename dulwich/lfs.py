@@ -51,8 +51,8 @@ class LFSStore(object):
         """Open an object by sha."""
         try:
             return open(self._sha_path(sha), "rb")
-        except FileNotFoundError:
-            raise KeyError(sha)
+        except FileNotFoundError as exc:
+            raise KeyError(sha) from exc
 
     def write_object(self, chunks):
         """Write an object.

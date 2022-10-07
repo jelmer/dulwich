@@ -152,8 +152,8 @@ class _GitFile(object):
                 os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
                 mask,
             )
-        except FileExistsError:
-            raise FileLocked(filename, self._lockfilename)
+        except FileExistsError as exc:
+            raise FileLocked(filename, self._lockfilename) from exc
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
 

@@ -4,7 +4,6 @@
 # Copyright (C) 2008-2022 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
 from setuptools import setup, Extension, Distribution
-import io
 import os
 import sys
 
@@ -66,57 +65,11 @@ ext_modules = [
 scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
 
 
-with io.open(os.path.join(os.path.dirname(__file__), "README.rst"),
-             encoding="utf-8") as f:
-    description = f.read()
-
-setup(name='dulwich',
-      author="Jelmer Vernooij",
-      author_email="jelmer@jelmer.uk",
-      url="https://www.dulwich.io/",
-      long_description=description,
-      description="Python Git Library",
-      version=dulwich_version_string,
-      license='Apachev2 or later or GPLv2',
-      project_urls={
-          "Bug Tracker": "https://github.com/dulwich/dulwich/issues",
-          "Repository": "https://www.dulwich.io/code/",
-          "GitHub": "https://github.com/dulwich/dulwich",
-      },
-      keywords="git vcs",
-      packages=['dulwich', 'dulwich.cloud', 'dulwich.tests',
-                'dulwich.tests.compat', 'dulwich.contrib'],
+setup(keywords="git vcs",
       package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
       scripts=scripts,
       ext_modules=ext_modules,
       zip_safe=False,
       distclass=DulwichDistribution,  # type: ignore
-      install_requires=['urllib3>=1.25'],
       include_package_data=True,
-      test_suite='dulwich.tests.test_suite',
-      tests_require=tests_require,
-      entry_points={
-          "console_scripts": ["dulwich=dulwich.cli:main"]
-      },
-      python_requires='>=3.6',
-      classifiers=[
-          'Development Status :: 4 - Beta',
-          'License :: OSI Approved :: Apache Software License',
-          'Programming Language :: Python :: 3.6',
-          'Programming Language :: Python :: 3.7',
-          'Programming Language :: Python :: 3.8',
-          'Programming Language :: Python :: 3.9',
-          'Programming Language :: Python :: 3.10',
-          'Programming Language :: Python :: 3.11',
-          'Programming Language :: Python :: Implementation :: CPython',
-          'Programming Language :: Python :: Implementation :: PyPy',
-          'Operating System :: POSIX',
-          'Operating System :: Microsoft :: Windows',
-          'Topic :: Software Development :: Version Control',
-      ],
-      extras_require={
-          'fastimport': ['fastimport'],
-          'https': ['urllib3>=1.24.1'],
-          'pgp': ['gpg'],
-          'paramiko': ['paramiko'],
-      })
+      tests_require=tests_require)

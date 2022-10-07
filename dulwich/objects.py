@@ -111,7 +111,7 @@ def hex_to_sha(hex):
     except TypeError as exc:
         if not isinstance(hex, bytes):
             raise
-        raise ValueError(exc.args[0])
+        raise ValueError(exc.args[0]) from exc
 
 
 def valid_hexsha(hex):
@@ -282,8 +282,9 @@ class ShaFile(object):
         type_name, size = header.split(b" ", 1)
         try:
             int(size)  # sanity check
-        except ValueError as e:
-            raise ObjectFormatException("Object size not an integer: %s" % e)
+        except ValueError as exc:
+            raise ObjectFormatException(
+                "Object size not an integer: %s" % exc) from exc
         obj_class = object_class(type_name)
         if not obj_class:
             raise ObjectFormatException("Not a known type: %s" % type_name)
@@ -427,8 +428,8 @@ class ShaFile(object):
             obj = cls._parse_file(f)
             obj._sha = None
             return obj
-        except (IndexError, ValueError):
-            raise ObjectFormatException("invalid object header")
+        except (IndexError, ValueError) as exc:
+            raise ObjectFormatException("invalid object header") from exc
 
     @staticmethod
     def from_raw_string(type_num, string, sha=None):
@@ -493,8 +494,8 @@ class ShaFile(object):
             self._deserialize(self.as_raw_chunks())
             self._sha = None
             new_sha = self.id
-        except Exception as e:
-            raise ObjectFormatException(e)
+        except Exception as exc:
+            raise ObjectFormatException(exc) from exc
         if old_sha != new_sha:
             raise ChecksumMismatch(new_sha, old_sha)
 
@@ -942,8 +943,9 @@ def parse_tree(text, strict=False):
             raise ObjectFormatException("Invalid mode '%s'" % mode_text)
         try:
             mode = int(mode_text, 8)
-        except ValueError:
-            raise ObjectFormatException("Invalid mode '%s'" % mode_text)
+        except ValueError as exc:
+            raise ObjectFormatException(
+                "Invalid mode '%s'" % mode_text) from exc
         name_end = text.index(b"\0", mode_end)
         name = text[mode_end + 1 : name_end]
         count = name_end + 21
@@ -1114,8 +1116,8 @@ class Tree(ShaFile):
         """Grab the entries in the tree"""
         try:
             parsed_entries = parse_tree(b"".join(chunks))
-        except ValueError as e:
-            raise ObjectFormatException(e)
+        except ValueError as exc:
+            raise ObjectFormatException(exc) from exc
         # TODO: list comprehension is for efficiency in the common (small)
         # case; if memory efficiency in the large case is a concern, use a
         # genexp.
@@ -1255,8 +1257,8 @@ def parse_time_entry(value):
         timetext, timezonetext = rest.rsplit(b" ", 1)
         time = int(timetext)
         timezone, timezone_neg_utc = parse_timezone(timezonetext)
-    except ValueError as e:
-        raise ObjectFormatException(e)
+    except ValueError as exc:
+        raise ObjectFormatException(exc) from exc
     return person, time, (timezone, timezone_neg_utc)
 
 

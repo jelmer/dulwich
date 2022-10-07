@@ -607,10 +607,10 @@ class FilePackIndex(PackIndex):
             sha = hex_to_sha(sha)
         try:
             return self._object_index(sha)
-        except ValueError:
+        except ValueError as exc:
             closed = getattr(self._contents, "closed", None)
             if closed in (None, True):
-                raise PackFileDisappeared(self)
+                raise PackFileDisappeared(self) from exc
             raise
 
     def _object_index(self, sha):

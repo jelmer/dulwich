@@ -1,6 +1,7 @@
-name: Releaser configuration
+---
+name: Disperse configuration
 
-on:
+"on":
   - push
 
 jobs:
@@ -15,9 +16,9 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt install protobuf-compiler
-      - name: Install releaser
+      - name: Install disperse
         run: |
-          pip install git+https://github.com/jelmer/releaser
-      - name: Validate releaser.conf
+          pip install git+https://github.com/jelmer/disperse
+      - name: Validate disperse.conf
         run: |
-          PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python releaser validate .
+          PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python disperse validate .

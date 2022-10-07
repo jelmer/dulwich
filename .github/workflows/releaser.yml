@@ -1,0 +1,23 @@
+name: Releaser configuration
+
+on:
+  - push
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+      - name: Install dependencies
+        run: |
+          sudo apt install protobuf-compiler
+      - name: Install releaser
+        run: |
+          pip install git+https://github.com/jelmer/releaser
+      - name: Validate releaser.conf
+        run: |
+          PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python releaser validate .

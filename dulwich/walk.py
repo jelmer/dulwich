@@ -148,8 +148,8 @@ class _CommitTimeQueue(object):
     def _push(self, object_id):
         try:
             obj = self._store[object_id]
-        except KeyError:
-            raise MissingCommitError(object_id)
+        except KeyError as exc:
+            raise MissingCommitError(object_id) from exc
         if isinstance(obj, Tag):
             self._push(obj.object[1])
             return

@@ -328,9 +328,9 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         commit_num = commit[0]
         try:
             parent_ids = [nums[pn] for pn in commit[1:]]
-        except KeyError as e:
-            (missing_parent,) = e.args
-            raise ValueError("Unknown parent %i" % missing_parent)
+        except KeyError as exc:
+            (missing_parent,) = exc.args
+            raise ValueError("Unknown parent %i" % missing_parent) from exc
 
         blobs = []
         for entry in trees.get(commit_num, []):

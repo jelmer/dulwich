@@ -185,9 +185,8 @@ DEFAULT_ENCODING = "utf-8"
 class Error(Exception):
     """Porcelain-based error. """
 
-    def __init__(self, msg, inner=None):
+    def __init__(self, msg):
         super(Error, self).__init__(msg)
-        self.inner = inner
 
 
 class RemoteExists(Error):
@@ -335,6 +334,10 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
 
 class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
+
+    def __init__(self, current_sha, new_sha):
+        self.current_sha = current_sha
+        self.new_sha = new_sha
 
 
 def check_diverged(repo, current_sha, new_sha):
@@ -669,8 +672,8 @@ def remove(repo=".", paths=None, cached=False):
             tree_path = path_to_tree_path(r.path, p)
             try:
                 index_sha = index[tree_path].sha
-            except KeyError:
-                raise Error("%s did not match any files" % p)
+            except KeyError as exc:
+                raise Error("%s did not match any files" % p) from exc
 
             if not cached:
                 try:
@@ -1194,8 +1197,10 @@ def push(
                 else:
                     try:
                         localsha = r.refs[lh]
-                    except KeyError:
-                        raise Error("No valid ref %s in local repository" % lh)
+                    except KeyError as exc:
+                        raise Error(
+                            "No valid ref %s in local repository" % lh
+                        ) from exc
                     if not force_ref and rh in refs:
                         check_diverged(r, refs[rh], localsha)
                     new_refs[rh] = localsha
@@ -1211,11 +1216,10 @@ def push(
                 generate_pack_data=r.generate_pack_data,
                 progress=errstream.write,
             )
-        except SendPackError as e:
+        except SendPackError as exc:
             raise Error(
-                "Push to " + remote_location + " failed -> " + e.args[0].decode(),
-                inner=e,
-            )
+                "Push to " + remote_location + " failed -> " + exc.args[0].decode(),
+            ) from exc
         else:
             errstream.write(
                 b"Push to " + remote_location.encode(err_encoding) + b" successful.\n"
@@ -1280,11 +1284,12 @@ def pull(
             if not force_ref and rh in r.refs:
                 try:
                     check_diverged(r, r.refs.follow(rh)[1], fetch_result.refs[lh])
-                except DivergedBranches:
+                except DivergedBranches as exc:
                     if fast_forward:
                         raise
                     else:
-                        raise NotImplementedError("merge is not yet supported")
+                        raise NotImplementedError(
+                            "merge is not yet supported") from exc
             r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
             r[b"HEAD"] = fetch_result.refs[selected_refs[0][1]]

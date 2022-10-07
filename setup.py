@@ -4,7 +4,6 @@
 # Copyright (C) 2008-2022 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
 from setuptools import setup, Extension, Distribution
-import io
 import os
 import sys
 

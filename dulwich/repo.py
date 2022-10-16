@@ -136,31 +136,39 @@ class InvalidUserIdentity(Exception):
         self.identity = identity
 
 
+# TODO(jelmer): Cache?
 def _get_default_identity() -> Tuple[str, str]:
-    import getpass
     import socket
 
-    username = getpass.getuser()
+    for name in ('LOGNAME', 'USER', 'LNAME', 'USERNAME'):
+        username = os.environ.get(name)
+        if username:
+            break
+    else:
+        username = None
+
     try:
         import pwd
     except ImportError:
         fullname = None
     else:
         try:
-            gecos = pwd.getpwnam(username).pw_gecos  # type: ignore
-        except (KeyError, AttributeError):
+            entry = pwd.getpwuid(os.getuid())  # type: ignore
+        except KeyError:
             fullname = None
         else:
-            if gecos:
-                fullname = gecos.split(",")[0]
+            if getattr(entry, 'gecos', None):
+                fullname = entry.pw_gecos.split(",")[0]
             else:
                 fullname = None
+            if username is None:
+                username = entry.pw_name
     if not fullname:
         fullname = username
     email = os.environ.get("EMAIL")
     if email is None:
         email = "{}@{}".format(username, socket.gethostname())
-    return (fullname, email)
+    return (fullname, email)  # type: ignore
 
 
 def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> bytes:

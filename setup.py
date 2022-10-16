@@ -62,14 +62,9 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c']),
 ]
 
-scripts = ['bin/dul-receive-pack', 'bin/dul-upload-pack']
-
 
 setup(keywords="git vcs",
       package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
-      scripts=scripts,
       ext_modules=ext_modules,
-      zip_safe=False,
       distclass=DulwichDistribution,  # type: ignore
-      include_package_data=True,
       tests_require=tests_require)

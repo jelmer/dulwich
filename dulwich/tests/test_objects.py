@@ -1203,7 +1203,10 @@ class CheckTests(TestCase):
             b"Dave Borowitz <dborowitz@google.com>",
             "failed to check good identity",
         )
-        check_identity(b"<dborowitz@google.com>", "failed to check good identity")
+        check_identity(b" <dborowitz@google.com>", "failed to check good identity")
+        self.assertRaises(
+            ObjectFormatException, check_identity, b'<dborowitz@google.com>', 'no space before email'
+        )
         self.assertRaises(
             ObjectFormatException, check_identity, b"Dave Borowitz", "no email"
         )
@@ -1236,6 +1239,36 @@ class CheckTests(TestCase):
             check_identity,
             b"Dave Borowitz <dborowitz@google.com>xxx",
             "trailing characters",
+        )
+        self.assertRaises(
+            ObjectFormatException,
+            check_identity,
+            b"Dave Borowitz <dborowitz@google.com>xxx",
+            "trailing characters",
+        )
+        self.assertRaises(
+            ObjectFormatException,
+            check_identity,
+            b'Dave<Borowitz <dborowitz@google.com>',
+            'reserved byte in name',
+        )
+        self.assertRaises(
+            ObjectFormatException,
+            check_identity,
+            b'Dave>Borowitz <dborowitz@google.com>',
+            'reserved byte in name',
+        )
+        self.assertRaises(
+            ObjectFormatException,
+            check_identity,
+            b'Dave\0Borowitz <dborowitz@google.com>',
+            'null byte',
+        )
+        self.assertRaises(
+            ObjectFormatException,
+            check_identity,
+            b'Dave\nBorowitz <dborowitz@google.com>',
+            'newline byte',
         )
 
 

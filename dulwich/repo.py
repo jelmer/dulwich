@@ -337,6 +337,9 @@ class ParentsProvider(object):
 class BaseRepo(object):
     """Base class for a git repository.
 
+    This base class is meant to be used for Repository implementations that e.g.
+    work on top of a different transport than a standard filesystem path.
+
     Attributes:
       object_store: Dictionary-like object for accessing
         the objects
@@ -1095,6 +1098,7 @@ class Repo(BaseRepo):
         object_store: Optional[BaseObjectStore] = None,
         bare: Optional[bool] = None
     ) -> None:
+        self.symlink_fn = None
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
             if (os.path.isfile(hidden_path)
@@ -1568,6 +1572,7 @@ class Repo(BaseRepo):
             tree,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
+            symlink_fn=self.symlink_fn,
         )
 
     def get_config(self) -> "ConfigFile":

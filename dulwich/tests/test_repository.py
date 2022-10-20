@@ -1487,3 +1487,9 @@ class CheckUserIdentityTests(TestCase):
         self.assertRaises(
             InvalidUserIdentity, check_user_identity, b"Fullname >order<>"
         )
+        self.assertRaises(
+            InvalidUserIdentity, check_user_identity, b'Contains\0null byte <>'
+        )
+        self.assertRaises(
+            InvalidUserIdentity, check_user_identity, b'Contains\nnewline byte <>'
+        )

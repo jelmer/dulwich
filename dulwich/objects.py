@@ -202,16 +202,16 @@ def check_identity(identity, error_msg):
       identity: Identity string
       error_msg: Error message to use in exception
     """
-    email_start = identity.find(b"<")
-    email_end = identity.find(b">")
-    if (
-        email_start < 0
-        or email_end < 0
-        or email_end <= email_start
-        or identity.find(b"<", email_start + 1) >= 0
-        or identity.find(b">", email_end + 1) >= 0
-        or not identity.endswith(b">")
-    ):
+    email_start = identity.find(b'<')
+    email_end = identity.find(b'>')
+    if not all([
+        email_start >= 1,
+        identity[email_start - 1] == b' '[0],
+        identity.find(b'<', email_start + 1) == -1,
+        email_end == len(identity) - 1,
+        b'\0' not in identity,
+        b'\n' not in identity,
+    ]):
         raise ObjectFormatException(error_msg)
 
 

@@ -235,6 +235,8 @@ def check_user_identity(identity):
         raise InvalidUserIdentity(identity) from exc
     if b">" not in snd:
         raise InvalidUserIdentity(identity)
+    if b'\0' in identity or b'\n' in identity:
+        raise InvalidUserIdentity(identity)
 
 
 def parse_graftpoints(

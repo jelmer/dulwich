@@ -581,8 +581,36 @@ def index_entry_from_stat(
     )
 
 
+if sys.platform == 'win32':
+    # On Windows, creating symlinks either requires administrator privileges
+    # or developer mode. Raise a more helpful error when we're unable to
+    # create symlinks
+
+    # https://github.com/jelmer/dulwich/issues/1005
+
+    class WindowsSymlinkPermissionError(PermissionError):
+
+        def __init__(self, errno, msg, filename):
+            super(PermissionError, self).__init__(
+                errno, "Unable to create symlink; "
+                "do you have developer mode enabled? %s" % msg,
+                filename)
+
+    def symlink(src, dst, target_is_directory=False, *, dir_fd=None):
+        try:
+            return os.symlink(
+                src, dst, target_is_directory=target_is_directory,
+                dir_fd=dir_fd)
+        except PermissionError as e:
+            raise WindowsSymlinkPermissionError(
+                e.errno, e.strerror, e.filename) from e
+else:
+    symlink = os.symlink
+
+
 def build_file_from_blob(
-    blob, mode, target_path, honor_filemode=True, tree_encoding="utf-8"
+    blob, mode, target_path, *, honor_filemode=True, tree_encoding="utf-8",
+    symlink_fn=None
 ):
     """Build a file or symlink on disk based on a Git object.
 
@@ -592,6 +620,7 @@ def build_file_from_blob(
       target_path: Path to write to
       honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
+      symlink: Function to use for creating symlinks
     Returns: stat object for the file
     """
     try:
@@ -607,7 +636,7 @@ def build_file_from_blob(
             # os.readlink on Python3 on Windows requires a unicode string.
             contents = contents.decode(tree_encoding)
             target_path = target_path.decode(tree_encoding)
-        os.symlink(contents, target_path)
+        (symlink_fn or symlink)(contents, target_path)
     else:
         if oldstat is not None and oldstat.st_size == len(contents):
             with open(target_path, "rb") as f:
@@ -657,6 +686,7 @@ def build_index_from_tree(
     tree_id,
     honor_filemode=True,
     validate_path_element=validate_path_element_default,
+    symlink_fn=None
 ):
     """Generate and materialize index from a tree
 
@@ -695,7 +725,9 @@ def build_index_from_tree(
         else:
             obj = object_store[entry.sha]
             st = build_file_from_blob(
-                obj, entry.mode, full_path, honor_filemode=honor_filemode
+                obj, entry.mode, full_path,
+                honor_filemode=honor_filemode,
+                symlink_fn=symlink_fn,
             )
 
         # Add file to index

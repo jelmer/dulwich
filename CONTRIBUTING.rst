@@ -9,7 +9,7 @@ New functionality and bug fixes should be accompanied by matching unit tests.
 
 Coding style
 ------------
-Where possible, please follow PEP8 with regard to coding style.
+Where possible, please follow PEP8 with regard to coding style. Run flake8.
 
 Furthermore, triple-quotes should always be """, single quotes are ' unless
 using " would result in less escaping within the string.
@@ -26,7 +26,7 @@ will run the tests using unittest.
 ::
    $ make check
 
-Tox configuration is also present as well as a Travis configuration file.
+Tox configuration is also present.
 
 String Types
 ------------

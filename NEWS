@@ -1,5 +1,9 @@
 0.20.47	UNRELEASED
 
+ * On Windows, provide a hint about developer mode
+   when creating symlinks fails due to a permission
+   error. (Jelmer Vernooĳ, #1005)
+
  * Support repository format version 1.
    (Jelmer Vernooĳ, #1056)
 

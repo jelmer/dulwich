@@ -1875,7 +1875,8 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
-def reset_file(repo, file_path: str, target: bytes = b'HEAD'):
+def reset_file(repo, file_path: str, target: bytes = b'HEAD',
+               symlink_fn=None):
     """Reset the file to specific commit or branch.
 
     Args:
@@ -1890,7 +1891,7 @@ def reset_file(repo, file_path: str, target: bytes = b'HEAD'):
     full_path = os.path.join(repo.path.encode(), file_path)
     blob = repo.object_store[file_entry[1]]
     mode = file_entry[0]
-    build_file_from_blob(blob, mode, full_path)
+    build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)
 
 
 def check_mailmap(repo, contact):

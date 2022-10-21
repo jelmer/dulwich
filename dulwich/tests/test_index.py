@@ -71,10 +71,6 @@ def can_symlink():
         # Platforms other than Windows should allow symlinks without issues.
         return True
 
-    if not hasattr(os, "symlink"):
-        # Older Python versions do not have `os.symlink` on Windows.
-        return False
-
     test_source = tempfile.mkdtemp()
     test_target = test_source + "can_symlink"
     try:

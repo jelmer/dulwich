@@ -741,7 +741,8 @@ class BaseRepo(object):
             return cached
         return self.object_store.peel_sha(self.refs[ref]).id
 
-    def get_walker(self, include=None, *args, **kwargs):
+    def get_walker(self, include: Optional[List[bytes]] = None,
+                   *args, **kwargs):
         """Obtain a walker for this repository.
 
         Args:
@@ -771,8 +772,6 @@ class BaseRepo(object):
 
         if include is None:
             include = [self.head()]
-        if isinstance(include, str):
-            include = [include]
 
         kwargs["get_parents"] = lambda commit: self.get_parents(commit.id, commit)
 

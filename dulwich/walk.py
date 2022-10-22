@@ -24,6 +24,7 @@
 import collections
 import heapq
 from itertools import chain
+from typing import List, Tuple, Set
 
 from dulwich.diff_tree import (
     RENAME_CHANGE_TYPES,
@@ -35,7 +36,9 @@ from dulwich.errors import (
     MissingCommitError,
 )
 from dulwich.objects import (
+    Commit,
     Tag,
+    ObjectID,
 )
 
 ORDER_DATE = "date"
@@ -128,15 +131,15 @@ class WalkEntry(object):
 class _CommitTimeQueue(object):
     """Priority queue of WalkEntry objects by commit time."""
 
-    def __init__(self, walker):
+    def __init__(self, walker: "Walker"):
         self._walker = walker
         self._store = walker.store
         self._get_parents = walker.get_parents
         self._excluded = walker.excluded
-        self._pq = []
-        self._pq_set = set()
-        self._seen = set()
-        self._done = set()
+        self._pq: List[Tuple[int, Commit]] = []
+        self._pq_set: Set[ObjectID] = set()
+        self._seen: Set[ObjectID] = set()
+        self._done: Set[ObjectID] = set()
         self._min_time = walker.since
         self._last = None
         self._extra_commits_left = _MAX_EXTRA_COMMITS
@@ -145,7 +148,7 @@ class _CommitTimeQueue(object):
         for commit_id in chain(walker.include, walker.excluded):
             self._push(commit_id)
 
-    def _push(self, object_id):
+    def _push(self, object_id: bytes):
         try:
             obj = self._store[object_id]
         except KeyError as exc:

@@ -4,6 +4,10 @@
    when creating symlinks fails due to a permission
    error. (Jelmer Vernooĳ, #1005)
 
+ * Add new ``ObjectID`` type in ``dulwich.objects``,
+   currently just an alias for ``bytes``.
+   (Jelmer Vernooĳ)
+
  * Support repository format version 1.
    (Jelmer Vernooĳ, #1056)
 

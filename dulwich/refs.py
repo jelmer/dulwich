@@ -34,12 +34,14 @@ from dulwich.objects import (
     valid_hexsha,
     ZERO_SHA,
     Tag,
+    ObjectID,
 )
 from dulwich.file import (
     GitFile,
     ensure_dir_exists,
 )
 
+Ref = bytes
 
 HEADREF = b"HEAD"
 SYMREF = b"ref: "
@@ -69,7 +71,7 @@ def parse_symref_value(contents):
     raise ValueError(contents)
 
 
-def check_ref_format(refname):
+def check_ref_format(refname: Ref):
     """Check if a refname is correctly formatted.
 
     Implements all the same rules as git-check-ref-format[1].
@@ -166,8 +168,8 @@ class RefsContainer(object):
 
     def import_refs(
         self,
-        base: bytes,
-        other: Dict[bytes, bytes],
+        base: Ref,
+        other: Dict[Ref, ObjectID],
         committer: Optional[bytes] = None,
         timestamp: Optional[bytes] = None,
         timezone: Optional[bytes] = None,
@@ -455,8 +457,8 @@ class DictRefsContainer(RefsContainer):
 
     def set_symbolic_ref(
         self,
-        name,
-        other,
+        name: Ref,
+        other: Ref,
         committer=None,
         timestamp=None,
         timezone=None,
@@ -507,8 +509,8 @@ class DictRefsContainer(RefsContainer):
 
     def add_if_new(
         self,
-        name: bytes,
-        ref: bytes,
+        name: Ref,
+        ref: ObjectID,
         committer=None,
         timestamp=None,
         timezone=None,

@@ -38,6 +38,7 @@ from dulwich.errors import (
 )
 from dulwich.file import GitFile
 from dulwich.objects import (
+    ObjectID,
     Commit,
     ShaFile,
     Tag,
@@ -67,7 +68,7 @@ from dulwich.pack import (
     PackStreamCopier,
 )
 from dulwich.protocol import DEPTH_INFINITE
-from dulwich.refs import ANNOTATED_TAG_SUFFIX
+from dulwich.refs import ANNOTATED_TAG_SUFFIX, Ref
 
 INFODIR = "info"
 PACKDIR = "pack"
@@ -83,9 +84,9 @@ class BaseObjectStore(object):
 
     def determine_wants_all(
         self,
-        refs: Dict[bytes, bytes],
+        refs: Dict[Ref, ObjectID],
         depth: Optional[int] = None
-    ) -> List[bytes]:
+    ) -> List[ObjectID]:
         def _want_deepen(sha):
             if not depth:
                 return False
@@ -139,7 +140,7 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.get_raw)
 
-    def __getitem__(self, sha):
+    def __getitem__(self, sha: ObjectID):
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha)
         return ShaFile.from_raw_string(type_num, uncomp, sha=sha)
@@ -984,7 +985,7 @@ class MemoryObjectStore(BaseObjectStore):
         """List with pack objects."""
         return []
 
-    def get_raw(self, name):
+    def get_raw(self, name: ObjectID):
         """Obtain the raw text for an object.
 
         Args:
@@ -994,10 +995,10 @@ class MemoryObjectStore(BaseObjectStore):
         obj = self[self._to_hexsha(name)]
         return obj.type_num, obj.as_raw_string()
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: ObjectID):
         return self._data[self._to_hexsha(name)].copy()
 
-    def __delitem__(self, name):
+    def __delitem__(self, name: ObjectID):
         """Delete an object from this store, for testing only."""
         del self._data[self._to_hexsha(name)]
 

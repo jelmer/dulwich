@@ -33,7 +33,18 @@ import os
 import sys
 import stat
 import time
-from typing import Optional, Tuple, TYPE_CHECKING, List, Dict, Union, Iterable
+from typing import (
+    Optional,
+    BinaryIO,
+    Callable,
+    Tuple,
+    TYPE_CHECKING,
+    List,
+    Dict,
+    Union,
+    Iterable,
+    Set
+)
 
 if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
@@ -391,7 +402,7 @@ class BaseRepo(object):
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")
 
-    def get_named_file(self, path):
+    def get_named_file(self, path: str) -> Optional[BinaryIO]:
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -404,7 +415,7 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.get_named_file)
 
-    def _put_named_file(self, path, contents):
+    def _put_named_file(self, path: str, contents: bytes):
         """Write a file to the control dir with the given name and contents.
 
         Args:
@@ -413,11 +424,11 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self._put_named_file)
 
-    def _del_named_file(self, path):
+    def _del_named_file(self, path: str):
         """Delete a file in the control directory with the given name."""
         raise NotImplementedError(self._del_named_file)
 
-    def open_index(self):
+    def open_index(self) -> "Index":
         """Open the index for this repository.
 
         Raises:
@@ -564,7 +575,9 @@ class BaseRepo(object):
             )
         )
 
-    def generate_pack_data(self, have, want, progress=None, ofs_delta=None):
+    def generate_pack_data(self, have: List[ObjectID], want: List[ObjectID],
+                           progress: Optional[Callable[[str], None]] = None,
+                           ofs_delta: Optional[bool] = None):
         """Generate pack data objects for a set of wants/haves.
 
         Args:
@@ -581,7 +594,8 @@ class BaseRepo(object):
             ofs_delta=ofs_delta,
         )
 
-    def get_graph_walker(self, heads=None):
+    def get_graph_walker(
+            self, heads: List[ObjectID] = None) -> ObjectStoreGraphWalker:
         """Retrieve a graph walker.
 
         A graph walker is used by a remote repository (or proxy)
@@ -642,7 +656,7 @@ class BaseRepo(object):
         """
         return self.object_store[sha]
 
-    def parents_provider(self):
+    def parents_provider(self) -> ParentsProvider:
         return ParentsProvider(
             self.object_store,
             grafts=self._graftpoints,
@@ -662,7 +676,7 @@ class BaseRepo(object):
         """
         return self.parents_provider().get_parents(sha, commit)
 
-    def get_config(self):
+    def get_config(self) -> "ConfigFile":
         """Retrieve the config object.
 
         Returns: `ConfigFile` object for the ``.git/config`` file.
@@ -699,7 +713,7 @@ class BaseRepo(object):
         backends = [self.get_config()] + StackedConfig.default_backends()
         return StackedConfig(backends, writable=backends[0])
 
-    def get_shallow(self):
+    def get_shallow(self) -> Set[ObjectID]:
         """Get the set of shallow commits.
 
         Returns: Set of shallow commits.
@@ -729,7 +743,7 @@ class BaseRepo(object):
         else:
             self._del_named_file("shallow")
 
-    def get_peeled(self, ref):
+    def get_peeled(self, ref: Ref) -> ObjectID:
         """Get the peeled value of a ref.
 
         Args:
@@ -878,19 +892,19 @@ class BaseRepo(object):
 
     def do_commit(  # noqa: C901
         self,
-        message=None,
-        committer=None,
-        author=None,
+        message: Optional[bytes] = None,
+        committer: Optional[bytes] = None,
+        author: Optional[bytes] = None,
         commit_timestamp=None,
         commit_timezone=None,
         author_timestamp=None,
         author_timezone=None,
-        tree=None,
-        encoding=None,
-        ref=b"HEAD",
-        merge_heads=None,
-        no_verify=False,
-        sign=False,
+        tree: Optional[ObjectID] = None,
+        encoding: Optional[bytes] = None,
+        ref: Ref = b"HEAD",
+        merge_heads: Optional[List[ObjectID]] = None,
+        no_verify: bool = False,
+        sign: bool = False,
     ):
         """Create a new commit.
 
@@ -1028,7 +1042,7 @@ class BaseRepo(object):
             if not ok:
                 # Fail if the atomic compare-and-swap failed, leaving the
                 # commit and all its objects as garbage.
-                raise CommitError("%s changed during commit" % (ref,))
+                raise CommitError(f"{ref!r} changed during commit")
 
         self._del_named_file("MERGE_HEAD")
 

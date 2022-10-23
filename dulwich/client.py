@@ -1397,7 +1397,8 @@ class SubprocessGitClient(TraditionalGitClient):
 class LocalGitClient(GitClient):
     """Git Client that just uses a local Repo."""
 
-    def __init__(self, thin_packs=True, report_activity=None, config=None):
+    def __init__(self, thin_packs=True, report_activity=None,
+                 config: Optional[Config] = None):
         """Create a new LocalGitClient instance.
 
         Args:

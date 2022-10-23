@@ -1540,7 +1540,7 @@ class Repo(BaseRepo):
             raise
         return target
 
-    def reset_index(self, tree: Optional[Tree] = None):
+    def reset_index(self, tree: Optional[bytes] = None):
         """Reset the index back to a specific tree.
 
         Args:

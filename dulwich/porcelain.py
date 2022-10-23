@@ -1036,6 +1036,7 @@ def tag_create(
     tag_time=None,
     tag_timezone=None,
     sign=False,
+    encoding=DEFAULT_ENCODING
 ):
     """Creates a tag in git via dulwich calls:
 
@@ -1063,7 +1064,7 @@ def tag_create(
                 # TODO(jelmer): Don't use repo private method.
                 author = r._get_user_identity(r.get_config_stack())
             tag_obj.tagger = author
-            tag_obj.message = message + "\n".encode()
+            tag_obj.message = message + "\n".encode(encoding)
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
             if tag_time is None:
@@ -1889,10 +1890,10 @@ def reset_file(repo, file_path: str, target: bytes = b'HEAD',
       target: branch or commit or b'HEAD' to reset
     """
     tree = parse_tree(repo, treeish=target)
-    file_path = _fs_to_tree_path(file_path)
+    tree_path = _fs_to_tree_path(file_path)
 
-    file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path)
-    full_path = os.path.join(repo.path.encode(), file_path)
+    file_entry = tree.lookup_path(repo.object_store.__getitem__, tree_path)
+    full_path = os.path.join(os.fsencode(repo.path), tree_path)
     blob = repo.object_store[file_entry[1]]
     mode = file_entry[0]
     build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)

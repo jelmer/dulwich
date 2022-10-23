@@ -632,13 +632,12 @@ def build_file_from_blob(
         oldstat = None
     contents = blob.as_raw_string()
     if stat.S_ISLNK(mode):
-        # FIXME: This will fail on Windows. What should we do instead?
         if oldstat:
             os.unlink(target_path)
         if sys.platform == "win32":
             # os.readlink on Python3 on Windows requires a unicode string.
-            contents = contents.decode(tree_encoding)
-            target_path = target_path.decode(tree_encoding)
+            contents = contents.decode(tree_encoding)  # type: ignore
+            target_path = target_path.decode(tree_encoding)  # type: ignore
         (symlink_fn or symlink)(contents, target_path)
     else:
         if oldstat is not None and oldstat.st_size == len(contents):
@@ -771,8 +770,7 @@ def blob_from_path_and_mode(fs_path: bytes, mode: int,
     if stat.S_ISLNK(mode):
         if sys.platform == "win32":
             # os.readlink on Python3 on Windows requires a unicode string.
-            fs_path = os.fsdecode(fs_path)
-            blob.data = os.readlink(fs_path).encode(tree_encoding)
+            blob.data = os.readlink(os.fsdecode(fs_path)).encode(tree_encoding)
         else:
             blob.data = os.readlink(fs_path)
     else:

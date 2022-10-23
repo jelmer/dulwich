@@ -89,6 +89,7 @@ from dulwich.client import (
     get_transport_and_path,
 )
 from dulwich.config import (
+    Config,
     ConfigFile,
     StackedConfig,
     read_submodules,
@@ -496,10 +497,10 @@ def clone(
     checkout=None,
     errstream=default_bytes_err_stream,
     outstream=None,
-    origin="origin",
-    depth=None,
-    branch=None,
-    config=None,
+    origin: Optional[str] = "origin",
+    depth: Optional[int] = None,
+    branch: Optional[Union[str, bytes]] = None,
+    config: Optional[Config] = None,
     **kwargs
 ):
     """Clone a local or remote git repository.
@@ -538,6 +539,9 @@ def clone(
 
     if target is None:
         target = source.split("/")[-1]
+
+    if isinstance(branch, str):
+        branch = branch.encode(DEFAULT_ENCODING)
 
     mkdir = not os.path.exists(target)
 
@@ -1709,7 +1713,7 @@ def fetch(
     return fetch_result
 
 
-def ls_remote(remote, config=None, **kwargs):
+def ls_remote(remote, config: Optional[Config] = None, **kwargs):
     """List the refs in a remote.
 
     Args:

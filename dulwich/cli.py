@@ -247,6 +247,10 @@ class cmd_clone(Command):
         parser.add_option(
             "--depth", dest="depth", type=int, help="Depth at which to fetch"
         )
+        parser.add_option(
+            "-b", "--branch", dest="branch", type=str,
+            help=("Check out branch instead of branch pointed to by remote "
+                  "HEAD"))
         options, args = parser.parse_args(args)
 
         if args == []:
@@ -259,7 +263,8 @@ class cmd_clone(Command):
         else:
             target = None
 
-        porcelain.clone(source, target, bare=options.bare, depth=options.depth)
+        porcelain.clone(source, target, bare=options.bare, depth=options.depth,
+                        branch=options.branch)
 
 
 class cmd_commit(Command):

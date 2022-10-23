@@ -70,6 +70,7 @@ from dulwich.objects import (
     ShaFile,
     Tag,
     Tree,
+    ObjectID,
 )
 from dulwich.pack import (
     pack_objects_to_data,
@@ -86,6 +87,7 @@ from dulwich.hooks import (
 from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
 
 from dulwich.refs import (  # noqa: F401
+    Ref,
     ANNOTATED_TAG_SUFFIX,
     LOCAL_BRANCH_PREFIX,
     LOCAL_TAG_PREFIX,
@@ -777,7 +779,7 @@ class BaseRepo(object):
 
         return Walker(self.object_store, include, *args, **kwargs)
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: Union[ObjectID, Ref]):
         """Retrieve a Git object by SHA1 or ref.
 
         Args:

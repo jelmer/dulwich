@@ -1,5 +1,9 @@
 0.20.47	UNRELEASED
 
+ * Fix Repo.reset_index.
+   Previously, it instead took the union with the given tree.
+   (Christian Sattler, #1072)
+
  * Add -b argument to ``dulwich clone``.
    (Jelmer Vernooĳ)
 

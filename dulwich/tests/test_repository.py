@@ -1404,6 +1404,7 @@ class BuildRepoRootTests(TestCase):
         porcelain.add(self._repo, paths=[full_path])
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
+
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 
     def test_unstage_remove_file(self):
@@ -1422,6 +1423,19 @@ class BuildRepoRootTests(TestCase):
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
+
+    def test_reset_index(self):
+        r = self._repo
+        with open(os.path.join(r.path, 'a'), 'wb') as f:
+            f.write(b'changed')
+        with open(os.path.join(r.path, 'b'), 'wb') as f:
+            f.write(b'added')
+        r.stage(['a', 'b'])
+        status = list(porcelain.status(self._repo))
+        self.assertEqual([{'add': [b'b'], 'delete': [], 'modify': [b'a']}, [], []], status)
+        r.reset_index()
+        status = list(porcelain.status(self._repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['b']], status)
 
     @skipIf(
         sys.platform in ("win32", "darwin"),

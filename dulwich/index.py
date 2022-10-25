@@ -316,17 +316,19 @@ def cleanup_mode(mode: int) -> int:
 class Index(object):
     """A Git Index file."""
 
-    def __init__(self, filename: Union[bytes, str]):
-        """Open an index file.
+    def __init__(self, filename: Union[bytes, str], read=True):
+        """Create an index object associated with the given filename.
 
         Args:
           filename: Path to the index file
+          read: Whether to initialize the index from the given file, should it exist.
         """
         self._filename = filename
         # TODO(jelmer): Store the version returned by read_index
         self._version = None
         self.clear()
-        self.read()
+        if read:
+            self.read()
 
     @property
     def path(self):
@@ -706,8 +708,7 @@ def build_index_from_tree(
     Note: existing index is wiped and contents are not merged
         in a working dir. Suitable only for fresh clones.
     """
-
-    index = Index(index_path)
+    index = Index(index_path, read=False)
     if not isinstance(root_path, bytes):
         root_path = os.fsencode(root_path)
 

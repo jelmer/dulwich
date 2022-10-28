@@ -123,6 +123,7 @@ class BlackboxTestCase(TestCase):
 
 def self_test_suite() -> unittest.TestSuite:
     names = [
+        "aiohttp",
         "annotate",
         "approxidate",
         "archive",

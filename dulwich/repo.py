@@ -33,7 +33,18 @@ import os
 import sys
 import stat
 import time
-from typing import Optional, Tuple, TYPE_CHECKING, List, Dict, Union, Iterable
+from typing import (
+    Optional,
+    BinaryIO,
+    Callable,
+    Tuple,
+    TYPE_CHECKING,
+    List,
+    Dict,
+    Union,
+    Iterable,
+    Set
+)
 
 if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
@@ -70,6 +81,7 @@ from dulwich.objects import (
     ShaFile,
     Tag,
     Tree,
+    ObjectID,
 )
 from dulwich.pack import (
     pack_objects_to_data,
@@ -86,6 +98,7 @@ from dulwich.hooks import (
 from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
 
 from dulwich.refs import (  # noqa: F401
+    Ref,
     ANNOTATED_TAG_SUFFIX,
     LOCAL_BRANCH_PREFIX,
     LOCAL_TAG_PREFIX,
@@ -136,31 +149,39 @@ class InvalidUserIdentity(Exception):
         self.identity = identity
 
 
+# TODO(jelmer): Cache?
 def _get_default_identity() -> Tuple[str, str]:
-    import getpass
     import socket
 
-    username = getpass.getuser()
+    for name in ('LOGNAME', 'USER', 'LNAME', 'USERNAME'):
+        username = os.environ.get(name)
+        if username:
+            break
+    else:
+        username = None
+
     try:
         import pwd
     except ImportError:
         fullname = None
     else:
         try:
-            gecos = pwd.getpwnam(username).pw_gecos  # type: ignore
-        except (KeyError, AttributeError):
+            entry = pwd.getpwuid(os.getuid())  # type: ignore
+        except KeyError:
             fullname = None
         else:
-            if gecos:
-                fullname = gecos.split(",")[0]
+            if getattr(entry, 'gecos', None):
+                fullname = entry.pw_gecos.split(",")[0]
             else:
                 fullname = None
+            if username is None:
+                username = entry.pw_name
     if not fullname:
         fullname = username
     email = os.environ.get("EMAIL")
     if email is None:
         email = "{}@{}".format(username, socket.gethostname())
-    return (fullname, email)
+    return (fullname, email)  # type: ignore
 
 
 def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> bytes:
@@ -223,9 +244,11 @@ def check_user_identity(identity):
     """
     try:
         fst, snd = identity.split(b" <", 1)
-    except ValueError:
-        raise InvalidUserIdentity(identity)
+    except ValueError as exc:
+        raise InvalidUserIdentity(identity) from exc
     if b">" not in snd:
+        raise InvalidUserIdentity(identity)
+    if b'\0' in identity or b'\n' in identity:
         raise InvalidUserIdentity(identity)
 
 
@@ -327,6 +350,9 @@ class ParentsProvider(object):
 class BaseRepo(object):
     """Base class for a git repository.
 
+    This base class is meant to be used for Repository implementations that e.g.
+    work on top of a different transport than a standard filesystem path.
+
     Attributes:
       object_store: Dictionary-like object for accessing
         the objects
@@ -376,7 +402,7 @@ class BaseRepo(object):
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")
 
-    def get_named_file(self, path):
+    def get_named_file(self, path: str) -> Optional[BinaryIO]:
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -389,7 +415,7 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.get_named_file)
 
-    def _put_named_file(self, path, contents):
+    def _put_named_file(self, path: str, contents: bytes):
         """Write a file to the control dir with the given name and contents.
 
         Args:
@@ -398,11 +424,11 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self._put_named_file)
 
-    def _del_named_file(self, path):
+    def _del_named_file(self, path: str):
         """Delete a file in the control directory with the given name."""
         raise NotImplementedError(self._del_named_file)
 
-    def open_index(self):
+    def open_index(self) -> "Index":
         """Open the index for this repository.
 
         Raises:
@@ -549,7 +575,9 @@ class BaseRepo(object):
             )
         )
 
-    def generate_pack_data(self, have, want, progress=None, ofs_delta=None):
+    def generate_pack_data(self, have: List[ObjectID], want: List[ObjectID],
+                           progress: Optional[Callable[[str], None]] = None,
+                           ofs_delta: Optional[bool] = None):
         """Generate pack data objects for a set of wants/haves.
 
         Args:
@@ -566,7 +594,8 @@ class BaseRepo(object):
             ofs_delta=ofs_delta,
         )
 
-    def get_graph_walker(self, heads=None):
+    def get_graph_walker(
+            self, heads: List[ObjectID] = None) -> ObjectStoreGraphWalker:
         """Retrieve a graph walker.
 
         A graph walker is used by a remote repository (or proxy)
@@ -627,7 +656,7 @@ class BaseRepo(object):
         """
         return self.object_store[sha]
 
-    def parents_provider(self):
+    def parents_provider(self) -> ParentsProvider:
         return ParentsProvider(
             self.object_store,
             grafts=self._graftpoints,
@@ -647,7 +676,7 @@ class BaseRepo(object):
         """
         return self.parents_provider().get_parents(sha, commit)
 
-    def get_config(self):
+    def get_config(self) -> "ConfigFile":
         """Retrieve the config object.
 
         Returns: `ConfigFile` object for the ``.git/config`` file.
@@ -684,7 +713,7 @@ class BaseRepo(object):
         backends = [self.get_config()] + StackedConfig.default_backends()
         return StackedConfig(backends, writable=backends[0])
 
-    def get_shallow(self):
+    def get_shallow(self) -> Set[ObjectID]:
         """Get the set of shallow commits.
 
         Returns: Set of shallow commits.
@@ -714,7 +743,7 @@ class BaseRepo(object):
         else:
             self._del_named_file("shallow")
 
-    def get_peeled(self, ref):
+    def get_peeled(self, ref: Ref) -> ObjectID:
         """Get the peeled value of a ref.
 
         Args:
@@ -728,7 +757,8 @@ class BaseRepo(object):
             return cached
         return self.object_store.peel_sha(self.refs[ref]).id
 
-    def get_walker(self, include=None, *args, **kwargs):
+    def get_walker(self, include: Optional[List[bytes]] = None,
+                   *args, **kwargs):
         """Obtain a walker for this repository.
 
         Args:
@@ -758,14 +788,12 @@ class BaseRepo(object):
 
         if include is None:
             include = [self.head()]
-        if isinstance(include, str):
-            include = [include]
 
         kwargs["get_parents"] = lambda commit: self.get_parents(commit.id, commit)
 
         return Walker(self.object_store, include, *args, **kwargs)
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: Union[ObjectID, Ref]):
         """Retrieve a Git object by SHA1 or ref.
 
         Args:
@@ -785,8 +813,8 @@ class BaseRepo(object):
                 pass
         try:
             return self.object_store[self.refs[name]]
-        except RefFormatError:
-            raise KeyError(name)
+        except RefFormatError as exc:
+            raise KeyError(name) from exc
 
     def __contains__(self, name: bytes) -> bool:
         """Check if a specific Git object or ref is present.
@@ -864,19 +892,19 @@ class BaseRepo(object):
 
     def do_commit(  # noqa: C901
         self,
-        message=None,
-        committer=None,
-        author=None,
+        message: Optional[bytes] = None,
+        committer: Optional[bytes] = None,
+        author: Optional[bytes] = None,
         commit_timestamp=None,
         commit_timezone=None,
         author_timestamp=None,
         author_timezone=None,
-        tree=None,
-        encoding=None,
-        ref=b"HEAD",
-        merge_heads=None,
-        no_verify=False,
-        sign=False,
+        tree: Optional[ObjectID] = None,
+        encoding: Optional[bytes] = None,
+        ref: Ref = b"HEAD",
+        merge_heads: Optional[List[ObjectID]] = None,
+        no_verify: bool = False,
+        sign: bool = False,
     ):
         """Create a new commit.
 
@@ -911,8 +939,8 @@ class BaseRepo(object):
         try:
             if not no_verify:
                 self.hooks["pre-commit"].execute()
-        except HookError as e:
-            raise CommitError(e)
+        except HookError as exc:
+            raise CommitError(exc) from exc
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
@@ -969,8 +997,8 @@ class BaseRepo(object):
                 c.message = self.hooks["commit-msg"].execute(message)
                 if c.message is None:
                     c.message = message
-        except HookError as e:
-            raise CommitError(e)
+        except HookError as exc:
+            raise CommitError(exc) from exc
         except KeyError:  # no hook defined, message not modified
             c.message = message
 
@@ -1014,7 +1042,7 @@ class BaseRepo(object):
             if not ok:
                 # Fail if the atomic compare-and-swap failed, leaving the
                 # commit and all its objects as garbage.
-                raise CommitError("%s changed during commit" % (ref,))
+                raise CommitError(f"{ref!r} changed during commit")
 
         self._del_named_file("MERGE_HEAD")
 
@@ -1050,6 +1078,13 @@ class UnsupportedVersion(Exception):
         self.version = version
 
 
+class UnsupportedExtension(Exception):
+    """Unsupported repository extension."""
+
+    def __init__(self, extension):
+        self.extension = extension
+
+
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -1078,6 +1113,7 @@ class Repo(BaseRepo):
         object_store: Optional[BaseObjectStore] = None,
         bare: Optional[bool] = None
     ) -> None:
+        self.symlink_fn = None
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
             if (os.path.isfile(hidden_path)
@@ -1125,8 +1161,12 @@ class Repo(BaseRepo):
         except KeyError:
             format_version = 0
 
-        if format_version != 0:
+        if format_version not in (0, 1):
             raise UnsupportedVersion(format_version)
+
+        for extension in config.items((b"extensions", )):
+            raise UnsupportedExtension(extension)
+
         if object_store is None:
             object_store = DiskObjectStore.from_config(
                 os.path.join(self.commondir(), OBJECTDIR), config
@@ -1395,8 +1435,10 @@ class Repo(BaseRepo):
                 try:
                     del index[tree_path]
                     continue
-                except KeyError:
-                    raise KeyError("file '%s' not in index" % (tree_path.decode()))
+                except KeyError as exc:
+                    raise KeyError(
+                        "file '%s' not in index" % (tree_path.decode())
+                    ) from exc
 
             st = None
             try:
@@ -1514,7 +1556,7 @@ class Repo(BaseRepo):
             raise
         return target
 
-    def reset_index(self, tree: Optional[Tree] = None):
+    def reset_index(self, tree: Optional[bytes] = None):
         """Reset the index back to a specific tree.
 
         Args:
@@ -1545,6 +1587,7 @@ class Repo(BaseRepo):
             tree,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
+            symlink_fn=self.symlink_fn,
         )
 
     def get_config(self) -> "ConfigFile":

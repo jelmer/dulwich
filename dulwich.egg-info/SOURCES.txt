@@ -16,15 +16,17 @@ README.rst
 README.swift.rst
 SECURITY.md
 TODO
+disperse.conf
 dulwich.cfg
-releaser.conf
 requirements.txt
 setup.cfg
 setup.py
 status.yaml
 tox.ini
 .github/FUNDING.yml
-.github/workflows/pythonpackage.yml
+.github/workflows/disperse.yml
+.github/workflows/docs.yml
+.github/workflows/pythontest.yml
 .github/workflows/pythonwheels.yml
 bin/dul-receive-pack
 bin/dul-upload-pack
@@ -61,6 +63,7 @@ dulwich/bundle.py
 dulwich/cli.py
 dulwich/client.py
 dulwich/config.py
+dulwich/credentials.py
 dulwich/diff_tree.py
 dulwich/errors.py
 dulwich/fastexport.py
@@ -128,6 +131,7 @@ dulwich/tests/test_blackbox.py
 dulwich/tests/test_bundle.py
 dulwich/tests/test_client.py
 dulwich/tests/test_config.py
+dulwich/tests/test_credentials.py
 dulwich/tests/test_diff_tree.py
 dulwich/tests/test_fastexport.py
 dulwich/tests/test_file.py

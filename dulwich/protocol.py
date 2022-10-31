@@ -109,6 +109,8 @@ KNOWN_RECEIVE_CAPABILITIES = set(
 
 DEPTH_INFINITE = 0x7FFFFFFF
 
+NAK_LINE = b"NAK\n"
+
 
 def agent_string():
     return ("dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
@@ -143,20 +145,6 @@ COMMAND_UNSHALLOW = b"unshallow"
 COMMAND_DONE = b"done"
 COMMAND_WANT = b"want"
 COMMAND_HAVE = b"have"
-
-
-class ProtocolFile(object):
-    """A dummy file for network ops that expect file-like objects."""
-
-    def __init__(self, read, write):
-        self.read = read
-        self.write = write
-
-    def tell(self):
-        pass
-
-    def close(self):
-        pass
 
 
 def format_cmd_pkt(cmd, *args):
@@ -238,10 +226,10 @@ class Protocol(object):
             if self.report_activity:
                 self.report_activity(size, "read")
             pkt_contents = read(size - 4)
-        except ConnectionResetError:
-            raise HangupException()
-        except socket.error as e:
-            raise GitProtocolError(e)
+        except ConnectionResetError as exc:
+            raise HangupException() from exc
+        except socket.error as exc:
+            raise GitProtocolError(exc) from exc
         else:
             if len(pkt_contents) + 4 != size:
                 raise GitProtocolError(
@@ -303,28 +291,8 @@ class Protocol(object):
             self.write(line)
             if self.report_activity:
                 self.report_activity(len(line), "write")
-        except socket.error as e:
-            raise GitProtocolError(e)
-
-    def write_file(self):
-        """Return a writable file-like object for this protocol."""
-
-        class ProtocolFile(object):
-            def __init__(self, proto):
-                self._proto = proto
-                self._offset = 0
-
-            def write(self, data):
-                self._proto.write(data)
-                self._offset += len(data)
-
-            def tell(self):
-                return self._offset
-
-            def close(self):
-                pass
-
-        return ProtocolFile(self)
+        except socket.error as exc:
+            raise GitProtocolError(exc) from exc
 
     def write_sideband(self, channel, blob):
         """Write multiplexed data to the sideband.
@@ -585,3 +553,31 @@ class PktLineParser(object):
     def get_tail(self):
         """Read back any unused data."""
         return self._readahead.getvalue()
+
+
+def format_capability_line(capabilities):
+    return b"".join([b" " + c for c in capabilities])
+
+
+def format_ref_line(ref, sha, capabilities=None):
+    if capabilities is None:
+        return sha + b" " + ref + b"\n"
+    else:
+        return (
+            sha + b" " + ref + b"\0"
+            + format_capability_line(capabilities)
+            + b"\n")
+
+
+def format_shallow_line(sha):
+    return COMMAND_SHALLOW + b" " + sha
+
+
+def format_unshallow_line(sha):
+    return COMMAND_UNSHALLOW + b" " + sha
+
+
+def format_ack_line(sha, ack_type=b""):
+    if ack_type:
+        ack_type = b" " + ack_type
+    return b"ACK " + sha + ack_type + b"\n"

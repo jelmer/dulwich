@@ -230,7 +230,7 @@ def build_pack(f, objects_spec, store=None):
     """
     sf = SHA1Writer(f)
     num_objects = len(objects_spec)
-    write_pack_header(sf, num_objects)
+    write_pack_header(sf.write, num_objects)
 
     full_objects = {}
     offsets = {}
@@ -260,7 +260,7 @@ def build_pack(f, objects_spec, store=None):
             base_index, data = obj
             base = offset - offsets[base_index]
             _, base_data, _ = full_objects[base_index]
-            obj = (base, create_delta(base_data, data))
+            obj = (base, list(create_delta(base_data, data)))
         elif type_num == REF_DELTA:
             base_ref, data = obj
             if isinstance(base_ref, int):
@@ -268,9 +268,9 @@ def build_pack(f, objects_spec, store=None):
             else:
                 base_type_num, base_data = store.get_raw(base_ref)
                 base = obj_sha(base_type_num, base_data)
-            obj = (base, create_delta(base_data, data))
+            obj = (base, list(create_delta(base_data, data)))
 
-        crc32 = write_pack_object(sf, type_num, obj)
+        crc32 = write_pack_object(sf.write, type_num, obj)
         offsets[i] = offset
         crc32s[i] = crc32
 
@@ -328,9 +328,9 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         commit_num = commit[0]
         try:
             parent_ids = [nums[pn] for pn in commit[1:]]
-        except KeyError as e:
-            (missing_parent,) = e.args
-            raise ValueError("Unknown parent %i" % missing_parent)
+        except KeyError as exc:
+            (missing_parent,) = exc.args
+            raise ValueError("Unknown parent %i" % missing_parent) from exc
 
         blobs = []
         for entry in trees.get(commit_num, []):

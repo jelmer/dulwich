@@ -73,6 +73,18 @@ class ArchiveTests(TestCase):
         self.addCleanup(tf.close)
         self.assertEqual(["somename"], tf.getnames())
 
+    def test_unicode(self):
+        store = MemoryObjectStore()
+        b1 = Blob.from_string(b"somedata")
+        store.add_object(b1)
+        t1 = Tree()
+        t1.add("ő".encode('utf-8'), 0o100644, b1.id)
+        store.add_object(t1)
+        stream = b"".join(tar_stream(store, t1, mtime=0))
+        tf = tarfile.TarFile(fileobj=BytesIO(stream))
+        self.addCleanup(tf.close)
+        self.assertEqual(["ő"], tf.getnames())
+
     def test_prefix(self):
         stream = self._get_example_tar_stream(mtime=0, prefix=b"blah")
         tf = tarfile.TarFile(fileobj=stream)

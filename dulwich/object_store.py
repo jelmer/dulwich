@@ -38,6 +38,7 @@ from dulwich.errors import (
 )
 from dulwich.file import GitFile
 from dulwich.objects import (
+    ObjectID,
     Commit,
     ShaFile,
     Tag,
@@ -67,7 +68,7 @@ from dulwich.pack import (
     PackStreamCopier,
 )
 from dulwich.protocol import DEPTH_INFINITE
-from dulwich.refs import ANNOTATED_TAG_SUFFIX
+from dulwich.refs import ANNOTATED_TAG_SUFFIX, Ref
 
 INFODIR = "info"
 PACKDIR = "pack"
@@ -83,9 +84,9 @@ class BaseObjectStore(object):
 
     def determine_wants_all(
         self,
-        refs: Dict[bytes, bytes],
+        refs: Dict[Ref, ObjectID],
         depth: Optional[int] = None
-    ) -> List[bytes]:
+    ) -> List[ObjectID]:
         def _want_deepen(sha):
             if not depth:
                 return False
@@ -139,7 +140,7 @@ class BaseObjectStore(object):
         """
         raise NotImplementedError(self.get_raw)
 
-    def __getitem__(self, sha):
+    def __getitem__(self, sha: ObjectID):
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha)
         return ShaFile.from_raw_string(type_num, uncomp, sha=sha)
@@ -179,7 +180,7 @@ class BaseObjectStore(object):
         f, commit, abort = self.add_pack()
         try:
             write_pack_data(
-                f,
+                f.write,
                 count,
                 pack_data,
                 progress,
@@ -780,7 +781,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Update the header with the new number of objects.
         f.seek(0)
-        write_pack_header(f, len(entries) + len(indexer.ext_refs()))
+        write_pack_header(f.write, len(entries) + len(indexer.ext_refs()))
 
         # Must flush before reading (http://bugs.python.org/issue3207)
         f.flush()
@@ -797,7 +798,7 @@ class DiskObjectStore(PackBasedObjectStore):
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
             crc32 = write_pack_object(
-                f,
+                f.write,
                 type_num,
                 data,
                 sha=new_sha,
@@ -984,7 +985,7 @@ class MemoryObjectStore(BaseObjectStore):
         """List with pack objects."""
         return []
 
-    def get_raw(self, name):
+    def get_raw(self, name: ObjectID):
         """Obtain the raw text for an object.
 
         Args:
@@ -994,10 +995,10 @@ class MemoryObjectStore(BaseObjectStore):
         obj = self[self._to_hexsha(name)]
         return obj.type_num, obj.as_raw_string()
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: ObjectID):
         return self._data[self._to_hexsha(name)].copy()
 
-    def __delitem__(self, name):
+    def __delitem__(self, name: ObjectID):
         """Delete an object from this store, for testing only."""
         del self._data[self._to_hexsha(name)]
 
@@ -1047,7 +1048,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         # Update the header with the new number of objects.
         f.seek(0)
-        write_pack_header(f, len(entries) + len(indexer.ext_refs()))
+        write_pack_header(f.write, len(entries) + len(indexer.ext_refs()))
 
         # Rescan the rest of the pack, computing the SHA with the new header.
         new_sha = compute_file_sha(f, end_ofs=-20)
@@ -1056,7 +1057,7 @@ class MemoryObjectStore(BaseObjectStore):
         for ext_sha in indexer.ext_refs():
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
-            write_pack_object(f, type_num, data, sha=new_sha)
+            write_pack_object(f.write, type_num, data, sha=new_sha)
         pack_sha = new_sha.digest()
         f.write(pack_sha)
 
@@ -1333,7 +1334,7 @@ class MissingObjectFinder(object):
         if not leaf:
             o = self.object_store[sha]
             if isinstance(o, Commit):
-                self.add_todo([(o.tree, "", False)])
+                self.add_todo([(o.tree, b"", False)])
             elif isinstance(o, Tree):
                 self.add_todo(
                     [

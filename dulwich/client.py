@@ -111,7 +111,6 @@ from dulwich.protocol import (
     SIDE_BAND_CHANNEL_FATAL,
     PktLineParser,
     Protocol,
-    ProtocolFile,
     TCP_GIT_PORT,
     ZERO_SHA,
     extract_capabilities,
@@ -511,8 +510,9 @@ def _read_side_band64k_data(pkt_seq, channel_callbacks):
         pkt = pkt[1:]
         try:
             cb = channel_callbacks[channel]
-        except KeyError:
-            raise AssertionError("Invalid sideband channel %d" % channel)
+        except KeyError as exc:
+            raise AssertionError(
+                "Invalid sideband channel %d" % channel) from exc
         else:
             if cb is not None:
                 cb(pkt)
@@ -1053,8 +1053,8 @@ class TraditionalGitClient(GitClient):
         with proto:
             try:
                 old_refs, server_capabilities = read_pkt_refs(proto.read_pkt_seq())
-            except HangupException:
-                raise _remote_error_from_stderr(stderr)
+            except HangupException as exc:
+                raise _remote_error_from_stderr(stderr) from exc
             (
                 negotiated_capabilities,
                 agent,
@@ -1147,8 +1147,8 @@ class TraditionalGitClient(GitClient):
         with proto:
             try:
                 refs, server_capabilities = read_pkt_refs(proto.read_pkt_seq())
-            except HangupException:
-                raise _remote_error_from_stderr(stderr)
+            except HangupException as exc:
+                raise _remote_error_from_stderr(stderr) from exc
             (
                 negotiated_capabilities,
                 symrefs,
@@ -1196,8 +1196,8 @@ class TraditionalGitClient(GitClient):
         with proto:
             try:
                 refs, _ = read_pkt_refs(proto.read_pkt_seq())
-            except HangupException:
-                raise _remote_error_from_stderr(stderr)
+            except HangupException as exc:
+                raise _remote_error_from_stderr(stderr) from exc
             proto.write_pkt_line(None)
             return refs
 
@@ -1225,8 +1225,8 @@ class TraditionalGitClient(GitClient):
             proto.write_pkt_line(None)
             try:
                 pkt = proto.read_pkt_line()
-            except HangupException:
-                raise _remote_error_from_stderr(stderr)
+            except HangupException as exc:
+                raise _remote_error_from_stderr(stderr) from exc
             if pkt == b"NACK\n" or pkt == b"NACK":
                 return
             elif pkt == b"ACK\n" or pkt == b"ACK":
@@ -1397,7 +1397,8 @@ class SubprocessGitClient(TraditionalGitClient):
 class LocalGitClient(GitClient):
     """Git Client that just uses a local Repo."""
 
-    def __init__(self, thin_packs=True, report_activity=None, config=None):
+    def __init__(self, thin_packs=True, report_activity=None,
+                 config: Optional[Config] = None):
         """Create a new LocalGitClient instance.
 
         Args:
@@ -1543,8 +1544,7 @@ class LocalGitClient(GitClient):
             # Note that the client still expects a 0-object pack in most cases.
             if objects_iter is None:
                 return FetchPackResult(None, symrefs, agent)
-            protocol = ProtocolFile(None, pack_data)
-            write_pack_objects(protocol, objects_iter)
+            write_pack_objects(pack_data, objects_iter)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):
@@ -1949,8 +1949,9 @@ class AbstractHttpGitClient(GitClient):
                 # The first line should mention the service
                 try:
                     [pkt] = list(proto.read_pkt_seq())
-                except ValueError:
-                    raise GitProtocolError("unexpected number of packets received")
+                except ValueError as exc:
+                    raise GitProtocolError(
+                        "unexpected number of packets received") from exc
                 if pkt.rstrip(b"\n") != (b"# service=" + service):
                     raise GitProtocolError(
                         "unexpected first line %r from smart server" % pkt

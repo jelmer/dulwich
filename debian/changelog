@@ -1,6 +1,7 @@
 dulwich (0.20.50-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * Set upstream metadata fields: Repository-Browse.
 
  -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Oct 2022 19:20:12 -0000
 

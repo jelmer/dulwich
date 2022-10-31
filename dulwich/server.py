@@ -96,7 +96,6 @@ from dulwich.protocol import (
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     Protocol,
-    ProtocolFile,
     ReceivableProtocol,
     SIDE_BAND_CHANNEL_DATA,
     SIDE_BAND_CHANNEL_PROGRESS,
@@ -108,6 +107,11 @@ from dulwich.protocol import (
     extract_capabilities,
     extract_want_line_capabilities,
     symref_capabilities,
+    format_ref_line,
+    format_shallow_line,
+    format_unshallow_line,
+    format_ack_line,
+    NAK_LINE,
 )
 from dulwich.refs import (
     ANNOTATED_TAG_SUFFIX,
@@ -189,10 +193,10 @@ class DictBackend(Backend):
         logger.debug("Opening repository at %s", path)
         try:
             return self.repos[path]
-        except KeyError:
+        except KeyError as exc:
             raise NotGitRepository(
                 "No git repository was found at %(path)s" % dict(path=path)
-            )
+            ) from exc
 
 
 class FileSystemBackend(Backend):
@@ -215,7 +219,7 @@ class FileSystemBackend(Backend):
 class Handler(object):
     """Smart protocol command handler base class."""
 
-    def __init__(self, backend, proto, stateless_rpc=None):
+    def __init__(self, backend, proto, stateless_rpc=False):
         self.backend = backend
         self.proto = proto
         self.stateless_rpc = stateless_rpc
@@ -227,16 +231,11 @@ class Handler(object):
 class PackHandler(Handler):
     """Protocol handler for packs."""
 
-    def __init__(self, backend, proto, stateless_rpc=None):
+    def __init__(self, backend, proto, stateless_rpc=False):
         super(PackHandler, self).__init__(backend, proto, stateless_rpc)
         self._client_capabilities = None
         # Flags needed for the no-done capability
         self._done_received = False
-
-    @classmethod
-    def capability_line(cls, capabilities):
-        logger.info("Sending capabilities: %s", capabilities)
-        return b"".join([b" " + c for c in capabilities])
 
     @classmethod
     def capabilities(cls) -> Iterable[bytes]:
@@ -289,7 +288,7 @@ class PackHandler(Handler):
 class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=None, advertise_refs=False):
+    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
         super(UploadPackHandler, self).__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
@@ -409,7 +408,7 @@ class UploadPackHandler(PackHandler):
         self.progress(
             ("counting objects: %d, done.\n" % len(objects_iter)).encode("ascii")
         )
-        write_pack_objects(ProtocolFile(None, write), objects_iter)
+        write_pack_objects(write, objects_iter)
         # we are done
         self.proto.write_pkt_line(None)
 
@@ -602,17 +601,19 @@ class _ProtocolGraphWalker(object):
                     # TODO(jelmer): Integrate with Repo.fetch_objects refs
                     # logic.
                     continue
-                line = sha + b" " + ref
-                if not i:
-                    line += b"\x00" + self.handler.capability_line(
+                if i == 0:
+                    logger.info(
+                        "Sending capabilities: %s", self.handler.capabilities())
+                    line = format_ref_line(
+                        ref, sha,
                         self.handler.capabilities()
-                        + symref_capabilities(symrefs.items())
-                    )
-                self.proto.write_pkt_line(line + b"\n")
+                        + symref_capabilities(symrefs.items()))
+                else:
+                    line = format_ref_line(ref, sha)
+                self.proto.write_pkt_line(line)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line(
-                        peeled_sha + b" " + ref + ANNOTATED_TAG_SUFFIX + b"\n"
-                    )
+                        format_ref_line(ref + ANNOTATED_TAG_SUFFIX, peeled_sha))
 
             # i'm done..
             self.proto.write_pkt_line(None)
@@ -706,9 +707,9 @@ class _ProtocolGraphWalker(object):
         unshallow = self.unshallow = not_shallow & self.client_shallow
 
         for sha in sorted(new_shallow):
-            self.proto.write_pkt_line(COMMAND_SHALLOW + b" " + sha)
+            self.proto.write_pkt_line(format_shallow_line(sha))
         for sha in sorted(unshallow):
-            self.proto.write_pkt_line(COMMAND_UNSHALLOW + b" " + sha)
+            self.proto.write_pkt_line(format_unshallow_line(sha))
 
         self.proto.write_pkt_line(None)
 
@@ -717,12 +718,10 @@ class _ProtocolGraphWalker(object):
         self.handler.notify_done()
 
     def send_ack(self, sha, ack_type=b""):
-        if ack_type:
-            ack_type = b" " + ack_type
-        self.proto.write_pkt_line(b"ACK " + sha + ack_type + b"\n")
+        self.proto.write_pkt_line(format_ack_line(sha, ack_type))
 
     def send_nak(self):
-        self.proto.write_pkt_line(b"NAK\n")
+        self.proto.write_pkt_line(NAK_LINE)
 
     def handle_done(self, done_required, done_received):
         # Delegate this to the implementation.
@@ -924,7 +923,7 @@ class MultiAckDetailedGraphWalkerImpl(object):
 class ReceivePackHandler(PackHandler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=None, advertise_refs=False):
+    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
         super(ReceivePackHandler, self).__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
@@ -1047,19 +1046,15 @@ class ReceivePackHandler(PackHandler):
 
             if not refs:
                 refs = [(CAPABILITIES_REF, ZERO_SHA)]
+            logger.info(
+                "Sending capabilities: %s", self.capabilities())
             self.proto.write_pkt_line(
-                refs[0][1]
-                + b" "
-                + refs[0][0]
-                + b"\0"
-                + self.capability_line(
-                    self.capabilities() + symref_capabilities(symrefs)
-                )
-                + b"\n"
-            )
+                format_ref_line(
+                    refs[0][0], refs[0][1],
+                    self.capabilities() + symref_capabilities(symrefs)))
             for i in range(1, len(refs)):
                 ref = refs[i]
-                self.proto.write_pkt_line(ref[1] + b" " + ref[0] + b"\n")
+                self.proto.write_pkt_line(format_ref_line(ref[0], ref[1]))
 
             self.proto.write_pkt_line(None)
             if self.advertise_refs:
@@ -1092,7 +1087,7 @@ class ReceivePackHandler(PackHandler):
 
 
 class UploadArchiveHandler(Handler):
-    def __init__(self, backend, args, proto, stateless_rpc=None):
+    def __init__(self, backend, args, proto, stateless_rpc=False):
         super(UploadArchiveHandler, self).__init__(backend, proto, stateless_rpc)
         self.repo = backend.open_repository(args[0])
 

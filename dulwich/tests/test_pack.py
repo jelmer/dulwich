@@ -186,7 +186,8 @@ class TestPackDeltas(TestCase):
 
     def _test_roundtrip(self, base, target):
         self.assertEqual(
-            target, b"".join(apply_delta(base, create_delta(base, target)))
+            target,
+            b"".join(apply_delta(base, list(create_delta(base, target))))
         )
 
     def test_nochange(self):
@@ -498,7 +499,7 @@ class TestPack(PackTests):
 
             data._file.seek(12)
             bad_file = BytesIO()
-            write_pack_header(bad_file, 9999)
+            write_pack_header(bad_file.write, 9999)
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
             bad_data = PackData("", file=bad_file)
@@ -562,8 +563,8 @@ class TestThinPack(PackTests):
         # Index the new pack.
         with self.make_pack(True) as pack:
             with PackData(pack._data_path) as data:
-                data.pack = pack
-                data.create_index(self.pack_prefix + ".idx")
+                data.create_index(
+                    self.pack_prefix + ".idx", resolve_ext_ref=pack.resolve_ext_ref)
 
         del self.store[self.blobs[b"bar"].id]
 
@@ -618,14 +619,14 @@ class TestThinPack(PackTests):
 class WritePackTests(TestCase):
     def test_write_pack_header(self):
         f = BytesIO()
-        write_pack_header(f, 42)
+        write_pack_header(f.write, 42)
         self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00*", f.getvalue())
 
     def test_write_pack_object(self):
         f = BytesIO()
         f.write(b"header")
         offset = f.tell()
-        crc32 = write_pack_object(f, Blob.type_num, b"blob")
+        crc32 = write_pack_object(f.write, Blob.type_num, b"blob")
         self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xFFFFFFFF)
 
         f.write(b"x")  # unpack_object needs extra trailing data.
@@ -643,7 +644,7 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f, Blob.type_num, b"blob", sha=sha_a)
+        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a)
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -654,7 +655,7 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f, Blob.type_num, b"blob", sha=sha_a, compression_level=6)
+        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a, compression_level=6)
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -873,17 +874,17 @@ class DeltifyTests(TestCase):
     def test_single(self):
         b = Blob.from_string(b"foo")
         self.assertEqual(
-            [(b.type_num, b.sha().digest(), None, b.as_raw_string())],
+            [(b.type_num, b.sha().digest(), None, b.as_raw_chunks())],
             list(deltify_pack_objects([(b, b"")])),
         )
 
     def test_simple_delta(self):
         b1 = Blob.from_string(b"a" * 101)
         b2 = Blob.from_string(b"a" * 100)
-        delta = create_delta(b1.as_raw_string(), b2.as_raw_string())
+        delta = list(create_delta(b1.as_raw_chunks(), b2.as_raw_chunks()))
         self.assertEqual(
             [
-                (b1.type_num, b1.sha().digest(), None, b1.as_raw_string()),
+                (b1.type_num, b1.sha().digest(), None, b1.as_raw_chunks()),
                 (b2.type_num, b2.sha().digest(), b1.sha().digest(), delta),
             ],
             list(deltify_pack_objects([(b1, b""), (b2, b"")])),
@@ -927,7 +928,7 @@ class TestPackStreamReader(TestCase):
             unpacked_delta.delta_base,
         )
         delta = create_delta(b"blob", b"blob1")
-        self.assertEqual(delta, b"".join(unpacked_delta.decomp_chunks))
+        self.assertEqual(b''.join(delta), b"".join(unpacked_delta.decomp_chunks))
         self.assertEqual(entries[1][4], unpacked_delta.crc32)
 
     def test_read_objects_buffered(self):

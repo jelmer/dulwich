@@ -44,6 +44,7 @@ from dulwich.repo import (
     MemoryRepo,
     check_user_identity,
     UnsupportedVersion,
+    UnsupportedExtension,
 )
 from dulwich.tests import (
     TestCase,
@@ -1081,12 +1082,27 @@ class BuildRepoRootTests(TestCase):
         r = Repo(self._repo_dir)
         self.assertEqual(r.object_store.loose_compression_level, 4)
 
-    def test_repositoryformatversion(self):
+    def test_repositoryformatversion_unsupported(self):
         r = self._repo
         c = r.get_config()
         c.set(("core",), "repositoryformatversion", "2")
         c.write_to_path()
         self.assertRaises(UnsupportedVersion, Repo, self._repo_dir)
+
+    def test_repositoryformatversion_1(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(("core",), "repositoryformatversion", "1")
+        c.write_to_path()
+        Repo(self._repo_dir)
+
+    def test_repositoryformatversion_1_extension(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(("core",), "repositoryformatversion", "1")
+        c.set(("extensions", ), "worktreeconfig", True)
+        c.write_to_path()
+        self.assertRaises(UnsupportedExtension, Repo, self._repo_dir)
 
     def test_commit_encoding_from_config(self):
         r = self._repo
@@ -1388,6 +1404,7 @@ class BuildRepoRootTests(TestCase):
         porcelain.add(self._repo, paths=[full_path])
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
+
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 
     def test_unstage_remove_file(self):
@@ -1406,6 +1423,19 @@ class BuildRepoRootTests(TestCase):
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
+
+    def test_reset_index(self):
+        r = self._repo
+        with open(os.path.join(r.path, 'a'), 'wb') as f:
+            f.write(b'changed')
+        with open(os.path.join(r.path, 'b'), 'wb') as f:
+            f.write(b'added')
+        r.stage(['a', 'b'])
+        status = list(porcelain.status(self._repo))
+        self.assertEqual([{'add': [b'b'], 'delete': [], 'modify': [b'a']}, [], []], status)
+        r.reset_index()
+        status = list(porcelain.status(self._repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['b']], status)
 
     @skipIf(
         sys.platform in ("win32", "darwin"),
@@ -1470,4 +1500,10 @@ class CheckUserIdentityTests(TestCase):
         )
         self.assertRaises(
             InvalidUserIdentity, check_user_identity, b"Fullname >order<>"
+        )
+        self.assertRaises(
+            InvalidUserIdentity, check_user_identity, b'Contains\0null byte <>'
+        )
+        self.assertRaises(
+            InvalidUserIdentity, check_user_identity, b'Contains\nnewline byte <>'
         )

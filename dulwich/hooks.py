@@ -200,4 +200,4 @@ class PostReceiveShellHook(ShellHook):
                 raise HookError(err_msg.decode('utf-8', 'backslashreplace'))
             return out_data
         except OSError as err:
-            raise HookError(repr(err))
+            raise HookError(repr(err)) from err

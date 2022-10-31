@@ -1,3 +1,9 @@
+dulwich (0.20.50-1) UNRELEASED; urgency=low
+
+  * New upstream release.
+
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 31 Oct 2022 19:20:12 -0000
+
 dulwich (0.20.46-2) unstable; urgency=medium
 
   * Drop Build-Dependency on python3-all-dbg. Closes: #1019278

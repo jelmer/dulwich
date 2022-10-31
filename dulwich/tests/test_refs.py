@@ -521,6 +521,14 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         )
         self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
 
+    def test_set_overwrite_loop(self):
+        self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
+        self._refs[b'refs/heads/loop'] = (
+            b"42d06bd4b77fed026b154d16493e5deab78f02ec")
+        self.assertEqual(
+            ([b'refs/heads/loop'], b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
+            self._refs.follow(b"refs/heads/loop"))
+
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)
         ref_file = os.path.join(self._refs.path, b"refs", b"heads", b"master")
@@ -633,8 +641,10 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
     def test_non_ascii(self):
         try:
             encoded_ref = os.fsencode(u"refs/tags/schön")
-        except UnicodeEncodeError:
-            raise SkipTest("filesystem encoding doesn't support special character")
+        except UnicodeEncodeError as exc:
+            raise SkipTest(
+                "filesystem encoding doesn't support special character"
+            ) from exc
         p = os.path.join(os.fsencode(self._repo.path), encoded_ref)
         with open(p, "w") as f:
             f.write("00" * 20)

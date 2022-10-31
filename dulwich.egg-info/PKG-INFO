@@ -1,16 +1,15 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.20.46
+Version: 0.20.50
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
 Author-email: jelmer@jelmer.uk
 License: Apachev2 or later or GPLv2
-Project-URL: Bug Tracker, https://github.com/dulwich/dulwich/issues
 Project-URL: Repository, https://www.dulwich.io/code/
 Project-URL: GitHub, https://github.com/dulwich/dulwich
-Keywords: git vcs
-Platform: UNKNOWN
+Project-URL: Bug Tracker, https://github.com/dulwich/dulwich/issues
+Keywords: vcs,git
 Classifier: Development Status :: 4 - Beta
 Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Programming Language :: Python :: 3.6
@@ -27,10 +26,9 @@ Classifier: Topic :: Software Development :: Version Control
 Requires-Python: >=3.6
 Provides-Extra: fastimport
 Provides-Extra: https
-Provides-Extra: paramiko
 Provides-Extra: pgp
+Provides-Extra: paramiko
 License-File: COPYING
-License-File: AUTHORS
 
 Dulwich
 =======
@@ -123,5 +121,3 @@ Supported versions of Python
 
 At the moment, Dulwich supports (and is tested on) CPython 3.6 and later and
 Pypy.
-
-

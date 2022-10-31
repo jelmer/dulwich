@@ -43,6 +43,8 @@ Currently implemented:
  * remote{_add}
  * receive-pack
  * reset
+ * submodule_add
+ * submodule_init
  * submodule_list
  * rev-list
  * tag{_create,_delete,_list}
@@ -87,8 +89,10 @@ from dulwich.client import (
     get_transport_and_path,
 )
 from dulwich.config import (
+    Config,
     ConfigFile,
     StackedConfig,
+    read_submodules,
 )
 from dulwich.diff_tree import (
     CHANGE_ADD,
@@ -182,9 +186,8 @@ DEFAULT_ENCODING = "utf-8"
 class Error(Exception):
     """Porcelain-based error. """
 
-    def __init__(self, msg, inner=None):
+    def __init__(self, msg):
         super(Error, self).__init__(msg)
-        self.inner = inner
 
 
 class RemoteExists(Error):
@@ -197,10 +200,13 @@ class TimezoneFormatError(Error):
 
 def parse_timezone_format(tz_str):
     """Parse given string and attempt to return a timezone offset.
+
     Different formats are considered in the following order:
-        - Git internal format: <unix timestamp> <timezone offset>
-        - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
-        - ISO 8601: e.g. 1995-11-20T19:12:08-0500
+
+     - Git internal format: <unix timestamp> <timezone offset>
+     - RFC 2822: e.g. Mon, 20 Nov 1995 19:12:08 -0500
+     - ISO 8601: e.g. 1995-11-20T19:12:08-0500
+
     Args:
       tz_str: datetime string
     Returns: Timezone offset as integer
@@ -329,6 +335,10 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
 
 class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
+
+    def __init__(self, current_sha, new_sha):
+        self.current_sha = current_sha
+        self.new_sha = new_sha
 
 
 def check_diverged(repo, current_sha, new_sha):
@@ -487,10 +497,10 @@ def clone(
     checkout=None,
     errstream=default_bytes_err_stream,
     outstream=None,
-    origin="origin",
-    depth=None,
-    branch=None,
-    config=None,
+    origin: Optional[str] = "origin",
+    depth: Optional[int] = None,
+    branch: Optional[Union[str, bytes]] = None,
+    config: Optional[Config] = None,
     **kwargs
 ):
     """Clone a local or remote git repository.
@@ -529,6 +539,9 @@ def clone(
 
     if target is None:
         target = source.split("/")[-1]
+
+    if isinstance(branch, str):
+        branch = branch.encode(DEFAULT_ENCODING)
 
     mkdir = not os.path.exists(target)
 
@@ -663,8 +676,8 @@ def remove(repo=".", paths=None, cached=False):
             tree_path = path_to_tree_path(r.path, p)
             try:
                 index_sha = index[tree_path].sha
-            except KeyError:
-                raise Error("%s did not match any files" % p)
+            except KeyError as exc:
+                raise Error("%s did not match any files" % p) from exc
 
             if not cached:
                 try:
@@ -986,6 +999,21 @@ def submodule_add(repo, url, path=None, name=None):
         config.write_to_path()
 
 
+def submodule_init(repo):
+    """Initialize submodules.
+
+    Args:
+      repo: Path to repository
+    """
+    with open_repo_closing(repo) as r:
+        config = r.get_config()
+        gitmodules_path = os.path.join(r.path, '.gitmodules')
+        for path, url, name in read_submodules(gitmodules_path):
+            config.set((b'submodule', name), b'active', True)
+            config.set((b'submodule', name), b'url', url)
+        config.write_to_path()
+
+
 def submodule_list(repo):
     """List submodules.
 
@@ -1008,6 +1036,7 @@ def tag_create(
     tag_time=None,
     tag_timezone=None,
     sign=False,
+    encoding=DEFAULT_ENCODING
 ):
     """Creates a tag in git via dulwich calls:
 
@@ -1035,7 +1064,7 @@ def tag_create(
                 # TODO(jelmer): Don't use repo private method.
                 author = r._get_user_identity(r.get_config_stack())
             tag_obj.tagger = author
-            tag_obj.message = message + "\n".encode()
+            tag_obj.message = message + "\n".encode(encoding)
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
             if tag_time is None:
@@ -1173,8 +1202,10 @@ def push(
                 else:
                     try:
                         localsha = r.refs[lh]
-                    except KeyError:
-                        raise Error("No valid ref %s in local repository" % lh)
+                    except KeyError as exc:
+                        raise Error(
+                            "No valid ref %s in local repository" % lh
+                        ) from exc
                     if not force_ref and rh in refs:
                         check_diverged(r, refs[rh], localsha)
                     new_refs[rh] = localsha
@@ -1190,11 +1221,10 @@ def push(
                 generate_pack_data=r.generate_pack_data,
                 progress=errstream.write,
             )
-        except SendPackError as e:
+        except SendPackError as exc:
             raise Error(
-                "Push to " + remote_location + " failed -> " + e.args[0].decode(),
-                inner=e,
-            )
+                "Push to " + remote_location + " failed -> " + exc.args[0].decode(),
+            ) from exc
         else:
             errstream.write(
                 b"Push to " + remote_location.encode(err_encoding) + b" successful.\n"
@@ -1259,11 +1289,12 @@ def pull(
             if not force_ref and rh in r.refs:
                 try:
                     check_diverged(r, r.refs.follow(rh)[1], fetch_result.refs[lh])
-                except DivergedBranches:
+                except DivergedBranches as exc:
                     if fast_forward:
                         raise
                     else:
-                        raise NotImplementedError("merge is not yet supported")
+                        raise NotImplementedError(
+                            "merge is not yet supported") from exc
             r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
             r[b"HEAD"] = fetch_result.refs[selected_refs[0][1]]
@@ -1683,7 +1714,7 @@ def fetch(
     return fetch_result
 
 
-def ls_remote(remote, config=None, **kwargs):
+def ls_remote(remote, config: Optional[Config] = None, **kwargs):
     """List the refs in a remote.
 
     Args:
@@ -1721,7 +1752,7 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
     """
     with open_repo_closing(repo) as r:
         entries, data_sum = write_pack_objects(
-            packf,
+            packf.write,
             r.object_store.iter_shas((oid, None) for oid in object_ids),
             delta_window_size=delta_window_size,
         )
@@ -1849,7 +1880,8 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
-def reset_file(repo, file_path: str, target: bytes = b'HEAD'):
+def reset_file(repo, file_path: str, target: bytes = b'HEAD',
+               symlink_fn=None):
     """Reset the file to specific commit or branch.
 
     Args:
@@ -1858,13 +1890,13 @@ def reset_file(repo, file_path: str, target: bytes = b'HEAD'):
       target: branch or commit or b'HEAD' to reset
     """
     tree = parse_tree(repo, treeish=target)
-    file_path = _fs_to_tree_path(file_path)
+    tree_path = _fs_to_tree_path(file_path)
 
-    file_entry = tree.lookup_path(repo.object_store.__getitem__, file_path)
-    full_path = os.path.join(repo.path.encode(), file_path)
+    file_entry = tree.lookup_path(repo.object_store.__getitem__, tree_path)
+    full_path = os.path.join(os.fsencode(repo.path), tree_path)
     blob = repo.object_store[file_entry[1]]
     mode = file_entry[0]
-    build_file_from_blob(blob, mode, full_path)
+    build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)
 
 
 def check_mailmap(repo, contact):

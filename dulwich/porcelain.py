@@ -1985,11 +1985,12 @@ def find_unique_abbrev(object_store, object_id):
     return object_id.decode("ascii")[:7]
 
 
-def describe(repo):
+def describe(repo, abbrev=7):
     """Describe the repository version.
 
     Args:
       repo: git repository
+      abbrev: number of characters of commit to take, default is 7
     Returns: a string description of the current git revision
 
     Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".
@@ -2045,13 +2046,13 @@ def describe(repo):
                         return "{}-{}-g{}".format(
                             tag_name,
                             commit_count,
-                            latest_commit.id.decode("ascii")[:7],
+                            latest_commit.id.decode("ascii")[:abbrev],
                         )
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return "g{}".format(latest_commit.id.decode("ascii")[:7])
+        return "g{}".format(latest_commit.id.decode("ascii")[:abbrev])
 
 
 def get_object_by_path(repo, path, committish=None):

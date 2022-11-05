@@ -2990,6 +2990,38 @@ class DescribeTests(PorcelainTestCase):
             porcelain.describe(self.repo.path),
         )
 
+    def test_tag_and_commit_full(self):
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Some message",
+            author=b"Joe <joe@example.com>",
+            committer=b"Bob <bob@example.com>",
+        )
+        porcelain.tag_create(
+            self.repo.path,
+            b"tryme",
+            b"foo <foo@bar.com>",
+            b"bar",
+            annotated=True,
+        )
+        with open(fullpath, "w") as f:
+            f.write("BAR2")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        sha = porcelain.commit(
+            self.repo.path,
+            message=b"Some message",
+            author=b"Joe <joe@example.com>",
+            committer=b"Bob <bob@example.com>",
+        )
+        self.assertEqual(
+            "tryme-1-g{}".format(sha.decode("ascii")),
+            porcelain.describe(self.repo.path, abbrev=40),
+        )
+
 
 class PathToTreeTests(PorcelainTestCase):
     def setUp(self):

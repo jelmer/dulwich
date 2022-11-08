@@ -281,12 +281,7 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
         # (e.g. the gpg-agent socket having been deleted). See
         # https://github.com/jelmer/dulwich/issues/1000
         self.addCleanup(shutil.rmtree, self.gpg_dir, ignore_errors=True)
-        self._old_gnupghome = os.environ.get("GNUPGHOME")
-        os.environ["GNUPGHOME"] = self.gpg_dir
-        if self._old_gnupghome is None:
-            self.addCleanup(os.environ.__delitem__, "GNUPGHOME")
-        else:
-            self.addCleanup(os.environ.__setitem__, "GNUPGHOME", self._old_gnupghome)
+        self.overrideEnv('GNUPGHOME', self.gpg_dir)
 
     def import_default_key(self):
         subprocess.run(

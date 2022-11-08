@@ -60,6 +60,17 @@ class TestCase(_TestCase):
         else:
             del os.environ["HOME"]
 
+    def overrideEnv(self, name, value):
+        def restore():
+            if oldval is not None:
+                os.environ[name] = oldval
+            else:
+                del os.environ[name]
+
+        oldval = os.environ.get(name)
+        os.environ[name] = value
+        self.addCleanup(restore)
+
 
 class BlackboxTestCase(TestCase):
     """Blackbox testing."""

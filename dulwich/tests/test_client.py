@@ -1238,6 +1238,16 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertEqual(manager.proxy.port, 8080)
         del os.environ["http_proxy"]
 
+    def test_environment_empty_proxy(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = ""
+        manager = default_urllib3_manager(config=config)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+
     def test_config_proxy_custom_cls(self):
         import urllib3
 

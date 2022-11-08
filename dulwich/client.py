@@ -910,7 +910,7 @@ class GitClient(object):
         self,
         proto: Protocol,
         capabilities: Set[bytes],
-        progress: Callable[[bytes], None] = None,
+        progress: Optional[Callable[[bytes], None]] = None,
     ) -> Optional[Dict[bytes, Optional[str]]]:
         """Handle the tail of a 'git-receive-pack' request.
 

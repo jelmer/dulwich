@@ -977,7 +977,7 @@ def serialize_tree(items):
         )
 
 
-def sorted_tree_items(entries, name_order):
+def sorted_tree_items(entries, name_order: bool):
     """Iterate over a tree entries dictionary.
 
     Args:
@@ -987,7 +987,10 @@ def sorted_tree_items(entries, name_order):
       entries: Dictionary mapping names to (mode, sha) tuples
     Returns: Iterator over (name, mode, hexsha)
     """
-    key_func = name_order and key_entry_name_order or key_entry
+    if name_order:
+        key_func = key_entry_name_order
+    else:
+        key_func = key_entry
     for name, entry in sorted(entries.items(), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.

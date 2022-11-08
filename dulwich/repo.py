@@ -595,7 +595,8 @@ class BaseRepo(object):
         )
 
     def get_graph_walker(
-            self, heads: List[ObjectID] = None) -> ObjectStoreGraphWalker:
+            self,
+            heads: Optional[List[ObjectID]] = None) -> ObjectStoreGraphWalker:
         """Retrieve a graph walker.
 
         A graph walker is used by a remote repository (or proxy)
@@ -663,7 +664,8 @@ class BaseRepo(object):
             shallows=self.get_shallow(),
         )
 
-    def get_parents(self, sha: bytes, commit: Commit = None) -> List[bytes]:
+    def get_parents(self, sha: bytes,
+                    commit: Optional[Commit] = None) -> List[bytes]:
         """Retrieve the parents of a specific commit.
 
         If the specific commit is a graftpoint, the graft parents
@@ -855,7 +857,8 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def _get_user_identity(self, config: "StackedConfig", kind: str = None) -> bytes:
+    def _get_user_identity(self, config: "StackedConfig",
+                           kind: Optional[str] = None) -> bytes:
         """Determine the identity to use for new commits."""
         # TODO(jelmer): Deprecate this function in favor of get_user_identity
         return get_user_identity(config)

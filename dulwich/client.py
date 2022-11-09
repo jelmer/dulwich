@@ -71,6 +71,7 @@ from urllib.parse import (
 if TYPE_CHECKING:
     import urllib3
 
+import ipaddress
 
 import dulwich
 from dulwich.config import get_xdg_config_home_path, Config, apply_instead_of
@@ -1844,12 +1845,24 @@ def default_urllib3_manager(   # noqa: C901
             hostname = parsed_url.hostname
 
             if hostname:
+                hostname_ip = None
+                try:
+                    hostname_ip = ipaddress.ip_address(hostname)
+                except ValueError:
+                    pass ## hostname is no ip
+
                 no_proxy_values = no_proxy_str.split(",")
                 for no_proxy_value in no_proxy_values:
                     no_proxy_value = no_proxy_value.strip()
                     if no_proxy_value:
                         no_proxy_value = no_proxy_value.lower()
                         no_proxy_value = no_proxy_value.lstrip('.') # ignore leading dots
+                        no_proxy_value_network = None
+                        if hostname_ip:
+                            try:
+                                no_proxy_value_network = ipaddress.ip_network(no_proxy_value, strict=False)
+                            except ValueError:
+                                pass # no_proxy_value is not a valid ip-network
                         if no_proxy_value == '*':
                             # '*' is special case for always bypass
                             proxy_server = None
@@ -1861,7 +1874,11 @@ def default_urllib3_manager(   # noqa: C901
                         if hostname.endswith(no_proxy_value):
                             proxy_server = None
                             break
-                        ## TODO: implement parsing of ip-addresses in CIDR notation
+                        
+                        if no_proxy_value_network:
+                            if hostname_ip in no_proxy_value_network:
+                                proxy_server = None
+                                break
 
     if config is not None:
         if proxy_server is None:

@@ -1811,7 +1811,7 @@ def default_user_agent_string():
 
 
 def default_urllib3_manager(   # noqa: C901
-    config, pool_manager_cls=None, proxy_manager_cls=None, **override_kwargs
+    config, pool_manager_cls=None, proxy_manager_cls=None, base_url=None, **override_kwargs
 ) -> Union["urllib3.ProxyManager", "urllib3.PoolManager"]:
     """Return urllib3 connection pool manager.
 
@@ -1835,6 +1835,33 @@ def default_urllib3_manager(   # noqa: C901
             proxy_server = os.environ.get(proxyname)
             if proxy_server:
                 break
+
+    if base_url and proxy_server:
+        no_proxy_str = os.environ.get("no_proxy")
+        if no_proxy_str:
+            ## implement parsing of no_proxy str. Based on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html and https://github.com/python/cpython/blob/3.11/Lib/urllib/request.py line 2524
+            parsed_url = urlparse(base_url)
+            hostname = parsed_url.hostname
+
+            if hostname:
+                no_proxy_values = no_proxy_str.split(",")
+                for no_proxy_value in no_proxy_values:
+                    no_proxy_value = no_proxy_value.strip()
+                    if no_proxy_value:
+                        no_proxy_value = no_proxy_value.lower()
+                        no_proxy_value = no_proxy_value.lstrip('.') # ignore leading dots
+                        if no_proxy_value == '*':
+                            # '*' is special case for always bypass
+                            proxy_server = None
+                            break
+                        elif hostname == no_proxy_value:
+                            proxy_server = None
+                            break
+                        no_proxy_value = '.' + no_proxy_value
+                        if hostname.endswith(no_proxy_value):
+                            proxy_server = None
+                            break
+                        ## TODO: implement parsing of ip-addresses in CIDR notation
 
     if config is not None:
         if proxy_server is None:
@@ -2171,7 +2198,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         self._password = password
 
         if pool_manager is None:
-            self.pool_manager = default_urllib3_manager(config)
+            self.pool_manager = default_urllib3_manager(config, base_url=base_url)
         else:
             self.pool_manager = pool_manager
 

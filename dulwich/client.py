@@ -1833,7 +1833,7 @@ def default_urllib3_manager(   # noqa: C901
     if proxy_server is None:
         for proxyname in ("https_proxy", "http_proxy", "all_proxy"):
             proxy_server = os.environ.get(proxyname)
-            if proxy_server is not None and proxy_server != "":
+            if proxy_server:
                 break
 
     if config is not None:

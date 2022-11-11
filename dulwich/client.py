@@ -1943,7 +1943,9 @@ class AbstractHttpGitClient(GitClient):
             base_url = resp.redirect_location[: -len(tail)]
 
         try:
-            self.dumb = not resp.content_type.startswith("application/x-git-")
+            self.dumb = (
+                resp.content_type is None
+                or not resp.content_type.startswith("application/x-git-"))
             if not self.dumb:
                 proto = Protocol(read, None)
                 # The first line should mention the service

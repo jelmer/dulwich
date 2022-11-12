@@ -1837,7 +1837,7 @@ def default_urllib3_manager(   # noqa: C901
             if proxy_server:
                 break
 
-    if base_url and proxy_server: # only check for no_proxy environment variable if a proxy is set and a base_url is provided
+    if base_url and proxy_server:  # only check for no_proxy environment variable if a proxy is set and a base_url is provided
         no_proxy_str = os.environ.get("no_proxy")
         if no_proxy_str:
             # implementation basd on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html
@@ -1858,7 +1858,7 @@ def default_urllib3_manager(   # noqa: C901
                     no_proxy_value = no_proxy_value.strip()
                     if no_proxy_value:
                         no_proxy_value = no_proxy_value.lower()
-                        no_proxy_value = no_proxy_value.lstrip('.') # ignore leading dots
+                        no_proxy_value = no_proxy_value.lstrip('.')  # ignore leading dots
 
                         if hostname_ip:
                             # check if no_proxy_value is a ip network

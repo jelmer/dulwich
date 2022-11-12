@@ -1837,48 +1837,52 @@ def default_urllib3_manager(   # noqa: C901
             if proxy_server:
                 break
 
-    if base_url and proxy_server:
+    if base_url and proxy_server: # only check for no_proxy environment variable if a proxy is set and a base_url is provided
         no_proxy_str = os.environ.get("no_proxy")
         if no_proxy_str:
-            ## implement parsing of no_proxy str. Based on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html and https://github.com/python/cpython/blob/3.11/Lib/urllib/request.py line 2524
+            # implementation basd on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html
+            # get hostname of provided parsed url
             parsed_url = urlparse(base_url)
             hostname = parsed_url.hostname
 
             if hostname:
-                hostname_ip = None
+                
+                # check if hostname is an ip address
                 try:
                     hostname_ip = ipaddress.ip_address(hostname)
                 except ValueError:
-                    pass ## hostname is no ip
+                    hostname_ip = None
 
-                no_proxy_values = no_proxy_str.split(",")
+                no_proxy_values = no_proxy_str.split(',')
                 for no_proxy_value in no_proxy_values:
                     no_proxy_value = no_proxy_value.strip()
                     if no_proxy_value:
                         no_proxy_value = no_proxy_value.lower()
                         no_proxy_value = no_proxy_value.lstrip('.') # ignore leading dots
-                        no_proxy_value_network = None
+
                         if hostname_ip:
+                            # check if no_proxy_value is a ip network
                             try:
                                 no_proxy_value_network = ipaddress.ip_network(no_proxy_value, strict=False)
                             except ValueError:
-                                pass # no_proxy_value is not a valid ip-network
+                                no_proxy_value_network = None
+                            if no_proxy_value_network:
+                                # if hostname is a ip address and no_proxy_value is a ip network -> check if ip address is part of network
+                                if hostname_ip in no_proxy_value_network:
+                                    proxy_server = None
+                                    break
+                                
                         if no_proxy_value == '*':
-                            # '*' is special case for always bypass
+                            # '*' is special case for always bypass proxy
                             proxy_server = None
                             break
-                        elif hostname == no_proxy_value:
+                        if hostname == no_proxy_value:
                             proxy_server = None
                             break
-                        no_proxy_value = '.' + no_proxy_value
+                        no_proxy_value = '.' + no_proxy_value   # add a dot to only match complete domains
                         if hostname.endswith(no_proxy_value):
                             proxy_server = None
-                            break
-                        
-                        if no_proxy_value_network:
-                            if hostname_ip in no_proxy_value_network:
-                                proxy_server = None
-                                break
+                            break                        
 
     if config is not None:
         if proxy_server is None:

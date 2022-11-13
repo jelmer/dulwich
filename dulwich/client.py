@@ -1837,53 +1837,10 @@ def default_urllib3_manager(   # noqa: C901
             if proxy_server:
                 break
 
-    if base_url and proxy_server:  # only check for no_proxy environment variable if a proxy is set and a base_url is provided
-        no_proxy_str = os.environ.get("no_proxy")
-        if no_proxy_str:
-            # implementation basd on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html
-            # get hostname of provided parsed url
-            parsed_url = urlparse(base_url)
-            hostname = parsed_url.hostname
-
-            if hostname:
-                
-                # check if hostname is an ip address
-                try:
-                    hostname_ip = ipaddress.ip_address(hostname)
-                except ValueError:
-                    hostname_ip = None
-
-                no_proxy_values = no_proxy_str.split(',')
-                for no_proxy_value in no_proxy_values:
-                    no_proxy_value = no_proxy_value.strip()
-                    if no_proxy_value:
-                        no_proxy_value = no_proxy_value.lower()
-                        no_proxy_value = no_proxy_value.lstrip('.')  # ignore leading dots
-
-                        if hostname_ip:
-                            # check if no_proxy_value is a ip network
-                            try:
-                                no_proxy_value_network = ipaddress.ip_network(no_proxy_value, strict=False)
-                            except ValueError:
-                                no_proxy_value_network = None
-                            if no_proxy_value_network:
-                                # if hostname is a ip address and no_proxy_value is a ip network -> check if ip address is part of network
-                                if hostname_ip in no_proxy_value_network:
-                                    proxy_server = None
-                                    break
-                                
-                        if no_proxy_value == '*':
-                            # '*' is special case for always bypass proxy
-                            proxy_server = None
-                            break
-                        if hostname == no_proxy_value:
-                            proxy_server = None
-                            break
-                        no_proxy_value = '.' + no_proxy_value   # add a dot to only match complete domains
-                        if hostname.endswith(no_proxy_value):
-                            proxy_server = None
-                            break                        
-
+    if proxy_server:
+        if check_for_proxy_bypass(base_url):
+            proxy_server = None
+    
     if config is not None:
         if proxy_server is None:
             try:
@@ -1938,6 +1895,52 @@ def default_urllib3_manager(   # noqa: C901
         manager = pool_manager_cls(headers=headers, **kwargs)
 
     return manager
+
+
+def check_for_proxy_bypass(base_url):
+    # Check if a proxy bypass is defined with the no_proxy environment variable
+    if base_url:  # only check if base_url is provided
+        no_proxy_str = os.environ.get("no_proxy")
+        if no_proxy_str:
+            # implementation basd on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html
+            # get hostname of provided parsed url
+            parsed_url = urlparse(base_url)
+            hostname = parsed_url.hostname
+
+            if hostname:
+                # check if hostname is an ip address
+                try:
+                    hostname_ip = ipaddress.ip_address(hostname)
+                except ValueError:
+                    hostname_ip = None
+
+                no_proxy_values = no_proxy_str.split(',')
+                for no_proxy_value in no_proxy_values:
+                    no_proxy_value = no_proxy_value.strip()
+                    if no_proxy_value:
+                        no_proxy_value = no_proxy_value.lower()
+                        no_proxy_value = no_proxy_value.lstrip('.')  # ignore leading dots
+
+                        if hostname_ip:
+                            # check if no_proxy_value is a ip network
+                            try:
+                                no_proxy_value_network = ipaddress.ip_network(no_proxy_value, strict=False)
+                            except ValueError:
+                                no_proxy_value_network = None
+                            if no_proxy_value_network:
+                                # if hostname is a ip address and no_proxy_value is a ip network -> check if ip address is part of network
+                                if hostname_ip in no_proxy_value_network:
+                                    return True
+                                
+                        if no_proxy_value == '*':
+                            # '*' is special case for always bypass proxy
+                            return True
+                        if hostname == no_proxy_value:
+                            return True
+                        no_proxy_value = '.' + no_proxy_value   # add a dot to only match complete domains
+                        if hostname.endswith(no_proxy_value):
+                            return True
+    return False
 
 
 class AbstractHttpGitClient(GitClient):

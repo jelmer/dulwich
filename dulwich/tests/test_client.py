@@ -1248,6 +1248,168 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertIsInstance(manager, urllib3.PoolManager)
         del os.environ["http_proxy"]
 
+    def test_environment_no_proxy_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,abc.gh"
+        base_url = "http://xyz.abc.def.gh:8080/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,abc.gh,ample.com"
+        base_url = "http://ample.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,abc.gh,ample.com"
+        base_url = "http://ample.com:80/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_4(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,abc.gh,ample.com"
+        base_url = "http://www.ample.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_5(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,abc.gh,ample.com"
+        base_url = "http://www.example.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, "proxy"))
+        self.assertEqual(manager.proxy.scheme, "http")
+        self.assertEqual(manager.proxy.host, "myproxy")
+        self.assertEqual(manager.proxy.port, 8080)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_6(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,abc.gh,ample.com"
+        base_url = "http://ample.com.org/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, "proxy"))
+        self.assertEqual(manager.proxy.scheme, "http")
+        self.assertEqual(manager.proxy.host, "myproxy")
+        self.assertEqual(manager.proxy.port, 8080)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_ipv4_address_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,192.168.0.10,ample.com"
+        base_url = "http://192.168.0.10/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_ipv4_address_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,192.168.0.10,ample.com"
+        base_url = "http://192.168.0.10:8888/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+    
+    def test_environment_no_proxy_ipv4_address_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,ff80:1::/64,192.168.0.0/24,ample.com"
+        base_url = "http://192.168.0.10/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_ipv6_address_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,ff80:1::affe,ample.com"
+        base_url = "http://[ff80:1::affe]/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_ipv6_address_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,ff80:1::affe,ample.com"
+        base_url = "http://[ff80:1::affe]:1234/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
+    def test_environment_no_proxy_ipv6_address_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        os.environ["http_proxy"] = "http://myproxy:8080"
+        os.environ["no_proxy"] = "xyz,abc.def.gh,192.168.0.0/24,ff80:1::/64,ample.com"
+        base_url = "http://[ff80:1::affe]/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+        del os.environ["http_proxy"]
+        del os.environ["no_proxy"]
+
     def test_config_proxy_custom_cls(self):
         import urllib3
 

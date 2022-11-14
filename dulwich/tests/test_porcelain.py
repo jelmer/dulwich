@@ -436,7 +436,8 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(commit._author_timezone, 18000)
         self.assertEqual(commit._commit_timezone, 18000)
 
-        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = "1995-11-20T19:12:08-0501"
+        self.overrideEnv("GIT_AUTHOR_DATE", "1995-11-20T19:12:08-0501")
+        self.overrideEnv("GIT_COMMITTER_DATE", "1995-11-20T19:12:08-0501")
 
         sha = porcelain.commit(
             self.repo.path,
@@ -451,8 +452,9 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(commit._author_timezone, -18060)
         self.assertEqual(commit._commit_timezone, -18060)
 
-        del os.environ["GIT_AUTHOR_DATE"]
-        del os.environ["GIT_COMMITTER_DATE"]
+        self.overrideEnv("GIT_AUTHOR_DATE", None)
+        self.overrideEnv("GIT_COMMITTER_DATE", None)
+
         local_timezone = time.localtime().tm_gmtoff
 
         sha = porcelain.commit(
@@ -536,7 +538,8 @@ class CommitSignTests(PorcelainGpgTestCase):
 class TimezoneTests(PorcelainTestCase):
 
     def put_envs(self, value):
-        os.environ["GIT_AUTHOR_DATE"] = os.environ["GIT_COMMITTER_DATE"] = value
+        self.overrideEnv("GIT_AUTHOR_DATE", value)
+        self.overrideEnv("GIT_COMMITTER_DATE", value)
 
     def fallback(self, value):
         self.put_envs(value)
@@ -583,8 +586,8 @@ class TimezoneTests(PorcelainTestCase):
         self.fallback("20.11.1995")
 
     def test_different_envs(self):
-        os.environ["GIT_AUTHOR_DATE"] = "0 +0500"
-        os.environ["GIT_COMMITTER_DATE"] = "0 +0501"
+        self.overrideEnv("GIT_AUTHOR_DATE", "0 +0500")
+        self.overrideEnv("GIT_COMMITTER_DATE", "0 +0501")
         self.assertTupleEqual((18000, 18060), porcelain.get_user_timezones())
 
     def test_no_envs(self):
@@ -593,16 +596,16 @@ class TimezoneTests(PorcelainTestCase):
         self.put_envs("0 +0500")
         self.assertTupleEqual((18000, 18000), porcelain.get_user_timezones())
 
-        del os.environ["GIT_COMMITTER_DATE"]
+        self.overrideEnv("GIT_COMMITTER_DATE", None)
         self.assertTupleEqual((18000, local_timezone), porcelain.get_user_timezones())
 
         self.put_envs("0 +0500")
-        del os.environ["GIT_AUTHOR_DATE"]
+        self.overrideEnv("GIT_AUTHOR_DATE", None)
         self.assertTupleEqual((local_timezone, 18000), porcelain.get_user_timezones())
 
         self.put_envs("0 +0500")
-        del os.environ["GIT_AUTHOR_DATE"]
-        del os.environ["GIT_COMMITTER_DATE"]
+        self.overrideEnv("GIT_AUTHOR_DATE", None)
+        self.overrideEnv("GIT_COMMITTER_DATE", None)
         self.assertTupleEqual((local_timezone, local_timezone), porcelain.get_user_timezones())
 
 

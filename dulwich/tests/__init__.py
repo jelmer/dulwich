@@ -49,16 +49,8 @@ from unittest import (  # noqa: F401
 class TestCase(_TestCase):
     def setUp(self):
         super(TestCase, self).setUp()
-        self._old_home = os.environ.get("HOME")
-        os.environ["HOME"] = "/nonexistent"
-        os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
-
-    def tearDown(self):
-        super(TestCase, self).tearDown()
-        if self._old_home:
-            os.environ["HOME"] = self._old_home
-        else:
-            del os.environ["HOME"]
+        self.overrideEnv("HOME", "/nonexistent")
+        self.overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 
     def overrideEnv(self, name, value):
         def restore():
@@ -68,7 +60,10 @@ class TestCase(_TestCase):
                 del os.environ[name]
 
         oldval = os.environ.get(name)
-        os.environ[name] = value
+        if value is not None:
+            os.environ[name] = value
+        else:
+            del os.environ[name]
         self.addCleanup(restore)
 
 

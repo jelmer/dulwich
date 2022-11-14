@@ -71,8 +71,6 @@ from urllib.parse import (
 if TYPE_CHECKING:
     import urllib3
 
-import ipaddress
-
 import dulwich
 from dulwich.config import get_xdg_config_home_path, Config, apply_instead_of
 from dulwich.errors import (
@@ -1902,12 +1900,14 @@ def check_for_proxy_bypass(base_url):
     if base_url:  # only check if base_url is provided
         no_proxy_str = os.environ.get("no_proxy")
         if no_proxy_str:
-            # implementation basd on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html
+            # implementation based on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html
             # get hostname of provided parsed url
             parsed_url = urlparse(base_url)
             hostname = parsed_url.hostname
 
             if hostname:
+                import ipaddress
+
                 # check if hostname is an ip address
                 try:
                     hostname_ip = ipaddress.ip_address(hostname)

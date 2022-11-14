@@ -307,14 +307,6 @@ class ConfigDictTests(TestCase):
 
 
 class StackedConfigTests(TestCase):
-    def setUp(self):
-        super(StackedConfigTests, self).setUp()
-        self._old_path = os.environ.get("PATH")
-
-    def tearDown(self):
-        super(StackedConfigTests, self).tearDown()
-        os.environ["PATH"] = self._old_path
-
     def test_default_backends(self):
         StackedConfig.default_backends()
 
@@ -323,7 +315,7 @@ class StackedConfigTests(TestCase):
         from dulwich.config import get_win_system_paths
 
         install_dir = os.path.join("C:", "foo", "Git")
-        os.environ["PATH"] = os.path.join(install_dir, "cmd")
+        self.overrideEnv("PATH", os.path.join(install_dir, "cmd"))
         with patch("os.path.exists", return_value=True):
             paths = set(get_win_system_paths())
         self.assertEqual(
@@ -340,7 +332,7 @@ class StackedConfigTests(TestCase):
 
         from dulwich.config import get_win_system_paths
 
-        del os.environ["PATH"]
+        self.overrideEnv("PATH", None)
         install_dir = os.path.join("C:", "foo", "Git")
         with patch("winreg.OpenKey"):
             with patch(

@@ -462,7 +462,7 @@ def commit_tree(
     Returns:
       SHA1 of the created tree.
     """
-    trees = {b"": {}}  # type: Dict[bytes, Any]
+    trees: Dict[bytes, Any] = {b"": {}}
 
     def add_tree(path):
         if path in trees:

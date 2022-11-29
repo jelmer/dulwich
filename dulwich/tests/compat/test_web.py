@@ -90,7 +90,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     This server test case does not use side-band-64k in git-receive-pack.
     """
 
-    min_git_version = (1, 6, 6)  # type: Tuple[int, ...]
+    min_git_version: Tuple[int, ...] = (1, 6, 6)
 
     def _handlers(self):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}

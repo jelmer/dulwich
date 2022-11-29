@@ -27,12 +27,12 @@ from .pack import PackData, write_pack_data
 
 class Bundle(object):
 
-    version = None  # type: Optional[int]
+    version: Optional[int] = None
 
-    capabilities = {}  # type: Dict[str, str]
-    prerequisites = []  # type: List[Tuple[bytes, str]]
-    references = {}  # type: Dict[str, bytes]
-    pack_data = []  # type: Union[PackData, Sequence[bytes]]
+    capabilities: Dict[str, str] = {}
+    prerequisites: List[Tuple[bytes, str]] = []
+    references: Dict[str, bytes] = {}
+    pack_data: Union[PackData, Sequence[bytes]] = []
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):

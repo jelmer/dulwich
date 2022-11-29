@@ -205,8 +205,8 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
     Returns:
       A user identity
     """
-    user = None  # type: Optional[bytes]
-    email = None  # type: Optional[bytes]
+    user: Optional[bytes] = None
+    email: Optional[bytes] = None
     if kind:
         user_uc = os.environ.get("GIT_" + kind + "_NAME")
         if user_uc is not None:
@@ -373,8 +373,8 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
-        self._graftpoints = {}  # type: Dict[bytes, List[bytes]]
-        self.hooks = {}  # type: Dict[str, Hook]
+        self._graftpoints: Dict[bytes, List[bytes]] = {}
+        self.hooks: Dict[str, Hook] = {}
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.

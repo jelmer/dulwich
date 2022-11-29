@@ -344,8 +344,8 @@ class HTTPGitRequest(object):
         self.dumb = dumb
         self.handlers = handlers
         self._start_response = start_response
-        self._cache_headers = []  # type: List[Tuple[str, str]]
-        self._headers = []  # type: List[Tuple[str, str]]
+        self._cache_headers: List[Tuple[str, str]] = []
+        self._headers: List[Tuple[str, str]] = []
 
     def add_header(self, name, value):
         """Add a header to the response."""

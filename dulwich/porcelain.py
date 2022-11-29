@@ -1146,7 +1146,7 @@ def get_remote_repo(
 
     section = (b"remote", encoded_location)
 
-    remote_name = None  # type: Optional[str]
+    remote_name: Optional[str] = None
 
     if config.has_section(section):
         remote_name = encoded_location.decode()

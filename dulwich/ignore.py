@@ -204,7 +204,7 @@ class Pattern(object):
 
 class IgnoreFilter(object):
     def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False, path=None):
-        self._patterns = []  # type: List[Pattern]
+        self._patterns: List[Pattern] = []
         self._ignorecase = ignorecase
         self._path = path
         for pattern in patterns:
@@ -304,7 +304,7 @@ class IgnoreFilterManager(object):
         global_filters: List[IgnoreFilter],
         ignorecase: bool,
     ):
-        self._path_filters = {}  # type: Dict[str, Optional[IgnoreFilter]]
+        self._path_filters: Dict[str, Optional[IgnoreFilter]] = {}
         self._top_path = top_path
         self._global_filters = global_filters
         self._ignorecase = ignorecase

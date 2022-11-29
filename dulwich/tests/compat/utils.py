@@ -233,7 +233,7 @@ class CompatTestCase(TestCase):
     min_git_version.
     """
 
-    min_git_version = (1, 5, 0)  # type: Tuple[int, ...]
+    min_git_version: Tuple[int, ...] = (1, 5, 0)
 
     def setUp(self):
         super(CompatTestCase, self).setUp()

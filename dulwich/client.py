@@ -819,7 +819,7 @@ class GitClient(object):
             # TODO(jelmer): Avoid reading entire file into memory and
             # only processing it after the whole file has been fetched.
             from tempfile import SpooledTemporaryFile
-            f = SpooledTemporaryFile()  # type: IO[bytes]
+            f: IO[bytes] = SpooledTemporaryFile()
 
             def commit():
                 if f.tell():

@@ -14,12 +14,12 @@ from dulwich.repo import MemoryRepo
 
 local_repo = MemoryRepo()
 local_repo.refs.set_symbolic_ref(b'HEAD', b'refs/heads/master')
+
+fetch_result = porcelain.fetch(local_repo, sys.argv[1])
+local_repo.refs[b'refs/heads/master'] = fetch_result.refs[b'refs/heads/master']
 print(local_repo.refs.as_dict())
 
-porcelain.fetch(local_repo, sys.argv[1])
-local_repo['refs/heads/master'] = local_repo['refs/remotes/origin/master']
-
-last_tree = local_repo[local_repo['HEAD'].tree]
+last_tree = local_repo[local_repo[b'HEAD'].tree]
 new_blob = Blob.from_string(b'Some contents')
 local_repo.object_store.add_object(new_blob)
 last_tree.add(b'test', stat.S_IFREG, new_blob.id)

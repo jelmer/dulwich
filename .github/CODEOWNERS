@@ -1,0 +1,5 @@
+* @jelmer
+
+# Release robot
+dulwich/contrib/release_robot.py @mikofski
+dulwich/contrib/test_release_robot.py @mikofski

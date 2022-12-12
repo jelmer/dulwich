@@ -529,12 +529,12 @@ class cmd_pack_objects(Command):
             print("Usage: dulwich pack-objects basename")
             sys.exit(1)
         object_ids = [line.strip() for line in sys.stdin.readlines()]
-        basename = args[0]
         if "--stdout" in opts.keys():
             packf = getattr(sys.stdout, "buffer", sys.stdout)
             idxf = None
             close = []
         else:
+            basename = args[0]
             packf = open(basename + ".pack", "wb")
             idxf = open(basename + ".idx", "wb")
             close = [packf, idxf]

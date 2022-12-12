@@ -535,8 +535,8 @@ class cmd_pack_objects(Command):
             idxf = None
             close = []
         else:
-            packf = open(basename + ".pack", "w")
-            idxf = open(basename + ".idx", "w")
+            packf = open(basename + ".pack", "wb")
+            idxf = open(basename + ".idx", "wb")
             close = [packf, idxf]
         porcelain.pack_objects(".", object_ids, packf, idxf)
         for f in close:

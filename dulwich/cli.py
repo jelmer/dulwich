@@ -525,18 +525,18 @@ class cmd_pack_objects(Command):
     def run(self, args):
         opts, args = getopt(args, "", ["stdout"])
         opts = dict(opts)
-        if len(args) < 1 and "--stdout" not in args:
+        if len(args) < 1 and "--stdout" not in opts.keys():
             print("Usage: dulwich pack-objects basename")
             sys.exit(1)
         object_ids = [line.strip() for line in sys.stdin.readlines()]
-        basename = args[0]
-        if "--stdout" in opts:
+        if "--stdout" in opts.keys():
             packf = getattr(sys.stdout, "buffer", sys.stdout)
             idxf = None
             close = []
         else:
-            packf = open(basename + ".pack", "w")
-            idxf = open(basename + ".idx", "w")
+            basename = args[0]
+            packf = open(basename + ".pack", "wb")
+            idxf = open(basename + ".idx", "wb")
             close = [packf, idxf]
         porcelain.pack_objects(".", object_ids, packf, idxf)
         for f in close:

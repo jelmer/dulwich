@@ -1270,6 +1270,22 @@ class PackData(object):
             unpacked.comp_chunks,
         )
 
+    def get_decompressed_data_at(self, offset):
+        """Given an offset in the packfile, decompress the data that is there.
+
+        Using the associated index the location of an object can be looked up,
+        and then the packfile can be asked directly for that object using this
+        function.
+        """
+        assert offset >= self._header_size
+        self._file.seek(offset)
+        unpacked, _ = unpack_object(self._file.read, include_comp=False)
+        return (
+            unpacked.pack_type_num,
+            unpacked.delta_base,
+            unpacked.decomp_chunks,
+        )
+
     def get_object_at(self, offset):
         """Given an offset in to the packfile return the object that is there.
 
@@ -1616,22 +1632,42 @@ def write_pack_header(write, num_objects):
         write(chunk)
 
 
-def deltify_pack_objects(objects, window_size=None):
+def deltify_pack_objects(objects, window_size=None, reuse_pack=None):
     """Generate deltas for pack objects.
 
     Args:
       objects: An iterable of (object, path) tuples to deltify.
       window_size: Window size; None for default
+      reuse_pack: Pack object we can search for objects to reuse
     Returns: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
     """
     # TODO(jelmer): Use threads
     if window_size is None:
         window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
+
+    reused_deltas = set()
+    if reuse_pack:
+        # Build a set of SHA1 IDs which will be part of this pack file.
+        # We can only reuse a delta if its base will be present in the
+        # generated pack file.
+        objects_to_pack = set()
+        for obj, path in objects:
+            objects_to_pack.add(sha_to_hex(obj.sha().digest()))
+        for o, _ in objects:
+            if not o.sha().digest() in reuse_pack:
+                continue
+            # get_raw_unresolved() translates OFS_DELTA into REF_DELTA for us
+            (obj_type, delta_base, _) = reuse_pack.get_raw_unresolved(o.sha().digest())
+            if obj_type == REF_DELTA and delta_base in objects_to_pack:
+                reused_deltas.add(o.sha().digest())
+
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic = []
     for obj, path in objects:
+        if obj.sha().digest() in reused_deltas:
+            continue
         magic.append((obj.type_num, path, -obj.raw_length(), obj))
     magic.sort()
 
@@ -1661,6 +1697,10 @@ def deltify_pack_objects(objects, window_size=None):
         while len(possible_bases) > window_size:
             possible_bases.pop()
 
+    for sha_digest in reused_deltas:
+        (obj_type, delta_base, chunks) = reuse_pack.get_raw_delta(sha_digest)
+        yield obj_type, sha_digest, hex_to_sha(delta_base), chunks
+
 
 def pack_objects_to_data(objects):
     """Create pack data from objects
@@ -1680,7 +1720,7 @@ def pack_objects_to_data(objects):
 
 
 def write_pack_objects(
-    write, objects, delta_window_size=None, deltify=None, compression_level=-1
+    write, objects, delta_window_size=None, deltify=None, reuse_pack=None, compression_level=-1
 ):
     """Write a new pack data file.
 
@@ -1691,6 +1731,7 @@ def write_pack_objects(
       delta_window_size: Sliding window size for searching for deltas;
                          Set to None for default window size.
       deltify: Whether to deltify objects
+      reuse_pack: Pack object we can search for objects to reuse
       compression_level: the zlib compression level to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
@@ -1705,7 +1746,7 @@ def write_pack_objects(
         # slow at the moment.
         deltify = False
     if deltify:
-        pack_contents = deltify_pack_objects(objects, delta_window_size)
+        pack_contents = deltify_pack_objects(objects, delta_window_size, reuse_pack)
         pack_contents_count = len(objects)
     else:
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
@@ -2171,6 +2212,22 @@ class Pack(object):
         obj_type, obj = self.data.get_object_at(offset)
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
         return type_num, b"".join(chunks)
+
+    def get_raw_delta(self, sha1):
+        """Get raw decompressed delta data chunks for a given SHA1.
+        Convert OFS_DELTA objects to REF_DELTA objects, like get_raw_unresolved() does.
+
+        Args:
+          sha1: SHA to return data for
+        Returns: Tuple with pack object type, delta base (if applicable),
+            list of data chunks
+        """
+        offset = self.index.object_index(sha1)
+        (obj_type, delta_base, chunks) = self.data.get_decompressed_data_at(offset)
+        if obj_type == OFS_DELTA:
+            delta_base = sha_to_hex(self.index.object_sha1(offset - delta_base))
+            obj_type = REF_DELTA
+        return (obj_type, delta_base, chunks)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""

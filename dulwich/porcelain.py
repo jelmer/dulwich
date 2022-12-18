@@ -1741,7 +1741,19 @@ def repack(repo):
         r.object_store.pack_loose_objects()
 
 
-def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
+def find_pack_for_reuse(repo):
+    reuse_pack = None
+    max_pack_len = 0
+    # The pack file which contains the largest number of objects
+    # will be most suitable for object reuse.
+    for p in repo.object_store.packs:
+        if len(p) > max_pack_len:
+            reuse_pack = p
+            max_pack_len = len(reuse_pack)
+    return reuse_pack
+
+
+def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None, deltify=None, reuse_deltas=True):
     """Pack objects into a file.
 
     Args:
@@ -1749,12 +1761,21 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
       object_ids: List of object ids to write
       packf: File-like object to write to
       idxf: File-like object to write to (can be None)
+      delta_window_size: Sliding window size for searching for deltas;
+                         Set to None for default window size.
+      deltify: Whether to deltify objects
+      reuse_deltas: Allow reuse of existing deltas while deltifying
     """
     with open_repo_closing(repo) as r:
+        reuse_pack = None
+        if deltify and reuse_deltas:
+            reuse_pack = find_pack_for_reuse(r)
         entries, data_sum = write_pack_objects(
             packf.write,
             r.object_store.iter_shas((oid, None) for oid in object_ids),
+            deltify=deltify,
             delta_window_size=delta_window_size,
+            reuse_pack=reuse_pack
         )
     if idxf is not None:
         entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])

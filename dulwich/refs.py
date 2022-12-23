@@ -748,7 +748,10 @@ class DiskRefsContainer(RefsContainer):
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
-        except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+        except (OSError, UnicodeError):
+            # don't assume anything specific about the error; in
+            # particular, invalid or forbidden paths can raise weird
+            # errors depending on the specific operating system
             return None
 
     def _remove_packed_ref(self, name):
@@ -965,9 +968,13 @@ class DiskRefsContainer(RefsContainer):
 
             # remove the reference file itself
             try:
+                found = os.path.lexists(filename)
+            except OSError:
+                # may only be packed, or otherwise unstorable
+                found = False
+
+            if found:
                 os.remove(filename)
-            except FileNotFoundError:
-                pass  # may only be packed
 
             self._remove_packed_ref(name)
             self._log(

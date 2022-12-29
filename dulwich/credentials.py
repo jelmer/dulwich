@@ -223,19 +223,19 @@ def get_credentials_from_store(
     username: Optional[bytes] = None,
     fnames: List[str] = DEFAULT_GIT_CREDENTIALS_PATHS,
 ):
+
+    encoding = sys.getdefaultencoding()
     for fname in fnames:
+        command = f"store --file {fname}"
+        helper = CredentialHelper(command)
         try:
-            with open(fname, "rb") as f:
-                for line in f:
-                    parsed_line = urlparse(line.strip())
-                    if (
-                        parsed_line.scheme == scheme
-                        and parsed_line.hostname == hostname
-                        and (username is None or parsed_line.username == username)
-                    ):
-                        return parsed_line.username, parsed_line.password
-        except FileNotFoundError:
-            # If the file doesn't exist, try the next one.
+            username, password = helper.get(
+                protocol=scheme.decode(encoding),
+                hostname=hostname.decode(encoding),
+                username=username.decode(encoding) if username is not None else None,
+            )
+            return username, password
+        except CredentialNotFoundError:
             continue
 
 

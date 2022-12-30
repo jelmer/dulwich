@@ -79,6 +79,78 @@ PACKDIR = "pack"
 PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
 
 
+def find_shallow(store, heads, depth):
+    """Find shallow commits according to a given depth.
+
+    Args:
+      store: An ObjectStore for looking up objects.
+      heads: Iterable of head SHAs to start walking from.
+      depth: The depth of ancestors to include. A depth of one includes
+        only the heads themselves.
+    Returns: A tuple of (shallow, not_shallow), sets of SHAs that should be
+        considered shallow and unshallow according to the arguments. Note that
+        these sets may overlap if a commit is reachable along multiple paths.
+    """
+    parents = {}
+
+    def get_parents(sha):
+        result = parents.get(sha, None)
+        if not result:
+            result = store[sha].parents
+            parents[sha] = result
+        return result
+
+    todo = []  # stack of (sha, depth)
+    for head_sha in heads:
+        obj = store.peel_sha(head_sha)
+        if isinstance(obj, Commit):
+            todo.append((obj.id, 1))
+
+    not_shallow = set()
+    shallow = set()
+    while todo:
+        sha, cur_depth = todo.pop()
+        if cur_depth < depth:
+            not_shallow.add(sha)
+            new_depth = cur_depth + 1
+            todo.extend((p, new_depth) for p in get_parents(sha))
+        else:
+            shallow.add(sha)
+
+    return shallow, not_shallow
+
+
+def get_depth(
+    store, head, get_parents=lambda commit: commit.parents, max_depth=None,
+):
+    """Return the current available depth for the given head.
+    For commits with multiple parents, the largest possible depth will be
+    returned.
+
+    Args:
+        head: commit to start from
+        get_parents: optional function for getting the parents of a commit
+        max_depth: maximum depth to search
+    """
+    if head not in store:
+        return 0
+    current_depth = 1
+    queue = [(head, current_depth)]
+    while queue and (max_depth is None or current_depth < max_depth):
+        e, depth = queue.pop(0)
+        current_depth = max(current_depth, depth)
+        cmt = store[e]
+        if isinstance(cmt, Tag):
+            _cls, sha = cmt.object
+            cmt = store[sha]
+        queue.extend(
+            (parent, depth + 1)
+            for parent in get_parents(cmt)
+            if parent in store
+        )
+    return current_depth
+
+
 class BaseObjectStore(object):
     """Object store interface."""
 
@@ -388,23 +460,7 @@ class BaseObjectStore(object):
             get_parents: optional function for getting the parents of a commit
             max_depth: maximum depth to search
         """
-        if head not in self:
-            return 0
-        current_depth = 1
-        queue = [(head, current_depth)]
-        while queue and (max_depth is None or current_depth < max_depth):
-            e, depth = queue.pop(0)
-            current_depth = max(current_depth, depth)
-            cmt = self[e]
-            if isinstance(cmt, Tag):
-                _cls, sha = cmt.object
-                cmt = self[sha]
-            queue.extend(
-                (parent, depth + 1)
-                for parent in get_parents(cmt)
-                if parent in self
-            )
-        return current_depth
+        return get_depth(self, head, get_parents=get_parents, max_depth=max_depth)
 
     def close(self):
         """Close any files opened by this object store."""
@@ -1324,7 +1380,7 @@ class MissingObjectFinder(object):
     def add_todo(self, entries):
         self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
 
-    def next(self):
+    def __next__(self):
         while True:
             if not self.objects_to_send:
                 return None
@@ -1351,7 +1407,7 @@ class MissingObjectFinder(object):
         self.progress(("counting objects: %d\r" % len(self.sha_done)).encode("ascii"))
         return (sha, name)
 
-    __next__ = next
+    next = __next__
 
 
 class ObjectStoreGraphWalker(object):
@@ -1362,7 +1418,7 @@ class ObjectStoreGraphWalker(object):
       get_parents: Function to retrieve parents in the local repo
     """
 
-    def __init__(self, local_heads, get_parents, shallow=None):
+    def __init__(self, local_heads, get_parents, shallow=None, update_shallow=None):
         """Create a new instance.
 
         Args:
@@ -1375,6 +1431,7 @@ class ObjectStoreGraphWalker(object):
         if shallow is None:
             shallow = set()
         self.shallow = shallow
+        self.update_shallow = update_shallow
 
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""
@@ -1402,7 +1459,7 @@ class ObjectStoreGraphWalker(object):
 
             ancestors = new_ancestors
 
-    def next(self):
+    def __next__(self):
         """Iterate over ancestors of heads in the target."""
         if self.heads:
             ret = self.heads.pop()
@@ -1415,7 +1472,7 @@ class ObjectStoreGraphWalker(object):
             return ret
         return None
 
-    __next__ = next
+    next = __next__
 
 
 def commit_tree_changes(object_store, tree, changes):

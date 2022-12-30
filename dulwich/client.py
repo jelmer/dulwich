@@ -757,6 +757,7 @@ class GitClient(object):
 
             ref_message = b"clone: from " + encoded_path
             result = self.fetch(path, target, progress=progress, depth=depth)
+
             _import_remote_refs(
                 target.refs, origin, result.refs, message=ref_message)
 

@@ -67,6 +67,8 @@ from dulwich.objects import (
     Commit,
     valid_hexsha,
 )
+from dulwich.object_store import find_shallow
+
 from dulwich.pack import (
     write_pack_objects,
 )
@@ -456,47 +458,6 @@ def _split_proto_line(line, allowed):
     raise GitProtocolError("Received invalid line from client: %r" % line)
 
 
-def _find_shallow(store, heads, depth):
-    """Find shallow commits according to a given depth.
-
-    Args:
-      store: An ObjectStore for looking up objects.
-      heads: Iterable of head SHAs to start walking from.
-      depth: The depth of ancestors to include. A depth of one includes
-        only the heads themselves.
-    Returns: A tuple of (shallow, not_shallow), sets of SHAs that should be
-        considered shallow and unshallow according to the arguments. Note that
-        these sets may overlap if a commit is reachable along multiple paths.
-    """
-    parents = {}
-
-    def get_parents(sha):
-        result = parents.get(sha, None)
-        if not result:
-            result = store[sha].parents
-            parents[sha] = result
-        return result
-
-    todo = []  # stack of (sha, depth)
-    for head_sha in heads:
-        obj = store.peel_sha(head_sha)
-        if isinstance(obj, Commit):
-            todo.append((obj.id, 1))
-
-    not_shallow = set()
-    shallow = set()
-    while todo:
-        sha, cur_depth = todo.pop()
-        if cur_depth < depth:
-            not_shallow.add(sha)
-            new_depth = cur_depth + 1
-            todo.extend((p, new_depth) for p in get_parents(sha))
-        else:
-            shallow.add(sha)
-
-    return shallow, not_shallow
-
-
 def _want_satisfied(store, haves, want, earliest):
     o = store[want]
     pending = collections.deque([o])
@@ -698,7 +659,7 @@ class _ProtocolGraphWalker(object):
             self.client_shallow.add(val)
         self.read_proto_line((None,))  # consume client's flush-pkt
 
-        shallow, not_shallow = _find_shallow(self.store, wants, depth)
+        shallow, not_shallow = find_shallow(self.store, wants, depth)
 
         # Update self.shallow instead of reassigning it since we passed a
         # reference to it before this method was called.
@@ -706,6 +667,9 @@ class _ProtocolGraphWalker(object):
         new_shallow = self.shallow - self.client_shallow
         unshallow = self.unshallow = not_shallow & self.client_shallow
 
+        self.update_shallow(new_shallow, unshallow)
+
+    def update_shallow(self, new_shallow, unshallow):
         for sha in sorted(new_shallow):
             self.proto.write_pkt_line(format_shallow_line(sha))
         for sha in sorted(unshallow):

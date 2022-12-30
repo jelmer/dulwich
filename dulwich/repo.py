@@ -72,6 +72,7 @@ from dulwich.object_store import (
     MemoryObjectStore,
     BaseObjectStore,
     ObjectStoreGraphWalker,
+    find_shallow,
 )
 from dulwich.objects import (
     check_hexsha,
@@ -437,7 +438,8 @@ class BaseRepo(object):
         """
         raise NotImplementedError(self.open_index)
 
-    def fetch(self, target, determine_wants=None, progress=None, depth=None):
+    def fetch(self, target, determine_wants=None, progress=None,
+              depth: Optional[int] = None):
         """Fetch objects into another repository.
 
         Args:
@@ -450,9 +452,10 @@ class BaseRepo(object):
         """
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
+        graph_walker = target.get_graph_walker()
         count, pack_data = self.fetch_pack_data(
             determine_wants,
-            target.get_graph_walker(),
+            graph_walker,
             progress=progress,
             depth=depth,
         )
@@ -511,9 +514,6 @@ class BaseRepo(object):
           depth: Shallow fetch depth
         Returns: iterator over objects, with __len__ implemented
         """
-        if depth not in (None, 0):
-            raise NotImplementedError("depth not supported yet")
-
         refs = {}
         for ref, sha in self.get_refs().items():
             try:
@@ -534,14 +534,23 @@ class BaseRepo(object):
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
-        shallows = getattr(graph_walker, "shallow", frozenset())
-        unshallows = getattr(graph_walker, "unshallow", frozenset())
+        current_shallow = set(graph_walker.shallow)
+
+        if depth not in (None, 0):
+            shallow, not_shallow = find_shallow(
+                self.object_store, wants, depth)
+            graph_walker.shallow.update(shallow - not_shallow)
+            new_shallow = graph_walker.shallow - current_shallow
+            unshallow = graph_walker.unshallow = not_shallow & current_shallow
+            graph_walker.update_shallow(new_shallow, unshallow)
+        else:
+            graph_walker.unshallow = set()
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
 
-            if shallows or unshallows:
+            if graph_walker.shallow or graph_walker.unshallow:
                 # Do not send a pack in shallow short-circuit path
                 return None
 
@@ -554,12 +563,13 @@ class BaseRepo(object):
 
         # Deal with shallow requests separately because the haves do
         # not reflect what objects are missing
-        if shallows or unshallows:
+        if graph_walker.shallow or graph_walker.unshallow:
             # TODO: filter the haves commits from iter_shas. the specific
             # commits aren't missing.
             haves = []
 
-        parents_provider = ParentsProvider(self.object_store, shallows=shallows)
+        parents_provider = ParentsProvider(
+            self.object_store, shallows=current_shallow)
 
         def get_parents(commit):
             return parents_provider.get_parents(commit.id, commit)
@@ -568,7 +578,7 @@ class BaseRepo(object):
             self.object_store.find_missing_objects(
                 haves,
                 wants,
-                self.get_shallow(),
+                graph_walker.shallow,
                 progress,
                 get_tagged,
                 get_parents=get_parents,
@@ -614,7 +624,8 @@ class BaseRepo(object):
             ]
         parents_provider = ParentsProvider(self.object_store)
         return ObjectStoreGraphWalker(
-            heads, parents_provider.get_parents, shallow=self.get_shallow()
+            heads, parents_provider.get_parents, shallow=self.get_shallow(),
+            update_shallow=self.update_shallow,
         )
 
     def get_refs(self) -> Dict[bytes, bytes]:
@@ -760,7 +771,7 @@ class BaseRepo(object):
         return self.object_store.peel_sha(self.refs[ref]).id
 
     def get_walker(self, include: Optional[List[bytes]] = None,
-                   *args, **kwargs):
+                   **kwargs):
         """Obtain a walker for this repository.
 
         Args:
@@ -793,7 +804,7 @@ class BaseRepo(object):
 
         kwargs["get_parents"] = lambda commit: self.get_parents(commit.id, commit)
 
-        return Walker(self.object_store, include, *args, **kwargs)
+        return Walker(self.object_store, include, **kwargs)
 
     def __getitem__(self, name: Union[ObjectID, Ref]):
         """Retrieve a Git object by SHA1 or ref.

@@ -243,6 +243,7 @@ class Walker(object):
         self,
         store,
         include,
+        *,
         exclude=None,
         order=ORDER_DATE,
         reverse=False,

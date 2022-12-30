@@ -870,6 +870,43 @@ class CloneTests(PorcelainTestCase):
             target_repo.refs.get_symrefs(),
         )
 
+    def test_local_depth(self):
+        f1_1 = make_object(Blob, data=b"f1")
+        commit_spec = [[1], [2, 1], [3, 1, 2]]
+        trees = {
+            1: [(b"f1", f1_1), (b"f2", f1_1)],
+            2: [(b"f1", f1_1), (b"f2", f1_1)],
+            3: [(b"f1", f1_1), (b"f2", f1_1)],
+        }
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/tags/foo"] = c3.id
+        target_path = tempfile.mkdtemp()
+        errstream = BytesIO()
+        self.addCleanup(shutil.rmtree, target_path)
+        r = porcelain.clone(
+            self.repo.path, target_path, checkout=False, errstream=errstream,
+            depth=1
+        )
+        self.addCleanup(r.close)
+        self.assertEqual(r.path, target_path)
+        target_repo = Repo(target_path)
+        self.assertEqual([c3.id], [w.commit.id for w in target_repo.get_walker()])
+        self.assertEqual(0, len(target_repo.open_index()))
+        self.assertEqual(c3.id, target_repo.refs[b"refs/tags/foo"])
+        self.assertNotIn(b"f1", os.listdir(target_path))
+        self.assertNotIn(b"f2", os.listdir(target_path))
+        c = r.get_config()
+        encoded_path = self.repo.path
+        if not isinstance(encoded_path, bytes):
+            encoded_path = encoded_path.encode("utf-8")
+        self.assertEqual(encoded_path, c.get((b"remote", b"origin"), b"url"))
+        self.assertEqual(
+            b"+refs/heads/*:refs/remotes/origin/*",
+            c.get((b"remote", b"origin"), b"fetch"),
+        )
+
 
 class InitTests(TestCase):
     def test_non_bare(self):

@@ -155,6 +155,15 @@ class RefsContainer(object):
         """
         raise NotImplementedError(self.get_packed_refs)
 
+    def add_packed_refs(self, new_refs: Dict[Ref, Optional[ObjectID]]):
+        """Add the given refs as packed refs.
+
+        Args:
+          new_refs: A mapping of ref names to targets; if a target is None that
+            means remove the ref
+        """
+        raise NotImplementedError(self.add_packed_refs)
+
     def get_peeled(self, name):
         """Return the cached peeled value of a ref, if available.
 
@@ -705,6 +714,44 @@ class DiskRefsContainer(RefsContainer):
                     for sha, name in read_packed_refs(f):
                         self._packed_refs[name] = sha
         return self._packed_refs
+
+    def add_packed_refs(self, new_refs: Dict[Ref, Optional[ObjectID]]):
+        """Add the given refs as packed refs.
+
+        Args:
+          new_refs: A mapping of ref names to targets; if a target is None that
+            means remove the ref
+        """
+        if not new_refs:
+            return
+
+        path = os.path.join(self.path, b"packed-refs")
+
+        with GitFile(path, "wb") as f:
+            # reread cached refs from disk, while holding the lock
+            packed_refs = self.get_packed_refs().copy()
+
+            for ref, target in new_refs.items():
+                # sanity check
+                if ref == HEADREF:
+                    raise ValueError("cannot pack HEAD")
+
+                # remove any loose refs pointing to this one -- please
+                # note that this bypasses remove_if_equals as we don't
+                # want to affect packed refs in here
+                try:
+                    os.remove(self.refpath(ref))
+                except (OSError, UnicodeError):
+                    pass
+
+                if target is not None:
+                    packed_refs[ref] = target
+                else:
+                    packed_refs.pop(ref, None)
+
+            write_packed_refs(f, packed_refs, self._peeled_refs)
+
+            self._packed_refs = packed_refs
 
     def get_peeled(self, name):
         """Return the cached peeled value of a ref, if available.

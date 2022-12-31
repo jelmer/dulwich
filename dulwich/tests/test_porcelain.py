@@ -3140,6 +3140,43 @@ class FindUniqueAbbrevTests(PorcelainTestCase):
             porcelain.find_unique_abbrev(self.repo.object_store, c1.id))
 
 
+class PackRefsTests(PorcelainTestCase):
+    def test_all(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/tags/foo"] = c1.id
+
+        porcelain.pack_refs(self.repo, all=True)
+
+        self.assertEqual(
+            self.repo.refs.get_packed_refs(),
+            {
+                b"refs/heads/master": c2.id,
+                b"refs/tags/foo": c1.id,
+            },
+        )
+
+    def test_not_all(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/tags/foo"] = c1.id
+
+        porcelain.pack_refs(self.repo)
+
+        self.assertEqual(
+            self.repo.refs.get_packed_refs(),
+            {
+                b"refs/tags/foo": c1.id,
+            },
+        )
+
+
 class ServerTests(PorcelainTestCase):
     @contextlib.contextmanager
     def _serving(self):

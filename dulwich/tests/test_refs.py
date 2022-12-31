@@ -447,6 +447,66 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
         )
 
+        # this shouldn't overwrite the packed refs
+        self.assertEqual(
+            {b"refs/heads/packed": b"42d06bd4b77fed026b154d16493e5deab78f02ec"},
+            self._refs.get_packed_refs(),
+        )
+
+    def test_add_packed_refs(self):
+        # first, create a non-packed ref
+        self._refs[b"refs/heads/packed"] = b"3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8"
+
+        packed_ref_path = os.path.join(self._refs.path, b"refs", b"heads", b"packed")
+        self.assertTrue(os.path.exists(packed_ref_path))
+
+        # now overwrite that with a packed ref
+        packed_refs_file_path = os.path.join(self._refs.path, b"packed-refs")
+        self._refs.add_packed_refs(
+            {
+                b"refs/heads/packed": b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+            }
+        )
+
+        # that should kill the file
+        self.assertFalse(os.path.exists(packed_ref_path))
+
+        # now delete the packed ref
+        self._refs.add_packed_refs(
+            {
+                b"refs/heads/packed": None,
+            }
+        )
+
+        # and it's gone!
+        self.assertFalse(os.path.exists(packed_ref_path))
+
+        self.assertRaises(
+            KeyError,
+            self._refs.__getitem__,
+            b"refs/heads/packed",
+        )
+
+        # just in case, make sure we can't pack HEAD
+        self.assertRaises(
+            ValueError,
+            self._refs.add_packed_refs,
+            {b"HEAD": "02ac81614bcdbd585a37b4b0edf8cb8a"},
+        )
+
+        # delete all packed refs
+        self._refs.add_packed_refs({ref: None for ref in self._refs.get_packed_refs()})
+
+        self.assertEqual({}, self._refs.get_packed_refs())
+
+        # remove the packed ref file, and check that adding nothing doesn't affect that
+        os.remove(packed_refs_file_path)
+
+        # adding nothing doesn't make it reappear
+        self._refs.add_packed_refs({})
+
+        self.assertFalse(os.path.exists(packed_refs_file_path))
+
     def test_setitem_symbolic(self):
         ones = b"1" * 40
         self._refs[b"HEAD"] = ones

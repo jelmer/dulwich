@@ -300,6 +300,18 @@ class cmd_symbolic_ref(Command):
         porcelain.symbolic_ref(".", ref_name=ref_name, force="--force" in args)
 
 
+class cmd_pack_refs(Command):
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--all', action='store_true')
+        # ignored, we never prune
+        parser.add_argument('--no-prune', action='store_true')
+
+        args = parser.parse_args(argv)
+
+        porcelain.pack_refs(".", all=args.all)
+
+
 class cmd_show(Command):
     def run(self, argv):
         parser = argparse.ArgumentParser()
@@ -756,6 +768,7 @@ commands = {
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,
+    "pack-refs": cmd_pack_refs,
     "pull": cmd_pull,
     "push": cmd_push,
     "receive-pack": cmd_receive_pack,

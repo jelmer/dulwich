@@ -209,7 +209,10 @@ class _GitFile(object):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        if exc_type is not None:
+            self.abort()
+        else:
+            self.close()
 
     def __getattr__(self, name):
         """Proxy property calls to the underlying file."""

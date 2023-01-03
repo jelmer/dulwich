@@ -1035,7 +1035,7 @@ def submodule_list(repo):
     from .submodule import iter_cached_submodules
     with open_repo_closing(repo) as r:
         for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
-            yield path.decode(DEFAULT_ENCODING), sha.decode(DEFAULT_ENCODING)
+            yield path, sha.decode(DEFAULT_ENCODING)
 
 
 def tag_create(

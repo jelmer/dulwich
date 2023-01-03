@@ -22,6 +22,7 @@
 """Ref handling.
 
 """
+from contextlib import suppress
 import os
 from typing import Dict, Optional
 
@@ -815,7 +816,7 @@ class DiskRefsContainer(RefsContainer):
                 return
 
             del self._packed_refs[name]
-            if name in self._peeled_refs:
+            with suppress(KeyError):
                 del self._peeled_refs[name]
             write_packed_refs(f, self._packed_refs, self._peeled_refs)
             f.close()

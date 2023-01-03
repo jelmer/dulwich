@@ -23,6 +23,7 @@
 Implementation of merge-base following the approach of git
 """
 
+from typing import Deque
 from collections import deque
 
 
@@ -44,7 +45,7 @@ def _find_lcas(lookup_parents, c1, c2s):
         return False
 
     # initialize the working list
-    wlst = deque()
+    wlst: Deque[int] = deque()
     cstates[c1] = _ANC_OF_1
     wlst.append(c1)
     for c2 in c2s:

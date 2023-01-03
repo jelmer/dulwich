@@ -52,7 +52,7 @@ def lower_key(key):
         return key.lower()
 
     if isinstance(key, Iterable):
-        return type(key)(map(lower_key, key))
+        return type(key)(map(lower_key, key))  # type: ignore
 
     return key
 
@@ -651,11 +651,11 @@ def _find_git_in_win_reg():
             "Uninstall\\Git_is1"
         )
 
-    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore
         try:
-            with winreg.OpenKey(key, subkey) as k:
-                val, typ = winreg.QueryValueEx(k, "InstallLocation")
-                if typ == winreg.REG_SZ:
+            with winreg.OpenKey(key, subkey) as k:  # type: ignore
+                val, typ = winreg.QueryValueEx(k, "InstallLocation")  # type: ignore
+                if typ == winreg.REG_SZ:  # type: ignore
                     yield val
         except OSError:
             pass

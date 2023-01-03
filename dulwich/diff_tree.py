@@ -28,10 +28,12 @@ from collections import (
 from io import BytesIO
 from itertools import chain
 import stat
+from typing import List
 
 from dulwich.objects import (
     S_ISGITLINK,
     TreeEntry,
+    Tree,
 )
 
 
@@ -65,8 +67,8 @@ class TreeChange(namedtuple("TreeChange", ["type", "old", "new"])):
         return cls(CHANGE_DELETE, old, _NULL_ENTRY)
 
 
-def _tree_entries(path, tree):
-    result = []
+def _tree_entries(path: str, tree: Tree) -> List[TreeEntry]:
+    result: List[TreeEntry] = []
     if not tree:
         return result
     for entry in tree.iteritems(name_order=True):

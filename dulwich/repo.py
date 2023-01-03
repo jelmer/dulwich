@@ -1493,9 +1493,7 @@ class Repo(BaseRepo):
         Returns: Created repository as `Repo`
         """
 
-        encoded_path = self.path
-        if not isinstance(encoded_path, bytes):
-            encoded_path = os.fsencode(encoded_path)
+        encoded_path = os.fsencode(self.path)
 
         if mkdir:
             os.mkdir(target_path)

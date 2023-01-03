@@ -63,12 +63,12 @@ class _LRUNode(Generic[K, V]):
             prev_key,
         )
 
-    def run_cleanup(self):
+    def run_cleanup(self) -> None:
         if self.cleanup is not None:
             self.cleanup(self.key, self.value)
         self.cleanup = None
         # Just make sure to break any refcycles, etc
-        self.value = None
+        del self.value
 
 
 class LRUCache(Generic[K, V]):

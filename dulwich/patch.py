@@ -27,6 +27,7 @@ on.
 from difflib import SequenceMatcher
 import email.parser
 import time
+from typing import Union, TextIO, BinaryIO, Optional
 
 from dulwich.objects import (
     Blob,
@@ -338,7 +339,7 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
         )
 
 
-def git_am_patch_split(f, encoding=None):
+def git_am_patch_split(f: Union[TextIO, BinaryIO], encoding: Optional[str] = None):
     """Parse a git-am-style patch and split it up into bits.
 
     Args:
@@ -349,12 +350,12 @@ def git_am_patch_split(f, encoding=None):
     encoding = encoding or getattr(f, "encoding", "ascii")
     encoding = encoding or "ascii"
     contents = f.read()
-    if isinstance(contents, bytes) and getattr(email.parser, "BytesParser", None):
-        parser = email.parser.BytesParser()
-        msg = parser.parsebytes(contents)
+    if isinstance(contents, bytes):
+        bparser = email.parser.BytesParser()
+        msg = bparser.parsebytes(contents)
     else:
-        parser = email.parser.Parser()
-        msg = parser.parsestr(contents)
+        uparser = email.parser.Parser()
+        msg = uparser.parsestr(contents)
     return parse_patch_message(msg, encoding)
 
 

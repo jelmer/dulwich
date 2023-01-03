@@ -49,7 +49,7 @@ from itertools import chain
 
 import os
 import sys
-from typing import Optional, Callable, Tuple, List
+from typing import Optional, Callable, Tuple, List, Deque, Union
 import warnings
 
 from hashlib import sha1
@@ -96,13 +96,13 @@ DELTA_TYPES = (OFS_DELTA, REF_DELTA)
 DEFAULT_PACK_DELTA_WINDOW_SIZE = 10
 
 
-def take_msb_bytes(read, crc32=None):
+def take_msb_bytes(read: Callable[[int], bytes], crc32: Optional[int] = None) -> Tuple[List[int], Optional[int]]:
     """Read bytes marked with most significant bit.
 
     Args:
       read: Read function
     """
-    ret = []
+    ret: List[int] = []
     while len(ret) == 0 or ret[-1] & 0x80:
         b = read(1)
         if crc32 is not None:
@@ -140,6 +140,9 @@ class UnpackedObject(object):
         "crc32",  # CRC32.
     ]
 
+    obj_type_num: Optional[int]
+    obj_chunks: Optional[List[bytes]]
+
     # TODO(dborowitz): read_zlib_chunks and unpack_object could very well be
     # methods of this object.
     def __init__(self, pack_type_num, delta_base, decomp_len, crc32):
@@ -148,7 +151,7 @@ class UnpackedObject(object):
         self.pack_type_num = pack_type_num
         self.delta_base = delta_base
         self.comp_chunks = None
-        self.decomp_chunks = []
+        self.decomp_chunks: List[bytes] = []
         self.decomp_len = decomp_len
         self.crc32 = crc32
 
@@ -168,6 +171,7 @@ class UnpackedObject(object):
 
     def sha_file(self):
         """Return a ShaFile from this object."""
+        assert self.obj_type_num is not None and self.obj_chunks is not None
         return ShaFile.from_raw_chunks(self.obj_type_num, self.obj_chunks)
 
     # Only provided for backwards compatibility with code that expects either
@@ -199,8 +203,10 @@ _ZLIB_BUFSIZE = 4096
 
 
 def read_zlib_chunks(
-    read_some, unpacked, include_comp=False, buffer_size=_ZLIB_BUFSIZE
-):
+        read_some: Callable[[int], bytes],
+        unpacked: UnpackedObject, include_comp: bool = False,
+        buffer_size: int = _ZLIB_BUFSIZE
+) -> bytes:
     """Read zlib data from a buffer.
 
     This function requires that the buffer have additional data following the
@@ -298,7 +304,7 @@ def _load_file_contents(f, size=None):
         if has_mmap:
             try:
                 contents = mmap.mmap(fd, size, access=mmap.ACCESS_READ)
-            except mmap.error:
+            except OSError:
                 # Perhaps a socket?
                 pass
             else:
@@ -430,6 +436,9 @@ class PackIndex(object):
     def _itersha(self):
         """Yield all the SHA1's of the objects in the index, sorted."""
         raise NotImplementedError(self._itersha)
+
+    def close(self):
+        pass
 
 
 class MemoryPackIndex(PackIndex):
@@ -726,8 +735,8 @@ def chunks_length(chunks):
 
 
 def unpack_object(
-    read_all,
-    read_some=None,
+    read_all: Callable[[int], bytes],
+    read_some: Optional[Callable[[int], bytes]] = None,
     compute_crc32=False,
     include_comp=False,
     zlib_bufsize=_ZLIB_BUFSIZE,
@@ -762,28 +771,30 @@ def unpack_object(
     else:
         crc32 = None
 
-    bytes, crc32 = take_msb_bytes(read_all, crc32=crc32)
-    type_num = (bytes[0] >> 4) & 0x07
-    size = bytes[0] & 0x0F
-    for i, byte in enumerate(bytes[1:]):
+    raw, crc32 = take_msb_bytes(read_all, crc32=crc32)
+    type_num = (raw[0] >> 4) & 0x07
+    size = raw[0] & 0x0F
+    for i, byte in enumerate(raw[1:]):
         size += (byte & 0x7F) << ((i * 7) + 4)
 
-    raw_base = len(bytes)
+    delta_base: Union[int, bytes, None]
+    raw_base = len(raw)
     if type_num == OFS_DELTA:
-        bytes, crc32 = take_msb_bytes(read_all, crc32=crc32)
-        raw_base += len(bytes)
-        if bytes[-1] & 0x80:
+        raw, crc32 = take_msb_bytes(read_all, crc32=crc32)
+        raw_base += len(raw)
+        if raw[-1] & 0x80:
             raise AssertionError
-        delta_base_offset = bytes[0] & 0x7F
-        for byte in bytes[1:]:
+        delta_base_offset = raw[0] & 0x7F
+        for byte in raw[1:]:
             delta_base_offset += 1
             delta_base_offset <<= 7
             delta_base_offset += byte & 0x7F
         delta_base = delta_base_offset
     elif type_num == REF_DELTA:
-        delta_base = read_all(20)
-        if compute_crc32:
-            crc32 = binascii.crc32(delta_base, crc32)
+        delta_base_obj = read_all(20)
+        if crc32 is not None:
+            crc32 = binascii.crc32(delta_base_obj, crc32)
+        delta_base = delta_base_obj
         raw_base += 20
     else:
         delta_base = None
@@ -823,7 +834,7 @@ class PackStreamReader(object):
         self._offset = 0
         self._rbuf = BytesIO()
         # trailer is a deque to avoid memory allocation on small reads
-        self._trailer = deque()
+        self._trailer: Deque[bytes] = deque()
         self._zlib_bufsize = zlib_bufsize
 
     def _read(self, read, size):
@@ -1671,7 +1682,7 @@ def deltify_pack_objects(objects, window_size=None, reuse_pack=None):
         magic.append((obj.type_num, path, -obj.raw_length(), obj))
     magic.sort()
 
-    possible_bases = deque()
+    possible_bases: Deque[Tuple[bytes, int, bytes]] = deque()
 
     for type_num, path, neg_length, o in magic:
         raw = o.as_raw_chunks()
@@ -2038,7 +2049,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
     for (name, offset, entry_checksum) in entries:
         fan_out_table[ord(name[:1])] += 1
     # Fan-out table
-    largetable = []
+    largetable: List[int] = []
     for i in range(0x100):
         f.write(struct.pack(b">L", fan_out_table[i]))
         fan_out_table[i + 1] += fan_out_table[i]
@@ -2079,6 +2090,12 @@ class _PackTupleIterable(object):
 class Pack(object):
     """A Git pack object."""
 
+    _data_load: Optional[Callable[[], PackData]]
+    _idx_load: Optional[Callable[[], PackIndex]]
+
+    _data: Optional[PackData]
+    _idx: Optional[PackIndex]
+
     def __init__(self, basename, resolve_ext_ref: Optional[
             Callable[[bytes], Tuple[int, UnpackedObject]]] = None):
         self._basename = basename
@@ -2115,20 +2132,22 @@ class Pack(object):
         return self.index.objects_sha1()
 
     @property
-    def data(self):
+    def data(self) -> PackData:
         """The pack data object being used."""
         if self._data is None:
+            assert self._data_load
             self._data = self._data_load()
             self.check_length_and_checksum()
         return self._data
 
     @property
-    def index(self):
+    def index(self) -> PackIndex:
         """The index being used.
 
         Note: This may be an in-memory index
         """
         if self._idx is None:
+            assert self._idx_load
             self._idx = self._idx_load()
         return self._idx
 

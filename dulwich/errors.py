@@ -61,6 +61,8 @@ class WrongObjectException(Exception):
     was expected if they were raised.
     """
 
+    type_name: str
+
     def __init__(self, sha, *args, **kwargs):
         Exception.__init__(self, "%s is not a %s" % (sha, self.type_name))
 

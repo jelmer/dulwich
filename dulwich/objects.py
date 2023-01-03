@@ -37,6 +37,7 @@ from typing import (
     List,
 )
 import zlib
+from _hashlib import HASH
 from hashlib import sha1
 
 from dulwich.errors import (
@@ -104,7 +105,7 @@ def _decompress(string):
 def sha_to_hex(sha):
     """Takes a string and returns the hex of the sha within"""
     hexsha = binascii.hexlify(sha)
-    assert len(hexsha) == 40, "Incorrect length of sha1 string: %s" % hexsha
+    assert len(hexsha) == 40, "Incorrect length of sha1 string: %r" % hexsha
     return hexsha
 
 
@@ -273,6 +274,7 @@ class ShaFile(object):
     type_name: bytes
     type_num: int
     _chunked_text: Optional[List[bytes]]
+    _sha: Union[FixedSha, None, HASH]
 
     @staticmethod
     def _parse_legacy_object_header(magic, f) -> "ShaFile":
@@ -454,7 +456,10 @@ class ShaFile(object):
           string: The raw uncompressed contents.
           sha: Optional known sha for the object
         """
-        obj = object_class(type_num)()
+        cls = object_class(type_num)
+        if cls is None:
+            raise AssertionError("unsupported class type num: %d" % type_num)
+        obj = cls()
         obj.set_raw_string(string, sha)
         return obj
 
@@ -542,6 +547,8 @@ class ShaFile(object):
     def copy(self):
         """Create a new copy of this SHA1 object from its raw string"""
         obj_class = object_class(self.type_num)
+        if obj_class is None:
+            raise AssertionError('invalid type num %d' % self.type_num)
         return obj_class.from_raw_string(self.type_num, self.as_raw_string(), self.id)
 
     @property
@@ -581,6 +588,8 @@ class Blob(ShaFile):
     type_name = b"blob"
     type_num = 3
 
+    _chunked_text: List[bytes]
+
     def __init__(self):
         super(Blob, self).__init__()
         self._chunked_text = []
@@ -599,7 +608,7 @@ class Blob(ShaFile):
     def _get_chunked(self):
         return self._chunked_text
 
-    def _set_chunked(self, chunks):
+    def _set_chunked(self, chunks: List[bytes]):
         self._chunked_text = chunks
 
     def _serialize(self):
@@ -729,6 +738,8 @@ class Tag(ShaFile):
         "_signature",
     )
 
+    _tagger: Optional[bytes]
+
     def __init__(self):
         super(Tag, self).__init__()
         self._tagger = None
@@ -751,6 +762,7 @@ class Tag(ShaFile):
           ObjectFormatException: if the object is malformed in some way
         """
         super(Tag, self).check()
+        assert self._chunked_text is not None
         self._check_has_member("_object_sha", "missing object sha")
         self._check_has_member("_object_class", "missing object type")
         self._check_has_member("_name", "missing tag name")
@@ -760,7 +772,7 @@ class Tag(ShaFile):
 
         check_hexsha(self._object_sha, "invalid object sha")
 
-        if getattr(self, "_tagger", None):
+        if self._tagger is not None:
             check_identity(self._tagger, "invalid tagger")
 
         self._check_has_member("_tag_time", "missing tag time")
@@ -1141,6 +1153,7 @@ class Tree(ShaFile):
           ObjectFormatException: if the object is malformed in some way
         """
         super(Tree, self).check()
+        assert self._chunked_text is not None
         last = None
         allowed_modes = (
             stat.S_IFREG | 0o755,
@@ -1395,6 +1408,7 @@ class Commit(ShaFile):
           ObjectFormatException: if the object is malformed in some way
         """
         super(Commit, self).check()
+        assert self._chunked_text is not None
         self._check_has_member("_tree", "missing tree")
         self._check_has_member("_author", "missing author")
         self._check_has_member("_committer", "missing committer")

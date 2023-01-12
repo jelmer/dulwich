@@ -41,7 +41,7 @@ from dulwich.tests.test_porcelain import (
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
     def setUp(self):
-        super(TagCreateSignTestCase, self).setUp()
+        super().setUp()
 
     def test_sign(self):
         # Test that dulwich signatures can be verified by CGit
@@ -64,7 +64,7 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
 
         run_git_or_fail(
             [
-                "--git-dir={}".format(self.repo.controldir()),
+                f"--git-dir={self.repo.controldir()}",
                 "tag",
                 "-v",
                 "tryme"
@@ -82,7 +82,7 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
 
         run_git_or_fail(
             [
-                "--git-dir={}".format(self.repo.controldir()),
+                f"--git-dir={self.repo.controldir()}",
                 "tag",
                 "-u",
                 PorcelainGpgTestCase.DEFAULT_KEY_ID,

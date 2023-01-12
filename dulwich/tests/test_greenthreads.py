@@ -80,7 +80,7 @@ def init_store(store, count=1):
 @skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsObjectStoreIterator(TestCase):
     def setUp(self):
-        super(TestGreenThreadsObjectStoreIterator, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.cmt_amount = 10
         self.objs = init_store(self.store, self.cmt_amount)
@@ -116,7 +116,7 @@ class TestGreenThreadsObjectStoreIterator(TestCase):
 @skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsMissingObjectFinder(TestCase):
     def setUp(self):
-        super(TestGreenThreadsMissingObjectFinder, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.cmt_amount = 10
         self.objs = init_store(self.store, self.cmt_amount)

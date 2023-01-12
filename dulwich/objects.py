@@ -199,7 +199,7 @@ def check_hexsha(hex, error_msg):
       ObjectFormatException: Raised when the string is not valid
     """
     if not valid_hexsha(hex):
-        raise ObjectFormatException("%s %s" % (error_msg, hex))
+        raise ObjectFormatException("{} {}".format(error_msg, hex))
 
 
 def check_identity(identity: bytes, error_msg: str) -> None:
@@ -243,7 +243,7 @@ def git_line(*items):
     return b" ".join(items) + b"\n"
 
 
-class FixedSha(object):
+class FixedSha:
     """SHA object that behaves like hashlib's but is given a fixed value."""
 
     __slots__ = ("_hexsha", "_sha")
@@ -265,7 +265,7 @@ class FixedSha(object):
         return self._hexsha.decode("ascii")
 
 
-class ShaFile(object):
+class ShaFile:
     """A git SHA file."""
 
     __slots__ = ("_chunked_text", "_sha", "_needs_serialization")
@@ -557,7 +557,7 @@ class ShaFile(object):
         return self.sha().hexdigest().encode("ascii")
 
     def __repr__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.id)
+        return "<{} {}>".format(self.__class__.__name__, self.id)
 
     def __ne__(self, other):
         """Check whether this object does not match the other."""
@@ -591,7 +591,7 @@ class Blob(ShaFile):
     _chunked_text: List[bytes]
 
     def __init__(self):
-        super(Blob, self).__init__()
+        super().__init__()
         self._chunked_text = []
         self._needs_serialization = False
 
@@ -636,7 +636,7 @@ class Blob(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Blob, self).check()
+        super().check()
 
     def splitlines(self) -> List[bytes]:
         """Return list of lines in this blob.
@@ -741,7 +741,7 @@ class Tag(ShaFile):
     _tagger: Optional[bytes]
 
     def __init__(self):
-        super(Tag, self).__init__()
+        super().__init__()
         self._tagger = None
         self._tag_time = None
         self._tag_timezone = None
@@ -761,7 +761,7 @@ class Tag(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Tag, self).check()
+        super().check()
         assert self._chunked_text is not None
         self._check_has_member("_object_sha", "missing object sha")
         self._check_has_member("_object_class", "missing object type")
@@ -1042,7 +1042,7 @@ def pretty_format_tree_entry(name, mode, hexsha, encoding="utf-8"):
         kind = "tree"
     else:
         kind = "blob"
-    return "%04o %s %s\t%s\n" % (
+    return "{:04o} {} {}\t{}\n".format(
         mode,
         kind,
         hexsha.decode("ascii"),
@@ -1067,7 +1067,7 @@ class Tree(ShaFile):
     __slots__ = "_entries"
 
     def __init__(self):
-        super(Tree, self).__init__()
+        super().__init__()
         self._entries = {}
 
     @classmethod
@@ -1144,7 +1144,7 @@ class Tree(ShaFile):
         # TODO: list comprehension is for efficiency in the common (small)
         # case; if memory efficiency in the large case is a concern, use a
         # genexp.
-        self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])
+        self._entries = {n: (m, s) for n, m, s in parsed_entries}
 
     def check(self):
         """Check this object for internal consistency.
@@ -1152,7 +1152,7 @@ class Tree(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Tree, self).check()
+        super().check()
         assert self._chunked_text is not None
         last = None
         allowed_modes = (
@@ -1362,7 +1362,7 @@ class Commit(ShaFile):
     )
 
     def __init__(self):
-        super(Commit, self).__init__()
+        super().__init__()
         self._parents = []
         self._encoding = None
         self._mergetag = []
@@ -1407,7 +1407,7 @@ class Commit(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Commit, self).check()
+        super().check()
         assert self._chunked_text is not None
         self._check_has_member("_tree", "missing tree")
         self._check_has_member("_author", "missing author")
@@ -1540,7 +1540,7 @@ class Commit(ShaFile):
                 chunks[-1] = chunks[-1][:-2]
         for k, v in self.extra:
             if b"\n" in k or b"\n" in v:
-                raise AssertionError("newline in extra data: %r -> %r" % (k, v))
+                raise AssertionError("newline in extra data: {!r} -> {!r}".format(k, v))
             chunks.append(git_line(k, v))
         if self.gpgsig:
             sig_chunks = self.gpgsig.split(b"\n")

@@ -25,7 +25,7 @@ from typing import Dict, List, Tuple, Optional, Union, Sequence
 from .pack import PackData, write_pack_data
 
 
-class Bundle(object):
+class Bundle:
 
     version: Optional[int] = None
 

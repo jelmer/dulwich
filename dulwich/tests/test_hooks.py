@@ -38,7 +38,7 @@ from dulwich.tests import TestCase
 
 class ShellHookTests(TestCase):
     def setUp(self):
-        super(ShellHookTests, self).setUp()
+        super().setUp()
         if os.name != "posix":
             self.skipTest("shell hook tests requires POSIX shell")
         self.assertTrue(os.path.exists("/bin/sh"))

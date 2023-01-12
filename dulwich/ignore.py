@@ -154,7 +154,7 @@ def match_pattern(path: bytes, pattern: bytes, ignorecase: bool = False) -> bool
     return Pattern(pattern, ignorecase).match(path)
 
 
-class Pattern(object):
+class Pattern:
     """A single ignore pattern."""
 
     def __init__(self, pattern: bytes, ignorecase: bool = False):
@@ -186,7 +186,7 @@ class Pattern(object):
         )
 
     def __repr__(self) -> str:
-        return "%s(%r, %r)" % (
+        return "{}({!r}, {!r})".format(
             type(self).__name__,
             self.pattern,
             self.ignorecase,
@@ -202,7 +202,7 @@ class Pattern(object):
         return bool(self._re.match(path))
 
 
-class IgnoreFilter(object):
+class IgnoreFilter:
     def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False, path=None):
         self._patterns: List[Pattern] = []
         self._ignorecase = ignorecase
@@ -249,12 +249,12 @@ class IgnoreFilter(object):
     def __repr__(self) -> str:
         path = getattr(self, "_path", None)
         if path is not None:
-            return "%s.from_path(%r)" % (type(self).__name__, path)
+            return "{}.from_path({!r})".format(type(self).__name__, path)
         else:
             return "<%s>" % (type(self).__name__)
 
 
-class IgnoreFilterStack(object):
+class IgnoreFilterStack:
     """Check for ignore status in multiple filters."""
 
     def __init__(self, filters):
@@ -295,7 +295,7 @@ def default_user_ignore_filter_path(config: Config) -> str:
     return get_xdg_config_home_path("git", "ignore")
 
 
-class IgnoreFilterManager(object):
+class IgnoreFilterManager:
     """Ignore file manager."""
 
     def __init__(
@@ -310,7 +310,7 @@ class IgnoreFilterManager(object):
         self._ignorecase = ignorecase
 
     def __repr__(self) -> str:
-        return "%s(%s, %r, %r)" % (
+        return "{}({}, {!r}, {!r})".format(
             type(self).__name__,
             self._top_path,
             self._global_filters,
@@ -326,7 +326,7 @@ class IgnoreFilterManager(object):
         p = os.path.join(self._top_path, path, ".gitignore")
         try:
             self._path_filters[path] = IgnoreFilter.from_path(p, self._ignorecase)
-        except IOError:
+        except OSError:
             self._path_filters[path] = None
         return self._path_filters[path]
 
@@ -389,7 +389,7 @@ class IgnoreFilterManager(object):
         ]:
             try:
                 global_filters.append(IgnoreFilter.from_path(os.path.expanduser(p)))
-            except IOError:
+            except OSError:
                 pass
         config = repo.get_config_stack()
         ignorecase = config.get_boolean((b"core"), (b"ignorecase"), False)

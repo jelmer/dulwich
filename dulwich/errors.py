@@ -43,12 +43,12 @@ class ChecksumMismatch(Exception):
         if self.extra is None:
             Exception.__init__(
                 self,
-                "Checksum mismatch: Expected %s, got %s" % (expected, got),
+                "Checksum mismatch: Expected {}, got {}".format(expected, got),
             )
         else:
             Exception.__init__(
                 self,
-                "Checksum mismatch: Expected %s, got %s; %s" % (expected, got, extra),
+                "Checksum mismatch: Expected {}, got {}; {}".format(expected, got, extra),
             )
 
 
@@ -64,7 +64,7 @@ class WrongObjectException(Exception):
     type_name: str
 
     def __init__(self, sha, *args, **kwargs):
-        Exception.__init__(self, "%s is not a %s" % (sha, self.type_name))
+        Exception.__init__(self, "{} is not a {}".format(sha, self.type_name))
 
 
 class NotCommitError(WrongObjectException):
@@ -142,7 +142,7 @@ class UpdateRefsError(GitProtocolError):
 
     def __init__(self, *args, **kwargs):
         self.ref_status = kwargs.pop("ref_status")
-        super(UpdateRefsError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 
 class HangupException(GitProtocolError):
@@ -150,13 +150,13 @@ class HangupException(GitProtocolError):
 
     def __init__(self, stderr_lines=None):
         if stderr_lines:
-            super(HangupException, self).__init__(
+            super().__init__(
                 "\n".join(
                     [line.decode("utf-8", "surrogateescape") for line in stderr_lines]
                 )
             )
         else:
-            super(HangupException, self).__init__(
+            super().__init__(
                 "The remote server unexpectedly closed the connection."
             )
         self.stderr_lines = stderr_lines
@@ -173,7 +173,7 @@ class UnexpectedCommandError(GitProtocolError):
             command = "flush-pkt"
         else:
             command = "command %s" % command
-        super(UnexpectedCommandError, self).__init__(
+        super().__init__(
             "Protocol got unexpected %s" % command
         )
 

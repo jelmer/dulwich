@@ -32,7 +32,7 @@ from io import BytesIO
 from contextlib import closing
 
 
-class ChunkedBytesIO(object):
+class ChunkedBytesIO:
     """Turn a list of bytestrings into a file-like object.
 
     This is similar to creating a `BytesIO` from a concatenation of the
@@ -129,7 +129,6 @@ def _walk_tree(store, tree, root=b""):
     for entry in tree.iteritems():
         entry_abspath = posixpath.join(root, entry.path)
         if stat.S_ISDIR(entry.mode):
-            for _ in _walk_tree(store, store[entry.sha], entry_abspath):
-                yield _
+            yield from _walk_tree(store, store[entry.sha], entry_abspath)
         else:
             yield (entry_abspath, entry)

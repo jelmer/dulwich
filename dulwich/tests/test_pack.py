@@ -91,7 +91,7 @@ class PackTests(TestCase):
     """Base class for testing packs"""
 
     def setUp(self):
-        super(PackTests, self).setUp()
+        super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
@@ -171,7 +171,7 @@ class PackIndexTests(PackTests):
 
     def test_iter(self):
         p = self.get_pack_index(pack1_sha)
-        self.assertEqual(set([tree_sha, commit_sha, a_sha]), set(p))
+        self.assertEqual({tree_sha, commit_sha, a_sha}, set(p))
 
 
 class TestPackDeltas(TestCase):
@@ -313,25 +313,23 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             entries = {(sha_to_hex(s), o, c) for s, o, c in p.iterentries()}
             self.assertEqual(
-                set(
-                    [
-                        (
-                            b"6f670c0fb53f9463760b7295fbb814e965fb20c8",
-                            178,
-                            1373561701,
-                        ),
-                        (
-                            b"b2a2766a2879c209ab1176e7e778b81ae422eeaa",
-                            138,
-                            912998690,
-                        ),
-                        (
-                            b"f18faa16531ac570a3fdc8c7ca16682548dafd12",
-                            12,
-                            3775879613,
-                        ),
-                    ]
-                ),
+                {
+                    (
+                        b"6f670c0fb53f9463760b7295fbb814e965fb20c8",
+                        178,
+                        1373561701,
+                    ),
+                    (
+                        b"b2a2766a2879c209ab1176e7e778b81ae422eeaa",
+                        138,
+                        912998690,
+                    ),
+                    (
+                        b"f18faa16531ac570a3fdc8c7ca16682548dafd12",
+                        12,
+                        3775879613,
+                    ),
+                },
                 entries,
             )
 
@@ -399,17 +397,17 @@ class TestPack(PackTests):
 
     def test_iter(self):
         with self.get_pack(pack1_sha) as p:
-            self.assertEqual(set([tree_sha, commit_sha, a_sha]), set(p))
+            self.assertEqual({tree_sha, commit_sha, a_sha}, set(p))
 
     def test_iterobjects(self):
         with self.get_pack(pack1_sha) as p:
-            expected = set([p[s] for s in [commit_sha, tree_sha, a_sha]])
+            expected = {p[s] for s in [commit_sha, tree_sha, a_sha]}
             self.assertEqual(expected, set(list(p.iterobjects())))
 
     def test_pack_tuples(self):
         with self.get_pack(pack1_sha) as p:
             tuples = p.pack_tuples()
-            expected = set([(p[s], None) for s in [commit_sha, tree_sha, a_sha]])
+            expected = {(p[s], None) for s in [commit_sha, tree_sha, a_sha]}
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(3, len(tuples))
@@ -468,7 +466,7 @@ class TestPack(PackTests):
         # file should exist
         self.assertTrue(os.path.exists(keepfile_name))
 
-        with open(keepfile_name, "r") as f:
+        with open(keepfile_name) as f:
             buf = f.read()
             self.assertEqual("", buf)
 
@@ -535,7 +533,7 @@ class TestPack(PackTests):
 
 class TestThinPack(PackTests):
     def setUp(self):
-        super(TestThinPack, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.blobs = {}
         for blob in (b"foo", b"bar", b"foo1234", b"bar2468"):
@@ -664,7 +662,7 @@ class WritePackTests(TestCase):
 pack_checksum = hex_to_sha("721980e866af9a5f93ad674144e1459b8ba3e7b7")
 
 
-class BaseTestPackIndexWriting(object):
+class BaseTestPackIndexWriting:
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
@@ -801,7 +799,7 @@ class ReadZlibTests(TestCase):
     extra = b"nextobject"
 
     def setUp(self):
-        super(ReadZlibTests, self).setUp()
+        super().setUp()
         self.read = BytesIO(self.comp + self.extra).read
         self.unpacked = UnpackedObject(Tree.type_num, None, len(self.decomp), 0)
 
@@ -953,7 +951,7 @@ class TestPackIterator(DeltaChainIterator):
     _compute_crc32 = True
 
     def __init__(self, *args, **kwargs):
-        super(TestPackIterator, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._unpacked_offsets = set()
 
     def _result(self, unpacked):
@@ -971,14 +969,14 @@ class TestPackIterator(DeltaChainIterator):
             "Attempted to re-inflate offset %i" % offset
         )
         self._unpacked_offsets.add(offset)
-        return super(TestPackIterator, self)._resolve_object(
+        return super()._resolve_object(
             offset, pack_type_num, base_chunks
         )
 
 
 class DeltaChainIteratorTests(TestCase):
     def setUp(self):
-        super(DeltaChainIteratorTests, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.fetched = set()
 

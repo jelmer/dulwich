@@ -214,7 +214,7 @@ def get_checkin_filter_autocrlf(core_autocrlf):
     return None
 
 
-class BlobNormalizer(object):
+class BlobNormalizer:
     """An object to store computation result of which filter to apply based
     on configuration, gitattributes, path and operation (checkin or checkout)
     """

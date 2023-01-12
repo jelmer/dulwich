@@ -187,7 +187,7 @@ class Error(Exception):
     """Porcelain-based error. """
 
     def __init__(self, msg):
-        super(Error, self).__init__(msg)
+        super().__init__(msg)
 
 
 class RemoteExists(Error):
@@ -699,7 +699,7 @@ def remove(repo=".", paths=None, cached=False):
                 else:
                     try:
                         blob = blob_from_path_and_stat(full_path, st)
-                    except IOError:
+                    except OSError:
                         pass
                     else:
                         try:
@@ -2036,10 +2036,10 @@ def describe(repo, abbrev=7):
         for key, value in refs.items():
             key = key.decode()
             obj = r.get_object(value)
-            if u"tags" not in key:
+            if "tags" not in key:
                 continue
 
-            _, tag = key.rsplit(u"/", 1)
+            _, tag = key.rsplit("/", 1)
 
             try:
                 commit = obj.object
@@ -2056,7 +2056,7 @@ def describe(repo, abbrev=7):
 
         # If there are no tags, return the current commit
         if len(sorted_tags) == 0:
-            return "g{}".format(find_unique_abbrev(r.object_store, r[r.head()].id))
+            return f"g{find_unique_abbrev(r.object_store, r[r.head()].id)}"
 
         # We're now 0 commits from the top
         commit_count = 0

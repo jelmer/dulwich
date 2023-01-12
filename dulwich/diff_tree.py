@@ -191,13 +191,12 @@ def tree_changes(
         source and target tree.
     """
     if rename_detector is not None and tree1_id is not None and tree2_id is not None:
-        for change in rename_detector.changes_with_renames(
+        yield from rename_detector.changes_with_renames(
             tree1_id,
             tree2_id,
             want_unchanged=want_unchanged,
             include_trees=include_trees,
-        ):
-            yield change
+        )
         return
 
     entries = walk_trees(
@@ -402,7 +401,7 @@ def _tree_change_key(entry):
     return (path1, path2)
 
 
-class RenameDetector(object):
+class RenameDetector:
     """Object for handling rename detection between two trees."""
 
     def __init__(

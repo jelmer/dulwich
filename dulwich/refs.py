@@ -106,7 +106,7 @@ def check_ref_format(refname: Ref):
     return True
 
 
-class RefsContainer(object):
+class RefsContainer:
     """A container for refs."""
 
     def __init__(self, logger=None):
@@ -447,7 +447,7 @@ class DictRefsContainer(RefsContainer):
     """
 
     def __init__(self, refs, logger=None):
-        super(DictRefsContainer, self).__init__(logger=logger)
+        super().__init__(logger=logger)
         self._refs = refs
         self._peeled = {}
         self._watchers = set()
@@ -622,7 +622,7 @@ class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 
     def __init__(self, path, worktree_path=None, logger=None):
-        super(DiskRefsContainer, self).__init__(logger=logger)
+        super().__init__(logger=logger)
         if getattr(path, "encode", None) is not None:
             path = os.fsencode(path)
         self.path = path
@@ -635,7 +635,7 @@ class DiskRefsContainer(RefsContainer):
         self._peeled_refs = None
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.path)
+        return "{}({!r})".format(self.__class__.__name__, self.path)
 
     def subkeys(self, base):
         subkeys = set()
@@ -911,12 +911,12 @@ class DiskRefsContainer(RefsContainer):
                     if orig_ref != old_ref:
                         f.abort()
                         return False
-                except (OSError, IOError):
+                except OSError:
                     f.abort()
                     raise
             try:
                 f.write(new_ref + b"\n")
-            except (OSError, IOError):
+            except OSError:
                 f.abort()
                 raise
             self._log(
@@ -966,7 +966,7 @@ class DiskRefsContainer(RefsContainer):
                 return False
             try:
                 f.write(ref + b"\n")
-            except (OSError, IOError):
+            except OSError:
                 f.abort()
                 raise
             else:

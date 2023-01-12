@@ -56,7 +56,7 @@ class _LRUNode(Generic[K, V]):
             prev_key = None
         else:
             prev_key = self.prev.key
-        return "%s(%r n:%r p:%r)" % (
+        return "{}({!r} n:{!r} p:{!r})".format(
             self.__class__.__name__,
             self.key,
             self.next_key,

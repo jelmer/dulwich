@@ -42,7 +42,7 @@ from dulwich.protocol import (
 from dulwich.tests import TestCase
 
 
-class BaseProtocolTests(object):
+class BaseProtocolTests:
     def test_write_pkt_line_none(self):
         self.proto.write_pkt_line(None)
         self.assertEqual(self.rout.getvalue(), b"0000")

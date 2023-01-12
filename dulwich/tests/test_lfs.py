@@ -28,7 +28,7 @@ import tempfile
 
 class LFSTests(TestCase):
     def setUp(self):
-        super(LFSTests, self).setUp()
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.lfs = LFSStore.create(self.test_dir)

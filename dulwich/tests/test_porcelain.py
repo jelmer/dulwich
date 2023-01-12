@@ -86,7 +86,7 @@ def flat_walk_dir(dir_to_walk):
 
 class PorcelainTestCase(TestCase):
     def setUp(self):
-        super(PorcelainTestCase, self).setUp()
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.repo_path = os.path.join(self.test_dir, "repo")
@@ -274,7 +274,7 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
     NON_DEFAULT_KEY_ID = "6A93393F50C5E6ACD3D6FB45B936212EDB4E14C0"
 
     def setUp(self):
-        super(PorcelainGpgTestCase, self).setUp()
+        super().setUp()
         self.gpg_dir = os.path.join(self.test_dir, "gpg")
         os.mkdir(self.gpg_dir, mode=0o700)
         # Ignore errors when deleting GNUPGHOME, because of race conditions
@@ -289,7 +289,7 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.DEFAULT_KEY,
-            universal_newlines=True,
+            text=True,
         )
 
     def import_non_default_key(self):
@@ -298,7 +298,7 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.NON_DEFAULT_KEY,
-            universal_newlines=True,
+            text=True,
         )
 
 
@@ -906,7 +906,7 @@ class AddTests(PorcelainTestCase):
         cwd = os.getcwd()
         try:
             os.chdir(self.repo.path)
-            self.assertEqual(set(["foo", "blah", "adir", ".git"]), set(os.listdir(".")))
+            self.assertEqual({"foo", "blah", "adir", ".git"}, set(os.listdir(".")))
             self.assertEqual(
                 (["foo", os.path.join("adir", "afile")], set()),
                 porcelain.add(self.repo.path),
@@ -967,8 +967,8 @@ class AddTests(PorcelainTestCase):
             ],
         )
         self.assertIn(b"bar", self.repo.open_index())
-        self.assertEqual(set(["bar"]), set(added))
-        self.assertEqual(set(["foo", os.path.join("subdir", "")]), ignored)
+        self.assertEqual({"bar"}, set(added))
+        self.assertEqual({"foo", os.path.join("subdir", "")}, ignored)
 
     def test_add_file_absolute_path(self):
         # Absolute paths are (not yet) supported
@@ -1554,7 +1554,7 @@ class ResetFileTests(PorcelainTestCase):
             f.write('something new')
         porcelain.reset_file(self.repo, file, target=sha)
 
-        with open(full_path, 'r') as f:
+        with open(full_path) as f:
             self.assertEqual('hello', f.read())
 
     def test_reset_remove_file_to_commit(self):
@@ -1573,7 +1573,7 @@ class ResetFileTests(PorcelainTestCase):
         os.remove(full_path)
         porcelain.reset_file(self.repo, file, target=sha)
 
-        with open(full_path, 'r') as f:
+        with open(full_path) as f:
             self.assertEqual('hello', f.read())
 
     def test_resetfile_with_dir(self):
@@ -1598,7 +1598,7 @@ class ResetFileTests(PorcelainTestCase):
             author=b"John <john@example.com>",
         )
         porcelain.reset_file(self.repo, os.path.join('new_dir', 'foo'), target=sha)
-        with open(full_path, 'r') as f:
+        with open(full_path) as f:
             self.assertEqual('hello', f.read())
 
 
@@ -1616,7 +1616,7 @@ class SubmoduleTests(PorcelainTestCase):
 
     def test_add(self):
         porcelain.submodule_add(self.repo, "../bar.git", "bar")
-        with open('%s/.gitmodules' % self.repo.path, 'r') as f:
+        with open('%s/.gitmodules' % self.repo.path) as f:
             self.assertEqual("""\
 [submodule "bar"]
 \turl = ../bar.git
@@ -1901,7 +1901,7 @@ class PushTests(PorcelainTestCase):
 
 class PullTests(PorcelainTestCase):
     def setUp(self):
-        super(PullTests, self).setUp()
+        super().setUp()
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
@@ -2301,7 +2301,7 @@ class StatusTests(PorcelainTestCase):
             os.path.join(self.repo.path, "link"),
         )
         self.assertEqual(
-            set(["ignored", "notignored", ".gitignore", "link"]),
+            {"ignored", "notignored", ".gitignore", "link"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -2309,11 +2309,11 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([".gitignore", "notignored", "link"]),
+            {".gitignore", "notignored", "link"},
             set(porcelain.status(self.repo).untracked),
         )
         self.assertEqual(
-            set([".gitignore", "notignored", "ignored", "link"]),
+            {".gitignore", "notignored", "ignored", "link"},
             set(porcelain.status(self.repo, ignored=True).untracked),
         )
 
@@ -2332,7 +2332,7 @@ class StatusTests(PorcelainTestCase):
             f.write("blop\n")
 
         self.assertEqual(
-            set([".gitignore", "notignored", os.path.join("nested", "")]),
+            {".gitignore", "notignored", os.path.join("nested", "")},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -2340,7 +2340,7 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([".gitignore", "notignored"]),
+            {".gitignore", "notignored"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2351,7 +2351,7 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set(["ignored", "with", "manager"]),
+            {"ignored", "with", "manager"},
             set(
                 porcelain.get_untracked_paths(
                     subrepo.path, subrepo.path, subrepo.open_index()
@@ -2369,9 +2369,9 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([os.path.join('nested', 'ignored'),
+            {os.path.join('nested', 'ignored'),
                 os.path.join('nested', 'with'),
-                os.path.join('nested', 'manager')]),
+                os.path.join('nested', 'manager')},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2393,14 +2393,12 @@ class StatusTests(PorcelainTestCase):
             f.write("foo")
 
         self.assertEqual(
-            set(
-                [
-                    ".gitignore",
-                    "notignored",
-                    "ignored",
-                    os.path.join("subdir", ""),
-                ]
-            ),
+            {
+                ".gitignore",
+                "notignored",
+                "ignored",
+                os.path.join("subdir", ""),
+            },
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2410,7 +2408,7 @@ class StatusTests(PorcelainTestCase):
             )
         )
         self.assertEqual(
-            set([".gitignore", "notignored"]),
+            {".gitignore", "notignored"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2488,14 +2486,14 @@ class ReceivePackTests(PorcelainTestCase):
 
 class BranchListTests(PorcelainTestCase):
     def test_standard(self):
-        self.assertEqual(set([]), set(porcelain.branch_list(self.repo)))
+        self.assertEqual(set(), set(porcelain.branch_list(self.repo)))
 
     def test_new_branch(self):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, b"foo")
         self.assertEqual(
-            set([b"master", b"foo"]), set(porcelain.branch_list(self.repo))
+            {b"master", b"foo"}, set(porcelain.branch_list(self.repo))
         )
 
 
@@ -2512,7 +2510,7 @@ class BranchCreateTests(PorcelainTestCase):
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, b"foo")
         self.assertEqual(
-            set([b"master", b"foo"]), set(porcelain.branch_list(self.repo))
+            {b"master", b"foo"}, set(porcelain.branch_list(self.repo))
         )
 
 
@@ -3023,7 +3021,7 @@ class DescribeTests(PorcelainTestCase):
 
 class PathToTreeTests(PorcelainTestCase):
     def setUp(self):
-        super(PathToTreeTests, self).setUp()
+        super().setUp()
         self.fp = os.path.join(self.test_dir, "bar")
         with open(self.fp, "w") as f:
             f.write("something")

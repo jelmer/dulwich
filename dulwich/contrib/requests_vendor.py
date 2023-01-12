@@ -55,7 +55,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         if username is not None:
             self.session.auth = (username, password)
 
-        super(RequestsHttpGitClient, self).__init__(
+        super().__init__(
             base_url=base_url, dumb=dumb, **kwargs)
 
     def _http_request(self, url, headers=None, data=None, allow_compression=False):

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
 
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
@@ -35,7 +34,7 @@
 
 import sys
 import re
-from typing import Optional
+from typing import Optional, Tuple, List
 
 # only needs to detect git style diffs as this is for
 # use with dulwich
@@ -56,7 +55,7 @@ _GIT_UNCHANGED_START = b" "
 # properly interface with diffstat routine
 
 
-def _parse_patch(lines):
+def _parse_patch(lines: List[bytes]) -> Tuple[List[bytes], List[bool], List[Tuple[int, int]]]:
     """Parse a git style diff or patch to generate diff stats.
 
     Args:

@@ -34,12 +34,12 @@ from ..pack import PackData, Pack, load_pack_index_file
 class GcsObjectStore(BucketBasedObjectStore):
 
     def __init__(self, bucket, subpath=''):
-        super(GcsObjectStore, self).__init__()
+        super().__init__()
         self.bucket = bucket
         self.subpath = subpath
 
     def __repr__(self):
-        return "%s(%r, subpath=%r)" % (
+        return "{}({!r}, subpath={!r})".format(
             type(self).__name__, self.bucket, self.subpath)
 
     def _remove_pack(self, name):
@@ -53,7 +53,7 @@ class GcsObjectStore(BucketBasedObjectStore):
             name, ext = posixpath.splitext(posixpath.basename(blob.name))
             packs.setdefault(name, set()).add(ext)
         for name, exts in packs.items():
-            if exts == set(['.pack', '.idx']):
+            if exts == {'.pack', '.idx'}:
                 yield name
 
     def _load_pack_data(self, name):

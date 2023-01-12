@@ -79,7 +79,7 @@ PACKDIR = "pack"
 PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
 
 
-class BaseObjectStore(object):
+class BaseObjectStore:
     """Object store interface."""
 
     def determine_wants_all(
@@ -477,8 +477,7 @@ class PackBasedObjectStore(BaseObjectStore):
     def _iter_alternate_objects(self):
         """Iterate over the SHAs of all the objects in alternate stores."""
         for alternate in self.alternates:
-            for alternate_object in alternate:
-                yield alternate_object
+            yield from alternate
 
     def _iter_loose_objects(self):
         """Iterate over the SHAs of all loose objects."""
@@ -539,14 +538,11 @@ class PackBasedObjectStore(BaseObjectStore):
         self._update_pack_cache()
         for pack in self._iter_cached_packs():
             try:
-                for sha in pack:
-                    yield sha
+                yield from pack
             except PackFileDisappeared:
                 pass
-        for sha in self._iter_loose_objects():
-            yield sha
-        for sha in self._iter_alternate_objects():
-            yield sha
+        yield from self._iter_loose_objects()
+        yield from self._iter_alternate_objects()
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose.
@@ -571,7 +567,7 @@ class PackBasedObjectStore(BaseObjectStore):
             sha = name
             hexsha = None
         else:
-            raise AssertionError("Invalid object name %r" % (name,))
+            raise AssertionError("Invalid object name {!r}".format(name))
         for pack in self._iter_cached_packs():
             try:
                 return pack.get_raw(sha)
@@ -618,7 +614,7 @@ class DiskObjectStore(PackBasedObjectStore):
           loose_compression_level: zlib compression level for loose objects
           pack_compression_level: zlib compression level for pack objects
         """
-        super(DiskObjectStore, self).__init__(
+        super().__init__(
             pack_compression_level=pack_compression_level
         )
         self.path = path
@@ -628,7 +624,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_compression_level = pack_compression_level
 
     def __repr__(self):
-        return "<%s(%r)>" % (self.__class__.__name__, self.path)
+        return "<{}({!r})>".format(self.__class__.__name__, self.path)
 
     @classmethod
     def from_config(cls, path, config):
@@ -956,7 +952,7 @@ class MemoryObjectStore(BaseObjectStore):
     """Object store that keeps all objects in memory."""
 
     def __init__(self):
-        super(MemoryObjectStore, self).__init__()
+        super().__init__()
         self._data = {}
         self.pack_compression_level = -1
 
@@ -966,7 +962,7 @@ class MemoryObjectStore(BaseObjectStore):
         elif len(sha) == 20:
             return sha_to_hex(sha)
         else:
-            raise ValueError("Invalid sha %r" % (sha,))
+            raise ValueError("Invalid sha {!r}".format(sha))
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose."""
@@ -1087,7 +1083,7 @@ class MemoryObjectStore(BaseObjectStore):
             commit()
 
 
-class ObjectIterator(object):
+class ObjectIterator:
     """Interface for iterating over objects."""
 
     def iterobjects(self):
@@ -1239,7 +1235,7 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
     return (commits, tags, others)
 
 
-class MissingObjectFinder(object):
+class MissingObjectFinder:
     """Find the objects missing from another object store.
 
     Args:
@@ -1313,7 +1309,7 @@ class MissingObjectFinder(object):
         wants = missing_commits.union(missing_tags)
         wants = wants.union(missing_others)
 
-        self.objects_to_send = set([(w, None, False) for w in wants])
+        self.objects_to_send = {(w, None, False) for w in wants}
 
         if progress is None:
             self.progress = lambda x: None
@@ -1354,7 +1350,7 @@ class MissingObjectFinder(object):
     __next__ = next
 
 
-class ObjectStoreGraphWalker(object):
+class ObjectStoreGraphWalker:
     """Graph walker that finds what commits are missing from an object store.
 
     Attributes:
@@ -1380,7 +1376,7 @@ class ObjectStoreGraphWalker(object):
         """Ack that a revision and its ancestors are present in the source."""
         if len(sha) != 40:
             raise ValueError("unexpected sha %r received" % sha)
-        ancestors = set([sha])
+        ancestors = {sha}
 
         # stop if we run out of heads to remove
         while self.heads:

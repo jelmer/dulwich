@@ -180,7 +180,7 @@ def _get_default_identity() -> Tuple[str, str]:
         fullname = username
     email = os.environ.get("EMAIL")
     if email is None:
-        email = "{}@{}".format(username, socket.gethostname())
+        email = f"{username}@{socket.gethostname()}"
     return (fullname, email)  # type: ignore
 
 
@@ -329,7 +329,7 @@ def _set_filesystem_hidden(path):
     # Could implement other platform specific filesystem hiding here
 
 
-class ParentsProvider(object):
+class ParentsProvider:
     def __init__(self, store, grafts={}, shallows=[]):
         self.store = store
         self.grafts = grafts
@@ -347,7 +347,7 @@ class ParentsProvider(object):
         return commit.parents
 
 
-class BaseRepo(object):
+class BaseRepo:
     """Base class for a git repository.
 
     This base class is meant to be used for Repository implementations that e.g.
@@ -642,7 +642,7 @@ class BaseRepo(object):
                 raise NotTagError(ret)
             else:
                 raise Exception(
-                    "Type invalid: %r != %r" % (ret.type_name, cls.type_name)
+                    "Type invalid: {!r} != {!r}".format(ret.type_name, cls.type_name)
                 )
         return ret
 
@@ -1133,7 +1133,7 @@ class Repo(BaseRepo):
         self.bare = bare
         if bare is False:
             if os.path.isfile(hidden_path):
-                with open(hidden_path, "r") as f:
+                with open(hidden_path) as f:
                     path = read_gitfile(f)
                 self._controldir = os.path.join(root, path)
             else:

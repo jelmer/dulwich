@@ -62,7 +62,7 @@ if sys.platform == "win32":
     import ctypes
 
 
-class DulwichClientTestBase(object):
+class DulwichClientTestBase:
     """Tests for client/server compatibility."""
 
     def setUp(self):
@@ -248,12 +248,10 @@ class DulwichClientTestBase(object):
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertEqual(
                 dest.get_shallow(),
-                set(
-                    [
-                        b"35e0b59e187dd72a0af294aedffc213eaa4d03ff",
-                        b"514dc6d3fbfe77361bcaef320c4d21b72bc10be9",
-                    ]
-                ),
+                {
+                    b"35e0b59e187dd72a0af294aedffc213eaa4d03ff",
+                    b"514dc6d3fbfe77361bcaef320c4d21b72bc10be9",
+                },
             )
 
     def test_repeat(self):
@@ -409,7 +407,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             try:
                 os.kill(pid, signal.SIGKILL)
                 os.unlink(self.pidfile)
-            except (OSError, IOError):
+            except OSError:
                 pass
         self.process.wait()
         self.process.stdout.close()
@@ -435,7 +433,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         self.skipTest('skip flaky test; see #1015')
 
 
-class TestSSHVendor(object):
+class TestSSHVendor:
     @staticmethod
     def run_command(
         host,
@@ -648,7 +646,7 @@ class HTTPGitServer(http.server.HTTPServer):
         self.server_name = "localhost"
 
     def get_url(self):
-        return "http://%s:%s/" % (self.server_name, self.server_port)
+        return "http://{}:{}/".format(self.server_name, self.server_port)
 
 
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):

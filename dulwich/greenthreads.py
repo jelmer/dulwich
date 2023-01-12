@@ -104,7 +104,7 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
             self.sha_done.add(t)
         missing_tags = want_tags.difference(have_tags)
         wants = missing_commits.union(missing_tags)
-        self.objects_to_send = set([(w, None, False) for w in wants])
+        self.objects_to_send = {(w, None, False) for w in wants}
         if progress is None:
             self.progress = lambda x: None
         else:
@@ -122,15 +122,14 @@ class GreenThreadsObjectStoreIterator(ObjectStoreIterator):
     def __init__(self, store, shas, finder, concurrency=1):
         self.finder = finder
         self.p = pool.Pool(size=concurrency)
-        super(GreenThreadsObjectStoreIterator, self).__init__(store, shas)
+        super().__init__(store, shas)
 
     def retrieve(self, args):
         sha, path = args
         return self.store[sha], path
 
     def __iter__(self):
-        for sha, path in self.p.imap_unordered(self.retrieve, self.itershas()):
-            yield sha, path
+        yield from self.p.imap_unordered(self.retrieve, self.itershas())
 
     def __len__(self):
         if len(self._shas) > 0:

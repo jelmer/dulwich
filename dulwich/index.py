@@ -174,7 +174,7 @@ def read_cache_entry(f, version: int) -> Tuple[str, IndexEntry]:
         (extended_flags, ) = struct.unpack(">H", f.read(2))
     else:
         extended_flags = 0
-    name = f.read((flags & 0x0FFF))
+    name = f.read(flags & 0x0FFF)
     # Padding:
     if version < 4:
         real_size = (f.tell() - beginoffset + 8) & ~7
@@ -313,7 +313,7 @@ def cleanup_mode(mode: int) -> int:
     return ret
 
 
-class Index(object):
+class Index:
     """A Git Index file."""
 
     def __init__(self, filename: Union[bytes, str], read=True):
@@ -335,7 +335,7 @@ class Index(object):
         return self._filename
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self._filename)
+        return "{}({!r})".format(self.__class__.__name__, self._filename)
 
     def write(self) -> None:
         """Write current contents of index to disk."""
@@ -431,14 +431,13 @@ class Index(object):
             entry = self[path]
             return entry.sha, cleanup_mode(entry.mode)
 
-        for (name, mode, sha) in changes_from_tree(
+        yield from changes_from_tree(
             self._byname.keys(),
             lookup_entry,
             object_store,
             tree,
             want_unchanged=want_unchanged,
-        ):
-            yield (name, mode, sha)
+        )
 
     def commit(self, object_store):
         """Create a new tree from an index.
@@ -1014,7 +1013,7 @@ def refresh_index(index: Index, root_path: bytes):
             index[path] = entry
 
 
-class locked_index(object):
+class locked_index:
     """Lock the index while making modifications.
 
     Works as a context manager.

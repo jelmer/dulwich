@@ -50,7 +50,7 @@ ALL_ORDERS = (ORDER_DATE, ORDER_TOPO)
 _MAX_EXTRA_COMMITS = 5
 
 
-class WalkEntry(object):
+class WalkEntry:
     """Object encapsulating a single result from a walk."""
 
     def __init__(self, walker, commit):
@@ -122,13 +122,13 @@ class WalkEntry(object):
         return self._changes[path_prefix]
 
     def __repr__(self):
-        return "<WalkEntry commit=%s, changes=%r>" % (
+        return "<WalkEntry commit={}, changes={!r}>".format(
             self.commit.id,
             self.changes(),
         )
 
 
-class _CommitTimeQueue(object):
+class _CommitTimeQueue:
     """Priority queue of WalkEntry objects by commit time."""
 
     def __init__(self, walker: "Walker"):
@@ -232,7 +232,7 @@ class _CommitTimeQueue(object):
     __next__ = next
 
 
-class Walker(object):
+class Walker:
     """Object for performing a walk of commits in a store.
 
     Walker objects are initialized with a store and other options and can then

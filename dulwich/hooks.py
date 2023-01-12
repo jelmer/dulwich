@@ -28,7 +28,7 @@ from dulwich.errors import (
 )
 
 
-class Hook(object):
+class Hook:
     """Generic hook object."""
 
     def execute(self, *args):

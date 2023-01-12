@@ -104,9 +104,9 @@ class GraftSerializerTests(TestCase):
         )
 
 
-class GraftsInRepositoryBase(object):
+class GraftsInRepositoryBase:
     def tearDown(self):
-        super(GraftsInRepositoryBase, self).tearDown()
+        super().tearDown()
 
     def get_repo_with_grafts(self, grafts):
         r = self._repo
@@ -148,7 +148,7 @@ class GraftsInRepositoryBase(object):
 
 class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
     def setUp(self):
-        super(GraftsInRepoTests, self).setUp()
+        super().setUp()
         self._repo_dir = os.path.join(tempfile.mkdtemp())
         r = self._repo = Repo.init(self._repo_dir)
         self.addCleanup(shutil.rmtree, self._repo_dir)
@@ -188,7 +188,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
 
 class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
     def setUp(self):
-        super(GraftsInMemoryRepoTests, self).setUp()
+        super().setUp()
         r = self._repo = MemoryRepo()
 
         self._shas = []

@@ -37,7 +37,7 @@ from dulwich.tests.utils import (
 
 class BuildCommitGraphTest(TestCase):
     def setUp(self):
-        super(BuildCommitGraphTest, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
 
     def test_linear(self):

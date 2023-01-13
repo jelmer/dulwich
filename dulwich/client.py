@@ -1515,7 +1515,7 @@ class LocalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-    ):
+    ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
         Args:
@@ -1543,7 +1543,7 @@ class LocalGitClient(GitClient):
             # Note that the client still expects a 0-object pack in most cases.
             if objects_iter is None:
                 return FetchPackResult(None, symrefs, agent)
-            write_pack_objects(pack_data, objects_iter)
+            write_pack_objects(pack_data, objects_iter, reuse_pack=r.object_store)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):

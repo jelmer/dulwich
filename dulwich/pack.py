@@ -1666,12 +1666,15 @@ def deltify_pack_objects(objects, window_size: Optional[int] = None, reuse_pack=
         for obj, path in objects:
             objects_to_pack.add(sha_to_hex(obj.sha().digest()))
         for o, _ in objects:
-            if not o.sha().digest() in reuse_pack:
-                continue
+            sha_digest = o.sha().digest()
             # get_raw_unresolved() translates OFS_DELTA into REF_DELTA for us
-            (obj_type, delta_base, _) = reuse_pack.get_raw_unresolved(o.sha().digest())
+            try:
+                (obj_type, delta_base, chunks) = reuse_pack.get_raw_unresolved(sha_digest)
+            except KeyError:
+                continue
             if obj_type == REF_DELTA and delta_base in objects_to_pack:
-                reused_deltas.add(o.sha().digest())
+                yield obj_type, sha_digest, hex_to_sha(delta_base), chunks
+                reused_deltas.add(sha_digest)
 
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
@@ -1707,10 +1710,6 @@ def deltify_pack_objects(objects, window_size: Optional[int] = None, reuse_pack=
         possible_bases.appendleft((o.sha().digest(), type_num, raw))
         while len(possible_bases) > window_size:
             possible_bases.pop()
-
-    for sha_digest in reused_deltas:
-        (obj_type, delta_base, chunks) = reuse_pack.get_raw_delta(sha_digest)
-        yield obj_type, sha_digest, hex_to_sha(delta_base), chunks
 
 
 def pack_objects_to_data(objects):
@@ -1757,7 +1756,8 @@ def write_pack_objects(
         # slow at the moment.
         deltify = False
     if deltify:
-        pack_contents = deltify_pack_objects(objects, delta_window_size, reuse_pack)
+        pack_contents = deltify_pack_objects(
+            objects, window_size=delta_window_size, reuse_pack=reuse_pack)
         pack_contents_count = len(objects)
     else:
         pack_contents_count, pack_contents = pack_objects_to_data(objects)
@@ -2231,22 +2231,6 @@ class Pack:
         obj_type, obj = self.data.get_object_at(offset)
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
         return type_num, b"".join(chunks)
-
-    def get_raw_delta(self, sha1):
-        """Get raw decompressed delta data chunks for a given SHA1.
-        Convert OFS_DELTA objects to REF_DELTA objects, like get_raw_unresolved() does.
-
-        Args:
-          sha1: SHA to return data for
-        Returns: Tuple with pack object type, delta base (if applicable),
-            list of data chunks
-        """
-        offset = self.index.object_index(sha1)
-        (obj_type, delta_base, chunks) = self.data.get_decompressed_data_at(offset)
-        if obj_type == OFS_DELTA:
-            delta_base = sha_to_hex(self.index.object_sha1(offset - delta_base))
-            obj_type = REF_DELTA
-        return (obj_type, delta_base, chunks)
 
     def __getitem__(self, sha1):
         """Retrieve the specified SHA1."""

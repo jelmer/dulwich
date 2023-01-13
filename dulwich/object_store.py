@@ -563,6 +563,46 @@ class PackBasedObjectStore(BaseObjectStore):
                 pass
         raise KeyError(hexsha)
 
+    def get_raw_unresolved(self, sha1: bytes) -> Tuple[int, Union[bytes, None], List[bytes]]:
+        """Obtain the unresolved data for an object.
+
+        Args:
+          name: sha for the object.
+        """
+        if name == ZERO_SHA:
+            raise KeyError(name)
+        if len(name) == 40:
+            sha = hex_to_sha(name)
+            hexsha = name
+        elif len(name) == 20:
+            sha = name
+            hexsha = None
+        else:
+            raise AssertionError("Invalid object name {!r}".format(name))
+        for pack in self._iter_cached_packs():
+            try:
+                return pack.get_raw_unresolved(sha)
+            except (KeyError, PackFileDisappeared):
+                pass
+        if hexsha is None:
+            hexsha = sha_to_hex(name)
+        ret = self._get_loose_object(hexsha)
+        if ret is not None:
+            return ret.type_num, None, ret.as_raw_chunks()
+        # Maybe something else has added a pack with the object
+        # in the mean time?
+        for pack in self._update_pack_cache():
+            try:
+                return pack.get_raw_unresolved(sha)
+            except KeyError:
+                pass
+        for alternate in self.alternates:
+            try:
+                return alternate.get_raw_unresolved(hexsha)
+            except KeyError:
+                pass
+        raise KeyError(hexsha)
+
     def add_objects(self, objects, progress=None):
         """Add a set of objects to this object store.
 
@@ -1149,7 +1189,7 @@ def tree_lookup_path(lookup_obj, root_sha, path):
     return tree.lookup_path(lookup_obj, path)
 
 
-def _collect_filetree_revs(obj_store, tree_sha, kset):
+def _collect_filetree_revs(obj_store: ObjectContainer, tree_sha: ObjectID, kset: Set[ObjectID]) -> None:
     """Collect SHA1s of files and directories for specified tree.
 
     Args:

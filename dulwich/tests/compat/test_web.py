@@ -135,10 +135,10 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
     def setUp(self):
         self.o_uph_cap = patch_capabilities(UploadPackHandler, (b"no-done",))
         self.o_rph_cap = patch_capabilities(ReceivePackHandler, (b"no-done",))
-        super(SmartWebSideBand64kTestCase, self).setUp()
+        super().setUp()
 
     def tearDown(self):
-        super(SmartWebSideBand64kTestCase, self).tearDown()
+        super().tearDown()
         UploadPackHandler.capabilities = self.o_uph_cap
         ReceivePackHandler.capabilities = self.o_rph_cap
 

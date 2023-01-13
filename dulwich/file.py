@@ -20,7 +20,6 @@
 
 """Safe access to git files."""
 
-import io
 import os
 import sys
 
@@ -83,15 +82,15 @@ def GitFile(filename, mode="rb", bufsize=-1, mask=0o644):
 
     """
     if "a" in mode:
-        raise IOError("append mode not supported for Git files")
+        raise OSError("append mode not supported for Git files")
     if "+" in mode:
-        raise IOError("read/write mode not supported for Git files")
+        raise OSError("read/write mode not supported for Git files")
     if "b" not in mode:
-        raise IOError("text mode not supported for Git files")
+        raise OSError("text mode not supported for Git files")
     if "w" in mode:
         return _GitFile(filename, mode, bufsize, mask)
     else:
-        return io.open(filename, mode, bufsize)
+        return open(filename, mode, bufsize)
 
 
 class FileLocked(Exception):
@@ -100,10 +99,10 @@ class FileLocked(Exception):
     def __init__(self, filename, lockfilename):
         self.filename = filename
         self.lockfilename = lockfilename
-        super(FileLocked, self).__init__(filename, lockfilename)
+        super().__init__(filename, lockfilename)
 
 
-class _GitFile(object):
+class _GitFile:
     """File that follows the git locking protocol for writes.
 
     All writes to a file foo will be written into foo.lock in the same
@@ -114,17 +113,15 @@ class _GitFile(object):
         released. Typically this will happen in a finally block.
     """
 
-    PROXY_PROPERTIES = set(
-        [
-            "closed",
-            "encoding",
-            "errors",
-            "mode",
-            "name",
-            "newlines",
-            "softspace",
-        ]
-    )
+    PROXY_PROPERTIES = {
+        "closed",
+        "encoding",
+        "errors",
+        "mode",
+        "name",
+        "newlines",
+        "softspace",
+    }
     PROXY_METHODS = (
         "__iter__",
         "flush",

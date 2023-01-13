@@ -1,5 +1,4 @@
 # test_reflog.py -- tests for reflog.py
-# encoding: utf-8
 # Copyright (C) 2015 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU

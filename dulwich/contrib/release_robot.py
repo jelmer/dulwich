@@ -78,11 +78,11 @@ def get_recent_tags(projdir=PROJDIR):
             obj = project.get_object(value)  # dulwich object from SHA-1
             # don't just check if object is "tag" b/c it could be a "commit"
             # instead check if "tags" is in the ref-name
-            if u"tags" not in key:
+            if "tags" not in key:
                 # skip ref if not a tag
                 continue
             # strip the leading text from refs to get "tag name"
-            _, tag = key.rsplit(u"/", 1)
+            _, tag = key.rsplit("/", 1)
             # check if tag object is "commit" or "tag" pointing to a "commit"
             try:
                 commit = obj.object  # a tuple (commit class, commit id)

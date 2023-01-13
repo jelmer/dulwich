@@ -23,7 +23,7 @@ import os
 import tempfile
 
 
-class LFSStore(object):
+class LFSStore:
     """Stores objects on disk, indexed by SHA256."""
 
     def __init__(self, path):

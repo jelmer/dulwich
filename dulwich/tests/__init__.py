@@ -48,7 +48,7 @@ from unittest import (  # noqa: F401
 
 class TestCase(_TestCase):
     def setUp(self):
-        super(TestCase, self).setUp()
+        super().setUp()
         self.overrideEnv("HOME", "/nonexistent")
         self.overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 

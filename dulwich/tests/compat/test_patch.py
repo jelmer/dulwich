@@ -36,7 +36,7 @@ from dulwich.tests.compat.utils import (
 
 class CompatPatchTestCase(CompatTestCase):
     def setUp(self):
-        super(CompatPatchTestCase, self).setUp()
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.repo_path = os.path.join(self.test_dir, "repo")

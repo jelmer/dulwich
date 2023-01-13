@@ -81,7 +81,7 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
     min_git_version = (1, 7, 0, 2)
 
     def setUp(self):
-        super(GitServerSideBand64kTestCase, self).setUp()
+        super().setUp()
         # side-band-64k is broken in the windows client.
         # https://github.com/msysgit/git/issues/101
         # Fix has landed for the 1.9.3 release.

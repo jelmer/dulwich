@@ -55,7 +55,7 @@ def signal_quit(signal, frame):
     pdb.set_trace()
 
 
-class Command(object):
+class Command:
     """A Dulwich subcommand."""
 
     def run(self, args):
@@ -139,7 +139,7 @@ class cmd_fsck(Command):
         opts, args = getopt(args, "", [])
         opts = dict(opts)
         for (obj, msg) in porcelain.fsck("."):
-            print("%s: %s" % (obj, msg))
+            print("{}: {}".format(obj, msg))
 
 
 class cmd_log(Command):
@@ -202,9 +202,9 @@ class cmd_dump_pack(Command):
             try:
                 print("\t%s" % x[name])
             except KeyError as k:
-                print("\t%s: Unable to resolve base %s" % (name, k))
+                print("\t{}: Unable to resolve base {}".format(name, k))
             except ApplyDeltaError as e:
-                print("\t%s: Unable to apply delta: %r" % (name, e))
+                print("\t{}: Unable to apply delta: {!r}".format(name, e))
 
 
 class cmd_dump_index(Command):
@@ -483,7 +483,7 @@ class cmd_status(Command):
             for kind, names in status.staged.items():
                 for name in names:
                     sys.stdout.write(
-                        "\t%s: %s\n" % (kind, name.decode(sys.getfilesystemencoding()))
+                        "\t{}: {}\n".format(kind, name.decode(sys.getfilesystemencoding()))
                     )
             sys.stdout.write("\n")
         if status.unstaged:
@@ -506,7 +506,7 @@ class cmd_ls_remote(Command):
             sys.exit(1)
         refs = porcelain.ls_remote(args[0])
         for ref in sorted(refs):
-            sys.stdout.write("%s\t%s\n" % (ref, refs[ref]))
+            sys.stdout.write("{}\t{}\n".format(ref, refs[ref]))
 
 
 class cmd_ls_tree(Command):
@@ -630,7 +630,7 @@ class cmd_submodule_list(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(argv)
         for path, sha in porcelain.submodule_list("."):
-            sys.stdout.write(' %s %s\n' % (sha, path))
+            sys.stdout.write(' {} {}\n'.format(sha, path))
 
 
 class cmd_submodule_init(Command):

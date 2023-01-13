@@ -118,7 +118,7 @@ class DummyPopen:
 # TODO(durin42): add unit-level tests of GitClient
 class GitClientTests(TestCase):
     def setUp(self):
-        super(GitClientTests, self).setUp()
+        super().setUp()
         self.rout = BytesIO()
         self.rin = BytesIO()
         self.client = DummyClient(lambda x: True, self.rin.read, self.rout.write)
@@ -126,29 +126,25 @@ class GitClientTests(TestCase):
     def test_caps(self):
         agent_cap = ("agent=dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
         self.assertEqual(
-            set(
-                [
-                    b"multi_ack",
-                    b"side-band-64k",
-                    b"ofs-delta",
-                    b"thin-pack",
-                    b"multi_ack_detailed",
-                    b"shallow",
-                    agent_cap,
-                ]
-            ),
+            {
+                b"multi_ack",
+                b"side-band-64k",
+                b"ofs-delta",
+                b"thin-pack",
+                b"multi_ack_detailed",
+                b"shallow",
+                agent_cap,
+            },
             set(self.client._fetch_capabilities),
         )
         self.assertEqual(
-            set(
-                [
-                    b"delete-refs",
-                    b"ofs-delta",
-                    b"report-status",
-                    b"side-band-64k",
-                    agent_cap,
-                ]
-            ),
+            {
+                b"delete-refs",
+                b"ofs-delta",
+                b"report-status",
+                b"side-band-64k",
+                agent_cap,
+            },
             set(self.client._send_capabilities),
         )
 
@@ -720,7 +716,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
                     c, path = get_transport_and_path(remote_url)
 
 
-class TestSSHVendor(object):
+class TestSSHVendor:
     def __init__(self):
         self.host = None
         self.command = ""
@@ -759,7 +755,7 @@ class TestSSHVendor(object):
 
 class SSHGitClientTests(TestCase):
     def setUp(self):
-        super(SSHGitClientTests, self).setUp()
+        super().setUp()
 
         self.server = TestSSHVendor()
         self.real_vendor = client.get_ssh_vendor
@@ -768,7 +764,7 @@ class SSHGitClientTests(TestCase):
         self.client = SSHGitClient("git.samba.org")
 
     def tearDown(self):
-        super(SSHGitClientTests, self).tearDown()
+        super().tearDown()
         client.get_ssh_vendor = self.real_vendor
 
     def test_get_url(self):
@@ -1013,7 +1009,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual("passwd", c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = "%s:%s" % ("user", "passwd")
+        auth_string = "{}:{}".format("user", "passwd")
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
         self.assertEqual(basic_auth, expected_basic_auth)
@@ -1069,7 +1065,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(original_password, c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = "%s:%s" % (original_username, original_password)
+        auth_string = "{}:{}".format(original_username, original_password)
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
         self.assertEqual(basic_auth, expected_basic_auth)
@@ -1527,7 +1523,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
+                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
             )
 
         args = command.proc.args
@@ -1572,7 +1568,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
+                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
             )
 
         args = command.proc.args

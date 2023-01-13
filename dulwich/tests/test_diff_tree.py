@@ -64,7 +64,7 @@ from dulwich.tests.utils import (
 
 class DiffTestCase(TestCase):
     def setUp(self):
-        super(DiffTestCase, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.empty_tree = self.commit_tree([])
 
@@ -87,7 +87,7 @@ class DiffTestCase(TestCase):
 
 class TreeChangesTest(DiffTestCase):
     def setUp(self):
-        super(TreeChangesTest, self).setUp()
+        super().setUp()
         self.detector = RenameDetector(self.store)
 
     def assertMergeFails(self, merge_entries, name, mode, sha):
@@ -699,7 +699,7 @@ class RenameDetectionTest(DiffTestCase):
 
         block_cache = {}
         self.assertEqual(50, _similarity_score(blob1, blob2, block_cache=block_cache))
-        self.assertEqual(set([blob1.id, blob2.id]), set(block_cache))
+        self.assertEqual({blob1.id, blob2.id}, set(block_cache))
 
         def fail_chunks():
             self.fail("Unexpected call to as_raw_chunks()")

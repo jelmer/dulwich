@@ -38,7 +38,7 @@ else:
     class Server(paramiko.ServerInterface):
         """http://docs.paramiko.org/en/2.4/api/server.html"""
         def __init__(self, commands, *args, **kwargs):
-            super(Server, self).__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)
             self.commands = commands
 
         def check_channel_exec_request(self, channel, command):
@@ -152,7 +152,7 @@ class ParamikoSSHVendorTests(TestCase):
     def _run(self):
         try:
             conn, addr = self.socket.accept()
-        except socket.error:
+        except OSError:
             return False
         self.transport = paramiko.Transport(conn)
         self.addCleanup(self.transport.close)

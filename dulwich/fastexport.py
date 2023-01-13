@@ -45,7 +45,7 @@ def split_email(text):
     return (name, email.rstrip(b">"))
 
 
-class GitFastExporter(object):
+class GitFastExporter:
     """Generate a fast-export output stream for Git objects."""
 
     def __init__(self, outf, store):

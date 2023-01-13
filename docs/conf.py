@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # dulwich documentation build configuration file, created by
 # sphinx-quickstart on Thu Feb 18 23:18:28 2010.
@@ -48,8 +47,8 @@ source_suffix = '.txt'
 master_doc = 'index'
 
 # General information about the project.
-project = u'dulwich'
-copyright = u'2011-2019 Jelmer Vernooĳ'
+project = 'dulwich'
+copyright = '2011-2023 Jelmer Vernooĳ'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -186,7 +185,7 @@ htmlhelp_basename = 'dulwichdoc'
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ('index', 'dulwich.tex', u'dulwich Documentation',
+    ('index', 'dulwich.tex', 'dulwich Documentation',
      'Jelmer Vernooij', 'manual'),
 ]
 

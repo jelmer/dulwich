@@ -47,7 +47,7 @@ class GitFastExporterTests(TestCase):
     """Tests for the GitFastExporter tests."""
 
     def setUp(self):
-        super(GitFastExporterTests, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.stream = BytesIO()
         try:
@@ -96,7 +96,7 @@ class GitImportProcessorTests(TestCase):
     """Tests for the GitImportProcessor tests."""
 
     def setUp(self):
-        super(GitImportProcessorTests, self).setUp()
+        super().setUp()
         self.repo = MemoryRepo()
         try:
             from dulwich.fastexport import GitImportProcessor

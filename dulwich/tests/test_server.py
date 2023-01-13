@@ -75,7 +75,7 @@ FIVE = b"5" * 40
 SIX = b"6" * 40
 
 
-class TestProto(object):
+class TestProto:
     def __init__(self):
         self._output = []
         self._received = {0: [], 1: [], 2: [], 3: []}
@@ -120,7 +120,7 @@ class TestGenericPackHandler(PackHandler):
 
 class HandlerTestCase(TestCase):
     def setUp(self):
-        super(HandlerTestCase, self).setUp()
+        super().setUp()
         self._handler = TestGenericPackHandler()
 
     def assertSucceeds(self, func, *args, **kwargs):
@@ -164,7 +164,7 @@ class HandlerTestCase(TestCase):
 
 class UploadPackHandlerTestCase(TestCase):
     def setUp(self):
-        super(UploadPackHandlerTestCase, self).setUp()
+        super().setUp()
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b"/": self._repo})
         self._handler = UploadPackHandler(
@@ -251,7 +251,7 @@ class UploadPackHandlerTestCase(TestCase):
 
 class FindShallowTests(TestCase):
     def setUp(self):
-        super(FindShallowTests, self).setUp()
+        super().setUp()
         self._store = MemoryObjectStore()
 
     def make_commit(self, **attrs):
@@ -274,18 +274,18 @@ class FindShallowTests(TestCase):
         c1, c2, c3 = self.make_linear_commits(3)
 
         self.assertEqual(
-            (set([c3.id]), set([])), _find_shallow(self._store, [c3.id], 1)
+            ({c3.id}, set()), _find_shallow(self._store, [c3.id], 1)
         )
         self.assertEqual(
-            (set([c2.id]), set([c3.id])),
+            ({c2.id}, {c3.id}),
             _find_shallow(self._store, [c3.id], 2),
         )
         self.assertEqual(
-            (set([c1.id]), set([c2.id, c3.id])),
+            ({c1.id}, {c2.id, c3.id}),
             _find_shallow(self._store, [c3.id], 3),
         )
         self.assertEqual(
-            (set([]), set([c1.id, c2.id, c3.id])),
+            (set(), {c1.id, c2.id, c3.id}),
             _find_shallow(self._store, [c3.id], 4),
         )
 
@@ -296,7 +296,7 @@ class FindShallowTests(TestCase):
         heads = [a[1].id, b[1].id, c[1].id]
 
         self.assertEqual(
-            (set([a[0].id, b[0].id, c[0].id]), set(heads)),
+            ({a[0].id, b[0].id, c[0].id}, set(heads)),
             _find_shallow(self._store, heads, 2),
         )
 
@@ -311,7 +311,7 @@ class FindShallowTests(TestCase):
 
         # 1 is shallow along the path from 4, but not along the path from 2.
         self.assertEqual(
-            (set([c1.id]), set([c1.id, c2.id, c3.id, c4.id])),
+            ({c1.id}, {c1.id, c2.id, c3.id, c4.id}),
             _find_shallow(self._store, [c2.id, c4.id], 3),
         )
 
@@ -321,7 +321,7 @@ class FindShallowTests(TestCase):
         c3 = self.make_commit(parents=[c1.id, c2.id])
 
         self.assertEqual(
-            (set([c1.id, c2.id]), set([c3.id])),
+            ({c1.id, c2.id}, {c3.id}),
             _find_shallow(self._store, [c3.id], 2),
         )
 
@@ -331,7 +331,7 @@ class FindShallowTests(TestCase):
         self._store.add_object(tag)
 
         self.assertEqual(
-            (set([c1.id]), set([c2.id])),
+            ({c1.id}, {c2.id}),
             _find_shallow(self._store, [tag.id], 2),
         )
 
@@ -344,7 +344,7 @@ class TestUploadPackHandler(UploadPackHandler):
 
 class ReceivePackHandlerTestCase(TestCase):
     def setUp(self):
-        super(ReceivePackHandlerTestCase, self).setUp()
+        super().setUp()
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b"/": self._repo})
         self._handler = ReceivePackHandler(
@@ -367,7 +367,7 @@ class ReceivePackHandlerTestCase(TestCase):
 
 class ProtocolGraphWalkerEmptyTestCase(TestCase):
     def setUp(self):
-        super(ProtocolGraphWalkerEmptyTestCase, self).setUp()
+        super().setUp()
         self._repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b"/": self._repo})
         self._walker = _ProtocolGraphWalker(
@@ -390,7 +390,7 @@ class ProtocolGraphWalkerEmptyTestCase(TestCase):
 
 class ProtocolGraphWalkerTestCase(TestCase):
     def setUp(self):
-        super(ProtocolGraphWalkerTestCase, self).setUp()
+        super().setUp()
         # Create the following commit tree:
         #   3---5
         #  /
@@ -555,7 +555,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
     def test_handle_shallow_request_no_client_shallows(self):
         self._handle_shallow_request([b"deepen 2\n"], [FOUR, FIVE])
-        self.assertEqual(set([TWO, THREE]), self._walker.shallow)
+        self.assertEqual({TWO, THREE}, self._walker.shallow)
         self.assertReceived(
             [
                 b"shallow " + TWO,
@@ -570,7 +570,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
             b"deepen 2\n",
         ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
-        self.assertEqual(set([TWO, THREE]), self._walker.shallow)
+        self.assertEqual({TWO, THREE}, self._walker.shallow)
         self.assertReceived([])
 
     def test_handle_shallow_request_unshallows(self):
@@ -579,7 +579,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
             b"deepen 3\n",
         ]
         self._handle_shallow_request(lines, [FOUR, FIVE])
-        self.assertEqual(set([ONE]), self._walker.shallow)
+        self.assertEqual({ONE}, self._walker.shallow)
         self.assertReceived(
             [
                 b"shallow " + ONE,
@@ -589,7 +589,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
         )
 
 
-class TestProtocolGraphWalker(object):
+class TestProtocolGraphWalker:
     def __init__(self):
         self.acks = []
         self.lines = []
@@ -639,7 +639,7 @@ class AckGraphWalkerImplTestCase(TestCase):
     """Base setup and asserts for AckGraphWalker tests."""
 
     def setUp(self):
-        super(AckGraphWalkerImplTestCase, self).setUp()
+        super().setUp()
         self._walker = TestProtocolGraphWalker()
         self._walker.lines = [
             (b"have", TWO),
@@ -1064,7 +1064,7 @@ class FileSystemBackendTests(TestCase):
     """Tests for FileSystemBackend."""
 
     def setUp(self):
-        super(FileSystemBackendTests, self).setUp()
+        super().setUp()
         self.path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
@@ -1124,7 +1124,7 @@ class ServeCommandTests(TestCase):
     """Tests for serve_command."""
 
     def setUp(self):
-        super(ServeCommandTests, self).setUp()
+        super().setUp()
         self.backend = DictBackend({})
 
     def serve_command(self, handler_cls, args, inf, outf):
@@ -1159,7 +1159,7 @@ class UpdateServerInfoTests(TestCase):
     """Tests for update_server_info."""
 
     def setUp(self):
-        super(UpdateServerInfoTests, self).setUp()
+        super().setUp()
         self.path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)

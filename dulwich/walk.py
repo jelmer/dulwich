@@ -24,7 +24,7 @@
 import collections
 import heapq
 from itertools import chain
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Deque, Literal, Optional
 
 from dulwich.diff_tree import (
     RENAME_CHANGE_TYPES,
@@ -50,7 +50,7 @@ ALL_ORDERS = (ORDER_DATE, ORDER_TOPO)
 _MAX_EXTRA_COMMITS = 5
 
 
-class WalkEntry(object):
+class WalkEntry:
     """Object encapsulating a single result from a walk."""
 
     def __init__(self, walker, commit):
@@ -122,13 +122,13 @@ class WalkEntry(object):
         return self._changes[path_prefix]
 
     def __repr__(self):
-        return "<WalkEntry commit=%s, changes=%r>" % (
+        return "<WalkEntry commit={}, changes={!r}>".format(
             self.commit.id,
             self.changes(),
         )
 
 
-class _CommitTimeQueue(object):
+class _CommitTimeQueue:
     """Priority queue of WalkEntry objects by commit time."""
 
     def __init__(self, walker: "Walker"):
@@ -232,7 +232,7 @@ class _CommitTimeQueue(object):
     __next__ = next
 
 
-class Walker(object):
+class Walker:
     """Object for performing a walk of commits in a store.
 
     Walker objects are initialized with a store and other options and can then
@@ -242,16 +242,16 @@ class Walker(object):
     def __init__(
         self,
         store,
-        include,
-        exclude=None,
-        order=ORDER_DATE,
-        reverse=False,
-        max_entries=None,
-        paths=None,
-        rename_detector=None,
-        follow=False,
-        since=None,
-        until=None,
+        include: List[bytes],
+        exclude: Optional[List[bytes]] = None,
+        order: Literal["date", "topo"] = 'date',
+        reverse: bool = False,
+        max_entries: Optional[int] = None,
+        paths: Optional[List[bytes]] = None,
+        rename_detector: Optional[RenameDetector] = None,
+        follow: bool = False,
+        since: Optional[int] = None,
+        until: Optional[int] = None,
         get_parents=lambda commit: commit.parents,
         queue_cls=_CommitTimeQueue,
     ):
@@ -306,11 +306,13 @@ class Walker(object):
 
         self._num_entries = 0
         self._queue = queue_cls(self)
-        self._out_queue = collections.deque()
+        self._out_queue: Deque[WalkEntry] = collections.deque()
 
     def _path_matches(self, changed_path):
         if changed_path is None:
             return False
+        if self.paths is None:
+            return True
         for followed_path in self.paths:
             if changed_path == followed_path:
                 return True

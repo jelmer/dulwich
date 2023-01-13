@@ -563,7 +563,7 @@ class PackBasedObjectStore(BaseObjectStore):
                 pass
         raise KeyError(hexsha)
 
-    def get_raw_unresolved(self, sha1: bytes) -> Tuple[int, Union[bytes, None], List[bytes]]:
+    def get_raw_unresolved(self, name: bytes) -> Tuple[int, Union[bytes, None], List[bytes]]:
         """Obtain the unresolved data for an object.
 
         Args:
@@ -1198,6 +1198,7 @@ def _collect_filetree_revs(obj_store: ObjectContainer, tree_sha: ObjectID, kset:
       kset: set to fill with references to files and directories
     """
     filetree = obj_store[tree_sha]
+    assert isinstance(filetree, Tree)
     for name, mode, sha in filetree.iteritems():
         if not S_ISGITLINK(mode) and sha not in kset:
             kset.add(sha)

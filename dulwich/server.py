@@ -472,7 +472,7 @@ def _find_shallow(store: ObjectContainer, heads, depth):
         considered shallow and unshallow according to the arguments. Note that
         these sets may overlap if a commit is reachable along multiple paths.
     """
-    parents: Dict[bytes, List[bytes]]  = {}
+    parents: Dict[bytes, List[bytes]] = {}
 
     def get_parents(sha):
         result = parents.get(sha, None)

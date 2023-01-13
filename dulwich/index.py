@@ -32,7 +32,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    TYPE_CHECKING,
     Iterable,
     Iterator,
     Tuple,

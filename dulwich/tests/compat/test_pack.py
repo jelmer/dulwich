@@ -66,7 +66,7 @@ class TestPack(PackTests):
 
     def setUp(self):
         require_git_version((1, 5, 0))
-        super(TestPack, self).setUp()
+        super().setUp()
         self._tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self._tempdir)
 

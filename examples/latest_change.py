@@ -6,7 +6,7 @@ import time
 from dulwich.repo import Repo
 
 if len(sys.argv) < 2:
-    print("usage: %s filename" % (sys.argv[0], ))
+    print("usage: {} filename".format(sys.argv[0]))
     sys.exit(1)
 
 r = Repo(".")
@@ -19,5 +19,5 @@ try:
 except StopIteration:
     print("No file %s anywhere in history." % sys.argv[1])
 else:
-    print("%s was last changed by %s at %s (commit %s)" % (
+    print("{} was last changed by {} at {} (commit {})".format(
         sys.argv[1], c.author, time.ctime(c.author_time), c.id))

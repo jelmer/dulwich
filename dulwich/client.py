@@ -194,7 +194,7 @@ RECEIVE_CAPABILITIES = [
 ] + COMMON_CAPABILITIES
 
 
-class ReportStatusParser(object):
+class ReportStatusParser:
     """Handle status as reported by servers with 'report-status' capability."""
 
     def __init__(self):
@@ -258,13 +258,13 @@ def read_pkt_refs(pkt_seq):
         refs[ref] = sha
 
     if len(refs) == 0:
-        return {}, set([])
+        return {}, set()
     if refs == {CAPABILITIES_REF: ZERO_SHA}:
         refs = {}
     return refs, set(server_capabilities)
 
 
-class FetchPackResult(object):
+class FetchPackResult:
     """Result of a fetch-pack operation.
 
     Attributes:
@@ -336,10 +336,10 @@ class FetchPackResult(object):
         if name in type(self)._FORWARDED_ATTRS:
             self._warn_deprecated()
             return getattr(self.refs, name)
-        return super(FetchPackResult, self).__getattribute__(name)
+        return super().__getattribute__(name)
 
     def __repr__(self):
-        return "%s(%r, %r, %r)" % (
+        return "{}({!r}, {!r}, {!r})".format(
             self.__class__.__name__,
             self.refs,
             self.symrefs,
@@ -347,7 +347,7 @@ class FetchPackResult(object):
         )
 
 
-class SendPackResult(object):
+class SendPackResult:
     """Result of a upload-pack operation.
 
     Attributes:
@@ -414,10 +414,10 @@ class SendPackResult(object):
         if name in type(self)._FORWARDED_ATTRS:
             self._warn_deprecated()
             return getattr(self.refs, name)
-        return super(SendPackResult, self).__getattribute__(name)
+        return super().__getattribute__(name)
 
     def __repr__(self):
-        return "%s(%r, %r)" % (self.__class__.__name__, self.refs, self.agent)
+        return "{}({!r}, {!r})".format(self.__class__.__name__, self.refs, self.agent)
 
 
 def _read_shallow_updates(pkt_seq):
@@ -434,7 +434,7 @@ def _read_shallow_updates(pkt_seq):
     return (new_shallow, new_unshallow)
 
 
-class _v1ReceivePackHeader(object):
+class _v1ReceivePackHeader:
 
     def __init__(self, capabilities, old_refs, new_refs):
         self.want = []
@@ -464,12 +464,12 @@ class _v1ReceivePackHeader(object):
             old_sha1 = old_refs.get(refname, ZERO_SHA)
             if not isinstance(old_sha1, bytes):
                 raise TypeError(
-                    "old sha1 for %s is not a bytestring: %r" % (refname, old_sha1)
+                    "old sha1 for {!r} is not a bytestring: {!r}".format(refname, old_sha1)
                 )
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if not isinstance(new_sha1, bytes):
                 raise TypeError(
-                    "old sha1 for %s is not a bytestring %r" % (refname, new_sha1)
+                    "old sha1 for {!r} is not a bytestring {!r}".format(refname, new_sha1)
                 )
 
             if old_sha1 != new_sha1:
@@ -643,7 +643,7 @@ def _handle_upload_pack_tail(
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
-class GitClient(object):
+class GitClient:
     """Git smart server client."""
 
     def __init__(
@@ -1012,7 +1012,7 @@ class TraditionalGitClient(GitClient):
 
     def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs):
         self._remote_path_encoding = path_encoding
-        super(TraditionalGitClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     async def _connect(self, cmd, path):
         """Create a connection to the server.
@@ -1255,7 +1255,7 @@ class TCPGitClient(TraditionalGitClient):
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
-        super(TCPGitClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
@@ -1283,7 +1283,7 @@ class TCPGitClient(TraditionalGitClient):
             try:
                 s.connect(sockaddr)
                 break
-            except socket.error as e:
+            except OSError as e:
                 err = e
                 if s is not None:
                     s.close()
@@ -1313,7 +1313,7 @@ class TCPGitClient(TraditionalGitClient):
         return proto, lambda: _fileno_can_read(s), None
 
 
-class SubprocessWrapper(object):
+class SubprocessWrapper:
     """A socket-like object that talks to a subprocess via pipes."""
 
     def __init__(self, proc):
@@ -1472,7 +1472,7 @@ class LocalGitClient(GitClient):
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
                 if new_sha1 != ZERO_SHA:
                     if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
-                        msg = "unable to set %s to %s" % (refname, new_sha1)
+                        msg = "unable to set {} to {}".format(refname, new_sha1)
                         progress(msg)
                         ref_status[refname] = msg
                 else:
@@ -1557,7 +1557,7 @@ class LocalGitClient(GitClient):
 default_local_git_client_cls = LocalGitClient
 
 
-class SSHVendor(object):
+class SSHVendor:
     """A client side SSH implementation."""
 
     def run_command(
@@ -1594,7 +1594,7 @@ class StrangeHostname(Exception):
     """Refusing to connect to strange SSH hostname."""
 
     def __init__(self, hostname):
-        super(StrangeHostname, self).__init__(hostname)
+        super().__init__(hostname)
 
 
 class SubprocessSSHVendor(SSHVendor):
@@ -1630,7 +1630,7 @@ class SubprocessSSHVendor(SSHVendor):
             args.extend(["-i", str(key_filename)])
 
         if username:
-            host = "%s@%s" % (username, host)
+            host = "{}@{}".format(username, host)
         if host.startswith("-"):
             raise StrangeHostname(hostname=host)
         args.append(host)
@@ -1684,7 +1684,7 @@ class PLinkSSHVendor(SSHVendor):
             args.extend(["-i", str(key_filename)])
 
         if username:
-            host = "%s@%s" % (username, host)
+            host = "{}@{}".format(username, host)
         if host.startswith("-"):
             raise StrangeHostname(hostname=host)
         args.append(host)
@@ -1736,7 +1736,7 @@ class SSHGitClient(TraditionalGitClient):
         self.ssh_command = ssh_command or os.environ.get(
             "GIT_SSH_COMMAND", os.environ.get("GIT_SSH")
         )
-        super(SSHGitClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.alternative_paths = {}
         if vendor is not None:
             self.ssh_vendor = vendor
@@ -2195,14 +2195,14 @@ class AbstractHttpGitClient(GitClient):
             kwargs["username"] = urlunquote(username)
         netloc = parsedurl.hostname
         if parsedurl.port:
-            netloc = "%s:%s" % (netloc, parsedurl.port)
+            netloc = "{}:{}".format(netloc, parsedurl.port)
         if parsedurl.username:
-            netloc = "%s@%s" % (parsedurl.username, netloc)
+            netloc = "{}@{}".format(parsedurl.username, netloc)
         parsedurl = parsedurl._replace(netloc=netloc)
         return cls(urlunparse(parsedurl), **kwargs)
 
     def __repr__(self):
-        return "%s(%r, dumb=%r)" % (
+        return "{}({!r}, dumb={!r})".format(
             type(self).__name__,
             self._base_url,
             self.dumb,
@@ -2239,7 +2239,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
 
         self.config = config
 
-        super(Urllib3HttpGitClient, self).__init__(
+        super().__init__(
             base_url=base_url, dumb=dumb, **kwargs)
 
     def _get_url(self, path):

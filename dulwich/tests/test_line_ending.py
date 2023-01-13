@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # test_line_ending.py -- Tests for the line ending functions
 # encoding: utf-8
 # Copyright (C) 2018-2019 Boris Feld <boris.feld@comet.ml>

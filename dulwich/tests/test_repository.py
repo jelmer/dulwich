@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # test_repository.py -- tests for repository.py
 # Copyright (C) 2007 James Westby <jw+debian@jameswestby.net>
 #
@@ -332,7 +331,7 @@ class RepositoryRootTests(TestCase):
         self.assertFilesystemHidden(os.path.join(repo_dir, ".git"))
 
     def test_init_mkdir_unicode(self):
-        repo_name = u"\xa7"
+        repo_name = "\xa7"
         try:
             os.fsencode(repo_name)
         except UnicodeEncodeError:
@@ -543,7 +542,7 @@ class RepositoryRootTests(TestCase):
         ``Repo.fetch_objects()``).
         """
 
-        expected_shas = set([b"60dacdc733de308bb77bb76ce0fb0f9b44c9769e"])
+        expected_shas = {b"60dacdc733de308bb77bb76ce0fb0f9b44c9769e"}
 
         # Source for objects.
         r_base = self.open_repo("simple_merge.git")
@@ -690,9 +689,9 @@ exit 0
         if os.name != "posix":
             self.skipTest("shell hook tests requires POSIX shell")
 
-        pre_commit_contents = """#!%(executable)s
+        pre_commit_contents = """#!{executable}
 import sys
-sys.path.extend(%(path)r)
+sys.path.extend({path!r})
 from dulwich.repo import Repo
 
 with open('foo', 'w') as f:
@@ -700,9 +699,9 @@ with open('foo', 'w') as f:
 
 r = Repo('.')
 r.stage(['foo'])
-""" % {
-            'executable': sys.executable,
-            'path': [os.path.join(os.path.dirname(__file__), '..', '..')] + sys.path}
+""".format(
+            executable=sys.executable,
+            path=[os.path.join(os.path.dirname(__file__), '..', '..')] + sys.path)
 
         repo_dir = os.path.join(self.mkdtemp())
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -732,7 +731,7 @@ r.stage(['foo'])
         self.assertEqual([], r[commit_sha].parents)
 
         tree = r[r[commit_sha].tree]
-        self.assertEqual(set([b'blah', b'foo']), set(tree))
+        self.assertEqual({b'blah', b'foo'}, set(tree))
 
     def test_shell_hook_post_commit(self):
         if os.name != "posix":
@@ -814,7 +813,7 @@ exit 1
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
+                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
             )
         self.assertEqual([commit_sha], r[commit_sha2].parents)
 
@@ -887,7 +886,7 @@ class BuildRepoRootTests(TestCase):
         return os.path.join(tempfile.mkdtemp(), "test")
 
     def setUp(self):
-        super(BuildRepoRootTests, self).setUp()
+        super().setUp()
         self._repo_dir = self.get_repo_dir()
         os.makedirs(self._repo_dir)
         r = self._repo = Repo.init(self._repo_dir)
@@ -1434,7 +1433,7 @@ class BuildRepoRootTests(TestCase):
         r = self._repo
         repo_path_bytes = os.fsencode(r.path)
         encodings = ("utf8", "latin1")
-        names = [u"À".encode(encoding) for encoding in encodings]
+        names = ["À".encode(encoding) for encoding in encodings]
         for name, encoding in zip(names, encodings):
             full_path = os.path.join(repo_path_bytes, name)
             with open(full_path, "wb") as f:

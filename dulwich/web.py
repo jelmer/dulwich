@@ -157,7 +157,7 @@ def send_file(req, f, content_type):
             if not data:
                 break
             yield data
-    except IOError:
+    except OSError:
         yield req.error("Error reading file")
     finally:
         f.close()
@@ -183,7 +183,7 @@ def get_loose_object(req, backend, mat):
         return
     try:
         data = object_store[sha].as_legacy_object()
-    except IOError:
+    except OSError:
         yield req.error("Error reading object")
         return
     req.cache_forever()
@@ -245,8 +245,7 @@ def get_info_refs(req, backend, mat):
         req.nocache()
         req.respond(HTTP_OK, "text/plain")
         logger.info("Emulating dumb info/refs")
-        for text in generate_info_refs(repo):
-            yield text
+        yield from generate_info_refs(repo)
 
 
 def get_info_packs(req, backend, mat):
@@ -266,7 +265,7 @@ def _chunk_iter(f):
         yield chunk[:-2]
 
 
-class ChunkReader(object):
+class ChunkReader:
 
     def __init__(self, f):
         self._iter = _chunk_iter(f)
@@ -284,7 +283,7 @@ class ChunkReader(object):
         return ret
 
 
-class _LengthLimitedFile(object):
+class _LengthLimitedFile:
     """Wrapper class to limit the length of reads from a file-like object.
 
     This is used to ensure EOF is read from the wsgi.input object once
@@ -332,7 +331,7 @@ def handle_service_request(req, backend, mat):
     handler.handle()
 
 
-class HTTPGitRequest(object):
+class HTTPGitRequest:
     """Class encapsulating the state of a single git HTTP request.
 
     Attributes:
@@ -396,7 +395,7 @@ class HTTPGitRequest(object):
         self._cache_headers = cache_forever_headers()
 
 
-class HTTPGitApplication(object):
+class HTTPGitApplication:
     """Class encapsulating the state of a git WSGI application.
 
     Attributes:
@@ -458,7 +457,7 @@ class HTTPGitApplication(object):
         return handler(req, self.backend, mat)
 
 
-class GunzipFilter(object):
+class GunzipFilter:
     """WSGI middleware that unzips gzip-encoded requests before
     passing on to the underlying application.
     """
@@ -471,7 +470,7 @@ class GunzipFilter(object):
             try:
                 environ["wsgi.input"].tell()
                 wsgi_input = environ["wsgi.input"]
-            except (AttributeError, IOError, NotImplementedError):
+            except (AttributeError, OSError, NotImplementedError):
                 # The gzip implementation in the standard library of Python 2.x
                 # requires working '.seek()' and '.tell()' methods on the input
                 # stream.  Read the data into a temporary file to work around
@@ -490,7 +489,7 @@ class GunzipFilter(object):
         return self.app(environ, start_response)
 
 
-class LimitedInputFilter(object):
+class LimitedInputFilter:
     """WSGI middleware that limits the input length of a request to that
     specified in Content-Length.
     """

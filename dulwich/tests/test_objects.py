@@ -980,7 +980,7 @@ class TreeTests(ShaFileCheckTests):
     def test_iter(self):
         t = Tree()
         t[b"foo"] = (0o100644, a_sha)
-        self.assertEqual(set([b"foo"]), set(t))
+        self.assertEqual({b"foo"}, set(t))
 
 
 class TagSerializeTests(TestCase):
@@ -1143,7 +1143,7 @@ class TagParseTests(ShaFileCheckTests):
 
     def test_check_tag_with_overflow_time(self):
         """Date with overflow should raise an ObjectFormatException when checked"""
-        author = "Some Dude <some@dude.org> %s +0000" % (MAX_TIME + 1,)
+        author = "Some Dude <some@dude.org> {} +0000".format(MAX_TIME + 1)
         tag = Tag.from_string(self.make_tag_text(tagger=(author.encode())))
         with self.assertRaises(ObjectFormatException):
             tag.check()
@@ -1301,14 +1301,14 @@ class TimezoneTests(TestCase):
         self.assertEqual(b"-0440", format_timezone(int(((-4 * 60) - 40) * 60)))
 
     def test_format_timezone_double_negative(self):
-        self.assertEqual(b"--700", format_timezone(int(((7 * 60)) * 60), True))
+        self.assertEqual(b"--700", format_timezone(int((7 * 60) * 60), True))
 
     def test_parse_timezone_pdt_half(self):
         self.assertEqual((((-4 * 60) - 40) * 60, False), parse_timezone(b"-0440"))
 
     def test_parse_timezone_double_negative(self):
-        self.assertEqual((int(((7 * 60)) * 60), False), parse_timezone(b"+700"))
-        self.assertEqual((int(((7 * 60)) * 60), True), parse_timezone(b"--700"))
+        self.assertEqual((int((7 * 60) * 60), False), parse_timezone(b"+700"))
+        self.assertEqual((int((7 * 60) * 60), True), parse_timezone(b"--700"))
 
 
 class ShaFileCopyTests(TestCase):

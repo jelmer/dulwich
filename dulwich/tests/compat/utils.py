@@ -94,7 +94,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     found_version = git_version(git_path=git_path)
     if found_version is None:
         raise SkipTest(
-            "Test requires git >= %s, but c git not found" % (required_version,)
+            "Test requires git >= {}, but c git not found".format(required_version)
         )
 
     if len(required_version) > _VERSION_LEN:
@@ -112,7 +112,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
         required_version = ".".join(map(str, required_version))
         found_version = ".".join(map(str, found_version))
         raise SkipTest(
-            "Test requires git >= %s, found %s" % (required_version, found_version)
+            "Test requires git >= {}, found {}".format(required_version, found_version)
         )
 
 
@@ -216,7 +216,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
             return True
         except socket.timeout:
             pass
-        except socket.error as e:
+        except OSError as e:
             if getattr(e, "errno", False) and e.errno != errno.ECONNREFUSED:
                 raise
             elif e.args[0] != errno.ECONNREFUSED:
@@ -236,7 +236,7 @@ class CompatTestCase(TestCase):
     min_git_version: Tuple[int, ...] = (1, 5, 0)
 
     def setUp(self):
-        super(CompatTestCase, self).setUp()
+        super().setUp()
         require_git_version(self.min_git_version)
 
     def assertObjectStoreEqual(self, store1, store2):

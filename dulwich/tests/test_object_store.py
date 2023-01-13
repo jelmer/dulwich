@@ -77,7 +77,7 @@ except ImportError:
 testobject = make_object(Blob, data=b"yummy data")
 
 
-class ObjectStoreTests(object):
+class ObjectStoreTests:
     def test_determine_wants_all(self):
         self.assertEqual(
             [b"1" * 40],
@@ -164,7 +164,7 @@ class ObjectStoreTests(object):
 
     def test_add_object(self):
         self.store.add_object(testobject)
-        self.assertEqual(set([testobject.id]), set(self.store))
+        self.assertEqual({testobject.id}, set(self.store))
         self.assertIn(testobject.id, self.store)
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
@@ -172,7 +172,7 @@ class ObjectStoreTests(object):
     def test_add_objects(self):
         data = [(testobject, "mypath")]
         self.store.add_objects(data)
-        self.assertEqual(set([testobject.id]), set(self.store))
+        self.assertEqual({testobject.id}, set(self.store))
         self.assertIn(testobject.id, self.store)
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
@@ -626,9 +626,9 @@ class TreeLookupPathTests(TestCase):
 
 class ObjectStoreGraphWalkerTests(TestCase):
     def get_walker(self, heads, parent_map):
-        new_parent_map = dict(
-            [(k * 40, [(p * 40) for p in ps]) for (k, ps) in parent_map.items()]
-        )
+        new_parent_map = {
+            k * 40: [(p * 40) for p in ps] for (k, ps) in parent_map.items()
+        }
         return ObjectStoreGraphWalker(
             [x * 40 for x in heads], new_parent_map.__getitem__
         )
@@ -707,7 +707,7 @@ class ObjectStoreGraphWalkerTests(TestCase):
 
 class CommitTreeChangesTests(TestCase):
     def setUp(self):
-        super(CommitTreeChangesTests, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.blob_a = make_object(Blob, data=b"a")
         self.blob_b = make_object(Blob, data=b"b")

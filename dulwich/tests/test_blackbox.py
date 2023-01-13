@@ -35,7 +35,7 @@ class GitReceivePackTests(BlackboxTestCase):
     """Blackbox tests for dul-receive-pack."""
 
     def setUp(self):
-        super(GitReceivePackTests, self).setUp()
+        super().setUp()
         self.path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
@@ -60,7 +60,7 @@ class GitUploadPackTests(BlackboxTestCase):
     """Blackbox tests for dul-upload-pack."""
 
     def setUp(self):
-        super(GitUploadPackTests, self).setUp()
+        super().setUp()
         self.path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)

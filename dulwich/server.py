@@ -126,7 +126,7 @@ from dulwich.repo import (
 logger = log_utils.getLogger(__name__)
 
 
-class Backend(object):
+class Backend:
     """A backend for the Git smart server implementation."""
 
     def open_repository(self, path):
@@ -141,7 +141,7 @@ class Backend(object):
         raise NotImplementedError(self.open_repository)
 
 
-class BackendRepo(object):
+class BackendRepo:
     """Repository abstraction used by the Git server.
 
     The methods required here are a subset of those provided by
@@ -203,7 +203,7 @@ class FileSystemBackend(Backend):
     """Simple backend looking up Git repositories in the local file system."""
 
     def __init__(self, root=os.sep):
-        super(FileSystemBackend, self).__init__()
+        super().__init__()
         self.root = (os.path.abspath(root) + os.sep).replace(os.sep * 2, os.sep)
 
     def open_repository(self, path):
@@ -212,11 +212,11 @@ class FileSystemBackend(Backend):
         normcase_abspath = os.path.normcase(abspath)
         normcase_root = os.path.normcase(self.root)
         if not normcase_abspath.startswith(normcase_root):
-            raise NotGitRepository("Path %r not inside root %r" % (path, self.root))
+            raise NotGitRepository("Path {!r} not inside root {!r}".format(path, self.root))
         return Repo(abspath)
 
 
-class Handler(object):
+class Handler:
     """Smart protocol command handler base class."""
 
     def __init__(self, backend, proto, stateless_rpc=False):
@@ -232,7 +232,7 @@ class PackHandler(Handler):
     """Protocol handler for packs."""
 
     def __init__(self, backend, proto, stateless_rpc=False):
-        super(PackHandler, self).__init__(backend, proto, stateless_rpc)
+        super().__init__(backend, proto, stateless_rpc)
         self._client_capabilities = None
         # Flags needed for the no-done capability
         self._done_received = False
@@ -289,7 +289,7 @@ class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
     def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
-        super(UploadPackHandler, self).__init__(
+        super().__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
         self.repo = backend.open_repository(args[0])
@@ -500,7 +500,7 @@ def _find_shallow(store, heads, depth):
 def _want_satisfied(store, haves, want, earliest):
     o = store[want]
     pending = collections.deque([o])
-    known = set([want])
+    known = {want}
     while pending:
         commit = pending.popleft()
         if commit.id in haves:
@@ -541,7 +541,7 @@ def _all_wants_satisfied(store, haves, wants):
     return True
 
 
-class _ProtocolGraphWalker(object):
+class _ProtocolGraphWalker:
     """A graph walker that knows the git protocol.
 
     As a graph walker, this class implements ack(), next(), and reset(). It
@@ -752,7 +752,7 @@ class _ProtocolGraphWalker(object):
 _GRAPH_WALKER_COMMANDS = (COMMAND_HAVE, COMMAND_DONE, None)
 
 
-class SingleAckGraphWalkerImpl(object):
+class SingleAckGraphWalkerImpl:
     """Graph walker implementation that speaks the single-ack protocol."""
 
     def __init__(self, walker):
@@ -796,7 +796,7 @@ class SingleAckGraphWalkerImpl(object):
         return True
 
 
-class MultiAckGraphWalkerImpl(object):
+class MultiAckGraphWalkerImpl:
     """Graph walker implementation that speaks the multi-ack protocol."""
 
     def __init__(self, walker):
@@ -855,7 +855,7 @@ class MultiAckGraphWalkerImpl(object):
         return True
 
 
-class MultiAckDetailedGraphWalkerImpl(object):
+class MultiAckDetailedGraphWalkerImpl:
     """Graph walker implementation speaking the multi-ack-detailed protocol."""
 
     def __init__(self, walker):
@@ -924,7 +924,7 @@ class ReceivePackHandler(PackHandler):
     """Protocol handler for downloading a pack from the client."""
 
     def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
-        super(ReceivePackHandler, self).__init__(
+        super().__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
         self.repo = backend.open_repository(args[0])
@@ -1088,7 +1088,7 @@ class ReceivePackHandler(PackHandler):
 
 class UploadArchiveHandler(Handler):
     def __init__(self, backend, args, proto, stateless_rpc=False):
-        super(UploadArchiveHandler, self).__init__(backend, proto, stateless_rpc)
+        super().__init__(backend, proto, stateless_rpc)
         self.repo = backend.open_repository(args[0])
 
     def handle(self):

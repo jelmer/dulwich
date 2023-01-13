@@ -28,7 +28,7 @@ from collections import (
 from io import BytesIO
 from itertools import chain
 import stat
-from typing import List
+from typing import List, Dict, Optional
 
 from dulwich.objects import (
     S_ISGITLINK,
@@ -191,13 +191,12 @@ def tree_changes(
         source and target tree.
     """
     if rename_detector is not None and tree1_id is not None and tree2_id is not None:
-        for change in rename_detector.changes_with_renames(
+        yield from rename_detector.changes_with_renames(
             tree1_id,
             tree2_id,
             want_unchanged=want_unchanged,
             include_trees=include_trees,
-        ):
-            yield change
+        )
         return
 
     entries = walk_trees(
@@ -271,7 +270,7 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None
         for t in parent_tree_ids
     ]
     num_parents = len(parent_tree_ids)
-    changes_by_path = defaultdict(lambda: [None] * num_parents)
+    changes_by_path: Dict[str, List[Optional[TreeChange]]] = defaultdict(lambda: [None] * num_parents)
 
     # Organize by path.
     for i, parent_changes in enumerate(all_parent_changes):
@@ -317,7 +316,7 @@ def _count_blocks(obj):
     Returns:
       A dict of block hashcode -> total bytes occurring.
     """
-    block_counts = defaultdict(int)
+    block_counts: Dict[int, int] = defaultdict(int)
     block = BytesIO()
     n = 0
 
@@ -402,7 +401,7 @@ def _tree_change_key(entry):
     return (path1, path2)
 
 
-class RenameDetector(object):
+class RenameDetector:
     """Object for handling rename detection between two trees."""
 
     def __init__(

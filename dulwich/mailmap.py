@@ -58,7 +58,7 @@ def read_mailmap(f):
         yield parsed_canonical_identity, parsed_from_identity
 
 
-class Mailmap(object):
+class Mailmap:
     """Class for accessing a mailmap file."""
 
     def __init__(self, map=None):

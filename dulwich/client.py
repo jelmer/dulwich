@@ -2266,15 +2266,15 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         if resp.status == 404:
             raise NotGitRepository()
         if resp.status == 401:
-            raise HTTPUnauthorized(resp.getheader("WWW-Authenticate"), url)
+            raise HTTPUnauthorized(resp.headers.get("WWW-Authenticate"), url)
         if resp.status == 407:
-            raise HTTPProxyUnauthorized(resp.getheader("Proxy-Authenticate"), url)
+            raise HTTPProxyUnauthorized(resp.headers.get("Proxy-Authenticate"), url)
         if resp.status != 200:
             raise GitProtocolError(
                 "unexpected http resp %d for %s" % (resp.status, url)
             )
 
-        resp.content_type = resp.getheader("Content-Type")
+        resp.content_type = resp.headers.get("Content-Type")
         # Check if geturl() is available (urllib3 version >= 1.23)
         try:
             resp_url = resp.geturl()

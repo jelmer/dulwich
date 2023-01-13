@@ -1,5 +1,4 @@
 # test_refs.py -- tests for refs.py
-# encoding: utf-8
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -172,7 +171,7 @@ _TEST_REFS = {
 }
 
 
-class RefsContainerTests(object):
+class RefsContainerTests:
     def test_keys(self):
         actual_keys = set(self._refs.keys())
         self.assertEqual(set(self._refs.allkeys()), actual_keys)
@@ -700,7 +699,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_non_ascii(self):
         try:
-            encoded_ref = os.fsencode(u"refs/tags/schön")
+            encoded_ref = os.fsencode("refs/tags/schön")
         except UnicodeEncodeError as exc:
             raise SkipTest(
                 "filesystem encoding doesn't support special character"

@@ -51,13 +51,13 @@ from dulwich.tests.utils import (
 )
 
 
-class TestWalkEntry(object):
+class TestWalkEntry:
     def __init__(self, commit, changes):
         self.commit = commit
         self.changes = changes
 
     def __repr__(self):
-        return "<TestWalkEntry commit=%s, changes=%r>" % (
+        return "<TestWalkEntry commit={}, changes={!r}>".format(
             self.commit.id,
             self.changes,
         )
@@ -72,7 +72,7 @@ class TestWalkEntry(object):
 
 class WalkerTest(TestCase):
     def setUp(self):
-        super(WalkerTest, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
 
     def make_commits(self, commit_spec, **kwargs):
@@ -500,7 +500,7 @@ class WalkerTest(TestCase):
 
 class WalkEntryTest(TestCase):
     def setUp(self):
-        super(WalkEntryTest, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
 
     def make_commits(self, commit_spec, **kwargs):

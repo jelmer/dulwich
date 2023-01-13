@@ -116,7 +116,7 @@ class PackFileDisappeared(Exception):
         self.obj = obj
 
 
-class UnpackedObject(object):
+class UnpackedObject:
     """Class encapsulating an object unpacked from a pack file.
 
     These objects should only be created from within unpack_object. Most
@@ -195,8 +195,8 @@ class UnpackedObject(object):
         return not (self == other)
 
     def __repr__(self):
-        data = ["%s=%r" % (s, getattr(self, s)) for s in self.__slots__]
-        return "%s(%s)" % (self.__class__.__name__, ", ".join(data))
+        data = ["{}={!r}".format(s, getattr(self, s)) for s in self.__slots__]
+        return "{}({})".format(self.__class__.__name__, ", ".join(data))
 
 
 _ZLIB_BUFSIZE = 4096
@@ -356,7 +356,7 @@ def bisect_find_sha(start, end, sha, unpack_name):
     return None
 
 
-class PackIndex(object):
+class PackIndex:
     """An index in to a packfile.
 
     Given a sha id of an object a pack index can tell you the location in the
@@ -524,7 +524,7 @@ class FilePackIndex(PackIndex):
         ):
             return False
 
-        return super(FilePackIndex, self).__eq__(other)
+        return super().__eq__(other)
 
     def close(self):
         self._file.close()
@@ -645,7 +645,7 @@ class PackIndex1(FilePackIndex):
     """Version 1 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
-        super(PackIndex1, self).__init__(filename, file, contents, size)
+        super().__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
 
@@ -670,7 +670,7 @@ class PackIndex2(FilePackIndex):
     """Version 2 Pack Index file."""
 
     def __init__(self, filename, file=None, contents=None, size=None):
-        super(PackIndex2, self).__init__(filename, file, contents, size)
+        super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
             raise AssertionError("Not a v2 pack index file")
         (self.version,) = unpack_from(b">L", self._contents, 4)
@@ -817,14 +817,14 @@ def _compute_object_size(value):
     return chunks_length(obj)
 
 
-class PackStreamReader(object):
+class PackStreamReader:
     """Class to read a pack stream.
 
     The pack is read from a ReceivableProtocol using read() or recv() as
     appropriate.
     """
 
-    def __init__(self, read_all, read_some=None, zlib_bufsize=_ZLIB_BUFSIZE):
+    def __init__(self, read_all, read_some=None, zlib_bufsize=_ZLIB_BUFSIZE) -> None:
         self.read_all = read_all
         if read_some is None:
             self.read_some = read_all
@@ -977,13 +977,13 @@ class PackStreamCopier(PackStreamReader):
           delta_iter: Optional DeltaChainIterator to record deltas as we
             read them.
         """
-        super(PackStreamCopier, self).__init__(read_all, read_some=read_some)
+        super().__init__(read_all, read_some=read_some)
         self.outfile = outfile
         self._delta_iter = delta_iter
 
     def _read(self, read, size):
         """Read data from the read callback and write it to the file."""
-        data = super(PackStreamCopier, self)._read(read, size)
+        data = super()._read(read, size)
         self.outfile.write(data)
         return data
 
@@ -1041,7 +1041,7 @@ def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1 << 16):
     return sha
 
 
-class PackData(object):
+class PackData:
     """The data contained in a packfile.
 
     Pack files can be accessed both sequentially for exploding a pack, and
@@ -1314,7 +1314,7 @@ class PackData(object):
         return (unpacked.pack_type_num, unpacked._obj())
 
 
-class DeltaChainIterator(object):
+class DeltaChainIterator:
     """Abstract iterator over pack data based on delta chains.
 
     Each object in the pack is guaranteed to be inflated exactly once,
@@ -1461,7 +1461,7 @@ class PackInflater(DeltaChainIterator):
         return unpacked.sha_file()
 
 
-class SHA1Reader(object):
+class SHA1Reader:
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
@@ -1485,7 +1485,7 @@ class SHA1Reader(object):
         return self.f.tell()
 
 
-class SHA1Writer(object):
+class SHA1Writer:
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f):
@@ -1643,7 +1643,7 @@ def write_pack_header(write, num_objects):
         write(chunk)
 
 
-def deltify_pack_objects(objects, window_size=None, reuse_pack=None):
+def deltify_pack_objects(objects, window_size: Optional[int] = None, reuse_pack=None):
     """Generate deltas for pack objects.
 
     Args:
@@ -1770,7 +1770,7 @@ def write_pack_objects(
     )
 
 
-class PackChunkGenerator(object):
+class PackChunkGenerator:
 
     def __init__(self, num_records=None, records=None, progress=None, compression_level=-1):
         self.cs = sha1(b"")
@@ -2073,7 +2073,7 @@ def write_pack_index_v2(f, entries, pack_checksum):
 write_pack_index = write_pack_index_v2
 
 
-class _PackTupleIterable(object):
+class _PackTupleIterable:
     """Helper for Pack.pack_tuples."""
 
     def __init__(self, iterobjects, length):
@@ -2087,7 +2087,7 @@ class _PackTupleIterable(object):
         return ((o, None) for o in self._iterobjects())
 
 
-class Pack(object):
+class Pack:
     """A Git pack object."""
 
     _data_load: Optional[Callable[[], PackData]]
@@ -2171,7 +2171,7 @@ class Pack(object):
         return len(self.index)
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self._basename)
+        return "{}({!r})".format(self.__class__.__name__, self._basename)
 
     def __iter__(self):
         """Iterate over all the sha1s of the objects in this pack."""

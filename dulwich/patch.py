@@ -109,10 +109,10 @@ def _format_range_unified(start, stop):
     beginning = start + 1  # lines start numbering with one
     length = stop - start
     if length == 1:
-        return "{}".format(beginning)
+        return f"{beginning}"
     if not length:
         beginning -= 1  # empty ranges begin at line just before the range
-    return "{},{}".format(beginning, length)
+    return f"{beginning},{length}"
 
 
 def unified_diff(
@@ -136,8 +136,8 @@ def unified_diff(
     for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
             started = True
-            fromdate = "\t{}".format(fromfiledate) if fromfiledate else ""
-            todate = "\t{}".format(tofiledate) if tofiledate else ""
+            fromdate = f"\t{fromfiledate}" if fromfiledate else ""
+            todate = f"\t{tofiledate}" if tofiledate else ""
             yield "--- {}{}{}".format(
                 fromfile.decode(tree_encoding), fromdate, lineterm
             ).encode(output_encoding)
@@ -148,7 +148,7 @@ def unified_diff(
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
         file2_range = _format_range_unified(first[3], last[4])
-        yield "@@ -{} +{} @@{}".format(file1_range, file2_range, lineterm).encode(
+        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode(
             output_encoding
         )
 

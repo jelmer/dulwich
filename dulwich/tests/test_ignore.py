@@ -133,14 +133,14 @@ class MatchPatternTests(TestCase):
         for (path, pattern) in POSITIVE_MATCH_TESTS:
             self.assertTrue(
                 match_pattern(path, pattern),
-                "path: %r, pattern: %r" % (path, pattern),
+                "path: {!r}, pattern: {!r}".format(path, pattern),
             )
 
     def test_no_matches(self):
         for (path, pattern) in NEGATIVE_MATCH_TESTS:
             self.assertFalse(
                 match_pattern(path, pattern),
-                "path: %r, pattern: %r" % (path, pattern),
+                "path: {!r}, pattern: {!r}".format(path, pattern),
             )
 
 

@@ -234,7 +234,7 @@ class SwiftException(Exception):
     pass
 
 
-class SwiftConnector(object):
+class SwiftConnector:
     """A Connector to swift that manage authentication and errors catching"""
 
     def __init__(self, root, conf):
@@ -501,7 +501,7 @@ class SwiftConnector(object):
             )
 
 
-class SwiftPackReader(object):
+class SwiftPackReader:
     """A SwiftPackReader that mimic read and sync method
 
     The reader allows to read a specified amount of bytes from
@@ -532,7 +532,7 @@ class SwiftPackReader(object):
             self.buff_length = self.buff_length * 2
         offset = self.base_offset
         r = min(self.base_offset + self.buff_length, self.pack_length)
-        ret = self.scon.get_object(self.filename, range="%s-%s" % (offset, r))
+        ret = self.scon.get_object(self.filename, range="{}-{}".format(offset, r))
         self.buff = ret
 
     def read(self, length):
@@ -629,7 +629,7 @@ class SwiftPack(Pack):
     def __init__(self, *args, **kwargs):
         self.scon = kwargs["scon"]
         del kwargs["scon"]
-        super(SwiftPack, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._pack_info_path = self._basename + ".info"
         self._pack_info = None
         self._pack_info_load = lambda: load_pack_info(self._pack_info_path, self.scon)
@@ -657,7 +657,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         Args:
           scon: A `SwiftConnector` instance
         """
-        super(SwiftObjectStore, self).__init__()
+        super().__init__()
         self.scon = scon
         self.root = self.scon.root
         self.pack_dir = posixpath.join(OBJECTDIR, PACKDIR)
@@ -860,7 +860,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         f = self.scon.get_object(self.filename)
         if not f:
             f = BytesIO(b"")
-        super(SwiftInfoRefsContainer, self).__init__(f)
+        super().__init__(f)
 
     def _load_check_ref(self, name, old_ref):
         self._check_refname(name)
@@ -1066,7 +1066,7 @@ def main(argv=sys.argv):
     }
 
     if len(sys.argv) < 2:
-        print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
+        print("Usage: {} <{}> [OPTIONS...]".format(sys.argv[0], "|".join(commands.keys())))
         sys.exit(1)
 
     cmd = sys.argv[1]

@@ -45,7 +45,7 @@ class ObjectStoreTestCase(CompatTestCase):
     """Tests for git repository compatibility."""
 
     def setUp(self):
-        super(ObjectStoreTestCase, self).setUp()
+        super().setUp()
         self._repo = self.import_repo("server_new.export")
 
     def _run_git(self, args):
@@ -147,7 +147,7 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         return temp_dir
 
     def setUp(self):
-        super(WorkingTreeTestCase, self).setUp()
+        super().setUp()
         self._worktree_path = self.create_new_worktree(self._repo.path, "branch")
         self._worktree_repo = Repo(self._worktree_path)
         self.addCleanup(self._worktree_repo.close)
@@ -156,7 +156,7 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self._repo = self._worktree_repo
 
     def test_refs(self):
-        super(WorkingTreeTestCase, self).test_refs()
+        super().test_refs()
         self.assertEqual(
             self._mainworktree_repo.refs.allkeys(), self._repo.refs.allkeys()
         )
@@ -225,7 +225,7 @@ class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
     min_git_version = (2, 5, 0)
 
     def setUp(self):
-        super(InitNewWorkingDirectoryTestCase, self).setUp()
+        super().setUp()
         self._other_worktree = self._repo
         worktree_repo_path = tempfile.mkdtemp()
         self.addCleanup(rmtree_ro, worktree_repo_path)

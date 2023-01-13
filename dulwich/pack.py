@@ -123,10 +123,6 @@ class PackedObjectContainer(ObjectContainer):
         """Get a raw unresolved object."""
         raise NotImplementedError(self.get_raw_unresolved)
 
-    def get_raw_delta(self, sha1: bytes) -> Tuple[int, Union[bytes, None], List[bytes]]:
-        """Get a raw delta text."""
-        raise NotImplementedError(self.get_raw_delta)
-
 
 def take_msb_bytes(read: Callable[[int], bytes], crc32: Optional[int] = None) -> Tuple[List[int], Optional[int]]:
     """Read bytes marked with most significant bit.

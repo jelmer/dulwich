@@ -51,6 +51,8 @@ from dulwich.object_store import (
     OverlayObjectStore,
     ObjectStoreGraphWalker,
     commit_tree_changes,
+    iter_tree_contents,
+    peel_sha,
     read_packs_file,
     tree_lookup_path,
 )
@@ -219,7 +221,7 @@ class ObjectStoreTests:
         tree_id = commit_tree(self.store, blobs)
         self.assertEqual(
             [TreeEntry(p, m, h) for (p, h, m) in blobs],
-            list(self.store.iter_tree_contents(tree_id)),
+            list(iter_tree_contents(self.store, tree_id)),
         )
 
     def test_iter_tree_contents_include_trees(self):
@@ -247,7 +249,7 @@ class ObjectStoreTests:
             TreeEntry(b"ad/bd", 0o040000, tree_bd.id),
             TreeEntry(b"ad/bd/c", 0o100755, blob_c.id),
         ]
-        actual = self.store.iter_tree_contents(tree_id, include_trees=True)
+        actual = iter_tree_contents(self.store, tree_id, include_trees=True)
         self.assertEqual(expected, list(actual))
 
     def make_tag(self, name, obj):
@@ -261,7 +263,7 @@ class ObjectStoreTests:
         tag2 = self.make_tag(b"2", testobject)
         tag3 = self.make_tag(b"3", testobject)
         for obj in [testobject, tag1, tag2, tag3]:
-            self.assertEqual(testobject, self.store.peel_sha(obj.id))
+            self.assertEqual(testobject, peel_sha(self.store, obj.id))
 
     def test_get_raw(self):
         self.store.add_object(testobject)

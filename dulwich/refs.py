@@ -37,6 +37,7 @@ from dulwich.objects import (
     Tag,
     ObjectID,
 )
+from dulwich.pack import ObjectContainer
 from dulwich.file import (
     GitFile,
     ensure_dir_exists,
@@ -1150,8 +1151,10 @@ def read_info_refs(f):
     return ret
 
 
-def write_info_refs(refs, store):
+def write_info_refs(refs, store: ObjectContainer):
     """Generate info refs."""
+    # Avoid recursive import :(
+    from dulwich.object_store import peel_sha
     for name, sha in sorted(refs.items()):
         # get_refs() includes HEAD as a special case, but we don't want to
         # advertise it
@@ -1161,7 +1164,7 @@ def write_info_refs(refs, store):
             o = store[sha]
         except KeyError:
             continue
-        peeled = store.peel_sha(sha)
+        peeled = peel_sha(store, sha)
         yield o.id + b"\t" + name + b"\n"
         if o.id != peeled.id:
             yield peeled.id + b"\t" + name + ANNOTATED_TAG_SUFFIX + b"\n"

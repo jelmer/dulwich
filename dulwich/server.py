@@ -47,7 +47,7 @@ import os
 import socket
 import sys
 import time
-from typing import List, Tuple, Dict, Optional, Iterable
+from typing import List, Tuple, Dict, Optional, Iterable, Set
 import zlib
 
 import socketserver
@@ -67,8 +67,12 @@ from dulwich.objects import (
     Commit,
     valid_hexsha,
 )
+from dulwich.object_store import (
+    peel_sha,
+)
 from dulwich.pack import (
     write_pack_objects,
+    ObjectContainer,
 )
 from dulwich.protocol import (
     BufferedPktLineWriter,
@@ -456,7 +460,7 @@ def _split_proto_line(line, allowed):
     raise GitProtocolError("Received invalid line from client: %r" % line)
 
 
-def _find_shallow(store, heads, depth):
+def _find_shallow(store: ObjectContainer, heads, depth):
     """Find shallow commits according to a given depth.
 
     Args:
@@ -468,7 +472,7 @@ def _find_shallow(store, heads, depth):
         considered shallow and unshallow according to the arguments. Note that
         these sets may overlap if a commit is reachable along multiple paths.
     """
-    parents = {}
+    parents: Dict[bytes, List[bytes]] = {}
 
     def get_parents(sha):
         result = parents.get(sha, None)
@@ -479,7 +483,7 @@ def _find_shallow(store, heads, depth):
 
     todo = []  # stack of (sha, depth)
     for head_sha in heads:
-        obj = store.peel_sha(head_sha)
+        obj = peel_sha(store, head_sha)
         if isinstance(obj, Commit):
             todo.append((obj.id, 1))
 
@@ -497,7 +501,7 @@ def _find_shallow(store, heads, depth):
     return shallow, not_shallow
 
 
-def _want_satisfied(store, haves, want, earliest):
+def _want_satisfied(store: ObjectContainer, haves, want, earliest):
     o = store[want]
     pending = collections.deque([o])
     known = {want}
@@ -505,7 +509,7 @@ def _want_satisfied(store, haves, want, earliest):
         commit = pending.popleft()
         if commit.id in haves:
             return True
-        if commit.type_name != b"commit":
+        if not isinstance(commit, Commit):
             # non-commit wants are assumed to be satisfied
             continue
         for parent in commit.parents:
@@ -513,13 +517,14 @@ def _want_satisfied(store, haves, want, earliest):
                 continue
             known.add(parent)
             parent_obj = store[parent]
+            assert isinstance(parent_obj, Commit)
             # TODO: handle parents with later commit times than children
             if parent_obj.commit_time >= earliest:
                 pending.append(parent_obj)
     return False
 
 
-def _all_wants_satisfied(store, haves, wants):
+def _all_wants_satisfied(store: ObjectContainer, haves, wants):
     """Check whether all the current wants are satisfied by a set of haves.
 
     Args:
@@ -531,7 +536,8 @@ def _all_wants_satisfied(store, haves, wants):
     """
     haves = set(haves)
     if haves:
-        earliest = min([store[h].commit_time for h in haves])
+        have_objs = [store[h] for h in haves]
+        earliest = min([h.commit_time for h in have_objs if isinstance(h, Commit)])
     else:
         earliest = 0
     for want in wants:
@@ -555,20 +561,20 @@ class _ProtocolGraphWalker:
     any calls to next() or ack() are made.
     """
 
-    def __init__(self, handler, object_store, get_peeled, get_symrefs):
+    def __init__(self, handler, object_store: ObjectContainer, get_peeled, get_symrefs):
         self.handler = handler
-        self.store = object_store
+        self.store: ObjectContainer = object_store
         self.get_peeled = get_peeled
         self.get_symrefs = get_symrefs
         self.proto = handler.proto
         self.stateless_rpc = handler.stateless_rpc
         self.advertise_refs = handler.advertise_refs
-        self._wants = []
-        self.shallow = set()
-        self.client_shallow = set()
-        self.unshallow = set()
+        self._wants: List[bytes] = []
+        self.shallow: Set[bytes] = set()
+        self.client_shallow: Set[bytes] = set()
+        self.unshallow: Set[bytes] = set()
         self._cached = False
-        self._cache = []
+        self._cache: List[bytes] = []
         self._cache_index = 0
         self._impl = None
 
@@ -1104,7 +1110,7 @@ class UploadArchiveHandler(Handler):
         prefix = b""
         format = "tar"
         i = 0
-        store = self.repo.object_store
+        store: ObjectContainer = self.repo.object_store
         while i < len(arguments):
             argument = arguments[i]
             if argument == b"--prefix":

@@ -31,12 +31,13 @@ from dulwich.objects import (
 )
 from dulwich.object_store import (
     MissingObjectFinder,
+    _collect_ancestors,
     _collect_filetree_revs,
     ObjectStoreIterator,
 )
 
 
-def _split_commits_and_tags(obj_store, lst, ignore_unknown=False, pool=None):
+def _split_commits_and_tags(obj_store, lst, *, ignore_unknown=False, pool=None):
     """Split object id list into two list with commit SHA1s and tag SHA1s.
 
     Same implementation as object_store._split_commits_and_tags
@@ -90,11 +91,11 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         self.object_store = object_store
         p = pool.Pool(size=concurrency)
 
-        have_commits, have_tags = _split_commits_and_tags(object_store, haves, True, p)
-        want_commits, want_tags = _split_commits_and_tags(object_store, wants, False, p)
-        all_ancestors = object_store._collect_ancestors(have_commits)[0]
-        missing_commits, common_commits = object_store._collect_ancestors(
-            want_commits, all_ancestors
+        have_commits, have_tags = _split_commits_and_tags(object_store, haves, ignore_unknown=True, pool=p)
+        want_commits, want_tags = _split_commits_and_tags(object_store, wants, ignore_unknown=False, pool=p)
+        all_ancestors = _collect_ancestors(object_store, have_commits)[0]
+        missing_commits, common_commits = _collect_ancestors(
+            object_store, want_commits, all_ancestors
         )
 
         self.sha_done = set()

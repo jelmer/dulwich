@@ -32,15 +32,11 @@ from typing import (
     Dict,
     List,
     Optional,
-    TYPE_CHECKING,
     Iterable,
     Iterator,
     Tuple,
     Union,
 )
-
-if TYPE_CHECKING:
-    from dulwich.object_store import BaseObjectStore
 
 from dulwich.file import GitFile
 from dulwich.objects import (
@@ -52,9 +48,11 @@ from dulwich.objects import (
     sha_to_hex,
     ObjectID,
 )
+from dulwich.object_store import iter_tree_contents
 from dulwich.pack import (
     SHA1Reader,
     SHA1Writer,
+    ObjectContainer,
 )
 
 
@@ -451,7 +449,7 @@ class Index:
 
 
 def commit_tree(
-    object_store: "BaseObjectStore", blobs: Iterable[Tuple[bytes, bytes, int]]
+    object_store: ObjectContainer, blobs: Iterable[Tuple[bytes, bytes, int]]
 ) -> bytes:
     """Commit a new tree.
 
@@ -494,7 +492,7 @@ def commit_tree(
     return build_tree(b"")
 
 
-def commit_index(object_store: "BaseObjectStore", index: Index) -> bytes:
+def commit_index(object_store: ObjectContainer, index: Index) -> bytes:
     """Create a new tree from an index.
 
     Args:
@@ -509,7 +507,7 @@ def commit_index(object_store: "BaseObjectStore", index: Index) -> bytes:
 def changes_from_tree(
     names: Iterable[bytes],
     lookup_entry: Callable[[bytes], Tuple[bytes, int]],
-    object_store: "BaseObjectStore",
+    object_store: ObjectContainer,
     tree: Optional[bytes],
     want_unchanged=False,
 ) -> Iterable[
@@ -535,7 +533,7 @@ def changes_from_tree(
     other_names = set(names)
 
     if tree is not None:
-        for (name, mode, sha) in object_store.iter_tree_contents(tree):
+        for (name, mode, sha) in iter_tree_contents(object_store, tree):
             try:
                 (other_sha, other_mode) = lookup_entry(name)
             except KeyError:
@@ -686,7 +684,7 @@ def validate_path(path: bytes,
 def build_index_from_tree(
     root_path: Union[str, bytes],
     index_path: Union[str, bytes],
-    object_store: "BaseObjectStore",
+    object_store: ObjectContainer,
     tree_id: bytes,
     honor_filemode: bool = True,
     validate_path_element=validate_path_element_default,
@@ -711,7 +709,7 @@ def build_index_from_tree(
     if not isinstance(root_path, bytes):
         root_path = os.fsencode(root_path)
 
-    for entry in object_store.iter_tree_contents(tree_id):
+    for entry in iter_tree_contents(object_store, tree_id):
         if not validate_path(entry.path, validate_path_element):
             continue
         full_path = _tree_to_fs_path(root_path, entry.path)
@@ -727,6 +725,7 @@ def build_index_from_tree(
             # TODO(jelmer): record and return submodule paths
         else:
             obj = object_store[entry.sha]
+            assert isinstance(obj, Blob)
             st = build_file_from_blob(
                 obj, entry.mode, full_path,
                 honor_filemode=honor_filemode,
@@ -927,7 +926,7 @@ def index_entry_from_directory(st, path: bytes) -> Optional[IndexEntry]:
 
 
 def index_entry_from_path(
-        path: bytes, object_store: Optional["BaseObjectStore"] = None
+        path: bytes, object_store: Optional[ObjectContainer] = None
 ) -> Optional[IndexEntry]:
     """Create an index from a filesystem path.
 
@@ -957,7 +956,7 @@ def index_entry_from_path(
 
 def iter_fresh_entries(
     paths: Iterable[bytes], root_path: bytes,
-    object_store: Optional["BaseObjectStore"] = None
+    object_store: Optional[ObjectContainer] = None
 ) -> Iterator[Tuple[bytes, Optional[IndexEntry]]]:
     """Iterate over current versions of index entries on disk.
 

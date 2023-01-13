@@ -1666,12 +1666,15 @@ def deltify_pack_objects(objects, window_size=None, reuse_pack=None):
         for obj, path in objects:
             objects_to_pack.add(sha_to_hex(obj.sha().digest()))
         for o, _ in objects:
-            if not o.sha().digest() in reuse_pack:
-                continue
+            sha_digest = o.sha().digest()
             # get_raw_unresolved() translates OFS_DELTA into REF_DELTA for us
-            (obj_type, delta_base, _) = reuse_pack.get_raw_unresolved(o.sha().digest())
+            try:
+                (obj_type, delta_base, chunks) = reuse_pack.get_raw_unresolved(sha_digest)
+            except KeyError:
+                continue
             if obj_type == REF_DELTA and delta_base in objects_to_pack:
-                reused_deltas.add(o.sha().digest())
+                yield obj_type, sha_digest, hex_to_sha(delta_base), chunks
+                reused_deltas.add(sha_digest)
 
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
@@ -1707,10 +1710,6 @@ def deltify_pack_objects(objects, window_size=None, reuse_pack=None):
         possible_bases.appendleft((o.sha().digest(), type_num, raw))
         while len(possible_bases) > window_size:
             possible_bases.pop()
-
-    for sha_digest in reused_deltas:
-        (obj_type, delta_base, chunks) = reuse_pack.get_raw_delta(sha_digest)
-        yield obj_type, sha_digest, hex_to_sha(delta_base), chunks
 
 
 def pack_objects_to_data(objects):
@@ -1757,7 +1756,8 @@ def write_pack_objects(
         # slow at the moment.
         deltify = False
     if deltify:
-        pack_contents = deltify_pack_objects(objects, delta_window_size, reuse_pack)
+        pack_contents = deltify_pack_objects(
+            objects, window_size=delta_window_size, reuse_pack=reuse_pack)
         pack_contents_count = len(objects)
     else:
         pack_contents_count, pack_contents = pack_objects_to_data(objects)

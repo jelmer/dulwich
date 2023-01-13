@@ -26,13 +26,10 @@ from io import BytesIO
 import os
 import stat
 import sys
+import warnings
 
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Protocol, Union, Iterator, Set
 
-from dulwich.diff_tree import (
-    tree_changes,
-    walk_trees,
-)
 from dulwich.errors import (
     NotTreeError,
 )
@@ -48,10 +45,12 @@ from dulwich.objects import (
     sha_to_hex,
     hex_to_filename,
     S_ISGITLINK,
+    TreeEntry,
     object_class,
     valid_hexsha,
 )
 from dulwich.pack import (
+    ObjectContainer,
     Pack,
     PackData,
     PackInflater,
@@ -77,6 +76,14 @@ PACKDIR = "pack"
 # TODO: should packs also be non-writable on Windows? if so, that
 # would requite some rather significant adjustments to the test suite
 PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
+
+
+class PackContainer(Protocol):
+
+    def add_pack(
+        self
+    ) -> Tuple[BytesIO, Callable[[], None], Callable[[], None]]:
+        """Add a new pack."""
 
 
 class BaseObjectStore:
@@ -213,6 +220,8 @@ class BaseObjectStore:
         Returns: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
+
+        from dulwich.diff_tree import tree_changes
         for change in tree_changes(
             self,
             source,
@@ -239,11 +248,10 @@ class BaseObjectStore:
         Returns: Iterator over TreeEntry namedtuples for all the objects in a
             tree.
         """
-        for entry, _ in walk_trees(self, tree_id, None):
-            if (
-                entry.mode is not None and not stat.S_ISDIR(entry.mode)
-            ) or include_trees:
-                yield entry
+        warnings.warn(
+            "Please use dulwich.object_store.iter_tree_contents",
+            DeprecationWarning, stacklevel=2)
+        return iter_tree_contents(self, tree_id, include_trees=include_trees)
 
     def find_missing_objects(
         self,
@@ -334,47 +342,10 @@ class BaseObjectStore:
             intermediate tags; if the original ref does not point to a tag,
             this will equal the original SHA1.
         """
-        obj = self[sha]
-        obj_class = object_class(obj.type_name)
-        while obj_class is Tag:
-            obj_class, sha = obj.object
-            obj = self[sha]
-        return obj
-
-    def _collect_ancestors(
-        self,
-        heads,
-        common=frozenset(),
-        shallow=frozenset(),
-        get_parents=lambda commit: commit.parents,
-    ):
-        """Collect all ancestors of heads up to (excluding) those in common.
-
-        Args:
-          heads: commits to start from
-          common: commits to end at, or empty set to walk repository
-            completely
-          get_parents: Optional function for getting the parents of a
-            commit.
-        Returns: a tuple (A, B) where A - all commits reachable
-            from heads but not present in common, B - common (shared) elements
-            that are directly reachable from heads
-        """
-        bases = set()
-        commits = set()
-        queue = []
-        queue.extend(heads)
-        while queue:
-            e = queue.pop(0)
-            if e in common:
-                bases.add(e)
-            elif e not in commits:
-                commits.add(e)
-                if e in shallow:
-                    continue
-                cmt = self[e]
-                queue.extend(get_parents(cmt))
-        return (commits, bases)
+        warnings.warn(
+            "Please use dulwich.object_store.peel_sha()",
+            DeprecationWarning, stacklevel=2)
+        return peel_sha(self, sha)
 
     def _get_depth(
         self, head, get_parents=lambda commit: commit.parents, max_depth=None,
@@ -1083,10 +1054,10 @@ class MemoryObjectStore(BaseObjectStore):
             commit()
 
 
-class ObjectIterator:
+class ObjectIterator(Protocol):
     """Interface for iterating over objects."""
 
-    def iterobjects(self):
+    def iterobjects(self) -> Iterator[ShaFile]:
         raise NotImplementedError(self.iterobjects)
 
 
@@ -1194,7 +1165,7 @@ def _collect_filetree_revs(obj_store, tree_sha, kset):
                 _collect_filetree_revs(obj_store, sha, kset)
 
 
-def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
+def _split_commits_and_tags(obj_store: ObjectContainer, lst, *, ignore_unknown=False) -> Tuple[Set[bytes], Set[bytes], Set[bytes]]:
     """Split object id list into three lists with commit, tag, and other SHAs.
 
     Commits referenced by tags are included into commits
@@ -1209,9 +1180,9 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
         silently.
     Returns: A tuple of (commits, tags, others) SHA1s
     """
-    commits = set()
-    tags = set()
-    others = set()
+    commits: Set[bytes] = set()
+    tags: Set[bytes] = set()
+    others: Set[bytes] = set()
     for e in lst:
         try:
             o = obj_store[e]
@@ -1224,12 +1195,12 @@ def _split_commits_and_tags(obj_store, lst, ignore_unknown=False):
             elif isinstance(o, Tag):
                 tags.add(e)
                 tagged = o.object[1]
-                c, t, o = _split_commits_and_tags(
+                c, t, os = _split_commits_and_tags(
                     obj_store, [tagged], ignore_unknown=ignore_unknown
                 )
                 commits |= c
                 tags |= t
-                others |= o
+                others |= os
             else:
                 others.add(e)
     return (commits, tags, others)
@@ -1270,20 +1241,22 @@ class MissingObjectFinder:
         # wants shall list only known SHAs, and otherwise
         # _split_commits_and_tags fails with KeyError
         have_commits, have_tags, have_others = _split_commits_and_tags(
-            object_store, haves, True
+            object_store, haves, ignore_unknown=True
         )
         want_commits, want_tags, want_others = _split_commits_and_tags(
-            object_store, wants, False
+            object_store, wants, ignore_unknown=False
         )
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
-        all_ancestors = object_store._collect_ancestors(
+        all_ancestors = _collect_ancestors(
+            object_store,
             have_commits, shallow=shallow, get_parents=self._get_parents
         )[0]
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
-        missing_commits, common_commits = object_store._collect_ancestors(
+        missing_commits, common_commits = _collect_ancestors(
+            object_store,
             want_commits,
             all_ancestors,
             shallow=shallow,
@@ -1606,3 +1579,85 @@ class BucketBasedObjectStore(PackBasedObjectStore):
             return final_pack
 
         return pf, commit, pf.close
+
+
+def _collect_ancestors(
+    store: ObjectContainer,
+    heads,
+    common=frozenset(),
+    shallow=frozenset(),
+    get_parents=lambda commit: commit.parents,
+):
+    """Collect all ancestors of heads up to (excluding) those in common.
+
+    Args:
+      heads: commits to start from
+      common: commits to end at, or empty set to walk repository
+        completely
+      get_parents: Optional function for getting the parents of a
+        commit.
+    Returns: a tuple (A, B) where A - all commits reachable
+        from heads but not present in common, B - common (shared) elements
+        that are directly reachable from heads
+    """
+    bases = set()
+    commits = set()
+    queue = []
+    queue.extend(heads)
+    while queue:
+        e = queue.pop(0)
+        if e in common:
+            bases.add(e)
+        elif e not in commits:
+            commits.add(e)
+            if e in shallow:
+                continue
+            cmt = store[e]
+            queue.extend(get_parents(cmt))
+    return (commits, bases)
+
+
+def iter_tree_contents(
+        store: ObjectContainer, tree_id: bytes, *, include_trees: bool = False):
+    """Iterate the contents of a tree and all subtrees.
+
+    Iteration is depth-first pre-order, as in e.g. os.walk.
+
+    Args:
+      tree_id: SHA1 of the tree.
+      include_trees: If True, include tree objects in the iteration.
+    Returns: Iterator over TreeEntry namedtuples for all the objects in a
+        tree.
+    """
+    # This could be fairly easily generalized to >2 trees if we find a use
+    # case.
+    todo = [TreeEntry(b"", stat.S_IFDIR, tree_id)]
+    while todo:
+        entry = todo.pop()
+        if stat.S_ISDIR(entry.mode):
+            extra = []
+            tree = store[entry.sha]
+            assert isinstance(tree, Tree)
+            for subentry in tree.iteritems(name_order=True):
+                extra.append(subentry.in_path(entry.path))
+            todo.extend(reversed(extra))
+        if not stat.S_ISDIR(entry.mode) or include_trees:
+            yield entry
+
+
+def peel_sha(store: ObjectContainer, sha: bytes) -> ShaFile:
+    """Peel all tags from a SHA.
+
+    Args:
+      sha: The object SHA to peel.
+    Returns: The fully-peeled SHA1 of a tag object, after peeling all
+        intermediate tags; if the original ref does not point to a tag,
+        this will equal the original SHA1.
+    """
+    obj = store[sha]
+    obj_class = object_class(obj.type_name)
+    while obj_class is Tag:
+        assert isinstance(obj, Tag)
+        obj_class, sha = obj.object
+        obj = store[sha]
+    return obj

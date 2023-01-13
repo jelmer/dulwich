@@ -72,6 +72,7 @@ from dulwich.object_store import (
     MemoryObjectStore,
     BaseObjectStore,
     ObjectStoreGraphWalker,
+    peel_sha,
 )
 from dulwich.objects import (
     check_hexsha,
@@ -757,7 +758,7 @@ class BaseRepo:
         cached = self.refs.get_peeled(ref)
         if cached is not None:
             return cached
-        return self.object_store.peel_sha(self.refs[ref]).id
+        return peel_sha(self.object_store, self.refs[ref]).id
 
     def get_walker(self, include: Optional[List[bytes]] = None,
                    *args, **kwargs):

@@ -1515,7 +1515,7 @@ class LocalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-    ):
+    ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
         Args:

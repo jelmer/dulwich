@@ -1626,9 +1626,11 @@ def write_pack_object(write, type, object, sha=None, compression_level=-1):
 def write_pack(
     filename,
     objects,
-    deltify=None,
-    delta_window_size=None,
-    compression_level=-1,
+    *,
+    deltify: Optional[bool] = None,
+    delta_window_size: Optional[int] = None,
+    compression_level: int = -1,
+    reuse_pack: Optional[PackedObjectContainer] = None):
 ):
     """Write a new pack data file.
 
@@ -1647,6 +1649,7 @@ def write_pack(
             delta_window_size=delta_window_size,
             deltify=deltify,
             compression_level=compression_level,
+            reuse_pack=reuse_pack,
         )
     entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + ".idx", "wb") as f:

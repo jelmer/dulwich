@@ -22,6 +22,7 @@
 """
 
 from typing import Iterator, Tuple
+from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK
 
 
@@ -35,6 +36,6 @@ def iter_cached_submodules(store, root_tree_id: bytes) -> Iterator[Tuple[str, by
     Returns:
       Iterator over over (path, sha) tuples
     """
-    for entry in store.iter_tree_contents(root_tree_id):
+    for entry in iter_tree_contents(store, root_tree_id):
         if S_ISGITLINK(entry.mode):
             yield entry.path, entry.sha

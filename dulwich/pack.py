@@ -49,7 +49,7 @@ from itertools import chain
 
 import os
 import sys
-from typing import Optional, Callable, Tuple, List, Deque, Union
+from typing import Optional, Callable, Tuple, List, Deque, Union, Protocol, Iterable
 import warnings
 
 from hashlib import sha1
@@ -94,6 +94,38 @@ DELTA_TYPES = (OFS_DELTA, REF_DELTA)
 
 
 DEFAULT_PACK_DELTA_WINDOW_SIZE = 10
+
+
+class ObjectContainer(Protocol):
+
+    def add_object(self, obj: ShaFile) -> None:
+        """Add a single object to this object store."""
+
+    def add_objects(
+            self, objects: Iterable[tuple[ShaFile, Optional[str]]],
+            progress: Optional[Callable[[str], None]] = None) -> None:
+        """Add a set of objects to this object store.
+
+        Args:
+          objects: Iterable over a list of (object, path) tuples
+        """
+
+    def __contains__(self, sha1: bytes) -> bool:
+        """Check if a hex sha is present."""
+
+    def __getitem__(self, sha1: bytes) -> ShaFile:
+        """Retrieve an object."""
+
+
+class PackedObjectContainer(ObjectContainer):
+
+    def get_raw_unresolved(self, sha1: bytes) -> Tuple[int, Union[bytes, None], List[bytes]]:
+        """Get a raw unresolved object."""
+        raise NotImplementedError(self.get_raw_unresolved)
+
+    def get_raw_delta(self, sha1: bytes) -> Tuple[int, Union[bytes, None], List[bytes]]:
+        """Get a raw delta text."""
+        raise NotImplementedError(self.get_raw_delta)
 
 
 def take_msb_bytes(read: Callable[[int], bytes], crc32: Optional[int] = None) -> Tuple[List[int], Optional[int]]:
@@ -1643,7 +1675,10 @@ def write_pack_header(write, num_objects):
         write(chunk)
 
 
-def deltify_pack_objects(objects, window_size: Optional[int] = None, reuse_pack=None):
+def deltify_pack_objects(
+        objects: Iterable[Tuple[ShaFile, str]],
+        window_size: Optional[int] = None,
+        reuse_pack: Optional[PackedObjectContainer] = None):
     """Generate deltas for pack objects.
 
     Args:
@@ -1685,7 +1720,7 @@ def deltify_pack_objects(objects, window_size: Optional[int] = None, reuse_pack=
         magic.append((obj.type_num, path, -obj.raw_length(), obj))
     magic.sort()
 
-    possible_bases: Deque[Tuple[bytes, int, bytes]] = deque()
+    possible_bases: Deque[Tuple[bytes, int, List[bytes]]] = deque()
 
     for type_num, path, neg_length, o in magic:
         raw = o.as_raw_chunks()
@@ -1730,7 +1765,11 @@ def pack_objects_to_data(objects):
 
 
 def write_pack_objects(
-    write, objects, delta_window_size=None, deltify=None, reuse_pack=None, compression_level=-1
+        write, objects,
+        delta_window_size: Optional[int] = None,
+        deltify: Optional[bool] = None,
+        reuse_pack: Optional[PackedObjectContainer] = None,
+        compression_level: int = -1
 ):
     """Write a new pack data file.
 

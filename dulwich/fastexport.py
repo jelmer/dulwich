@@ -30,6 +30,9 @@ from dulwich.objects import (
     Tag,
     ZERO_SHA,
 )
+from dulwich.object_store import (
+    iter_tree_contents,
+)
 from fastimport import (
     commands,
     errors as fastimport_errors,
@@ -232,7 +235,7 @@ class GitImportProcessor(processor.ImportProcessor):
                 path,
                 mode,
                 hexsha,
-            ) in self.repo.object_store.iter_tree_contents(tree_id):
+            ) in iter_tree_contents(self.repo.object_store, tree_id):
                 self._contents[path] = (mode, hexsha)
 
     def reset_handler(self, cmd):

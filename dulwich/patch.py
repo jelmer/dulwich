@@ -34,6 +34,7 @@ from dulwich.objects import (
     Commit,
     S_ISGITLINK,
 )
+from dulwich.pack import ObjectContainer
 
 FIRST_FEW_BYTES = 8000
 
@@ -192,7 +193,7 @@ def patch_filename(p, root):
         return root + b"/" + p
 
 
-def write_object_diff(f, store, old_file, new_file, diff_binary=False):
+def write_object_diff(f, store: ObjectContainer, old_file, new_file, diff_binary=False):
     """Write the diff for an object.
 
     Args:

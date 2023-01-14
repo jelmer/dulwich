@@ -125,9 +125,9 @@ class ObjectContainer(Protocol):
 
 class PackedObjectContainer(ObjectContainer):
 
-    def get_raw_unresolved(self, sha1: bytes) -> Tuple[int, Optional[bytes], List[bytes]]:
+    def get_unpacked_object(self, sha1: bytes, *, include_comp: bool = False) -> "UnpackedObject":
         """Get a raw unresolved object."""
-        raise NotImplementedError(self.get_raw_unresolved)
+        raise NotImplementedError(self.get_unpacked_object)
 
 
 def take_msb_bytes(read: Callable[[int], bytes], crc32: Optional[int] = None) -> Tuple[List[int], Optional[int]]:
@@ -179,14 +179,17 @@ class UnpackedObject:
 
     # TODO(dborowitz): read_zlib_chunks and unpack_object could very well be
     # methods of this object.
-    def __init__(self, pack_type_num, delta_base, decomp_len, crc32):
+    def __init__(self, pack_type_num, delta_base, decomp_len=None, crc32=None, sha=None, decomp_chunks=None):
         self.offset = None
-        self._sha = None
+        self._sha = sha
         self.pack_type_num = pack_type_num
         self.delta_base = delta_base
         self.comp_chunks = None
-        self.decomp_chunks: List[bytes] = []
-        self.decomp_len = decomp_len
+        self.decomp_chunks: List[bytes] = decomp_chunks or []
+        if decomp_chunks is not None and decomp_len is None:
+            self.decomp_len = sum(map(len, decomp_chunks))
+        else:
+            self.decomp_len = decomp_len
         self.crc32 = crc32
 
         if pack_type_num in DELTA_TYPES:
@@ -1740,7 +1743,7 @@ def write_pack_header(write, num_objects):
 def deltify_pack_objects(
         objects: Iterable[Tuple[ShaFile, str]],
         window_size: Optional[int] = None,
-        reuse_pack: Optional[PackedObjectContainer] = None):
+        reuse_pack: Optional[PackedObjectContainer] = None) -> Iterator[UnpackedObject]:
     """Generate deltas for pack objects.
 
     Args:
@@ -1766,11 +1769,11 @@ def deltify_pack_objects(
             sha_digest = o.sha().digest()
             # get_raw_unresolved() translates OFS_DELTA into REF_DELTA for us
             try:
-                (obj_type, delta_base, chunks) = reuse_pack.get_raw_unresolved(sha_digest)
+                unpacked = reuse_pack.get_unpacked_object(sha_digest)
             except KeyError:
                 continue
-            if obj_type == REF_DELTA and delta_base in objects_to_pack:
-                yield obj_type, sha_digest, hex_to_sha(delta_base), chunks
+            if unpacked.pack_type_num == REF_DELTA and unpacked.delta_base in objects_to_pack:
+                yield unpacked
                 reused_deltas.add(sha_digest)
 
     # Build a list of objects ordered by the magic Linus heuristic
@@ -1803,7 +1806,8 @@ def deltify_pack_objects(
                 winner_base = base_id
                 winner = delta
                 winner_len = sum(map(len, winner))
-        yield type_num, o.sha().digest(), winner_base, winner
+        unpacked = UnpackedObject(type_num, sha=o.sha().digest(), delta_base=winner_base, decomp_len=winner_len, decomp_chunks=winner)
+        yield unpacked
         possible_bases.appendleft((o.sha().digest(), type_num, raw))
         while len(possible_bases) > window_size:
             possible_bases.pop()
@@ -1811,9 +1815,9 @@ def deltify_pack_objects(
 
 def pack_objects_to_data(
         objects,
-        delta_window_size: Optional[int] = None,
+        *, delta_window_size: Optional[int] = None,
         deltify: Optional[bool] = None,
-        reuse_pack: Optional[PackedObjectContainer] = None):
+        reuse_pack: Optional[PackedObjectContainer] = None) -> Tuple[int, Iterator[UnpackedObject]]:
     """Create pack data from objects
 
     Args:
@@ -1832,11 +1836,15 @@ def pack_objects_to_data(
     else:
         return (
             count,
-            (
-                (o.type_num, o.sha().digest(), None, o.as_raw_chunks())
-                for (o, path) in objects
-            ),
+            (full_unpacked_object(o) for (o, path) in objects)
         )
+
+
+def full_unpacked_object(o: ShaFile) -> UnpackedObject:
+    return UnpackedObject(
+        o.type_num, delta_base=None, crc32=None,
+        decomp_chunks=o.as_raw_chunks(),
+        sha=o.sha().digest())
 
 
 def write_pack_objects(
@@ -1872,8 +1880,8 @@ def write_pack_objects(
 
     return write_pack_data(
         write,
-        pack_contents_count,
         pack_contents,
+        num_records=pack_contents_count,
         compression_level=compression_level,
     )
 
@@ -1892,8 +1900,8 @@ class PackChunkGenerator:
     def __iter__(self):
         return self._it
 
-    def _pack_data_chunks(self, num_records=None, records=None, progress=None, compression_level=-1):
-        """Iterate pack data file chunks..
+    def _pack_data_chunks(self, records: Iterator[UnpackedObject], *, num_records=None, progress=None, compression_level: int = -1) -> Iterator[bytes]:
+        """Iterate pack data file chunks.
 
         Args:
           num_records: Number of records (defaults to len(records) if None)
@@ -1904,34 +1912,38 @@ class PackChunkGenerator:
         """
         # Write the pack
         if num_records is None:
-            num_records = len(records)
+            num_records = len(records)   # type: ignore
         offset = 0
         for chunk in pack_header_chunks(num_records):
             yield chunk
             self.cs.update(chunk)
             offset += len(chunk)
         actual_num_records = 0
-        for i, (type_num, object_id, delta_base, raw) in enumerate(records):
+        for i, unpacked in enumerate(records):
+            type_num = unpacked.pack_type_num
             if progress is not None:
                 progress(("writing pack data: %d/%d\r" % (i, num_records)).encode("ascii"))
-            if delta_base is not None:
+            if unpacked.delta_base is not None:
                 try:
-                    base_offset, base_crc32 = self.entries[delta_base]
+                    base_offset, base_crc32 = self.entries[unpacked.delta_base]
                 except KeyError:
                     type_num = REF_DELTA
-                    raw = (delta_base, raw)
+                    raw = (unpacked.delta_base, unpacked.decomp_chunks)
                 else:
                     type_num = OFS_DELTA
-                    raw = (offset - base_offset, raw)
+                    raw = (offset - base_offset, unpacked.decomp_chunks)
+            else:
+                raw = unpacked.decomp_chunks
             crc32 = 0
             object_size = 0
+            # TODO(jelmer,perf): if unpacked.comp_chunks is populated, use that?
             for chunk in pack_object_chunks(type_num, raw, compression_level=compression_level):
                 yield chunk
                 crc32 = binascii.crc32(chunk, crc32)
                 self.cs.update(chunk)
                 object_size += len(chunk)
             actual_num_records += 1
-            self.entries[object_id] = (offset, crc32)
+            self.entries[unpacked.sha()] = (offset, crc32)
             offset += object_size
         if actual_num_records != num_records:
             raise AssertionError(
@@ -1941,7 +1953,7 @@ class PackChunkGenerator:
         yield self.cs.digest()
 
 
-def write_pack_data(write, num_records=None, records=None, progress=None, compression_level=-1):
+def write_pack_data(write, records: Iterator[UnpackedObject], *, num_records=None, progress=None, compression_level=-1):
     """Write a new pack data file.
 
     Args:
@@ -1952,11 +1964,6 @@ def write_pack_data(write, num_records=None, records=None, progress=None, compre
       compression_level: the zlib compression level
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
-    if hasattr(write, 'write'):
-        warnings.warn(
-            'write_pack_data() now takes a write rather than file argument',
-            DeprecationWarning, stacklevel=2)
-        write = write.write
     chunk_generator = PackChunkGenerator(
         num_records=num_records, records=records, progress=progress,
         compression_level=compression_level)
@@ -2361,13 +2368,10 @@ class Pack:
             if uo.sha() in shas)
 
     def pack_tuples(self):
-        """Provide an iterable for use with write_pack_objects.
-
-        Returns: Object that can iterate over (object, path) tuples
-            and provides __len__
-        """
-
         return _PackTupleIterable(self.iterobjects, len(self))
+
+    def iter_unpacked(self):
+        return self.data.iter_unpacked()
 
     def keep(self, msg: Optional[bytes] = None) -> str:
         """Add a .keep file for the pack, preventing git from garbage collecting it.

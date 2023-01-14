@@ -70,6 +70,7 @@ from dulwich.file import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
+    MissingObjectFinder,
     BaseObjectStore,
     ObjectStoreGraphWalker,
     peel_sha,

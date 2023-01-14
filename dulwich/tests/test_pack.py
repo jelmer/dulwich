@@ -429,7 +429,7 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, "Elch")
-            write_pack(basename, origpack.pack_tuples())
+            write_pack(basename, list(origpack.pack_tuples()))
 
             with Pack(basename) as newpack:
                 self.assertEqual(origpack, newpack)
@@ -453,7 +453,7 @@ class TestPack(PackTests):
 
     def _copy_pack(self, origpack):
         basename = os.path.join(self.tempdir, "somepack")
-        write_pack(basename, origpack.pack_tuples())
+        write_pack(basename, list(origpack.pack_tuples()))
         return Pack(basename)
 
     def test_keep_no_message(self):
@@ -872,7 +872,7 @@ class DeltifyTests(TestCase):
     def test_single(self):
         b = Blob.from_string(b"foo")
         self.assertEqual(
-            [(b.type_num, b.sha().digest(), None, b.as_raw_chunks())],
+            [UnpackedObject(b.type_num, sha=b.sha().digest(), delta_base=None, decomp_chunks=b.as_raw_chunks())],
             list(deltify_pack_objects([(b, b"")])),
         )
 
@@ -882,8 +882,8 @@ class DeltifyTests(TestCase):
         delta = list(create_delta(b1.as_raw_chunks(), b2.as_raw_chunks()))
         self.assertEqual(
             [
-                (b1.type_num, b1.sha().digest(), None, b1.as_raw_chunks()),
-                (b2.type_num, b2.sha().digest(), b1.sha().digest(), delta),
+                UnpackedObject(b1.type_num, sha=b1.sha().digest(), delta_base=None, decomp_chunks=b1.as_raw_chunks()),
+                UnpackedObject(b2.type_num, sha=b2.sha().digest(), delta_base=b1.sha().digest(), decomp_chunks=delta),
             ],
             list(deltify_pack_objects([(b1, b""), (b2, b"")])),
         )

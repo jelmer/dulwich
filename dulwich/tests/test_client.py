@@ -380,7 +380,8 @@ class GitClientTests(TestCase):
             )
 
         f = BytesIO()
-        write_pack_data(f.write, *generate_pack_data(None, None))
+        count, records = generate_pack_data(None, None)
+        write_pack_data(f.write, records, num_records=count)
         self.client.send_pack(b"/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),

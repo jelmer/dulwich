@@ -1769,7 +1769,7 @@ def deltify_pack_objects(
             sha_digest = o.sha().digest()
             # get_raw_unresolved() translates OFS_DELTA into REF_DELTA for us
             try:
-                unpacked = reuse_pack.get_unpacked_object(sha_digest)
+                unpacked = reuse_pack.get_unpacked_object(sha_digest, convert_ofs_delta=True)
             except KeyError:
                 continue
             if unpacked.pack_type_num == REF_DELTA and unpacked.delta_base in objects_to_pack:
@@ -2467,7 +2467,7 @@ class Pack:
         return self.data.sorted_entries(
             progress=progress, resolve_ext_ref=self.resolve_ext_ref)
 
-    def get_unpacked_object(self, sha: bytes, *, include_comp: bool = False) -> UnpackedObject:
+    def get_unpacked_object(self, sha: bytes, *, include_comp: bool = False, convert_ofs_delta: bool = True) -> UnpackedObject:
         """Get the unpacked object for a sha.
 
         Args:
@@ -2475,7 +2475,12 @@ class Pack:
           include_comp: Whether to include compression data in UnpackedObject
         """
         offset = self.index.object_offset(sha)
-        return self.data.get_unpacked_object_at(offset, include_comp=include_comp)
+        unpacked = self.data.get_unpacked_object_at(offset, include_comp=include_comp)
+        if unpacked.pack_type_num == OFS_DELTA and convert_ofs_delta:
+            unpacked.delta_base = self.index.object_sha1(offset - unpacked.delta_base)
+            unpacked.pack_type_num = REF_DELTA
+        return unpacked
+
 
 
 try:

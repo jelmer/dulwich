@@ -84,7 +84,7 @@ class TestPack(PackTests):
             orig_blob = orig_pack[a_sha]
             new_blob = Blob()
             new_blob.data = orig_blob.data + b"x"
-            all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None)]
+            all_to_pack = [(o, None) for o in orig_pack.iterobjects()] + [(new_blob, None)]
         pack_path = os.path.join(self._tempdir, "pack_with_deltas")
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])

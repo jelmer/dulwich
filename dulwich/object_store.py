@@ -188,9 +188,9 @@ class BaseObjectStore:
         try:
             write_pack_data(
                 f.write,
-                count,
                 pack_data,
-                progress,
+                num_records=count,
+                progress=progress,
                 compression_level=self.pack_compression_level,
             )
         except BaseException:

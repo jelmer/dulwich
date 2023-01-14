@@ -20,6 +20,7 @@
 
 from dulwich.object_store import (
     MemoryObjectStore,
+    MissingObjectFinder,
 )
 from dulwich.objects import (
     Blob,
@@ -42,7 +43,7 @@ class MissingObjectFinderTest(TestCase):
         return self.commits[n - 1]
 
     def assertMissingMatch(self, haves, wants, expected):
-        for sha, path in self.store.find_missing_objects(haves, wants, set()):
+        for sha, path in MissingObjectFinder(self.store, haves, wants, shallow=set()):
             self.assertIn(
                 sha,
                 expected,
@@ -115,8 +116,7 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         haves = [self.cmt(1).id]
         wants = [self.cmt(3).id, bogus_sha]
         self.assertRaises(
-            KeyError, self.store.find_missing_objects, haves, wants, set()
-        )
+            KeyError, MissingObjectFinder, self.store, haves, wants, shallow=set())
 
     def test_no_changes(self):
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])

@@ -73,6 +73,7 @@ from dulwich.object_store import (
     BaseObjectStore,
     ObjectStoreGraphWalker,
     peel_sha,
+    MissingObjectFinder,
 )
 from dulwich.objects import (
     check_hexsha,
@@ -566,12 +567,13 @@ class BaseRepo:
             return parents_provider.get_parents(commit.id, commit)
 
         return self.object_store.iter_shas(
-            self.object_store.find_missing_objects(
-                haves,
-                wants,
-                self.get_shallow(),
-                progress,
-                get_tagged,
+            MissingObjectFinder(
+                self.object_store,
+                haves=haves,
+                wants=wants,
+                shallow=self.get_shallow(),
+                progress=progress,
+                get_tagged=get_tagged,
                 get_parents=get_parents,
             )
         )

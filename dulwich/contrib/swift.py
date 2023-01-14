@@ -690,10 +690,6 @@ class SwiftObjectStore(PackBasedObjectStore):
         shas = iter(finder.next, None)
         return PackInfoObjectStoreIterator(self, shas, finder, self.scon.concurrency)
 
-    def find_missing_objects(self, *args, **kwargs):
-        kwargs["concurrency"] = self.scon.concurrency
-        return PackInfoMissingObjectFinder(self, *args, **kwargs)
-
     def pack_info_get(self, sha):
         for pack in self.packs:
             if sha in pack:

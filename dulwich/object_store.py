@@ -261,7 +261,6 @@ class BaseObjectStore:
         progress=None,
         get_tagged=None,
         get_parents=lambda commit: commit.parents,
-        depth=None,
     ):
         """Find the missing objects required for a set of revisions.
 
@@ -277,16 +276,18 @@ class BaseObjectStore:
             commit.
         Returns: Iterator over (sha, path) pairs.
         """
+        warnings.warn(
+            'Please use MissingObjectFinder(store)', DeprecationWarning)
         finder = MissingObjectFinder(
             self,
-            haves,
-            wants,
-            shallow,
-            progress,
-            get_tagged,
+            haves=haves,
+            wants=wants,
+            shallow=shallow,
+            progress=progress,
+            get_tagged=get_tagged,
             get_parents=get_parents,
         )
-        return iter(finder.next, None)
+        return iter(finder)
 
     def find_common_revisions(self, graphwalker):
         """Find which revisions this store has in common using graphwalker.
@@ -313,7 +314,8 @@ class BaseObjectStore:
           shallow: Set of shallow commit SHA1s to skip
           progress: Optional progress reporting method
         """
-        missing = self.find_missing_objects(have, want, shallow, progress)
+        missing = MissingObjectFinder(
+            self, haves=have, wants=want, shallow=shallow, progress=progress)
         return self.iter_shas(missing)
 
     def generate_pack_data(
@@ -1267,6 +1269,7 @@ class MissingObjectFinder:
         object_store,
         haves,
         wants,
+        *,
         shallow=None,
         progress=None,
         get_tagged=None,
@@ -1334,7 +1337,7 @@ class MissingObjectFinder:
     def add_todo(self, entries):
         self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
 
-    def next(self):
+    def __next__(self):
         while True:
             if not self.objects_to_send:
                 return None
@@ -1361,7 +1364,8 @@ class MissingObjectFinder:
         self.progress(("counting objects: %d\r" % len(self.sha_done)).encode("ascii"))
         return (sha, name)
 
-    __next__ = next
+    def __iter__(self):
+        return iter(self.__next__, None)
 
 
 class ObjectStoreGraphWalker:

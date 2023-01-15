@@ -284,7 +284,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             self.assertSucceeds(p.check)
 
-    def test_iterobjects(self):
+    def test_iter_unpacked(self):
         with self.get_pack_data(pack1_sha) as p:
             commit_data = (
                 b"tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\n"
@@ -297,14 +297,12 @@ class TestPackData(PackTests):
             )
             blob_sha = b"6f670c0fb53f9463760b7295fbb814e965fb20c8"
             tree_data = b"100644 a\0" + hex_to_sha(blob_sha)
-            actual = []
-            for offset, type_num, chunks, crc32 in p.iterobjects():
-                actual.append((offset, type_num, b"".join(chunks), crc32))
+            actual = list(p.iter_unpacked())
             self.assertEqual(
                 [
-                    (12, 1, commit_data, 3775879613),
-                    (138, 2, tree_data, 912998690),
-                    (178, 3, b"test 1\n", 1373561701),
+                    UnpackedObject(offset=12, pack_type_num=1, decomp_chunks=[commit_data], crc32=None),
+                    UnpackedObject(offset=138, pack_type_num=2, decomp_chunks=[tree_data], crc32=None),
+                    UnpackedObject(offset=178, pack_type_num=3, decomp_chunks=[b"test 1\n"], crc32=None),
                 ],
                 actual,
             )
@@ -583,7 +581,7 @@ class TestThinPack(PackTests):
         with self.make_pack(False) as p:
             expected = UnpackedObject(
                 7,
-                b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
+                delta_base=b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
                 decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
             )
             expected.offset = 12
@@ -592,7 +590,7 @@ class TestThinPack(PackTests):
         with self.make_pack(True) as p:
             expected = UnpackedObject(
                 7,
-                b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
+                delta_base=b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
                 decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
             )
             expected.offset = 12
@@ -805,7 +803,7 @@ class ReadZlibTests(TestCase):
     def setUp(self):
         super().setUp()
         self.read = BytesIO(self.comp + self.extra).read
-        self.unpacked = UnpackedObject(Tree.type_num, None, len(self.decomp), 0)
+        self.unpacked = UnpackedObject(Tree.type_num, decomp_len=len(self.decomp), crc32=0)
 
     def test_decompress_size(self):
         good_decomp_len = len(self.decomp)
@@ -824,7 +822,7 @@ class ReadZlibTests(TestCase):
         self.assertRaises(zlib.error, read_zlib_chunks, read, self.unpacked)
 
     def test_decompress_empty(self):
-        unpacked = UnpackedObject(Tree.type_num, None, 0, None)
+        unpacked = UnpackedObject(Tree.type_num, decomp_len=0)
         comp = zlib.compress(b"")
         read = BytesIO(comp + self.extra).read
         unused = read_zlib_chunks(read, unpacked)

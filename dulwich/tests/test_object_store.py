@@ -223,6 +223,7 @@ class ObjectStoreTests:
             [TreeEntry(p, m, h) for (p, h, m) in blobs],
             list(iter_tree_contents(self.store, tree_id)),
         )
+        self.assertEqual([], list(iter_tree_contents(self.store, None)))
 
     def test_iter_tree_contents_include_trees(self):
         blob_a = make_object(Blob, data=b"a")

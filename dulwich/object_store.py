@@ -1648,7 +1648,7 @@ def _collect_ancestors(
 
 
 def iter_tree_contents(
-        store: ObjectContainer, tree_id: bytes, *, include_trees: bool = False):
+        store: ObjectContainer, tree_id: Optional[ObjectID], *, include_trees: bool = False):
     """Iterate the contents of a tree and all subtrees.
 
     Iteration is depth-first pre-order, as in e.g. os.walk.
@@ -1659,6 +1659,8 @@ def iter_tree_contents(
     Returns: Iterator over TreeEntry namedtuples for all the objects in a
         tree.
     """
+    if tree_id is None:
+        return
     # This could be fairly easily generalized to >2 trees if we find a use
     # case.
     todo = [TreeEntry(b"", stat.S_IFDIR, tree_id)]

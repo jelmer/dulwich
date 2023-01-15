@@ -24,7 +24,7 @@
 import collections
 import heapq
 from itertools import chain
-from typing import List, Tuple, Set, Deque, Literal, Optional
+from typing import List, Tuple, Set, Deque, Optional
 
 from dulwich.diff_tree import (
     RENAME_CHANGE_TYPES,
@@ -244,7 +244,7 @@ class Walker:
         store,
         include: List[bytes],
         exclude: Optional[List[bytes]] = None,
-        order: Literal["date", "topo"] = 'date',
+        order: str = 'date',
         reverse: bool = False,
         max_entries: Optional[int] = None,
         paths: Optional[List[bytes]] = None,

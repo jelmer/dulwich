@@ -165,7 +165,10 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
     def setUp(self):
         super().setUp()
-        self._repo = MemoryRepo.init_bare([], {})
+        self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
+        self.repo = Repo.init(self.path)
+        self._repo = Repo.init_bare(self.path)
         backend = DictBackend({b"/": self._repo})
         self._handler = UploadPackHandler(
             backend, [b"/", b"host=lolcathost"], TestProto()

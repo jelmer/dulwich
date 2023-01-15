@@ -304,7 +304,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
     def test_add_pack_emtpy(self):
         o = MemoryObjectStore()
         f, commit, abort = o.add_pack()
-        commit()
+        self.assertRaises(AssertionError, commit)
 
     def test_add_thin_pack(self):
         o = MemoryObjectStore()

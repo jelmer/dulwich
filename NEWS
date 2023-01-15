@@ -1,4 +1,12 @@
-0.20.51	UNRELEASED
+0.21.0	UNRELEASED
+
+ * Pack internals have been significantly refactored, including
+   significant low-level API changes.
+
+   As a consequence of this, Dulwich now reuses pack deltas
+   when communicating with remote servers, which brings a
+   big boost to network performance.
+   (Jelmer Vernooĳ)
 
 0.20.50	2022-10-30
 

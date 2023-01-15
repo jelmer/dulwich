@@ -75,7 +75,6 @@ from dulwich.object_store import (
     PackBasedObjectStore,
     ObjectStoreGraphWalker,
     peel_sha,
-    MissingObjectFinder,
 )
 from dulwich.objects import (
     check_hexsha,

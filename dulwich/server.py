@@ -665,6 +665,9 @@ class _ProtocolGraphWalker:
             value = str(value).encode("ascii")
         self.proto.unread_pkt_line(command + b" " + value)
 
+    def nak(self):
+        pass
+
     def ack(self, have_ref):
         if len(have_ref) != 40:
             raise ValueError("invalid sha %r" % have_ref)
@@ -875,7 +878,7 @@ class MultiAckDetailedGraphWalkerImpl:
         self._common.append(have_ref)
         self.walker.send_ack(have_ref, b"common")
 
-    def next(self):
+    def __next__(self):
         while True:
             command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
@@ -890,7 +893,7 @@ class MultiAckDetailedGraphWalkerImpl:
                     # specified and that's handled in handle_done which
                     # may or may not call post_nodone_check depending on
                     # that).
-                    return None
+                    raise StopIteration
             elif command == COMMAND_DONE:
                 # Let the walker know that we got a done.
                 self.walker.notify_done()
@@ -901,8 +904,6 @@ class MultiAckDetailedGraphWalkerImpl:
                 return sha
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
-
-    __next__ = next
 
     def handle_done(self, done_required, done_received):
         if done_required and not done_received:

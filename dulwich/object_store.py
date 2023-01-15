@@ -254,7 +254,8 @@ class BaseObjectStore:
         """
         # Note that the pack-specific implementation below is more efficient,
         # as it reuses deltas
-        missing_objects = MissingObjectFinder(self, have, want, shallow, progress)
+        missing_objects = MissingObjectFinder(
+            self, haves=have, wants=want, shallow=shallow, progress=progress)
         object_ids = list(missing_objects)
         return pack_objects_to_data(
             [(self[oid], path) for oid, path in object_ids], ofs_delta=ofs_delta,
@@ -1353,6 +1354,9 @@ class ObjectStoreGraphWalker:
             shallow = set()
         self.shallow = shallow
 
+    def nak(self):
+        """Nothing incommon was found."""
+        pass
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""
         if len(sha) != 40:

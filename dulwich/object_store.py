@@ -804,7 +804,7 @@ class DiskObjectStore(PackBasedObjectStore):
         suffix = suffix.decode("ascii")
         return os.path.join(self.pack_dir, "pack-" + suffix)
 
-    def _complete_thin_pack(self, f, path, copier, indexer):
+    def _complete_thin_pack(self, f, path, copier, indexer, progress=None):
         """Move a specific file containing a pack into the pack directory.
 
         Note: The file should be on the same file system as the
@@ -816,36 +816,49 @@ class DiskObjectStore(PackBasedObjectStore):
           copier: A PackStreamCopier to use for writing pack data.
           indexer: A PackIndexer for indexing the pack.
         """
-        entries = list(indexer)
+        entries = []
+        for i, entry in enumerate(indexer):
+            if progress is not None:
+                progress(("generating index: %d\r" % i).encode('ascii'))
+            entries.append(entry)
 
-        # Update the header with the new number of objects.
-        f.seek(0)
-        write_pack_header(f.write, len(entries) + len(indexer.ext_refs()))
+        ext_refs = indexer.ext_refs()
 
-        # Must flush before reading (http://bugs.python.org/issue3207)
-        f.flush()
+        if ext_refs:
+            # Update the header with the new number of objects.
+            f.seek(0)
+            write_pack_header(f.write, len(entries) + len(ext_refs))
 
-        # Rescan the rest of the pack, computing the SHA with the new header.
-        new_sha = compute_file_sha(f, end_ofs=-20)
+            # Must flush before reading (http://bugs.python.org/issue3207)
+            f.flush()
 
-        # Must reposition before writing (http://bugs.python.org/issue3207)
-        f.seek(0, os.SEEK_CUR)
+            # Rescan the rest of the pack, computing the SHA with the new header.
+            new_sha = compute_file_sha(f, end_ofs=-20)
 
-        # Complete the pack.
-        for ext_sha in indexer.ext_refs():
-            assert len(ext_sha) == 20
-            type_num, data = self.get_raw(ext_sha)
-            offset = f.tell()
-            crc32 = write_pack_object(
-                f.write,
-                type_num,
-                data,
-                sha=new_sha,
-                compression_level=self.pack_compression_level,
-            )
-            entries.append((ext_sha, offset, crc32))
-        pack_sha = new_sha.digest()
-        f.write(pack_sha)
+            # Must reposition before writing (http://bugs.python.org/issue3207)
+            f.seek(0, os.SEEK_CUR)
+
+            # Complete the pack.
+            for i, ext_sha in enumerate(ext_refs):
+                if progress is not None:
+                    progress(("writing extra base objects: %d/%d\r" % (i, len(ext_refs))).encode("ascii"))
+                assert len(ext_sha) == 20
+                type_num, data = self.get_raw(ext_sha)
+                offset = f.tell()
+                crc32 = write_pack_object(
+                    f.write,
+                    type_num,
+                    data,
+                    sha=new_sha,
+                    compression_level=self.pack_compression_level,
+                )
+                entries.append((ext_sha, offset, crc32))
+            pack_sha = new_sha.digest()
+            f.write(pack_sha)
+        else:
+            f.seek(-20, os.SEEK_END)
+            pack_sha = f.read(20)
+
         f.close()
 
         # Move the pack in.
@@ -875,7 +888,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self._add_cached_pack(pack_base_name, final_pack)
         return final_pack
 
-    def add_thin_pack(self, read_all, read_some):
+    def add_thin_pack(self, read_all, read_some, progress=None):
         """Add a new thin pack to this object store.
 
         Thin packs are packs that contain deltas with parents that exist
@@ -897,8 +910,8 @@ class DiskObjectStore(PackBasedObjectStore):
             os.chmod(path, PACK_MODE)
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
             copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
-            copier.verify()
-            return self._complete_thin_pack(f, path, copier, indexer)
+            copier.verify(progress=progress)
+            return self._complete_thin_pack(f, path, copier, indexer, progress=progress)
 
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -1076,7 +1089,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         return f, commit, abort
 
-    def _complete_thin_pack(self, f, indexer):
+    def _complete_thin_pack(self, f, indexer, progress=None):
         """Complete a thin pack by adding external references.
 
         Args:
@@ -1085,22 +1098,25 @@ class MemoryObjectStore(BaseObjectStore):
         """
         entries = list(indexer)
 
-        # Update the header with the new number of objects.
-        f.seek(0)
-        write_pack_header(f.write, len(entries) + len(indexer.ext_refs()))
+        ext_refs = indexer.ext_refs()
 
-        # Rescan the rest of the pack, computing the SHA with the new header.
-        new_sha = compute_file_sha(f, end_ofs=-20)
+        if ext_refs:
+            # Update the header with the new number of objects.
+            f.seek(0)
+            write_pack_header(f.write, len(entries) + len(ext_refs))
 
-        # Complete the pack.
-        for ext_sha in indexer.ext_refs():
-            assert len(ext_sha) == 20
-            type_num, data = self.get_raw(ext_sha)
-            write_pack_object(f.write, type_num, data, sha=new_sha)
-        pack_sha = new_sha.digest()
-        f.write(pack_sha)
+            # Rescan the rest of the pack, computing the SHA with the new header.
+            new_sha = compute_file_sha(f, end_ofs=-20)
 
-    def add_thin_pack(self, read_all, read_some):
+            # Complete the pack.
+            for ext_sha in indexer.ext_refs():
+                assert len(ext_sha) == 20
+                type_num, data = self.get_raw(ext_sha)
+                write_pack_object(f.write, type_num, data, sha=new_sha)
+            pack_sha = new_sha.digest()
+            f.write(pack_sha)
+
+    def add_thin_pack(self, read_all, read_some, progress=None):
         """Add a new thin pack to this object store.
 
         Thin packs are packs that contain deltas with parents that exist
@@ -1117,8 +1133,8 @@ class MemoryObjectStore(BaseObjectStore):
         try:
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
             copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
-            copier.verify()
-            self._complete_thin_pack(f, indexer)
+            copier.verify(progress=progress)
+            self._complete_thin_pack(f, indexer, progress=progress)
         except BaseException:
             abort()
             raise

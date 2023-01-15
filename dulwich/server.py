@@ -175,7 +175,7 @@ class BackendRepo:
         """
         return None
 
-    def fetch_objects(self, determine_wants, graph_walker, progress, get_tagged=None):
+    def find_missing_objects(self, determine_wants, graph_walker, progress, get_tagged=None):
         """
         Yield the objects required for a list of commits.
 
@@ -355,7 +355,7 @@ class UploadPackHandler(PackHandler):
                 # TODO: fix behavior when missing
                 return {}
         # TODO(jelmer): Integrate this with the refs logic in
-        # Repo.fetch_objects
+        # Repo.find_missing_objects
         tagged = {}
         for name, sha in refs.items():
             peeled_sha = repo.get_peeled(name)
@@ -379,12 +379,14 @@ class UploadPackHandler(PackHandler):
             wants.extend(graph_walker.determine_wants(refs, **kwargs))
             return wants
 
-        object_ids = self.repo.fetch_objects(
+        missing_objects = self.repo.find_missing_objects(
             wants_wrapper,
             graph_walker,
             self.progress,
             get_tagged=self.get_tagged,
         )
+
+        object_ids = list(missing_objects)
 
         # Note the fact that client is only processing responses related
         # to the have lines it sent, and any other data (including side-
@@ -604,7 +606,7 @@ class _ProtocolGraphWalker:
                     peeled_sha = self.get_peeled(ref)
                 except KeyError:
                     # Skip refs that are inaccessible
-                    # TODO(jelmer): Integrate with Repo.fetch_objects refs
+                    # TODO(jelmer): Integrate with Repo.find_missing_objects refs
                     # logic.
                     continue
                 if i == 0:

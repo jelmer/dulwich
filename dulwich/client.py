@@ -857,6 +857,7 @@ class GitClient:
         determine_wants,
         graph_walker,
         pack_data,
+        *,
         progress=None,
         depth=None,
     ):
@@ -1536,9 +1537,11 @@ class LocalGitClient(GitClient):
 
         """
         with self._open_repo(path) as r:
-            object_ids = r.fetch_objects(
+            missing_objects = r.find_missing_objects(
                 determine_wants, graph_walker, progress=progress, depth=depth
             )
+            other_haves = missing_objects.get_remote_has()
+            object_ids = list(missing_objects)
             symrefs = r.refs.get_symrefs()
             agent = agent_string()
 
@@ -1546,7 +1549,7 @@ class LocalGitClient(GitClient):
             # Note that the client still expects a 0-object pack in most cases.
             if object_ids is None:
                 return FetchPackResult(None, symrefs, agent)
-            write_pack_from_container(pack_data, r.object_store, object_ids)
+            write_pack_from_container(pack_data, r.object_store, object_ids, other_haves=other_haves)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):

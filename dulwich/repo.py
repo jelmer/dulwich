@@ -39,6 +39,7 @@ from typing import (
     Callable,
     Tuple,
     TYPE_CHECKING,
+    FrozenSet,
     List,
     Dict,
     Union,
@@ -485,22 +486,23 @@ class BaseRepo:
           depth: Shallow fetch depth
         Returns: count and iterator over pack data
         """
-        # TODO(jelmer): Fetch pack data directly, don't create objects first.
-        object_ids = self.fetch_objects(
+        missing_objects = self.find_missing_objects(
             determine_wants, graph_walker, progress, get_tagged, depth=depth
         )
-        # TODO(jelmer): Set other_has=missing_objects.remote_has
+        remote_has = missing_objects.get_remote_has()
+        object_ids = list(missing_objects)
         return len(object_ids), generate_unpacked_objects(
-            self.object_store, object_ids, progress=progress)
+            self.object_store, object_ids, progress=progress,
+            other_haves=remote_has)
 
-    def fetch_objects(
+    def find_missing_objects(
         self,
         determine_wants,
         graph_walker,
         progress,
         get_tagged=None,
         depth=None,
-    ):
+    ) -> Optional[MissingObjectFinder]:
         """Fetch the missing objects required for a set of revisions.
 
         Args:
@@ -539,8 +541,8 @@ class BaseRepo:
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
-        shallows = getattr(graph_walker, "shallow", frozenset())
-        unshallows = getattr(graph_walker, "unshallow", frozenset())
+        shallows: FrozenSet[ObjectID] = getattr(graph_walker, "shallow", frozenset())
+        unshallows: FrozenSet[ObjectID] = getattr(graph_walker, "unshallow", frozenset())
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
@@ -550,7 +552,18 @@ class BaseRepo:
                 # Do not send a pack in shallow short-circuit path
                 return None
 
-            return []
+            class DummyMissingObjectFinder:
+
+                def get_remote_has(self):
+                    return None
+
+                def __len__(self):
+                    return 0
+
+                def __iter__(self):
+                    yield from []
+
+            return DummyMissingObjectFinder()  # type: ignore
 
         # If the graph walker is set up with an implementation that can
         # ACK/NAK to the wire, it will write data to the client through
@@ -569,14 +582,14 @@ class BaseRepo:
         def get_parents(commit):
             return parents_provider.get_parents(commit.id, commit)
 
-        return list(MissingObjectFinder(
+        return MissingObjectFinder(
             self.object_store,
             haves,
             wants,
             self.get_shallow(),
             progress,
             get_tagged,
-            get_parents=get_parents))
+            get_parents=get_parents)
 
     def generate_pack_data(self, have: List[ObjectID], want: List[ObjectID],
                            progress: Optional[Callable[[str], None]] = None,

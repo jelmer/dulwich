@@ -584,11 +584,11 @@ class BaseRepo:
 
         return MissingObjectFinder(
             self.object_store,
-            haves,
-            wants,
-            self.get_shallow(),
-            progress,
-            get_tagged,
+            haves=haves,
+            wants=wants,
+            shallow=self.get_shallow(),
+            progress=progress,
+            get_tagged=get_tagged,
             get_parents=get_parents)
 
     def generate_pack_data(self, have: List[ObjectID], want: List[ObjectID],

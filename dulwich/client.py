@@ -497,27 +497,17 @@ class _v1ReceivePackHeader:
         yield None
 
 
-def _read_side_band64k_data(pkt_seq: Iterable[bytes], channel_callbacks: Dict[int, Callable[[bytes], None]]) -> None:
+def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[Tuple[int, bytes]]:
     """Read per-channel data.
 
     This requires the side-band-64k capability.
 
     Args:
       pkt_seq: Sequence of packets to read
-      channel_callbacks: Dictionary mapping channels to packet
-        handlers to use. None for a callback discards channel data.
     """
     for pkt in pkt_seq:
         channel = ord(pkt[:1])
-        pkt = pkt[1:]
-        try:
-            cb = channel_callbacks[channel]
-        except KeyError as exc:
-            raise AssertionError(
-                "Invalid sideband channel %d" % channel) from exc
-        else:
-            if cb is not None:
-                cb(pkt)
+        yield channel, pkt[1:]
 
 
 def _handle_upload_pack_head(
@@ -630,13 +620,14 @@ def _handle_upload_pack_tail(
             def progress(x):
                 pass
 
-        _read_side_band64k_data(
-            proto.read_pkt_seq(),
-            {
-                SIDE_BAND_CHANNEL_DATA: pack_data,
-                SIDE_BAND_CHANNEL_PROGRESS: progress,
-            },
-        )
+        for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
+            if chan == SIDE_BAND_CHANNEL_DATA:
+                pack_data(data)
+            elif chan == SIDE_BAND_CHANNEL_PROGRESS:
+                progress(data)
+            else:
+                raise AssertionError(
+                    "Invalid sideband channel %d" % chan)
     else:
         while True:
             data = proto.read(rbufsize)
@@ -935,12 +926,17 @@ class GitClient:
                 def progress(x):
                     pass
 
-            channel_callbacks = {2: progress}
             if CAPABILITY_REPORT_STATUS in capabilities:
-                channel_callbacks[1] = PktLineParser(
-                    self._report_status_parser.handle_packet
-                ).parse
-            _read_side_band64k_data(proto.read_pkt_seq(), channel_callbacks)
+                pktline_parser = PktLineParser(self._report_status_parser.handle_packet)
+            for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
+                if chan == SIDE_BAND_CHANNEL_DATA:
+                    if CAPABILITY_REPORT_STATUS in capabilities:
+                        pktline_parser.parse(data)
+                elif chan == SIDE_BAND_CHANNEL_PROGRESS:
+                    progress(data)
+                else:
+                    raise AssertionError(
+                        "Invalid sideband channel %d" % chan)
         else:
             if CAPABILITY_REPORT_STATUS in capabilities:
                 for pkt in proto.read_pkt_seq():
@@ -1244,14 +1240,15 @@ class TraditionalGitClient(GitClient):
             ret = proto.read_pkt_line()
             if ret is not None:
                 raise AssertionError("expected pkt tail")
-            _read_side_band64k_data(
-                proto.read_pkt_seq(),
-                {
-                    SIDE_BAND_CHANNEL_DATA: write_data,
-                    SIDE_BAND_CHANNEL_PROGRESS: progress,
-                    SIDE_BAND_CHANNEL_FATAL: write_error,
-                },
-            )
+            for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
+                if chan == SIDE_BAND_CHANNEL_DATA:
+                    write_data(data)
+                elif chan == SIDE_BAND_CHANNEL_PROGRESS:
+                    progress(data)
+                elif chan == SIDE_BAND_CHANNEL_FATAL:
+                    write_error(data)
+                else:
+                    raise AssertionError("Invalid sideband channel %d" % chan)
 
 
 class TCPGitClient(TraditionalGitClient):

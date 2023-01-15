@@ -979,7 +979,7 @@ class PackStreamReader:
     def __len__(self):
         return self._num_objects
 
-    def read_objects(self, compute_crc32=False):
+    def read_objects(self, compute_crc32=False) -> Iterator[UnpackedObject]:
         """Read the objects in this pack file.
 
         Args:
@@ -1873,7 +1873,6 @@ def generate_unpacked_objects(
             yield full_unpacked_object(container[oid])
 
 
-
 def full_unpacked_object(o: ShaFile) -> UnpackedObject:
     return UnpackedObject(
         o.type_num, delta_base=None, crc32=None,
@@ -1916,7 +1915,6 @@ def write_pack_from_container(
         num_records=pack_contents_count,
         compression_level=compression_level,
     )
-
 
 
 def write_pack_objects(

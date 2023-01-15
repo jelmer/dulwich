@@ -28,7 +28,6 @@ from dulwich.tests import (
 )
 from dulwich.object_store import (
     MemoryObjectStore,
-    MissingObjectFinder,
 )
 from dulwich.objects import (
     Commit,

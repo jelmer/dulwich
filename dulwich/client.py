@@ -51,6 +51,8 @@ from typing import (
     Callable,
     Dict,
     List,
+    Iterable,
+    Iterator,
     Optional,
     Set,
     Tuple,
@@ -117,7 +119,8 @@ from dulwich.protocol import (
     pkt_line,
 )
 from dulwich.pack import (
-    write_pack_objects,
+    write_pack_from_container,
+    UnpackedObject,
     PackChunkGenerator,
 )
 from dulwich.refs import (
@@ -494,7 +497,7 @@ class _v1ReceivePackHeader:
         yield None
 
 
-def _read_side_band64k_data(pkt_seq, channel_callbacks):
+def _read_side_band64k_data(pkt_seq: Iterable[bytes], channel_callbacks: Dict[int, Callable[[bytes], None]]) -> None:
     """Read per-channel data.
 
     This requires the side-band-64k capability.
@@ -587,9 +590,9 @@ def _handle_upload_pack_head(
 
 def _handle_upload_pack_tail(
     proto,
-    capabilities,
+    capabilities: Set[bytes],
     graph_walker,
-    pack_data,
+    pack_data: Callable[[bytes], None],
     progress=None,
     rbufsize=_RBUFSIZE,
 ):
@@ -611,6 +614,8 @@ def _handle_upload_pack_tail(
         parts = pkt.rstrip(b"\n").split(b" ")
         if parts[0] == b"ACK":
             graph_walker.ack(parts[1])
+        if parts[0] == b"NAK":
+            graph_walker.nak()
         if len(parts) < 3 or parts[2] not in (
             b"ready",
             b"continue",
@@ -699,7 +704,7 @@ class GitClient:
         """
         raise NotImplementedError(cls.from_parsedurl)
 
-    def send_pack(self, path, update_refs, generate_pack_data, progress=None):
+    def send_pack(self, path, update_refs, generate_pack_data: Callable[[Set[bytes], Set[bytes], bool], Tuple[int, Iterator[UnpackedObject]]], progress=None):
         """Upload a pack to a remote repository.
 
         Args:
@@ -855,6 +860,7 @@ class GitClient:
         determine_wants,
         graph_walker,
         pack_data,
+        *,
         progress=None,
         depth=None,
     ):
@@ -1106,10 +1112,11 @@ class TraditionalGitClient(GitClient):
                 header_handler.have,
                 header_handler.want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
+                progress=progress,
             )
 
             if self._should_send_pack(new_refs):
-                for chunk in PackChunkGenerator(pack_data_count, pack_data):
+                for chunk in PackChunkGenerator(pack_data_count, pack_data, progress=progress):
                     proto.write(chunk)
 
             ref_status = self._handle_receive_pack_tail(
@@ -1533,17 +1540,19 @@ class LocalGitClient(GitClient):
 
         """
         with self._open_repo(path) as r:
-            objects_iter = r.fetch_objects(
+            missing_objects = r.find_missing_objects(
                 determine_wants, graph_walker, progress=progress, depth=depth
             )
+            other_haves = missing_objects.get_remote_has()
+            object_ids = list(missing_objects)
             symrefs = r.refs.get_symrefs()
             agent = agent_string()
 
             # Did the process short-circuit (e.g. in a stateless RPC call)?
             # Note that the client still expects a 0-object pack in most cases.
-            if objects_iter is None:
+            if object_ids is None:
                 return FetchPackResult(None, symrefs, agent)
-            write_pack_objects(pack_data, objects_iter, reuse_pack=r.object_store)
+            write_pack_from_container(pack_data, r.object_store, object_ids, other_haves=other_haves)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):

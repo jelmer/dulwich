@@ -528,10 +528,7 @@ class ShaFile:
 
     def raw_length(self) -> int:
         """Returns the length of the raw string of this object."""
-        ret = 0
-        for chunk in self.as_raw_chunks():
-            ret += len(chunk)
-        return ret
+        return sum(map(len, self.as_raw_chunks()))
 
     def sha(self):
         """The SHA1 object that is the name of this object."""

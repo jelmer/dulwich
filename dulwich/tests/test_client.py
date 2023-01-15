@@ -200,7 +200,7 @@ class GitClientTests(TestCase):
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b"0000")
 
-    def test_send_pack_no_sideband64k_with_update_ref_error(self):
+    def test_send_pack_no_sideband64k_with_update_ref_error(self) -> None:
         # No side-bank-64k reported by server shouldn't try to parse
         # side band data
         pkts = [
@@ -233,11 +233,11 @@ class GitClientTests(TestCase):
                 b"refs/foo/bar": commit.id,
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
-                    (tree, ""),
+                    (tree, b""),
                 ]
             )
 
@@ -260,7 +260,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -280,7 +280,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -304,7 +304,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -331,11 +331,11 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         f = BytesIO()
-        write_pack_objects(f.write, {})
+        write_pack_objects(f.write, [])
         self.client.send_pack("/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -371,7 +371,7 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
@@ -380,7 +380,8 @@ class GitClientTests(TestCase):
             )
 
         f = BytesIO()
-        write_pack_data(f.write, *generate_pack_data(None, None))
+        count, records = generate_pack_data(None, None)
+        write_pack_data(f.write, records, num_records=count)
         self.client.send_pack(b"/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -407,7 +408,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         result = self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -861,7 +862,9 @@ class LocalGitClientTests(TestCase):
 
     def test_fetch_into_empty(self):
         c = LocalGitClient()
-        t = MemoryRepo()
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        t = Repo.init_bare(target)
         s = open_repo("a.git")
         self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)

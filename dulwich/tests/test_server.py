@@ -198,7 +198,8 @@ class UploadPackHandlerTestCase(TestCase):
         }
         # repo needs to peel this object
         self._repo.object_store.add_object(make_commit(id=FOUR))
-        self._repo.refs._update(refs)
+        for name, sha in refs.items():
+            self._repo.refs[name] = sha
         peeled = {
             b"refs/tags/tag1": b"1234" * 10,
             b"refs/tags/tag2": b"5678" * 10,
@@ -224,7 +225,8 @@ class UploadPackHandlerTestCase(TestCase):
         tree = Tree()
         self._repo.object_store.add_object(tree)
         self._repo.object_store.add_object(make_commit(id=ONE, tree=tree))
-        self._repo.refs._update(refs)
+        for name, sha in refs.items():
+            self._repo.refs[name] = sha
         self._handler.proto.set_output(
             [
                 b"want " + ONE + b" side-band-64k thin-pack ofs-delta",

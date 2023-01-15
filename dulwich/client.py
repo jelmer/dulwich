@@ -51,6 +51,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Iterable,
     Iterator,
     Optional,
     Set,
@@ -496,7 +497,7 @@ class _v1ReceivePackHeader:
         yield None
 
 
-def _read_side_band64k_data(pkt_seq, channel_callbacks):
+def _read_side_band64k_data(pkt_seq: Iterable[bytes], channel_callbacks: Dict[int, Callable[[bytes], None]]) -> None:
     """Read per-channel data.
 
     This requires the side-band-64k capability.
@@ -589,9 +590,9 @@ def _handle_upload_pack_head(
 
 def _handle_upload_pack_tail(
     proto,
-    capabilities,
+    capabilities: Set[bytes],
     graph_walker,
-    pack_data,
+    pack_data: Callable[[bytes], None],
     progress=None,
     rbufsize=_RBUFSIZE,
 ):
@@ -613,6 +614,8 @@ def _handle_upload_pack_tail(
         parts = pkt.rstrip(b"\n").split(b" ")
         if parts[0] == b"ACK":
             graph_walker.ack(parts[1])
+        if parts[0] == b"NAK":
+            graph_walker.nak()
         if len(parts) < 3 or parts[2] not in (
             b"ready",
             b"continue",

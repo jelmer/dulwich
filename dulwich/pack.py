@@ -1029,7 +1029,7 @@ class PackStreamReader:
             # read buffer and (20 - N) come from the wire.
             self.read(20)
 
-        pack_sha = bytearray(self._trailer)
+        pack_sha = bytearray(self._trailer)  # type: ignore
         if pack_sha != self.sha.digest():
             raise ChecksumMismatch(sha_to_hex(pack_sha), self.sha.hexdigest())
 

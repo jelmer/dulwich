@@ -50,7 +50,13 @@ from itertools import chain
 
 import os
 import sys
-from typing import Optional, Callable, Tuple, List, Deque, Union, Protocol, Iterable, Iterator, Dict, TypeVar, Generic, Sequence, Set
+from typing import Optional, Callable, Tuple, List, Deque, Union, Iterable, Iterator, Dict, TypeVar, Generic, Sequence, Set
+
+try:
+    from typing import Protocol
+except ImportError:  # python << 3.8
+    from typing_extensions import Protocol   # type: ignore
+
 import warnings
 
 from hashlib import sha1

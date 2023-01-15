@@ -48,7 +48,13 @@ import os
 import socket
 import sys
 import time
-from typing import List, Tuple, Dict, Optional, Iterable, Set, Protocol as TypingProtocol
+from typing import List, Tuple, Dict, Optional, Iterable, Set
+
+try:
+    from typing import Protocol as TypingProtocol
+except ImportError:  # python < 3.8
+    from typing_extensions import Protocol as TypingProtocol  # type: ignore
+
 import zlib
 
 import socketserver

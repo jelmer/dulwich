@@ -20,6 +20,7 @@
 
 """Tests for bundle support."""
 
+from io import BytesIO
 import os
 import tempfile
 
@@ -32,6 +33,10 @@ from dulwich.bundle import (
     read_bundle,
     write_bundle,
 )
+from dulwich.pack import (
+    PackData,
+    write_pack_objects,
+)
 
 
 class BundleTests(TestCase):
@@ -41,6 +46,10 @@ class BundleTests(TestCase):
         origbundle.capabilities = {"foo": None}
         origbundle.references = {b"refs/heads/master": b"ab" * 20}
         origbundle.prerequisites = [(b"cc" * 20, "comment")]
+        b = BytesIO()
+        write_pack_objects(b.write, [])
+        b.seek(0)
+        origbundle.pack_data = PackData.from_file(b)
         with tempfile.TemporaryDirectory() as td:
             with open(os.path.join(td, "foo"), "wb") as f:
                 write_bundle(f, origbundle)

@@ -39,6 +39,7 @@ from typing import (
     Callable,
     Tuple,
     TYPE_CHECKING,
+    FrozenSet,
     List,
     Dict,
     Union,
@@ -70,10 +71,10 @@ from dulwich.file import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
-    BaseObjectStore,
+    MissingObjectFinder,
+    PackBasedObjectStore,
     ObjectStoreGraphWalker,
     peel_sha,
-    MissingObjectFinder,
 )
 from dulwich.objects import (
     check_hexsha,
@@ -86,7 +87,7 @@ from dulwich.objects import (
     ObjectID,
 )
 from dulwich.pack import (
-    pack_objects_to_data,
+    generate_unpacked_objects
 )
 
 from dulwich.hooks import (
@@ -362,7 +363,7 @@ class BaseRepo:
         repository
     """
 
-    def __init__(self, object_store: BaseObjectStore, refs: RefsContainer):
+    def __init__(self, object_store: PackBasedObjectStore, refs: RefsContainer):
         """Open a repository.
 
         This shouldn't be called directly, but rather through one of the
@@ -484,20 +485,23 @@ class BaseRepo:
           depth: Shallow fetch depth
         Returns: count and iterator over pack data
         """
-        # TODO(jelmer): Fetch pack data directly, don't create objects first.
-        objects = self.fetch_objects(
+        missing_objects = self.find_missing_objects(
             determine_wants, graph_walker, progress, get_tagged, depth=depth
         )
-        return pack_objects_to_data(objects)
+        remote_has = missing_objects.get_remote_has()
+        object_ids = list(missing_objects)
+        return len(object_ids), generate_unpacked_objects(
+            self.object_store, object_ids, progress=progress,
+            other_haves=remote_has)
 
-    def fetch_objects(
+    def find_missing_objects(
         self,
         determine_wants,
         graph_walker,
         progress,
         get_tagged=None,
         depth=None,
-    ):
+    ) -> Optional[MissingObjectFinder]:
         """Fetch the missing objects required for a set of revisions.
 
         Args:
@@ -536,8 +540,8 @@ class BaseRepo:
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
-        shallows = getattr(graph_walker, "shallow", frozenset())
-        unshallows = getattr(graph_walker, "unshallow", frozenset())
+        shallows: FrozenSet[ObjectID] = getattr(graph_walker, "shallow", frozenset())
+        unshallows: FrozenSet[ObjectID] = getattr(graph_walker, "unshallow", frozenset())
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
@@ -547,7 +551,18 @@ class BaseRepo:
                 # Do not send a pack in shallow short-circuit path
                 return None
 
-            return []
+            class DummyMissingObjectFinder:
+
+                def get_remote_has(self):
+                    return None
+
+                def __len__(self):
+                    return 0
+
+                def __iter__(self):
+                    yield from []
+
+            return DummyMissingObjectFinder()  # type: ignore
 
         # If the graph walker is set up with an implementation that can
         # ACK/NAK to the wire, it will write data to the client through
@@ -566,17 +581,14 @@ class BaseRepo:
         def get_parents(commit):
             return parents_provider.get_parents(commit.id, commit)
 
-        return self.object_store.iter_shas(
-            MissingObjectFinder(
-                self.object_store,
-                haves=haves,
-                wants=wants,
-                shallow=self.get_shallow(),
-                progress=progress,
-                get_tagged=get_tagged,
-                get_parents=get_parents,
-            )
-        )
+        return MissingObjectFinder(
+            self.object_store,
+            haves=haves,
+            wants=wants,
+            shallow=self.get_shallow(),
+            progress=progress,
+            get_tagged=get_tagged,
+            get_parents=get_parents)
 
     def generate_pack_data(self, have: List[ObjectID], want: List[ObjectID],
                            progress: Optional[Callable[[str], None]] = None,
@@ -1116,7 +1128,7 @@ class Repo(BaseRepo):
     def __init__(
         self,
         root: str,
-        object_store: Optional[BaseObjectStore] = None,
+        object_store: Optional[PackBasedObjectStore] = None,
         bare: Optional[bool] = None
     ) -> None:
         self.symlink_fn = None
@@ -1433,7 +1445,9 @@ class Repo(BaseRepo):
         for fs_path in fs_paths:
             tree_path = _fs_to_tree_path(fs_path)
             try:
-                tree_entry = self.object_store[tree_id].lookup_path(
+                tree = self.object_store[tree_id]
+                assert isinstance(tree, Tree)
+                tree_entry = tree.lookup_path(
                     self.object_store.__getitem__, tree_path)
             except KeyError:
                 # if tree_entry didn't exist, this file was being added, so

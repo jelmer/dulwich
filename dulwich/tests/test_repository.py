@@ -539,7 +539,7 @@ class RepositoryRootTests(TestCase):
         This test demonstrates that ``find_common_revisions()`` actually
         returns common heads, not revisions; dulwich already uses
         ``find_common_revisions()`` in such a manner (see
-        ``Repo.fetch_objects()``).
+        ``Repo.find_objects()``).
         """
 
         expected_shas = {b"60dacdc733de308bb77bb76ce0fb0f9b44c9769e"}

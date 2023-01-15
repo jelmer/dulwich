@@ -329,7 +329,7 @@ class DulwichClientTestBase:
             sendrefs[b"refs/heads/abranch"] = b"00" * 20
             del sendrefs[b"HEAD"]
 
-            def gen_pack(have, want, ofs_delta=False):
+            def gen_pack(have, want, ofs_delta=False, progress=None):
                 return 0, []
 
             c = self._client()
@@ -344,7 +344,7 @@ class DulwichClientTestBase:
             dest.refs[b"refs/heads/abranch"] = dummy_commit
             sendrefs = {b"refs/heads/bbranch": dummy_commit}
 
-            def gen_pack(have, want, ofs_delta=False):
+            def gen_pack(have, want, ofs_delta=False, progress=None):
                 return 0, []
 
             c = self._client()

@@ -55,6 +55,7 @@ which claims that the client doesn't have any objects::
 
    >>> class DummyGraphWalker(object):
    ...     def ack(self, sha): pass
+   ...     def nak(self): pass
    ...     def next(self): pass
    ...     def __next__(self): pass
 

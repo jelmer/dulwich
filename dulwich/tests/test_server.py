@@ -165,7 +165,10 @@ class HandlerTestCase(TestCase):
 class UploadPackHandlerTestCase(TestCase):
     def setUp(self):
         super().setUp()
-        self._repo = MemoryRepo.init_bare([], {})
+        self.path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.path)
+        self.repo = Repo.init(self.path)
+        self._repo = Repo.init_bare(self.path)
         backend = DictBackend({b"/": self._repo})
         self._handler = UploadPackHandler(
             backend, [b"/", b"host=lolcathost"], TestProto()
@@ -174,6 +177,7 @@ class UploadPackHandlerTestCase(TestCase):
     def test_progress(self):
         caps = self._handler.required_capabilities()
         self._handler.set_client_capabilities(caps)
+        self._handler._start_pack_send_phase()
         self._handler.progress(b"first message")
         self._handler.progress(b"second message")
         self.assertEqual(b"first message", self._handler.proto.get_received_line(2))
@@ -195,12 +199,14 @@ class UploadPackHandlerTestCase(TestCase):
         }
         # repo needs to peel this object
         self._repo.object_store.add_object(make_commit(id=FOUR))
-        self._repo.refs._update(refs)
+        for name, sha in refs.items():
+            self._repo.refs[name] = sha
         peeled = {
             b"refs/tags/tag1": b"1234" * 10,
             b"refs/tags/tag2": b"5678" * 10,
         }
-        self._repo.refs._update_peeled(peeled)
+        self._repo.refs._peeled_refs = peeled
+        self._repo.refs.add_packed_refs(refs)
 
         caps = list(self._handler.required_capabilities()) + [b"include-tag"]
         self._handler.set_client_capabilities(caps)
@@ -221,7 +227,8 @@ class UploadPackHandlerTestCase(TestCase):
         tree = Tree()
         self._repo.object_store.add_object(tree)
         self._repo.object_store.add_object(make_commit(id=ONE, tree=tree))
-        self._repo.refs._update(refs)
+        for name, sha in refs.items():
+            self._repo.refs[name] = sha
         self._handler.proto.set_output(
             [
                 b"want " + ONE + b" side-band-64k thin-pack ofs-delta",
@@ -241,7 +248,8 @@ class UploadPackHandlerTestCase(TestCase):
         tree = Tree()
         self._repo.object_store.add_object(tree)
         self._repo.object_store.add_object(make_commit(id=ONE, tree=tree))
-        self._repo.refs._update(refs)
+        for ref, sha in refs.items():
+            self._repo.refs[ref] = sha
         self._handler.proto.set_output([None])
         self._handler.handle()
         # The server should not send a pack, since the client didn't ask for

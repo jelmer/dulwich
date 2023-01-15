@@ -37,7 +37,7 @@ import signal
 from typing import Dict, Type, Optional
 
 from dulwich import porcelain
-from dulwich.client import get_transport_and_path
+from dulwich.client import get_transport_and_path, GitProtocolError
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.objectspec import parse_commit
@@ -263,8 +263,11 @@ class cmd_clone(Command):
         else:
             target = None
 
-        porcelain.clone(source, target, bare=options.bare, depth=options.depth,
-                        branch=options.branch)
+        try:
+            porcelain.clone(source, target, bare=options.bare, depth=options.depth,
+                            branch=options.branch)
+        except GitProtocolError as e:
+            print("%s" % e)
 
 
 class cmd_commit(Command):

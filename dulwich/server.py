@@ -1,6 +1,6 @@
 # server.py -- Implementation of the server side git protocols
 # Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
-# Coprygith (C) 2011-2012 Jelmer Vernooij <jelmer@jelmer.uk>
+# Copyright(C) 2011-2012 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -43,11 +43,18 @@ Currently supported capabilities:
 """
 
 import collections
+from functools import partial
 import os
 import socket
 import sys
 import time
 from typing import List, Tuple, Dict, Optional, Iterable, Set
+
+try:
+    from typing import Protocol as TypingProtocol
+except ImportError:  # python < 3.8
+    from typing_extensions import Protocol as TypingProtocol  # type: ignore
+
 import zlib
 
 import socketserver
@@ -65,14 +72,16 @@ from dulwich.errors import (
 from dulwich import log_utils
 from dulwich.objects import (
     Commit,
+    ObjectID,
     valid_hexsha,
 )
 from dulwich.object_store import (
     peel_sha,
 )
 from dulwich.pack import (
-    write_pack_objects,
+    write_pack_from_container,
     ObjectContainer,
+    PackedObjectContainer,
 )
 from dulwich.protocol import (
     BufferedPktLineWriter,
@@ -118,6 +127,7 @@ from dulwich.protocol import (
     NAK_LINE,
 )
 from dulwich.refs import (
+    RefsContainer,
     ANNOTATED_TAG_SUFFIX,
     write_info_refs,
 )
@@ -145,15 +155,15 @@ class Backend:
         raise NotImplementedError(self.open_repository)
 
 
-class BackendRepo:
+class BackendRepo(TypingProtocol):
     """Repository abstraction used by the Git server.
 
     The methods required here are a subset of those provided by
     dulwich.repo.Repo.
     """
 
-    object_store = None
-    refs = None
+    object_store: PackedObjectContainer
+    refs: RefsContainer
 
     def get_refs(self) -> Dict[bytes, bytes]:
         """
@@ -175,7 +185,7 @@ class BackendRepo:
         """
         return None
 
-    def fetch_objects(self, determine_wants, graph_walker, progress, get_tagged=None):
+    def find_missing_objects(self, determine_wants, graph_walker, progress, get_tagged=None):
         """
         Yield the objects required for a list of commits.
 
@@ -326,12 +336,21 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_OFS_DELTA,
         )
 
-    def progress(self, message):
-        if self.has_capability(CAPABILITY_NO_PROGRESS) or self._processing_have_lines:
-            return
-        self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, message)
+    def progress(self, message: bytes):
+        pass
 
-    def get_tagged(self, refs=None, repo=None):
+    def _start_pack_send_phase(self):
+        if self.has_capability(CAPABILITY_SIDE_BAND_64K):
+            # The provided haves are processed, and it is safe to send side-
+            # band data now.
+            if not self.has_capability(CAPABILITY_NO_PROGRESS):
+                self.progress = partial(self.proto.write_sideband, SIDE_BAND_CHANNEL_PROGRESS)
+
+            self.write_pack_data = partial(self.proto.write_sideband, SIDE_BAND_CHANNEL_DATA)
+        else:
+            self.write_pack_data = self.proto.write
+
+    def get_tagged(self, refs=None, repo=None) -> Dict[ObjectID, ObjectID]:
         """Get a dict of peeled values of tags to their original tag shas.
 
         Args:
@@ -355,7 +374,7 @@ class UploadPackHandler(PackHandler):
                 # TODO: fix behavior when missing
                 return {}
         # TODO(jelmer): Integrate this with the refs logic in
-        # Repo.fetch_objects
+        # Repo.find_missing_objects
         tagged = {}
         for name, sha in refs.items():
             peeled_sha = repo.get_peeled(name)
@@ -364,8 +383,10 @@ class UploadPackHandler(PackHandler):
         return tagged
 
     def handle(self):
-        def write(x):
-            return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
+        # Note the fact that client is only processing responses related
+        # to the have lines it sent, and any other data (including side-
+        # band) will be be considered a fatal error.
+        self._processing_have_lines = True
 
         graph_walker = _ProtocolGraphWalker(
             self,
@@ -379,17 +400,14 @@ class UploadPackHandler(PackHandler):
             wants.extend(graph_walker.determine_wants(refs, **kwargs))
             return wants
 
-        objects_iter = self.repo.fetch_objects(
+        missing_objects = self.repo.find_missing_objects(
             wants_wrapper,
             graph_walker,
             self.progress,
             get_tagged=self.get_tagged,
         )
 
-        # Note the fact that client is only processing responses related
-        # to the have lines it sent, and any other data (including side-
-        # band) will be be considered a fatal error.
-        self._processing_have_lines = True
+        object_ids = list(missing_objects)
 
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
@@ -400,19 +418,17 @@ class UploadPackHandler(PackHandler):
         if len(wants) == 0:
             return
 
-        # The provided haves are processed, and it is safe to send side-
-        # band data now.
-        self._processing_have_lines = False
-
         if not graph_walker.handle_done(
             not self.has_capability(CAPABILITY_NO_DONE), self._done_received
         ):
             return
 
+        self._start_pack_send_phase()
         self.progress(
-            ("counting objects: %d, done.\n" % len(objects_iter)).encode("ascii")
+            ("counting objects: %d, done.\n" % len(object_ids)).encode("ascii")
         )
-        write_pack_objects(write, objects_iter)
+
+        write_pack_from_container(self.write_pack_data, self.repo.object_store, object_ids)
         # we are done
         self.proto.write_pkt_line(None)
 
@@ -604,7 +620,7 @@ class _ProtocolGraphWalker:
                     peeled_sha = self.get_peeled(ref)
                 except KeyError:
                     # Skip refs that are inaccessible
-                    # TODO(jelmer): Integrate with Repo.fetch_objects refs
+                    # TODO(jelmer): Integrate with Repo.find_missing_objects refs
                     # logic.
                     continue
                 if i == 0:
@@ -662,6 +678,9 @@ class _ProtocolGraphWalker:
         if isinstance(value, int):
             value = str(value).encode("ascii")
         self.proto.unread_pkt_line(command + b" " + value)
+
+    def nak(self):
+        pass
 
     def ack(self, have_ref):
         if len(have_ref) != 40:

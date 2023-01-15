@@ -783,7 +783,7 @@ class PackIndex2(FilePackIndex):
         return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
 
 
-def read_pack_header(read) -> Tuple[Optional[int], Optional[int]]:
+def read_pack_header(read) -> Tuple[int, int]:
     """Read the header of a pack file.
 
     Args:
@@ -793,7 +793,7 @@ def read_pack_header(read) -> Tuple[Optional[int], Optional[int]]:
     """
     header = read(12)
     if not header:
-        return None, None
+        raise AssertionError("file too short to contain pack")
     if header[:4] != b"PACK":
         raise AssertionError("Invalid pack header %r" % header)
     (version,) = unpack_from(b">L", header, 4)
@@ -1922,6 +1922,7 @@ def write_pack_from_container(
 def write_pack_objects(
         write,
         objects: Union[Sequence[ShaFile], Sequence[Tuple[ShaFile, Optional[bytes]]]],
+        *,
         delta_window_size: Optional[int] = None,
         deltify: Optional[bool] = None,
         compression_level: int = -1

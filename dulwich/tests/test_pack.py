@@ -945,7 +945,7 @@ class TestPackStreamReader(TestCase):
 
     def test_read_objects_empty(self):
         reader = PackStreamReader(BytesIO().read)
-        self.assertEqual([], list(reader.read_objects()))
+        self.assertRaises(AssertionError, list, reader.read_objects())
 
 
 class TestPackIterator(DeltaChainIterator):

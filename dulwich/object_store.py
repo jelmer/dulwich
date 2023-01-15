@@ -28,7 +28,12 @@ import stat
 import sys
 import warnings
 
-from typing import Callable, Dict, List, Optional, Tuple, Protocol, Iterator, Set, Iterable, Sequence, cast
+from typing import Callable, Dict, List, Optional, Tuple, Iterator, Set, Iterable, Sequence, cast
+
+try:
+    from typing import Protocol
+except ImportError:  # python << 3.8
+    from typing_extensions import Protocol  # type: ignore
 
 from dulwich.errors import (
     NotTreeError,

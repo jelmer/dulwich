@@ -54,6 +54,7 @@ from dulwich.pack import (
     ObjectContainer,
     Pack,
     PackData,
+    PackHint,
     PackInflater,
     PackFileDisappeared,
     UnpackedObject,
@@ -253,7 +254,8 @@ class BaseObjectStore:
         """
         # Note that the pack-specific implementation below is more efficient,
         # as it reuses deltas
-        object_ids = list(MissingObjectFinder(self, have, want, shallow, progress))
+        missing_objects = MissingObjectFinder(self, have, want, shallow, progress)
+        object_ids = list(missing_objects)
         return pack_objects_to_data(
             [(self[oid], path) for oid, path in object_ids], ofs_delta=ofs_delta,
             progress=progress)
@@ -393,12 +395,15 @@ class PackBasedObjectStore(BaseObjectStore):
           ofs_delta: Whether OFS deltas can be included
           progress: Optional progress reporting method
         """
-        object_ids = list(MissingObjectFinder(self, have, want, shallow, progress))
+        missing_objects = MissingObjectFinder(self, have, want, shallow, progress)
+        remote_has = missing_objects.get_remote_has()
+        object_ids = list(missing_objects)
         return len(object_ids), generate_unpacked_objects(
             cast(PackedObjectContainer, self),
             object_ids,
             progress=progress,
-            ofs_delta=ofs_delta)
+            ofs_delta=ofs_delta,
+            other_haves=remote_has)
 
     def _clear_cached_packs(self):
         pack_cache = self._pack_cache
@@ -1285,10 +1290,13 @@ class MissingObjectFinder:
             self.progress = progress
         self._tagged = get_tagged and get_tagged() or {}
 
-    def add_todo(self, entries):
+    def get_remote_has(self):
+        return self.remote_has
+
+    def add_todo(self, entries: Iterable[Tuple[ObjectID, Optional[bytes], Optional[int], bool]]):
         self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
 
-    def __next__(self) -> Tuple[bytes, Optional[bytes]]:
+    def __next__(self) -> Tuple[bytes, PackHint]:
         while True:
             if not self.objects_to_send:
                 self.progress(("counting objects: %d, done.\n" % len(self.sha_done)).encode("ascii"))
@@ -1316,8 +1324,7 @@ class MissingObjectFinder:
         self.sha_done.add(sha)
         if len(self.sha_done) % 1000 == 0:
             self.progress(("counting objects: %d\r" % len(self.sha_done)).encode("ascii"))
-        # TODO (type_num, name, -length, sha)
-        return (sha, name)
+        return (sha, (type_num, name))
 
     def __iter__(self):
         return self

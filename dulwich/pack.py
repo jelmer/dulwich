@@ -82,6 +82,7 @@ from dulwich.lru_cache import (
 )
 from dulwich.objects import (
     ShaFile,
+    ObjectID,
     hex_to_sha,
     sha_to_hex,
     object_header,
@@ -100,6 +101,7 @@ DEFAULT_PACK_DELTA_WINDOW_SIZE = 10
 OldUnpackedObject = Union[Tuple[Union[bytes, int], List[bytes]], List[bytes]]
 ResolveExtRefFn = Callable[[bytes], Tuple[int, OldUnpackedObject]]
 ProgressFn = Callable[[int, str], None]
+PackHint = Tuple[int, Optional[bytes]]
 
 
 class ObjectContainer(Protocol):
@@ -136,6 +138,15 @@ class PackedObjectContainer(ObjectContainer):
             self, shas: Set[bytes], include_comp: bool = False, allow_missing: bool = False,
             convert_ofs_delta: bool = True) -> Iterator["UnpackedObject"]:
         raise NotImplementedError(self.iter_unpacked_subset)
+
+
+class UnpackedObjectStream:
+
+    def __iter__(self) -> Iterator["UnpackedObject"]:
+        raise NotImplementedError(self.__iter__)
+
+    def __len__(self) -> int:
+        raise NotImplementedError(self.__len__)
 
 
 def take_msb_bytes(read: Callable[[int], bytes], crc32: Optional[int] = None) -> Tuple[List[int], Optional[int]]:
@@ -1674,7 +1685,7 @@ def write_pack_object(write, type, object, sha=None, compression_level=-1):
 
 def write_pack(
         filename,
-        objects: Sequence[Tuple[ShaFile, Optional[bytes]]],
+        objects: Union[Sequence[ShaFile], Sequence[Tuple[ShaFile, Optional[bytes]]]],
         *,
         deltify: Optional[bool] = None,
         delta_window_size: Optional[int] = None,
@@ -1741,7 +1752,7 @@ def find_reusable_deltas(
 
 
 def deltify_pack_objects(
-        objects,
+        objects: Union[Iterator[bytes], Iterator[Tuple[ShaFile, Optional[bytes]]]],
         *, window_size: Optional[int] = None,
         progress=None) -> Iterator[UnpackedObject]:
     """Generate deltas for pack objects.
@@ -1752,20 +1763,31 @@ def deltify_pack_objects(
     Returns: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
     """
+    def objects_with_hints():
+        for e in objects:
+            if isinstance(e, ShaFile):
+                yield (e, (e.type_num, None))
+            else:
+                yield (e[0], (e[0].type_num, e[1]))
     yield from deltas_from_sorted_objects(
-        sort_objects_for_delta(objects),
+        sort_objects_for_delta(objects_with_hints()),
         window_size=window_size,
         progress=progress)
 
 
-def sort_objects_for_delta(objects: Union[Iterator[ShaFile], Iterator[Tuple[ShaFile, Optional[bytes]]]]) -> Iterator[ShaFile]:
+def sort_objects_for_delta(objects: Union[Iterator[ShaFile], Iterator[Tuple[ShaFile, Optional[PackHint]]]]) -> Iterator[ShaFile]:
     magic = []
     for entry in objects:
         if isinstance(entry, tuple):
-            obj, path = entry
+            obj, hint = entry
+            if hint is None:
+                type_num = None
+                path = None
+            else:
+                (type_num, path) = hint
         else:
             obj = entry
-        magic.append((obj.type_num, path, -obj.raw_length(), obj))
+        magic.append((type_num, path, -obj.raw_length(), obj))
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic.sort()
@@ -1806,7 +1828,7 @@ def deltas_from_sorted_objects(objects, window_size: Optional[int] = None, progr
 
 
 def pack_objects_to_data(
-        objects: Sequence[Tuple[ShaFile, Optional[bytes]]],
+        objects: Union[Sequence[ShaFile], Sequence[Tuple[ShaFile, Optional[bytes]]]],
         *,
         deltify: Optional[bool] = None,
         delta_window_size: Optional[int] = None,
@@ -1827,17 +1849,23 @@ def pack_objects_to_data(
     if deltify:
         return (
             count,
-            deltify_pack_objects(objects, window_size=delta_window_size, progress=progress))
+            deltify_pack_objects(iter(objects), window_size=delta_window_size, progress=progress))  # type: ignore
     else:
+        def iter_without_path():
+            for o in objects:
+                if isinstance(o, tuple):
+                    yield full_unpacked_object(o[0])
+                else:
+                    yield full_unpacked_object(o)
         return (
             count,
-            (full_unpacked_object(o) for o, path in objects)
+            iter_without_path()
         )
 
 
 def generate_unpacked_objects(
         container: PackedObjectContainer,
-        object_ids: Sequence[Tuple[bytes, Optional[bytes]]],
+        object_ids: Sequence[Tuple[ObjectID, Optional[PackHint]]],
         delta_window_size: Optional[int] = None,
         deltify: Optional[bool] = None,
         reuse_deltas: bool = True,
@@ -1883,11 +1911,12 @@ def full_unpacked_object(o: ShaFile) -> UnpackedObject:
 def write_pack_from_container(
         write,
         container: PackedObjectContainer,
-        object_ids: Sequence[Tuple[bytes, Optional[bytes]]],
+        object_ids: Sequence[Tuple[ObjectID, Optional[PackHint]]],
         delta_window_size: Optional[int] = None,
         deltify: Optional[bool] = None,
         reuse_deltas: bool = True,
-        compression_level: int = -1
+        compression_level: int = -1,
+        other_haves: Optional[Set[bytes]] = None
 ):
     """Write a new pack data file.
 
@@ -1905,7 +1934,8 @@ def write_pack_from_container(
     pack_contents = generate_unpacked_objects(
         container, object_ids, delta_window_size=delta_window_size,
         deltify=deltify,
-        reuse_deltas=reuse_deltas)
+        reuse_deltas=reuse_deltas,
+        other_haves=other_haves)
 
     return write_pack_data(
         write,
@@ -1918,7 +1948,7 @@ def write_pack_from_container(
 
 def write_pack_objects(
         write,
-        objects: Sequence[Tuple[ShaFile, Optional[bytes]]],
+        objects: Union[Sequence[ShaFile], Sequence[Tuple[ShaFile, Optional[bytes]]]],
         delta_window_size: Optional[int] = None,
         deltify: Optional[bool] = None,
         compression_level: int = -1

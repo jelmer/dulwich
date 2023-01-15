@@ -34,6 +34,12 @@ class Bundle:
     references: Dict[str, bytes] = {}
     pack_data: Union[PackData, Sequence[bytes]] = []
 
+    def __repr__(self):
+        return (f"<{type(self).__name__}(version={self.version}, "
+                f"capabilities={self.capabilities}, "
+                f"prerequisites={self.prerequisites}, "
+                f"references={self.references})>")
+
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return False
@@ -119,4 +125,4 @@ def write_bundle(f, bundle):
     for ref, obj_id in bundle.references.items():
         f.write(b"%s %s\n" % (obj_id, ref))
     f.write(b"\n")
-    write_pack_data(f.write, records=bundle.pack_data)
+    write_pack_data(f.write, num_records=len(bundle.pack_data), records=bundle.pack_data.iter_unpacked())

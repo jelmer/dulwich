@@ -1,6 +1,6 @@
 # server.py -- Implementation of the server side git protocols
 # Copyright (C) 2008 John Carr <john.carr@unrouted.co.uk>
-# Coprygith (C) 2011-2012 Jelmer Vernooij <jelmer@jelmer.uk>
+# Copyright(C) 2011-2012 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -43,6 +43,7 @@ Currently supported capabilities:
 """
 
 import collections
+from functools import partial
 import os
 import socket
 import sys
@@ -65,6 +66,7 @@ from dulwich.errors import (
 from dulwich import log_utils
 from dulwich.objects import (
     Commit,
+    ObjectID,
     valid_hexsha,
 )
 from dulwich.object_store import (
@@ -326,12 +328,21 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_OFS_DELTA,
         )
 
-    def progress(self, message):
-        if self.has_capability(CAPABILITY_NO_PROGRESS) or self._processing_have_lines:
-            return
-        self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, message)
+    def progress(self, message: bytes):
+        pass
 
-    def get_tagged(self, refs=None, repo=None):
+    def _start_pack_send_phase(self):
+        if self.has_capability(CAPABILITY_SIDE_BAND_64K):
+            # The provided haves are processed, and it is safe to send side-
+            # band data now.
+            if not self.has_capability(CAPABILITY_NO_PROGRESS):
+                self.progress = partial(self.proto.write_sideband, SIDE_BAND_CHANNEL_PROGRESS)
+
+            self.write_pack_data = partial(self.proto.write_sideband, SIDE_BAND_CHANNEL_DATA)
+        else:
+            self.write_pack_data = self.proto.write
+
+    def get_tagged(self, refs=None, repo=None) -> Dict[ObjectID, ObjectID]:
         """Get a dict of peeled values of tags to their original tag shas.
 
         Args:
@@ -364,8 +375,10 @@ class UploadPackHandler(PackHandler):
         return tagged
 
     def handle(self):
-        def write(x):
-            return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
+        # Note the fact that client is only processing responses related
+        # to the have lines it sent, and any other data (including side-
+        # band) will be be considered a fatal error.
+        self._processing_have_lines = True
 
         graph_walker = _ProtocolGraphWalker(
             self,
@@ -388,11 +401,6 @@ class UploadPackHandler(PackHandler):
 
         object_ids = list(missing_objects)
 
-        # Note the fact that client is only processing responses related
-        # to the have lines it sent, and any other data (including side-
-        # band) will be be considered a fatal error.
-        self._processing_have_lines = True
-
         # Did the process short-circuit (e.g. in a stateless RPC call)? Note
         # that the client still expects a 0-object pack in most cases.
         # Also, if it also happens that the object_iter is instantiated
@@ -402,19 +410,17 @@ class UploadPackHandler(PackHandler):
         if len(wants) == 0:
             return
 
-        # The provided haves are processed, and it is safe to send side-
-        # band data now.
-        self._processing_have_lines = False
-
         if not graph_walker.handle_done(
             not self.has_capability(CAPABILITY_NO_DONE), self._done_received
         ):
             return
 
+        self._start_pack_send_phase()
         self.progress(
             ("counting objects: %d, done.\n" % len(object_ids)).encode("ascii")
         )
-        write_pack_from_container(write, self.repo.object_store, object_ids)
+
+        write_pack_from_container(self.write_pack_data, self.repo.object_store, object_ids)
         # we are done
         self.proto.write_pkt_line(None)
 
@@ -878,7 +884,7 @@ class MultiAckDetailedGraphWalkerImpl:
         self._common.append(have_ref)
         self.walker.send_ack(have_ref, b"common")
 
-    def __next__(self):
+    def next(self):
         while True:
             command, sha = self.walker.read_proto_line(_GRAPH_WALKER_COMMANDS)
             if command is None:
@@ -893,7 +899,7 @@ class MultiAckDetailedGraphWalkerImpl:
                     # specified and that's handled in handle_done which
                     # may or may not call post_nodone_check depending on
                     # that).
-                    raise StopIteration
+                    return None
             elif command == COMMAND_DONE:
                 # Let the walker know that we got a done.
                 self.walker.notify_done()
@@ -904,6 +910,8 @@ class MultiAckDetailedGraphWalkerImpl:
                 return sha
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
+
+    __next__ = next
 
     def handle_done(self, done_required, done_received):
         if done_required and not done_received:

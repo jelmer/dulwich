@@ -71,7 +71,7 @@ from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
     MissingObjectFinder,
-    BaseObjectStore,
+    PackBasedObjectStore,
     ObjectStoreGraphWalker,
     peel_sha,
     MissingObjectFinder,
@@ -87,7 +87,7 @@ from dulwich.objects import (
     ObjectID,
 )
 from dulwich.pack import (
-    pack_objects_to_data,
+    generate_unpacked_objects
 )
 
 from dulwich.hooks import (
@@ -363,7 +363,7 @@ class BaseRepo:
         repository
     """
 
-    def __init__(self, object_store: BaseObjectStore, refs: RefsContainer):
+    def __init__(self, object_store: PackBasedObjectStore, refs: RefsContainer):
         """Open a repository.
 
         This shouldn't be called directly, but rather through one of the
@@ -486,10 +486,12 @@ class BaseRepo:
         Returns: count and iterator over pack data
         """
         # TODO(jelmer): Fetch pack data directly, don't create objects first.
-        objects = self.fetch_objects(
+        object_ids = self.fetch_objects(
             determine_wants, graph_walker, progress, get_tagged, depth=depth
         )
-        return pack_objects_to_data(objects)
+        # TODO(jelmer): Set other_has=missing_objects.remote_has
+        return len(object_ids), generate_unpacked_objects(
+            self.object_store, object_ids, progress=progress)
 
     def fetch_objects(
         self,
@@ -567,17 +569,14 @@ class BaseRepo:
         def get_parents(commit):
             return parents_provider.get_parents(commit.id, commit)
 
-        return self.object_store.iter_shas(
-            MissingObjectFinder(
-                self.object_store,
-                haves=haves,
-                wants=wants,
-                shallow=self.get_shallow(),
-                progress=progress,
-                get_tagged=get_tagged,
-                get_parents=get_parents,
-            )
-        )
+        return list(MissingObjectFinder(
+            self.object_store,
+            haves,
+            wants,
+            self.get_shallow(),
+            progress,
+            get_tagged,
+            get_parents=get_parents))
 
     def generate_pack_data(self, have: List[ObjectID], want: List[ObjectID],
                            progress: Optional[Callable[[str], None]] = None,
@@ -1117,7 +1116,7 @@ class Repo(BaseRepo):
     def __init__(
         self,
         root: str,
-        object_store: Optional[BaseObjectStore] = None,
+        object_store: Optional[PackBasedObjectStore] = None,
         bare: Optional[bool] = None
     ) -> None:
         self.symlink_fn = None
@@ -1434,7 +1433,9 @@ class Repo(BaseRepo):
         for fs_path in fs_paths:
             tree_path = _fs_to_tree_path(fs_path)
             try:
-                tree_entry = self.object_store[tree_id].lookup_path(
+                tree = self.object_store[tree_id]
+                assert isinstance(tree, Tree)
+                tree_entry = tree.lookup_path(
                     self.object_store.__getitem__, tree_path)
             except KeyError:
                 # if tree_entry didn't exist, this file was being added, so

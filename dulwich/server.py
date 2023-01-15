@@ -71,7 +71,7 @@ from dulwich.object_store import (
     peel_sha,
 )
 from dulwich.pack import (
-    write_pack_objects,
+    write_pack_from_container,
     ObjectContainer,
 )
 from dulwich.protocol import (
@@ -379,7 +379,7 @@ class UploadPackHandler(PackHandler):
             wants.extend(graph_walker.determine_wants(refs, **kwargs))
             return wants
 
-        objects_iter = self.repo.fetch_objects(
+        object_ids = self.repo.fetch_objects(
             wants_wrapper,
             graph_walker,
             self.progress,
@@ -410,9 +410,9 @@ class UploadPackHandler(PackHandler):
             return
 
         self.progress(
-            ("counting objects: %d, done.\n" % len(objects_iter)).encode("ascii")
+            ("counting objects: %d, done.\n" % len(object_ids)).encode("ascii")
         )
-        write_pack_objects(write, objects_iter)
+        write_pack_from_container(write, self.repo.object_store, object_ids)
         # we are done
         self.proto.write_pkt_line(None)
 

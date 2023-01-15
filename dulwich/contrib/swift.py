@@ -40,7 +40,6 @@ from geventhttpclient import HTTPClient
 
 from dulwich.greenthreads import (
     GreenThreadsMissingObjectFinder,
-    GreenThreadsObjectStoreIterator,
 )
 
 from dulwich.lru_cache import LRUSizeCache
@@ -117,15 +116,6 @@ chunk_length = 12228
 # Cache size (MBytes) (Default 20)
 cache_length = 20
 """
-
-
-class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
-    def __len__(self):
-        while self.finder.objects_to_send:
-            for _ in range(0, len(self.finder.objects_to_send)):
-                sha = self.finder.next()
-                self._shas.append(sha)
-        return len(self._shas)
 
 
 class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
@@ -680,15 +670,6 @@ class SwiftObjectStore(PackBasedObjectStore):
     def _iter_loose_objects(self):
         """Loose objects are not supported by this repository"""
         return []
-
-    def iter_shas(self, finder):
-        """An iterator over pack's ObjectStore.
-
-        Returns: a `ObjectStoreIterator` or `GreenThreadsObjectStoreIterator`
-                 instance if gevent is enabled
-        """
-        shas = iter(finder.next, None)
-        return PackInfoObjectStoreIterator(self, shas, finder, self.scon.concurrency)
 
     def pack_info_get(self, sha):
         for pack in self.packs:

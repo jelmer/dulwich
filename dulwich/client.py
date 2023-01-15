@@ -51,6 +51,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Iterator,
     Optional,
     Set,
     Tuple,
@@ -117,7 +118,8 @@ from dulwich.protocol import (
     pkt_line,
 )
 from dulwich.pack import (
-    write_pack_objects,
+    write_pack_from_container,
+    UnpackedObject,
     PackChunkGenerator,
 )
 from dulwich.refs import (
@@ -699,7 +701,7 @@ class GitClient:
         """
         raise NotImplementedError(cls.from_parsedurl)
 
-    def send_pack(self, path, update_refs, generate_pack_data, progress=None):
+    def send_pack(self, path, update_refs, generate_pack_data: Callable[[Set[bytes], Set[bytes], bool], Tuple[int, Iterator[UnpackedObject]]], progress=None):
         """Upload a pack to a remote repository.
 
         Args:
@@ -1106,10 +1108,11 @@ class TraditionalGitClient(GitClient):
                 header_handler.have,
                 header_handler.want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
+                progress=progress,
             )
 
             if self._should_send_pack(new_refs):
-                for chunk in PackChunkGenerator(pack_data_count, pack_data):
+                for chunk in PackChunkGenerator(pack_data_count, pack_data, progress=progress):
                     proto.write(chunk)
 
             ref_status = self._handle_receive_pack_tail(
@@ -1533,7 +1536,7 @@ class LocalGitClient(GitClient):
 
         """
         with self._open_repo(path) as r:
-            objects_iter = r.fetch_objects(
+            object_ids = r.fetch_objects(
                 determine_wants, graph_walker, progress=progress, depth=depth
             )
             symrefs = r.refs.get_symrefs()
@@ -1541,9 +1544,9 @@ class LocalGitClient(GitClient):
 
             # Did the process short-circuit (e.g. in a stateless RPC call)?
             # Note that the client still expects a 0-object pack in most cases.
-            if objects_iter is None:
+            if object_ids is None:
                 return FetchPackResult(None, symrefs, agent)
-            write_pack_objects(pack_data, objects_iter, reuse_pack=r.object_store)
+            write_pack_from_container(pack_data, r.object_store, object_ids)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):

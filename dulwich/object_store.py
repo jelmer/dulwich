@@ -395,7 +395,8 @@ class PackBasedObjectStore(BaseObjectStore):
           ofs_delta: Whether OFS deltas can be included
           progress: Optional progress reporting method
         """
-        missing_objects = MissingObjectFinder(self, have, want, shallow, progress)
+        missing_objects = MissingObjectFinder(
+            self, haves=have, wants=want, shallow=shallow, progress=progress)
         remote_has = missing_objects.get_remote_has()
         object_ids = list(missing_objects)
         return len(object_ids), generate_unpacked_objects(

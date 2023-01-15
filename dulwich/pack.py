@@ -200,8 +200,8 @@ class UnpackedObject:
 
     # TODO(dborowitz): read_zlib_chunks and unpack_object could very well be
     # methods of this object.
-    def __init__(self, pack_type_num, delta_base, decomp_len=None, crc32=None, sha=None, decomp_chunks=None):
-        self.offset = None
+    def __init__(self, pack_type_num, *, delta_base=None, decomp_len=None, crc32=None, sha=None, decomp_chunks=None, offset=None):
+        self.offset = offset
         self._sha = sha
         self.pack_type_num = pack_type_num
         self.delta_base = delta_base
@@ -875,7 +875,7 @@ def unpack_object(
     else:
         delta_base = None
 
-    unpacked = UnpackedObject(type_num, delta_base, size, crc32)
+    unpacked = UnpackedObject(type_num, delta_base=delta_base, decomp_len=size, crc32=crc32)
     unused = read_zlib_chunks(
         read_some,
         unpacked,
@@ -1193,13 +1193,6 @@ class PackData:
     def __eq__(self, other):
         if isinstance(other, PackData):
             return self.get_stored_checksum() == other.get_stored_checksum()
-        if isinstance(other, list):
-            if len(self) != len(other):
-                return False
-            for o1, o2 in zip(self.iterobjects(), other):
-                if o1 != o2:
-                    return False
-            return True
         return False
 
     def _get_size(self):
@@ -1226,27 +1219,7 @@ class PackData:
         """
         return compute_file_sha(self._file, end_ofs=-20).digest()
 
-    def iterobjects(self, progress: Optional[ProgressFn] = None, compute_crc32: bool = True):
-        self._file.seek(self._header_size)
-        for i in range(1, self._num_objects + 1):
-            offset = self._file.tell()
-            unpacked, unused = unpack_object(
-                self._file.read, compute_crc32=compute_crc32
-            )
-            if progress is not None:
-                progress(i, self._num_objects)
-            yield (
-                offset,
-                unpacked.pack_type_num,
-                unpacked._obj(),
-                unpacked.crc32,
-            )
-            # Back up over unused data.
-            self._file.seek(-len(unused), SEEK_CUR)
-
     def iter_unpacked(self, *, include_comp: bool = False):
-        # TODO(dborowitz): Merge this with iterobjects, if we can change its
-        # return type.
         self._file.seek(self._header_size)
 
         if self._num_objects is None:

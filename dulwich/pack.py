@@ -1069,18 +1069,19 @@ class PackStreamCopier(PackStreamReader):
         self.outfile.write(data)
         return data
 
-    def verify(self):
+    def verify(self, progress=None):
         """Verify a pack stream and write it to the output file.
 
         See PackStreamReader.iterobjects for a list of exceptions this may
         throw.
         """
-        if self._delta_iter:
-            for unpacked in self.read_objects():
+        for i, unpacked in enumerate(self.read_objects()):
+            if self._delta_iter:
                 self._delta_iter.record(unpacked)
-        else:
-            for _ in self.read_objects():
-                pass
+            if progress is not None:
+                progress(("copying pack entries: %d/%d\r" % (i, len(self))).encode('ascii'))
+        if progress is not None:
+            progress(("copied %d pack entries\n" % i).encode('ascii'))
 
 
 def obj_sha(type, chunks):
@@ -2352,7 +2353,7 @@ class Pack:
 
     def check_length_and_checksum(self) -> None:
         """Sanity check the length and checksum of the pack index and data."""
-        assert len(self.index) == len(self.data)
+        assert len(self.index) == len(self.data), f"Length mismatch: {len(self.index)} (index) != {len(self.data)} (data)"
         idx_stored_checksum = self.index.get_pack_checksum()
         data_stored_checksum = self.data.get_stored_checksum()
         if idx_stored_checksum != data_stored_checksum:

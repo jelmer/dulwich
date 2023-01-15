@@ -48,7 +48,7 @@ import os
 import socket
 import sys
 import time
-from typing import List, Tuple, Dict, Optional, Iterable, Set
+from typing import List, Tuple, Dict, Optional, Iterable, Set, Protocol as TypingProtocol
 import zlib
 
 import socketserver
@@ -75,6 +75,7 @@ from dulwich.object_store import (
 from dulwich.pack import (
     write_pack_from_container,
     ObjectContainer,
+    PackedObjectContainer,
 )
 from dulwich.protocol import (
     BufferedPktLineWriter,
@@ -120,6 +121,7 @@ from dulwich.protocol import (
     NAK_LINE,
 )
 from dulwich.refs import (
+    RefsContainer,
     ANNOTATED_TAG_SUFFIX,
     write_info_refs,
 )
@@ -147,15 +149,15 @@ class Backend:
         raise NotImplementedError(self.open_repository)
 
 
-class BackendRepo:
+class BackendRepo(TypingProtocol):
     """Repository abstraction used by the Git server.
 
     The methods required here are a subset of those provided by
     dulwich.repo.Repo.
     """
 
-    object_store = None
-    refs = None
+    object_store: PackedObjectContainer
+    refs: RefsContainer
 
     def get_refs(self) -> Dict[bytes, bytes]:
         """

@@ -429,7 +429,7 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, "Elch")
-            write_pack(basename, list(origpack.pack_tuples()))
+            write_pack(basename, origpack.pack_tuples())
 
             with Pack(basename) as newpack:
                 self.assertEqual(origpack, newpack)
@@ -453,7 +453,7 @@ class TestPack(PackTests):
 
     def _copy_pack(self, origpack):
         basename = os.path.join(self.tempdir, "somepack")
-        write_pack(basename, list(origpack.pack_tuples()))
+        write_pack(basename, origpack.pack_tuples())
         return Pack(basename)
 
     def test_keep_no_message(self):
@@ -578,24 +578,28 @@ class TestThinPack(PackTests):
         with self.make_pack(True) as p:
             self.assertEqual((3, b"foo1234"), p.get_raw(self.blobs[b"foo1234"].id))
 
-    def test_get_raw_unresolved(self):
+    def test_get_unpacked_object(self):
+        self.maxDiff = None
         with self.make_pack(False) as p:
-            self.assertEqual(
-                (
-                    7,
-                    b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
-                    [b"x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l"],
-                ),
-                p.get_raw_unresolved(self.blobs[b"foo1234"].id),
+            expected = UnpackedObject(
+                7,
+                b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
+                decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
             )
+            expected.offset = 12
+            got = p.get_unpacked_object(self.blobs[b"foo1234"].id)
+            self.assertEqual(expected, got)
         with self.make_pack(True) as p:
+            expected = UnpackedObject(
+                7,
+                b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
+                decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
+            )
+            expected.offset = 12
+            got = p.get_unpacked_object(self.blobs[b"foo1234"].id)
             self.assertEqual(
-                (
-                    7,
-                    b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
-                    [b"x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l"],
-                ),
-                p.get_raw_unresolved(self.blobs[b"foo1234"].id),
+                expected,
+                got,
             )
 
     def test_iterobjects(self):

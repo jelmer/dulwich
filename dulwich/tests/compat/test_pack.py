@@ -115,8 +115,8 @@ class TestPack(PackTests):
                 (new_blob, None),
                 (new_blob_2, None),
             ]
-        pack_path = os.path.join(self._tempdir, "pack_with_deltas")
-        write_pack(pack_path, all_to_pack, deltify=True)
+            pack_path = os.path.join(self._tempdir, "pack_with_deltas")
+            write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
             {x[0].id for x in all_to_pack},
@@ -154,8 +154,8 @@ class TestPack(PackTests):
                 (new_blob, None),
                 (new_blob_2, None),
             ]
-        pack_path = os.path.join(self._tempdir, "pack_with_deltas")
-        write_pack(pack_path, all_to_pack, deltify=True)
+            pack_path = os.path.join(self._tempdir, "pack_with_deltas")
+            write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
             {x[0].id for x in all_to_pack},

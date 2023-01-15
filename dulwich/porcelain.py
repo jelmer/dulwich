@@ -1769,7 +1769,7 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None, deltify=
     with open_repo_closing(repo) as r:
         entries, data_sum = write_pack_from_container(
             packf.write,
-            repo.object_store,
+            r.object_store,
             [(oid, None) for oid in object_ids],
             deltify=deltify,
             delta_window_size=delta_window_size,

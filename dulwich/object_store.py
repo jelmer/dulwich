@@ -28,7 +28,7 @@ import stat
 import sys
 import warnings
 
-from typing import Callable, Dict, List, Optional, Tuple, Protocol, Union, Iterator, Set, Iterable, Sequence, cast
+from typing import Callable, Dict, List, Optional, Tuple, Protocol, Iterator, Set, Iterable, Sequence, cast
 
 from dulwich.errors import (
     NotTreeError,
@@ -1280,11 +1280,11 @@ class MissingObjectFinder:
         missing_tags = want_tags.difference(have_tags)
         self.objects_to_send.update(
             {(w, None, Tag.type_num, False)
-            for w in missing_tags})
+             for w in missing_tags})
         missing_others = want_others.difference(have_others)
         self.objects_to_send.update(
             {(w, None, None, False)
-            for w in missing_others})
+             for w in missing_others})
 
         if progress is None:
             self.progress = lambda x: None
@@ -1355,8 +1355,8 @@ class ObjectStoreGraphWalker:
         self.shallow = shallow
 
     def nak(self):
-        """Nothing incommon was found."""
-        pass
+        """Nothing in common was found."""
+
     def ack(self, sha):
         """Ack that a revision and its ancestors are present in the source."""
         if len(sha) != 40:

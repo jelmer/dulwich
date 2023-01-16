@@ -1,9 +1,9 @@
-dulwich (0.21.0-1) UNRELEASED; urgency=low
+dulwich (0.21.0-1) unstable; urgency=low
 
   * New upstream release.
   * Update standards version to 4.6.2, no changes needed.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 16 Jan 2023 19:13:10 -0000
+ -- Jelmer Vernooĳ <jelmer@debian.org>  Mon, 16 Jan 2023 19:15:41 +0000
 
 dulwich (0.20.50-1) unstable; urgency=low
 

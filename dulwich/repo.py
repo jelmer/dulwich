@@ -533,7 +533,7 @@ class BaseRepo:
                 continue
             else:
                 if isinstance(obj, Tag):
-                    refs[ref + ANNOTATED_TAG_SUFFIX] = obj.object[1]
+                    refs[ref + PEELED_TAG_SUFFIX] = obj.object[1]
                 refs[ref] = sha
 
         wants = determine_wants(refs)

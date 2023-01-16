@@ -50,7 +50,10 @@ SYMREF = b"ref: "
 LOCAL_BRANCH_PREFIX = b"refs/heads/"
 LOCAL_TAG_PREFIX = b"refs/tags/"
 BAD_REF_CHARS = set(b"\177 ~^:?*[")
-ANNOTATED_TAG_SUFFIX = b"^{}"
+PEELED_TAG_SUFFIX = b"^{}"
+
+# For backwards compatibility
+ANNOTATED_TAG_SUFFIX = PEELED_TAG_SUFFIX
 
 
 class SymrefLoop(Exception):
@@ -593,7 +596,7 @@ class InfoRefsContainer(RefsContainer):
         self._peeled = {}
         for line in f.readlines():
             sha, name = line.rstrip(b"\n").split(b"\t")
-            if name.endswith(ANNOTATED_TAG_SUFFIX):
+            if name.endswith(PEELED_TAG_SUFFIX):
                 name = name[:-3]
                 if not check_ref_format(name):
                     raise ValueError("invalid ref name %r" % name)
@@ -1167,7 +1170,7 @@ def write_info_refs(refs, store: ObjectContainer):
         peeled = peel_sha(store, sha)
         yield o.id + b"\t" + name + b"\n"
         if o.id != peeled.id:
-            yield peeled.id + b"\t" + name + ANNOTATED_TAG_SUFFIX + b"\n"
+            yield peeled.id + b"\t" + name + PEELED_TAG_SUFFIX + b"\n"
 
 
 def is_local_branch(x):
@@ -1179,7 +1182,7 @@ def strip_peeled_refs(refs):
     return {
         ref: sha
         for (ref, sha) in refs.items()
-        if not ref.endswith(ANNOTATED_TAG_SUFFIX)
+        if not ref.endswith(PEELED_TAG_SUFFIX)
     }
 
 
@@ -1275,6 +1278,6 @@ def _import_remote_refs(
     tags = {
         n[len(LOCAL_TAG_PREFIX) :]: v
         for (n, v) in stripped_refs.items()
-        if n.startswith(LOCAL_TAG_PREFIX) and not n.endswith(ANNOTATED_TAG_SUFFIX)
+        if n.startswith(LOCAL_TAG_PREFIX) and not n.endswith(PEELED_TAG_SUFFIX)
     }
     refs_container.import_refs(LOCAL_TAG_PREFIX, tags, message=message, prune=prune_tags)

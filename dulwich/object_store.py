@@ -77,7 +77,7 @@ from dulwich.pack import (
     PACK_SPOOL_FILE_MAX_SIZE,
 )
 from dulwich.protocol import DEPTH_INFINITE
-from dulwich.refs import ANNOTATED_TAG_SUFFIX, Ref
+from dulwich.refs import PEELED_TAG_SUFFIX, Ref
 
 INFODIR = "info"
 PACKDIR = "pack"
@@ -115,7 +115,7 @@ class BaseObjectStore:
             sha
             for (ref, sha) in refs.items()
             if (sha not in self or _want_deepen(sha))
-            and not ref.endswith(ANNOTATED_TAG_SUFFIX)
+            and not ref.endswith(PEELED_TAG_SUFFIX)
             and not sha == ZERO_SHA
         ]
 

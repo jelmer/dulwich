@@ -25,7 +25,6 @@ from io import BytesIO
 from os import (
     SEEK_END,
 )
-import socket
 
 import dulwich
 from dulwich.errors import (
@@ -171,7 +170,7 @@ def pkt_line(data):
     return ("%04x" % (len(data) + 4)).encode("ascii") + data
 
 
-class Protocol(object):
+class Protocol:
     """Class for interacting with a remote git process over the wire.
 
     Parts of the git wire protocol use 'pkt-lines' to communicate. A pkt-line
@@ -228,7 +227,7 @@ class Protocol(object):
             pkt_contents = read(size - 4)
         except ConnectionResetError as exc:
             raise HangupException() from exc
-        except socket.error as exc:
+        except OSError as exc:
             raise GitProtocolError(exc) from exc
         else:
             if len(pkt_contents) + 4 != size:
@@ -291,7 +290,7 @@ class Protocol(object):
             self.write(line)
             if self.report_activity:
                 self.report_activity(len(line), "write")
-        except socket.error as exc:
+        except OSError as exc:
             raise GitProtocolError(exc) from exc
 
     def write_sideband(self, channel, blob):
@@ -348,7 +347,7 @@ class ReceivableProtocol(Protocol):
     def __init__(
         self, recv, write, close=None, report_activity=None, rbufsize=_RBUFSIZE
     ):
-        super(ReceivableProtocol, self).__init__(
+        super().__init__(
             self.read, write, close=close, report_activity=report_activity
         )
         self._recv = recv
@@ -480,7 +479,7 @@ def ack_type(capabilities):
     return SINGLE_ACK
 
 
-class BufferedPktLineWriter(object):
+class BufferedPktLineWriter:
     """Writer that wraps its data in pkt-lines and has an independent buffer.
 
     Consecutive calls to write() wrap the data in a pkt-line and then buffers
@@ -524,7 +523,7 @@ class BufferedPktLineWriter(object):
         self._wbuf = BytesIO()
 
 
-class PktLineParser(object):
+class PktLineParser:
     """Packet line parser that hands completed packets off to a callback."""
 
     def __init__(self, handle_pkt):

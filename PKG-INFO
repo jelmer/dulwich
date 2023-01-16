@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: dulwich
-Version: 0.20.50
+Version: 0.21.0
 Summary: Python Git Library
 Home-page: https://www.dulwich.io/
 Author: Jelmer Vernooij
@@ -12,7 +12,6 @@ Project-URL: Bug Tracker, https://github.com/dulwich/dulwich/issues
 Keywords: vcs,git
 Classifier: Development Status :: 4 - Beta
 Classifier: License :: OSI Approved :: Apache Software License
-Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
@@ -23,11 +22,11 @@ Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Operating System :: POSIX
 Classifier: Operating System :: Microsoft :: Windows
 Classifier: Topic :: Software Development :: Version Control
-Requires-Python: >=3.6
+Requires-Python: >=3.7
 Provides-Extra: fastimport
 Provides-Extra: https
-Provides-Extra: pgp
 Provides-Extra: paramiko
+Provides-Extra: pgp
 License-File: COPYING
 
 Dulwich

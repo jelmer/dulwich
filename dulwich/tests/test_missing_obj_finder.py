@@ -20,6 +20,7 @@
 
 from dulwich.object_store import (
     MemoryObjectStore,
+    MissingObjectFinder,
 )
 from dulwich.objects import (
     Blob,
@@ -34,7 +35,7 @@ from dulwich.tests.utils import (
 
 class MissingObjectFinderTest(TestCase):
     def setUp(self):
-        super(MissingObjectFinderTest, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.commits = []
 
@@ -42,24 +43,24 @@ class MissingObjectFinderTest(TestCase):
         return self.commits[n - 1]
 
     def assertMissingMatch(self, haves, wants, expected):
-        for sha, path in self.store.find_missing_objects(haves, wants, set()):
+        for sha, path in MissingObjectFinder(self.store, haves, wants, shallow=set()):
             self.assertIn(
                 sha,
                 expected,
-                "(%s,%s) erroneously reported as missing" % (sha, path)
+                "({},{}) erroneously reported as missing".format(sha, path)
             )
             expected.remove(sha)
 
         self.assertEqual(
             len(expected),
             0,
-            "some objects are not reported as missing: %s" % (expected,),
+            "some objects are not reported as missing: {}".format(expected),
         )
 
 
 class MOFLinearRepoTest(MissingObjectFinderTest):
     def setUp(self):
-        super(MOFLinearRepoTest, self).setUp()
+        super().setUp()
         # present in 1, removed in 3
         f1_1 = make_object(Blob, data=b"f1")
         # present in all revisions, changed in 2 and 3
@@ -115,8 +116,7 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         haves = [self.cmt(1).id]
         wants = [self.cmt(3).id, bogus_sha]
         self.assertRaises(
-            KeyError, self.store.find_missing_objects, haves, wants, set()
-        )
+            KeyError, MissingObjectFinder, self.store, haves, wants, shallow=set())
 
     def test_no_changes(self):
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])
@@ -130,7 +130,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
     #             5
 
     def setUp(self):
-        super(MOFMergeForkRepoTest, self).setUp()
+        super().setUp()
         f1_1 = make_object(Blob, data=b"f1")
         f1_2 = make_object(Blob, data=b"f1-2")
         f1_4 = make_object(Blob, data=b"f1-4")
@@ -256,7 +256,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
 
 class MOFTagsTest(MissingObjectFinderTest):
     def setUp(self):
-        super(MOFTagsTest, self).setUp()
+        super().setUp()
         f1_1 = make_object(Blob, data=b"f1")
         commit_spec = [[1]]
         trees = {1: [(b"f1", f1_1)]}

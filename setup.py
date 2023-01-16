@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-# encoding: utf-8
 # Setup file for dulwich
 # Copyright (C) 2008-2022 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
@@ -39,7 +38,6 @@ if '__pypy__' not in sys.modules and sys.platform != 'win32':
 
 optional = os.environ.get('CIBUILDWHEEL', '0') != '1'
 
-
 ext_modules = [
     Extension('dulwich._objects', ['dulwich/_objects.c'],
               optional=optional),
@@ -48,6 +46,12 @@ ext_modules = [
     Extension('dulwich._diff_tree', ['dulwich/_diff_tree.c'],
               optional=optional),
 ]
+
+# Ideally, setuptools would just provide a way to do this
+if '--pure' in sys.argv:
+    sys.argv.remove('--pure')
+    ext_modules = []
+
 
 setup(package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
       ext_modules=ext_modules,

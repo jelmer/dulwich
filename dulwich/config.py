@@ -52,7 +52,7 @@ def lower_key(key):
         return key.lower()
 
     if isinstance(key, Iterable):
-        return type(key)(map(lower_key, key))
+        return type(key)(map(lower_key, key))  # type: ignore
 
     return key
 
@@ -145,7 +145,7 @@ Value = bytes
 ValueLike = Union[bytes, str]
 
 
-class Config(object):
+class Config:
     """A Git configuration."""
 
     def get(self, section: SectionLike, name: NameLike) -> Value:
@@ -265,7 +265,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
         self._values = CaseInsensitiveOrderedMultiDict.make(values)
 
     def __repr__(self) -> str:
-        return "%s(%r)" % (self.__class__.__name__, self._values)
+        return "{}({!r})".format(self.__class__.__name__, self._values)
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, self.__class__) and other._values == self._values
@@ -534,7 +534,7 @@ class ConfigFile(ConfigDict):
         ] = None,
         encoding: Union[str, None] = None
     ) -> None:
-        super(ConfigFile, self).__init__(values=values, encoding=encoding)
+        super().__init__(values=values, encoding=encoding)
         self.path: Optional[str] = None
 
     @classmethod  # noqa: C901
@@ -651,11 +651,11 @@ def _find_git_in_win_reg():
             "Uninstall\\Git_is1"
         )
 
-    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore
         try:
-            with winreg.OpenKey(key, subkey) as k:
-                val, typ = winreg.QueryValueEx(k, "InstallLocation")
-                if typ == winreg.REG_SZ:
+            with winreg.OpenKey(key, subkey) as k:  # type: ignore
+                val, typ = winreg.QueryValueEx(k, "InstallLocation")  # type: ignore
+                if typ == winreg.REG_SZ:  # type: ignore
                     yield val
         except OSError:
             pass
@@ -687,7 +687,7 @@ class StackedConfig(Config):
         self.writable = writable
 
     def __repr__(self) -> str:
-        return "<%s for %r>" % (self.__class__.__name__, self.backends)
+        return "<{} for {!r}>".format(self.__class__.__name__, self.backends)
 
     @classmethod
     def default(cls) -> "StackedConfig":

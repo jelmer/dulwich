@@ -29,7 +29,7 @@ from dulwich.tests.compat import utils
 
 class GitVersionTests(TestCase):
     def setUp(self):
-        super(GitVersionTests, self).setUp()
+        super().setUp()
         self._orig_run_git = utils.run_git
         self._version_str = None  # tests can override to set stub version
 
@@ -40,7 +40,7 @@ class GitVersionTests(TestCase):
         utils.run_git = run_git
 
     def tearDown(self):
-        super(GitVersionTests, self).tearDown()
+        super().tearDown()
         utils.run_git = self._orig_run_git
 
     def test_git_version_none(self):

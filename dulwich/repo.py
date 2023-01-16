@@ -39,6 +39,7 @@ from typing import (
     Callable,
     Tuple,
     TYPE_CHECKING,
+    FrozenSet,
     List,
     Dict,
     Union,
@@ -70,8 +71,10 @@ from dulwich.file import (
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
-    BaseObjectStore,
+    MissingObjectFinder,
+    PackBasedObjectStore,
     ObjectStoreGraphWalker,
+    peel_sha,
 )
 from dulwich.objects import (
     check_hexsha,
@@ -84,7 +87,7 @@ from dulwich.objects import (
     ObjectID,
 )
 from dulwich.pack import (
-    pack_objects_to_data,
+    generate_unpacked_objects
 )
 
 from dulwich.hooks import (
@@ -180,7 +183,7 @@ def _get_default_identity() -> Tuple[str, str]:
         fullname = username
     email = os.environ.get("EMAIL")
     if email is None:
-        email = "{}@{}".format(username, socket.gethostname())
+        email = f"{username}@{socket.gethostname()}"
     return (fullname, email)  # type: ignore
 
 
@@ -205,8 +208,8 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
     Returns:
       A user identity
     """
-    user = None  # type: Optional[bytes]
-    email = None  # type: Optional[bytes]
+    user: Optional[bytes] = None
+    email: Optional[bytes] = None
     if kind:
         user_uc = os.environ.get("GIT_" + kind + "_NAME")
         if user_uc is not None:
@@ -329,7 +332,7 @@ def _set_filesystem_hidden(path):
     # Could implement other platform specific filesystem hiding here
 
 
-class ParentsProvider(object):
+class ParentsProvider:
     def __init__(self, store, grafts={}, shallows=[]):
         self.store = store
         self.grafts = grafts
@@ -347,7 +350,7 @@ class ParentsProvider(object):
         return commit.parents
 
 
-class BaseRepo(object):
+class BaseRepo:
     """Base class for a git repository.
 
     This base class is meant to be used for Repository implementations that e.g.
@@ -360,7 +363,7 @@ class BaseRepo(object):
         repository
     """
 
-    def __init__(self, object_store: BaseObjectStore, refs: RefsContainer):
+    def __init__(self, object_store: PackBasedObjectStore, refs: RefsContainer):
         """Open a repository.
 
         This shouldn't be called directly, but rather through one of the
@@ -373,8 +376,8 @@ class BaseRepo(object):
         self.object_store = object_store
         self.refs = refs
 
-        self._graftpoints = {}  # type: Dict[bytes, List[bytes]]
-        self.hooks = {}  # type: Dict[str, Hook]
+        self._graftpoints: Dict[bytes, List[bytes]] = {}
+        self.hooks: Dict[str, Hook] = {}
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
@@ -482,20 +485,23 @@ class BaseRepo(object):
           depth: Shallow fetch depth
         Returns: count and iterator over pack data
         """
-        # TODO(jelmer): Fetch pack data directly, don't create objects first.
-        objects = self.fetch_objects(
+        missing_objects = self.find_missing_objects(
             determine_wants, graph_walker, progress, get_tagged, depth=depth
         )
-        return pack_objects_to_data(objects)
+        remote_has = missing_objects.get_remote_has()
+        object_ids = list(missing_objects)
+        return len(object_ids), generate_unpacked_objects(
+            self.object_store, object_ids, progress=progress,
+            other_haves=remote_has)
 
-    def fetch_objects(
+    def find_missing_objects(
         self,
         determine_wants,
         graph_walker,
         progress,
         get_tagged=None,
         depth=None,
-    ):
+    ) -> Optional[MissingObjectFinder]:
         """Fetch the missing objects required for a set of revisions.
 
         Args:
@@ -534,8 +540,8 @@ class BaseRepo(object):
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
-        shallows = getattr(graph_walker, "shallow", frozenset())
-        unshallows = getattr(graph_walker, "unshallow", frozenset())
+        shallows: FrozenSet[ObjectID] = getattr(graph_walker, "shallow", frozenset())
+        unshallows: FrozenSet[ObjectID] = getattr(graph_walker, "unshallow", frozenset())
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
@@ -545,7 +551,18 @@ class BaseRepo(object):
                 # Do not send a pack in shallow short-circuit path
                 return None
 
-            return []
+            class DummyMissingObjectFinder:
+
+                def get_remote_has(self):
+                    return None
+
+                def __len__(self):
+                    return 0
+
+                def __iter__(self):
+                    yield from []
+
+            return DummyMissingObjectFinder()  # type: ignore
 
         # If the graph walker is set up with an implementation that can
         # ACK/NAK to the wire, it will write data to the client through
@@ -564,16 +581,14 @@ class BaseRepo(object):
         def get_parents(commit):
             return parents_provider.get_parents(commit.id, commit)
 
-        return self.object_store.iter_shas(
-            self.object_store.find_missing_objects(
-                haves,
-                wants,
-                self.get_shallow(),
-                progress,
-                get_tagged,
-                get_parents=get_parents,
-            )
-        )
+        return MissingObjectFinder(
+            self.object_store,
+            haves=haves,
+            wants=wants,
+            shallow=self.get_shallow(),
+            progress=progress,
+            get_tagged=get_tagged,
+            get_parents=get_parents)
 
     def generate_pack_data(self, have: List[ObjectID], want: List[ObjectID],
                            progress: Optional[Callable[[str], None]] = None,
@@ -595,7 +610,8 @@ class BaseRepo(object):
         )
 
     def get_graph_walker(
-            self, heads: List[ObjectID] = None) -> ObjectStoreGraphWalker:
+            self,
+            heads: Optional[List[ObjectID]] = None) -> ObjectStoreGraphWalker:
         """Retrieve a graph walker.
 
         A graph walker is used by a remote repository (or proxy)
@@ -641,7 +657,7 @@ class BaseRepo(object):
                 raise NotTagError(ret)
             else:
                 raise Exception(
-                    "Type invalid: %r != %r" % (ret.type_name, cls.type_name)
+                    "Type invalid: {!r} != {!r}".format(ret.type_name, cls.type_name)
                 )
         return ret
 
@@ -663,7 +679,8 @@ class BaseRepo(object):
             shallows=self.get_shallow(),
         )
 
-    def get_parents(self, sha: bytes, commit: Commit = None) -> List[bytes]:
+    def get_parents(self, sha: bytes,
+                    commit: Optional[Commit] = None) -> List[bytes]:
         """Retrieve the parents of a specific commit.
 
         If the specific commit is a graftpoint, the graft parents
@@ -755,7 +772,7 @@ class BaseRepo(object):
         cached = self.refs.get_peeled(ref)
         if cached is not None:
             return cached
-        return self.object_store.peel_sha(self.refs[ref]).id
+        return peel_sha(self.object_store, self.refs[ref]).id
 
     def get_walker(self, include: Optional[List[bytes]] = None,
                    *args, **kwargs):
@@ -855,7 +872,8 @@ class BaseRepo(object):
         else:
             raise ValueError(name)
 
-    def _get_user_identity(self, config: "StackedConfig", kind: str = None) -> bytes:
+    def _get_user_identity(self, config: "StackedConfig",
+                           kind: Optional[str] = None) -> bytes:
         """Determine the identity to use for new commits."""
         # TODO(jelmer): Deprecate this function in favor of get_user_identity
         return get_user_identity(config)
@@ -1110,7 +1128,7 @@ class Repo(BaseRepo):
     def __init__(
         self,
         root: str,
-        object_store: Optional[BaseObjectStore] = None,
+        object_store: Optional[PackBasedObjectStore] = None,
         bare: Optional[bool] = None
     ) -> None:
         self.symlink_fn = None
@@ -1130,7 +1148,7 @@ class Repo(BaseRepo):
         self.bare = bare
         if bare is False:
             if os.path.isfile(hidden_path):
-                with open(hidden_path, "r") as f:
+                with open(hidden_path) as f:
                     path = read_gitfile(f)
                 self._controldir = os.path.join(root, path)
             else:
@@ -1427,7 +1445,9 @@ class Repo(BaseRepo):
         for fs_path in fs_paths:
             tree_path = _fs_to_tree_path(fs_path)
             try:
-                tree_entry = self.object_store[tree_id].lookup_path(
+                tree = self.object_store[tree_id]
+                assert isinstance(tree, Tree)
+                tree_entry = tree.lookup_path(
                     self.object_store.__getitem__, tree_path)
             except KeyError:
                 # if tree_entry didn't exist, this file was being added, so
@@ -1490,9 +1510,7 @@ class Repo(BaseRepo):
         Returns: Created repository as `Repo`
         """
 
-        encoded_path = self.path
-        if not isinstance(encoded_path, bytes):
-            encoded_path = os.fsencode(encoded_path)
+        encoded_path = os.fsencode(self.path)
 
         if mkdir:
             os.mkdir(target_path)

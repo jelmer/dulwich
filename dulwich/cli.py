@@ -37,7 +37,7 @@ import signal
 from typing import Dict, Type, Optional
 
 from dulwich import porcelain
-from dulwich.client import get_transport_and_path
+from dulwich.client import get_transport_and_path, GitProtocolError
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.objectspec import parse_commit
@@ -55,7 +55,7 @@ def signal_quit(signal, frame):
     pdb.set_trace()
 
 
-class Command(object):
+class Command:
     """A Dulwich subcommand."""
 
     def run(self, args):
@@ -139,7 +139,7 @@ class cmd_fsck(Command):
         opts, args = getopt(args, "", [])
         opts = dict(opts)
         for (obj, msg) in porcelain.fsck("."):
-            print("%s: %s" % (obj, msg))
+            print("{}: {}".format(obj, msg))
 
 
 class cmd_log(Command):
@@ -202,9 +202,9 @@ class cmd_dump_pack(Command):
             try:
                 print("\t%s" % x[name])
             except KeyError as k:
-                print("\t%s: Unable to resolve base %s" % (name, k))
+                print("\t{}: Unable to resolve base {}".format(name, k))
             except ApplyDeltaError as e:
-                print("\t%s: Unable to apply delta: %r" % (name, e))
+                print("\t{}: Unable to apply delta: {!r}".format(name, e))
 
 
 class cmd_dump_index(Command):
@@ -263,8 +263,11 @@ class cmd_clone(Command):
         else:
             target = None
 
-        porcelain.clone(source, target, bare=options.bare, depth=options.depth,
-                        branch=options.branch)
+        try:
+            porcelain.clone(source, target, bare=options.bare, depth=options.depth,
+                            branch=options.branch)
+        except GitProtocolError as e:
+            print("%s" % e)
 
 
 class cmd_commit(Command):
@@ -298,6 +301,18 @@ class cmd_symbolic_ref(Command):
 
         ref_name = args.pop(0)
         porcelain.symbolic_ref(".", ref_name=ref_name, force="--force" in args)
+
+
+class cmd_pack_refs(Command):
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--all', action='store_true')
+        # ignored, we never prune
+        parser.add_argument('--no-prune', action='store_true')
+
+        args = parser.parse_args(argv)
+
+        porcelain.pack_refs(".", all=args.all)
 
 
 class cmd_show(Command):
@@ -471,7 +486,7 @@ class cmd_status(Command):
             for kind, names in status.staged.items():
                 for name in names:
                     sys.stdout.write(
-                        "\t%s: %s\n" % (kind, name.decode(sys.getfilesystemencoding()))
+                        "\t{}: {}\n".format(kind, name.decode(sys.getfilesystemencoding()))
                     )
             sys.stdout.write("\n")
         if status.unstaged:
@@ -494,7 +509,7 @@ class cmd_ls_remote(Command):
             sys.exit(1)
         refs = porcelain.ls_remote(args[0])
         for ref in sorted(refs):
-            sys.stdout.write("%s\t%s\n" % (ref, refs[ref]))
+            sys.stdout.write("{}\t{}\n".format(ref, refs[ref]))
 
 
 class cmd_ls_tree(Command):
@@ -523,22 +538,34 @@ class cmd_ls_tree(Command):
 
 class cmd_pack_objects(Command):
     def run(self, args):
-        opts, args = getopt(args, "", ["stdout"])
+        deltify = False
+        reuse_deltas = True
+        opts, args = getopt(args, "", ["stdout", "deltify", "no-reuse-deltas"])
         opts = dict(opts)
-        if len(args) < 1 and "--stdout" not in args:
+        if len(args) < 1 and "--stdout" not in opts.keys():
             print("Usage: dulwich pack-objects basename")
             sys.exit(1)
         object_ids = [line.strip() for line in sys.stdin.readlines()]
-        basename = args[0]
-        if "--stdout" in opts:
+        if "--deltify" in opts.keys():
+            deltify = True
+        if "--no-reuse-deltas" in opts.keys():
+            reuse_deltas = False
+        if "--stdout" in opts.keys():
             packf = getattr(sys.stdout, "buffer", sys.stdout)
             idxf = None
             close = []
         else:
-            packf = open(basename + ".pack", "w")
-            idxf = open(basename + ".idx", "w")
+            basename = args[0]
+            packf = open(basename + ".pack", "wb")
+            idxf = open(basename + ".idx", "wb")
             close = [packf, idxf]
-        porcelain.pack_objects(".", object_ids, packf, idxf)
+        porcelain.pack_objects(
+            ".",
+            object_ids,
+            packf,
+            idxf,
+            deltify=deltify,
+            reuse_deltas=reuse_deltas)
         for f in close:
             f.close()
 
@@ -606,7 +633,7 @@ class cmd_submodule_list(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(argv)
         for path, sha in porcelain.submodule_list("."):
-            sys.stdout.write(' %s %s\n' % (sha, path))
+            sys.stdout.write(' {} {}\n'.format(sha, path))
 
 
 class cmd_submodule_init(Command):
@@ -744,6 +771,7 @@ commands = {
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,
+    "pack-refs": cmd_pack_refs,
     "pull": cmd_pull,
     "push": cmd_push,
     "receive-pack": cmd_receive_pack,

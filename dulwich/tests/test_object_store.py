@@ -51,6 +51,8 @@ from dulwich.object_store import (
     OverlayObjectStore,
     ObjectStoreGraphWalker,
     commit_tree_changes,
+    iter_tree_contents,
+    peel_sha,
     read_packs_file,
     tree_lookup_path,
 )
@@ -77,7 +79,7 @@ except ImportError:
 testobject = make_object(Blob, data=b"yummy data")
 
 
-class ObjectStoreTests(object):
+class ObjectStoreTests:
     def test_determine_wants_all(self):
         self.assertEqual(
             [b"1" * 40],
@@ -164,7 +166,7 @@ class ObjectStoreTests(object):
 
     def test_add_object(self):
         self.store.add_object(testobject)
-        self.assertEqual(set([testobject.id]), set(self.store))
+        self.assertEqual({testobject.id}, set(self.store))
         self.assertIn(testobject.id, self.store)
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
@@ -172,7 +174,7 @@ class ObjectStoreTests(object):
     def test_add_objects(self):
         data = [(testobject, "mypath")]
         self.store.add_objects(data)
-        self.assertEqual(set([testobject.id]), set(self.store))
+        self.assertEqual({testobject.id}, set(self.store))
         self.assertIn(testobject.id, self.store)
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
@@ -219,8 +221,9 @@ class ObjectStoreTests(object):
         tree_id = commit_tree(self.store, blobs)
         self.assertEqual(
             [TreeEntry(p, m, h) for (p, h, m) in blobs],
-            list(self.store.iter_tree_contents(tree_id)),
+            list(iter_tree_contents(self.store, tree_id)),
         )
+        self.assertEqual([], list(iter_tree_contents(self.store, None)))
 
     def test_iter_tree_contents_include_trees(self):
         blob_a = make_object(Blob, data=b"a")
@@ -247,7 +250,7 @@ class ObjectStoreTests(object):
             TreeEntry(b"ad/bd", 0o040000, tree_bd.id),
             TreeEntry(b"ad/bd/c", 0o100755, blob_c.id),
         ]
-        actual = self.store.iter_tree_contents(tree_id, include_trees=True)
+        actual = iter_tree_contents(self.store, tree_id, include_trees=True)
         self.assertEqual(expected, list(actual))
 
     def make_tag(self, name, obj):
@@ -261,7 +264,7 @@ class ObjectStoreTests(object):
         tag2 = self.make_tag(b"2", testobject)
         tag3 = self.make_tag(b"3", testobject)
         for obj in [testobject, tag1, tag2, tag3]:
-            self.assertEqual(testobject, self.store.peel_sha(obj.id))
+            self.assertEqual(testobject, peel_sha(self.store, obj.id))
 
     def test_get_raw(self):
         self.store.add_object(testobject)
@@ -302,7 +305,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
     def test_add_pack_emtpy(self):
         o = MemoryObjectStore()
         f, commit, abort = o.add_pack()
-        commit()
+        self.assertRaises(AssertionError, commit)
 
     def test_add_thin_pack(self):
         o = MemoryObjectStore()
@@ -626,9 +629,9 @@ class TreeLookupPathTests(TestCase):
 
 class ObjectStoreGraphWalkerTests(TestCase):
     def get_walker(self, heads, parent_map):
-        new_parent_map = dict(
-            [(k * 40, [(p * 40) for p in ps]) for (k, ps) in parent_map.items()]
-        )
+        new_parent_map = {
+            k * 40: [(p * 40) for p in ps] for (k, ps) in parent_map.items()
+        }
         return ObjectStoreGraphWalker(
             [x * 40 for x in heads], new_parent_map.__getitem__
         )
@@ -707,7 +710,7 @@ class ObjectStoreGraphWalkerTests(TestCase):
 
 class CommitTreeChangesTests(TestCase):
     def setUp(self):
-        super(CommitTreeChangesTests, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.blob_a = make_object(Blob, data=b"a")
         self.blob_b = make_object(Blob, data=b"b")

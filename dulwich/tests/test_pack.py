@@ -410,7 +410,7 @@ class TestPack(PackTests):
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(3, len(tuples))
 
-    def test_get_object_at(self):
+    def test_get_object(self):
         """Tests random access for non-delta objects"""
         with self.get_pack(pack1_sha) as p:
             obj = p[a_sha]

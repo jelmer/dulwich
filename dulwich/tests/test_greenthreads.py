@@ -28,7 +28,6 @@ from dulwich.tests import (
 )
 from dulwich.object_store import (
     MemoryObjectStore,
-    MissingObjectFinder,
 )
 from dulwich.objects import (
     Commit,
@@ -46,7 +45,6 @@ except ImportError:
 
 if gevent_support:
     from dulwich.greenthreads import (
-        GreenThreadsObjectStoreIterator,
         GreenThreadsMissingObjectFinder,
     )
 
@@ -78,45 +76,9 @@ def init_store(store, count=1):
 
 
 @skipIf(not gevent_support, skipmsg)
-class TestGreenThreadsObjectStoreIterator(TestCase):
-    def setUp(self):
-        super(TestGreenThreadsObjectStoreIterator, self).setUp()
-        self.store = MemoryObjectStore()
-        self.cmt_amount = 10
-        self.objs = init_store(self.store, self.cmt_amount)
-
-    def test_len(self):
-        wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
-        finder = MissingObjectFinder(self.store, (), wants)
-        iterator = GreenThreadsObjectStoreIterator(
-            self.store, iter(finder.next, None), finder
-        )
-        # One commit refers one tree and one blob
-        self.assertEqual(len(iterator), self.cmt_amount * 3)
-        haves = wants[0 : self.cmt_amount - 1]
-        finder = MissingObjectFinder(self.store, haves, wants)
-        iterator = GreenThreadsObjectStoreIterator(
-            self.store, iter(finder.next, None), finder
-        )
-        self.assertEqual(len(iterator), 3)
-
-    def test_iter(self):
-        wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
-        finder = MissingObjectFinder(self.store, (), wants)
-        iterator = GreenThreadsObjectStoreIterator(
-            self.store, iter(finder.next, None), finder
-        )
-        objs = []
-        for sha, path in iterator:
-            self.assertIn(sha, self.objs)
-            objs.append(sha)
-        self.assertEqual(len(objs), len(self.objs))
-
-
-@skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsMissingObjectFinder(TestCase):
     def setUp(self):
-        super(TestGreenThreadsMissingObjectFinder, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.cmt_amount = 10
         self.objs = init_store(self.store, self.cmt_amount)

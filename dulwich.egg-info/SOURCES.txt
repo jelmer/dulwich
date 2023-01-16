@@ -18,11 +18,13 @@ SECURITY.md
 TODO
 disperse.conf
 dulwich.cfg
+pyproject.toml
 requirements.txt
 setup.cfg
 setup.py
 status.yaml
 tox.ini
+.github/CODEOWNERS
 .github/FUNDING.yml
 .github/workflows/disperse.yml
 .github/workflows/docs.yml

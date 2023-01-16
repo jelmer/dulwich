@@ -134,7 +134,7 @@ from dulwich.objectspec import (
 )
 from dulwich.pack import (
     write_pack_index,
-    write_pack_objects,
+    write_pack_from_container,
 )
 from dulwich.patch import write_tree_diff
 from dulwich.protocol import (
@@ -187,7 +187,7 @@ class Error(Exception):
     """Porcelain-based error. """
 
     def __init__(self, msg):
-        super(Error, self).__init__(msg)
+        super().__init__(msg)
 
 
 class RemoteExists(Error):
@@ -405,6 +405,18 @@ def symbolic_ref(repo, ref_name, force=False):
         if not force and ref_path not in repo_obj.refs.keys():
             raise Error("fatal: ref `%s` is not a ref" % ref_name)
         repo_obj.refs.set_symbolic_ref(b"HEAD", ref_path)
+
+
+def pack_refs(repo, all=False):
+    with open_repo_closing(repo) as repo_obj:
+        refs = repo_obj.refs
+        packed_refs = {
+            ref: refs[ref]
+            for ref in refs
+            if (all or ref.startswith(LOCAL_TAG_PREFIX)) and ref != b"HEAD"
+        }
+
+        refs.add_packed_refs(packed_refs)
 
 
 def commit(
@@ -687,7 +699,7 @@ def remove(repo=".", paths=None, cached=False):
                 else:
                     try:
                         blob = blob_from_path_and_stat(full_path, st)
-                    except IOError:
+                    except OSError:
                         pass
                     else:
                         try:
@@ -1023,7 +1035,7 @@ def submodule_list(repo):
     from .submodule import iter_cached_submodules
     with open_repo_closing(repo) as r:
         for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
-            yield path.decode(DEFAULT_ENCODING), sha.decode(DEFAULT_ENCODING)
+            yield path, sha.decode(DEFAULT_ENCODING)
 
 
 def tag_create(
@@ -1146,7 +1158,7 @@ def get_remote_repo(
 
     section = (b"remote", encoded_location)
 
-    remote_name = None  # type: Optional[str]
+    remote_name: Optional[str] = None
 
     if config.has_section(section):
         remote_name = encoded_location.decode()
@@ -1741,7 +1753,7 @@ def repack(repo):
         r.object_store.pack_loose_objects()
 
 
-def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
+def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None, deltify=None, reuse_deltas=True):
     """Pack objects into a file.
 
     Args:
@@ -1749,12 +1761,19 @@ def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None):
       object_ids: List of object ids to write
       packf: File-like object to write to
       idxf: File-like object to write to (can be None)
+      delta_window_size: Sliding window size for searching for deltas;
+                         Set to None for default window size.
+      deltify: Whether to deltify objects
+      reuse_deltas: Allow reuse of existing deltas while deltifying
     """
     with open_repo_closing(repo) as r:
-        entries, data_sum = write_pack_objects(
+        entries, data_sum = write_pack_from_container(
             packf.write,
-            r.object_store.iter_shas((oid, None) for oid in object_ids),
+            r.object_store,
+            [(oid, None) for oid in object_ids],
+            deltify=deltify,
             delta_window_size=delta_window_size,
+            reuse_deltas=reuse_deltas,
         )
     if idxf is not None:
         entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
@@ -1985,11 +2004,12 @@ def find_unique_abbrev(object_store, object_id):
     return object_id.decode("ascii")[:7]
 
 
-def describe(repo):
+def describe(repo, abbrev=7):
     """Describe the repository version.
 
     Args:
       repo: git repository
+      abbrev: number of characters of commit to take, default is 7
     Returns: a string description of the current git revision
 
     Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".
@@ -2002,10 +2022,10 @@ def describe(repo):
         for key, value in refs.items():
             key = key.decode()
             obj = r.get_object(value)
-            if u"tags" not in key:
+            if "tags" not in key:
                 continue
 
-            _, tag = key.rsplit(u"/", 1)
+            _, tag = key.rsplit("/", 1)
 
             try:
                 commit = obj.object
@@ -2022,7 +2042,7 @@ def describe(repo):
 
         # If there are no tags, return the current commit
         if len(sorted_tags) == 0:
-            return "g{}".format(find_unique_abbrev(r.object_store, r[r.head()].id))
+            return f"g{find_unique_abbrev(r.object_store, r[r.head()].id)}"
 
         # We're now 0 commits from the top
         commit_count = 0
@@ -2045,13 +2065,13 @@ def describe(repo):
                         return "{}-{}-g{}".format(
                             tag_name,
                             commit_count,
-                            latest_commit.id.decode("ascii")[:7],
+                            latest_commit.id.decode("ascii")[:abbrev],
                         )
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return "g{}".format(latest_commit.id.decode("ascii")[:7])
+        return "g{}".format(latest_commit.id.decode("ascii")[:abbrev])
 
 
 def get_object_by_path(repo, path, committish=None):

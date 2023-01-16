@@ -48,17 +48,23 @@ from unittest import (  # noqa: F401
 
 class TestCase(_TestCase):
     def setUp(self):
-        super(TestCase, self).setUp()
-        self._old_home = os.environ.get("HOME")
-        os.environ["HOME"] = "/nonexistent"
-        os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
+        super().setUp()
+        self.overrideEnv("HOME", "/nonexistent")
+        self.overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 
-    def tearDown(self):
-        super(TestCase, self).tearDown()
-        if self._old_home:
-            os.environ["HOME"] = self._old_home
+    def overrideEnv(self, name, value):
+        def restore():
+            if oldval is not None:
+                os.environ[name] = oldval
+            else:
+                del os.environ[name]
+
+        oldval = os.environ.get(name)
+        if value is not None:
+            os.environ[name] = value
         else:
-            del os.environ["HOME"]
+            del os.environ[name]
+        self.addCleanup(restore)
 
 
 class BlackboxTestCase(TestCase):

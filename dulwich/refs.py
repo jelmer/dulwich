@@ -22,6 +22,7 @@
 """Ref handling.
 
 """
+from contextlib import suppress
 import os
 from typing import Dict, Optional
 
@@ -36,6 +37,7 @@ from dulwich.objects import (
     Tag,
     ObjectID,
 )
+from dulwich.pack import ObjectContainer
 from dulwich.file import (
     GitFile,
     ensure_dir_exists,
@@ -105,7 +107,7 @@ def check_ref_format(refname: Ref):
     return True
 
 
-class RefsContainer(object):
+class RefsContainer:
     """A container for refs."""
 
     def __init__(self, logger=None):
@@ -154,6 +156,15 @@ class RefsContainer(object):
             present.
         """
         raise NotImplementedError(self.get_packed_refs)
+
+    def add_packed_refs(self, new_refs: Dict[Ref, Optional[ObjectID]]):
+        """Add the given refs as packed refs.
+
+        Args:
+          new_refs: A mapping of ref names to targets; if a target is None that
+            means remove the ref
+        """
+        raise NotImplementedError(self.add_packed_refs)
 
     def get_peeled(self, name):
         """Return the cached peeled value of a ref, if available.
@@ -437,7 +448,7 @@ class DictRefsContainer(RefsContainer):
     """
 
     def __init__(self, refs, logger=None):
-        super(DictRefsContainer, self).__init__(logger=logger)
+        super().__init__(logger=logger)
         self._refs = refs
         self._peeled = {}
         self._watchers = set()
@@ -612,7 +623,7 @@ class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 
     def __init__(self, path, worktree_path=None, logger=None):
-        super(DiskRefsContainer, self).__init__(logger=logger)
+        super().__init__(logger=logger)
         if getattr(path, "encode", None) is not None:
             path = os.fsencode(path)
         self.path = path
@@ -625,7 +636,7 @@ class DiskRefsContainer(RefsContainer):
         self._peeled_refs = None
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, self.path)
+        return "{}({!r})".format(self.__class__.__name__, self.path)
 
     def subkeys(self, base):
         subkeys = set()
@@ -706,6 +717,44 @@ class DiskRefsContainer(RefsContainer):
                         self._packed_refs[name] = sha
         return self._packed_refs
 
+    def add_packed_refs(self, new_refs: Dict[Ref, Optional[ObjectID]]):
+        """Add the given refs as packed refs.
+
+        Args:
+          new_refs: A mapping of ref names to targets; if a target is None that
+            means remove the ref
+        """
+        if not new_refs:
+            return
+
+        path = os.path.join(self.path, b"packed-refs")
+
+        with GitFile(path, "wb") as f:
+            # reread cached refs from disk, while holding the lock
+            packed_refs = self.get_packed_refs().copy()
+
+            for ref, target in new_refs.items():
+                # sanity check
+                if ref == HEADREF:
+                    raise ValueError("cannot pack HEAD")
+
+                # remove any loose refs pointing to this one -- please
+                # note that this bypasses remove_if_equals as we don't
+                # want to affect packed refs in here
+                try:
+                    os.remove(self.refpath(ref))
+                except OSError:
+                    pass
+
+                if target is not None:
+                    packed_refs[ref] = target
+                else:
+                    packed_refs.pop(ref, None)
+
+            write_packed_refs(f, packed_refs, self._peeled_refs)
+
+            self._packed_refs = packed_refs
+
     def get_peeled(self, name):
         """Return the cached peeled value of a ref, if available.
 
@@ -748,7 +797,10 @@ class DiskRefsContainer(RefsContainer):
                 else:
                     # Read only the first 40 bytes
                     return header + f.read(40 - len(SYMREF))
-        except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+        except (OSError, UnicodeError):
+            # don't assume anything specific about the error; in
+            # particular, invalid or forbidden paths can raise weird
+            # errors depending on the specific operating system
             return None
 
     def _remove_packed_ref(self, name):
@@ -765,7 +817,7 @@ class DiskRefsContainer(RefsContainer):
                 return
 
             del self._packed_refs[name]
-            if name in self._peeled_refs:
+            with suppress(KeyError):
                 del self._peeled_refs[name]
             write_packed_refs(f, self._packed_refs, self._peeled_refs)
             f.close()
@@ -860,12 +912,12 @@ class DiskRefsContainer(RefsContainer):
                     if orig_ref != old_ref:
                         f.abort()
                         return False
-                except (OSError, IOError):
+                except OSError:
                     f.abort()
                     raise
             try:
                 f.write(new_ref + b"\n")
-            except (OSError, IOError):
+            except OSError:
                 f.abort()
                 raise
             self._log(
@@ -915,7 +967,7 @@ class DiskRefsContainer(RefsContainer):
                 return False
             try:
                 f.write(ref + b"\n")
-            except (OSError, IOError):
+            except OSError:
                 f.abort()
                 raise
             else:
@@ -965,9 +1017,13 @@ class DiskRefsContainer(RefsContainer):
 
             # remove the reference file itself
             try:
+                found = os.path.lexists(filename)
+            except OSError:
+                # may only be packed, or otherwise unstorable
+                found = False
+
+            if found:
                 os.remove(filename)
-            except FileNotFoundError:
-                pass  # may only be packed
 
             self._remove_packed_ref(name)
             self._log(
@@ -1095,8 +1151,10 @@ def read_info_refs(f):
     return ret
 
 
-def write_info_refs(refs, store):
+def write_info_refs(refs, store: ObjectContainer):
     """Generate info refs."""
+    # Avoid recursive import :(
+    from dulwich.object_store import peel_sha
     for name, sha in sorted(refs.items()):
         # get_refs() includes HEAD as a special case, but we don't want to
         # advertise it
@@ -1106,7 +1164,7 @@ def write_info_refs(refs, store):
             o = store[sha]
         except KeyError:
             continue
-        peeled = store.peel_sha(sha)
+        peeled = peel_sha(store, sha)
         yield o.id + b"\t" + name + b"\n"
         if o.id != peeled.id:
             yield peeled.id + b"\t" + name + ANNOTATED_TAG_SUFFIX + b"\n"

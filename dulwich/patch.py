@@ -27,12 +27,14 @@ on.
 from difflib import SequenceMatcher
 import email.parser
 import time
+from typing import Union, TextIO, BinaryIO, Optional
 
 from dulwich.objects import (
     Blob,
     Commit,
     S_ISGITLINK,
 )
+from dulwich.pack import ObjectContainer
 
 FIRST_FEW_BYTES = 8000
 
@@ -108,10 +110,10 @@ def _format_range_unified(start, stop):
     beginning = start + 1  # lines start numbering with one
     length = stop - start
     if length == 1:
-        return "{}".format(beginning)
+        return f"{beginning}"
     if not length:
         beginning -= 1  # empty ranges begin at line just before the range
-    return "{},{}".format(beginning, length)
+    return f"{beginning},{length}"
 
 
 def unified_diff(
@@ -135,8 +137,8 @@ def unified_diff(
     for group in SequenceMatcher(None, a, b).get_grouped_opcodes(n):
         if not started:
             started = True
-            fromdate = "\t{}".format(fromfiledate) if fromfiledate else ""
-            todate = "\t{}".format(tofiledate) if tofiledate else ""
+            fromdate = f"\t{fromfiledate}" if fromfiledate else ""
+            todate = f"\t{tofiledate}" if tofiledate else ""
             yield "--- {}{}{}".format(
                 fromfile.decode(tree_encoding), fromdate, lineterm
             ).encode(output_encoding)
@@ -147,7 +149,7 @@ def unified_diff(
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
         file2_range = _format_range_unified(first[3], last[4])
-        yield "@@ -{} +{} @@{}".format(file1_range, file2_range, lineterm).encode(
+        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode(
             output_encoding
         )
 
@@ -191,7 +193,7 @@ def patch_filename(p, root):
         return root + b"/" + p
 
 
-def write_object_diff(f, store, old_file, new_file, diff_binary=False):
+def write_object_diff(f, store: ObjectContainer, old_file, new_file, diff_binary=False):
     """Write the diff for an object.
 
     Args:
@@ -338,7 +340,7 @@ def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
         )
 
 
-def git_am_patch_split(f, encoding=None):
+def git_am_patch_split(f: Union[TextIO, BinaryIO], encoding: Optional[str] = None):
     """Parse a git-am-style patch and split it up into bits.
 
     Args:
@@ -349,12 +351,12 @@ def git_am_patch_split(f, encoding=None):
     encoding = encoding or getattr(f, "encoding", "ascii")
     encoding = encoding or "ascii"
     contents = f.read()
-    if isinstance(contents, bytes) and getattr(email.parser, "BytesParser", None):
-        parser = email.parser.BytesParser()
-        msg = parser.parsebytes(contents)
+    if isinstance(contents, bytes):
+        bparser = email.parser.BytesParser()
+        msg = bparser.parsebytes(contents)
     else:
-        parser = email.parser.Parser()
-        msg = parser.parsestr(contents)
+        uparser = email.parser.Parser()
+        msg = uparser.parsestr(contents)
     return parse_patch_message(msg, encoding)
 
 

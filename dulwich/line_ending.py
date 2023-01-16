@@ -136,6 +136,7 @@ Sources:
 - https://adaptivepatchwork.com/2012/03/01/mind-the-end-of-your-line/
 """
 
+from dulwich.object_store import iter_tree_contents
 from dulwich.objects import Blob
 from dulwich.patch import is_binary
 
@@ -214,7 +215,7 @@ def get_checkin_filter_autocrlf(core_autocrlf):
     return None
 
 
-class BlobNormalizer(object):
+class BlobNormalizer:
     """An object to store computation result of which filter to apply based
     on configuration, gitattributes, path and operation (checkin or checkout)
     """
@@ -290,7 +291,7 @@ class TreeBlobNormalizer(BlobNormalizer):
         if tree:
             self.existing_paths = {
                 name
-                for name, _, _ in object_store.iter_tree_contents(tree)
+                for name, _, _ in iter_tree_contents(object_store, tree)
             }
         else:
             self.existing_paths = set()

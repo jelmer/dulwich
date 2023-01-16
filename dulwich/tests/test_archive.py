@@ -78,7 +78,7 @@ class ArchiveTests(TestCase):
         b1 = Blob.from_string(b"somedata")
         store.add_object(b1)
         t1 = Tree()
-        t1.add("ő".encode('utf-8'), 0o100644, b1.id)
+        t1.add("ő".encode(), 0o100644, b1.id)
         store.add_object(t1)
         stream = b"".join(tar_stream(store, t1, mtime=0))
         tf = tarfile.TarFile(fileobj=BytesIO(stream))

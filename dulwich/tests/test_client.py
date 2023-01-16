@@ -118,7 +118,7 @@ class DummyPopen:
 # TODO(durin42): add unit-level tests of GitClient
 class GitClientTests(TestCase):
     def setUp(self):
-        super(GitClientTests, self).setUp()
+        super().setUp()
         self.rout = BytesIO()
         self.rin = BytesIO()
         self.client = DummyClient(lambda x: True, self.rin.read, self.rout.write)
@@ -126,29 +126,25 @@ class GitClientTests(TestCase):
     def test_caps(self):
         agent_cap = ("agent=dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
         self.assertEqual(
-            set(
-                [
-                    b"multi_ack",
-                    b"side-band-64k",
-                    b"ofs-delta",
-                    b"thin-pack",
-                    b"multi_ack_detailed",
-                    b"shallow",
-                    agent_cap,
-                ]
-            ),
+            {
+                b"multi_ack",
+                b"side-band-64k",
+                b"ofs-delta",
+                b"thin-pack",
+                b"multi_ack_detailed",
+                b"shallow",
+                agent_cap,
+            },
             set(self.client._fetch_capabilities),
         )
         self.assertEqual(
-            set(
-                [
-                    b"delete-refs",
-                    b"ofs-delta",
-                    b"report-status",
-                    b"side-band-64k",
-                    agent_cap,
-                ]
-            ),
+            {
+                b"delete-refs",
+                b"ofs-delta",
+                b"report-status",
+                b"side-band-64k",
+                agent_cap,
+            },
             set(self.client._send_capabilities),
         )
 
@@ -204,7 +200,7 @@ class GitClientTests(TestCase):
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b"0000")
 
-    def test_send_pack_no_sideband64k_with_update_ref_error(self):
+    def test_send_pack_no_sideband64k_with_update_ref_error(self) -> None:
         # No side-bank-64k reported by server shouldn't try to parse
         # side band data
         pkts = [
@@ -237,11 +233,11 @@ class GitClientTests(TestCase):
                 b"refs/foo/bar": commit.id,
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
-                    (tree, ""),
+                    (tree, b""),
                 ]
             )
 
@@ -264,7 +260,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -284,7 +280,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -308,7 +304,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -335,11 +331,11 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         f = BytesIO()
-        write_pack_objects(f.write, {})
+        write_pack_objects(f.write, [])
         self.client.send_pack("/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -375,7 +371,7 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
@@ -384,7 +380,8 @@ class GitClientTests(TestCase):
             )
 
         f = BytesIO()
-        write_pack_data(f.write, *generate_pack_data(None, None))
+        count, records = generate_pack_data(None, None)
+        write_pack_data(f.write, records, num_records=count)
         self.client.send_pack(b"/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -411,7 +408,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         result = self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -720,7 +717,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
                     c, path = get_transport_and_path(remote_url)
 
 
-class TestSSHVendor(object):
+class TestSSHVendor:
     def __init__(self):
         self.host = None
         self.command = ""
@@ -759,7 +756,7 @@ class TestSSHVendor(object):
 
 class SSHGitClientTests(TestCase):
     def setUp(self):
-        super(SSHGitClientTests, self).setUp()
+        super().setUp()
 
         self.server = TestSSHVendor()
         self.real_vendor = client.get_ssh_vendor
@@ -768,7 +765,7 @@ class SSHGitClientTests(TestCase):
         self.client = SSHGitClient("git.samba.org")
 
     def tearDown(self):
-        super(SSHGitClientTests, self).tearDown()
+        super().tearDown()
         client.get_ssh_vendor = self.real_vendor
 
     def test_get_url(self):
@@ -820,19 +817,16 @@ class SSHGitClientTests(TestCase):
         self.assertEqual("git-relative-command '~/path/to/repo'", server.command)
 
     def test_ssh_command_precedence(self):
-        os.environ["GIT_SSH"] = "/path/to/ssh"
+        self.overrideEnv("GIT_SSH", "/path/to/ssh")
         test_client = SSHGitClient("git.samba.org")
         self.assertEqual(test_client.ssh_command, "/path/to/ssh")
 
-        os.environ["GIT_SSH_COMMAND"] = "/path/to/ssh -o Option=Value"
+        self.overrideEnv("GIT_SSH_COMMAND", "/path/to/ssh -o Option=Value")
         test_client = SSHGitClient("git.samba.org")
         self.assertEqual(test_client.ssh_command, "/path/to/ssh -o Option=Value")
 
         test_client = SSHGitClient("git.samba.org", ssh_command="ssh -o Option1=Value1")
         self.assertEqual(test_client.ssh_command, "ssh -o Option1=Value1")
-
-        del os.environ["GIT_SSH"]
-        del os.environ["GIT_SSH_COMMAND"]
 
 
 class ReportStatusParserTests(TestCase):
@@ -868,7 +862,9 @@ class LocalGitClientTests(TestCase):
 
     def test_fetch_into_empty(self):
         c = LocalGitClient()
-        t = MemoryRepo()
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        t = Repo.init_bare(target)
         s = open_repo("a.git")
         self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)
@@ -1016,7 +1012,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual("passwd", c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = "%s:%s" % ("user", "passwd")
+        auth_string = "{}:{}".format("user", "passwd")
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
         self.assertEqual(basic_auth, expected_basic_auth)
@@ -1072,7 +1068,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(original_password, c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = "%s:%s" % (original_username, original_password)
+        auth_string = "{}:{}".format(original_username, original_password)
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
         self.assertEqual(basic_auth, expected_basic_auth)
@@ -1229,14 +1225,160 @@ class DefaultUrllib3ManagerTest(TestCase):
         import urllib3
 
         config = ConfigDict()
-        os.environ["http_proxy"] = "http://myproxy:8080"
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
         manager = default_urllib3_manager(config=config)
         self.assertIsInstance(manager, urllib3.ProxyManager)
         self.assertTrue(hasattr(manager, "proxy"))
         self.assertEqual(manager.proxy.scheme, "http")
         self.assertEqual(manager.proxy.host, "myproxy")
         self.assertEqual(manager.proxy.port, 8080)
-        del os.environ["http_proxy"]
+
+    def test_environment_empty_proxy(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "")
+        manager = default_urllib3_manager(config=config)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh")
+        base_url = "http://xyz.abc.def.gh:8080/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://ample.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://ample.com:80/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_4(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://www.ample.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_5(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://www.example.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, "proxy"))
+        self.assertEqual(manager.proxy.scheme, "http")
+        self.assertEqual(manager.proxy.host, "myproxy")
+        self.assertEqual(manager.proxy.port, 8080)
+
+    def test_environment_no_proxy_6(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://ample.com.org/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, "proxy"))
+        self.assertEqual(manager.proxy.scheme, "http")
+        self.assertEqual(manager.proxy.host, "myproxy")
+        self.assertEqual(manager.proxy.port, 8080)
+
+    def test_environment_no_proxy_ipv4_address_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,192.168.0.10,ample.com")
+        base_url = "http://192.168.0.10/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv4_address_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,192.168.0.10,ample.com")
+        base_url = "http://192.168.0.10:8888/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv4_address_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,ff80:1::/64,192.168.0.0/24,ample.com")
+        base_url = "http://192.168.0.10/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv6_address_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,ff80:1::affe,ample.com")
+        base_url = "http://[ff80:1::affe]/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv6_address_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,ff80:1::affe,ample.com")
+        base_url = "http://[ff80:1::affe]:1234/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv6_address_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,192.168.0.0/24,ff80:1::/64,ample.com")
+        base_url = "http://[ff80:1::affe]/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
 
     def test_config_proxy_custom_cls(self):
         import urllib3
@@ -1384,7 +1526,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
+                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
             )
 
         args = command.proc.args
@@ -1429,7 +1571,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
+                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
             )
 
         args = command.proc.args

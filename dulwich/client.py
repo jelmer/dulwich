@@ -51,6 +51,8 @@ from typing import (
     Callable,
     Dict,
     List,
+    Iterable,
+    Iterator,
     Optional,
     Set,
     Tuple,
@@ -70,7 +72,6 @@ from urllib.parse import (
 
 if TYPE_CHECKING:
     import urllib3
-
 
 import dulwich
 from dulwich.config import get_xdg_config_home_path, Config, apply_instead_of
@@ -118,7 +119,8 @@ from dulwich.protocol import (
     pkt_line,
 )
 from dulwich.pack import (
-    write_pack_objects,
+    write_pack_from_container,
+    UnpackedObject,
     PackChunkGenerator,
 )
 from dulwich.refs import (
@@ -195,7 +197,7 @@ RECEIVE_CAPABILITIES = [
 ] + COMMON_CAPABILITIES
 
 
-class ReportStatusParser(object):
+class ReportStatusParser:
     """Handle status as reported by servers with 'report-status' capability."""
 
     def __init__(self):
@@ -259,13 +261,13 @@ def read_pkt_refs(pkt_seq):
         refs[ref] = sha
 
     if len(refs) == 0:
-        return {}, set([])
+        return {}, set()
     if refs == {CAPABILITIES_REF: ZERO_SHA}:
         refs = {}
     return refs, set(server_capabilities)
 
 
-class FetchPackResult(object):
+class FetchPackResult:
     """Result of a fetch-pack operation.
 
     Attributes:
@@ -337,10 +339,10 @@ class FetchPackResult(object):
         if name in type(self)._FORWARDED_ATTRS:
             self._warn_deprecated()
             return getattr(self.refs, name)
-        return super(FetchPackResult, self).__getattribute__(name)
+        return super().__getattribute__(name)
 
     def __repr__(self):
-        return "%s(%r, %r, %r)" % (
+        return "{}({!r}, {!r}, {!r})".format(
             self.__class__.__name__,
             self.refs,
             self.symrefs,
@@ -348,7 +350,7 @@ class FetchPackResult(object):
         )
 
 
-class SendPackResult(object):
+class SendPackResult:
     """Result of a upload-pack operation.
 
     Attributes:
@@ -415,10 +417,10 @@ class SendPackResult(object):
         if name in type(self)._FORWARDED_ATTRS:
             self._warn_deprecated()
             return getattr(self.refs, name)
-        return super(SendPackResult, self).__getattribute__(name)
+        return super().__getattribute__(name)
 
     def __repr__(self):
-        return "%s(%r, %r)" % (self.__class__.__name__, self.refs, self.agent)
+        return "{}({!r}, {!r})".format(self.__class__.__name__, self.refs, self.agent)
 
 
 def _read_shallow_updates(pkt_seq):
@@ -435,7 +437,7 @@ def _read_shallow_updates(pkt_seq):
     return (new_shallow, new_unshallow)
 
 
-class _v1ReceivePackHeader(object):
+class _v1ReceivePackHeader:
 
     def __init__(self, capabilities, old_refs, new_refs):
         self.want = []
@@ -465,12 +467,12 @@ class _v1ReceivePackHeader(object):
             old_sha1 = old_refs.get(refname, ZERO_SHA)
             if not isinstance(old_sha1, bytes):
                 raise TypeError(
-                    "old sha1 for %s is not a bytestring: %r" % (refname, old_sha1)
+                    "old sha1 for {!r} is not a bytestring: {!r}".format(refname, old_sha1)
                 )
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if not isinstance(new_sha1, bytes):
                 raise TypeError(
-                    "old sha1 for %s is not a bytestring %r" % (refname, new_sha1)
+                    "old sha1 for {!r} is not a bytestring {!r}".format(refname, new_sha1)
                 )
 
             if old_sha1 != new_sha1:
@@ -495,27 +497,17 @@ class _v1ReceivePackHeader(object):
         yield None
 
 
-def _read_side_band64k_data(pkt_seq, channel_callbacks):
+def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[Tuple[int, bytes]]:
     """Read per-channel data.
 
     This requires the side-band-64k capability.
 
     Args:
       pkt_seq: Sequence of packets to read
-      channel_callbacks: Dictionary mapping channels to packet
-        handlers to use. None for a callback discards channel data.
     """
     for pkt in pkt_seq:
         channel = ord(pkt[:1])
-        pkt = pkt[1:]
-        try:
-            cb = channel_callbacks[channel]
-        except KeyError as exc:
-            raise AssertionError(
-                "Invalid sideband channel %d" % channel) from exc
-        else:
-            if cb is not None:
-                cb(pkt)
+        yield channel, pkt[1:]
 
 
 def _handle_upload_pack_head(
@@ -588,9 +580,9 @@ def _handle_upload_pack_head(
 
 def _handle_upload_pack_tail(
     proto,
-    capabilities,
+    capabilities: Set[bytes],
     graph_walker,
-    pack_data,
+    pack_data: Callable[[bytes], None],
     progress=None,
     rbufsize=_RBUFSIZE,
 ):
@@ -612,6 +604,8 @@ def _handle_upload_pack_tail(
         parts = pkt.rstrip(b"\n").split(b" ")
         if parts[0] == b"ACK":
             graph_walker.ack(parts[1])
+        if parts[0] == b"NAK":
+            graph_walker.nak()
         if len(parts) < 3 or parts[2] not in (
             b"ready",
             b"continue",
@@ -626,13 +620,14 @@ def _handle_upload_pack_tail(
             def progress(x):
                 pass
 
-        _read_side_band64k_data(
-            proto.read_pkt_seq(),
-            {
-                SIDE_BAND_CHANNEL_DATA: pack_data,
-                SIDE_BAND_CHANNEL_PROGRESS: progress,
-            },
-        )
+        for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
+            if chan == SIDE_BAND_CHANNEL_DATA:
+                pack_data(data)
+            elif chan == SIDE_BAND_CHANNEL_PROGRESS:
+                progress(data)
+            else:
+                raise AssertionError(
+                    "Invalid sideband channel %d" % chan)
     else:
         while True:
             data = proto.read(rbufsize)
@@ -644,7 +639,7 @@ def _handle_upload_pack_tail(
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
-class GitClient(object):
+class GitClient:
     """Git smart server client."""
 
     def __init__(
@@ -700,7 +695,7 @@ class GitClient(object):
         """
         raise NotImplementedError(cls.from_parsedurl)
 
-    def send_pack(self, path, update_refs, generate_pack_data, progress=None):
+    def send_pack(self, path, update_refs, generate_pack_data: Callable[[Set[bytes], Set[bytes], bool], Tuple[int, Iterator[UnpackedObject]]], progress=None):
         """Upload a pack to a remote repository.
 
         Args:
@@ -817,15 +812,13 @@ class GitClient(object):
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         if CAPABILITY_THIN_PACK in self._fetch_capabilities:
-            # TODO(jelmer): Avoid reading entire file into memory and
-            # only processing it after the whole file has been fetched.
             from tempfile import SpooledTemporaryFile
-            f = SpooledTemporaryFile()  # type: IO[bytes]
+            f: IO[bytes] = SpooledTemporaryFile()
 
             def commit():
                 if f.tell():
                     f.seek(0)
-                    target.object_store.add_thin_pack(f.read, None)
+                    target.object_store.add_thin_pack(f.read, None, progress=progress)
                 f.close()
 
             def abort():
@@ -856,6 +849,7 @@ class GitClient(object):
         determine_wants,
         graph_walker,
         pack_data,
+        *,
         progress=None,
         depth=None,
     ):
@@ -910,7 +904,7 @@ class GitClient(object):
         self,
         proto: Protocol,
         capabilities: Set[bytes],
-        progress: Callable[[bytes], None] = None,
+        progress: Optional[Callable[[bytes], None]] = None,
     ) -> Optional[Dict[bytes, Optional[str]]]:
         """Handle the tail of a 'git-receive-pack' request.
 
@@ -930,12 +924,17 @@ class GitClient(object):
                 def progress(x):
                     pass
 
-            channel_callbacks = {2: progress}
             if CAPABILITY_REPORT_STATUS in capabilities:
-                channel_callbacks[1] = PktLineParser(
-                    self._report_status_parser.handle_packet
-                ).parse
-            _read_side_band64k_data(proto.read_pkt_seq(), channel_callbacks)
+                pktline_parser = PktLineParser(self._report_status_parser.handle_packet)
+            for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
+                if chan == SIDE_BAND_CHANNEL_DATA:
+                    if CAPABILITY_REPORT_STATUS in capabilities:
+                        pktline_parser.parse(data)
+                elif chan == SIDE_BAND_CHANNEL_PROGRESS:
+                    progress(data)
+                else:
+                    raise AssertionError(
+                        "Invalid sideband channel %d" % chan)
         else:
             if CAPABILITY_REPORT_STATUS in capabilities:
                 for pkt in proto.read_pkt_seq():
@@ -1013,7 +1012,7 @@ class TraditionalGitClient(GitClient):
 
     def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs):
         self._remote_path_encoding = path_encoding
-        super(TraditionalGitClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     async def _connect(self, cmd, path):
         """Create a connection to the server.
@@ -1107,10 +1106,11 @@ class TraditionalGitClient(GitClient):
                 header_handler.have,
                 header_handler.want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
+                progress=progress,
             )
 
             if self._should_send_pack(new_refs):
-                for chunk in PackChunkGenerator(pack_data_count, pack_data):
+                for chunk in PackChunkGenerator(pack_data_count, pack_data, progress=progress):
                     proto.write(chunk)
 
             ref_status = self._handle_receive_pack_tail(
@@ -1238,14 +1238,15 @@ class TraditionalGitClient(GitClient):
             ret = proto.read_pkt_line()
             if ret is not None:
                 raise AssertionError("expected pkt tail")
-            _read_side_band64k_data(
-                proto.read_pkt_seq(),
-                {
-                    SIDE_BAND_CHANNEL_DATA: write_data,
-                    SIDE_BAND_CHANNEL_PROGRESS: progress,
-                    SIDE_BAND_CHANNEL_FATAL: write_error,
-                },
-            )
+            for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
+                if chan == SIDE_BAND_CHANNEL_DATA:
+                    write_data(data)
+                elif chan == SIDE_BAND_CHANNEL_PROGRESS:
+                    progress(data)
+                elif chan == SIDE_BAND_CHANNEL_FATAL:
+                    write_error(data)
+                else:
+                    raise AssertionError("Invalid sideband channel %d" % chan)
 
 
 class TCPGitClient(TraditionalGitClient):
@@ -1256,7 +1257,7 @@ class TCPGitClient(TraditionalGitClient):
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
-        super(TCPGitClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
@@ -1284,7 +1285,7 @@ class TCPGitClient(TraditionalGitClient):
             try:
                 s.connect(sockaddr)
                 break
-            except socket.error as e:
+            except OSError as e:
                 err = e
                 if s is not None:
                     s.close()
@@ -1314,7 +1315,7 @@ class TCPGitClient(TraditionalGitClient):
         return proto, lambda: _fileno_can_read(s), None
 
 
-class SubprocessWrapper(object):
+class SubprocessWrapper:
     """A socket-like object that talks to a subprocess via pipes."""
 
     def __init__(self, proc):
@@ -1473,7 +1474,7 @@ class LocalGitClient(GitClient):
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
                 if new_sha1 != ZERO_SHA:
                     if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
-                        msg = "unable to set %s to %s" % (refname, new_sha1)
+                        msg = "unable to set {} to {}".format(refname, new_sha1)
                         progress(msg)
                         ref_status[refname] = msg
                 else:
@@ -1516,7 +1517,7 @@ class LocalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-    ):
+    ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
         Args:
@@ -1534,17 +1535,19 @@ class LocalGitClient(GitClient):
 
         """
         with self._open_repo(path) as r:
-            objects_iter = r.fetch_objects(
+            missing_objects = r.find_missing_objects(
                 determine_wants, graph_walker, progress=progress, depth=depth
             )
+            other_haves = missing_objects.get_remote_has()
+            object_ids = list(missing_objects)
             symrefs = r.refs.get_symrefs()
             agent = agent_string()
 
             # Did the process short-circuit (e.g. in a stateless RPC call)?
             # Note that the client still expects a 0-object pack in most cases.
-            if objects_iter is None:
+            if object_ids is None:
                 return FetchPackResult(None, symrefs, agent)
-            write_pack_objects(pack_data, objects_iter)
+            write_pack_from_container(pack_data, r.object_store, object_ids, other_haves=other_haves)
             return FetchPackResult(r.get_refs(), symrefs, agent)
 
     def get_refs(self, path):
@@ -1558,7 +1561,7 @@ class LocalGitClient(GitClient):
 default_local_git_client_cls = LocalGitClient
 
 
-class SSHVendor(object):
+class SSHVendor:
     """A client side SSH implementation."""
 
     def run_command(
@@ -1595,7 +1598,7 @@ class StrangeHostname(Exception):
     """Refusing to connect to strange SSH hostname."""
 
     def __init__(self, hostname):
-        super(StrangeHostname, self).__init__(hostname)
+        super().__init__(hostname)
 
 
 class SubprocessSSHVendor(SSHVendor):
@@ -1631,7 +1634,7 @@ class SubprocessSSHVendor(SSHVendor):
             args.extend(["-i", str(key_filename)])
 
         if username:
-            host = "%s@%s" % (username, host)
+            host = "{}@{}".format(username, host)
         if host.startswith("-"):
             raise StrangeHostname(hostname=host)
         args.append(host)
@@ -1685,7 +1688,7 @@ class PLinkSSHVendor(SSHVendor):
             args.extend(["-i", str(key_filename)])
 
         if username:
-            host = "%s@%s" % (username, host)
+            host = "{}@{}".format(username, host)
         if host.startswith("-"):
             raise StrangeHostname(hostname=host)
         args.append(host)
@@ -1737,7 +1740,7 @@ class SSHGitClient(TraditionalGitClient):
         self.ssh_command = ssh_command or os.environ.get(
             "GIT_SSH_COMMAND", os.environ.get("GIT_SSH")
         )
-        super(SSHGitClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.alternative_paths = {}
         if vendor is not None:
             self.ssh_vendor = vendor
@@ -1811,7 +1814,7 @@ def default_user_agent_string():
 
 
 def default_urllib3_manager(   # noqa: C901
-    config, pool_manager_cls=None, proxy_manager_cls=None, **override_kwargs
+    config, pool_manager_cls=None, proxy_manager_cls=None, base_url=None, **override_kwargs
 ) -> Union["urllib3.ProxyManager", "urllib3.PoolManager"]:
     """Return urllib3 connection pool manager.
 
@@ -1833,9 +1836,13 @@ def default_urllib3_manager(   # noqa: C901
     if proxy_server is None:
         for proxyname in ("https_proxy", "http_proxy", "all_proxy"):
             proxy_server = os.environ.get(proxyname)
-            if proxy_server is not None:
+            if proxy_server:
                 break
 
+    if proxy_server:
+        if check_for_proxy_bypass(base_url):
+            proxy_server = None
+    
     if config is not None:
         if proxy_server is None:
             try:
@@ -1892,6 +1899,54 @@ def default_urllib3_manager(   # noqa: C901
     return manager
 
 
+def check_for_proxy_bypass(base_url):
+    # Check if a proxy bypass is defined with the no_proxy environment variable
+    if base_url:  # only check if base_url is provided
+        no_proxy_str = os.environ.get("no_proxy")
+        if no_proxy_str:
+            # implementation based on curl behavior: https://curl.se/libcurl/c/CURLOPT_NOPROXY.html
+            # get hostname of provided parsed url
+            parsed_url = urlparse(base_url)
+            hostname = parsed_url.hostname
+
+            if hostname:
+                import ipaddress
+
+                # check if hostname is an ip address
+                try:
+                    hostname_ip = ipaddress.ip_address(hostname)
+                except ValueError:
+                    hostname_ip = None
+
+                no_proxy_values = no_proxy_str.split(',')
+                for no_proxy_value in no_proxy_values:
+                    no_proxy_value = no_proxy_value.strip()
+                    if no_proxy_value:
+                        no_proxy_value = no_proxy_value.lower()
+                        no_proxy_value = no_proxy_value.lstrip('.')  # ignore leading dots
+
+                        if hostname_ip:
+                            # check if no_proxy_value is a ip network
+                            try:
+                                no_proxy_value_network = ipaddress.ip_network(no_proxy_value, strict=False)
+                            except ValueError:
+                                no_proxy_value_network = None
+                            if no_proxy_value_network:
+                                # if hostname is a ip address and no_proxy_value is a ip network -> check if ip address is part of network
+                                if hostname_ip in no_proxy_value_network:
+                                    return True
+                                
+                        if no_proxy_value == '*':
+                            # '*' is special case for always bypass proxy
+                            return True
+                        if hostname == no_proxy_value:
+                            return True
+                        no_proxy_value = '.' + no_proxy_value   # add a dot to only match complete domains
+                        if hostname.endswith(no_proxy_value):
+                            return True
+    return False
+
+
 class AbstractHttpGitClient(GitClient):
     """Abstract base class for HTTP Git Clients.
 
@@ -1943,7 +1998,9 @@ class AbstractHttpGitClient(GitClient):
             base_url = resp.redirect_location[: -len(tail)]
 
         try:
-            self.dumb = not resp.content_type.startswith("application/x-git-")
+            self.dumb = (
+                resp.content_type is None
+                or not resp.content_type.startswith("application/x-git-"))
             if not self.dumb:
                 proto = Protocol(read, None)
                 # The first line should mention the service
@@ -2142,14 +2199,14 @@ class AbstractHttpGitClient(GitClient):
             kwargs["username"] = urlunquote(username)
         netloc = parsedurl.hostname
         if parsedurl.port:
-            netloc = "%s:%s" % (netloc, parsedurl.port)
+            netloc = "{}:{}".format(netloc, parsedurl.port)
         if parsedurl.username:
-            netloc = "%s@%s" % (parsedurl.username, netloc)
+            netloc = "{}@{}".format(parsedurl.username, netloc)
         parsedurl = parsedurl._replace(netloc=netloc)
         return cls(urlunparse(parsedurl), **kwargs)
 
     def __repr__(self):
-        return "%s(%r, dumb=%r)" % (
+        return "{}({!r}, dumb={!r})".format(
             type(self).__name__,
             self._base_url,
             self.dumb,
@@ -2171,7 +2228,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         self._password = password
 
         if pool_manager is None:
-            self.pool_manager = default_urllib3_manager(config)
+            self.pool_manager = default_urllib3_manager(config, base_url=base_url)
         else:
             self.pool_manager = pool_manager
 
@@ -2186,7 +2243,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
 
         self.config = config
 
-        super(Urllib3HttpGitClient, self).__init__(
+        super().__init__(
             base_url=base_url, dumb=dumb, **kwargs)
 
     def _get_url(self, path):
@@ -2213,15 +2270,15 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         if resp.status == 404:
             raise NotGitRepository()
         if resp.status == 401:
-            raise HTTPUnauthorized(resp.getheader("WWW-Authenticate"), url)
+            raise HTTPUnauthorized(resp.headers.get("WWW-Authenticate"), url)
         if resp.status == 407:
-            raise HTTPProxyUnauthorized(resp.getheader("Proxy-Authenticate"), url)
+            raise HTTPProxyUnauthorized(resp.headers.get("Proxy-Authenticate"), url)
         if resp.status != 200:
             raise GitProtocolError(
                 "unexpected http resp %d for %s" % (resp.status, url)
             )
 
-        resp.content_type = resp.getheader("Content-Type")
+        resp.content_type = resp.headers.get("Content-Type")
         # Check if geturl() is available (urllib3 version >= 1.23)
         try:
             resp_url = resp.geturl()

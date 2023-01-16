@@ -20,7 +20,6 @@
 
 """Stash handling."""
 
-from __future__ import absolute_import
 
 import os
 
@@ -35,7 +34,7 @@ from dulwich.reflog import drop_reflog_entry, read_reflog
 DEFAULT_STASH_REF = b"refs/stash"
 
 
-class Stash(object):
+class Stash:
     """A Git stash.
 
     Note that this doesn't currently update the working tree.

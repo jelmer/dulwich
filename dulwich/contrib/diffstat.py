@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
 
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
@@ -35,6 +34,7 @@
 
 import sys
 import re
+from typing import Optional, Tuple, List
 
 # only needs to detect git style diffs as this is for
 # use with dulwich
@@ -55,7 +55,7 @@ _GIT_UNCHANGED_START = b" "
 # properly interface with diffstat routine
 
 
-def _parse_patch(lines):
+def _parse_patch(lines: List[bytes]) -> Tuple[List[bytes], List[bool], List[Tuple[int, int]]]:
     """Parse a git style diff or patch to generate diff stats.
 
     Args:
@@ -66,7 +66,7 @@ def _parse_patch(lines):
     nametypes = []
     counts = []
     in_patch_chunk = in_git_header = binaryfile = False
-    currentfile = None
+    currentfile: Optional[bytes] = None
     added = deleted = 0
     for line in lines:
         if line.startswith(_GIT_HEADER_START):
@@ -74,7 +74,9 @@ def _parse_patch(lines):
                 names.append(currentfile)
                 nametypes.append(binaryfile)
                 counts.append((added, deleted))
-            currentfile = _git_header_name.search(line).group(2)
+            m = _git_header_name.search(line)
+            assert m
+            currentfile = m.group(2)
             binaryfile = False
             added = deleted = 0
             in_git_header = True
@@ -85,6 +87,7 @@ def _parse_patch(lines):
         elif line.startswith(_GIT_RENAMEFROM_START) and in_git_header:
             currentfile = line[12:]
         elif line.startswith(_GIT_RENAMETO_START) and in_git_header:
+            assert currentfile
             currentfile += b" => %s" % line[10:]
         elif line.startswith(_GIT_CHUNK_START) and (in_patch_chunk or in_git_header):
             in_patch_chunk = True

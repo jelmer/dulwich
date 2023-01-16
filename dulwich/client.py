@@ -126,7 +126,7 @@ from dulwich.pack import (
 )
 from dulwich.refs import (
     read_info_refs,
-    ANNOTATED_TAG_SUFFIX,
+    PEELED_TAG_SUFFIX,
     _import_remote_refs,
 )
 from dulwich.repo import Repo
@@ -992,7 +992,7 @@ def check_wants(wants, refs):
 
     """
     missing = set(wants) - {
-        v for (k, v) in refs.items() if not k.endswith(ANNOTATED_TAG_SUFFIX)
+        v for (k, v) in refs.items() if not k.endswith(PEELED_TAG_SUFFIX)
     }
     if missing:
         raise InvalidWants(missing)

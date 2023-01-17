@@ -1,5 +1,8 @@
 0.21.1	UNRELEASED
 
+ * Factor out ``dulwich.pack.extend_pack``.
+   (Jelmer Vernooĳ)
+
 0.21.0	2023-01-16
 
  * Pack internals have been significantly refactored, including

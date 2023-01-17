@@ -83,9 +83,6 @@ from dulwich.errors import (
     ChecksumMismatch,
 )
 from dulwich.file import GitFile
-from dulwich.lru_cache import (
-    LRUSizeCache,
-)
 from dulwich.objects import (
     ShaFile,
     ObjectID,
@@ -894,14 +891,6 @@ def unpack_object(
     return unpacked, unused
 
 
-def _compute_object_size(value):
-    """Compute the size of a unresolved object for use with LRUSizeCache."""
-    (num, obj) = value
-    if num in DELTA_TYPES:
-        return chunks_length(obj[1])
-    return chunks_length(obj)
-
-
 class PackStreamReader:
     """Class to read a pack stream.
 
@@ -1169,9 +1158,6 @@ class PackData:
         else:
             self._file = file
         (version, self._num_objects) = read_pack_header(self._file.read)
-        self._offset_cache = LRUSizeCache(
-            1024 * 1024 * 20, compute_size=_compute_object_size
-        )
 
     @property
     def filename(self):
@@ -1330,20 +1316,6 @@ class PackData:
         unpacked, _ = unpack_object(self._file.read, include_comp=include_comp)
         unpacked.offset = offset
         return unpacked
-
-    def get_object_at(self, offset: int) -> Tuple[int, OldUnpackedObject]:
-        """Given an offset in to the packfile return the object that is there.
-
-        Using the associated index the location of an object can be looked up,
-        and then the packfile can be asked directly for that object using this
-        function.
-        """
-        try:
-            return self._offset_cache[offset]
-        except KeyError:
-            pass
-        unpacked = self.get_unpacked_object_at(offset, include_comp=False)
-        return (unpacked.pack_type_num, unpacked._obj())
 
 
 T = TypeVar('T')
@@ -2391,7 +2363,9 @@ class Pack:
 
     def get_raw(self, sha1: bytes) -> Tuple[int, bytes]:
         offset = self.index.object_offset(sha1)
-        obj_type, obj = self.data.get_object_at(offset)
+        unpacked = self.data.get_unpacked_object_at(offset, include_comp=False)
+        obj = unpacked._obj()
+        obj_type = unpacked.pack_type_num
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
         return type_num, b"".join(chunks)
 
@@ -2475,7 +2449,9 @@ class Pack:
         except KeyError:
             offset = None
         if offset:
-            type, obj = self.data.get_object_at(offset)
+            unpacked = self.data.get_unpacked_object_at(offset, include_comp=False)
+            type = unpacked.pack_type_num
+            obj = unpacked._obj()
         elif self.resolve_ext_ref:
             type, obj = self.resolve_ext_ref(sha)
         else:
@@ -2501,7 +2477,9 @@ class Pack:
                 (delta_offset, delta) = base_obj
                 # TODO: clean up asserts and replace with nicer error messages
                 base_offset = base_offset - delta_offset
-                base_type, base_obj = self.data.get_object_at(base_offset)
+                unpacked = self.data.get_unpacked_object_at(base_offset, include_comp=False)
+                base_type = unpacked.pack_type_num
+                base_obj = unpacked._obj()
                 assert isinstance(base_type, int)
             elif base_type == REF_DELTA:
                 (basename, delta) = base_obj
@@ -2515,13 +2493,6 @@ class Pack:
         chunks = base_obj
         for prev_offset, delta_type, delta in reversed(delta_stack):
             chunks = apply_delta(chunks, delta)
-            # TODO(dborowitz): This can result in poor performance if
-            # large base objects are separated from deltas in the pack.
-            # We should reorganize so that we apply deltas to all
-            # objects in a chain one after the other to optimize cache
-            # performance.
-            if prev_offset is not None:
-                self.data._offset_cache[prev_offset] = base_type, chunks
         return base_type, chunks
 
     def entries(self, progress: Optional[ProgressFn] = None) -> Iterator[PackIndexEntry]:

@@ -42,7 +42,6 @@ from dulwich.greenthreads import (
     GreenThreadsMissingObjectFinder,
 )
 
-from dulwich.lru_cache import LRUSizeCache
 from dulwich.objects import (
     Blob,
     Commit,
@@ -66,7 +65,6 @@ from dulwich.pack import (
     write_pack_index_v2,
     load_pack_index_file,
     read_pack_header,
-    _compute_object_size,
     unpack_object,
     write_pack_object,
 )
@@ -585,20 +583,14 @@ class SwiftPackData(PackData):
         self.pack_length = int(headers["content-length"])
         pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
         (version, self._num_objects) = read_pack_header(pack_reader.read)
-        self._offset_cache = LRUSizeCache(
-            1024 * 1024 * self.scon.cache_length,
-            compute_size=_compute_object_size,
-        )
         self.pack = None
 
-    def get_object_at(self, offset):
-        if offset in self._offset_cache:
-            return self._offset_cache[offset]
+    def get_unpacked_object_at(self, offset):
         assert offset >= self._header_size
         pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
         pack_reader.seek(offset)
         unpacked, _ = unpack_object(pack_reader.read)
-        return (unpacked.pack_type_num, unpacked._obj())
+        return unpacked
 
     def get_stored_checksum(self):
         pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)

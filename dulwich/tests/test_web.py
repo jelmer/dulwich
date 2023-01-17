@@ -78,7 +78,7 @@ class MinimalistWSGIInputStream:
         start = self.pos
         end = self.pos + howmuch
         if start >= len(self.data):
-            return ""
+            return b""
         self.pos = end
         return self.data[start:end]
 
@@ -538,7 +538,7 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
 
     def _get_zstream(self, text):
         zstream = BytesIO()
-        zfile = gzip.GzipFile(fileobj=zstream, mode="w")
+        zfile = gzip.GzipFile(fileobj=zstream, mode="wb")
         zfile.write(text)
         zfile.close()
         zlength = zstream.tell()

@@ -63,19 +63,18 @@ from dulwich.pack import (
     PackInflater,
     PackFileDisappeared,
     UnpackedObject,
+    extend_pack,
     load_pack_index_file,
     iter_sha1,
     full_unpacked_object,
     generate_unpacked_objects,
     pack_objects_to_data,
-    write_pack_header,
-    write_pack_index_v2,
+    write_pack_index,
     write_pack_data,
-    write_pack_object,
-    compute_file_sha,
     PackIndexer,
     PackStreamCopier,
     PackedObjectContainer,
+    PACK_SPOOL_FILE_MAX_SIZE,
 )
 from dulwich.protocol import DEPTH_INFINITE
 from dulwich.refs import ANNOTATED_TAG_SUFFIX, Ref
@@ -819,47 +818,14 @@ class DiskObjectStore(PackBasedObjectStore):
         entries = []
         for i, entry in enumerate(indexer):
             if progress is not None:
-                progress(("generating index: %d\r" % i).encode('ascii'))
+                progress(("generating index: %d/%d\r" % (i, len(copier))).encode('ascii'))
             entries.append(entry)
 
-        ext_refs = indexer.ext_refs()
+        pack_sha, extra_entries = extend_pack(
+            f, indexer.ext_refs(), get_raw=self.get_raw, compression_level=self.pack_compression_level,
+            progress=progress)
 
-        if ext_refs:
-            # Update the header with the new number of objects.
-            f.seek(0)
-            write_pack_header(f.write, len(entries) + len(ext_refs))
-
-            # Must flush before reading (http://bugs.python.org/issue3207)
-            f.flush()
-
-            # Rescan the rest of the pack, computing the SHA with the new header.
-            new_sha = compute_file_sha(f, end_ofs=-20)
-
-            # Must reposition before writing (http://bugs.python.org/issue3207)
-            f.seek(0, os.SEEK_CUR)
-
-            # Complete the pack.
-            for i, ext_sha in enumerate(ext_refs):
-                if progress is not None:
-                    progress(("writing extra base objects: %d/%d\r" % (i, len(ext_refs))).encode("ascii"))
-                assert len(ext_sha) == 20
-                type_num, data = self.get_raw(ext_sha)
-                offset = f.tell()
-                crc32 = write_pack_object(
-                    f.write,
-                    type_num,
-                    data,
-                    sha=new_sha,
-                    compression_level=self.pack_compression_level,
-                )
-                entries.append((ext_sha, offset, crc32))
-            pack_sha = new_sha.digest()
-            f.write(pack_sha)
-        else:
-            f.seek(-20, os.SEEK_END)
-            pack_sha = f.read(20)
-
-        f.close()
+        entries.extend(extra_entries)
 
         # Move the pack in.
         entries.sort()
@@ -877,7 +843,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Write the index.
         index_file = GitFile(pack_base_name + ".idx", "wb", mask=PACK_MODE)
         try:
-            write_pack_index_v2(index_file, entries, pack_sha)
+            write_pack_index(index_file, entries, pack_sha)
             index_file.close()
         finally:
             index_file.abort()
@@ -928,7 +894,7 @@ class DiskObjectStore(PackBasedObjectStore):
             index_name = basename + ".idx"
             if not os.path.exists(index_name):
                 with GitFile(index_name, "wb", mask=PACK_MODE) as f:
-                    write_pack_index_v2(f, entries, p.get_stored_checksum())
+                    write_pack_index(f, entries, p.get_stored_checksum())
         for pack in self.packs:
             if pack._basename == basename:
                 return pack
@@ -1076,45 +1042,22 @@ class MemoryObjectStore(BaseObjectStore):
         Returns: Fileobject to write to and a commit function to
             call when the pack is finished.
         """
-        f = BytesIO()
+        from tempfile import SpooledTemporaryFile
+        f = SpooledTemporaryFile(
+            max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix='incoming-')
 
         def commit():
-            p = PackData.from_file(BytesIO(f.getvalue()), f.tell())
-            f.close()
+            size = f.tell()
+            f.seek(0)
+            p = PackData.from_file(f, size)
             for obj in PackInflater.for_pack_data(p, self.get_raw):
                 self.add_object(obj)
+            p.close()
 
         def abort():
             pass
 
         return f, commit, abort
-
-    def _complete_thin_pack(self, f, indexer, progress=None):
-        """Complete a thin pack by adding external references.
-
-        Args:
-          f: Open file object for the pack.
-          indexer: A PackIndexer for indexing the pack.
-        """
-        entries = list(indexer)
-
-        ext_refs = indexer.ext_refs()
-
-        if ext_refs:
-            # Update the header with the new number of objects.
-            f.seek(0)
-            write_pack_header(f.write, len(entries) + len(ext_refs))
-
-            # Rescan the rest of the pack, computing the SHA with the new header.
-            new_sha = compute_file_sha(f, end_ofs=-20)
-
-            # Complete the pack.
-            for ext_sha in indexer.ext_refs():
-                assert len(ext_sha) == 20
-                type_num, data = self.get_raw(ext_sha)
-                write_pack_object(f.write, type_num, data, sha=new_sha)
-            pack_sha = new_sha.digest()
-            f.write(pack_sha)
 
     def add_thin_pack(self, read_all, read_some, progress=None):
         """Add a new thin pack to this object store.
@@ -1129,12 +1072,11 @@ class MemoryObjectStore(BaseObjectStore):
           read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
         """
+
         f, commit, abort = self.add_pack()
         try:
-            indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
-            copier.verify(progress=progress)
-            self._complete_thin_pack(f, indexer, progress=progress)
+            copier = PackStreamCopier(read_all, read_some, f)
+            copier.verify()
         except BaseException:
             abort()
             raise
@@ -1601,7 +1543,8 @@ class BucketBasedObjectStore(PackBasedObjectStore):
         """
         import tempfile
 
-        pf = tempfile.SpooledTemporaryFile()
+        pf = tempfile.SpooledTemporaryFile(
+            max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix='incoming-')
 
         def commit():
             if pf.tell() == 0:
@@ -1612,9 +1555,10 @@ class BucketBasedObjectStore(PackBasedObjectStore):
             p = PackData(pf.name, pf)
             entries = p.sorted_entries()
             basename = iter_sha1(entry[0] for entry in entries).decode('ascii')
-            idxf = tempfile.SpooledTemporaryFile()
+            idxf = tempfile.SpooledTemporaryFile(
+                max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix='incoming-')
             checksum = p.get_stored_checksum()
-            write_pack_index_v2(idxf, entries, checksum)
+            write_pack_index(idxf, entries, checksum)
             idxf.seek(0)
             idx = load_pack_index_file(basename + '.idx', idxf)
             for pack in self.packs:

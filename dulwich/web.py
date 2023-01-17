@@ -22,8 +22,6 @@
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
 from io import BytesIO
-import shutil
-import tempfile
 import os
 import re
 import sys

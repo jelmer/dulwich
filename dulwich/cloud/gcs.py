@@ -25,7 +25,7 @@ import posixpath
 import tempfile
 
 from ..object_store import BucketBasedObjectStore
-from ..pack import PackData, Pack, load_pack_index_file
+from ..pack import PackData, Pack, load_pack_index_file, PACK_SPOOL_FILE_MAX_SIZE
 
 
 # TODO(jelmer): For performance, read ranges?
@@ -58,14 +58,14 @@ class GcsObjectStore(BucketBasedObjectStore):
 
     def _load_pack_data(self, name):
         b = self.bucket.blob(posixpath.join(self.subpath, name + '.pack'))
-        f = tempfile.SpooledTemporaryFile()
+        f = tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE)
         b.download_to_file(f)
         f.seek(0)
         return PackData(name + '.pack', f)
 
     def _load_pack_index(self, name):
         b = self.bucket.blob(posixpath.join(self.subpath, name + '.idx'))
-        f = tempfile.SpooledTemporaryFile()
+        f = tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE)
         b.download_to_file(f)
         f.seek(0)
         return load_pack_index_file(name + '.idx', f)

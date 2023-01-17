@@ -122,6 +122,7 @@ from dulwich.pack import (
     write_pack_from_container,
     UnpackedObject,
     PackChunkGenerator,
+    PACK_SPOOL_FILE_MAX_SIZE,
 )
 from dulwich.refs import (
     read_info_refs,
@@ -813,7 +814,9 @@ class GitClient:
             determine_wants = target.object_store.determine_wants_all
         if CAPABILITY_THIN_PACK in self._fetch_capabilities:
             from tempfile import SpooledTemporaryFile
-            f: IO[bytes] = SpooledTemporaryFile()
+            f: IO[bytes] = SpooledTemporaryFile(
+                max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix='incoming-',
+                dir=getattr(target.object_store, 'path', None))
 
             def commit():
                 if f.tell():

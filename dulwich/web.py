@@ -24,7 +24,6 @@
 from io import BytesIO
 import shutil
 import tempfile
-import gzip
 import os
 import re
 import sys
@@ -466,21 +465,10 @@ class GunzipFilter:
         self.app = application
 
     def __call__(self, environ, start_response):
+        import gzip
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
-            try:
-                environ["wsgi.input"].tell()
-                wsgi_input = environ["wsgi.input"]
-            except (AttributeError, OSError, NotImplementedError):
-                # The gzip implementation in the standard library of Python 2.x
-                # requires working '.seek()' and '.tell()' methods on the input
-                # stream.  Read the data into a temporary file to work around
-                # this limitation.
-                wsgi_input = tempfile.SpooledTemporaryFile(16 * 1024 * 1024)
-                shutil.copyfileobj(environ["wsgi.input"], wsgi_input)
-                wsgi_input.seek(0)
-
             environ["wsgi.input"] = gzip.GzipFile(
-                filename=None, fileobj=wsgi_input, mode="r"
+                filename=None, fileobj=environ["wsgi.input"], mode="rb"
             )
             del environ["HTTP_CONTENT_ENCODING"]
             if "CONTENT_LENGTH" in environ:

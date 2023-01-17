@@ -277,7 +277,7 @@ class BaseObjectStore:
         warnings.warn(
             "Please use dulwich.object_store.peel_sha()",
             DeprecationWarning, stacklevel=2)
-        return peel_sha(self, sha)
+        return peel_sha(self, sha)[1]
 
     def _get_depth(
         self, head, get_parents=lambda commit: commit.parents, max_depth=None,
@@ -1642,7 +1642,7 @@ def iter_tree_contents(
             yield entry
 
 
-def peel_sha(store: ObjectContainer, sha: bytes) -> ShaFile:
+def peel_sha(store: ObjectContainer, sha: bytes) -> Tuple[ShaFile, ShaFile]:
     """Peel all tags from a SHA.
 
     Args:
@@ -1651,10 +1651,10 @@ def peel_sha(store: ObjectContainer, sha: bytes) -> ShaFile:
         intermediate tags; if the original ref does not point to a tag,
         this will equal the original SHA1.
     """
-    obj = store[sha]
+    unpeeled = obj = store[sha]
     obj_class = object_class(obj.type_name)
     while obj_class is Tag:
         assert isinstance(obj, Tag)
         obj_class, sha = obj.object
         obj = store[sha]
-    return obj
+    return unpeeled, obj

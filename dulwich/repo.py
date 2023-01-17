@@ -46,6 +46,8 @@ from typing import (
     Iterable,
     Set
 )
+import warnings
+
 
 if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
@@ -105,6 +107,7 @@ from dulwich.refs import (  # noqa: F401
     ANNOTATED_TAG_SUFFIX,
     LOCAL_BRANCH_PREFIX,
     LOCAL_TAG_PREFIX,
+    serialize_refs,
     check_ref_format,
     RefsContainer,
     DictRefsContainer,
@@ -118,9 +121,6 @@ from dulwich.refs import (  # noqa: F401
     _set_head,
     _set_origin_head,
 )
-
-
-import warnings
 
 
 CONTROLDIR = ".git"
@@ -520,21 +520,7 @@ class BaseRepo:
         if depth not in (None, 0):
             raise NotImplementedError("depth not supported yet")
 
-        refs = {}
-        for ref, sha in self.get_refs().items():
-            try:
-                obj = self.object_store[sha]
-            except KeyError:
-                warnings.warn(
-                    "ref %s points at non-present sha %s"
-                    % (ref.decode("utf-8", "replace"), sha.decode("ascii")),
-                    UserWarning,
-                )
-                continue
-            else:
-                if isinstance(obj, Tag):
-                    refs[ref + PEELED_TAG_SUFFIX] = obj.object[1]
-                refs[ref] = sha
+        refs = serialize_refs(self.object_store, self.get_refs())
 
         wants = determine_wants(refs)
         if not isinstance(wants, list):
@@ -772,7 +758,7 @@ class BaseRepo:
         cached = self.refs.get_peeled(ref)
         if cached is not None:
             return cached
-        return peel_sha(self.object_store, self.refs[ref]).id
+        return peel_sha(self.object_store, self.refs[ref])[1].id
 
     def get_walker(self, include: Optional[List[bytes]] = None,
                    *args, **kwargs):

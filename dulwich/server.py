@@ -499,9 +499,9 @@ def _find_shallow(store: ObjectContainer, heads, depth):
 
     todo = []  # stack of (sha, depth)
     for head_sha in heads:
-        obj = peel_sha(store, head_sha)
-        if isinstance(obj, Commit):
-            todo.append((obj.id, 1))
+        _unpeeled, peeled = peel_sha(store, head_sha)
+        if isinstance(peeled, Commit):
+            todo.append((peeled.id, 1))
 
     not_shallow = set()
     shallow = set()

@@ -25,6 +25,7 @@
 from contextlib import suppress
 import os
 from typing import Dict, Optional
+import warnings
 
 from dulwich.errors import (
     PackedRefsException,
@@ -1156,7 +1157,7 @@ def read_info_refs(f):
 
 def write_info_refs(refs, store: ObjectContainer):
     """Generate info refs."""
-    # Avoid recursive import :(
+    # TODO: Avoid recursive import :(
     from dulwich.object_store import peel_sha
     for name, sha in sorted(refs.items()):
         # get_refs() includes HEAD as a special case, but we don't want to
@@ -1167,7 +1168,7 @@ def write_info_refs(refs, store: ObjectContainer):
             o = store[sha]
         except KeyError:
             continue
-        peeled = peel_sha(store, sha)
+        unpeeled, peeled = peel_sha(store, sha)
         yield o.id + b"\t" + name + b"\n"
         if o.id != peeled.id:
             yield peeled.id + b"\t" + name + PEELED_TAG_SUFFIX + b"\n"
@@ -1281,3 +1282,24 @@ def _import_remote_refs(
         if n.startswith(LOCAL_TAG_PREFIX) and not n.endswith(PEELED_TAG_SUFFIX)
     }
     refs_container.import_refs(LOCAL_TAG_PREFIX, tags, message=message, prune=prune_tags)
+
+
+def serialize_refs(store, refs):
+    # TODO: Avoid recursive import :(
+    from dulwich.object_store import peel_sha
+    ret = {}
+    for ref, sha in refs.items():
+        try:
+            unpeeled, peeled = peel_sha(store, sha)
+        except KeyError:
+            warnings.warn(
+                "ref %s points at non-present sha %s"
+                % (ref.decode("utf-8", "replace"), sha.decode("ascii")),
+                UserWarning,
+            )
+            continue
+        else:
+            if isinstance(unpeeled, Tag):
+                ret[ref + PEELED_TAG_SUFFIX] = peeled.id
+            ret[ref] = unpeeled.id
+    return ret

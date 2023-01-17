@@ -1,3 +1,8 @@
+0.21.1	2023-01-17
+
+ * Factor out ``dulwich.pack.extend_pack``.
+   (Jelmer Vernooĳ)
+
 0.21.0	2023-01-16
 
  * Pack internals have been significantly refactored, including
@@ -7,6 +12,32 @@
    when communicating with remote servers, which brings a
    big boost to network performance.
    (Jelmer Vernooĳ)
+
+ * Add 'pack-refs' command.
+   (Dan Villiom Podlaski Christiansen)
+
+ * Handle more errors when trying to read a ref
+   (Dan Villiom Podlaski Christiansen)
+
+ * Allow for reuse of existing deltas while creating pack files
+   (Stefan Sperling)
+
+ * cli: fix argument parsing for pack-objects --stdout
+   (Stefan Sperling)
+
+ * cli: open pack-objects output files in binary mode to avoid write() error
+   (Stefan Sperling)
+
+ * Bump minimum python version to 3.7. (Jelmer Vernooĳ)
+
+ * honor no_proxy environment variable (#1098, afaul)
+
+ * In HTTP Git Client, allow missing Content-Type.
+   (Jelmer Vernooĳ)
+
+ * Fix --pure builds (Jelmer Vernooĳ, #1093)
+
+ * Allow passing abbrev to describe (#1084, Seppo Yli-Olli)
 
 0.20.50	2022-10-30
 

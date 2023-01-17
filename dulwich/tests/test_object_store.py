@@ -264,7 +264,7 @@ class ObjectStoreTests:
         tag2 = self.make_tag(b"2", testobject)
         tag3 = self.make_tag(b"3", testobject)
         for obj in [testobject, tag1, tag2, tag3]:
-            self.assertEqual(testobject, peel_sha(self.store, obj.id))
+            self.assertEqual((obj, testobject), peel_sha(self.store, obj.id))
 
     def test_get_raw(self):
         self.store.add_object(testobject)

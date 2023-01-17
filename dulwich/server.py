@@ -128,7 +128,7 @@ from dulwich.protocol import (
 )
 from dulwich.refs import (
     RefsContainer,
-    ANNOTATED_TAG_SUFFIX,
+    PEELED_TAG_SUFFIX,
     write_info_refs,
 )
 from dulwich.repo import (
@@ -499,9 +499,9 @@ def _find_shallow(store: ObjectContainer, heads, depth):
 
     todo = []  # stack of (sha, depth)
     for head_sha in heads:
-        obj = peel_sha(store, head_sha)
-        if isinstance(obj, Commit):
-            todo.append((obj.id, 1))
+        _unpeeled, peeled = peel_sha(store, head_sha)
+        if isinstance(peeled, Commit):
+            todo.append((peeled.id, 1))
 
     not_shallow = set()
     shallow = set()
@@ -635,7 +635,7 @@ class _ProtocolGraphWalker:
                 self.proto.write_pkt_line(line)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line(
-                        format_ref_line(ref + ANNOTATED_TAG_SUFFIX, peeled_sha))
+                        format_ref_line(ref + PEELED_TAG_SUFFIX, peeled_sha))
 
             # i'm done..
             self.proto.write_pkt_line(None)

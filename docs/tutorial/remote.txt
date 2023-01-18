@@ -9,7 +9,8 @@ Most of the tests in this file require a Dulwich server, so let's start one:
     >>> cid = repo.do_commit(b"message", committer=b"Jelmer <jelmer@samba.org>")
     >>> backend = DictBackend({b'/': repo})
     >>> dul_server = TCPGitServer(backend, b'localhost', 0)
-    >>> threading.Thread(target=dul_server.serve).start()
+    >>> server_thread = threading.Thread(target=dul_server.serve)
+    >>> server_thread.start()
     >>> server_address, server_port=dul_server.socket.getsockname()
 
 Remote repositories
@@ -82,6 +83,7 @@ importing the received pack file into the local repository::
    >>> from dulwich.repo import Repo
    >>> local = Repo.init("local", mkdir=True)
    >>> remote_refs = client.fetch(b"/", local)
+   >>> local.close()
 
 Let's shut down the server now that all tests have been run::
 

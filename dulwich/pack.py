@@ -2604,8 +2604,6 @@ def extend_pack(f: BinaryIO, object_ids: Set[ObjectID], get_raw, *, compression_
         extra_entries.append((object_id, offset, crc32))
     pack_sha = new_sha.digest()
     f.write(pack_sha)
-    f.close()
-
     return pack_sha, extra_entries
 
 

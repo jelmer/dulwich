@@ -887,20 +887,6 @@ class DiskObjectStore(PackBasedObjectStore):
             copier.verify(progress=progress)
             return self._complete_pack(f, path, len(copier), indexer, progress=progress)
 
-    def _move_in_pack(self, path, f):
-        """Move a specific file containing a pack into the pack directory.
-
-        Note: The file should be on the same file system as the
-            packs directory.
-
-        Args:
-          path: Path to the pack file.
-        """
-        f.seek(0)
-        with PackData(path, f) as pd:
-            indexer = PackIndexer.for_pack_data(pd, resolve_ext_ref=self.get_raw)
-            return self._complete_pack(f, path, len(pd), indexer)
-
     def add_pack(self):
         """Add a new pack to this object store.
 
@@ -916,7 +902,10 @@ class DiskObjectStore(PackBasedObjectStore):
 
         def commit():
             if f.tell() > 0:
-                return self._move_in_pack(path, f)
+                f.seek(0)
+                with PackData(path, f) as pd:
+                    indexer = PackIndexer.for_pack_data(pd, resolve_ext_ref=self.get_raw)
+                    return self._complete_pack(f, path, len(pd), indexer)
             else:
                 f.close()
                 os.remove(path)

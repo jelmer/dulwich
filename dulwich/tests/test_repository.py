@@ -413,9 +413,11 @@ class RepositoryRootTests(TestCase):
         dest_dir = os.path.join(temp_dir, "a.git")
         shutil.copytree(os.path.join(repo_dir, "a.git"), dest_dir, symlinks=True)
         r = Repo(dest_dir)
+        self.addCleanup(r.close)
         del r.refs[b"refs/heads/master"]
         del r.refs[b"HEAD"]
         t = r.clone(os.path.join(temp_dir, "b.git"), mkdir=True)
+        self.addCleanup(t.close)
         self.assertEqual(
             {
                 b"refs/tags/mytag": b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a",

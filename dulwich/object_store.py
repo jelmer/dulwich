@@ -22,6 +22,7 @@
 
 """Git object store interfaces and implementation."""
 
+from contextlib import suppress
 from io import BytesIO
 import os
 import stat
@@ -803,7 +804,7 @@ class DiskObjectStore(PackBasedObjectStore):
         suffix = suffix.decode("ascii")
         return os.path.join(self.pack_dir, "pack-" + suffix)
 
-    def _complete_thin_pack(self, f, path, copier, indexer, progress=None):
+    def _complete_pack(self, f, path, num_objects, indexer, progress=None):
         """Move a specific file containing a pack into the pack directory.
 
         Note: The file should be on the same file system as the
@@ -812,18 +813,19 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           f: Open file object for the pack.
           path: Path to the pack file.
-          copier: A PackStreamCopier to use for writing pack data.
           indexer: A PackIndexer for indexing the pack.
         """
         entries = []
         for i, entry in enumerate(indexer):
             if progress is not None:
-                progress(("generating index: %d/%d\r" % (i, len(copier))).encode('ascii'))
+                progress(("generating index: %d/%d\r" % (i, num_objects)).encode('ascii'))
             entries.append(entry)
 
         pack_sha, extra_entries = extend_pack(
             f, indexer.ext_refs(), get_raw=self.get_raw, compression_level=self.pack_compression_level,
             progress=progress)
+
+        f.close()
 
         entries.extend(extra_entries)
 
@@ -834,19 +836,13 @@ class DiskObjectStore(PackBasedObjectStore):
         if sys.platform == "win32":
             # Windows might have the target pack file lingering. Attempt
             # removal, silently passing if the target does not exist.
-            try:
+            with suppress(FileNotFoundError):
                 os.remove(target_pack)
-            except FileNotFoundError:
-                pass
         os.rename(path, target_pack)
 
         # Write the index.
-        index_file = GitFile(pack_base_name + ".idx", "wb", mask=PACK_MODE)
-        try:
+        with GitFile(pack_base_name + ".idx", "wb", mask=PACK_MODE) as index_file:
             write_pack_index(index_file, entries, pack_sha)
-            index_file.close()
-        finally:
-            index_file.abort()
 
         # Add the pack to the store and return it.
         final_pack = Pack(pack_base_name)
@@ -877,7 +873,7 @@ class DiskObjectStore(PackBasedObjectStore):
             indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)
             copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
             copier.verify(progress=progress)
-            return self._complete_thin_pack(f, path, copier, indexer, progress=progress)
+            return self._complete_pack(f, path, len(copier), indexer, progress=progress)
 
     def move_in_pack(self, path):
         """Move a specific file containing a pack into the pack directory.
@@ -902,10 +898,8 @@ class DiskObjectStore(PackBasedObjectStore):
         if sys.platform == "win32":
             # Windows might have the target pack file lingering. Attempt
             # removal, silently passing if the target does not exist.
-            try:
+            with suppress(FileNotFoundError):
                 os.remove(target_pack)
-            except FileNotFoundError:
-                pass
         os.rename(path, target_pack)
         final_pack = Pack(basename)
         self._add_cached_pack(basename, final_pack)

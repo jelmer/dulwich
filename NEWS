@@ -1,5 +1,8 @@
 0.21.2	UNRELEASED
 
+ * Fix early file close bug in ``dulwich.pack.extend_pack``.
+   (Jelmer Vernooĳ)
+
 0.21.1	2023-01-17
 
  * Factor out ``dulwich.pack.extend_pack``.

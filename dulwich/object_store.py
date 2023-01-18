@@ -875,7 +875,7 @@ class DiskObjectStore(PackBasedObjectStore):
             copier.verify(progress=progress)
             return self._complete_pack(f, path, len(copier), indexer, progress=progress)
 
-    def move_in_pack(self, path):
+    def _move_in_pack(self, path, f):
         """Move a specific file containing a pack into the pack directory.
 
         Note: The file should be on the same file system as the
@@ -884,7 +884,15 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           path: Path to the pack file.
         """
-        with PackData(path) as p:
+        f.flush()
+        try:
+            fileno = f.fileno()
+        except AttributeError:
+            pass
+        else:
+            os.fsync(fileno)
+        f.seek(0)
+        with PackData(path, f) as p:
             entries = p.sorted_entries()
             basename = self._get_pack_basepath(entries)
             index_name = basename + ".idx"
@@ -915,16 +923,14 @@ class DiskObjectStore(PackBasedObjectStore):
         import tempfile
 
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
-        f = os.fdopen(fd, "wb")
+        f = os.fdopen(fd, "w+b")
         os.chmod(path, PACK_MODE)
 
         def commit():
-            f.flush()
-            os.fsync(fd)
-            f.close()
-            if os.path.getsize(path) > 0:
-                return self.move_in_pack(path)
+            if f.tell() > 0:
+                return self._move_in_pack(path, f)
             else:
+                f.close()
                 os.remove(path)
                 return None
 

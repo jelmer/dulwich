@@ -824,7 +824,13 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_sha, extra_entries = extend_pack(
             f, indexer.ext_refs(), get_raw=self.get_raw, compression_level=self.pack_compression_level,
             progress=progress)
-
+        f.flush()
+        try:
+            fileno = f.fileno()
+        except AttributeError:
+            pass
+        else:
+            os.fsync(fileno)
         f.close()
 
         entries.extend(extra_entries)
@@ -832,16 +838,22 @@ class DiskObjectStore(PackBasedObjectStore):
         # Move the pack in.
         entries.sort()
         pack_base_name = self._get_pack_basepath(entries)
-        target_pack = pack_base_name + ".pack"
+
+        for pack in self.packs:
+            if pack._basename == pack_base_name:
+                return pack
+
+        target_pack_path = pack_base_name + ".pack"
+        target_index_path = pack_base_name + ".idx"
         if sys.platform == "win32":
             # Windows might have the target pack file lingering. Attempt
             # removal, silently passing if the target does not exist.
             with suppress(FileNotFoundError):
-                os.remove(target_pack)
-        os.rename(path, target_pack)
+                os.remove(target_pack_path)
+        os.rename(path, target_pack_path)
 
         # Write the index.
-        with GitFile(pack_base_name + ".idx", "wb", mask=PACK_MODE) as index_file:
+        with GitFile(target_index_path, "wb", mask=PACK_MODE) as index_file:
             write_pack_index(index_file, entries, pack_sha)
 
         # Add the pack to the store and return it.
@@ -884,34 +896,10 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           path: Path to the pack file.
         """
-        f.flush()
-        try:
-            fileno = f.fileno()
-        except AttributeError:
-            pass
-        else:
-            os.fsync(fileno)
         f.seek(0)
-        with PackData(path, f) as p:
-            entries = p.sorted_entries()
-            basename = self._get_pack_basepath(entries)
-            index_name = basename + ".idx"
-            if not os.path.exists(index_name):
-                with GitFile(index_name, "wb", mask=PACK_MODE) as f:
-                    write_pack_index(f, entries, p.get_stored_checksum())
-        for pack in self.packs:
-            if pack._basename == basename:
-                return pack
-        target_pack = basename + ".pack"
-        if sys.platform == "win32":
-            # Windows might have the target pack file lingering. Attempt
-            # removal, silently passing if the target does not exist.
-            with suppress(FileNotFoundError):
-                os.remove(target_pack)
-        os.rename(path, target_pack)
-        final_pack = Pack(basename)
-        self._add_cached_pack(basename, final_pack)
-        return final_pack
+        with PackData(path, f) as pd:
+            indexer = PackIndexer.for_pack_data(pd, resolve_ext_ref=self.get_raw)
+            return self._complete_pack(f, path, len(pd), indexer)
 
     def add_pack(self):
         """Add a new pack to this object store.
@@ -1048,14 +1036,17 @@ class MemoryObjectStore(BaseObjectStore):
 
         def commit():
             size = f.tell()
-            f.seek(0)
-            p = PackData.from_file(f, size)
-            for obj in PackInflater.for_pack_data(p, self.get_raw):
-                self.add_object(obj)
-            p.close()
+            if size > 0:
+                f.seek(0)
+                p = PackData.from_file(f, size)
+                for obj in PackInflater.for_pack_data(p, self.get_raw):
+                    self.add_object(obj)
+                p.close()
+            else:
+                f.close()
 
         def abort():
-            pass
+            f.close()
 
         return f, commit, abort
 

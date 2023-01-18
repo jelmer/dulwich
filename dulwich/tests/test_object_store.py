@@ -305,7 +305,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
     def test_add_pack_emtpy(self):
         o = MemoryObjectStore()
         f, commit, abort = o.add_pack()
-        self.assertRaises(AssertionError, commit)
+        commit()
 
     def test_add_thin_pack(self):
         o = MemoryObjectStore()
@@ -525,6 +525,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_add_pack(self):
         o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
         f, commit, abort = o.add_pack()
         try:
             b = make_object(Blob, data=b"more yummy data")

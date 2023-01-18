@@ -865,6 +865,7 @@ class LocalGitClientTests(TestCase):
         target = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target)
         t = Repo.init_bare(target)
+        self.addCleanup(t.close)
         s = open_repo("a.git")
         self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)

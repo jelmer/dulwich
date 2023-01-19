@@ -2395,7 +2395,7 @@ class Pack:
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
         return type_num, b"".join(chunks)
 
-    def __getitem__(self, sha1: bytes) -> bytes:
+    def __getitem__(self, sha1: bytes) -> ShaFile:
         """Retrieve the specified SHA1."""
         type, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type, uncomp, sha=sha1)

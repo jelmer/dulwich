@@ -29,7 +29,7 @@ import unittest
 
 from dulwich.contrib import release_robot
 from dulwich.repo import Repo
-from dulwich.tests.utils import make_commit, make_tag
+from dulwich.test_utils import make_commit, make_tag
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))  # this directory
 

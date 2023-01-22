@@ -30,7 +30,7 @@ The container used to create a fake repository is defined
 in cls.fakerepo and will be deleted after the tests.
 
 DULWICH_SWIFT_CFG=/tmp/conf.cfg PYTHONPATH=. python -m unittest \
-    dulwich.tests_swift.test_smoke
+    tests_swift.test_smoke
 """
 
 import os

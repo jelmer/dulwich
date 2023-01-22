@@ -29,10 +29,10 @@ from io import BytesIO, StringIO
 
 from unittest import skipIf
 
-from dulwich.tests import (
+from tests import (
     TestCase,
 )
-from dulwich.tests.test_object_store import (
+from tests.test_object_store import (
     ObjectStoreTests,
 )
 from dulwich.objects import (

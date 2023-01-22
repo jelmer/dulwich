@@ -22,7 +22,7 @@
 import socket
 import threading
 
-from dulwich.tests import TestCase
+from tests import TestCase
 
 from io import StringIO
 from unittest import skipIf

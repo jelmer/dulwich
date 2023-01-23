@@ -686,6 +686,11 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_config)
 
+    def get_worktree_config(self) -> "ConfigFile":
+        """Retrieve the worktree config object.
+        """
+        raise NotImplementedError(self.get_worktree_config)
+
     def get_description(self):
         """Retrieve the description for this repository.
 
@@ -711,10 +716,15 @@ class BaseRepo:
 
         Returns: `Config` instance for this repository
         """
-        from dulwich.config import StackedConfig
+        from dulwich.config import StackedConfig, ConfigFile
 
-        backends = [self.get_config()] + StackedConfig.default_backends()
-        return StackedConfig(backends, writable=backends[0])
+        local_config = self.get_config()
+        backends: List[ConfigFile] = [local_config]
+        if local_config.get_boolean((b"extensions", ), b"worktreeconfig", False):
+            backends.append(self.get_worktree_config())
+
+        backends += StackedConfig.default_backends()
+        return StackedConfig(backends, writable=local_config)
 
     def get_shallow(self) -> Set[ObjectID]:
         """Get the set of shallow commits.
@@ -1168,8 +1178,9 @@ class Repo(BaseRepo):
         if format_version not in (0, 1):
             raise UnsupportedVersion(format_version)
 
-        for extension in config.items((b"extensions", )):
-            raise UnsupportedExtension(extension)
+        for extension, _value in config.items((b"extensions", )):
+            if extension not in (b'worktreeconfig', ):
+                raise UnsupportedExtension(extension)
 
         if object_store is None:
             object_store = DiskObjectStore.from_config(
@@ -1593,6 +1604,16 @@ class Repo(BaseRepo):
             validate_path_element=validate_path_element,
             symlink_fn=self.symlink_fn,
         )
+
+    def get_worktree_config(self) -> "ConfigFile":
+        from dulwich.config import ConfigFile
+        path = os.path.join(self.commondir(), "config.worktree")
+        try:
+            return ConfigFile.from_path(path)
+        except FileNotFoundError:
+            cf = ConfigFile()
+            cf.path = path
+            return cf
 
     def get_config(self) -> "ConfigFile":
         """Retrieve the config object.

@@ -1097,11 +1097,24 @@ class BuildRepoRootTests(TestCase):
         c.write_to_path()
         Repo(self._repo_dir)
 
-    def test_repositoryformatversion_1_extension(self):
+    def test_worktreeconfig_extension(self):
         r = self._repo
         c = r.get_config()
         c.set(("core",), "repositoryformatversion", "1")
         c.set(("extensions", ), "worktreeconfig", True)
+        c.write_to_path()
+        c = r.get_worktree_config()
+        c.set(("user",), "repositoryformatversion", "1")
+        c.set((b"user",), b"name", b"Jelmer")
+        c.write_to_path()
+        cs = r.get_config_stack()
+        self.assertEqual(cs.get(("user", ), "name"), b"Jelmer")
+
+    def test_repositoryformatversion_1_extension(self):
+        r = self._repo
+        c = r.get_config()
+        c.set(("core",), "repositoryformatversion", "1")
+        c.set(("extensions", ), "unknownextension", True)
         c.write_to_path()
         self.assertRaises(UnsupportedExtension, Repo, self._repo_dir)
 

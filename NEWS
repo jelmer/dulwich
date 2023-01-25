@@ -3,6 +3,15 @@
  * Add support for ``worktreeconfig`` extension.
    (Jelmer Vernooĳ)
 
+ * Deprecate ``Commit.extra``; the Git project specifically
+   discourages adding custom lines, and the contents of
+   ``Commit.extra`` are unpredictable as contents
+   may be different between different versions of Dulwich
+   with support for different headers.
+
+   ``Commit._extra`` still exists.
+   (Jelmer Vernooĳ)
+
 0.21.2	2023-01-18
 
  * Fix early file close bug in ``dulwich.pack.extend_pack``.

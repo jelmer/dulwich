@@ -228,6 +228,42 @@ class BaseObjectStore:
                 if not allow_missing:
                     raise
 
+    def find_missing_objects(
+        self,
+        haves,
+        wants,
+        shallow=None,
+        progress=None,
+        get_tagged=None,
+        get_parents=lambda commit: commit.parents,
+    ):
+        """Find the missing objects required for a set of revisions.
+
+        Args:
+          haves: Iterable over SHAs already in common.
+          wants: Iterable over SHAs of objects to fetch.
+          shallow: Set of shallow commit SHA1s to skip
+          progress: Simple progress function that will be called with
+            updated progress strings.
+          get_tagged: Function that returns a dict of pointed-to sha ->
+            tag sha for including tags.
+          get_parents: Optional function for getting the parents of a
+            commit.
+        Returns: Iterator over (sha, path) pairs.
+        """
+        warnings.warn(
+            'Please use MissingObjectFinder(store)', DeprecationWarning)
+        finder = MissingObjectFinder(
+            self,
+            haves=haves,
+            wants=wants,
+            shallow=shallow,
+            progress=progress,
+            get_tagged=get_tagged,
+            get_parents=get_parents,
+        )
+        return iter(finder)
+
     def find_common_revisions(self, graphwalker):
         """Find which revisions this store has in common using graphwalker.
 

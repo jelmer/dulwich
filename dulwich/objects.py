@@ -25,7 +25,16 @@ import binascii
 import os
 import posixpath
 import stat
-import warnings
+from typing import (
+    Sequence,
+    Optional,
+    Dict,
+    Iterable,
+    Union,
+    Type,
+    Iterator,
+    List,
+)
 import zlib
 from collections import namedtuple
 from hashlib import sha1
@@ -413,10 +422,10 @@ class ShaFile:
         self._chunked_text = []
         self._needs_serialization = True
 
-    def _deserialize(self, chunks):
+    def _deserialize(self, chunks: Iterator[bytes]) -> None:
         raise NotImplementedError(self._deserialize)
 
-    def _serialize(self):
+    def _serialize(self) -> Sequence[bytes]:
         raise NotImplementedError(self._serialize)
 
     @classmethod
@@ -651,7 +660,7 @@ class Blob(ShaFile):
         return ret
 
 
-def _parse_message(chunks: Iterable[bytes]):
+def _parse_message(chunks: Iterable[bytes]) -> Iterator[tuple[Optional[bytes], Optional[bytes]]]:
     """Parse a message with a list of fields and a body.
 
     Args:
@@ -703,6 +712,17 @@ def _parse_message(chunks: Iterable[bytes]):
         yield (None, f.read())
 
     f.close()
+
+
+def _format_message(headers, body):
+    for field, value in headers:
+        lines = value.split(b"\n")
+        yield git_line(field, lines[0])
+        for line in lines[1:]:
+            yield b" " + line + b"\n"
+    if body:
+        yield b"\n"  # There must be a new line after the headers
+        yield body
 
 
 class Tag(ShaFile):
@@ -776,28 +796,25 @@ class Tag(ShaFile):
             last = field
 
     def _serialize(self):
-        chunks = []
-        chunks.append(git_line(_OBJECT_HEADER, self._object_sha))
-        chunks.append(git_line(_TYPE_HEADER, self._object_class.type_name))
-        chunks.append(git_line(_TAG_HEADER, self._name))
+        headers = []
+        headers.append((_OBJECT_HEADER, self._object_sha))
+        headers.append((_TYPE_HEADER, self._object_class.type_name))
+        headers.append((_TAG_HEADER, self._name))
         if self._tagger:
             if self._tag_time is None:
-                chunks.append(git_line(_TAGGER_HEADER, self._tagger))
+                headers.append((_TAGGER_HEADER, self._tagger))
             else:
-                chunks.append(
-                    git_line(
-                        _TAGGER_HEADER,
-                        self._tagger,
-                        str(self._tag_time).encode("ascii"),
-                        format_timezone(self._tag_timezone, self._tag_timezone_neg_utc),
-                    )
-                )
-        if self._message is not None:
-            chunks.append(b"\n")  # To close headers
-            chunks.append(self._message)
-        if self._signature is not None:
-            chunks.append(self._signature)
-        return chunks
+                headers.append((_TAGGER_HEADER,
+                    b" ".join([self._tagger,
+                    str(self._tag_time).encode("ascii"),
+                    format_timezone(self._tag_timezone, self._tag_timezone_neg_utc)]),
+                ))
+
+        if self.message is None and self._signature is None:
+            body = None
+        else:
+            body = (self.message or b"") + (self._signature or b"")
+        return list(_format_message(headers, body))
 
     def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
@@ -1367,7 +1384,7 @@ class Commit(ShaFile):
     def _deserialize(self, chunks):
         self._parents = []
         self._extra = []
-        self._tree= None
+        self._tree = None
         author_info = (None, None, (None, None))
         commit_info = (None, None, (None, None))
         self._encoding = None
@@ -1510,52 +1527,31 @@ class Commit(ShaFile):
                 )
 
     def _serialize(self):
-        chunks = []
+        headers = []
         tree_bytes = self._tree.id if isinstance(self._tree, Tree) else self._tree
-        chunks.append(git_line(_TREE_HEADER, tree_bytes))
+        headers.append((_TREE_HEADER, tree_bytes))
         for p in self._parents:
-            chunks.append(git_line(_PARENT_HEADER, p))
-        chunks.append(
-            git_line(
-                _AUTHOR_HEADER,
-                self._author,
-                str(self._author_time).encode("ascii"),
-                format_timezone(self._author_timezone, self._author_timezone_neg_utc),
-            )
-        )
-        chunks.append(
-            git_line(
-                _COMMITTER_HEADER,
-                self._committer,
-                str(self._commit_time).encode("ascii"),
-                format_timezone(self._commit_timezone, self._commit_timezone_neg_utc),
-            )
-        )
+            headers.append((_PARENT_HEADER, p))
+        headers.append((
+            _AUTHOR_HEADER,
+            b" ".join([self._author,
+            str(self._author_time).encode("ascii"),
+            format_timezone(self._author_timezone, self._author_timezone_neg_utc)])
+        ))
+        headers.append((
+            _COMMITTER_HEADER,
+            b" ".join([self._committer,
+            str(self._commit_time).encode("ascii"),
+            format_timezone(self._commit_timezone, self._commit_timezone_neg_utc)]),
+        ))
         if self.encoding:
-            chunks.append(git_line(_ENCODING_HEADER, self.encoding))
+            headers.append((_ENCODING_HEADER, self.encoding))
         for mergetag in self.mergetag:
-            mergetag_chunks = mergetag.as_raw_string().split(b"\n")
-
-            chunks.append(git_line(_MERGETAG_HEADER, mergetag_chunks[0]))
-            # Embedded extra header needs leading space
-            for chunk in mergetag_chunks[1:]:
-                chunks.append(b" " + chunk + b"\n")
-
-            # No trailing empty line
-            if chunks[-1].endswith(b" \n"):
-                chunks[-1] = chunks[-1][:-2]
-        for k, v in self._extra:
-            if b"\n" in k or b"\n" in v:
-                raise AssertionError("newline in extra data: {!r} -> {!r}".format(k, v))
-            chunks.append(git_line(k, v))
+            headers.append((_MERGETAG_HEADER, mergetag.as_raw_string()[:-1]))
+        headers.extend(self._extra)
         if self.gpgsig:
-            sig_chunks = self.gpgsig.split(b"\n")
-            chunks.append(git_line(_GPGSIG_HEADER, sig_chunks[0]))
-            for chunk in sig_chunks[1:]:
-                chunks.append(git_line(b"", chunk))
-        chunks.append(b"\n")  # There must be a new line after the headers
-        chunks.append(self._message)
-        return chunks
+            headers.append((_GPGSIG_HEADER, self.gpgsig))
+        return list(_format_message(headers, self._message))
 
     tree = serializable_property("tree", "Tree that is the state of this commit")
 

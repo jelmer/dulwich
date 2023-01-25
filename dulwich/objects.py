@@ -39,7 +39,6 @@ import zlib
 from collections import namedtuple
 from hashlib import sha1
 from io import BytesIO
-from typing import Dict, Iterable, Iterator, List, Optional, Type, Union
 import warnings
 
 from _hashlib import HASH
@@ -804,11 +803,9 @@ class Tag(ShaFile):
             if self._tag_time is None:
                 headers.append((_TAGGER_HEADER, self._tagger))
             else:
-                headers.append((_TAGGER_HEADER,
-                    b" ".join([self._tagger,
-                    str(self._tag_time).encode("ascii"),
-                    format_timezone(self._tag_timezone, self._tag_timezone_neg_utc)]),
-                ))
+                headers.append((_TAGGER_HEADER, format_time_entry(
+                    self._tagger, self._tag_time,
+                    (self._tag_timezone, self._tag_timezone_neg_utc))))
 
         if self.message is None and self._signature is None:
             body = None
@@ -1264,7 +1261,7 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
 
 
 def parse_time_entry(value):
-    """Parse time entry behavior
+    """Parse event
 
     Args:
       value: Bytes representing a git commit/tag line
@@ -1286,6 +1283,16 @@ def parse_time_entry(value):
     except ValueError as exc:
         raise ObjectFormatException(exc) from exc
     return person, time, (timezone, timezone_neg_utc)
+
+
+def format_time_entry(person, time, timezone_info):
+    """Format an event
+    """
+    (timezone, timezone_neg_utc) = timezone_info
+    return b" ".join([
+        person,
+        str(time).encode("ascii"),
+        format_timezone(timezone, timezone_neg_utc)])
 
 
 def parse_commit(chunks):
@@ -1534,16 +1541,14 @@ class Commit(ShaFile):
             headers.append((_PARENT_HEADER, p))
         headers.append((
             _AUTHOR_HEADER,
-            b" ".join([self._author,
-            str(self._author_time).encode("ascii"),
-            format_timezone(self._author_timezone, self._author_timezone_neg_utc)])
-        ))
+            format_time_entry(
+                self._author, self._author_time,
+                (self._author_timezone, self._author_timezone_neg_utc))))
         headers.append((
             _COMMITTER_HEADER,
-            b" ".join([self._committer,
-            str(self._commit_time).encode("ascii"),
-            format_timezone(self._commit_timezone, self._commit_timezone_neg_utc)]),
-        ))
+            format_time_entry(
+                self._committer, self._commit_time,
+                (self._commit_timezone, self._commit_timezone_neg_utc))))
         if self.encoding:
             headers.append((_ENCODING_HEADER, self.encoding))
         for mergetag in self.mergetag:

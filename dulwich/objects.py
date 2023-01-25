@@ -36,6 +36,7 @@ from typing import (
     Iterator,
     List,
 )
+import warnings
 import zlib
 from _hashlib import HASH
 from hashlib import sha1
@@ -1567,6 +1568,9 @@ class Commit(ShaFile):
 
     def _get_extra(self):
         """Return extra settings of this commit."""
+        warnings.warn(
+            'Commit.extra is deprecated. Use Commit._extra instead.',
+            DeprecationWarning)
         return self._extra
 
     extra = property(

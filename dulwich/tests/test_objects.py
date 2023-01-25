@@ -37,6 +37,7 @@ from dulwich.errors import (
 )
 from dulwich.objects import (
     Blob,
+    Event,
     Tree,
     Commit,
     ShaFile,
@@ -1441,6 +1442,7 @@ class ShaFileSerializeTests(TestCase):
                 object=(Commit, b"0" * 40),
             )
             tag._deserialize(tag._serialize())
+            tag.tag_event.timestamp
 
 
 class PrettyFormatTreeEntryTests(TestCase):
@@ -1451,3 +1453,41 @@ class PrettyFormatTreeEntryTests(TestCase):
                 b"foo", 0o40000, b"40820c38cfb182ce6c8b261555410d8382a5918b"
             ),
         )
+
+
+class EventTests(TestCase):
+
+    def test_simple(self):
+        e = Event(raw=b"Tagger <test@example.com> 1174773719 +0000")
+        self.assertEqual(e.identity, b"Tagger <test@example.com>")
+        self.assertEqual(e.timestamp, 1174773719)
+        self.assertEqual(e.timezone, 0)
+        self.assertEqual(
+            e.raw, b"Tagger <test@example.com> 1174773719 +0000")
+        self.assertEqual(
+            bytes(e), b"Tagger <test@example.com> 1174773719 +0000")
+        self.assertEqual(
+            e.datetime(),
+            datetime.datetime.fromtimestamp(
+                1174773719, datetime.timezone(datetime.timedelta(seconds=0))))
+
+    def test_eq(self):
+        e = Event(raw=b"Tagger <test@example.com> 1174773719 +0000")
+        self.assertEqual(e, e)
+        f = Event(raw=b"Tagger <test@example.com> 1174773719 +0000")
+        self.assertEqual(e, f)
+        g = Event(raw=b"Tagger1 <test@example.com> 1174773719 +0000")
+        self.assertNotEqual(e, g)
+
+    def test_modify(self):
+        e = Event(raw=b"Tagger <test@example.com> 1174773719 +0000")
+        e.identity = b"Other Tagger <foo@example.com>"
+        self.assertEqual(
+            e.raw, b"Other Tagger <foo@example.com> 1174773719 +0000")
+
+    def test_invalid(self):
+        raw = b"Joe Example <joe@example.com> lala aaa"
+        e = Event(raw=raw)
+        # We can still access the raw data
+        self.assertEqual(e.raw, raw)
+        self.assertRaises(ObjectFormatException, lambda: e.identity)

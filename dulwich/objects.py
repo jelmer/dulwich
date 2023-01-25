@@ -167,6 +167,18 @@ def object_header(num_type: int, length: int) -> bytes:
     return cls.type_name + b" " + str(length).encode("ascii") + b"\0"
 
 
+def event_property_proxy(event_name: str, property_name: str, docstring: Optional[str] = None):
+
+    def set(obj, value):
+        setattr(getattr(obj, event_name), property_name, value)
+        obj._needs_serialization = True
+
+    def get(obj):
+        return getattr(getattr(obj, event_name), property_name)
+
+    return property(get, set, doc=docstring)
+
+
 def serializable_property(name: str, docstring: Optional[str] = None):
     """A property that helps tracking whether serialization is necessary."""
 
@@ -204,7 +216,7 @@ def check_hexsha(hex, error_msg):
         raise ObjectFormatException("{} {}".format(error_msg, hex))
 
 
-def check_identity(identity: bytes, error_msg: str) -> None:
+def check_identity(identity: bytes, kind: str) -> None:
     """Check if the specified identity is valid.
 
     This will raise an exception if the identity is not valid.
@@ -223,7 +235,7 @@ def check_identity(identity: bytes, error_msg: str) -> None:
         b'\0' not in identity,
         b'\n' not in identity,
     ]):
-        raise ObjectFormatException(error_msg)
+        raise ObjectFormatException(f"invalid {kind}")
 
 
 def check_time(time_seconds):
@@ -339,7 +351,8 @@ class ShaFile:
             self._sha = None
             self._chunked_text = self._serialize()
             self._needs_serialization = False
-        return self._chunked_text  # type: ignore
+        assert self._chunked_text is not None
+        return self._chunked_text
 
     def as_raw_string(self) -> bytes:
         """Return raw string with serialization of the object.
@@ -427,10 +440,10 @@ class ShaFile:
         self._chunked_text = []
         self._needs_serialization = True
 
-    def _deserialize(self, chunks: Iterator[bytes]) -> None:
+    def _deserialize(self, chunks: List[bytes]) -> None:
         raise NotImplementedError(self._deserialize)
 
-    def _serialize(self) -> Sequence[bytes]:
+    def _serialize(self) -> List[bytes]:
         raise NotImplementedError(self._serialize)
 
     @classmethod
@@ -737,25 +750,17 @@ class Tag(ShaFile):
     type_num = 4
 
     __slots__ = (
-        "_tag_timezone_neg_utc",
         "_name",
         "_object_sha",
         "_object_class",
-        "_tag_time",
-        "_tag_timezone",
-        "_tagger",
         "_message",
         "_signature",
+        "tag_event",
     )
-
-    _tagger: Optional[bytes]
 
     def __init__(self):
         super().__init__()
-        self._tagger = None
-        self._tag_time = None
-        self._tag_timezone = None
-        self._tag_timezone_neg_utc = False
+        self.tag_event = Event(parent=self)
         self._signature = None
 
     @classmethod
@@ -782,11 +787,10 @@ class Tag(ShaFile):
 
         check_hexsha(self._object_sha, "invalid object sha")
 
-        if self._tagger is not None:
-            check_identity(self._tagger, "invalid tagger")
+        if self.tagger is not None:
+            check_identity(self.tagger, "tagger")
 
-        self._check_has_member("_tag_time", "missing tag time")
-        check_time(self._tag_time)
+        check_time(self.tag_time)
 
         last = None
         for field, _ in _parse_message(self._chunked_text):
@@ -805,14 +809,8 @@ class Tag(ShaFile):
         headers.append((_OBJECT_HEADER, self._object_sha))
         headers.append((_TYPE_HEADER, self._object_class.type_name))
         headers.append((_TAG_HEADER, self._name))
-        if self._tagger:
-            if self._tag_time is None:
-                headers.append((_TAGGER_HEADER, self._tagger))
-            else:
-                headers.append((_TAGGER_HEADER,
-                    format_event(
-                        self._tagger, self._tag_time,
-                        (self._tag_timezone, self._tag_timezone_neg_utc))))
+        if self.tag_event.raw:
+            headers.append((_TAGGER_HEADER, self.tag_event.raw))
 
         if self.message is None and self._signature is None:
             body = None
@@ -822,10 +820,7 @@ class Tag(ShaFile):
 
     def _deserialize(self, chunks):
         """Grab the metadata attached to the tag"""
-        self._tagger = None
-        self._tag_time = None
-        self._tag_timezone = None
-        self._tag_timezone_neg_utc = False
+        self.tag_event.raw = None
         for field, value in _parse_message(chunks):
             if field == _OBJECT_HEADER:
                 self._object_sha = value
@@ -837,11 +832,7 @@ class Tag(ShaFile):
             elif field == _TAG_HEADER:
                 self._name = value
             elif field == _TAGGER_HEADER:
-                (
-                    self._tagger,
-                    self._tag_time,
-                    (self._tag_timezone, self._tag_timezone_neg_utc),
-                ) = parse_event(value)
+                self.tag_event.raw = value
             elif field is None:
                 if value is None:
                     self._message = None
@@ -872,16 +863,17 @@ class Tag(ShaFile):
     object = property(_get_object, _set_object)
 
     name = serializable_property("name", "The name of this tag")
-    tagger = serializable_property(
-        "tagger", "Returns the name of the person who created this tag"
+    tagger = event_property_proxy(
+        "tag_event", "identity",
+        "Returns the name of the person who created this tag"
     )
-    tag_time = serializable_property(
-        "tag_time",
+    tag_time = event_property_proxy(
+        "tag_event", "timestamp",
         "The creation timestamp of the tag.  As the number of seconds "
         "since the epoch",
     )
-    tag_timezone = serializable_property(
-        "tag_timezone", "The timezone that tag_time is in."
+    tag_timezone = event_property_proxy(
+        "tag_event", "timezone", "The timezone that tag_time is in."
     )
     message = serializable_property("message", "the message attached to this tag")
 
@@ -1292,14 +1284,24 @@ def parse_event(value):
     return person, time, (timezone, timezone_neg_utc)
 
 
-def format_event(person, time, timezone_info):
+def format_time_entry(person, time, timezone_info):
+    warnings.warn(
+        'Please use format_event rather than format_time_entry',
+        DeprecationWarning)
+    (timezone, timezone_neg_utc) = timezone_info
+    return format_event(person, time, timezone, timezone_neg_utc)
+
+
+def format_event(person, time, timezone, negative_utc=False):
     """Format an event
     """
-    (timezone, timezone_neg_utc) = timezone_info
+    if time is None:
+        assert timezone is None
+        return person
     return b" ".join([
         person,
         str(time).encode("ascii"),
-        format_timezone(timezone, timezone_neg_utc)])
+        format_timezone(timezone, negative_utc)])
 
 
 def parse_commit(chunks):
@@ -1354,6 +1356,125 @@ def parse_commit(chunks):
     )
 
 
+class Event:
+    """An event (commit, authoring, tagging)."""
+
+    __slots__ = [
+        'parent',
+        '_raw',
+        '_deserialized',
+    ]
+
+    def __init__(self, *, raw=None, parent=None):
+        self.parent = parent
+        self._raw = raw
+        if raw is not None:
+            self._deserialized = None
+        else:
+            self._deserialized = (None, None, (None, None))
+
+    def check(self, kind):
+        self._check_has_member("identity", f"missing {kind}")
+        check_identity(self.identity, kind)
+        self._check_has_member("timestamp", f"missing {kind} time")
+        check_time(self.timestamp)
+
+    def _check_has_member(self, member, error_msg):
+        """Check that the object has a given member variable.
+
+        Args:
+          member: the member variable to check for
+          error_msg: the message for an error if the member is missing
+        Raises:
+          ObjectFormatException: with the given error_msg if member is
+            missing or is None
+        """
+        if getattr(self, member, None) is None:
+            raise ObjectFormatException(error_msg)
+
+    def __bytes__(self):
+        return self.raw
+
+    def __eq__(self, other):
+        if isinstance(other, Event):
+            return self.raw == other.raw
+        if isinstance(other, bytes):
+            return self.raw == other
+        return False
+
+    def __repr__(self):
+        return "<%s(%r)>" % (type(self).__name__, self.raw)
+
+    def _get_raw(self):
+        if self._raw is None:
+            self._raw = format_event(
+                self._deserialized[0], self._deserialized[1],
+                self._deserialized[2][0], self._deserialized[2][1])
+        return self._raw
+
+    def _set_raw(self, value):
+        self._raw = value
+        if value is None:
+            self._deserialized = (None, None, (None, None))
+        else:
+            self._deserialized = None
+
+    raw = property(_get_raw, _set_raw)
+
+    def _get_timestamp(self):
+        if self._deserialized is None:
+            self._deserialized = parse_event(self._raw)
+        return self._deserialized[1]
+
+    def _set_timestamp(self, value):
+        if self._deserialized is None:
+            self._deserialized = parse_event(self._raw)
+        self._deserialized = (self._deserialized[0], value, self._deserialized[2])
+        self._raw = None
+        if self.parent is not None:
+            self.parent._needs_serialization = True
+
+    timestamp = property(_get_timestamp, _set_timestamp)
+
+    def _get_timezone(self):
+        if self._deserialized is None:
+            self._deserialized = parse_event(self._raw)
+        return self._deserialized[2][0]
+
+    def _set_timezone(self, value):
+        if self._deserialized is None:
+            self._deserialized = parse_event(self._raw)
+        self._deserialized = (self._deserialized[0], self._deserialized[1], (value, self._deserialized[2][1]))
+        self._raw = None
+        if self.parent is not None:
+            self.parent._needs_serialization = True
+
+    timezone = property(_get_timezone, _set_timezone)
+
+    def _get_identity(self):
+        if self._deserialized is None:
+            self._deserialized = parse_event(self._raw)
+        return self._deserialized[0]
+
+    def _set_identity(self, value):
+        if self._deserialized is None:
+            self._deserialized = parse_event(self._raw)
+        self._deserialized = (value, self._deserialized[1], self._deserialized[2])
+        self._raw = None
+        if self.parent is not None:
+            self.parent._needs_serialization = True
+
+    identity = property(_get_identity, _set_identity)
+
+    def tzinfo(self):
+        from datetime import timezone, timedelta
+        return timezone(timedelta(seconds=self.timezone))
+
+    def datetime(self):
+        from datetime import datetime
+        return datetime.fromtimestamp(self.timestamp, self.tzinfo())
+
+
 class Commit(ShaFile):
     """A git commit object"""
 
@@ -1364,18 +1485,12 @@ class Commit(ShaFile):
         "_parents",
         "_encoding",
         "_extra",
-        "_author_timezone_neg_utc",
-        "_commit_timezone_neg_utc",
-        "_commit_time",
-        "_author_time",
-        "_author_timezone",
-        "_commit_timezone",
-        "_author",
-        "_committer",
         "_tree",
         "_message",
         "_mergetag",
         "_gpgsig",
+        "author_event",
+        "commit_event",
     )
 
     def __init__(self):
@@ -1385,8 +1500,8 @@ class Commit(ShaFile):
         self._mergetag = []
         self._gpgsig = None
         self._extra = []
-        self._author_timezone_neg_utc = False
-        self._commit_timezone_neg_utc = False
+        self.author_event = Event(parent=self)
+        self.commit_event = Event(parent=self)
 
     @classmethod
     def from_path(cls, path):
@@ -1399,12 +1514,12 @@ class Commit(ShaFile):
         self._parents = []
         self._extra = []
         self._tree = None
-        author_info = (None, None, (None, None))
-        commit_info = (None, None, (None, None))
         self._encoding = None
         self._mergetag = []
         self._message = None
         self._gpgsig = None
+        self.commit_event.raw = None
+        self.author_event.raw = None
 
         for field, value in _parse_message(chunks):
             # TODO(jelmer): Enforce ordering
@@ -1413,9 +1528,9 @@ class Commit(ShaFile):
             elif field == _PARENT_HEADER:
                 self._parents.append(value)
             elif field == _AUTHOR_HEADER:
-                author_info = parse_event(value)
+                self.author_event.raw = value
             elif field == _COMMITTER_HEADER:
-                commit_info = parse_event(value)
+                self.commit_event.raw = value
             elif field == _ENCODING_HEADER:
                 self._encoding = value
             elif field == _MERGETAG_HEADER:
@@ -1427,17 +1542,6 @@ class Commit(ShaFile):
             else:
                 self._extra.append((field, value))
 
-        (
-            self._author,
-            self._author_time,
-            (self._author_timezone, self._author_timezone_neg_utc),
-        ) = author_info
-        (
-            self._committer,
-            self._commit_time,
-            (self._commit_timezone, self._commit_timezone_neg_utc),
-        ) = commit_info
-
     def check(self):
         """Check this object for internal consistency.
 
@@ -1447,20 +1551,13 @@ class Commit(ShaFile):
         super().check()
         assert self._chunked_text is not None
         self._check_has_member("_tree", "missing tree")
-        self._check_has_member("_author", "missing author")
-        self._check_has_member("_committer", "missing committer")
-        self._check_has_member("_author_time", "missing author time")
-        self._check_has_member("_commit_time", "missing commit time")
 
         for parent in self._parents:
             check_hexsha(parent, "invalid parent sha")
         check_hexsha(self._tree, "invalid tree sha")
 
-        check_identity(self._author, "invalid author")
-        check_identity(self._committer, "invalid committer")
-
-        check_time(self._author_time)
-        check_time(self._commit_time)
+        self.author_event.check("author")
+        self.commit_event.check("committer")
 
         last = None
         for field, _ in _parse_message(self._chunked_text):
@@ -1546,16 +1643,8 @@ class Commit(ShaFile):
         headers.append((_TREE_HEADER, tree_bytes))
         for p in self._parents:
             headers.append((_PARENT_HEADER, p))
-        headers.append((
-            _AUTHOR_HEADER,
-            format_event(
-                self._author, self._author_time,
-                (self._author_timezone, self._author_timezone_neg_utc))))
-        headers.append((
-            _COMMITTER_HEADER,
-            format_event(
-                self._committer, self._commit_time,
-                (self._commit_timezone, self._commit_timezone_neg_utc))))
+        headers.append((_AUTHOR_HEADER, self.author_event.raw))
+        headers.append((_COMMITTER_HEADER, self.commit_event.raw))
         if self.encoding:
             headers.append((_ENCODING_HEADER, self.encoding))
         for mergetag in self.mergetag:
@@ -1594,32 +1683,34 @@ class Commit(ShaFile):
         "pseudo-headers in Commit.message, rather than this field.",
     )
 
-    author = serializable_property("author", "The name of the author of the commit")
+    author = event_property_proxy(
+        "author_event", "identity", "The name of the author of the commit")
 
-    committer = serializable_property(
-        "committer", "The name of the committer of the commit"
+    committer = event_property_proxy(
+        "commit_event",
+        "identity", "The name of the committer of the commit"
     )
 
     message = serializable_property("message", "The commit message")
 
-    commit_time = serializable_property(
-        "commit_time",
+    commit_time = event_property_proxy(
+        "commit_event", "timestamp",
         "The timestamp of the commit. As the number of seconds since the " "epoch.",
     )
 
-    commit_timezone = serializable_property(
-        "commit_timezone", "The zone the commit time is in"
+    commit_timezone = event_property_proxy(
+        "commit_event", "timezone", "The zone the commit time is in"
     )
 
-    author_time = serializable_property(
-        "author_time",
+    author_time = event_property_proxy(
+        "author_event",
+        "timestamp",
         "The timestamp the commit was written. As the number of "
         "seconds since the epoch.",
     )
 
-    author_timezone = serializable_property(
-        "author_timezone", "Returns the zone the author time is in."
-    )
+    author_timezone = event_property_proxy(
+        "author_event", "timezone", "The zone the author time is in.")
 
     encoding = serializable_property("encoding", "Encoding of the commit message.")
 

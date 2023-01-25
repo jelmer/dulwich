@@ -6,6 +6,11 @@
  * Deprecate ``dulwich.objects.parse_commit``.
    (Jelmer Vernooĳ)
 
+ * Add new ``Commit.author_event``, ``Commit.commit_event`` and
+   ``Tag.tag_event`` properties. These provide raw and
+   convenience access to the event properties.
+   (Jelmer Vernooĳ)
+
 0.21.2	2023-01-18
 
  * Fix early file close bug in ``dulwich.pack.extend_pack``.

@@ -433,8 +433,8 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
-        self.assertEqual(commit._author_timezone, 18000)
-        self.assertEqual(commit._commit_timezone, 18000)
+        self.assertEqual(commit.author_timezone, 18000)
+        self.assertEqual(commit.commit_timezone, 18000)
 
         self.overrideEnv("GIT_AUTHOR_DATE", "1995-11-20T19:12:08-0501")
         self.overrideEnv("GIT_COMMITTER_DATE", "1995-11-20T19:12:08-0501")
@@ -449,8 +449,8 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
-        self.assertEqual(commit._author_timezone, -18060)
-        self.assertEqual(commit._commit_timezone, -18060)
+        self.assertEqual(commit.author_timezone, -18060)
+        self.assertEqual(commit.commit_timezone, -18060)
 
         self.overrideEnv("GIT_AUTHOR_DATE", None)
         self.overrideEnv("GIT_COMMITTER_DATE", None)
@@ -467,8 +467,8 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
-        self.assertEqual(commit._author_timezone, local_timezone)
-        self.assertEqual(commit._commit_timezone, local_timezone)
+        self.assertEqual(commit.author_timezone, local_timezone)
+        self.assertEqual(commit.commit_timezone, local_timezone)
 
 
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")

@@ -31,6 +31,7 @@ from collections import namedtuple
 from hashlib import sha1
 from io import BytesIO
 from typing import Dict, Iterable, Iterator, List, Optional, Type, Union
+import warnings
 
 from _hashlib import HASH
 
@@ -1278,6 +1279,7 @@ def parse_commit(chunks):
     Returns: Tuple of (tree, parents, author_info, commit_info,
         encoding, mergetag, gpgsig, message, extra)
     """
+    warnings.warn('parse_commit will be removed in 0.22', DeprecationWarning)
     parents = []
     extra = []
     tree = None
@@ -1363,17 +1365,37 @@ class Commit(ShaFile):
         return commit
 
     def _deserialize(self, chunks):
-        (
-            self._tree,
-            self._parents,
-            author_info,
-            commit_info,
-            self._encoding,
-            self._mergetag,
-            self._gpgsig,
-            self._message,
-            self._extra,
-        ) = parse_commit(chunks)
+        self._parents = []
+        self._extra = []
+        self._tree= None
+        author_info = (None, None, (None, None))
+        commit_info = (None, None, (None, None))
+        self._encoding = None
+        self._mergetag = []
+        self._message = None
+        self._gpgsig = None
+
+        for field, value in _parse_message(chunks):
+            # TODO(jelmer): Enforce ordering
+            if field == _TREE_HEADER:
+                self._tree = value
+            elif field == _PARENT_HEADER:
+                self._parents.append(value)
+            elif field == _AUTHOR_HEADER:
+                author_info = parse_time_entry(value)
+            elif field == _COMMITTER_HEADER:
+                commit_info = parse_time_entry(value)
+            elif field == _ENCODING_HEADER:
+                self._encoding = value
+            elif field == _MERGETAG_HEADER:
+                self._mergetag.append(Tag.from_string(value + b"\n"))
+            elif field == _GPGSIG_HEADER:
+                self._gpgsig = value
+            elif field is None:
+                self._message = value
+            else:
+                self._extra.append((field, value))
+
         (
             self._author,
             self._author_time,

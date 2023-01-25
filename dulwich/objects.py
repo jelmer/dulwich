@@ -810,10 +810,9 @@ class Tag(ShaFile):
                 headers.append((_TAGGER_HEADER, self._tagger))
             else:
                 headers.append((_TAGGER_HEADER,
-                    b" ".join([self._tagger,
-                    str(self._tag_time).encode("ascii"),
-                    format_timezone(self._tag_timezone, self._tag_timezone_neg_utc)]),
-                ))
+                    format_event(
+                        self._tagger, self._tag_time,
+                        (self._tag_timezone, self._tag_timezone_neg_utc))))
 
         if self.message is None and self._signature is None:
             body = None
@@ -842,7 +841,7 @@ class Tag(ShaFile):
                     self._tagger,
                     self._tag_time,
                     (self._tag_timezone, self._tag_timezone_neg_utc),
-                ) = parse_time_entry(value)
+                ) = parse_event(value)
             elif field is None:
                 if value is None:
                     self._message = None
@@ -1268,8 +1267,8 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
     return ("%c%02d%02d" % (sign, offset / 3600, (offset / 60) % 60)).encode("ascii")
 
 
-def parse_time_entry(value):
-    """Parse time entry behavior
+def parse_event(value):
+    """Parse event
 
     Args:
       value: Bytes representing a git commit/tag line
@@ -1291,6 +1290,16 @@ def parse_time_entry(value):
     except ValueError as exc:
         raise ObjectFormatException(exc) from exc
     return person, time, (timezone, timezone_neg_utc)
+
+
+def format_event(person, time, timezone_info):
+    """Format an event
+    """
+    (timezone, timezone_neg_utc) = timezone_info
+    return b" ".join([
+        person,
+        str(time).encode("ascii"),
+        format_timezone(timezone, timezone_neg_utc)])
 
 
 def parse_commit(chunks):
@@ -1319,9 +1328,9 @@ def parse_commit(chunks):
         elif field == _PARENT_HEADER:
             parents.append(value)
         elif field == _AUTHOR_HEADER:
-            author_info = parse_time_entry(value)
+            author_info = parse_event(value)
         elif field == _COMMITTER_HEADER:
-            commit_info = parse_time_entry(value)
+            commit_info = parse_event(value)
         elif field == _ENCODING_HEADER:
             encoding = value
         elif field == _MERGETAG_HEADER:
@@ -1404,9 +1413,9 @@ class Commit(ShaFile):
             elif field == _PARENT_HEADER:
                 self._parents.append(value)
             elif field == _AUTHOR_HEADER:
-                author_info = parse_time_entry(value)
+                author_info = parse_event(value)
             elif field == _COMMITTER_HEADER:
-                commit_info = parse_time_entry(value)
+                commit_info = parse_event(value)
             elif field == _ENCODING_HEADER:
                 self._encoding = value
             elif field == _MERGETAG_HEADER:
@@ -1539,16 +1548,14 @@ class Commit(ShaFile):
             headers.append((_PARENT_HEADER, p))
         headers.append((
             _AUTHOR_HEADER,
-            b" ".join([self._author,
-            str(self._author_time).encode("ascii"),
-            format_timezone(self._author_timezone, self._author_timezone_neg_utc)])
-        ))
+            format_event(
+                self._author, self._author_time,
+                (self._author_timezone, self._author_timezone_neg_utc))))
         headers.append((
             _COMMITTER_HEADER,
-            b" ".join([self._committer,
-            str(self._commit_time).encode("ascii"),
-            format_timezone(self._commit_timezone, self._commit_timezone_neg_utc)]),
-        ))
+            format_event(
+                self._committer, self._commit_time,
+                (self._commit_timezone, self._commit_timezone_neg_utc))))
         if self.encoding:
             headers.append((_ENCODING_HEADER, self.encoding))
         for mergetag in self.mergetag:

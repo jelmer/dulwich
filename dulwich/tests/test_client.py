@@ -54,7 +54,6 @@ from dulwich.client import (
     GitProtocolError,
     check_wants,
     default_urllib3_manager,
-    get_credentials_from_store,
     get_transport_and_path,
     get_transport_and_path_from_url,
     parse_rsync_url,
@@ -62,6 +61,12 @@ from dulwich.client import (
 )
 from dulwich.config import (
     ConfigDict,
+    StackedConfig
+)
+from dulwich.credentials import (
+    CredentialNotFoundError,
+    get_credentials_from_store,
+    get_credentials_from_helper,
 )
 from dulwich.tests import (
     TestCase,
@@ -1153,6 +1158,152 @@ class HttpGitClientTests(TestCase):
             else:
                 # check also the no redirection case
                 self.assertEqual(processed_url, base_url)
+
+    @patch("dulwich.credentials.CredentialHelper.get")
+    def test_git_credentials(self, get_mock):
+        config = ConfigDict()
+        config.set(b"credential", b"helper", b"foo")
+        get_mock.return_value = {b"username": b"username", b"password": b"password"}
+
+        from urllib3.response import HTTPResponse
+
+        encoded_credentials = base64.b64encode(b"username:password")
+
+        class PoolManagerMock:
+            def __init__(self):
+                self.headers = {}
+
+            def request(self, method, url, headers, **kwargs):
+                if (
+                    "authorization" in headers
+                    and headers["authorization"]
+                    == f"Basic {encoded_credentials.decode('ascii')}"
+                ):
+                    status = 200
+                else:
+                    status = 401
+                return HTTPResponse(
+                    headers={},
+                    request_method=method,
+                    status=status,
+                )
+
+        base_url = "https://github.com/jelmer/dulwich"
+        pool_manager = PoolManagerMock()
+        http_client = HttpGitClient(base_url, config=config, pool_manager=pool_manager)
+        response, _ = http_client._http_request(base_url)
+        self.assertEqual(response.status, 200)
+
+    @patch("dulwich.credentials.CredentialHelper.get")
+    def test_no_credentials(self, get_mock):
+        config = ConfigDict()
+        config.set(b"credential", b"helper", b"foo")
+
+        def raise_not_found(*args, **kargs):
+            raise CredentialNotFoundError
+
+        get_mock.side_effect = raise_not_found
+
+        from urllib3.response import HTTPResponse
+
+        base_url = "https://github.com/jelmer/dulwich"
+        for status_code, expected_exception in (
+            (401, client.HTTPUnauthorized),
+            (404, client.NotGitRepository),
+        ):
+            class PoolManagerMock:
+                def __init__(self):
+                    self.headers = {}
+
+                def request(self, method, url, headers, **kwargs):
+                    return HTTPResponse(
+                        headers={},
+                        request_method=method,
+                        status=status_code,
+                    )
+
+            pool_manager = PoolManagerMock()
+            http_client = HttpGitClient(base_url, config=config, pool_manager=pool_manager)
+            with self.assertRaises(expected_exception):
+                http_client._http_request(base_url)
+
+    @patch("dulwich.credentials.CredentialHelper.get")
+    def test_invalid_credentials(self, get_mock):
+        config = ConfigDict()
+        config.set(b"credential", b"helper", b"foo")
+        get_mock.return_value = {b"username": b"username", b"password": b"password"}
+
+        from urllib3.response import HTTPResponse
+
+        base_url = "https://github.com/jelmer/dulwich"
+        for status_code, expected_exception in (
+            (401, client.HTTPUnauthorized),
+            (404, client.NotGitRepository),
+        ):
+
+            class PoolManagerMock:
+                def __init__(self):
+                    self.headers = {}
+
+                def request(self, method, url, headers, **kwargs):
+                    return HTTPResponse(
+                        headers={},
+                        request_method=method,
+                        status=status_code,
+                    )
+
+            pool_manager = PoolManagerMock()
+            http_client = HttpGitClient(
+                base_url, config=config, pool_manager=pool_manager
+            )
+            with self.assertRaises(expected_exception):
+                http_client._http_request(base_url)
+
+
+class GitCredentialsHttpClientTests(TestCase):
+    @patch("dulwich.credentials.CredentialHelper.get")
+    def test_no_credentials(self, get_mock):
+        def raise_not_found(*args, **kargs):
+            raise CredentialNotFoundError
+        get_mock.side_effect = raise_not_found
+
+        config = ConfigDict()
+        config.set(b"credential", b"helper", b"foo")
+        with self.assertRaises(CredentialNotFoundError):
+            get_credentials_from_helper("dummy", config) == {}
+
+    @patch("dulwich.credentials.CredentialHelper.get")
+    def test_get_credentials(self, get_mock):
+        get_mock.return_value = {
+            b"username": b"username",
+            b"password": b"password"
+        }
+
+        config = ConfigDict()
+        config.set(b"credential", b"helper", b"foo")
+        url = "https://github.com"
+        username, password = get_credentials_from_helper(url, config)
+
+        self.assertEqual(username, b"username")
+        self.assertEqual(password, b"password")
+
+    def test_get_credentials_no_configured_helper(self):
+        config = ConfigDict()
+        with self.assertRaises(CredentialNotFoundError):
+            get_credentials_from_helper("dummy", config)
+
+    @patch("dulwich.credentials.CredentialHelper.get")
+    def test_get_credentials_multiple_configs(self, get):
+        config = ConfigDict()
+        config.set(b"credential", b"helper", "foo")
+        empty_config = ConfigDict()
+        config = StackedConfig([empty_config, config])
+
+        expected = {b"username": b"dummy", b"password": b"dummy"}
+        get.return_value = expected
+        credentials = get_credentials_from_helper("dummy", config)
+
+        self.assertEqual(credentials, expected)
 
 
 class TCPGitClientTests(TestCase):

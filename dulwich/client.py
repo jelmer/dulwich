@@ -74,7 +74,8 @@ if TYPE_CHECKING:
     import urllib3
 
 import dulwich
-from dulwich.config import get_xdg_config_home_path, Config, apply_instead_of
+from dulwich.config import Config, StackedConfig, apply_instead_of
+from dulwich.credentials import CredentialNotFoundError, get_credentials_from_helper
 from dulwich.errors import (
     GitProtocolError,
     NotGitRepository,
@@ -2235,16 +2236,31 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         else:
             self.pool_manager = pool_manager
 
-        if username is not None:
+        self.config = config
+        if not self._username:
+            try:
+                self._username, self._password = get_credentials_from_helper(
+                    base_url, config or StackedConfig.default()
+                )
+            except CredentialNotFoundError:
+                pass
+
+        if self._username:
             # No escaping needed: ":" is not allowed in username:
             # https://tools.ietf.org/html/rfc2617#section-2
-            credentials = f"{username}:{password or ''}"
-            import urllib3.util
+            if isinstance(self._username, str):
+                credentials = f"{self._username}:{self._password or ''}".encode("ascii")
+            elif isinstance(self._username, bytes):
+                credentials = self._username + b":" + self._password or b""
+            else:
+                raise TypeError
+            import base64
 
-            basic_auth = urllib3.util.make_headers(basic_auth=credentials)
+            encoded = base64.b64encode(credentials).decode('ascii')
+            basic_auth = {
+                "authorization": f"Basic {encoded}"
+            }
             self.pool_manager.headers.update(basic_auth)
-
-        self.config = config
 
         super().__init__(
             base_url=base_url, dumb=dumb, **kwargs)
@@ -2431,28 +2447,3 @@ def get_transport_and_path(
         return default_local_git_client_cls(**kwargs), location
     else:
         return SSHGitClient(hostname, username=username, **kwargs), path
-
-
-DEFAULT_GIT_CREDENTIALS_PATHS = [
-    os.path.expanduser("~/.git-credentials"),
-    get_xdg_config_home_path("git", "credentials"),
-]
-
-
-def get_credentials_from_store(
-    scheme, hostname, username=None, fnames=DEFAULT_GIT_CREDENTIALS_PATHS
-):
-    for fname in fnames:
-        try:
-            with open(fname, "rb") as f:
-                for line in f:
-                    parsed_line = urlparse(line.strip())
-                    if (
-                        parsed_line.scheme == scheme
-                        and parsed_line.hostname == hostname
-                        and (username is None or parsed_line.username == username)
-                    ):
-                        return parsed_line.username, parsed_line.password
-        except FileNotFoundError:
-            # If the file doesn't exist, try the next one.
-            continue

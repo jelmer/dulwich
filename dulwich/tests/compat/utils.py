@@ -32,13 +32,9 @@ import tempfile
 import time
 from typing import Tuple
 
-from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
-
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
+from dulwich.repo import Repo
+from dulwich.tests import SkipTest, TestCase
 
 _DEFAULT_GIT = "git"
 _VERSION_LEN = 4

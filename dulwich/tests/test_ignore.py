@@ -20,24 +20,17 @@
 
 """Tests for ignore files."""
 
-from io import BytesIO
 import os
 import re
 import shutil
 import tempfile
-from dulwich.tests import TestCase
+from io import BytesIO
 
-from dulwich.ignore import (
-    IgnoreFilter,
-    IgnoreFilterManager,
-    IgnoreFilterStack,
-    Pattern,
-    match_pattern,
-    read_ignore_patterns,
-    translate,
-)
+from dulwich.ignore import (IgnoreFilter, IgnoreFilterManager,
+                            IgnoreFilterStack, Pattern, match_pattern,
+                            read_ignore_patterns, translate)
 from dulwich.repo import Repo
-
+from dulwich.tests import TestCase
 
 POSITIVE_MATCH_TESTS = [
     (b"foo.c", b"*.c"),

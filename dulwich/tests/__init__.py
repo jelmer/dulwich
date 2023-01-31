@@ -34,16 +34,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
-
-
 # If Python itself provides an exception, use that
 import unittest
-from unittest import (  # noqa: F401
-    SkipTest,
-    TestCase as _TestCase,
-    skipIf,
-    expectedFailure,
-)
+from unittest import SkipTest
+from unittest import TestCase as _TestCase  # noqa: F401
+from unittest import expectedFailure, skipIf
 
 
 class TestCase(_TestCase):
@@ -163,9 +158,6 @@ def tutorial_test_suite():
     import dulwich.client
     import dulwich.config
     import dulwich.index
-    import dulwich.reflog
-    import dulwich.repo
-    import dulwich.server
     import dulwich.patch  # noqa: F401
 
     tutorial = [
@@ -176,7 +168,7 @@ def tutorial_test_suite():
         "remote",
         "conclusion",
     ]
-    tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
+    tutorial_files = [f"../../docs/tutorial/{name}.txt" for name in tutorial]
 
     def setup(test):
         test.__old_cwd = os.getcwd()

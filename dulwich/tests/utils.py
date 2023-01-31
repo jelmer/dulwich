@@ -27,34 +27,15 @@ import shutil
 import tempfile
 import time
 import types
-
 import warnings
 
-from dulwich.index import (
-    commit_tree,
-)
-from dulwich.objects import (
-    FixedSha,
-    Commit,
-    Tag,
-    object_class,
-)
-from dulwich.pack import (
-    OFS_DELTA,
-    REF_DELTA,
-    DELTA_TYPES,
-    obj_sha,
-    SHA1Writer,
-    write_pack_header,
-    write_pack_object,
-    create_delta,
-)
+from dulwich.index import commit_tree
+from dulwich.objects import Commit, FixedSha, Tag, object_class
+from dulwich.pack import (DELTA_TYPES, OFS_DELTA, REF_DELTA, SHA1Writer,
+                          create_delta, obj_sha, write_pack_header,
+                          write_pack_object)
 from dulwich.repo import Repo
-from dulwich.tests import (  # noqa: F401
-    skipIf,
-    SkipTest,
-)
-
+from dulwich.tests import SkipTest, skipIf  # noqa: F401
 
 # Plain files are very frequently used in tests, so let the mode be very short.
 F = 0o100644  # Shorthand mode for Files.

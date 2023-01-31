@@ -20,35 +20,17 @@
 
 """Tests for commit walking functionality."""
 
-from itertools import (
-    permutations,
-)
+from itertools import permutations
 from unittest import expectedFailure
 
-from dulwich.diff_tree import (
-    CHANGE_MODIFY,
-    CHANGE_RENAME,
-    TreeChange,
-    RenameDetector,
-)
-from dulwich.errors import (
-    MissingCommitError,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Commit,
-    Blob,
-)
-from dulwich.walk import ORDER_TOPO, WalkEntry, Walker, _topo_reorder
+from dulwich.diff_tree import (CHANGE_MODIFY, CHANGE_RENAME, RenameDetector,
+                               TreeChange)
+from dulwich.errors import MissingCommitError
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob, Commit
 from dulwich.tests import TestCase
-from dulwich.tests.utils import (
-    F,
-    make_object,
-    make_tag,
-    build_commit_graph,
-)
+from dulwich.tests.utils import F, build_commit_graph, make_object, make_tag
+from dulwich.walk import ORDER_TOPO, WalkEntry, Walker, _topo_reorder
 
 
 class TestWalkEntry:

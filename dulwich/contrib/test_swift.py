@@ -22,28 +22,15 @@
 
 """Tests for dulwich.contrib.swift."""
 
+import json
 import posixpath
-
-from time import time
 from io import BytesIO, StringIO
-
+from time import time
 from unittest import skipIf
 
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.test_object_store import (
-    ObjectStoreTests,
-)
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tree,
-    Tag,
-    parse_timezone,
-)
-
-import json
+from dulwich.objects import Blob, Commit, Tag, Tree, parse_timezone
+from dulwich.tests import TestCase
+from dulwich.tests.test_object_store import ObjectStoreTests
 
 missing_libs = []
 

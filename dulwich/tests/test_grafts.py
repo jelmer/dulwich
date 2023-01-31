@@ -20,20 +20,14 @@
 """Tests for graftpoints."""
 
 import os
-import tempfile
 import shutil
+import tempfile
 
 from dulwich.errors import ObjectFormatException
+from dulwich.objects import Tree
+from dulwich.repo import (MemoryRepo, Repo, parse_graftpoints,
+                          serialize_graftpoints)
 from dulwich.tests import TestCase
-from dulwich.objects import (
-    Tree,
-)
-from dulwich.repo import (
-    parse_graftpoints,
-    serialize_graftpoints,
-    MemoryRepo,
-    Repo,
-)
 
 
 def makesha(digit):

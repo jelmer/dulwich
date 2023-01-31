@@ -32,9 +32,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import sys
 import re
-from typing import Optional, Tuple, List
+import sys
+from typing import List, Optional, Tuple
 
 # only needs to detect git style diffs as this is for
 # use with dulwich

@@ -20,51 +20,23 @@
 
 """Tests for the Git HTTP server."""
 
-from io import BytesIO
 import gzip
-import re
 import os
+import re
+from io import BytesIO
 from typing import Type
 
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Blob,
-)
-from dulwich.repo import (
-    BaseRepo,
-    MemoryRepo,
-)
-from dulwich.server import (
-    DictBackend,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.web import (
-    HTTP_OK,
-    HTTP_NOT_FOUND,
-    HTTP_FORBIDDEN,
-    HTTP_ERROR,
-    GunzipFilter,
-    send_file,
-    get_text_file,
-    get_loose_object,
-    get_pack_file,
-    get_idx_file,
-    get_info_refs,
-    get_info_packs,
-    handle_service_request,
-    _LengthLimitedFile,
-    HTTPGitRequest,
-    HTTPGitApplication,
-)
-
-from dulwich.tests.utils import (
-    make_object,
-    make_tag,
-)
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob
+from dulwich.repo import BaseRepo, MemoryRepo
+from dulwich.server import DictBackend
+from dulwich.tests import TestCase
+from dulwich.tests.utils import make_object, make_tag
+from dulwich.web import (HTTP_ERROR, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_OK,
+                         GunzipFilter, HTTPGitApplication, HTTPGitRequest,
+                         _LengthLimitedFile, get_idx_file, get_info_packs,
+                         get_info_refs, get_loose_object, get_pack_file,
+                         get_text_file, handle_service_request, send_file)
 
 
 class MinimalistWSGIInputStream:

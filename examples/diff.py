@@ -5,9 +5,10 @@
 # Example usage:
 #  python examples/diff.py
 
-from dulwich.repo import Repo
-from dulwich.patch import write_tree_diff
 import sys
+
+from dulwich.patch import write_tree_diff
+from dulwich.repo import Repo
 
 repo_path = "."
 commit_id = b"a6602654997420bcfd0bee2a0563d9416afe34b4"

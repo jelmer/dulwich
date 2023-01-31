@@ -27,24 +27,11 @@ import re
 import shutil
 import tempfile
 
-from dulwich.pack import (
-    write_pack,
-)
-from dulwich.objects import (
-    Blob,
-)
-from dulwich.tests import (
-    SkipTest,
-)
-from dulwich.tests.test_pack import (
-    a_sha,
-    pack1_sha,
-    PackTests,
-)
-from dulwich.tests.compat.utils import (
-    require_git_version,
-    run_git_or_fail,
-)
+from dulwich.objects import Blob
+from dulwich.pack import write_pack
+from dulwich.tests import SkipTest
+from dulwich.tests.compat.utils import require_git_version, run_git_or_fail
+from dulwich.tests.test_pack import PackTests, a_sha, pack1_sha
 
 _NON_DELTA_RE = re.compile(b"non delta: (?P<non_delta>\\d+) objects")
 

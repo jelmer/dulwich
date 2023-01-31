@@ -25,15 +25,9 @@
 import gevent
 from gevent import pool
 
-from dulwich.objects import (
-    Commit,
-    Tag,
-)
-from dulwich.object_store import (
-    MissingObjectFinder,
-    _collect_ancestors,
-    _collect_filetree_revs,
-)
+from dulwich.object_store import (MissingObjectFinder, _collect_ancestors,
+                                  _collect_filetree_revs)
+from dulwich.objects import Commit, Tag
 
 
 def _split_commits_and_tags(obj_store, lst, *, ignore_unknown=False, pool=None):

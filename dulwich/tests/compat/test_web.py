@@ -25,34 +25,18 @@ warning: these tests should be fairly stable, but when writing/debugging new
     Ctrl-C'ed. On POSIX systems, you can kill the tests with Ctrl-Z, "kill %".
 """
 
-import threading
-from wsgiref import simple_server
 import sys
+import threading
 from typing import Tuple
+from wsgiref import simple_server
 
-from dulwich.server import (
-    DictBackend,
-    UploadPackHandler,
-    ReceivePackHandler,
-)
-from dulwich.tests import (
-    SkipTest,
-    skipIf,
-)
-from dulwich.web import (
-    make_wsgi_chain,
-    HTTPGitApplication,
-    WSGIRequestHandlerLogger,
-    WSGIServerLogger,
-)
-
-from dulwich.tests.compat.server_utils import (
-    ServerTests,
-    NoSideBand64kReceivePackHandler,
-)
-from dulwich.tests.compat.utils import (
-    CompatTestCase,
-)
+from dulwich.server import DictBackend, ReceivePackHandler, UploadPackHandler
+from dulwich.tests import SkipTest, skipIf
+from dulwich.tests.compat.server_utils import (NoSideBand64kReceivePackHandler,
+                                               ServerTests)
+from dulwich.tests.compat.utils import CompatTestCase
+from dulwich.web import (HTTPGitApplication, WSGIRequestHandlerLogger,
+                         WSGIServerLogger, make_wsgi_chain)
 
 
 @skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")

@@ -24,20 +24,13 @@ For details for the matching rules, see https://git-scm.com/docs/gitignore
 
 import os.path
 import re
-from typing import (
-    BinaryIO,
-    Iterable,
-    List,
-    Optional,
-    TYPE_CHECKING,
-    Dict,
-    Union,
-)
+from typing import (TYPE_CHECKING, BinaryIO, Dict, Iterable, List, Optional,
+                    Union)
 
 if TYPE_CHECKING:
     from dulwich.repo import Repo
 
-from dulwich.config import get_xdg_config_home_path, Config
+from dulwich.config import Config, get_xdg_config_home_path
 
 
 def _translate_segment(segment: bytes) -> bytes:

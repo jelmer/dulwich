@@ -25,10 +25,7 @@ import sys
 import tempfile
 
 from dulwich.file import FileLocked, GitFile, _fancy_rename
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
+from dulwich.tests import SkipTest, TestCase
 
 
 class FancyRenameTests(TestCase):

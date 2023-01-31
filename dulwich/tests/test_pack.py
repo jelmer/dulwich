@@ -22,62 +22,28 @@
 """Tests for Dulwich packs."""
 
 
-from io import BytesIO
-from hashlib import sha1
 import os
 import shutil
 import sys
 import tempfile
 import zlib
+from hashlib import sha1
+from io import BytesIO
 
-from dulwich.errors import (
-    ApplyDeltaError,
-    ChecksumMismatch,
-)
-from dulwich.file import (
-    GitFile,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    hex_to_sha,
-    sha_to_hex,
-    Commit,
-    Tree,
-    Blob,
-)
-from dulwich.pack import (
-    OFS_DELTA,
-    REF_DELTA,
-    MemoryPackIndex,
-    Pack,
-    PackData,
-    apply_delta,
-    create_delta,
-    deltify_pack_objects,
-    load_pack_index,
-    UnpackedObject,
-    read_zlib_chunks,
-    write_pack_header,
-    write_pack_index_v1,
-    write_pack_index_v2,
-    write_pack_object,
-    write_pack,
-    unpack_object,
-    compute_file_sha,
-    PackStreamReader,
-    DeltaChainIterator,
-    _delta_encode_size,
-    _encode_copy_operation,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    make_object,
-    build_pack,
-)
+from dulwich.errors import ApplyDeltaError, ChecksumMismatch
+from dulwich.file import GitFile
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob, Commit, Tree, hex_to_sha, sha_to_hex
+from dulwich.pack import (OFS_DELTA, REF_DELTA, DeltaChainIterator,
+                          MemoryPackIndex, Pack, PackData, PackStreamReader,
+                          UnpackedObject, _delta_encode_size,
+                          _encode_copy_operation, apply_delta,
+                          compute_file_sha, create_delta, deltify_pack_objects,
+                          load_pack_index, read_zlib_chunks, unpack_object,
+                          write_pack, write_pack_header, write_pack_index_v1,
+                          write_pack_index_v2, write_pack_object)
+from dulwich.tests import TestCase
+from dulwich.tests.utils import build_pack, make_object
 
 pack1_sha = b"bc63ddad95e7321ee734ea11a7a62d314e0d7481"
 

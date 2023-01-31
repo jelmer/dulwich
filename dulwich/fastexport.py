@@ -21,26 +21,15 @@
 
 """Fast export/import functionality."""
 
-from dulwich.index import (
-    commit_tree,
-)
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tag,
-    ZERO_SHA,
-)
-from dulwich.object_store import (
-    iter_tree_contents,
-)
-from fastimport import (
-    commands,
-    errors as fastimport_errors,
-    parser,
-    processor,
-)
-
 import stat
+
+from fastimport import commands
+from fastimport import errors as fastimport_errors
+from fastimport import parser, processor
+
+from dulwich.index import commit_tree
+from dulwich.object_store import iter_tree_contents
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tag
 
 
 def split_email(text):

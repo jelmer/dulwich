@@ -28,16 +28,16 @@ no means intended to be a full-blown Git command-line interface but just
 a way to test Dulwich.
 """
 
-import os
-import sys
-from getopt import getopt
 import argparse
 import optparse
+import os
 import signal
-from typing import Dict, Type, Optional
+import sys
+from getopt import getopt
+from typing import Dict, Optional, Type
 
 from dulwich import porcelain
-from dulwich.client import get_transport_and_path, GitProtocolError
+from dulwich.client import GitProtocolError, get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
 from dulwich.objectspec import parse_commit

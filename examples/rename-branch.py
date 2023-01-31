@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
+import argparse
+
 from dulwich.client import get_transport_and_path_from_url
 from dulwich.objects import ZERO_SHA
 from dulwich.pack import pack_objects_to_data
 
-import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('url', type=str)
 parser.add_argument('old_ref', type=str)

@@ -22,27 +22,15 @@
 """Ref handling.
 
 """
-from contextlib import suppress
 import os
-from typing import Dict, Optional
 import warnings
+from contextlib import suppress
+from typing import Dict, Optional
 
-from dulwich.errors import (
-    PackedRefsException,
-    RefFormatError,
-)
-from dulwich.objects import (
-    git_line,
-    valid_hexsha,
-    ZERO_SHA,
-    Tag,
-    ObjectID,
-)
+from dulwich.errors import PackedRefsException, RefFormatError
+from dulwich.file import GitFile, ensure_dir_exists
+from dulwich.objects import ZERO_SHA, ObjectID, Tag, git_line, valid_hexsha
 from dulwich.pack import ObjectContainer
-from dulwich.file import (
-    GitFile,
-    ensure_dir_exists,
-)
 
 Ref = bytes
 

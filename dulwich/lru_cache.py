@@ -21,8 +21,8 @@
 
 """A simple least-recently-used (LRU) cache."""
 
-from typing import Generic, TypeVar, Optional, Callable, Dict, Iterable, Iterator
-
+from typing import (Callable, Dict, Generic, Iterable, Iterator, Optional,
+                    TypeVar)
 
 _null_key = object()
 

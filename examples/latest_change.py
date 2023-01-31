@@ -3,6 +3,7 @@
 
 import sys
 import time
+
 from dulwich.repo import Repo
 
 if len(sys.argv) < 2:

@@ -32,25 +32,23 @@ match for the object name. You then use the pointer got from this as
 a pointer in to the corresponding packfile.
 """
 
-from collections import defaultdict
-
 import binascii
+from collections import defaultdict, deque
 from contextlib import suppress
 from io import BytesIO, UnsupportedOperation
-from collections import (
-    deque,
-)
+
 try:
     from cdifflib import CSequenceMatcher as SequenceMatcher
 except ModuleNotFoundError:
     from difflib import SequenceMatcher
-import struct
-
-from itertools import chain
 
 import os
+import struct
 import sys
-from typing import Optional, Callable, Tuple, List, Deque, Union, Iterable, Iterator, Dict, TypeVar, Generic, Sequence, Set, BinaryIO
+from itertools import chain
+from typing import (BinaryIO, Callable, Deque, Dict, Generic, Iterable,
+                    Iterator, List, Optional, Sequence, Set, Tuple, TypeVar,
+                    Union)
 
 try:
     from typing import Protocol
@@ -58,14 +56,10 @@ except ImportError:  # python << 3.8
     from typing_extensions import Protocol   # type: ignore
 
 import warnings
-
-from hashlib import sha1
-from os import (
-    SEEK_CUR,
-    SEEK_END,
-)
-from struct import unpack_from
 import zlib
+from hashlib import sha1
+from os import SEEK_CUR, SEEK_END
+from struct import unpack_from
 
 try:
     import mmap
@@ -78,22 +72,11 @@ else:
 if sys.platform == "Plan9":
     has_mmap = False
 
-from dulwich.errors import (
-    ApplyDeltaError,
-    ChecksumMismatch,
-)
+from dulwich.errors import ApplyDeltaError, ChecksumMismatch
 from dulwich.file import GitFile
-from dulwich.lru_cache import (
-    LRUSizeCache,
-)
-from dulwich.objects import (
-    ShaFile,
-    ObjectID,
-    hex_to_sha,
-    sha_to_hex,
-    object_header,
-)
-
+from dulwich.lru_cache import LRUSizeCache
+from dulwich.objects import (ObjectID, ShaFile, hex_to_sha, object_header,
+                             sha_to_hex)
 
 OFS_DELTA = 6
 REF_DELTA = 7
@@ -2608,9 +2591,7 @@ def extend_pack(f: BinaryIO, object_ids: Set[ObjectID], get_raw, *, compression_
 
 
 try:
-    from dulwich._pack import (  # type: ignore # noqa: F811
-        apply_delta,
-        bisect_find_sha,
-    )
+    from dulwich._pack import (apply_delta,  # type: ignore # noqa: F811
+                               bisect_find_sha)
 except ImportError:
     pass

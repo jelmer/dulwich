@@ -22,8 +22,8 @@
 Implementation of merge-base following the approach of git
 """
 
-from typing import Deque
 from collections import deque
+from typing import Deque
 
 
 def _find_lcas(lookup_parents, c1, c2s):

@@ -38,99 +38,48 @@ Known capabilities that are not supported:
  * include-tag
 """
 
-from contextlib import closing
-from io import BytesIO, BufferedReader
 import logging
 import os
 import select
 import socket
 import subprocess
 import sys
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Iterable,
-    Iterator,
-    Optional,
-    Set,
-    Tuple,
-    IO,
-    Union,
-    TYPE_CHECKING,
-)
-
-from urllib.parse import (
-    quote as urlquote,
-    unquote as urlunquote,
-    urlparse,
-    urljoin,
-    urlunsplit,
-    urlunparse,
-)
+from contextlib import closing
+from io import BufferedReader, BytesIO
+from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, Iterator,
+                    List, Optional, Set, Tuple, Union)
+from urllib.parse import quote as urlquote
+from urllib.parse import unquote as urlunquote
+from urllib.parse import urljoin, urlparse, urlunparse, urlunsplit
 
 if TYPE_CHECKING:
     import urllib3
 
 import dulwich
-from dulwich.config import get_xdg_config_home_path, Config, apply_instead_of
-from dulwich.errors import (
-    GitProtocolError,
-    NotGitRepository,
-    SendPackError,
-)
-from dulwich.protocol import (
-    HangupException,
-    _RBUFSIZE,
-    agent_string,
-    capability_agent,
-    extract_capability_names,
-    CAPABILITY_AGENT,
-    CAPABILITY_DELETE_REFS,
-    CAPABILITY_INCLUDE_TAG,
-    CAPABILITY_MULTI_ACK,
-    CAPABILITY_MULTI_ACK_DETAILED,
-    CAPABILITY_OFS_DELTA,
-    CAPABILITY_QUIET,
-    CAPABILITY_REPORT_STATUS,
-    CAPABILITY_SHALLOW,
-    CAPABILITY_SYMREF,
-    CAPABILITY_SIDE_BAND_64K,
-    CAPABILITY_THIN_PACK,
-    CAPABILITIES_REF,
-    KNOWN_RECEIVE_CAPABILITIES,
-    KNOWN_UPLOAD_CAPABILITIES,
-    COMMAND_DEEPEN,
-    COMMAND_SHALLOW,
-    COMMAND_UNSHALLOW,
-    COMMAND_DONE,
-    COMMAND_HAVE,
-    COMMAND_WANT,
-    SIDE_BAND_CHANNEL_DATA,
-    SIDE_BAND_CHANNEL_PROGRESS,
-    SIDE_BAND_CHANNEL_FATAL,
-    PktLineParser,
-    Protocol,
-    TCP_GIT_PORT,
-    ZERO_SHA,
-    extract_capabilities,
-    parse_capability,
-    pkt_line,
-)
-from dulwich.pack import (
-    write_pack_from_container,
-    UnpackedObject,
-    PackChunkGenerator,
-    PACK_SPOOL_FILE_MAX_SIZE,
-)
-from dulwich.refs import (
-    read_info_refs,
-    PEELED_TAG_SUFFIX,
-    _import_remote_refs,
-)
+from dulwich.config import Config, apply_instead_of, get_xdg_config_home_path
+from dulwich.errors import GitProtocolError, NotGitRepository, SendPackError
+from dulwich.pack import (PACK_SPOOL_FILE_MAX_SIZE, PackChunkGenerator,
+                          UnpackedObject, write_pack_from_container)
+from dulwich.protocol import (_RBUFSIZE, CAPABILITIES_REF, CAPABILITY_AGENT,
+                              CAPABILITY_DELETE_REFS, CAPABILITY_INCLUDE_TAG,
+                              CAPABILITY_MULTI_ACK,
+                              CAPABILITY_MULTI_ACK_DETAILED,
+                              CAPABILITY_OFS_DELTA, CAPABILITY_QUIET,
+                              CAPABILITY_REPORT_STATUS, CAPABILITY_SHALLOW,
+                              CAPABILITY_SIDE_BAND_64K, CAPABILITY_SYMREF,
+                              CAPABILITY_THIN_PACK, COMMAND_DEEPEN,
+                              COMMAND_DONE, COMMAND_HAVE, COMMAND_SHALLOW,
+                              COMMAND_UNSHALLOW, COMMAND_WANT,
+                              KNOWN_RECEIVE_CAPABILITIES,
+                              KNOWN_UPLOAD_CAPABILITIES,
+                              SIDE_BAND_CHANNEL_DATA, SIDE_BAND_CHANNEL_FATAL,
+                              SIDE_BAND_CHANNEL_PROGRESS, TCP_GIT_PORT,
+                              ZERO_SHA, HangupException, PktLineParser,
+                              Protocol, agent_string, capability_agent,
+                              extract_capabilities, extract_capability_names,
+                              parse_capability, pkt_line)
+from dulwich.refs import PEELED_TAG_SUFFIX, _import_remote_refs, read_info_refs
 from dulwich.repo import Repo
-
 
 # url2pathname is lazily imported
 url2pathname = None
@@ -173,7 +122,7 @@ def _fileno_can_read(fileno):
 
 def _win32_peek_avail(handle):
     """Wrapper around PeekNamedPipe to check how many bytes are available."""
-    from ctypes import byref, wintypes, windll
+    from ctypes import byref, windll, wintypes
 
     c_avail = wintypes.DWORD()
     c_message = wintypes.DWORD()
@@ -720,7 +669,7 @@ class GitClient:
     def clone(self, path, target_path, mkdir: bool = True, bare=False, origin="origin",
               checkout=None, branch=None, progress=None, depth=None):
         """Clone a repository."""
-        from .refs import _set_origin_head, _set_default_branch, _set_head
+        from .refs import _set_default_branch, _set_head, _set_origin_head
 
         if mkdir:
             os.mkdir(target_path)

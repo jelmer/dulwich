@@ -26,21 +26,11 @@ from io import BytesIO
 from unittest import skipIf
 from unittest.mock import patch
 
-from dulwich.config import (
-    ConfigDict,
-    ConfigFile,
-    StackedConfig,
-    _check_section_name,
-    _check_variable_name,
-    _format_string,
-    _escape_value,
-    _parse_string,
-    parse_submodules,
-    apply_instead_of,
-)
-from dulwich.tests import (
-    TestCase,
-)
+from dulwich.config import (ConfigDict, ConfigFile, StackedConfig,
+                            _check_section_name, _check_variable_name,
+                            _escape_value, _format_string, _parse_string,
+                            apply_instead_of, parse_submodules)
+from dulwich.tests import TestCase
 
 
 class ConfigFileTests(TestCase):

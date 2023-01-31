@@ -34,22 +34,16 @@ DULWICH_SWIFT_CFG=/tmp/conf.cfg PYTHONPATH=. python -m unittest \
 """
 
 import os
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 
 import gevent
 from gevent import monkey
 
 monkey.patch_all()
 
-from dulwich import (  # noqa:E402
-    server,
-    repo,
-    index,
-    client,
-    objects,
-)
+from dulwich import client, index, objects, repo, server  # noqa:E402
 from dulwich.contrib import swift  # noqa:E402
 
 

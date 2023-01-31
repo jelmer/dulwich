@@ -22,46 +22,25 @@
 """Tests for the index."""
 
 
-from io import BytesIO
 import os
 import shutil
 import stat
 import struct
 import sys
 import tempfile
+from io import BytesIO
 
-from dulwich.index import (
-    Index,
-    build_index_from_tree,
-    cleanup_mode,
-    commit_tree,
-    get_unstaged_changes,
-    index_entry_from_stat,
-    read_index,
-    read_index_dict,
-    validate_path_element_default,
-    validate_path_element_ntfs,
-    write_cache_time,
-    write_index,
-    write_index_dict,
-    _tree_to_fs_path,
-    _fs_to_tree_path,
-    IndexEntry,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tree,
-    S_IFGITLINK,
-)
+from dulwich.index import (Index, IndexEntry, _fs_to_tree_path,
+                           _tree_to_fs_path, build_index_from_tree,
+                           cleanup_mode, commit_tree, get_unstaged_changes,
+                           index_entry_from_stat, read_index, read_index_dict,
+                           validate_path_element_default,
+                           validate_path_element_ntfs, write_cache_time,
+                           write_index, write_index_dict)
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
 from dulwich.repo import Repo
-from dulwich.tests import (
-    TestCase,
-    skipIf,
-)
+from dulwich.tests import TestCase, skipIf
 
 
 def can_symlink():

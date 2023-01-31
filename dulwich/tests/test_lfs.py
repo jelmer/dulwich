@@ -20,10 +20,11 @@
 
 """Tests for LFS support."""
 
-from . import TestCase
-from ..lfs import LFSStore
 import shutil
 import tempfile
+
+from ..lfs import LFSStore
+from . import TestCase
 
 
 class LFSTests(TestCase):

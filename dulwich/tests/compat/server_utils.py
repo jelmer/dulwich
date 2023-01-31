@@ -26,21 +26,12 @@ import shutil
 import socket
 import tempfile
 
-from dulwich.repo import Repo
 from dulwich.objects import hex_to_sha
-from dulwich.protocol import (
-    CAPABILITY_SIDE_BAND_64K,
-)
-from dulwich.server import (
-    ReceivePackHandler,
-)
-from dulwich.tests.utils import (
-    tear_down_repo,
-)
-from dulwich.tests.compat.utils import (
-    run_git_or_fail,
-)
-from dulwich.tests.compat.utils import require_git_version
+from dulwich.protocol import CAPABILITY_SIDE_BAND_64K
+from dulwich.repo import Repo
+from dulwich.server import ReceivePackHandler
+from dulwich.tests.compat.utils import require_git_version, run_git_or_fail
+from dulwich.tests.utils import tear_down_repo
 
 
 class _StubRepo:

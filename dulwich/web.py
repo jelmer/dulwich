@@ -21,38 +21,21 @@
 
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
-from io import BytesIO
 import os
 import re
 import sys
 import time
-from typing import List, Tuple, Optional
-from wsgiref.simple_server import (
-    WSGIRequestHandler,
-    ServerHandler,
-    WSGIServer,
-    make_server,
-)
-
+from io import BytesIO
+from typing import List, Optional, Tuple
 from urllib.parse import parse_qs
-
+from wsgiref.simple_server import (ServerHandler, WSGIRequestHandler,
+                                   WSGIServer, make_server)
 
 from dulwich import log_utils
-from dulwich.protocol import (
-    ReceivableProtocol,
-)
-from dulwich.repo import (
-    BaseRepo,
-    NotGitRepository,
-    Repo,
-)
-from dulwich.server import (
-    DictBackend,
-    DEFAULT_HANDLERS,
-    generate_info_refs,
-    generate_objects_info_packs,
-)
-
+from dulwich.protocol import ReceivableProtocol
+from dulwich.repo import BaseRepo, NotGitRepository, Repo
+from dulwich.server import (DEFAULT_HANDLERS, DictBackend, generate_info_refs,
+                            generate_objects_info_packs)
 
 logger = log_utils.getLogger(__name__)
 

@@ -22,61 +22,34 @@
 
 """Git object store interfaces and implementation."""
 
-from contextlib import suppress
-from io import BytesIO
 import os
 import stat
 import sys
 import warnings
-
-from typing import Callable, Dict, List, Optional, Tuple, Iterator, Set, Iterable, Sequence, cast
+from contextlib import suppress
+from io import BytesIO
+from typing import (Callable, Dict, Iterable, Iterator, List, Optional,
+                    Sequence, Set, Tuple, cast)
 
 try:
     from typing import Protocol
 except ImportError:  # python << 3.8
     from typing_extensions import Protocol  # type: ignore
 
-from dulwich.errors import (
-    NotTreeError,
-)
+from dulwich.errors import NotTreeError
 from dulwich.file import GitFile
-from dulwich.objects import (
-    ObjectID,
-    Commit,
-    ShaFile,
-    Tag,
-    Tree,
-    Blob,
-    ZERO_SHA,
-    hex_to_sha,
-    sha_to_hex,
-    hex_to_filename,
-    S_ISGITLINK,
-    TreeEntry,
-    object_class,
-    valid_hexsha,
-)
-from dulwich.pack import (
-    ObjectContainer,
-    Pack,
-    PackData,
-    PackHint,
-    PackInflater,
-    PackFileDisappeared,
-    UnpackedObject,
-    extend_pack,
-    load_pack_index_file,
-    iter_sha1,
-    full_unpacked_object,
-    generate_unpacked_objects,
-    pack_objects_to_data,
-    write_pack_index,
-    write_pack_data,
-    PackIndexer,
-    PackStreamCopier,
-    PackedObjectContainer,
-    PACK_SPOOL_FILE_MAX_SIZE,
-)
+from dulwich.objects import (S_ISGITLINK, ZERO_SHA, Blob, Commit, ObjectID,
+                             ShaFile, Tag, Tree, TreeEntry, hex_to_filename,
+                             hex_to_sha, object_class, sha_to_hex,
+                             valid_hexsha)
+from dulwich.pack import (PACK_SPOOL_FILE_MAX_SIZE, ObjectContainer, Pack,
+                          PackData, PackedObjectContainer, PackFileDisappeared,
+                          PackHint, PackIndexer, PackInflater,
+                          PackStreamCopier, UnpackedObject, extend_pack,
+                          full_unpacked_object, generate_unpacked_objects,
+                          iter_sha1, load_pack_index_file,
+                          pack_objects_to_data, write_pack_data,
+                          write_pack_index)
 from dulwich.protocol import DEPTH_INFINITE
 from dulwich.refs import PEELED_TAG_SUFFIX, Ref
 

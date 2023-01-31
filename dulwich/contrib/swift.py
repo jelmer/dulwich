@@ -26,69 +26,32 @@
 # TODO(fbo): Second attempt to _send() must be notified via real log
 # TODO(fbo): More logs for operations
 
+import json
 import os
-import stat
-import zlib
-import tempfile
 import posixpath
-
+import stat
+import sys
+import tempfile
 import urllib.parse as urlparse
-
-from io import BytesIO
+import zlib
 from configparser import ConfigParser
+from io import BytesIO
+
 from geventhttpclient import HTTPClient
 
-from dulwich.greenthreads import (
-    GreenThreadsMissingObjectFinder,
-)
-
+from dulwich.greenthreads import GreenThreadsMissingObjectFinder
 from dulwich.lru_cache import LRUSizeCache
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tree,
-    Tag,
-    S_ISGITLINK,
-)
-from dulwich.object_store import (
-    PackBasedObjectStore,
-    PACKDIR,
-    INFODIR,
-)
-from dulwich.pack import (
-    PackData,
-    Pack,
-    PackIndexer,
-    PackStreamCopier,
-    write_pack_header,
-    compute_file_sha,
-    iter_sha1,
-    write_pack_index_v2,
-    load_pack_index_file,
-    read_pack_header,
-    _compute_object_size,
-    unpack_object,
-    write_pack_object,
-)
+from dulwich.object_store import INFODIR, PACKDIR, PackBasedObjectStore
+from dulwich.objects import S_ISGITLINK, Blob, Commit, Tag, Tree
+from dulwich.pack import (Pack, PackData, PackIndexer, PackStreamCopier,
+                          _compute_object_size, compute_file_sha, iter_sha1,
+                          load_pack_index_file, read_pack_header,
+                          unpack_object, write_pack_header,
+                          write_pack_index_v2, write_pack_object)
 from dulwich.protocol import TCP_GIT_PORT
-from dulwich.refs import (
-    InfoRefsContainer,
-    read_info_refs,
-    write_info_refs,
-)
-from dulwich.repo import (
-    BaseRepo,
-    OBJECTDIR,
-)
-from dulwich.server import (
-    Backend,
-    TCPGitServer,
-)
-
-import json
-
-import sys
-
+from dulwich.refs import InfoRefsContainer, read_info_refs, write_info_refs
+from dulwich.repo import OBJECTDIR, BaseRepo
+from dulwich.server import Backend, TCPGitServer
 
 """
 # Configuration file sample

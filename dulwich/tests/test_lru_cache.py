@@ -19,12 +19,8 @@
 
 """Tests for the lru_cache module."""
 
-from dulwich import (
-    lru_cache,
-)
-from dulwich.tests import (
-    TestCase,
-)
+from dulwich import lru_cache
+from dulwich.tests import TestCase
 
 
 class TestLRUCache(TestCase):

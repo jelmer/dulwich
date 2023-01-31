@@ -21,54 +21,27 @@
 """Tests for the object store interface."""
 
 
-from contextlib import closing
-from io import BytesIO
-from unittest import skipUnless
 import os
 import shutil
 import stat
 import sys
 import tempfile
+from contextlib import closing
+from io import BytesIO
+from unittest import skipUnless
 
-from dulwich.index import (
-    commit_tree,
-)
-from dulwich.errors import (
-    NotTreeError,
-)
-from dulwich.objects import (
-    sha_to_hex,
-    Blob,
-    Tree,
-    TreeEntry,
-    EmptyFileException,
-    SubmoduleEncountered,
-    S_IFGITLINK,
-)
-from dulwich.object_store import (
-    DiskObjectStore,
-    MemoryObjectStore,
-    OverlayObjectStore,
-    ObjectStoreGraphWalker,
-    commit_tree_changes,
-    iter_tree_contents,
-    peel_sha,
-    read_packs_file,
-    tree_lookup_path,
-)
-from dulwich.pack import (
-    REF_DELTA,
-    write_pack_objects,
-)
+from dulwich.errors import NotTreeError
+from dulwich.index import commit_tree
+from dulwich.object_store import (DiskObjectStore, MemoryObjectStore,
+                                  ObjectStoreGraphWalker, OverlayObjectStore,
+                                  commit_tree_changes, iter_tree_contents,
+                                  peel_sha, read_packs_file, tree_lookup_path)
+from dulwich.objects import (S_IFGITLINK, Blob, EmptyFileException,
+                             SubmoduleEncountered, Tree, TreeEntry, sha_to_hex)
+from dulwich.pack import REF_DELTA, write_pack_objects
 from dulwich.protocol import DEPTH_INFINITE
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    make_object,
-    make_tag,
-    build_pack,
-)
+from dulwich.tests import TestCase
+from dulwich.tests.utils import build_pack, make_object, make_tag
 
 try:
     from unittest.mock import patch

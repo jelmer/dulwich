@@ -43,99 +43,51 @@ Currently supported capabilities:
 """
 
 import collections
-from functools import partial
 import os
 import socket
 import sys
 import time
-from typing import List, Tuple, Dict, Optional, Iterable, Set
+from functools import partial
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 try:
     from typing import Protocol as TypingProtocol
 except ImportError:  # python < 3.8
     from typing_extensions import Protocol as TypingProtocol  # type: ignore
 
+import socketserver
 import zlib
 
-import socketserver
-
-from dulwich.archive import tar_stream
-from dulwich.errors import (
-    ApplyDeltaError,
-    ChecksumMismatch,
-    GitProtocolError,
-    HookError,
-    NotGitRepository,
-    UnexpectedCommandError,
-    ObjectFormatException,
-)
 from dulwich import log_utils
-from dulwich.objects import (
-    Commit,
-    ObjectID,
-    valid_hexsha,
-)
-from dulwich.object_store import (
-    peel_sha,
-)
-from dulwich.pack import (
-    write_pack_from_container,
-    ObjectContainer,
-    PackedObjectContainer,
-)
-from dulwich.protocol import (
-    BufferedPktLineWriter,
-    capability_agent,
-    CAPABILITIES_REF,
-    CAPABILITY_AGENT,
-    CAPABILITY_DELETE_REFS,
-    CAPABILITY_INCLUDE_TAG,
-    CAPABILITY_MULTI_ACK_DETAILED,
-    CAPABILITY_MULTI_ACK,
-    CAPABILITY_NO_DONE,
-    CAPABILITY_NO_PROGRESS,
-    CAPABILITY_OFS_DELTA,
-    CAPABILITY_QUIET,
-    CAPABILITY_REPORT_STATUS,
-    CAPABILITY_SHALLOW,
-    CAPABILITY_SIDE_BAND_64K,
-    CAPABILITY_THIN_PACK,
-    COMMAND_DEEPEN,
-    COMMAND_DONE,
-    COMMAND_HAVE,
-    COMMAND_SHALLOW,
-    COMMAND_UNSHALLOW,
-    COMMAND_WANT,
-    MULTI_ACK,
-    MULTI_ACK_DETAILED,
-    Protocol,
-    ReceivableProtocol,
-    SIDE_BAND_CHANNEL_DATA,
-    SIDE_BAND_CHANNEL_PROGRESS,
-    SIDE_BAND_CHANNEL_FATAL,
-    SINGLE_ACK,
-    TCP_GIT_PORT,
-    ZERO_SHA,
-    ack_type,
-    extract_capabilities,
-    extract_want_line_capabilities,
-    symref_capabilities,
-    format_ref_line,
-    format_shallow_line,
-    format_unshallow_line,
-    format_ack_line,
-    NAK_LINE,
-)
-from dulwich.refs import (
-    RefsContainer,
-    PEELED_TAG_SUFFIX,
-    write_info_refs,
-)
-from dulwich.repo import (
-    BaseRepo,
-    Repo,
-)
-
+from dulwich.archive import tar_stream
+from dulwich.errors import (ApplyDeltaError, ChecksumMismatch,
+                            GitProtocolError, HookError, NotGitRepository,
+                            ObjectFormatException, UnexpectedCommandError)
+from dulwich.object_store import peel_sha
+from dulwich.objects import Commit, ObjectID, valid_hexsha
+from dulwich.pack import (ObjectContainer, PackedObjectContainer,
+                          write_pack_from_container)
+from dulwich.protocol import (CAPABILITIES_REF, CAPABILITY_AGENT,
+                              CAPABILITY_DELETE_REFS, CAPABILITY_INCLUDE_TAG,
+                              CAPABILITY_MULTI_ACK,
+                              CAPABILITY_MULTI_ACK_DETAILED,
+                              CAPABILITY_NO_DONE, CAPABILITY_NO_PROGRESS,
+                              CAPABILITY_OFS_DELTA, CAPABILITY_QUIET,
+                              CAPABILITY_REPORT_STATUS, CAPABILITY_SHALLOW,
+                              CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
+                              COMMAND_DEEPEN, COMMAND_DONE, COMMAND_HAVE,
+                              COMMAND_SHALLOW, COMMAND_UNSHALLOW, COMMAND_WANT,
+                              MULTI_ACK, MULTI_ACK_DETAILED, NAK_LINE,
+                              SIDE_BAND_CHANNEL_DATA, SIDE_BAND_CHANNEL_FATAL,
+                              SIDE_BAND_CHANNEL_PROGRESS, SINGLE_ACK,
+                              TCP_GIT_PORT, ZERO_SHA, BufferedPktLineWriter,
+                              Protocol, ReceivableProtocol, ack_type,
+                              capability_agent, extract_capabilities,
+                              extract_want_line_capabilities, format_ack_line,
+                              format_ref_line, format_shallow_line,
+                              format_unshallow_line, symref_capabilities)
+from dulwich.refs import PEELED_TAG_SUFFIX, RefsContainer, write_info_refs
+from dulwich.repo import BaseRepo, Repo
 
 logger = log_utils.getLogger(__name__)
 

@@ -20,22 +20,13 @@
 
 """Utilities for diffing files and trees."""
 
-from collections import (
-    defaultdict,
-    namedtuple,
-)
-
+import stat
+from collections import defaultdict, namedtuple
 from io import BytesIO
 from itertools import chain
-import stat
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
-from dulwich.objects import (
-    S_ISGITLINK,
-    TreeEntry,
-    Tree,
-)
-
+from dulwich.objects import S_ISGITLINK, Tree, TreeEntry
 
 # TreeChange type constants.
 CHANGE_ADD = "add"
@@ -640,10 +631,7 @@ _merge_entries_py = _merge_entries
 _count_blocks_py = _count_blocks
 try:
     # Try to import C versions
-    from dulwich._diff_tree import (  # type: ignore
-        _is_tree,
-        _merge_entries,
-        _count_blocks,
-    )
+    from dulwich._diff_tree import (_count_blocks, _is_tree,  # type: ignore
+                                    _merge_entries)
 except ImportError:
     pass

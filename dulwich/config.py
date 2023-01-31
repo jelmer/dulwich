@@ -28,21 +28,10 @@ TODO:
 
 import os
 import sys
-from typing import (
-    BinaryIO,
-    Iterable,
-    Iterator,
-    KeysView,
-    List,
-    MutableMapping,
-    Optional,
-    Tuple,
-    Union,
-    overload,
-)
+from typing import (BinaryIO, Iterable, Iterator, KeysView, List,
+                    MutableMapping, Optional, Tuple, Union, overload)
 
 from dulwich.file import GitFile
-
 
 SENTINEL = object()
 

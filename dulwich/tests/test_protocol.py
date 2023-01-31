@@ -23,22 +23,12 @@
 
 from io import BytesIO
 
-from dulwich.errors import (
-    HangupException,
-)
-from dulwich.protocol import (
-    GitProtocolError,
-    PktLineParser,
-    Protocol,
-    ReceivableProtocol,
-    extract_capabilities,
-    extract_want_line_capabilities,
-    ack_type,
-    SINGLE_ACK,
-    MULTI_ACK,
-    MULTI_ACK_DETAILED,
-    BufferedPktLineWriter,
-)
+from dulwich.errors import HangupException
+from dulwich.protocol import (MULTI_ACK, MULTI_ACK_DETAILED, SINGLE_ACK,
+                              BufferedPktLineWriter, GitProtocolError,
+                              PktLineParser, Protocol, ReceivableProtocol,
+                              ack_type, extract_capabilities,
+                              extract_want_line_capabilities)
 from dulwich.tests import TestCase
 
 

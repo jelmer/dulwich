@@ -1522,7 +1522,7 @@ class Commit(ShaFile):
             # No trailing empty line
             if chunks[-1].endswith(b" \n"):
                 chunks[-1] = chunks[-1][:-2]
-        for k, v in self.extra:
+        for k, v in self._extra:
             if b"\n" in k or b"\n" in v:
                 raise AssertionError("newline in extra data: {!r} -> {!r}".format(k, v))
             chunks.append(git_line(k, v))
@@ -1556,7 +1556,7 @@ class Commit(ShaFile):
         """Return extra settings of this commit."""
         warnings.warn(
             'Commit.extra is deprecated. Use Commit._extra instead.',
-            DeprecationWarning)
+            DeprecationWarning, stacklevel=2)
         return self._extra
 
     extra = property(

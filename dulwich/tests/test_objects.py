@@ -599,7 +599,7 @@ class CommitParseTests(ShaFileCheckTests):
 
     def test_custom(self):
         c = Commit.from_string(self.make_commit_text(extra={b"extra-field": b"data"}))
-        self.assertEqual([(b"extra-field", b"data")], c.extra)
+        self.assertEqual([(b"extra-field", b"data")], c._extra)
 
     def test_encoding(self):
         c = Commit.from_string(self.make_commit_text(encoding=b"UTF-8"))
@@ -732,7 +732,7 @@ foo
 """
         )
         self.assertEqual(b"foo\n", c.message)
-        self.assertEqual([], c.extra)
+        self.assertEqual([], c._extra)
         self.assertEqual(
             b"""-----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1
@@ -776,7 +776,7 @@ gpgsig -----BEGIN PGP SIGNATURE-----
 3.3.0 version bump and docs
 """
         )
-        self.assertEqual([], c.extra)
+        self.assertEqual([], c._extra)
         self.assertEqual(
             b"""\
 -----BEGIN PGP SIGNATURE-----

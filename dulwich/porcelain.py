@@ -63,98 +63,43 @@ to the repository root.
 Functions should generally accept both unicode strings and bytestrings
 """
 
-from collections import namedtuple
-from contextlib import (
-    closing,
-    contextmanager,
-)
-from io import BytesIO, RawIOBase
 import datetime
 import os
-from pathlib import Path
 import posixpath
 import stat
 import sys
 import time
-from typing import (
-    Optional,
-    Tuple,
-    Union,
-)
+from collections import namedtuple
+from contextlib import closing, contextmanager
+from io import BytesIO, RawIOBase
+from pathlib import Path
+from typing import Optional, Tuple, Union
 
-from dulwich.archive import (
-    tar_stream,
-)
-from dulwich.client import (
-    get_transport_and_path,
-)
-from dulwich.config import (
-    Config,
-    ConfigFile,
-    StackedConfig,
-    read_submodules,
-)
-from dulwich.diff_tree import (
-    CHANGE_ADD,
-    CHANGE_DELETE,
-    CHANGE_MODIFY,
-    CHANGE_RENAME,
-    CHANGE_COPY,
-    RENAME_CHANGE_TYPES,
-)
-from dulwich.errors import (
-    SendPackError,
-)
-from dulwich.graph import (
-    can_fast_forward,
-)
+from dulwich.archive import tar_stream
+from dulwich.client import get_transport_and_path
+from dulwich.config import Config, ConfigFile, StackedConfig, read_submodules
+from dulwich.diff_tree import (CHANGE_ADD, CHANGE_COPY, CHANGE_DELETE,
+                               CHANGE_MODIFY, CHANGE_RENAME,
+                               RENAME_CHANGE_TYPES)
+from dulwich.errors import SendPackError
+from dulwich.graph import can_fast_forward
 from dulwich.ignore import IgnoreFilterManager
-from dulwich.index import (
-    blob_from_path_and_stat,
-    get_unstaged_changes,
-    build_file_from_blob,
-    _fs_to_tree_path,
-)
-from dulwich.object_store import (
-    tree_lookup_path,
-)
-from dulwich.objects import (
-    Commit,
-    Tag,
-    format_timezone,
-    parse_timezone,
-    pretty_format_tree_entry,
-)
-from dulwich.objectspec import (
-    parse_commit,
-    parse_object,
-    parse_ref,
-    parse_reftuples,
-    parse_tree,
-)
-from dulwich.pack import (
-    write_pack_index,
-    write_pack_from_container,
-)
+from dulwich.index import (_fs_to_tree_path, blob_from_path_and_stat,
+                           build_file_from_blob, get_unstaged_changes)
+from dulwich.object_store import tree_lookup_path
+from dulwich.objects import (Commit, Tag, format_timezone, parse_timezone,
+                             pretty_format_tree_entry)
+from dulwich.objectspec import (parse_commit, parse_object, parse_ref,
+                                parse_reftuples, parse_tree)
+from dulwich.pack import write_pack_from_container, write_pack_index
 from dulwich.patch import write_tree_diff
-from dulwich.protocol import (
-    Protocol,
-    ZERO_SHA,
-)
-from dulwich.refs import (
-    LOCAL_BRANCH_PREFIX,
-    LOCAL_TAG_PREFIX,
-    _import_remote_refs,
-)
+from dulwich.protocol import ZERO_SHA, Protocol
+from dulwich.refs import (LOCAL_BRANCH_PREFIX, LOCAL_TAG_PREFIX,
+                          _import_remote_refs)
 from dulwich.repo import BaseRepo, Repo
-from dulwich.server import (
-    FileSystemBackend,
-    TCPGitServer,
-    ReceivePackHandler,
-    UploadPackHandler,
-    update_server_info as server_update_server_info,
-)
-
+from dulwich.server import (FileSystemBackend, ReceivePackHandler,
+                            TCPGitServer, UploadPackHandler)
+from dulwich.server import update_server_info as server_update_server_info
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -1511,12 +1456,8 @@ def web_daemon(path=".", address=None, port=None):
       address: Optional address to listen on (defaults to ::)
       port: Optional port to listen on (defaults to 80)
     """
-    from dulwich.web import (
-        make_wsgi_chain,
-        make_server,
-        WSGIRequestHandlerLogger,
-        WSGIServerLogger,
-    )
+    from dulwich.web import (WSGIRequestHandlerLogger, WSGIServerLogger,
+                             make_server, make_wsgi_chain)
 
     backend = FileSystemBackend(path)
     app = make_wsgi_chain(backend)

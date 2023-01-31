@@ -22,6 +22,7 @@
 """
 
 from typing import Iterator, Tuple
+
 from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK
 

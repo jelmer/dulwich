@@ -21,13 +21,9 @@
 
 """Tests for the line ending conversion."""
 
-from dulwich.line_ending import (
-    normalize_blob,
-    convert_crlf_to_lf,
-    convert_lf_to_crlf,
-    get_checkin_filter_autocrlf,
-    get_checkout_filter_autocrlf,
-)
+from dulwich.line_ending import (convert_crlf_to_lf, convert_lf_to_crlf,
+                                 get_checkin_filter_autocrlf,
+                                 get_checkout_filter_autocrlf, normalize_blob)
 from dulwich.objects import Blob
 from dulwich.tests import TestCase
 

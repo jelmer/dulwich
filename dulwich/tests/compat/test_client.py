@@ -21,7 +21,7 @@
 """Compatibility tests between the Dulwich client and the cgit server."""
 
 import copy
-from io import BytesIO
+import http.server
 import os
 import select
 import signal
@@ -31,32 +31,14 @@ import sys
 import tarfile
 import tempfile
 import threading
-
+from io import BytesIO
 from urllib.parse import unquote
 
-import http.server
-
-from dulwich import (
-    client,
-    file,
-    index,
-    protocol,
-    objects,
-    repo,
-)
-from dulwich.tests import (
-    SkipTest,
-    expectedFailure,
-)
-from dulwich.tests.compat.utils import (
-    CompatTestCase,
-    check_for_daemon,
-    import_repo_to_dir,
-    rmtree_ro,
-    run_git_or_fail,
-    _DEFAULT_GIT,
-)
-
+from dulwich import client, file, index, objects, protocol, repo
+from dulwich.tests import SkipTest, expectedFailure
+from dulwich.tests.compat.utils import (_DEFAULT_GIT, CompatTestCase,
+                                        check_for_daemon, import_repo_to_dir,
+                                        rmtree_ro, run_git_or_fail)
 
 if sys.platform == "win32":
     import ctypes

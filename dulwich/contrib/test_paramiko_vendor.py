@@ -21,11 +21,10 @@
 
 import socket
 import threading
-
-from dulwich.tests import TestCase
-
 from io import StringIO
 from unittest import skipIf
+
+from dulwich.tests import TestCase
 
 try:
     import paramiko

@@ -28,26 +28,14 @@ local disk (Repo).
 
 """
 
-from io import BytesIO
 import os
-import sys
 import stat
+import sys
 import time
-from typing import (
-    Optional,
-    BinaryIO,
-    Callable,
-    Tuple,
-    TYPE_CHECKING,
-    FrozenSet,
-    List,
-    Dict,
-    Union,
-    Iterable,
-    Set
-)
 import warnings
-
+from io import BytesIO
+from typing import (TYPE_CHECKING, BinaryIO, Callable, Dict, FrozenSet,
+                    Iterable, List, Optional, Set, Tuple, Union)
 
 if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
@@ -56,72 +44,27 @@ if TYPE_CHECKING:
     from dulwich.config import StackedConfig, ConfigFile
     from dulwich.index import Index
 
-from dulwich.errors import (
-    NoIndexPresent,
-    NotBlobError,
-    NotCommitError,
-    NotGitRepository,
-    NotTreeError,
-    NotTagError,
-    CommitError,
-    RefFormatError,
-    HookError,
-)
-from dulwich.file import (
-    GitFile,
-)
-from dulwich.object_store import (
-    DiskObjectStore,
-    MemoryObjectStore,
-    MissingObjectFinder,
-    PackBasedObjectStore,
-    ObjectStoreGraphWalker,
-    peel_sha,
-)
-from dulwich.objects import (
-    check_hexsha,
-    valid_hexsha,
-    Blob,
-    Commit,
-    ShaFile,
-    Tag,
-    Tree,
-    ObjectID,
-)
-from dulwich.pack import (
-    generate_unpacked_objects
-)
-
-from dulwich.hooks import (
-    Hook,
-    PreCommitShellHook,
-    PostCommitShellHook,
-    CommitMsgShellHook,
-    PostReceiveShellHook,
-)
-
+from dulwich.errors import (CommitError, HookError, NoIndexPresent,
+                            NotBlobError, NotCommitError, NotGitRepository,
+                            NotTagError, NotTreeError, RefFormatError)
+from dulwich.file import GitFile
+from dulwich.hooks import (CommitMsgShellHook, Hook, PostCommitShellHook,
+                           PostReceiveShellHook, PreCommitShellHook)
 from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
-
-from dulwich.refs import (  # noqa: F401
-    Ref,
-    ANNOTATED_TAG_SUFFIX,
-    LOCAL_BRANCH_PREFIX,
-    LOCAL_TAG_PREFIX,
-    serialize_refs,
-    check_ref_format,
-    RefsContainer,
-    DictRefsContainer,
-    InfoRefsContainer,
-    DiskRefsContainer,
-    read_packed_refs,
-    read_packed_refs_with_peeled,
-    write_packed_refs,
-    SYMREF,
-    _set_default_branch,
-    _set_head,
-    _set_origin_head,
-)
-
+from dulwich.object_store import (DiskObjectStore, MemoryObjectStore,
+                                  MissingObjectFinder, ObjectStoreGraphWalker,
+                                  PackBasedObjectStore, peel_sha)
+from dulwich.objects import (Blob, Commit, ObjectID, ShaFile, Tag, Tree,
+                             check_hexsha, valid_hexsha)
+from dulwich.pack import generate_unpacked_objects
+from dulwich.refs import (ANNOTATED_TAG_SUFFIX,  # noqa: F401
+                          LOCAL_BRANCH_PREFIX, LOCAL_TAG_PREFIX, SYMREF,
+                          DictRefsContainer, DiskRefsContainer,
+                          InfoRefsContainer, Ref, RefsContainer,
+                          _set_default_branch, _set_head, _set_origin_head,
+                          check_ref_format, read_packed_refs,
+                          read_packed_refs_with_peeled, serialize_refs,
+                          write_packed_refs)
 
 CONTROLDIR = ".git"
 OBJECTDIR = "objects"
@@ -716,7 +659,7 @@ class BaseRepo:
 
         Returns: `Config` instance for this repository
         """
-        from dulwich.config import StackedConfig, ConfigFile
+        from dulwich.config import ConfigFile, StackedConfig
 
         local_config = self.get_config()
         backends: List[ConfigFile] = [local_config]
@@ -1368,12 +1311,9 @@ class Repo(BaseRepo):
             fs_paths = [fs_paths]
         fs_paths = list(fs_paths)
 
-        from dulwich.index import (
-            blob_from_path_and_stat,
-            index_entry_from_stat,
-            index_entry_from_directory,
-            _fs_to_tree_path,
-        )
+        from dulwich.index import (_fs_to_tree_path, blob_from_path_and_stat,
+                                   index_entry_from_directory,
+                                   index_entry_from_stat)
 
         index = self.open_index()
         blob_normalizer = self.get_blob_normalizer()
@@ -1423,10 +1363,7 @@ class Repo(BaseRepo):
           fs_paths: a list of files to unstage,
             relative to the repository path
         """
-        from dulwich.index import (
-            IndexEntry,
-            _fs_to_tree_path,
-        )
+        from dulwich.index import IndexEntry, _fs_to_tree_path
 
         index = self.open_index()
         try:
@@ -1577,11 +1514,9 @@ class Repo(BaseRepo):
         Args:
           tree: Tree SHA to reset to, None for current HEAD tree.
         """
-        from dulwich.index import (
-            build_index_from_tree,
-            validate_path_element_default,
-            validate_path_element_ntfs,
-        )
+        from dulwich.index import (build_index_from_tree,
+                                   validate_path_element_default,
+                                   validate_path_element_ntfs)
 
         if tree is None:
             head = self[b"HEAD"]

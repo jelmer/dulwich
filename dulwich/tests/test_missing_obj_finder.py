@@ -18,19 +18,10 @@
 # License, Version 2.0.
 #
 
-from dulwich.object_store import (
-    MemoryObjectStore,
-    MissingObjectFinder,
-)
-from dulwich.objects import (
-    Blob,
-)
+from dulwich.object_store import MemoryObjectStore, MissingObjectFinder
+from dulwich.objects import Blob
 from dulwich.tests import TestCase
-from dulwich.tests.utils import (
-    make_object,
-    make_tag,
-    build_commit_graph,
-)
+from dulwich.tests.utils import build_commit_graph, make_object, make_tag
 
 
 class MissingObjectFinderTest(TestCase):

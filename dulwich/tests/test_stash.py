@@ -20,10 +20,9 @@
 
 """Tests for stashes."""
 
-from . import TestCase
-
 from ..repo import MemoryRepo
 from ..stash import Stash
+from . import TestCase
 
 
 class StashTests(TestCase):

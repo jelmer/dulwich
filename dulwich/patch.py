@@ -24,16 +24,12 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
-from difflib import SequenceMatcher
 import email.parser
 import time
-from typing import Union, TextIO, BinaryIO, Optional
+from difflib import SequenceMatcher
+from typing import BinaryIO, Optional, TextIO, Union
 
-from dulwich.objects import (
-    Blob,
-    Commit,
-    S_ISGITLINK,
-)
+from dulwich.objects import S_ISGITLINK, Blob, Commit
 from dulwich.pack import ObjectContainer
 
 FIRST_FEW_BYTES = 8000

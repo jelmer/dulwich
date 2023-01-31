@@ -10,13 +10,10 @@ Example usage:
 
 
 import sys
-
+from getopt import getopt
 from os.path import basename
 
-from getopt import getopt
-
 from dulwich import porcelain
-
 
 _, args = getopt(sys.argv, "", [])
 

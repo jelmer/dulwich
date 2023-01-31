@@ -20,10 +20,7 @@
 
 """Tests for git compatibility utilities."""
 
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
+from dulwich.tests import SkipTest, TestCase
 from dulwich.tests.compat import utils
 
 

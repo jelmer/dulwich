@@ -20,23 +20,13 @@
 
 """Tests for bundle support."""
 
-from io import BytesIO
 import os
 import tempfile
+from io import BytesIO
 
-from dulwich.tests import (
-    TestCase,
-)
-
-from dulwich.bundle import (
-    Bundle,
-    read_bundle,
-    write_bundle,
-)
-from dulwich.pack import (
-    PackData,
-    write_pack_objects,
-)
+from dulwich.bundle import Bundle, read_bundle, write_bundle
+from dulwich.pack import PackData, write_pack_objects
+from dulwich.tests import TestCase
 
 
 class BundleTests(TestCase):

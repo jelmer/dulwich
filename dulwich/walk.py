@@ -24,22 +24,12 @@
 import collections
 import heapq
 from itertools import chain
-from typing import List, Tuple, Set, Deque, Optional
+from typing import Deque, List, Optional, Set, Tuple
 
-from dulwich.diff_tree import (
-    RENAME_CHANGE_TYPES,
-    tree_changes,
-    tree_changes_for_merge,
-    RenameDetector,
-)
-from dulwich.errors import (
-    MissingCommitError,
-)
-from dulwich.objects import (
-    Commit,
-    Tag,
-    ObjectID,
-)
+from dulwich.diff_tree import (RENAME_CHANGE_TYPES, RenameDetector,
+                               tree_changes, tree_changes_for_merge)
+from dulwich.errors import MissingCommitError
+from dulwich.objects import Commit, ObjectID, Tag
 
 ORDER_DATE = "date"
 ORDER_TOPO = "topo"

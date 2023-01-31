@@ -22,36 +22,22 @@
 """Access to base git objects."""
 
 import binascii
-from io import BytesIO
-from collections import namedtuple
 import os
 import posixpath
 import stat
-from typing import (
-    Optional,
-    Dict,
-    Iterable,
-    Union,
-    Type,
-    Iterator,
-    List,
-)
 import warnings
 import zlib
-from _hashlib import HASH
+from collections import namedtuple
 from hashlib import sha1
+from io import BytesIO
+from typing import Dict, Iterable, Iterator, List, Optional, Type, Union
 
-from dulwich.errors import (
-    ChecksumMismatch,
-    NotBlobError,
-    NotCommitError,
-    NotTagError,
-    NotTreeError,
-    ObjectFormatException,
-    FileFormatException,
-)
+from _hashlib import HASH
+
+from dulwich.errors import (ChecksumMismatch, FileFormatException,
+                            NotBlobError, NotCommitError, NotTagError,
+                            NotTreeError, ObjectFormatException)
 from dulwich.file import GitFile
-
 
 ZERO_SHA = b"0" * 40
 

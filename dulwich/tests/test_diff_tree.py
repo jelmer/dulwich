@@ -21,45 +21,19 @@
 """Tests for file and tree diff utilities."""
 
 from itertools import permutations
-from dulwich.diff_tree import (
-    CHANGE_MODIFY,
-    CHANGE_RENAME,
-    CHANGE_COPY,
-    CHANGE_UNCHANGED,
-    TreeChange,
-    _merge_entries,
-    _merge_entries_py,
-    tree_changes,
-    tree_changes_for_merge,
-    _count_blocks,
-    _count_blocks_py,
-    _similarity_score,
-    _tree_change_key,
-    RenameDetector,
-    _is_tree,
-    _is_tree_py,
-)
-from dulwich.index import (
-    commit_tree,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    ShaFile,
-    Blob,
-    TreeEntry,
-    Tree,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    F,
-    make_object,
-    functest_builder,
-    ext_functest_builder,
-)
+
+from dulwich.diff_tree import (CHANGE_COPY, CHANGE_MODIFY, CHANGE_RENAME,
+                               CHANGE_UNCHANGED, RenameDetector, TreeChange,
+                               _count_blocks, _count_blocks_py, _is_tree,
+                               _is_tree_py, _merge_entries, _merge_entries_py,
+                               _similarity_score, _tree_change_key,
+                               tree_changes, tree_changes_for_merge)
+from dulwich.index import commit_tree
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob, ShaFile, Tree, TreeEntry
+from dulwich.tests import TestCase
+from dulwich.tests.utils import (F, ext_functest_builder, functest_builder,
+                                 make_object)
 
 
 class DiffTestCase(TestCase):

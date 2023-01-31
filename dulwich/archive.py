@@ -25,11 +25,11 @@
 
 import posixpath
 import stat
-import tarfile
 import struct
-from os import SEEK_END
-from io import BytesIO
+import tarfile
 from contextlib import closing
+from io import BytesIO
+from os import SEEK_END
 
 
 class ChunkedBytesIO:

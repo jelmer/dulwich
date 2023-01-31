@@ -29,31 +29,16 @@ import sys
 import tempfile
 import warnings
 
-from dulwich import errors
-from dulwich import porcelain
-from dulwich.object_store import (
-    tree_lookup_path,
-)
-from dulwich import objects
+from dulwich import errors, objects, porcelain
 from dulwich.config import Config
 from dulwich.errors import NotGitRepository
-from dulwich.repo import (
-    InvalidUserIdentity,
-    Repo,
-    MemoryRepo,
-    check_user_identity,
-    UnsupportedVersion,
-    UnsupportedExtension,
-)
-from dulwich.tests import (
-    TestCase,
-    skipIf,
-)
-from dulwich.tests.utils import (
-    open_repo,
-    tear_down_repo,
-    setup_warning_catcher,
-)
+from dulwich.object_store import tree_lookup_path
+from dulwich.repo import (InvalidUserIdentity, MemoryRepo, Repo,
+                          UnsupportedExtension, UnsupportedVersion,
+                          check_user_identity)
+from dulwich.tests import TestCase, skipIf
+from dulwich.tests.utils import (open_repo, setup_warning_catcher,
+                                 tear_down_repo)
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
 

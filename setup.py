@@ -2,10 +2,10 @@
 # Setup file for dulwich
 # Copyright (C) 2008-2022 Jelmer Vernooĳ <jelmer@jelmer.uk>
 
-from setuptools import setup, Extension
 import os
 import sys
 
+from setuptools import Extension, setup
 
 if sys.version_info < (3, 6):
     raise Exception(

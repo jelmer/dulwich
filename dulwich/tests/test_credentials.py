@@ -22,11 +22,8 @@
 from urllib.parse import urlparse
 
 from dulwich.config import ConfigDict
-from dulwich.credentials import (
-    match_partial_url,
-    match_urls,
-    urlmatch_credential_sections,
-)
+from dulwich.credentials import (match_partial_url, match_urls,
+                                 urlmatch_credential_sections)
 from dulwich.tests import TestCase
 
 

@@ -25,36 +25,14 @@ import os
 import stat
 import struct
 import sys
-from typing import (
-    Any,
-    BinaryIO,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Iterable,
-    Iterator,
-    Tuple,
-    Union,
-)
+from typing import (Any, BinaryIO, Callable, Dict, Iterable, Iterator, List,
+                    Optional, Tuple, Union)
 
 from dulwich.file import GitFile
-from dulwich.objects import (
-    Blob,
-    S_IFGITLINK,
-    S_ISGITLINK,
-    Tree,
-    hex_to_sha,
-    sha_to_hex,
-    ObjectID,
-)
 from dulwich.object_store import iter_tree_contents
-from dulwich.pack import (
-    SHA1Reader,
-    SHA1Writer,
-    ObjectContainer,
-)
-
+from dulwich.objects import (S_IFGITLINK, S_ISGITLINK, Blob, ObjectID, Tree,
+                             hex_to_sha, sha_to_hex)
+from dulwich.pack import ObjectContainer, SHA1Reader, SHA1Writer
 
 # TODO(jelmer): Switch to dataclass?
 IndexEntry = collections.namedtuple(

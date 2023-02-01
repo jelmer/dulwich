@@ -986,7 +986,7 @@ class HttpGitClientTests(TestCase):
 
         c = HttpGitClient(url, config=None, username="user")
         self.assertEqual("user", c._username)
-        self.assertIs(c._password, None)
+        self.assertIsNone(c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
         auth_string = b"user:"

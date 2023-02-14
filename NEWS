@@ -65,6 +65,9 @@
    deltas found in an existing pack file.
    (Stefan Sperling)
 
+ * Add basic ``dulwich.aiohttp`` module that provides
+   server support. (Jelmer Vernooĳ)
+
  * Fix Repo.reset_index.
    Previously, it instead took the union with the given tree.
    (Christian Sattler, #1072)

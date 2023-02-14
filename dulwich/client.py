@@ -2149,12 +2149,6 @@ class AbstractHttpGitClient(GitClient):
         username = parsedurl.username
         if username is not None:
             kwargs["username"] = urlunquote(username)
-        netloc = parsedurl.hostname
-        if parsedurl.port:
-            netloc = "{}:{}".format(netloc, parsedurl.port)
-        if parsedurl.username:
-            netloc = "{}@{}".format(parsedurl.username, netloc)
-        parsedurl = parsedurl._replace(netloc=netloc)
         return cls(urlunparse(parsedurl), **kwargs)
 
     def __repr__(self):

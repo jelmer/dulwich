@@ -1,4 +1,4 @@
-0.21.3	UNRELEASED
+0.21.3	2023-02-17
 
  * Add support for ``worktreeconfig`` extension.
    (Jelmer Vernooĳ)

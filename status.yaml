@@ -1,30 +1,30 @@
 ---
 configuration:
- - key: core.compression
-   status: supported
- - key: core.looseCompression
-   status: supported
- - key: core.packCompression
-   status: supported
- - key: core.filemode
-   status: supported
- - key: http.proxy
-   status: supported
- - key: http.useragent
-   status: supported
- - key: http.sslVerify
-   status: supported
- - key: http.sslCAInfo
-   status: supported
- - key: i18n.commitEncoding
-   status: supported
- - key: core.excludsFile
-   status: supported
- - key: user.name
-   status: supported
- - key: user.email
-   status: supported
- - key: core.protectNTFS
-   status: supported
- - key: core.ignorecase
-   status: supported
+  - key: core.compression
+    status: supported
+  - key: core.looseCompression
+    status: supported
+  - key: core.packCompression
+    status: supported
+  - key: core.filemode
+    status: supported
+  - key: http.proxy
+    status: supported
+  - key: http.useragent
+    status: supported
+  - key: http.sslVerify
+    status: supported
+  - key: http.sslCAInfo
+    status: supported
+  - key: i18n.commitEncoding
+    status: supported
+  - key: core.excludsFile
+    status: supported
+  - key: user.name
+    status: supported
+  - key: user.email
+    status: supported
+  - key: core.protectNTFS
+    status: supported
+  - key: core.ignorecase
+    status: supported

@@ -22,44 +22,31 @@
 
 """Tests for dulwich.contrib.swift."""
 
+import json
 import posixpath
-
-from time import time
 from io import BytesIO, StringIO
-
+from time import time
 from unittest import skipIf
 
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.test_object_store import (
-    ObjectStoreTests,
-)
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tree,
-    Tag,
-    parse_timezone,
-)
-
-import json
+from dulwich.objects import Blob, Commit, Tag, Tree, parse_timezone
+from dulwich.tests import TestCase
+from dulwich.tests.test_object_store import ObjectStoreTests
 
 missing_libs = []
 
 try:
     import gevent  # noqa:F401
-except ImportError:
+except ModuleNotFoundError:
     missing_libs.append("gevent")
 
 try:
     import geventhttpclient  # noqa:F401
-except ImportError:
+except ModuleNotFoundError:
     missing_libs.append("geventhttpclient")
 
 try:
     from unittest.mock import patch
-except ImportError:
+except ModuleNotFoundError:
     missing_libs.append("mock")
 
 skipmsg = "Required libraries are not installed (%r)" % missing_libs
@@ -99,7 +86,7 @@ def create_swift_connector(store={}):
     return lambda root, conf: FakeSwiftConnector(root, conf=conf, store=store)
 
 
-class Response(object):
+class Response:
     def __init__(self, headers={}, status=200, content=None):
         self.headers = headers
         self.status_code = status
@@ -183,14 +170,14 @@ def create_commit(data, marker=b"Default", blob=None):
 def create_commits(length=1, marker=b"Default"):
     data = []
     for i in range(0, length):
-        _marker = ("%s_%s" % (marker, i)).encode()
+        _marker = ("{}_{}".format(marker, i)).encode()
         blob, tree, tag, cmt = create_commit(data, _marker)
         data.extend([blob, tree, tag, cmt])
     return data
 
 
 @skipIf(missing_libs, skipmsg)
-class FakeSwiftConnector(object):
+class FakeSwiftConnector:
     def __init__(self, root, conf, store=None):
         if store:
             self.store = store
@@ -246,7 +233,7 @@ class FakeSwiftConnector(object):
 @skipIf(missing_libs, skipmsg)
 class TestSwiftRepo(TestCase):
     def setUp(self):
-        super(TestSwiftRepo, self).setUp()
+        super().setUp()
         self.conf = swift.load_conf(file=StringIO(config_file % def_config_file))
 
     def test_init(self):
@@ -302,7 +289,7 @@ class TestSwiftRepo(TestCase):
 @skipIf(missing_libs, skipmsg)
 class TestSwiftInfoRefsContainer(TestCase):
     def setUp(self):
-        super(TestSwiftInfoRefsContainer, self).setUp()
+        super().setUp()
         content = (
             b"22effb216e3a82f97da599b8885a6cadb488b4c5\trefs/heads/master\n"
             b"cca703b0e1399008b53a1a236d6b4584737649e4\trefs/heads/dev"
@@ -343,7 +330,7 @@ class TestSwiftInfoRefsContainer(TestCase):
 @skipIf(missing_libs, skipmsg)
 class TestSwiftConnector(TestCase):
     def setUp(self):
-        super(TestSwiftConnector, self).setUp()
+        super().setUp()
         self.conf = swift.load_conf(file=StringIO(config_file % def_config_file))
         with patch("geventhttpclient.HTTPClient.request", fake_auth_request_v1):
             self.conn = swift.SwiftConnector("fakerepo", conf=self.conf)
@@ -409,7 +396,7 @@ class TestSwiftConnector(TestCase):
         with patch(
             "geventhttpclient.HTTPClient.request",
             lambda *args: Response(
-                content=json.dumps((({"name": "a"}, {"name": "b"})))
+                content=json.dumps(({"name": "a"}, {"name": "b"}))
             ),
         ):
             self.assertEqual(len(self.conn.get_container_objects()), 2)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # test_index.py -- Tests for the git index
 # encoding: utf-8
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@jelmer.uk>
@@ -23,50 +22,25 @@
 """Tests for the index."""
 
 
-from io import BytesIO
 import os
 import shutil
 import stat
 import struct
 import sys
 import tempfile
-import warnings
+from io import BytesIO
 
-from dulwich.index import (
-    Index,
-    build_index_from_tree,
-    cleanup_mode,
-    commit_tree,
-    get_unstaged_changes,
-    index_entry_from_stat,
-    read_index,
-    read_index_dict,
-    validate_path_element_default,
-    validate_path_element_ntfs,
-    write_cache_time,
-    write_index,
-    write_index_dict,
-    _tree_to_fs_path,
-    _fs_to_tree_path,
-    IndexEntry,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tree,
-    S_IFGITLINK,
-)
+from dulwich.index import (Index, IndexEntry, _fs_to_tree_path,
+                           _tree_to_fs_path, build_index_from_tree,
+                           cleanup_mode, commit_tree, get_unstaged_changes,
+                           index_entry_from_stat, read_index, read_index_dict,
+                           validate_path_element_default,
+                           validate_path_element_ntfs, write_cache_time,
+                           write_index, write_index_dict)
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
 from dulwich.repo import Repo
-from dulwich.tests import (
-    TestCase,
-    skipIf,
-)
-from dulwich.tests.utils import (
-    setup_warning_catcher,
-)
+from dulwich.tests import TestCase, skipIf
 
 
 def can_symlink():
@@ -74,10 +48,6 @@ def can_symlink():
     if sys.platform != "win32":
         # Platforms other than Windows should allow symlinks without issues.
         return True
-
-    if not hasattr(os, "symlink"):
-        # Older Python versions do not have `os.symlink` on Windows.
-        return False
 
     test_source = tempfile.mkdtemp()
     test_target = test_source + "can_symlink"
@@ -90,7 +60,7 @@ def can_symlink():
 
 class IndexTestCase(TestCase):
 
-    datadir = os.path.join(os.path.dirname(__file__), "data/indexes")
+    datadir = os.path.join(os.path.dirname(__file__), "../../testdata/indexes")
 
     def get_simple_index(self, name):
         return Index(os.path.join(self.datadir, name))
@@ -108,26 +78,6 @@ class SimpleIndexTestCase(IndexTestCase):
             [(b"bla", b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", 33188)],
             list(self.get_simple_index("index").iterobjects()),
         )
-
-    def test_iterblobs(self):
-        warnings.simplefilter("always", UserWarning)
-        self.addCleanup(warnings.resetwarnings)
-        warnings_list, restore_warnings = setup_warning_catcher()
-        self.addCleanup(restore_warnings)
-
-        self.assertEqual(
-            [(b"bla", b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", 33188)],
-            list(self.get_simple_index("index").iterblobs()),
-        )
-
-        expected_warning = PendingDeprecationWarning("Use iterobjects() instead.")
-        for w in warnings_list:
-            if type(w) == type(expected_warning) and w.args == expected_warning.args:
-                break
-        else:
-            raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
-            )
 
     def test_getitem(self):
         self.assertEqual(
@@ -231,7 +181,7 @@ class ReadIndexDictTests(IndexTestCase):
 
 class CommitTreeTests(TestCase):
     def setUp(self):
-        super(CommitTreeTests, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
 
     def test_single_blob(self):
@@ -242,7 +192,7 @@ class CommitTreeTests(TestCase):
         rootid = commit_tree(self.store, blobs)
         self.assertEqual(rootid, b"1a1e80437220f9312e855c37ac4398b68e5c1d50")
         self.assertEqual((stat.S_IFREG, blob.id), self.store[rootid][b"bla"])
-        self.assertEqual(set([rootid, blob.id]), set(self.store._data.keys()))
+        self.assertEqual({rootid, blob.id}, set(self.store._data.keys()))
 
     def test_nested(self):
         blob = Blob()
@@ -255,12 +205,12 @@ class CommitTreeTests(TestCase):
         self.assertEqual(dirid, b"c1a1deb9788150829579a8b4efa6311e7b638650")
         self.assertEqual((stat.S_IFDIR, dirid), self.store[rootid][b"bla"])
         self.assertEqual((stat.S_IFREG, blob.id), self.store[dirid][b"bar"])
-        self.assertEqual(set([rootid, dirid, blob.id]), set(self.store._data.keys()))
+        self.assertEqual({rootid, dirid, blob.id}, set(self.store._data.keys()))
 
 
 class CleanupModeTests(TestCase):
     def assertModeEqual(self, expected, got):
-        self.assertEqual(expected, got, "%o != %o" % (expected, got))
+        self.assertEqual(expected, got, "{:o} != {:o}".format(expected, got))
 
     def test_file(self):
         self.assertModeEqual(0o100644, cleanup_mode(0o100000))
@@ -575,9 +525,9 @@ class BuildIndexTests(TestCase):
             file = Blob.from_string(b"foo")
 
             tree = Tree()
-            latin1_name = u"À".encode("latin1")
+            latin1_name = "À".encode("latin1")
             latin1_path = os.path.join(repo_dir_bytes, latin1_name)
-            utf8_name = u"À".encode("utf8")
+            utf8_name = "À".encode()
             utf8_path = os.path.join(repo_dir_bytes, utf8_name)
             tree[latin1_name] = (stat.S_IFREG | 0o644, file.id)
             tree[utf8_name] = (stat.S_IFREG | 0o644, file.id)
@@ -823,19 +773,19 @@ class TestValidatePathElement(TestCase):
 
 class TestTreeFSPathConversion(TestCase):
     def test_tree_to_fs_path(self):
-        tree_path = u"délwíçh/foo".encode("utf8")
+        tree_path = "délwíçh/foo".encode()
         fs_path = _tree_to_fs_path(b"/prefix/path", tree_path)
         self.assertEqual(
             fs_path,
-            os.fsencode(os.path.join(u"/prefix/path", u"délwíçh", u"foo")),
+            os.fsencode(os.path.join("/prefix/path", "délwíçh", "foo")),
         )
 
     def test_fs_to_tree_path_str(self):
-        fs_path = os.path.join(os.path.join(u"délwíçh", u"foo"))
+        fs_path = os.path.join(os.path.join("délwíçh", "foo"))
         tree_path = _fs_to_tree_path(fs_path)
-        self.assertEqual(tree_path, u"délwíçh/foo".encode("utf-8"))
+        self.assertEqual(tree_path, "délwíçh/foo".encode())
 
     def test_fs_to_tree_path_bytes(self):
-        fs_path = os.path.join(os.fsencode(os.path.join(u"délwíçh", u"foo")))
+        fs_path = os.path.join(os.fsencode(os.path.join("délwíçh", "foo")))
         tree_path = _fs_to_tree_path(fs_path)
-        self.assertEqual(tree_path, u"délwíçh/foo".encode("utf-8"))
+        self.assertEqual(tree_path, "délwíçh/foo".encode())

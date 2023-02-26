@@ -22,62 +22,28 @@
 """Tests for Dulwich packs."""
 
 
-from io import BytesIO
-from hashlib import sha1
 import os
 import shutil
 import sys
 import tempfile
 import zlib
+from hashlib import sha1
+from io import BytesIO
 
-from dulwich.errors import (
-    ApplyDeltaError,
-    ChecksumMismatch,
-)
-from dulwich.file import (
-    GitFile,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    hex_to_sha,
-    sha_to_hex,
-    Commit,
-    Tree,
-    Blob,
-)
-from dulwich.pack import (
-    OFS_DELTA,
-    REF_DELTA,
-    MemoryPackIndex,
-    Pack,
-    PackData,
-    apply_delta,
-    create_delta,
-    deltify_pack_objects,
-    load_pack_index,
-    UnpackedObject,
-    read_zlib_chunks,
-    write_pack_header,
-    write_pack_index_v1,
-    write_pack_index_v2,
-    write_pack_object,
-    write_pack,
-    unpack_object,
-    compute_file_sha,
-    PackStreamReader,
-    DeltaChainIterator,
-    _delta_encode_size,
-    _encode_copy_operation,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    make_object,
-    build_pack,
-)
+from dulwich.errors import ApplyDeltaError, ChecksumMismatch
+from dulwich.file import GitFile
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob, Commit, Tree, hex_to_sha, sha_to_hex
+from dulwich.pack import (OFS_DELTA, REF_DELTA, DeltaChainIterator,
+                          MemoryPackIndex, Pack, PackData, PackStreamReader,
+                          UnpackedObject, _delta_encode_size,
+                          _encode_copy_operation, apply_delta,
+                          compute_file_sha, create_delta, deltify_pack_objects,
+                          load_pack_index, read_zlib_chunks, unpack_object,
+                          write_pack, write_pack_header, write_pack_index_v1,
+                          write_pack_index_v2, write_pack_object)
+from dulwich.tests import TestCase
+from dulwich.tests.utils import build_pack, make_object
 
 pack1_sha = b"bc63ddad95e7321ee734ea11a7a62d314e0d7481"
 
@@ -91,11 +57,11 @@ class PackTests(TestCase):
     """Base class for testing packs"""
 
     def setUp(self):
-        super(PackTests, self).setUp()
+        super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
-    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data/packs"))
+    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../testdata/packs"))
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha"""
@@ -122,13 +88,13 @@ class PackTests(TestCase):
 class PackIndexTests(PackTests):
     """Class that tests the index of packfiles"""
 
-    def test_object_index(self):
+    def test_object_offset(self):
         """Tests that the correct object offset is returned from the index."""
         p = self.get_pack_index(pack1_sha)
-        self.assertRaises(KeyError, p.object_index, pack1_sha)
-        self.assertEqual(p.object_index(a_sha), 178)
-        self.assertEqual(p.object_index(tree_sha), 138)
-        self.assertEqual(p.object_index(commit_sha), 12)
+        self.assertRaises(KeyError, p.object_offset, pack1_sha)
+        self.assertEqual(p.object_offset(a_sha), 178)
+        self.assertEqual(p.object_offset(tree_sha), 138)
+        self.assertEqual(p.object_offset(commit_sha), 12)
 
     def test_object_sha1(self):
         """Tests that the correct object offset is returned from the index."""
@@ -171,7 +137,7 @@ class PackIndexTests(PackTests):
 
     def test_iter(self):
         p = self.get_pack_index(pack1_sha)
-        self.assertEqual(set([tree_sha, commit_sha, a_sha]), set(p))
+        self.assertEqual({tree_sha, commit_sha, a_sha}, set(p))
 
 
 class TestPackDeltas(TestCase):
@@ -186,7 +152,8 @@ class TestPackDeltas(TestCase):
 
     def _test_roundtrip(self, base, target):
         self.assertEqual(
-            target, b"".join(apply_delta(base, create_delta(base, target)))
+            target,
+            b"".join(apply_delta(base, list(create_delta(base, target))))
         )
 
     def test_nochange(self):
@@ -283,7 +250,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             self.assertSucceeds(p.check)
 
-    def test_iterobjects(self):
+    def test_iter_unpacked(self):
         with self.get_pack_data(pack1_sha) as p:
             commit_data = (
                 b"tree b2a2766a2879c209ab1176e7e778b81ae422eeaa\n"
@@ -296,14 +263,12 @@ class TestPackData(PackTests):
             )
             blob_sha = b"6f670c0fb53f9463760b7295fbb814e965fb20c8"
             tree_data = b"100644 a\0" + hex_to_sha(blob_sha)
-            actual = []
-            for offset, type_num, chunks, crc32 in p.iterobjects():
-                actual.append((offset, type_num, b"".join(chunks), crc32))
+            actual = list(p.iter_unpacked())
             self.assertEqual(
                 [
-                    (12, 1, commit_data, 3775879613),
-                    (138, 2, tree_data, 912998690),
-                    (178, 3, b"test 1\n", 1373561701),
+                    UnpackedObject(offset=12, pack_type_num=1, decomp_chunks=[commit_data], crc32=None),
+                    UnpackedObject(offset=138, pack_type_num=2, decomp_chunks=[tree_data], crc32=None),
+                    UnpackedObject(offset=178, pack_type_num=3, decomp_chunks=[b"test 1\n"], crc32=None),
                 ],
                 actual,
             )
@@ -312,25 +277,23 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             entries = {(sha_to_hex(s), o, c) for s, o, c in p.iterentries()}
             self.assertEqual(
-                set(
-                    [
-                        (
-                            b"6f670c0fb53f9463760b7295fbb814e965fb20c8",
-                            178,
-                            1373561701,
-                        ),
-                        (
-                            b"b2a2766a2879c209ab1176e7e778b81ae422eeaa",
-                            138,
-                            912998690,
-                        ),
-                        (
-                            b"f18faa16531ac570a3fdc8c7ca16682548dafd12",
-                            12,
-                            3775879613,
-                        ),
-                    ]
-                ),
+                {
+                    (
+                        b"6f670c0fb53f9463760b7295fbb814e965fb20c8",
+                        178,
+                        1373561701,
+                    ),
+                    (
+                        b"b2a2766a2879c209ab1176e7e778b81ae422eeaa",
+                        138,
+                        912998690,
+                    ),
+                    (
+                        b"f18faa16531ac570a3fdc8c7ca16682548dafd12",
+                        12,
+                        3775879613,
+                    ),
+                },
                 entries,
             )
 
@@ -390,7 +353,7 @@ class TestPack(PackTests):
 
     def test_contains(self):
         with self.get_pack(pack1_sha) as p:
-            self.assertTrue(tree_sha in p)
+            self.assertIn(tree_sha, p)
 
     def test_get(self):
         with self.get_pack(pack1_sha) as p:
@@ -398,17 +361,17 @@ class TestPack(PackTests):
 
     def test_iter(self):
         with self.get_pack(pack1_sha) as p:
-            self.assertEqual(set([tree_sha, commit_sha, a_sha]), set(p))
+            self.assertEqual({tree_sha, commit_sha, a_sha}, set(p))
 
     def test_iterobjects(self):
         with self.get_pack(pack1_sha) as p:
-            expected = set([p[s] for s in [commit_sha, tree_sha, a_sha]])
+            expected = {p[s] for s in [commit_sha, tree_sha, a_sha]}
             self.assertEqual(expected, set(list(p.iterobjects())))
 
     def test_pack_tuples(self):
         with self.get_pack(pack1_sha) as p:
             tuples = p.pack_tuples()
-            expected = set([(p[s], None) for s in [commit_sha, tree_sha, a_sha]])
+            expected = {(p[s], None) for s in [commit_sha, tree_sha, a_sha]}
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(3, len(tuples))
@@ -467,7 +430,7 @@ class TestPack(PackTests):
         # file should exist
         self.assertTrue(os.path.exists(keepfile_name))
 
-        with open(keepfile_name, "r") as f:
+        with open(keepfile_name) as f:
             buf = f.read()
             self.assertEqual("", buf)
 
@@ -498,7 +461,7 @@ class TestPack(PackTests):
 
             data._file.seek(12)
             bad_file = BytesIO()
-            write_pack_header(bad_file, 9999)
+            write_pack_header(bad_file.write, 9999)
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
             bad_data = PackData("", file=bad_file)
@@ -527,14 +490,14 @@ class TestPack(PackTests):
             objs = {o.id: o for o in p.iterobjects()}
             self.assertEqual(3, len(objs))
             self.assertEqual(sorted(objs), sorted(p.index))
-            self.assertTrue(isinstance(objs[a_sha], Blob))
-            self.assertTrue(isinstance(objs[tree_sha], Tree))
-            self.assertTrue(isinstance(objs[commit_sha], Commit))
+            self.assertIsInstance(objs[a_sha], Blob)
+            self.assertIsInstance(objs[tree_sha], Tree)
+            self.assertIsInstance(objs[commit_sha], Commit)
 
 
 class TestThinPack(PackTests):
     def setUp(self):
-        super(TestThinPack, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.blobs = {}
         for blob in (b"foo", b"bar", b"foo1234", b"bar2468"):
@@ -562,8 +525,8 @@ class TestThinPack(PackTests):
         # Index the new pack.
         with self.make_pack(True) as pack:
             with PackData(pack._data_path) as data:
-                data.pack = pack
-                data.create_index(self.pack_prefix + ".idx")
+                data.create_index(
+                    self.pack_prefix + ".idx", resolve_ext_ref=pack.resolve_ext_ref)
 
         del self.store[self.blobs[b"bar"].id]
 
@@ -579,24 +542,28 @@ class TestThinPack(PackTests):
         with self.make_pack(True) as p:
             self.assertEqual((3, b"foo1234"), p.get_raw(self.blobs[b"foo1234"].id))
 
-    def test_get_raw_unresolved(self):
+    def test_get_unpacked_object(self):
+        self.maxDiff = None
         with self.make_pack(False) as p:
-            self.assertEqual(
-                (
-                    7,
-                    b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
-                    [b"x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l"],
-                ),
-                p.get_raw_unresolved(self.blobs[b"foo1234"].id),
+            expected = UnpackedObject(
+                7,
+                delta_base=b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
+                decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
             )
+            expected.offset = 12
+            got = p.get_unpacked_object(self.blobs[b"foo1234"].id)
+            self.assertEqual(expected, got)
         with self.make_pack(True) as p:
+            expected = UnpackedObject(
+                7,
+                delta_base=b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
+                decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
+            )
+            expected.offset = 12
+            got = p.get_unpacked_object(self.blobs[b"foo1234"].id)
             self.assertEqual(
-                (
-                    7,
-                    b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
-                    [b"x\x9ccf\x9f\xc0\xccbhdl\x02\x00\x06f\x01l"],
-                ),
-                p.get_raw_unresolved(self.blobs[b"foo1234"].id),
+                expected,
+                got,
             )
 
     def test_iterobjects(self):
@@ -618,14 +585,14 @@ class TestThinPack(PackTests):
 class WritePackTests(TestCase):
     def test_write_pack_header(self):
         f = BytesIO()
-        write_pack_header(f, 42)
+        write_pack_header(f.write, 42)
         self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00*", f.getvalue())
 
     def test_write_pack_object(self):
         f = BytesIO()
         f.write(b"header")
         offset = f.tell()
-        crc32 = write_pack_object(f, Blob.type_num, b"blob")
+        crc32 = write_pack_object(f.write, Blob.type_num, b"blob")
         self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xFFFFFFFF)
 
         f.write(b"x")  # unpack_object needs extra trailing data.
@@ -643,7 +610,7 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f, Blob.type_num, b"blob", sha=sha_a)
+        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a)
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -654,7 +621,7 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f, Blob.type_num, b"blob", sha=sha_a, compression_level=6)
+        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a, compression_level=6)
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -663,7 +630,7 @@ class WritePackTests(TestCase):
 pack_checksum = hex_to_sha("721980e866af9a5f93ad674144e1459b8ba3e7b7")
 
 
-class BaseTestPackIndexWriting(object):
+class BaseTestPackIndexWriting:
     def assertSucceeds(self, func, *args, **kwargs):
         try:
             func(*args, **kwargs)
@@ -703,7 +670,7 @@ class BaseTestPackIndexWriting(object):
             if self._has_crc32_checksum:
                 self.assertEqual(my_crc, actual_crc)
             else:
-                self.assertTrue(actual_crc is None)
+                self.assertIsNone(actual_crc)
 
     def test_single(self):
         entry_sha = hex_to_sha("6f670c0fb53f9463760b7295fbb814e965fb20c8")
@@ -721,7 +688,7 @@ class BaseTestPackIndexWriting(object):
             if self._has_crc32_checksum:
                 self.assertEqual(my_crc, actual_crc)
             else:
-                self.assertTrue(actual_crc is None)
+                self.assertIsNone(actual_crc)
 
 
 class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
@@ -800,9 +767,9 @@ class ReadZlibTests(TestCase):
     extra = b"nextobject"
 
     def setUp(self):
-        super(ReadZlibTests, self).setUp()
+        super().setUp()
         self.read = BytesIO(self.comp + self.extra).read
-        self.unpacked = UnpackedObject(Tree.type_num, None, len(self.decomp), 0)
+        self.unpacked = UnpackedObject(Tree.type_num, decomp_len=len(self.decomp), crc32=0)
 
     def test_decompress_size(self):
         good_decomp_len = len(self.decomp)
@@ -821,7 +788,7 @@ class ReadZlibTests(TestCase):
         self.assertRaises(zlib.error, read_zlib_chunks, read, self.unpacked)
 
     def test_decompress_empty(self):
-        unpacked = UnpackedObject(Tree.type_num, None, 0, None)
+        unpacked = UnpackedObject(Tree.type_num, decomp_len=0)
         comp = zlib.compress(b"")
         read = BytesIO(comp + self.extra).read
         unused = read_zlib_chunks(read, unpacked)
@@ -873,18 +840,18 @@ class DeltifyTests(TestCase):
     def test_single(self):
         b = Blob.from_string(b"foo")
         self.assertEqual(
-            [(b.type_num, b.sha().digest(), None, b.as_raw_string())],
+            [UnpackedObject(b.type_num, sha=b.sha().digest(), delta_base=None, decomp_chunks=b.as_raw_chunks())],
             list(deltify_pack_objects([(b, b"")])),
         )
 
     def test_simple_delta(self):
         b1 = Blob.from_string(b"a" * 101)
         b2 = Blob.from_string(b"a" * 100)
-        delta = create_delta(b1.as_raw_string(), b2.as_raw_string())
+        delta = list(create_delta(b1.as_raw_chunks(), b2.as_raw_chunks()))
         self.assertEqual(
             [
-                (b1.type_num, b1.sha().digest(), None, b1.as_raw_string()),
-                (b2.type_num, b2.sha().digest(), b1.sha().digest(), delta),
+                UnpackedObject(b1.type_num, sha=b1.sha().digest(), delta_base=None, decomp_chunks=b1.as_raw_chunks()),
+                UnpackedObject(b2.type_num, sha=b2.sha().digest(), delta_base=b1.sha().digest(), decomp_chunks=delta),
             ],
             list(deltify_pack_objects([(b1, b""), (b2, b"")])),
         )
@@ -927,7 +894,7 @@ class TestPackStreamReader(TestCase):
             unpacked_delta.delta_base,
         )
         delta = create_delta(b"blob", b"blob1")
-        self.assertEqual(delta, b"".join(unpacked_delta.decomp_chunks))
+        self.assertEqual(b''.join(delta), b"".join(unpacked_delta.decomp_chunks))
         self.assertEqual(entries[1][4], unpacked_delta.crc32)
 
     def test_read_objects_buffered(self):
@@ -944,7 +911,7 @@ class TestPackStreamReader(TestCase):
 
     def test_read_objects_empty(self):
         reader = PackStreamReader(BytesIO().read)
-        self.assertEqual([], list(reader.read_objects()))
+        self.assertRaises(AssertionError, list, reader.read_objects())
 
 
 class TestPackIterator(DeltaChainIterator):
@@ -952,7 +919,7 @@ class TestPackIterator(DeltaChainIterator):
     _compute_crc32 = True
 
     def __init__(self, *args, **kwargs):
-        super(TestPackIterator, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._unpacked_offsets = set()
 
     def _result(self, unpacked):
@@ -970,14 +937,14 @@ class TestPackIterator(DeltaChainIterator):
             "Attempted to re-inflate offset %i" % offset
         )
         self._unpacked_offsets.add(offset)
-        return super(TestPackIterator, self)._resolve_object(
+        return super()._resolve_object(
             offset, pack_type_num, base_chunks
         )
 
 
 class DeltaChainIteratorTests(TestCase):
     def setUp(self):
-        super(DeltaChainIteratorTests, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.fetched = set()
 
@@ -992,9 +959,10 @@ class DeltaChainIteratorTests(TestCase):
     def get_raw_no_repeat(self, bin_sha):
         """Wrapper around store.get_raw that doesn't allow repeat lookups."""
         hex_sha = sha_to_hex(bin_sha)
-        self.assertFalse(
-            hex_sha in self.fetched,
-            "Attempted to re-fetch object %s" % hex_sha,
+        self.assertNotIn(
+            hex_sha,
+            self.fetched,
+            "Attempted to re-fetch object %s" % hex_sha
         )
         self.fetched.add(hex_sha)
         return self.store.get_raw(hex_sha)
@@ -1005,6 +973,16 @@ class DeltaChainIteratorTests(TestCase):
         resolve_ext_ref = thin and self.get_raw_no_repeat or None
         data = PackData("test.pack", file=f)
         return TestPackIterator.for_pack_data(data, resolve_ext_ref=resolve_ext_ref)
+
+    def make_pack_iter_subset(self, f, subset, thin=None):
+        if thin is None:
+            thin = bool(list(self.store))
+        resolve_ext_ref = thin and self.get_raw_no_repeat or None
+        data = PackData("test.pack", file=f)
+        assert data
+        index = MemoryPackIndex.for_pack(data)
+        pack = Pack.from_objects(data, index)
+        return TestPackIterator.for_pack_subset(pack, subset, resolve_ext_ref=resolve_ext_ref)
 
     def assertEntriesMatch(self, expected_indexes, entries, pack_iter):
         expected = [entries[i] for i in expected_indexes]
@@ -1021,6 +999,10 @@ class DeltaChainIteratorTests(TestCase):
             ],
         )
         self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
+        f.seek(0)
+        self.assertEntriesMatch([], entries, self.make_pack_iter_subset(f, []))
+        f.seek(0)
+        self.assertEntriesMatch([1, 0], entries, self.make_pack_iter_subset(f, [entries[0][3], entries[1][3]]))
 
     def test_ofs_deltas(self):
         f = BytesIO()
@@ -1032,7 +1014,12 @@ class DeltaChainIteratorTests(TestCase):
                 (OFS_DELTA, (0, b"blob2")),
             ],
         )
-        self.assertEntriesMatch([0, 1, 2], entries, self.make_pack_iter(f))
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([0, 2, 1], entries, self.make_pack_iter(f))
+        f.seek(0)
+        self.assertEntriesMatch(
+            [0, 2, 1], entries,
+            self.make_pack_iter_subset(f, [entries[1][3], entries[2][3]]))
 
     def test_ofs_deltas_chain(self):
         f = BytesIO()
@@ -1056,7 +1043,8 @@ class DeltaChainIteratorTests(TestCase):
                 (REF_DELTA, (1, b"blob2")),
             ],
         )
-        self.assertEntriesMatch([1, 0, 2], entries, self.make_pack_iter(f))
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([1, 2, 0], entries, self.make_pack_iter(f))
 
     def test_ref_deltas_chain(self):
         f = BytesIO()
@@ -1082,7 +1070,9 @@ class DeltaChainIteratorTests(TestCase):
                 (OFS_DELTA, (1, b"blob2")),
             ],
         )
-        self.assertEntriesMatch([1, 2, 0], entries, self.make_pack_iter(f))
+
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([1, 0, 2], entries, self.make_pack_iter(f))
 
     def test_mixed_chain(self):
         f = BytesIO()
@@ -1094,9 +1084,9 @@ class DeltaChainIteratorTests(TestCase):
                 (OFS_DELTA, (0, b"blob1")),
                 (OFS_DELTA, (1, b"blob3")),
                 (OFS_DELTA, (0, b"bob")),
-            ],
-        )
-        self.assertEntriesMatch([0, 2, 4, 1, 3], entries, self.make_pack_iter(f))
+            ])
+        # Delta resolution changed to DFS
+        self.assertEntriesMatch([0, 4, 2, 1, 3], entries, self.make_pack_iter(f))
 
     def test_long_chain(self):
         n = 100
@@ -1114,7 +1104,9 @@ class DeltaChainIteratorTests(TestCase):
             objects_spec.append((OFS_DELTA, (0, b"blob" + str(i).encode("ascii"))))
         f = BytesIO()
         entries = build_pack(f, objects_spec)
-        self.assertEntriesMatch(range(n + 1), entries, self.make_pack_iter(f))
+        # Delta resolution changed to DFS
+        indices = [0] + list(range(100, 0, -1))
+        self.assertEntriesMatch(indices, entries, self.make_pack_iter(f))
 
     def test_ext_ref(self):
         (blob,) = self.store_blobs([b"blob"])

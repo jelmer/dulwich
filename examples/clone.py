@@ -10,19 +10,16 @@ Example usage:
 
 
 import sys
-
+from getopt import getopt
 from os.path import basename
 
-from getopt import getopt
-
 from dulwich import porcelain
-
 
 _, args = getopt(sys.argv, "", [])
 
 
 if len(args) < 2:
-    print("usage: %s host:path path" % (args[0], ))
+    print("usage: {} host:path path".format(args[0]))
     sys.exit(1)
 
 elif len(args) < 3:

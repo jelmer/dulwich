@@ -20,15 +20,16 @@
 
 """Tests for LFS support."""
 
-from . import TestCase
-from ..lfs import LFSStore
 import shutil
 import tempfile
+
+from ..lfs import LFSStore
+from . import TestCase
 
 
 class LFSTests(TestCase):
     def setUp(self):
-        super(LFSTests, self).setUp()
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.lfs = LFSStore.create(self.test_dir)

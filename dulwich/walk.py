@@ -24,19 +24,12 @@
 import collections
 import heapq
 from itertools import chain
+from typing import Deque, List, Optional, Set, Tuple
 
-from dulwich.diff_tree import (
-    RENAME_CHANGE_TYPES,
-    tree_changes,
-    tree_changes_for_merge,
-    RenameDetector,
-)
-from dulwich.errors import (
-    MissingCommitError,
-)
-from dulwich.objects import (
-    Tag,
-)
+from dulwich.diff_tree import (RENAME_CHANGE_TYPES, RenameDetector,
+                               tree_changes, tree_changes_for_merge)
+from dulwich.errors import MissingCommitError
+from dulwich.objects import Commit, ObjectID, Tag
 
 ORDER_DATE = "date"
 ORDER_TOPO = "topo"
@@ -47,7 +40,7 @@ ALL_ORDERS = (ORDER_DATE, ORDER_TOPO)
 _MAX_EXTRA_COMMITS = 5
 
 
-class WalkEntry(object):
+class WalkEntry:
     """Object encapsulating a single result from a walk."""
 
     def __init__(self, walker, commit):
@@ -119,24 +112,24 @@ class WalkEntry(object):
         return self._changes[path_prefix]
 
     def __repr__(self):
-        return "<WalkEntry commit=%s, changes=%r>" % (
+        return "<WalkEntry commit={}, changes={!r}>".format(
             self.commit.id,
             self.changes(),
         )
 
 
-class _CommitTimeQueue(object):
+class _CommitTimeQueue:
     """Priority queue of WalkEntry objects by commit time."""
 
-    def __init__(self, walker):
+    def __init__(self, walker: "Walker"):
         self._walker = walker
         self._store = walker.store
         self._get_parents = walker.get_parents
         self._excluded = walker.excluded
-        self._pq = []
-        self._pq_set = set()
-        self._seen = set()
-        self._done = set()
+        self._pq: List[Tuple[int, Commit]] = []
+        self._pq_set: Set[ObjectID] = set()
+        self._seen: Set[ObjectID] = set()
+        self._done: Set[ObjectID] = set()
         self._min_time = walker.since
         self._last = None
         self._extra_commits_left = _MAX_EXTRA_COMMITS
@@ -145,11 +138,11 @@ class _CommitTimeQueue(object):
         for commit_id in chain(walker.include, walker.excluded):
             self._push(commit_id)
 
-    def _push(self, object_id):
+    def _push(self, object_id: bytes):
         try:
             obj = self._store[object_id]
-        except KeyError:
-            raise MissingCommitError(object_id)
+        except KeyError as exc:
+            raise MissingCommitError(object_id) from exc
         if isinstance(obj, Tag):
             self._push(obj.object[1])
             return
@@ -229,7 +222,7 @@ class _CommitTimeQueue(object):
     __next__ = next
 
 
-class Walker(object):
+class Walker:
     """Object for performing a walk of commits in a store.
 
     Walker objects are initialized with a store and other options and can then
@@ -239,16 +232,16 @@ class Walker(object):
     def __init__(
         self,
         store,
-        include,
-        exclude=None,
-        order=ORDER_DATE,
-        reverse=False,
-        max_entries=None,
-        paths=None,
-        rename_detector=None,
-        follow=False,
-        since=None,
-        until=None,
+        include: List[bytes],
+        exclude: Optional[List[bytes]] = None,
+        order: str = 'date',
+        reverse: bool = False,
+        max_entries: Optional[int] = None,
+        paths: Optional[List[bytes]] = None,
+        rename_detector: Optional[RenameDetector] = None,
+        follow: bool = False,
+        since: Optional[int] = None,
+        until: Optional[int] = None,
         get_parents=lambda commit: commit.parents,
         queue_cls=_CommitTimeQueue,
     ):
@@ -303,11 +296,13 @@ class Walker(object):
 
         self._num_entries = 0
         self._queue = queue_cls(self)
-        self._out_queue = collections.deque()
+        self._out_queue: Deque[WalkEntry] = collections.deque()
 
     def _path_matches(self, changed_path):
         if changed_path is None:
             return False
+        if self.paths is None:
+            return True
         for followed_path in self.paths:
             if changed_path == followed_path:
                 return True

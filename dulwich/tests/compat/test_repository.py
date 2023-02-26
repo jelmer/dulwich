@@ -21,31 +21,22 @@
 """Compatibility tests for dulwich repositories."""
 
 
-from io import BytesIO
-from itertools import chain
 import os
 import tempfile
+from io import BytesIO
+from itertools import chain
 
-from dulwich.objects import (
-    hex_to_sha,
-)
-from dulwich.repo import (
-    check_ref_format,
-    Repo,
-)
-from dulwich.tests.compat.utils import (
-    require_git_version,
-    rmtree_ro,
-    run_git_or_fail,
-    CompatTestCase,
-)
+from dulwich.objects import hex_to_sha
+from dulwich.repo import Repo, check_ref_format
+from dulwich.tests.compat.utils import (CompatTestCase, require_git_version,
+                                        rmtree_ro, run_git_or_fail)
 
 
 class ObjectStoreTestCase(CompatTestCase):
     """Tests for git repository compatibility."""
 
     def setUp(self):
-        super(ObjectStoreTestCase, self).setUp()
+        super().setUp()
         self._repo = self.import_repo("server_new.export")
 
     def _run_git(self, args):
@@ -147,7 +138,7 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         return temp_dir
 
     def setUp(self):
-        super(WorkingTreeTestCase, self).setUp()
+        super().setUp()
         self._worktree_path = self.create_new_worktree(self._repo.path, "branch")
         self._worktree_repo = Repo(self._worktree_path)
         self.addCleanup(self._worktree_repo.close)
@@ -156,7 +147,7 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self._repo = self._worktree_repo
 
     def test_refs(self):
-        super(WorkingTreeTestCase, self).test_refs()
+        super().test_refs()
         self.assertEqual(
             self._mainworktree_repo.refs.allkeys(), self._repo.refs.allkeys()
         )
@@ -192,6 +183,32 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self.assertEqual(worktrees[0][1], "(bare)")
         self.assertTrue(os.path.samefile(worktrees[0][0], self._mainworktree_repo.path))
 
+    def test_git_worktree_config(self):
+        """Test that git worktree config parsing matches the git CLI's behavior."""
+        # Set some config value in the main repo using the git CLI
+        require_git_version((2, 7, 0))
+        test_name = "Jelmer"
+        test_email = "jelmer@apache.org"
+        run_git_or_fail(["config", "user.name", test_name], cwd=self._repo.path)
+        run_git_or_fail(["config", "user.email", test_email], cwd=self._repo.path)
+
+        worktree_cfg = self._worktree_repo.get_config()
+        main_cfg = self._repo.get_config()
+
+        # Assert that both the worktree repo and main repo have the same view of the config,
+        # and that the config matches what we set with the git cli
+        self.assertEqual(worktree_cfg, main_cfg)
+        for c in [worktree_cfg, main_cfg]:
+            self.assertEqual(test_name.encode(), c.get((b"user",), b"name"))
+            self.assertEqual(test_email.encode(), c.get((b"user",), b"email"))
+
+        # Read the config values in the worktree with the git cli and assert they match
+        # the dulwich-parsed configs
+        output_name = run_git_or_fail(["config", "user.name"], cwd=self._mainworktree_repo.path).decode().rstrip("\n")
+        output_email = run_git_or_fail(["config", "user.email"], cwd=self._mainworktree_repo.path).decode().rstrip("\n")
+        self.assertEqual(test_name, output_name)
+        self.assertEqual(test_email, output_email)
+
 
 class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
     """Test compatibility of Repo.init_new_working_directory."""
@@ -199,7 +216,7 @@ class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
     min_git_version = (2, 5, 0)
 
     def setUp(self):
-        super(InitNewWorkingDirectoryTestCase, self).setUp()
+        super().setUp()
         self._other_worktree = self._repo
         worktree_repo_path = tempfile.mkdtemp()
         self.addCleanup(rmtree_ro, worktree_repo_path)

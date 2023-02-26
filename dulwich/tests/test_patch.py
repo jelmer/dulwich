@@ -22,27 +22,12 @@
 
 from io import BytesIO, StringIO
 
-from dulwich.objects import (
-    Blob,
-    Commit,
-    S_IFGITLINK,
-    Tree,
-)
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.patch import (
-    get_summary,
-    git_am_patch_split,
-    write_blob_diff,
-    write_commit_patch,
-    write_object_diff,
-    write_tree_diff,
-)
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
+from dulwich.patch import (get_summary, git_am_patch_split, write_blob_diff,
+                           write_commit_patch, write_object_diff,
+                           write_tree_diff)
+from dulwich.tests import SkipTest, TestCase
 
 
 class WriteCommitPatchTests(TestCase):
@@ -93,7 +78,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(StringIO(text.decode("utf-8")), "utf-8")
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
@@ -125,7 +110,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
@@ -160,7 +145,7 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(
             b"""\
@@ -192,7 +177,7 @@ From: Jelmer Vernooij <jelmer@debian.org>
 
 -- 
 1.7.0.4
-"""  # noqa: W291
+"""
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(b"Jelmer Vernooij <jelmer@debian.org>", c.author)
         self.assertEqual(
@@ -242,7 +227,7 @@ diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
  
  
  class DiffTests(TestCase):
-"""  # noqa: W291,W293
+"""
         text = (
             """\
 From dulwich-users-bounces+jelmer=samba.org@lists.launchpad.net \
@@ -265,7 +250,7 @@ More help   : https://help.launchpad.net/ListHelp
 
 """
             % expected_diff
-        )  # noqa: W291
+        )
         c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(expected_diff, diff)
         self.assertEqual(None, version)

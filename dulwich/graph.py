@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
 #
@@ -24,6 +23,7 @@ Implementation of merge-base following the approach of git
 """
 
 from collections import deque
+from typing import Deque
 
 
 def _find_lcas(lookup_parents, c1, c2s):
@@ -44,7 +44,7 @@ def _find_lcas(lookup_parents, c1, c2s):
         return False
 
     # initialize the working list
-    wlst = deque()
+    wlst: Deque[int] = deque()
     cstates[c1] = _ANC_OF_1
     wlst.append(c1)
     for c2 in c2s:
@@ -74,7 +74,7 @@ def _find_lcas(lookup_parents, c1, c2s):
                     cstates[pcmt] = flags
                 wlst.append(pcmt)
 
-    # walk final candidates removing any superceded by _DNC by later lower LCAs
+    # walk final candidates removing any superseded by _DNC by later lower LCAs
     results = []
     for cmt in cands:
         if not (cstates[cmt] & _DNC):

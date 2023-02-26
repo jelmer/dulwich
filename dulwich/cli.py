@@ -28,20 +28,20 @@ no means intended to be a full-blown Git command-line interface but just
 a way to test Dulwich.
 """
 
-import os
-import sys
-from getopt import getopt
 import argparse
 import optparse
+import os
 import signal
-from typing import Dict, Type
+import sys
+from getopt import getopt
+from typing import Dict, Optional, Type
 
 from dulwich import porcelain
-from dulwich.client import get_transport_and_path
+from dulwich.client import GitProtocolError, get_transport_and_path
 from dulwich.errors import ApplyDeltaError
 from dulwich.index import Index
+from dulwich.objectspec import parse_commit
 from dulwich.pack import Pack, sha_to_hex
-from dulwich.patch import write_tree_diff
 from dulwich.repo import Repo
 
 
@@ -55,7 +55,7 @@ def signal_quit(signal, frame):
     pdb.set_trace()
 
 
-class Command(object):
+class Command:
     """A Dulwich subcommand."""
 
     def run(self, args):
@@ -139,7 +139,7 @@ class cmd_fsck(Command):
         opts, args = getopt(args, "", [])
         opts = dict(opts)
         for (obj, msg) in porcelain.fsck("."):
-            print("%s: %s" % (obj, msg))
+            print("{}: {}".format(obj, msg))
 
 
 class cmd_log(Command):
@@ -172,15 +172,15 @@ class cmd_diff(Command):
     def run(self, args):
         opts, args = getopt(args, "", [])
 
-        if args == []:
-            print("Usage: dulwich diff COMMITID")
-            sys.exit(1)
-
         r = Repo(".")
-        commit_id = args[0]
-        commit = r[commit_id]
+        if args == []:
+            commit_id = b'HEAD'
+        else:
+            commit_id = args[0]
+        commit = parse_commit(r, commit_id)
         parent_commit = r[commit.parents[0]]
-        write_tree_diff(sys.stdout, r.object_store, parent_commit.tree, commit.tree)
+        porcelain.diff_tree(
+            r, parent_commit.tree, commit.tree, outstream=sys.stdout.buffer)
 
 
 class cmd_dump_pack(Command):
@@ -202,9 +202,9 @@ class cmd_dump_pack(Command):
             try:
                 print("\t%s" % x[name])
             except KeyError as k:
-                print("\t%s: Unable to resolve base %s" % (name, k))
+                print("\t{}: Unable to resolve base {}".format(name, k))
             except ApplyDeltaError as e:
-                print("\t%s: Unable to apply delta: %r" % (name, e))
+                print("\t{}: Unable to apply delta: {!r}".format(name, e))
 
 
 class cmd_dump_index(Command):
@@ -247,6 +247,10 @@ class cmd_clone(Command):
         parser.add_option(
             "--depth", dest="depth", type=int, help="Depth at which to fetch"
         )
+        parser.add_option(
+            "-b", "--branch", dest="branch", type=str,
+            help=("Check out branch instead of branch pointed to by remote "
+                  "HEAD"))
         options, args = parser.parse_args(args)
 
         if args == []:
@@ -259,7 +263,11 @@ class cmd_clone(Command):
         else:
             target = None
 
-        porcelain.clone(source, target, bare=options.bare, depth=options.depth)
+        try:
+            porcelain.clone(source, target, bare=options.bare, depth=options.depth,
+                            branch=options.branch)
+        except GitProtocolError as e:
+            print("%s" % e)
 
 
 class cmd_commit(Command):
@@ -293,6 +301,18 @@ class cmd_symbolic_ref(Command):
 
         ref_name = args.pop(0)
         porcelain.symbolic_ref(".", ref_name=ref_name, force="--force" in args)
+
+
+class cmd_pack_refs(Command):
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--all', action='store_true')
+        # ignored, we never prune
+        parser.add_argument('--no-prune', action='store_true')
+
+        args = parser.parse_args(argv)
+
+        porcelain.pack_refs(".", all=args.all)
 
 
 class cmd_show(Command):
@@ -466,7 +486,7 @@ class cmd_status(Command):
             for kind, names in status.staged.items():
                 for name in names:
                     sys.stdout.write(
-                        "\t%s: %s\n" % (kind, name.decode(sys.getfilesystemencoding()))
+                        "\t{}: {}\n".format(kind, name.decode(sys.getfilesystemencoding()))
                     )
             sys.stdout.write("\n")
         if status.unstaged:
@@ -489,7 +509,7 @@ class cmd_ls_remote(Command):
             sys.exit(1)
         refs = porcelain.ls_remote(args[0])
         for ref in sorted(refs):
-            sys.stdout.write("%s\t%s\n" % (ref, refs[ref]))
+            sys.stdout.write("{}\t{}\n".format(ref, refs[ref]))
 
 
 class cmd_ls_tree(Command):
@@ -499,7 +519,7 @@ class cmd_ls_tree(Command):
             "-r",
             "--recursive",
             action="store_true",
-            help="Recusively list tree contents.",
+            help="Recursively list tree contents.",
         )
         parser.add_option("--name-only", action="store_true", help="Only display name.")
         options, args = parser.parse_args(args)
@@ -518,22 +538,34 @@ class cmd_ls_tree(Command):
 
 class cmd_pack_objects(Command):
     def run(self, args):
-        opts, args = getopt(args, "", ["stdout"])
+        deltify = False
+        reuse_deltas = True
+        opts, args = getopt(args, "", ["stdout", "deltify", "no-reuse-deltas"])
         opts = dict(opts)
-        if len(args) < 1 and "--stdout" not in args:
+        if len(args) < 1 and "--stdout" not in opts.keys():
             print("Usage: dulwich pack-objects basename")
             sys.exit(1)
         object_ids = [line.strip() for line in sys.stdin.readlines()]
-        basename = args[0]
-        if "--stdout" in opts:
+        if "--deltify" in opts.keys():
+            deltify = True
+        if "--no-reuse-deltas" in opts.keys():
+            reuse_deltas = False
+        if "--stdout" in opts.keys():
             packf = getattr(sys.stdout, "buffer", sys.stdout)
             idxf = None
             close = []
         else:
-            packf = open(basename + ".pack", "w")
-            idxf = open(basename + ".idx", "w")
+            basename = args[0]
+            packf = open(basename + ".pack", "wb")
+            idxf = open(basename + ".idx", "wb")
             close = [packf, idxf]
-        porcelain.pack_objects(".", object_ids, packf, idxf)
+        porcelain.pack_objects(
+            ".",
+            object_ids,
+            packf,
+            idxf,
+            deltify=deltify,
+            reuse_deltas=reuse_deltas)
         for f in close:
             f.close()
 
@@ -553,10 +585,15 @@ class cmd_push(Command):
 
     def run(self, argv):
         parser = argparse.ArgumentParser()
+        parser.add_argument('-f', '--force', action='store_true', help='Force')
         parser.add_argument('to_location', type=str)
         parser.add_argument('refspec', type=str, nargs='*')
         args = parser.parse_args(argv)
-        porcelain.push('.', args.to_location, args.refspec or None)
+        try:
+            porcelain.push('.', args.to_location, args.refspec or None, force=args.force)
+        except porcelain.DivergedBranches:
+            sys.stderr.write('Diverged branches; specify --force to override')
+            return 1
 
 
 class cmd_remote_add(Command):
@@ -568,10 +605,11 @@ class cmd_remote_add(Command):
 
 class SuperCommand(Command):
 
-    subcommands = {}  # type: Dict[str, Type[Command]]
+    subcommands: Dict[str, Type[Command]] = {}
+    default_command: Optional[Type[Command]] = None
 
     def run(self, args):
-        if not args:
+        if not args and not self.default_command:
             print("Supported subcommands: %s" % ", ".join(self.subcommands.keys()))
             return False
         cmd = args[0]
@@ -588,6 +626,30 @@ class cmd_remote(SuperCommand):
     subcommands = {
         "add": cmd_remote_add,
     }
+
+
+class cmd_submodule_list(Command):
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.parse_args(argv)
+        for path, sha in porcelain.submodule_list("."):
+            sys.stdout.write(' {} {}\n'.format(sha, path))
+
+
+class cmd_submodule_init(Command):
+    def run(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.parse_args(argv)
+        porcelain.submodule_init(".")
+
+
+class cmd_submodule(SuperCommand):
+
+    subcommands = {
+        "init": cmd_submodule_init,
+    }
+
+    default_command = cmd_submodule_init
 
 
 class cmd_check_ignore(Command):
@@ -709,6 +771,7 @@ commands = {
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "pack-objects": cmd_pack_objects,
+    "pack-refs": cmd_pack_refs,
     "pull": cmd_pull,
     "push": cmd_push,
     "receive-pack": cmd_receive_pack,
@@ -721,6 +784,7 @@ commands = {
     "stash": cmd_stash,
     "status": cmd_status,
     "symbolic-ref": cmd_symbolic_ref,
+    "submodule": cmd_submodule,
     "tag": cmd_tag,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,

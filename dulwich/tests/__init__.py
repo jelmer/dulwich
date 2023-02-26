@@ -20,37 +20,46 @@
 
 """Tests for Dulwich."""
 
+__all__ = [
+    'SkipTest',
+    'TestCase',
+    'BlackboxTestCase',
+    'skipIf',
+    'expectedFailure',
+]
+
 import doctest
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-
-
 # If Python itself provides an exception, use that
 import unittest
-from unittest import (  # noqa: F401
-    SkipTest,
-    TestCase as _TestCase,
-    skipIf,
-    expectedFailure,
-)
+from unittest import SkipTest
+from unittest import TestCase as _TestCase  # noqa: F401
+from unittest import expectedFailure, skipIf
 
 
 class TestCase(_TestCase):
     def setUp(self):
-        super(TestCase, self).setUp()
-        self._old_home = os.environ.get("HOME")
-        os.environ["HOME"] = "/nonexistant"
-        os.environ["GIT_CONFIG_NOSYSTEM"] = "1"
+        super().setUp()
+        self.overrideEnv("HOME", "/nonexistent")
+        self.overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 
-    def tearDown(self):
-        super(TestCase, self).tearDown()
-        if self._old_home:
-            os.environ["HOME"] = self._old_home
+    def overrideEnv(self, name, value):
+        def restore():
+            if oldval is not None:
+                os.environ[name] = oldval
+            else:
+                del os.environ[name]
+
+        oldval = os.environ.get(name)
+        if value is not None:
+            os.environ[name] = value
         else:
-            del os.environ["HOME"]
+            del os.environ[name]
+        self.addCleanup(restore)
 
 
 class BlackboxTestCase(TestCase):
@@ -109,6 +118,7 @@ def self_test_suite():
         "bundle",
         "client",
         "config",
+        "credentials",
         "diff_tree",
         "fastexport",
         "file",
@@ -145,12 +155,9 @@ def self_test_suite():
 
 
 def tutorial_test_suite():
-    import dulwich.client  # noqa: F401
-    import dulwich.config  # noqa: F401
-    import dulwich.index  # noqa: F401
-    import dulwich.reflog  # noqa: F401
-    import dulwich.repo  # noqa: F401
-    import dulwich.server  # noqa: F401
+    import dulwich.client
+    import dulwich.config
+    import dulwich.index
     import dulwich.patch  # noqa: F401
 
     tutorial = [
@@ -161,7 +168,7 @@ def tutorial_test_suite():
         "remote",
         "conclusion",
     ]
-    tutorial_files = ["../../docs/tutorial/%s.txt" % name for name in tutorial]
+    tutorial_files = [f"../../docs/tutorial/{name}.txt" for name in tutorial]
 
     def setup(test):
         test.__old_cwd = os.getcwd()

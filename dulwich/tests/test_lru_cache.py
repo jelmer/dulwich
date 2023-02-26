@@ -19,12 +19,8 @@
 
 """Tests for the lru_cache module."""
 
-from dulwich import (
-    lru_cache,
-)
-from dulwich.tests import (
-    TestCase,
-)
+from dulwich import lru_cache
+from dulwich.tests import TestCase
 
 
 class TestLRUCache(TestCase):
@@ -43,18 +39,18 @@ class TestLRUCache(TestCase):
     def test_missing(self):
         cache = lru_cache.LRUCache(max_cache=10)
 
-        self.assertFalse("foo" in cache)
+        self.assertNotIn("foo", cache)
         self.assertRaises(KeyError, cache.__getitem__, "foo")
 
         cache["foo"] = "bar"
         self.assertEqual("bar", cache["foo"])
-        self.assertTrue("foo" in cache)
-        self.assertFalse("bar" in cache)
+        self.assertIn("foo", cache)
+        self.assertNotIn("bar", cache)
 
     def test_map_None(self):
         # Make sure that we can properly map None as a key.
         cache = lru_cache.LRUCache(max_cache=10)
-        self.assertFalse(None in cache)
+        self.assertNotIn(None, cache)
         cache[None] = 1
         self.assertEqual(1, cache[None])
         cache[None] = 2
@@ -80,8 +76,8 @@ class TestLRUCache(TestCase):
         # With a max cache of 1, adding 'baz' should pop out 'foo'
         cache["baz"] = "biz"
 
-        self.assertFalse("foo" in cache)
-        self.assertTrue("baz" in cache)
+        self.assertNotIn("foo", cache)
+        self.assertIn("baz", cache)
 
         self.assertEqual("biz", cache["baz"])
 
@@ -97,7 +93,7 @@ class TestLRUCache(TestCase):
         # This must kick out 'foo' because it was the last accessed
         cache["nub"] = "in"
 
-        self.assertFalse("foo" in cache)
+        self.assertNotIn("foo", cache)
 
     def test_cleanup(self):
         """Test that we can use a cleanup function."""
@@ -236,7 +232,7 @@ class TestLRUCache(TestCase):
         self.assertEqual(20, cache.get(2))
         self.assertEqual(None, cache.get(3))
         obj = object()
-        self.assertTrue(obj is cache.get(3, obj))
+        self.assertIs(obj, cache.get(3, obj))
         self.assertEqual([2, 1], [n.key for n in cache._walk_lru()])
         self.assertEqual(10, cache.get(1))
         self.assertEqual([1, 2], [n.key for n in cache._walk_lru()])

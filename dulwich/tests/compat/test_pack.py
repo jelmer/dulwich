@@ -27,24 +27,11 @@ import re
 import shutil
 import tempfile
 
-from dulwich.pack import (
-    write_pack,
-)
-from dulwich.objects import (
-    Blob,
-)
-from dulwich.tests import (
-    SkipTest,
-)
-from dulwich.tests.test_pack import (
-    a_sha,
-    pack1_sha,
-    PackTests,
-)
-from dulwich.tests.compat.utils import (
-    require_git_version,
-    run_git_or_fail,
-)
+from dulwich.objects import Blob
+from dulwich.pack import write_pack
+from dulwich.tests import SkipTest
+from dulwich.tests.compat.utils import require_git_version, run_git_or_fail
+from dulwich.tests.test_pack import PackTests, a_sha, pack1_sha
 
 _NON_DELTA_RE = re.compile(b"non delta: (?P<non_delta>\\d+) objects")
 
@@ -66,7 +53,7 @@ class TestPack(PackTests):
 
     def setUp(self):
         require_git_version((1, 5, 0))
-        super(TestPack, self).setUp()
+        super().setUp()
         self._tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self._tempdir)
 
@@ -84,7 +71,7 @@ class TestPack(PackTests):
             orig_blob = orig_pack[a_sha]
             new_blob = Blob()
             new_blob.data = orig_blob.data + b"x"
-            all_to_pack = list(orig_pack.pack_tuples()) + [(new_blob, None)]
+            all_to_pack = [(o, None) for o in orig_pack.iterobjects()] + [(new_blob, None)]
         pack_path = os.path.join(self._tempdir, "pack_with_deltas")
         write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
@@ -115,8 +102,8 @@ class TestPack(PackTests):
                 (new_blob, None),
                 (new_blob_2, None),
             ]
-        pack_path = os.path.join(self._tempdir, "pack_with_deltas")
-        write_pack(pack_path, all_to_pack, deltify=True)
+            pack_path = os.path.join(self._tempdir, "pack_with_deltas")
+            write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
             {x[0].id for x in all_to_pack},
@@ -154,8 +141,8 @@ class TestPack(PackTests):
                 (new_blob, None),
                 (new_blob_2, None),
             ]
-        pack_path = os.path.join(self._tempdir, "pack_with_deltas")
-        write_pack(pack_path, all_to_pack, deltify=True)
+            pack_path = os.path.join(self._tempdir, "pack_with_deltas")
+            write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
             {x[0].id for x in all_to_pack},

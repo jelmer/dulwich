@@ -18,72 +18,37 @@
 # License, Version 2.0.
 #
 
-from io import BytesIO
 import base64
 import os
-import sys
 import shutil
+import sys
 import tempfile
 import warnings
-
-from urllib.parse import (
-    quote as urlquote,
-    urlparse,
-)
+from io import BytesIO
+from unittest.mock import patch
+from urllib.parse import quote as urlquote
+from urllib.parse import urlparse
 
 import dulwich
-from dulwich import (
-    client,
-)
-from dulwich.client import (
-    InvalidWants,
-    LocalGitClient,
-    TraditionalGitClient,
-    TCPGitClient,
-    SSHGitClient,
-    HttpGitClient,
-    FetchPackResult,
-    ReportStatusParser,
-    SendPackError,
-    StrangeHostname,
-    SubprocessSSHVendor,
-    PLinkSSHVendor,
-    HangupException,
-    GitProtocolError,
-    check_wants,
-    default_urllib3_manager,
-    get_credentials_from_store,
-    get_transport_and_path,
-    get_transport_and_path_from_url,
-    parse_rsync_url,
-    _remote_error_from_stderr,
-)
-from dulwich.config import (
-    ConfigDict,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.protocol import (
-    TCP_GIT_PORT,
-    Protocol,
-)
-from dulwich.pack import (
-    pack_objects_to_data,
-    write_pack_data,
-    write_pack_objects,
-)
+from dulwich import client
+from dulwich.client import (FetchPackResult, GitProtocolError, HangupException,
+                            HttpGitClient, InvalidWants, LocalGitClient,
+                            PLinkSSHVendor, ReportStatusParser, SendPackError,
+                            SSHGitClient, StrangeHostname, SubprocessSSHVendor,
+                            TCPGitClient, TraditionalGitClient,
+                            _remote_error_from_stderr, check_wants,
+                            default_urllib3_manager,
+                            get_credentials_from_store, get_transport_and_path,
+                            get_transport_and_path_from_url, parse_rsync_url)
+from dulwich.config import ConfigDict
 from dulwich.objects import Commit, Tree
-from dulwich.repo import (
-    MemoryRepo,
-    Repo,
-)
-from dulwich.tests import skipIf
-from dulwich.tests.utils import (
-    open_repo,
-    tear_down_repo,
-    setup_warning_catcher,
-)
+from dulwich.pack import (pack_objects_to_data, write_pack_data,
+                          write_pack_objects)
+from dulwich.protocol import TCP_GIT_PORT, Protocol
+from dulwich.repo import MemoryRepo, Repo
+from dulwich.tests import TestCase, skipIf
+from dulwich.tests.utils import (open_repo, setup_warning_catcher,
+                                 tear_down_repo)
 
 
 class DummyClient(TraditionalGitClient):
@@ -116,7 +81,7 @@ class DummyPopen:
 # TODO(durin42): add unit-level tests of GitClient
 class GitClientTests(TestCase):
     def setUp(self):
-        super(GitClientTests, self).setUp()
+        super().setUp()
         self.rout = BytesIO()
         self.rin = BytesIO()
         self.client = DummyClient(lambda x: True, self.rin.read, self.rout.write)
@@ -124,29 +89,25 @@ class GitClientTests(TestCase):
     def test_caps(self):
         agent_cap = ("agent=dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
         self.assertEqual(
-            set(
-                [
-                    b"multi_ack",
-                    b"side-band-64k",
-                    b"ofs-delta",
-                    b"thin-pack",
-                    b"multi_ack_detailed",
-                    b"shallow",
-                    agent_cap,
-                ]
-            ),
+            {
+                b"multi_ack",
+                b"side-band-64k",
+                b"ofs-delta",
+                b"thin-pack",
+                b"multi_ack_detailed",
+                b"shallow",
+                agent_cap,
+            },
             set(self.client._fetch_capabilities),
         )
         self.assertEqual(
-            set(
-                [
-                    b"delete-refs",
-                    b"ofs-delta",
-                    b"report-status",
-                    b"side-band-64k",
-                    agent_cap,
-                ]
-            ),
+            {
+                b"delete-refs",
+                b"ofs-delta",
+                b"report-status",
+                b"side-band-64k",
+                agent_cap,
+            },
             set(self.client._send_capabilities),
         )
 
@@ -202,7 +163,7 @@ class GitClientTests(TestCase):
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b"0000")
 
-    def test_send_pack_no_sideband64k_with_update_ref_error(self):
+    def test_send_pack_no_sideband64k_with_update_ref_error(self) -> None:
         # No side-bank-64k reported by server shouldn't try to parse
         # side band data
         pkts = [
@@ -235,11 +196,11 @@ class GitClientTests(TestCase):
                 b"refs/foo/bar": commit.id,
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
-                    (tree, ""),
+                    (tree, b""),
                 ]
             )
 
@@ -262,7 +223,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -282,7 +243,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -306,7 +267,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -333,11 +294,11 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         f = BytesIO()
-        write_pack_objects(f, {})
+        write_pack_objects(f.write, [])
         self.client.send_pack("/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -373,7 +334,7 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
@@ -382,7 +343,8 @@ class GitClientTests(TestCase):
             )
 
         f = BytesIO()
-        write_pack_data(f, *generate_pack_data(None, None))
+        count, records = generate_pack_data(None, None)
+        write_pack_data(f.write, records, num_records=count)
         self.client.send_pack(b"/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -409,7 +371,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False):
+        def generate_pack_data(have, want, ofs_delta=False, progress=None):
             return 0, []
 
         result = self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -427,21 +389,21 @@ class GitClientTests(TestCase):
 class TestGetTransportAndPath(TestCase):
     def test_tcp(self):
         c, path = get_transport_and_path("git://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(TCP_GIT_PORT, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_tcp_port(self):
         c, path = get_transport_and_path("git://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(1234, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_git_ssh_explicit(self):
         c, path = get_transport_and_path("git+ssh://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -449,7 +411,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_explicit(self):
         c, path = get_transport_and_path("ssh://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -457,20 +419,20 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_port_explicit(self):
         c, path = get_transport_and_path("git+ssh://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/bar/baz", path)
 
     def test_username_and_port_explicit_unknown_scheme(self):
         c, path = get_transport_and_path("unknown://git@server:7999/dply/stuff.git")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("unknown", c.host)
         self.assertEqual("//git@server:7999/dply/stuff.git", path)
 
     def test_username_and_port_explicit(self):
         c, path = get_transport_and_path("ssh://git@server:7999/dply/stuff.git")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("git", c.username)
         self.assertEqual("server", c.host)
         self.assertEqual(7999, c.port)
@@ -478,7 +440,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_abspath_doubleslash(self):
         c, path = get_transport_and_path("git+ssh://foo.com//bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -486,14 +448,14 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_port(self):
         c, path = get_transport_and_path("git+ssh://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_implicit(self):
         c, path = get_transport_and_path("foo:/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -501,7 +463,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_host(self):
         c, path = get_transport_and_path("foo.com:/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -509,7 +471,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_user_host(self):
         c, path = get_transport_and_path("user@foo.com:/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual("user", c.username)
@@ -517,7 +479,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_relpath(self):
         c, path = get_transport_and_path("foo:bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -525,7 +487,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_host_relpath(self):
         c, path = get_transport_and_path("foo.com:bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -533,7 +495,7 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_user_host_relpath(self):
         c, path = get_transport_and_path("user@foo.com:bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual("user", c.username)
@@ -541,25 +503,25 @@ class TestGetTransportAndPath(TestCase):
 
     def test_local(self):
         c, path = get_transport_and_path("foo.bar/baz")
-        self.assertTrue(isinstance(c, LocalGitClient))
+        self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("foo.bar/baz", path)
 
     @skipIf(sys.platform != "win32", "Behaviour only happens on windows.")
     def test_local_abs_windows_path(self):
         c, path = get_transport_and_path("C:\\foo.bar\\baz")
-        self.assertTrue(isinstance(c, LocalGitClient))
+        self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("C:\\foo.bar\\baz", path)
 
     def test_error(self):
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
         c, path = get_transport_and_path("prospero://bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
 
     def test_http(self):
         url = "https://github.com/jelmer/dulwich"
         c, path = get_transport_and_path(url)
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
 
     def test_http_auth(self):
@@ -567,7 +529,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url)
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertEqual("user", c._username)
         self.assertEqual("passwd", c._password)
@@ -577,7 +539,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url, username="user2", password="blah")
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertEqual("user2", c._username)
         self.assertEqual("blah", c._password)
@@ -587,7 +549,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url, username="user2", password="blah")
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertEqual("user", c._username)
         self.assertEqual("passwd", c._password)
@@ -597,7 +559,7 @@ class TestGetTransportAndPath(TestCase):
 
         c, path = get_transport_and_path(url)
 
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
@@ -606,21 +568,21 @@ class TestGetTransportAndPath(TestCase):
 class TestGetTransportAndPathFromUrl(TestCase):
     def test_tcp(self):
         c, path = get_transport_and_path_from_url("git://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(TCP_GIT_PORT, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_tcp_port(self):
         c, path = get_transport_and_path_from_url("git://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, TCPGitClient))
+        self.assertIsInstance(c, TCPGitClient)
         self.assertEqual("foo.com", c._host)
         self.assertEqual(1234, c._port)
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_explicit(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -628,14 +590,14 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_ssh_port_explicit(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com:1234/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/bar/baz", path)
 
     def test_ssh_homepath(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com/~/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(None, c.port)
         self.assertEqual(None, c.username)
@@ -643,7 +605,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
     def test_ssh_port_homepath(self):
         c, path = get_transport_and_path_from_url("git+ssh://foo.com:1234/~/bar/baz")
-        self.assertTrue(isinstance(c, SSHGitClient))
+        self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("foo.com", c.host)
         self.assertEqual(1234, c.port)
         self.assertEqual("/~/bar/baz", path)
@@ -671,7 +633,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
     def test_http(self):
         url = "https://github.com/jelmer/dulwich"
         c, path = get_transport_and_path_from_url(url)
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("https://github.com", c.get_url(b"/"))
         self.assertEqual("/jelmer/dulwich", path)
 
@@ -679,16 +641,46 @@ class TestGetTransportAndPathFromUrl(TestCase):
         url = "https://github.com:9090/jelmer/dulwich"
         c, path = get_transport_and_path_from_url(url)
         self.assertEqual("https://github.com:9090", c.get_url(b"/"))
-        self.assertTrue(isinstance(c, HttpGitClient))
+        self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
 
+    @patch("os.name", "posix")
+    @patch("sys.platform", "linux")
     def test_file(self):
         c, path = get_transport_and_path_from_url("file:///home/jelmer/foo")
-        self.assertTrue(isinstance(c, LocalGitClient))
+        self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("/home/jelmer/foo", path)
 
+    @patch("os.name", "nt")
+    @patch("sys.platform", "win32")
+    def test_file_win(self):
+        # `_win32_url_to_path` uses urllib.request.url2pathname, which is set to
+        # `ntutl2path.url2pathname`  when `os.name==nt`
+        from nturl2path import url2pathname
 
-class TestSSHVendor(object):
+        with patch("dulwich.client.url2pathname", url2pathname):
+            expected = "C:\\foo.bar\\baz"
+            for file_url in [
+                "file:C:/foo.bar/baz",
+                "file:/C:/foo.bar/baz",
+                "file://C:/foo.bar/baz",
+                "file://C://foo.bar//baz",
+                "file:///C:/foo.bar/baz",
+            ]:
+                c, path = get_transport_and_path(file_url)
+                self.assertIsInstance(c, LocalGitClient)
+                self.assertEqual(path, expected)
+
+            for remote_url in [
+                "file://host.example.com/C:/foo.bar/baz"
+                "file://host.example.com/C:/foo.bar/baz"
+                "file:////host.example/foo.bar/baz",
+            ]:
+                with self.assertRaises(NotImplementedError):
+                    c, path = get_transport_and_path(remote_url)
+
+
+class TestSSHVendor:
     def __init__(self):
         self.host = None
         self.command = ""
@@ -705,6 +697,7 @@ class TestSSHVendor(object):
         port=None,
         password=None,
         key_filename=None,
+        ssh_command=None,
     ):
         self.host = host
         self.command = command
@@ -712,6 +705,7 @@ class TestSSHVendor(object):
         self.port = port
         self.password = password
         self.key_filename = key_filename
+        self.ssh_command = ssh_command
 
         class Subprocess:
             pass
@@ -725,7 +719,7 @@ class TestSSHVendor(object):
 
 class SSHGitClientTests(TestCase):
     def setUp(self):
-        super(SSHGitClientTests, self).setUp()
+        super().setUp()
 
         self.server = TestSSHVendor()
         self.real_vendor = client.get_ssh_vendor
@@ -734,7 +728,7 @@ class SSHGitClientTests(TestCase):
         self.client = SSHGitClient("git.samba.org")
 
     def tearDown(self):
-        super(SSHGitClientTests, self).tearDown()
+        super().tearDown()
         client.get_ssh_vendor = self.real_vendor
 
     def test_get_url(self):
@@ -785,6 +779,18 @@ class SSHGitClientTests(TestCase):
         client._connect(b"relative-command", b"/~/path/to/repo")
         self.assertEqual("git-relative-command '~/path/to/repo'", server.command)
 
+    def test_ssh_command_precedence(self):
+        self.overrideEnv("GIT_SSH", "/path/to/ssh")
+        test_client = SSHGitClient("git.samba.org")
+        self.assertEqual(test_client.ssh_command, "/path/to/ssh")
+
+        self.overrideEnv("GIT_SSH_COMMAND", "/path/to/ssh -o Option=Value")
+        test_client = SSHGitClient("git.samba.org")
+        self.assertEqual(test_client.ssh_command, "/path/to/ssh -o Option=Value")
+
+        test_client = SSHGitClient("git.samba.org", ssh_command="ssh -o Option1=Value1")
+        self.assertEqual(test_client.ssh_command, "ssh -o Option1=Value1")
+
 
 class ReportStatusParserTests(TestCase):
     def test_invalid_pack(self):
@@ -819,10 +825,26 @@ class LocalGitClientTests(TestCase):
 
     def test_fetch_into_empty(self):
         c = LocalGitClient()
-        t = MemoryRepo()
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        t = Repo.init_bare(target)
+        self.addCleanup(t.close)
         s = open_repo("a.git")
         self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)
+
+    def test_clone(self):
+        c = LocalGitClient()
+        s = open_repo("a.git")
+        self.addCleanup(tear_down_repo, s)
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        result_repo = c.clone(s.path, target, mkdir=False)
+        self.addCleanup(result_repo.close)
+        expected = dict(s.get_refs())
+        expected[b'refs/remotes/origin/HEAD'] = expected[b'HEAD']
+        expected[b'refs/remotes/origin/master'] = expected[b'refs/heads/master']
+        self.assertEqual(expected, result_repo.get_refs())
 
     def test_fetch_empty(self):
         c = LocalGitClient()
@@ -954,9 +976,22 @@ class HttpGitClientTests(TestCase):
         self.assertEqual("passwd", c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = "%s:%s" % ("user", "passwd")
+        auth_string = "{}:{}".format("user", "passwd")
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
+        self.assertEqual(basic_auth, expected_basic_auth)
+
+    def test_init_username_set_no_password(self):
+        url = "https://github.com/jelmer/dulwich"
+
+        c = HttpGitClient(url, config=None, username="user")
+        self.assertEqual("user", c._username)
+        self.assertIsNone(c._password)
+
+        basic_auth = c.pool_manager.headers["authorization"]
+        auth_string = b"user:"
+        b64_credentials = base64.b64encode(auth_string)
+        expected_basic_auth = f"Basic {b64_credentials.decode('ascii')}"
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_init_no_username_passwd(self):
@@ -966,6 +1001,20 @@ class HttpGitClientTests(TestCase):
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
         self.assertNotIn("authorization", c.pool_manager.headers)
+
+    def test_from_parsedurl_username_only(self):
+        username = "user"
+        url = f"https://{username}@github.com/jelmer/dulwich"
+
+        c = HttpGitClient.from_parsedurl(urlparse(url))
+        self.assertEqual(c._username, username)
+        self.assertEqual(c._password, None)
+
+        basic_auth = c.pool_manager.headers["authorization"]
+        auth_string = username.encode('ascii') + b":"
+        b64_credentials = base64.b64encode(auth_string)
+        expected_basic_auth = f"Basic {b64_credentials.decode('ascii')}"
+        self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_from_parsedurl_on_url_with_quoted_credentials(self):
         original_username = "john|the|first"
@@ -983,7 +1032,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(original_password, c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = "%s:%s" % (original_username, original_password)
+        auth_string = "{}:{}".format(original_username, original_password)
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
         self.assertEqual(basic_auth, expected_basic_auth)
@@ -1018,7 +1067,7 @@ class HttpGitClientTests(TestCase):
             def __init__(self):
                 self.headers = {}
 
-            def request(self, method, url, fields=None, headers=None, redirect=True):
+            def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
                 base_url = url[: -len(tail)]
                 redirect_base_url = test_data[base_url]["redirect_url"]
                 redirect_url = redirect_base_url + tail
@@ -1033,14 +1082,15 @@ class HttpGitClientTests(TestCase):
                 if redirect is False:
                     request_url = url
                     if redirect_base_url != base_url:
-                        body = ""
+                        body = b""
                         headers["location"] = redirect_url
                         status = 301
                 return HTTPResponse(
-                    body=body,
+                    body=BytesIO(body),
                     headers=headers,
                     request_method=method,
                     request_url=request_url,
+                    preload_content=preload_content,
                     status=status,
                 )
 
@@ -1139,14 +1189,160 @@ class DefaultUrllib3ManagerTest(TestCase):
         import urllib3
 
         config = ConfigDict()
-        os.environ["http_proxy"] = "http://myproxy:8080"
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
         manager = default_urllib3_manager(config=config)
         self.assertIsInstance(manager, urllib3.ProxyManager)
         self.assertTrue(hasattr(manager, "proxy"))
         self.assertEqual(manager.proxy.scheme, "http")
         self.assertEqual(manager.proxy.host, "myproxy")
         self.assertEqual(manager.proxy.port, 8080)
-        del os.environ["http_proxy"]
+
+    def test_environment_empty_proxy(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "")
+        manager = default_urllib3_manager(config=config)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh")
+        base_url = "http://xyz.abc.def.gh:8080/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://ample.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://ample.com:80/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_4(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://www.ample.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_5(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://www.example.com/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, "proxy"))
+        self.assertEqual(manager.proxy.scheme, "http")
+        self.assertEqual(manager.proxy.host, "myproxy")
+        self.assertEqual(manager.proxy.port, 8080)
+
+    def test_environment_no_proxy_6(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,abc.gh,ample.com")
+        base_url = "http://ample.com.org/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertIsInstance(manager, urllib3.ProxyManager)
+        self.assertTrue(hasattr(manager, "proxy"))
+        self.assertEqual(manager.proxy.scheme, "http")
+        self.assertEqual(manager.proxy.host, "myproxy")
+        self.assertEqual(manager.proxy.port, 8080)
+
+    def test_environment_no_proxy_ipv4_address_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,192.168.0.10,ample.com")
+        base_url = "http://192.168.0.10/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv4_address_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,192.168.0.10,ample.com")
+        base_url = "http://192.168.0.10:8888/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv4_address_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,ff80:1::/64,192.168.0.0/24,ample.com")
+        base_url = "http://192.168.0.10/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv6_address_1(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,ff80:1::affe,ample.com")
+        base_url = "http://[ff80:1::affe]/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv6_address_2(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,ff80:1::affe,ample.com")
+        base_url = "http://[ff80:1::affe]:1234/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
+
+    def test_environment_no_proxy_ipv6_address_3(self):
+        import urllib3
+
+        config = ConfigDict()
+        self.overrideEnv("http_proxy", "http://myproxy:8080")
+        self.overrideEnv("no_proxy", "xyz,abc.def.gh,192.168.0.0/24,ff80:1::/64,ample.com")
+        base_url = "http://[ff80:1::affe]/path/port"
+        manager = default_urllib3_manager(config=config, base_url=base_url)
+        self.assertNotIsInstance(manager, urllib3.ProxyManager)
+        self.assertIsInstance(manager, urllib3.PoolManager)
 
     def test_config_proxy_custom_cls(self):
         import urllib3
@@ -1230,6 +1426,26 @@ class SubprocessSSHVendorTests(TestCase):
 
         self.assertListEqual(expected, args[0])
 
+    def test_run_with_ssh_command(self):
+        expected = [
+            "/path/to/ssh",
+            "-o",
+            "Option=Value",
+            "-x",
+            "host",
+            "git-clone-url",
+        ]
+
+        vendor = SubprocessSSHVendor()
+        command = vendor.run_command(
+            "host",
+            "git-clone-url",
+            ssh_command="/path/to/ssh -o Option=Value",
+        )
+
+        args = command.proc.args
+        self.assertListEqual(expected, args[0])
+
 
 class PLinkSSHVendorTests(TestCase):
     def setUp(self):
@@ -1274,7 +1490,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
+                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
             )
 
         args = command.proc.args
@@ -1319,7 +1535,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning %r not in %r" % (expected_warning, warnings_list)
+                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
             )
 
         args = command.proc.args
@@ -1351,6 +1567,24 @@ class PLinkSSHVendorTests(TestCase):
 
         args = command.proc.args
 
+        self.assertListEqual(expected, args[0])
+
+    def test_run_with_ssh_command(self):
+        expected = [
+            "/path/to/plink",
+            "-x",
+            "host",
+            "git-clone-url",
+        ]
+
+        vendor = SubprocessSSHVendor()
+        command = vendor.run_command(
+            "host",
+            "git-clone-url",
+            ssh_command="/path/to/plink",
+        )
+
+        args = command.proc.args
         self.assertListEqual(expected, args[0])
 
 

@@ -20,24 +20,17 @@
 
 """Tests for ignore files."""
 
-from io import BytesIO
 import os
 import re
 import shutil
 import tempfile
-from dulwich.tests import TestCase
+from io import BytesIO
 
-from dulwich.ignore import (
-    IgnoreFilter,
-    IgnoreFilterManager,
-    IgnoreFilterStack,
-    Pattern,
-    match_pattern,
-    read_ignore_patterns,
-    translate,
-)
+from dulwich.ignore import (IgnoreFilter, IgnoreFilterManager,
+                            IgnoreFilterStack, Pattern, match_pattern,
+                            read_ignore_patterns, translate)
 from dulwich.repo import Repo
-
+from dulwich.tests import TestCase
 
 POSITIVE_MATCH_TESTS = [
     (b"foo.c", b"*.c"),
@@ -82,6 +75,9 @@ TRANSLATE_TESTS = [
     (b"**/bla.c", b"(?ms)(.*/)?bla\\.c/?\\Z"),
     (b"foo/**/bar", b"(?ms)foo(/.*)?\\/bar/?\\Z"),
     (b"foo/bar/*", b"(?ms)foo\\/bar\\/[^/]+/?\\Z"),
+    (b"/foo\\[bar\\]", b"(?ms)foo\\[bar\\]/?\\Z"),
+    (b"/foo[bar]", b"(?ms)foo[bar]/?\\Z"),
+    (b"/foo[0-9]", b"(?ms)foo[0-9]/?\\Z"),
 ]
 
 
@@ -113,7 +109,7 @@ class ReadIgnorePatterns(TestCase):
 with trailing whitespace 
 with escaped trailing whitespace\\ 
 """
-        )  # noqa: W291
+        )
         self.assertEqual(
             list(read_ignore_patterns(f)),
             [
@@ -130,14 +126,14 @@ class MatchPatternTests(TestCase):
         for (path, pattern) in POSITIVE_MATCH_TESTS:
             self.assertTrue(
                 match_pattern(path, pattern),
-                "path: %r, pattern: %r" % (path, pattern),
+                "path: {!r}, pattern: {!r}".format(path, pattern),
             )
 
     def test_no_matches(self):
         for (path, pattern) in NEGATIVE_MATCH_TESTS:
             self.assertFalse(
                 match_pattern(path, pattern),
-                "path: %r, pattern: %r" % (path, pattern),
+                "path: {!r}, pattern: {!r}".format(path, pattern),
             )
 
 
@@ -182,6 +178,12 @@ class IgnoreFilterTests(TestCase):
         self.assertFalse(filter.is_ignored(b"foo/bar"))
         self.assertFalse(filter.is_ignored(b"foo/bar/"))
         self.assertFalse(filter.is_ignored(b"foo/bar/bloe"))
+
+    def test_regex_special(self):
+        # See https://github.com/dulwich/dulwich/issues/930#issuecomment-1026166429
+        filter = IgnoreFilter([b"/foo\\[bar\\]", b"/foo"])
+        self.assertTrue(filter.is_ignored("foo"))
+        self.assertTrue(filter.is_ignored("foo[bar]"))
 
 
 class IgnoreFilterStackTests(TestCase):
@@ -239,7 +241,7 @@ class IgnoreFilterManagerTests(TestCase):
 
         with open(os.path.join(repo.path, 'foo', 'bar'), 'wb') as f:
             f.write(b'IGNORED')
-        
+
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored('foo/bar'))
 

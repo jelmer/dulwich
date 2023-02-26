@@ -20,7 +20,7 @@
 
 """Object specification."""
 
-from typing import Union, List, Tuple
+from typing import List, Tuple, Union
 
 
 def to_bytes(text):
@@ -55,7 +55,7 @@ def parse_tree(repo, treeish):
     """
     treeish = to_bytes(treeish)
     try:
-        treeish = parse_ref(repo.refs.keys(), treeish)
+        treeish = parse_ref(repo, treeish)
     except KeyError:  # treeish is commit sha
         pass
     o = repo[treeish]
@@ -94,7 +94,7 @@ def parse_reftuple(lh_container, rh_container, refspec, force=False):
 
     Args:
       lh_container: A RefsContainer object
-      hh_container: A RefsContainer object
+      rh_container: A RefsContainer object
       refspec: A string
     Returns: A tuple with left and right ref
     Raises:
@@ -132,7 +132,7 @@ def parse_reftuples(
 
     Args:
       lh_container: A RefsContainer object
-      hh_container: A RefsContainer object
+      rh_container: A RefsContainer object
       refspecs: A list of refspecs or a string
       force: Force overwriting for all reftuples
     Returns: A list of refs
@@ -211,7 +211,7 @@ def parse_commit(repo, committish):
 
     Args:
       repo: A` Repo` object
-      commitish: A string referring to a single commit.
+      committish: A string referring to a single commit.
     Returns: A Commit object
     Raises:
       KeyError: When the reference commits can not be found

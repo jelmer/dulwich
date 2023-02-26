@@ -26,20 +26,11 @@ from io import BytesIO
 from unittest import skipIf
 from unittest.mock import patch
 
-from dulwich.config import (
-    ConfigDict,
-    ConfigFile,
-    StackedConfig,
-    _check_section_name,
-    _check_variable_name,
-    _format_string,
-    _escape_value,
-    _parse_string,
-    parse_submodules,
-)
-from dulwich.tests import (
-    TestCase,
-)
+from dulwich.config import (ConfigDict, ConfigFile, StackedConfig,
+                            _check_section_name, _check_variable_name,
+                            _escape_value, _format_string, _parse_string,
+                            apply_instead_of, parse_submodules)
+from dulwich.tests import TestCase
 
 
 class ConfigFileTests(TestCase):
@@ -103,10 +94,19 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b'[branch "foo#bar"] # a comment\nbar= foo\n')
         self.assertEqual(ConfigFile({(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
 
+    def test_closing_bracket_within_section_string(self):
+        cf = self.from_file(b'[branch "foo]bar"] # a comment\nbar= foo\n')
+        self.assertEqual(ConfigFile({(b"branch", b"foo]bar"): {b"bar": b"foo"}}), cf)
+
     def test_from_file_section(self):
         cf = self.from_file(b"[core]\nfoo = bar\n")
         self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
+
+    def test_from_file_multiple(self):
+        cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
+        self.assertEqual([b"bar", b"blah"], list(cf.get_multivar((b"core",), b"foo")))
+        self.assertEqual([], list(cf.get_multivar((b"core", ), b"blah")))
 
     def test_from_file_utf8_bom(self):
         text = "[core]\nfoo = b\u00e4r\n".encode("utf-8-sig")
@@ -156,6 +156,12 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(b"[branch.foo]\nfoo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
+    def test_write_preserve_multivar(self):
+        cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
+        f = BytesIO()
+        cf.write_to_file(f)
+        self.assertEqual(b"[core]\n\tfoo = bar\n\tfoo = blah\n", f.getvalue())
+
     def test_write_to_file_empty(self):
         c = ConfigFile()
         f = BytesIO()
@@ -179,6 +185,19 @@ class ConfigFileTests(TestCase):
     def test_same_line(self):
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
+
+    def test_quoted_newlines_windows(self):
+        cf = self.from_file(
+            b"[alias]\r\n"
+            b"c = '!f() { \\\r\n"
+            b" printf '[git commit -m \\\"%s\\\"]\\n' \\\"$*\\\" && \\\r\n"
+            b" git commit -m \\\"$*\\\"; \\\r\n"
+            b" }; f'\r\n")
+        self.assertEqual(list(cf.sections()), [(b'alias', )])
+        self.assertEqual(
+            b'\'!f() { printf \'[git commit -m "%s"]\n\' '
+            b'"$*" && git commit -m "$*"',
+            cf.get((b"alias", ), b"c"))
 
     def test_quoted(self):
         cf = self.from_file(
@@ -257,44 +276,36 @@ class ConfigDictTests(TestCase):
         cd[b"a"] = b"b"
         self.assertEqual(cd[b"a"], b"b")
 
-    def test_iteritems(self):
+    def test_items(self):
         cd = ConfigDict()
         cd.set((b"core",), b"foo", b"bla")
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"foo", b"bla")], list(cd.iteritems((b"core",))))
+        self.assertEqual([(b"foo", b"bla")], list(cd.items((b"core",))))
 
-    def test_iteritems_nonexistant(self):
+    def test_items_nonexistant(self):
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([], list(cd.iteritems((b"core",))))
+        self.assertEqual([], list(cd.items((b"core",))))
 
-    def test_itersections(self):
+    def test_sections(self):
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
-        self.assertEqual([(b"core2",)], list(cd.itersections()))
+        self.assertEqual([(b"core2",)], list(cd.sections()))
 
 
 class StackedConfigTests(TestCase):
-    def setUp(self):
-        super(StackedConfigTests, self).setUp()
-        self._old_path = os.environ.get("PATH")
-
-    def tearDown(self):
-        super(StackedConfigTests, self).tearDown()
-        os.environ["PATH"] = self._old_path
-
     def test_default_backends(self):
         StackedConfig.default_backends()
 
-    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_path(self):
         from dulwich.config import get_win_system_paths
 
         install_dir = os.path.join("C:", "foo", "Git")
-        os.environ["PATH"] = os.path.join(install_dir, "cmd")
+        self.overrideEnv("PATH", os.path.join(install_dir, "cmd"))
         with patch("os.path.exists", return_value=True):
             paths = set(get_win_system_paths())
         self.assertEqual(
@@ -305,13 +316,13 @@ class StackedConfigTests(TestCase):
             paths,
         )
 
-    @skipIf(sys.platform != "win32", "Windows specfic config location.")
+    @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_reg(self):
         import winreg
 
         from dulwich.config import get_win_system_paths
 
-        del os.environ["PATH"]
+        self.overrideEnv("PATH", None)
         install_dir = os.path.join("C:", "foo", "Git")
         with patch("winreg.OpenKey"):
             with patch(
@@ -417,3 +428,31 @@ class SubmodulesTests(TestCase):
             ],
             got,
         )
+
+
+class ApplyInsteadOfTests(TestCase):
+    def test_none(self):
+        config = ConfigDict()
+        self.assertEqual(
+            'https://example.com/', apply_instead_of(config, 'https://example.com/'))
+
+    def test_apply(self):
+        config = ConfigDict()
+        config.set(
+            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
+        self.assertEqual(
+            'https://samba.org/',
+            apply_instead_of(config, 'https://example.com/'))
+
+    def test_apply_multiple(self):
+        config = ConfigDict()
+        config.set(
+            ('url', 'https://samba.org/'), 'insteadOf', 'https://blah.com/')
+        config.set(
+            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
+        self.assertEqual(
+            [b'https://blah.com/', b'https://example.com/'],
+            list(config.get_multivar(('url', 'https://samba.org/'), 'insteadOf')))
+        self.assertEqual(
+            'https://samba.org/',
+            apply_instead_of(config, 'https://example.com/'))

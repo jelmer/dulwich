@@ -20,25 +20,20 @@
 """Tests for executing hooks."""
 
 import os
-import stat
 import shutil
+import stat
 import sys
 import tempfile
 
 from dulwich import errors
-
-from dulwich.hooks import (
-    PreCommitShellHook,
-    PostCommitShellHook,
-    CommitMsgShellHook,
-)
-
+from dulwich.hooks import (CommitMsgShellHook, PostCommitShellHook,
+                           PreCommitShellHook)
 from dulwich.tests import TestCase
 
 
 class ShellHookTests(TestCase):
     def setUp(self):
-        super(ShellHookTests, self).setUp()
+        super().setUp()
         if os.name != "posix":
             self.skipTest("shell hook tests requires POSIX shell")
         self.assertTrue(os.path.exists("/bin/sh"))
@@ -71,7 +66,7 @@ exit 0
         )
 
         pre_commit = os.path.join(repo_dir, "hooks", "pre-commit")
-        hook = PreCommitShellHook(repo_dir)
+        hook = PreCommitShellHook(repo_dir, repo_dir)
 
         with open(pre_commit, "w") as f:
             f.write(pre_commit_fail)

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
 
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
@@ -33,8 +32,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import sys
 import re
+import sys
+from typing import List, Optional, Tuple
 
 # only needs to detect git style diffs as this is for
 # use with dulwich
@@ -55,22 +55,18 @@ _GIT_UNCHANGED_START = b" "
 # properly interface with diffstat routine
 
 
-def _parse_patch(lines):
-    """An internal routine to parse a git style diff or patch to generate
-       diff stats
+def _parse_patch(lines: List[bytes]) -> Tuple[List[bytes], List[bool], List[Tuple[int, int]]]:
+    """Parse a git style diff or patch to generate diff stats.
+
     Args:
-      lines: list of byte strings "lines" from the diff to be parsed
-    Returns: A tuple (names, nametypes, counts) of three lists:
-             names = list of repo relative file paths
-             nametypes - list of booolean values indicating if file
-                         is binary (True means binary file)
-             counts = list of tuples of (added, deleted) counts for that file
+      lines: list of byte string lines from the diff to be parsed
+    Returns: A tuple (names, is_binary, counts) of three lists
     """
     names = []
     nametypes = []
     counts = []
     in_patch_chunk = in_git_header = binaryfile = False
-    currentfile = None
+    currentfile: Optional[bytes] = None
     added = deleted = 0
     for line in lines:
         if line.startswith(_GIT_HEADER_START):
@@ -78,7 +74,9 @@ def _parse_patch(lines):
                 names.append(currentfile)
                 nametypes.append(binaryfile)
                 counts.append((added, deleted))
-            currentfile = _git_header_name.search(line).group(2)
+            m = _git_header_name.search(line)
+            assert m
+            currentfile = m.group(2)
             binaryfile = False
             added = deleted = 0
             in_git_header = True
@@ -89,6 +87,7 @@ def _parse_patch(lines):
         elif line.startswith(_GIT_RENAMEFROM_START) and in_git_header:
             currentfile = line[12:]
         elif line.startswith(_GIT_RENAMETO_START) and in_git_header:
+            assert currentfile
             currentfile += b" => %s" % line[10:]
         elif line.startswith(_GIT_CHUNK_START) and (in_patch_chunk or in_git_header):
             in_patch_chunk = True
@@ -188,7 +187,7 @@ def diffstat(lines, max_width=80):
 
 def main():
     argv = sys.argv
-    # allow diffstat.py to also be used from the comand line
+    # allow diffstat.py to also be used from the command line
     if len(sys.argv) > 1:
         diffpath = argv[1]
         data = b""
@@ -201,7 +200,7 @@ def main():
 
     # if no path argument to a diff file is passed in, run
     # a self test. The test case includes tricky things like
-    # a diff of diff, binary files, renames with futher changes
+    # a diff of diff, binary files, renames with further changes
     # added files and removed files.
     # All extracted from Sigil-Ebook/Sigil's github repo with
     # full permission to use under this license.
@@ -323,14 +322,14 @@ index 3b41fd80..64914c78 100644
  2. open Sigil.app to the normal nearly blank template epub it generates when opened
  3. use Plugins->Manage Plugins menu and make sure the "Use Bundled Python" checkbox is checked
  4. use the "Add Plugin" button to navigate to and add testplugin.zip and then hit "Okay" to exit the Manage Plugins Dialog
-"""  # noqa: E501 W293
+"""
 
     testoutput = b""" docs/qt512.7_remove_bad_workaround.patch            | 15 ++++++++++++
  docs/testplugin_v017.zip                            | Bin
  ci_scripts/macgddeploy.py => ci_scripts/gddeploy.py |  0 
  docs/qt512.6_backport_009abcd_fix.patch             | 26 ---------------------
  docs/Building_Sigil_On_MacOSX.txt                   |  2 +-
- 5 files changed, 16 insertions(+), 27 deletions(-)"""  # noqa: W291
+ 5 files changed, 16 insertions(+), 27 deletions(-)"""
 
     # return 0 on success otherwise return -1
     result = diffstat(selftest.split(b"\n"))

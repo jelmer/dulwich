@@ -25,15 +25,12 @@ import sys
 import tempfile
 
 from dulwich.file import FileLocked, GitFile, _fancy_rename
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
+from dulwich.tests import SkipTest, TestCase
 
 
 class FancyRenameTests(TestCase):
     def setUp(self):
-        super(FancyRenameTests, self).setUp()
+        super().setUp()
         self._tempdir = tempfile.mkdtemp()
         self.foo = self.path("foo")
         self.bar = self.path("bar")
@@ -41,7 +38,7 @@ class FancyRenameTests(TestCase):
 
     def tearDown(self):
         shutil.rmtree(self._tempdir)
-        super(FancyRenameTests, self).tearDown()
+        super().tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
@@ -89,7 +86,7 @@ class FancyRenameTests(TestCase):
 
 class GitFileTests(TestCase):
     def setUp(self):
-        super(GitFileTests, self).setUp()
+        super().setUp()
         self._tempdir = tempfile.mkdtemp()
         f = open(self.path("foo"), "wb")
         f.write(b"foo contents")
@@ -97,7 +94,7 @@ class GitFileTests(TestCase):
 
     def tearDown(self):
         shutil.rmtree(self._tempdir)
-        super(GitFileTests, self).tearDown()
+        super().tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
@@ -112,7 +109,7 @@ class GitFileTests(TestCase):
 
     def test_readonly(self):
         f = GitFile(self.path("foo"), "rb")
-        self.assertTrue(isinstance(f, io.IOBase))
+        self.assertIsInstance(f, io.IOBase)
         self.assertEqual(b"foo contents", f.read())
         self.assertEqual(b"", f.read())
         f.seek(4)
@@ -191,14 +188,14 @@ class GitFileTests(TestCase):
         f.abort()
         try:
             f.close()
-        except (IOError, OSError):
+        except OSError:
             self.fail()
 
         f = GitFile(foo, "wb")
         f.close()
         try:
             f.abort()
-        except (IOError, OSError):
+        except OSError:
             self.fail()
 
     def test_abort_close_removed(self):

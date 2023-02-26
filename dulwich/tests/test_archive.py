@@ -20,25 +20,16 @@
 
 """Tests for archive support."""
 
-from io import BytesIO
-import tarfile
 import struct
+import tarfile
+from io import BytesIO
 from unittest import skipUnless
 
 from dulwich.archive import tar_stream
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Blob,
-    Tree,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    build_commit_graph,
-)
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob, Tree
+from dulwich.tests import TestCase
+from dulwich.tests.utils import build_commit_graph
 
 try:
     from unittest.mock import patch
@@ -72,6 +63,18 @@ class ArchiveTests(TestCase):
         tf = tarfile.TarFile(fileobj=stream)
         self.addCleanup(tf.close)
         self.assertEqual(["somename"], tf.getnames())
+
+    def test_unicode(self):
+        store = MemoryObjectStore()
+        b1 = Blob.from_string(b"somedata")
+        store.add_object(b1)
+        t1 = Tree()
+        t1.add("ő".encode(), 0o100644, b1.id)
+        store.add_object(t1)
+        stream = b"".join(tar_stream(store, t1, mtime=0))
+        tf = tarfile.TarFile(fileobj=BytesIO(stream))
+        self.addCleanup(tf.close)
+        self.assertEqual(["ő"], tf.getnames())
 
     def test_prefix(self):
         stream = self._get_example_tar_stream(mtime=0, prefix=b"blah")

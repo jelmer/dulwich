@@ -20,16 +20,48 @@
 """Tests for paramiko_vendor."""
 
 import socket
-import paramiko
 import threading
+from io import StringIO
+from unittest import skipIf
 
 from dulwich.tests import TestCase
-from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
 
 try:
-    from StringIO import StringIO
+    import paramiko
 except ImportError:
-    from io import StringIO
+    has_paramiko = False
+else:
+    has_paramiko = True
+    from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
+
+    class Server(paramiko.ServerInterface):
+        """http://docs.paramiko.org/en/2.4/api/server.html"""
+        def __init__(self, commands, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.commands = commands
+
+        def check_channel_exec_request(self, channel, command):
+            self.commands.append(command)
+            return True
+
+        def check_auth_password(self, username, password):
+            if username == USER and password == PASSWORD:
+                return paramiko.AUTH_SUCCESSFUL
+            return paramiko.AUTH_FAILED
+
+        def check_auth_publickey(self, username, key):
+            pubkey = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
+            if username == USER and key == pubkey:
+                return paramiko.AUTH_SUCCESSFUL
+            return paramiko.AUTH_FAILED
+
+        def check_channel_request(self, kind, chanid):
+            if kind == "session":
+                return paramiko.OPEN_SUCCEEDED
+            return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+
+        def get_allowed_auths(self, username):
+            return "password,publickey"
 
 
 USER = 'testuser'
@@ -60,7 +92,8 @@ cNj+6W2guZ2tyHuPhZ64/4SJVyE2hKDSKD4xTb2nVjsMeN0bLD2UWXC9mwbx8nWa
 R6legDG2e/50ph7yc8gwAaA1kUXMiuLi8Nfkw/3yyvmJwklNegi4aRzRbA2Mzhi2
 4q9WMQKBgQCb0JNyxHG4pvLWCF/j0Sm1FfvrpnqSv5678n1j4GX7Ka/TubOK1Y4K
 U+Oib7dKa/zQMWehVFNTayrsq6bKVZ6q7zG+IHiRLw4wjeAxREFH6WUjDrn9vl2l
-D48DKbBuBwuVOJWyq3qbfgJXojscgNQklrsPdXVhDwOF0dYxP89HnA=="""
+D48DKbBuBwuVOJWyq3qbfgJXojscgNQklrsPdXVhDwOF0dYxP89HnA==
+-----END RSA PRIVATE KEY-----"""
 CLIENT_KEY = """\
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAxvREKSElPOm/0z/nPO+j5rk2tjdgGcGc7We1QZ6TRXYLu7nN
@@ -91,38 +124,16 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 -----END RSA PRIVATE KEY-----"""
 
 
-class Server(paramiko.ServerInterface):
-    """http://docs.paramiko.org/en/2.4/api/server.html"""
-    def __init__(self, commands, *args, **kwargs):
-        super(Server, self).__init__(*args, **kwargs)
-        self.commands = commands
-
-    def check_channel_exec_request(self, channel, command):
-        self.commands.append(command)
-        return True
-
-    def check_auth_password(self, username, password):
-        if username == USER and password == PASSWORD:
-            return paramiko.AUTH_SUCCESSFUL
-        return paramiko.AUTH_FAILED
-
-    def check_auth_publickey(self, username, key):
-        pubkey = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
-        if username == USER and key == pubkey:
-            return paramiko.AUTH_SUCCESSFUL
-        return paramiko.AUTH_FAILED
-
-    def check_channel_request(self, kind, chanid):
-        if kind == "session":
-            return paramiko.OPEN_SUCCEEDED
-        return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
-
-    def get_allowed_auths(self, username):
-        return "password,publickey"
-
-
+@skipIf(not has_paramiko, "paramiko is not installed")
 class ParamikoSSHVendorTests(TestCase):
+
     def setUp(self):
+        import paramiko.transport
+
+        # re-enable server functionality for tests
+        if hasattr(paramiko.transport, "SERVER_DISABLED_BY_GENTOO"):
+            paramiko.transport.SERVER_DISABLED_BY_GENTOO = False
+
         self.commands = []
         socket.setdefaulttimeout(10)
         self.addCleanup(socket.setdefaulttimeout, None)
@@ -135,12 +146,12 @@ class ParamikoSSHVendorTests(TestCase):
         self.thread.start()
 
     def tearDown(self):
-        pass
+        self.thread.join()
 
     def _run(self):
         try:
             conn, addr = self.socket.accept()
-        except socket.error:
+        except OSError:
             return False
         self.transport = paramiko.Transport(conn)
         self.addCleanup(self.transport.close)

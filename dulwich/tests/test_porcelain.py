@@ -20,7 +20,7 @@
 
 """Tests for dulwich.porcelain."""
 
-from io import BytesIO, StringIO
+import contextlib
 import os
 import platform
 import re
@@ -30,36 +30,25 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
+from io import BytesIO, StringIO
 from unittest import skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
-from dulwich.errors import (
-    CommitError,
-    DirNotCleanError,
-)
-from dulwich.objects import (
-    Blob,
-    Tag,
-    Tree,
-    ZERO_SHA,
-)
-from dulwich.repo import (
-    NoIndexPresent,
-    Repo,
-)
-from dulwich.index import (
-    _fs_to_tree_path,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    build_commit_graph,
-    make_commit,
-    make_object,
-)
+from dulwich.errors import CommitError, DirNotCleanError
+from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
+from dulwich.repo import NoIndexPresent, Repo
+from dulwich.server import DictBackend
+from dulwich.tests import TestCase
+from dulwich.tests.utils import build_commit_graph, make_commit, make_object
+from dulwich.web import make_server, make_wsgi_chain
+
+try:
+    import gpg
+except ImportError:
+    gpg = None
 
 
 def flat_walk_dir(dir_to_walk):
@@ -76,14 +65,20 @@ def flat_walk_dir(dir_to_walk):
 
 class PorcelainTestCase(TestCase):
     def setUp(self):
-        super(PorcelainTestCase, self).setUp()
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.repo_path = os.path.join(self.test_dir, "repo")
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
+    def assertRecentTimestamp(self, ts):
+        # On some slow CIs it does actually take more than 5 seconds to go from
+        # creating the tag to here.
+        self.assertLess(time.time() - ts, 50)
 
+
+@skipIf(gpg is None, "gpg is not available")
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """
 -----BEGIN PGP PRIVATE KEY BLOCK-----
@@ -258,16 +253,14 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
     NON_DEFAULT_KEY_ID = "6A93393F50C5E6ACD3D6FB45B936212EDB4E14C0"
 
     def setUp(self):
-        super(PorcelainGpgTestCase, self).setUp()
+        super().setUp()
         self.gpg_dir = os.path.join(self.test_dir, "gpg")
         os.mkdir(self.gpg_dir, mode=0o700)
-        self.addCleanup(shutil.rmtree, self.gpg_dir)
-        self._old_gnupghome = os.environ.get("GNUPGHOME")
-        os.environ["GNUPGHOME"] = self.gpg_dir
-        if self._old_gnupghome is None:
-            self.addCleanup(os.environ.__delitem__, "GNUPGHOME")
-        else:
-            self.addCleanup(os.environ.__setitem__, "GNUPGHOME", self._old_gnupghome)
+        # Ignore errors when deleting GNUPGHOME, because of race conditions
+        # (e.g. the gpg-agent socket having been deleted). See
+        # https://github.com/jelmer/dulwich/issues/1000
+        self.addCleanup(shutil.rmtree, self.gpg_dir, ignore_errors=True)
+        self.overrideEnv('GNUPGHOME', self.gpg_dir)
 
     def import_default_key(self):
         subprocess.run(
@@ -275,7 +268,7 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.DEFAULT_KEY,
-            universal_newlines=True,
+            text=True,
         )
 
     def import_non_default_key(self):
@@ -284,7 +277,7 @@ ya6JVZCRbMXfdCy8lVPgtNQ6VlHaj8Wvnn2FLbWWO2n2r3s=
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             input=PorcelainGpgTestCase.NON_DEFAULT_KEY,
-            universal_newlines=True,
+            text=True,
         )
 
 
@@ -331,7 +324,7 @@ class CommitTests(PorcelainTestCase):
             author=b"Joe <joe@example.com>",
             committer=b"Bob <bob@example.com>",
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
     def test_unicode(self):
@@ -345,7 +338,7 @@ class CommitTests(PorcelainTestCase):
             author="Joe <joe@example.com>",
             committer="Bob <bob@example.com>",
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
     def test_no_verify(self):
@@ -399,8 +392,200 @@ class CommitTests(PorcelainTestCase):
             committer="Bob <bob@example.com>",
             no_verify=True,
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
+
+    def test_timezone(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"refs/heads/foo"] = c3.id
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            author_timezone=18000,
+            committer="Bob <bob@example.com>",
+            commit_timezone=18000,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, 18000)
+        self.assertEqual(commit._commit_timezone, 18000)
+
+        self.overrideEnv("GIT_AUTHOR_DATE", "1995-11-20T19:12:08-0501")
+        self.overrideEnv("GIT_COMMITTER_DATE", "1995-11-20T19:12:08-0501")
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, -18060)
+        self.assertEqual(commit._commit_timezone, -18060)
+
+        self.overrideEnv("GIT_AUTHOR_DATE", None)
+        self.overrideEnv("GIT_COMMITTER_DATE", None)
+
+        local_timezone = time.localtime().tm_gmtoff
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        self.assertEqual(commit._author_timezone, local_timezone)
+        self.assertEqual(commit._commit_timezone, local_timezone)
+
+
+@skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
+class CommitSignTests(PorcelainGpgTestCase):
+
+    def test_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_default_key()
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=True,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        commit.verify()
+        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+        self.import_non_default_key()
+        self.assertRaises(
+            gpg.errors.MissingSignatures,
+            commit.verify,
+            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
+        )
+
+        commit.committer = b"Alice <alice@example.com>"
+        self.assertRaises(
+            gpg.errors.BadSignatures,
+            commit.verify,
+        )
+
+    def test_non_default_key(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        self.import_non_default_key()
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # GPG Signatures aren't deterministic, so we can't do a static assertion.
+        commit.verify()
+
+
+class TimezoneTests(PorcelainTestCase):
+
+    def put_envs(self, value):
+        self.overrideEnv("GIT_AUTHOR_DATE", value)
+        self.overrideEnv("GIT_COMMITTER_DATE", value)
+
+    def fallback(self, value):
+        self.put_envs(value)
+        self.assertRaises(porcelain.TimezoneFormatError, porcelain.get_user_timezones)
+
+    def test_internal_format(self):
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezones())
+
+    def test_rfc_2822(self):
+        self.put_envs("Mon, 20 Nov 1995 19:12:08 -0500")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezones())
+
+        self.put_envs("Mon, 20 Nov 1995 19:12:08")
+        self.assertTupleEqual((0, 0), porcelain.get_user_timezones())
+
+    def test_iso8601(self):
+        self.put_envs("1995-11-20T19:12:08-0501")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20T19:12:08+0501")
+        self.assertTupleEqual((18060, 18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20T19:12:08-05:01")
+        self.assertTupleEqual((-18060, -18060), porcelain.get_user_timezones())
+
+        self.put_envs("1995-11-20 19:12:08-05")
+        self.assertTupleEqual((-18000, -18000), porcelain.get_user_timezones())
+
+        # https://github.com/git/git/blob/96b2d4fa927c5055adc5b1d08f10a5d7352e2989/t/t6300-for-each-ref.sh#L128
+        self.put_envs("2006-07-03 17:18:44 +0200")
+        self.assertTupleEqual((7200, 7200), porcelain.get_user_timezones())
+
+    def test_missing_or_malformed(self):
+        # TODO: add more here
+        self.fallback("0 + 0500")
+        self.fallback("a +0500")
+
+        self.fallback("1995-11-20T19:12:08")
+        self.fallback("1995-11-20T19:12:08-05:")
+
+        self.fallback("1995.11.20")
+        self.fallback("11/20/1995")
+        self.fallback("20.11.1995")
+
+    def test_different_envs(self):
+        self.overrideEnv("GIT_AUTHOR_DATE", "0 +0500")
+        self.overrideEnv("GIT_COMMITTER_DATE", "0 +0501")
+        self.assertTupleEqual((18000, 18060), porcelain.get_user_timezones())
+
+    def test_no_envs(self):
+        local_timezone = time.localtime().tm_gmtoff
+
+        self.put_envs("0 +0500")
+        self.assertTupleEqual((18000, 18000), porcelain.get_user_timezones())
+
+        self.overrideEnv("GIT_COMMITTER_DATE", None)
+        self.assertTupleEqual((18000, local_timezone), porcelain.get_user_timezones())
+
+        self.put_envs("0 +0500")
+        self.overrideEnv("GIT_AUTHOR_DATE", None)
+        self.assertTupleEqual((local_timezone, 18000), porcelain.get_user_timezones())
+
+        self.put_envs("0 +0500")
+        self.overrideEnv("GIT_AUTHOR_DATE", None)
+        self.overrideEnv("GIT_COMMITTER_DATE", None)
+        self.assertTupleEqual((local_timezone, local_timezone), porcelain.get_user_timezones())
 
 
 class CleanTests(PorcelainTestCase):
@@ -523,8 +708,8 @@ class CloneTests(PorcelainTestCase):
         target_repo = Repo(target_path)
         self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c3.id, target_repo.refs[b"refs/tags/foo"])
-        self.assertTrue(b"f1" not in os.listdir(target_path))
-        self.assertTrue(b"f2" not in os.listdir(target_path))
+        self.assertNotIn(b"f1", os.listdir(target_path))
+        self.assertNotIn(b"f2", os.listdir(target_path))
         c = r.get_config()
         encoded_path = self.repo.path
         if not isinstance(encoded_path, bytes):
@@ -555,8 +740,8 @@ class CloneTests(PorcelainTestCase):
             self.assertEqual(r.path, target_path)
         with Repo(target_path) as r:
             self.assertEqual(r.head(), c3.id)
-        self.assertTrue("f1" in os.listdir(target_path))
-        self.assertTrue("f2" in os.listdir(target_path))
+        self.assertIn("f1", os.listdir(target_path))
+        self.assertIn("f2", os.listdir(target_path))
 
     def test_bare_local_with_checkout(self):
         f1_1 = make_object(Blob, data=b"f1")
@@ -579,8 +764,8 @@ class CloneTests(PorcelainTestCase):
         with Repo(target_path) as r:
             r.head()
             self.assertRaises(NoIndexPresent, r.open_index)
-        self.assertFalse(b"f1" in os.listdir(target_path))
-        self.assertFalse(b"f2" in os.listdir(target_path))
+        self.assertNotIn(b"f1", os.listdir(target_path))
+        self.assertNotIn(b"f2", os.listdir(target_path))
 
     def test_no_checkout_with_bare(self):
         f1_1 = make_object(Blob, data=b"f1")
@@ -634,9 +819,12 @@ class CloneTests(PorcelainTestCase):
         r.close()
 
     def test_source_broken(self):
-        target_path = tempfile.mkdtemp()
-        self.assertRaises(Exception, porcelain.clone, "/nonexistant/repo", target_path)
-        self.assertFalse(os.path.exists(target_path))
+        with tempfile.TemporaryDirectory() as parent:
+            target_path = os.path.join(parent, "target")
+            self.assertRaises(
+                Exception, porcelain.clone, "/nonexistent/repo", target_path
+            )
+            self.assertFalse(os.path.exists(target_path))
 
     def test_fetch_symref(self):
         f1_1 = make_object(Blob, data=b"f1")
@@ -656,7 +844,10 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c1.id, target_repo.refs[b"refs/heads/else"])
         self.assertEqual(c1.id, target_repo.refs[b"HEAD"])
-        self.assertEqual({b"HEAD": b"refs/heads/else"}, target_repo.refs.get_symrefs())
+        self.assertEqual(
+            {b"HEAD": b"refs/heads/else", b"refs/remotes/origin/HEAD": b"refs/remotes/origin/else"},
+            target_repo.refs.get_symrefs(),
+        )
 
 
 class InitTests(TestCase):
@@ -694,7 +885,7 @@ class AddTests(PorcelainTestCase):
         cwd = os.getcwd()
         try:
             os.chdir(self.repo.path)
-            self.assertEqual(set(["foo", "blah", "adir", ".git"]), set(os.listdir(".")))
+            self.assertEqual({"foo", "blah", "adir", ".git"}, set(os.listdir(".")))
             self.assertEqual(
                 (["foo", os.path.join("adir", "afile")], set()),
                 porcelain.add(self.repo.path),
@@ -755,8 +946,8 @@ class AddTests(PorcelainTestCase):
             ],
         )
         self.assertIn(b"bar", self.repo.open_index())
-        self.assertEqual(set(["bar"]), set(added))
-        self.assertEqual(set(["foo", os.path.join("subdir", "")]), ignored)
+        self.assertEqual({"bar"}, set(added))
+        self.assertEqual({"foo", os.path.join("subdir", "")}, ignored)
 
     def test_add_file_absolute_path(self):
         # Absolute paths are (not yet) supported
@@ -1092,7 +1283,7 @@ class CommitTreeTests(PorcelainTestCase):
             author=b"Joe <joe@example.com>",
             committer=b"Jane <jane@example.com>",
         )
-        self.assertTrue(isinstance(sha, bytes))
+        self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
 
@@ -1110,9 +1301,8 @@ class RevListTests(PorcelainTestCase):
 
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
 class TagCreateSignTests(PorcelainGpgTestCase):
-    def test_default_key(self):
-        import gpg
 
+    def test_default_key(self):
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
@@ -1133,10 +1323,10 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tags = self.repo.refs.as_dict(b"refs/tags")
         self.assertEqual(list(tags.keys()), [b"tryme"])
         tag = self.repo[b"refs/tags/tryme"]
-        self.assertTrue(isinstance(tag, Tag))
+        self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
@@ -1176,16 +1366,17 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tags = self.repo.refs.as_dict(b"refs/tags")
         self.assertEqual(list(tags.keys()), [b"tryme"])
         tag = self.repo[b"refs/tags/tryme"]
-        self.assertTrue(isinstance(tag, Tag))
+        self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b'refs/tags/tryme']
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
 
 
 class TagCreateTests(PorcelainTestCase):
+
     def test_annotated(self):
         c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
@@ -1203,10 +1394,10 @@ class TagCreateTests(PorcelainTestCase):
         tags = self.repo.refs.as_dict(b"refs/tags")
         self.assertEqual(list(tags.keys()), [b"tryme"])
         tag = self.repo[b"refs/tags/tryme"]
-        self.assertTrue(isinstance(tag, Tag))
+        self.assertIsInstance(tag, Tag)
         self.assertEqual(b"foo <foo@bar.com>", tag.tagger)
         self.assertEqual(b"bar\n", tag.message)
-        self.assertLess(time.time() - tag.tag_time, 5)
+        self.assertRecentTimestamp(tag.tag_time)
 
     def test_unannotated(self):
         c1, c2, c3 = build_commit_graph(
@@ -1253,9 +1444,9 @@ class TagDeleteTests(PorcelainTestCase):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.tag_create(self.repo, b"foo")
-        self.assertTrue(b"foo" in porcelain.tag_list(self.repo))
+        self.assertIn(b"foo", porcelain.tag_list(self.repo))
         porcelain.tag_delete(self.repo, b"foo")
-        self.assertFalse(b"foo" in porcelain.tag_list(self.repo))
+        self.assertNotIn(b"foo", porcelain.tag_list(self.repo))
 
 
 class ResetTests(PorcelainTestCase):
@@ -1324,6 +1515,7 @@ class ResetTests(PorcelainTestCase):
 
 
 class ResetFileTests(PorcelainTestCase):
+
     def test_reset_modify_file_to_commit(self):
         file = 'foo'
         full_path = os.path.join(self.repo.path, file)
@@ -1341,7 +1533,7 @@ class ResetFileTests(PorcelainTestCase):
             f.write('something new')
         porcelain.reset_file(self.repo, file, target=sha)
 
-        with open(full_path, 'r') as f:
+        with open(full_path) as f:
             self.assertEqual('hello', f.read())
 
     def test_reset_remove_file_to_commit(self):
@@ -1360,39 +1552,9 @@ class ResetFileTests(PorcelainTestCase):
         os.remove(full_path)
         porcelain.reset_file(self.repo, file, target=sha)
 
-        with open(full_path, 'r') as f:
+        with open(full_path) as f:
             self.assertEqual('hello', f.read())
-            
-    def test_resetfile_to_branch(self):
-        file = 'foo'
-        full_path = os.path.join(self.repo.path, file)
 
-        with open(full_path, 'w') as f:
-            f.write('hello')
-        porcelain.add(self.repo, paths=[full_path])
-        porcelain.commit(
-            self.repo,
-            message=b"unitest",
-            committer=b"Jane <jane@example.com>",
-            author=b"John <john@example.com>",
-        )
-
-        # create a new branch and do commit
-        porcelain.branch_create(self.repo, 'uni')
-        porcelain.checkout(self.repo, b'uni')
-        with open(full_path, 'a') as f:
-            f.write('something new')
-        porcelain.commit(
-            self.repo,
-            message=b"unitest in branch uni",
-            committer=b"Jane <jane@example.com>",
-            author=b"John <john@example.com>",
-        )
-
-        porcelain.reset_file(self.repo, file, target=b'uni')
-        with open(full_path, 'r') as f:
-            self.assertEqual('hello', f.read())
-    
     def test_resetfile_with_dir(self):
         os.mkdir(os.path.join(self.repo.path, 'new_dir'))
         full_path = os.path.join(self.repo.path, 'new_dir', 'foo')
@@ -1415,7 +1577,8 @@ class ResetFileTests(PorcelainTestCase):
             author=b"John <john@example.com>",
         )
         porcelain.reset_file(self.repo, os.path.join('new_dir', 'foo'), target=sha)
-        with open(full_path, 'r') as f:
+
+        with open(full_path) as f:
             self.assertEqual('hello', f.read())
 
 
@@ -1536,8 +1699,32 @@ class CheckoutTests(PorcelainTestCase):
         )
         porcelain.checkout(self.repo, sha)
         self.assertEqual(sha, self.repo.head())
-        with open(full_path) as f:
-            self.assertEqual('hello', f.read())
+
+
+class SubmoduleTests(PorcelainTestCase):
+
+    def test_empty(self):
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        self.assertEqual([], list(porcelain.submodule_list(self.repo)))
+
+    def test_add(self):
+        porcelain.submodule_add(self.repo, "../bar.git", "bar")
+        with open('%s/.gitmodules' % self.repo.path) as f:
+            self.assertEqual("""\
+[submodule "bar"]
+\turl = ../bar.git
+\tpath = bar
+""", f.read())
+
+    def test_init(self):
+        porcelain.submodule_add(self.repo, "../bar.git", "bar")
+        porcelain.submodule_init(self.repo)
 
 
 class PushTests(PorcelainTestCase):
@@ -1813,7 +2000,7 @@ class PushTests(PorcelainTestCase):
 
 class PullTests(PorcelainTestCase):
     def setUp(self):
-        super(PullTests, self).setUp()
+        super().setUp()
         # create a file for initial commit
         handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
         os.close(handle)
@@ -2022,7 +2209,22 @@ class StatusTests(PorcelainTestCase):
             results.staged,
         )
         self.assertListEqual(results.unstaged, [b"blye"])
-        self.assertListEqual(results.untracked, ["blyat"])
+        results_no_untracked = porcelain.status(self.repo.path, untracked_files="no")
+        self.assertListEqual(results_no_untracked.untracked, [])
+
+    def test_status_wrong_untracked_files_value(self):
+        with self.assertRaises(ValueError):
+            porcelain.status(self.repo.path, untracked_files="antani")
+
+    def test_status_untracked_path(self):
+        untracked_dir = os.path.join(self.repo_path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        untracked_file = os.path.join(untracked_dir, "untracked_file")
+        with open(untracked_file, "w") as fh:
+            fh.write("untracked")
+
+        _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
+        self.assertEqual(untracked, ["untracked_dir/untracked_file"])
 
     def test_status_crlf_mismatch(self):
         # First make a commit as if the file has been added on a Linux system
@@ -2198,7 +2400,7 @@ class StatusTests(PorcelainTestCase):
             os.path.join(self.repo.path, "link"),
         )
         self.assertEqual(
-            set(["ignored", "notignored", ".gitignore", "link"]),
+            {"ignored", "notignored", ".gitignore", "link"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -2206,11 +2408,11 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([".gitignore", "notignored", "link"]),
+            {".gitignore", "notignored", "link"},
             set(porcelain.status(self.repo).untracked),
         )
         self.assertEqual(
-            set([".gitignore", "notignored", "ignored", "link"]),
+            {".gitignore", "notignored", "ignored", "link"},
             set(porcelain.status(self.repo, ignored=True).untracked),
         )
 
@@ -2229,7 +2431,7 @@ class StatusTests(PorcelainTestCase):
             f.write("blop\n")
 
         self.assertEqual(
-            set([".gitignore", "notignored", os.path.join("nested", "")]),
+            {".gitignore", "notignored", os.path.join("nested", "")},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -2237,7 +2439,7 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([".gitignore", "notignored"]),
+            {".gitignore", "notignored"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2248,7 +2450,7 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set(["ignored", "with", "manager"]),
+            {"ignored", "with", "manager"},
             set(
                 porcelain.get_untracked_paths(
                     subrepo.path, subrepo.path, subrepo.open_index()
@@ -2266,9 +2468,9 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            set([os.path.join('nested', 'ignored'),
+            {os.path.join('nested', 'ignored'),
                 os.path.join('nested', 'with'),
-                os.path.join('nested', 'manager')]),
+                os.path.join('nested', 'manager')},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2290,14 +2492,12 @@ class StatusTests(PorcelainTestCase):
             f.write("foo")
 
         self.assertEqual(
-            set(
-                [
-                    ".gitignore",
-                    "notignored",
-                    "ignored",
-                    os.path.join("subdir", ""),
-                ]
-            ),
+            {
+                ".gitignore",
+                "notignored",
+                "ignored",
+                os.path.join("subdir", ""),
+            },
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2307,7 +2507,7 @@ class StatusTests(PorcelainTestCase):
             )
         )
         self.assertEqual(
-            set([".gitignore", "notignored"]),
+            {".gitignore", "notignored"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -2318,6 +2518,22 @@ class StatusTests(PorcelainTestCase):
             )
         )
 
+    def test_get_untracked_paths_invalid_untracked_files(self):
+        with self.assertRaises(ValueError):
+            list(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    untracked_files="invalid_value",
+                )
+            )
+
+    def test_get_untracked_paths_normal(self):
+        with self.assertRaises(NotImplementedError):
+            _, _, _ = porcelain.status(
+                repo=self.repo.path, untracked_files="normal"
+            )
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
@@ -2356,7 +2572,7 @@ class ReceivePackTests(PorcelainTestCase):
         outlines = outf.getvalue().splitlines()
         self.assertEqual(
             [
-                b"0091319b56ce3aee2d489f759736a79cc552c9bb86d9 HEAD\x00 report-status "  # noqa: E501
+                b"0091319b56ce3aee2d489f759736a79cc552c9bb86d9 HEAD\x00 report-status "
                 b"delete-refs quiet ofs-delta side-band-64k "
                 b"no-done symref=HEAD:refs/heads/master",
                 b"003f319b56ce3aee2d489f759736a79cc552c9bb86d9 refs/heads/master",
@@ -2369,14 +2585,14 @@ class ReceivePackTests(PorcelainTestCase):
 
 class BranchListTests(PorcelainTestCase):
     def test_standard(self):
-        self.assertEqual(set([]), set(porcelain.branch_list(self.repo)))
+        self.assertEqual(set(), set(porcelain.branch_list(self.repo)))
 
     def test_new_branch(self):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, b"foo")
         self.assertEqual(
-            set([b"master", b"foo"]), set(porcelain.branch_list(self.repo))
+            {b"master", b"foo"}, set(porcelain.branch_list(self.repo))
         )
 
 
@@ -2393,7 +2609,7 @@ class BranchCreateTests(PorcelainTestCase):
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, b"foo")
         self.assertEqual(
-            set([b"master", b"foo"]), set(porcelain.branch_list(self.repo))
+            {b"master", b"foo"}, set(porcelain.branch_list(self.repo))
         )
 
 
@@ -2402,17 +2618,17 @@ class BranchDeleteTests(PorcelainTestCase):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, b"foo")
-        self.assertTrue(b"foo" in porcelain.branch_list(self.repo))
+        self.assertIn(b"foo", porcelain.branch_list(self.repo))
         porcelain.branch_delete(self.repo, b"foo")
-        self.assertFalse(b"foo" in porcelain.branch_list(self.repo))
+        self.assertNotIn(b"foo", porcelain.branch_list(self.repo))
 
     def test_simple_unicode(self):
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo[b"HEAD"] = c1.id
         porcelain.branch_create(self.repo, "foo")
-        self.assertTrue(b"foo" in porcelain.branch_list(self.repo))
+        self.assertIn(b"foo", porcelain.branch_list(self.repo))
         porcelain.branch_delete(self.repo, "foo")
-        self.assertFalse(b"foo" in porcelain.branch_list(self.repo))
+        self.assertNotIn(b"foo", porcelain.branch_list(self.repo))
 
 
 class FetchTests(PorcelainTestCase):
@@ -2449,7 +2665,7 @@ class FetchTests(PorcelainTestCase):
             committer=b"test2 <email>",
         )
 
-        self.assertFalse(self.repo[b"HEAD"].id in target_repo)
+        self.assertNotIn(self.repo[b"HEAD"].id, target_repo)
         target_repo.close()
 
         # Fetch changes into the cloned repo
@@ -2460,7 +2676,7 @@ class FetchTests(PorcelainTestCase):
 
         # Check the target repo for pushed changes
         with Repo(target_path) as r:
-            self.assertTrue(self.repo[b"HEAD"].id in r)
+            self.assertIn(self.repo[b"HEAD"].id, r)
 
     def test_with_remote_name(self):
         remote_name = "origin"
@@ -2499,7 +2715,7 @@ class FetchTests(PorcelainTestCase):
             committer=b"test2 <email>",
         )
 
-        self.assertFalse(self.repo[b"HEAD"].id in target_repo)
+        self.assertNotIn(self.repo[b"HEAD"].id, target_repo)
 
         target_config = target_repo.get_config()
         target_config.set(
@@ -2518,7 +2734,7 @@ class FetchTests(PorcelainTestCase):
         # Check the target repo for pushed changes, as well as updates
         # for the refs
         with Repo(target_path) as r:
-            self.assertTrue(self.repo[b"HEAD"].id in r)
+            self.assertIn(self.repo[b"HEAD"].id, r)
             self.assertNotEqual(self.repo.get_refs(), target_refs)
 
     def assert_correct_remote_refs(
@@ -2539,6 +2755,8 @@ class FetchTests(PorcelainTestCase):
             for k, v in remote_refs.items()
             if k.startswith(local_ref_prefix)
         }
+        if b"HEAD" in locally_known_remote_refs and b"HEAD" in remote_refs:
+            normalized_remote_refs[b"HEAD"] = remote_refs[b"HEAD"]
 
         self.assertEqual(locally_known_remote_refs, normalized_remote_refs)
 
@@ -2668,6 +2886,20 @@ class RemoteAddTests(PorcelainTestCase):
             "jelmer",
             "git://jelmer.uk/code/dulwich",
         )
+
+
+class RemoteRemoveTests(PorcelainTestCase):
+    def test_remove(self):
+        porcelain.remote_add(self.repo, "jelmer", "git://jelmer.uk/code/dulwich")
+        c = self.repo.get_config()
+        self.assertEqual(
+            c.get((b"remote", b"jelmer"), b"url"),
+            b"git://jelmer.uk/code/dulwich",
+        )
+        porcelain.remote_remove(self.repo, "jelmer")
+        self.assertRaises(KeyError, porcelain.remote_remove, self.repo, "jelmer")
+        c = self.repo.get_config()
+        self.assertRaises(KeyError, c.get, (b"remote", b"jelmer"), b"url")
 
 
 class CheckIgnoreTests(PorcelainTestCase):
@@ -2853,10 +3085,42 @@ class DescribeTests(PorcelainTestCase):
             porcelain.describe(self.repo.path),
         )
 
+    def test_tag_and_commit_full(self):
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Some message",
+            author=b"Joe <joe@example.com>",
+            committer=b"Bob <bob@example.com>",
+        )
+        porcelain.tag_create(
+            self.repo.path,
+            b"tryme",
+            b"foo <foo@bar.com>",
+            b"bar",
+            annotated=True,
+        )
+        with open(fullpath, "w") as f:
+            f.write("BAR2")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        sha = porcelain.commit(
+            self.repo.path,
+            message=b"Some message",
+            author=b"Joe <joe@example.com>",
+            committer=b"Bob <bob@example.com>",
+        )
+        self.assertEqual(
+            "tryme-1-g{}".format(sha.decode("ascii")),
+            porcelain.describe(self.repo.path, abbrev=40),
+        )
+
 
 class PathToTreeTests(PorcelainTestCase):
     def setUp(self):
-        super(PathToTreeTests, self).setUp()
+        super().setUp()
         self.fp = os.path.join(self.test_dir, "bar")
         with open(self.fp, "w") as f:
             f.write("something")
@@ -2959,3 +3223,91 @@ class WriteTreeTests(PorcelainTestCase):
 class ActiveBranchTests(PorcelainTestCase):
     def test_simple(self):
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+
+class FindUniqueAbbrevTests(PorcelainTestCase):
+
+    def test_simple(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        self.assertEqual(
+            c1.id.decode('ascii')[:7],
+            porcelain.find_unique_abbrev(self.repo.object_store, c1.id))
+
+
+class PackRefsTests(PorcelainTestCase):
+    def test_all(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/tags/foo"] = c1.id
+
+        porcelain.pack_refs(self.repo, all=True)
+
+        self.assertEqual(
+            self.repo.refs.get_packed_refs(),
+            {
+                b"refs/heads/master": c2.id,
+                b"refs/tags/foo": c1.id,
+            },
+        )
+
+    def test_not_all(self):
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/tags/foo"] = c1.id
+
+        porcelain.pack_refs(self.repo)
+
+        self.assertEqual(
+            self.repo.refs.get_packed_refs(),
+            {
+                b"refs/tags/foo": c1.id,
+            },
+        )
+
+
+class ServerTests(PorcelainTestCase):
+    @contextlib.contextmanager
+    def _serving(self):
+        with make_server('localhost', 0, self.app) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            try:
+                yield f"http://localhost:{server.server_port}"
+
+            finally:
+                server.shutdown()
+                thread.join(10)
+
+    def setUp(self):
+        super().setUp()
+
+        self.served_repo_path = os.path.join(self.test_dir, "served_repo.git")
+        self.served_repo = Repo.init_bare(self.served_repo_path, mkdir=True)
+        self.addCleanup(self.served_repo.close)
+
+        backend = DictBackend({"/": self.served_repo})
+        self.app = make_wsgi_chain(backend)
+
+    def test_pull(self):
+        c1, = build_commit_graph(self.served_repo.object_store, [[1]])
+        self.served_repo.refs[b"refs/heads/master"] = c1.id
+
+        with self._serving() as url:
+            porcelain.pull(self.repo, url, "master")
+
+    def test_push(self):
+        c1, = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/heads/master"] = c1.id
+
+        with self._serving() as url:
+            porcelain.push(self.repo, url, "master")

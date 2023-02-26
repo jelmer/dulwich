@@ -25,8 +25,8 @@ import posixpath
 import tempfile
 
 from ..object_store import BucketBasedObjectStore
-from ..pack import PackData, Pack, load_pack_index_file
-
+from ..pack import (PACK_SPOOL_FILE_MAX_SIZE, Pack, PackData,
+                    load_pack_index_file)
 
 # TODO(jelmer): For performance, read ranges?
 
@@ -34,12 +34,12 @@ from ..pack import PackData, Pack, load_pack_index_file
 class GcsObjectStore(BucketBasedObjectStore):
 
     def __init__(self, bucket, subpath=''):
-        super(GcsObjectStore, self).__init__()
+        super().__init__()
         self.bucket = bucket
         self.subpath = subpath
 
     def __repr__(self):
-        return "%s(%r, subpath=%r)" % (
+        return "{}({!r}, subpath={!r})".format(
             type(self).__name__, self.bucket, self.subpath)
 
     def _remove_pack(self, name):
@@ -53,19 +53,19 @@ class GcsObjectStore(BucketBasedObjectStore):
             name, ext = posixpath.splitext(posixpath.basename(blob.name))
             packs.setdefault(name, set()).add(ext)
         for name, exts in packs.items():
-            if exts == set(['.pack', '.idx']):
+            if exts == {'.pack', '.idx'}:
                 yield name
 
     def _load_pack_data(self, name):
         b = self.bucket.blob(posixpath.join(self.subpath, name + '.pack'))
-        f = tempfile.SpooledTemporaryFile()
+        f = tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE)
         b.download_to_file(f)
         f.seek(0)
         return PackData(name + '.pack', f)
 
     def _load_pack_index(self, name):
         b = self.bucket.blob(posixpath.join(self.subpath, name + '.idx'))
-        f = tempfile.SpooledTemporaryFile()
+        f = tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE)
         b.download_to_file(f)
         f.seek(0)
         return load_pack_index_file(name + '.idx', f)

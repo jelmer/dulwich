@@ -25,23 +25,15 @@ Warning: these tests should be fairly stable, but when writing/debugging new
     Ctrl-C'ed. On POSIX systems, you can kill the tests with Ctrl-Z, "kill %".
 """
 
-import threading
 import os
 import sys
+import threading
 
-from dulwich.server import (
-    DictBackend,
-    TCPGitServer,
-)
+from dulwich.server import DictBackend, TCPGitServer
 from dulwich.tests import skipIf
-from dulwich.tests.compat.server_utils import (
-    ServerTests,
-    NoSideBand64kReceivePackHandler,
-)
-from dulwich.tests.compat.utils import (
-    CompatTestCase,
-    require_git_version,
-)
+from dulwich.tests.compat.server_utils import (NoSideBand64kReceivePackHandler,
+                                               ServerTests)
+from dulwich.tests.compat.utils import CompatTestCase, require_git_version
 
 
 @skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
@@ -59,7 +51,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
     def _check_server(self, dul_server):
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertFalse(b"side-band-64k" in caps)
+        self.assertNotIn(b"side-band-64k", caps)
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
@@ -81,7 +73,7 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
     min_git_version = (1, 7, 0, 2)
 
     def setUp(self):
-        super(GitServerSideBand64kTestCase, self).setUp()
+        super().setUp()
         # side-band-64k is broken in the windows client.
         # https://github.com/msysgit/git/issues/101
         # Fix has landed for the 1.9.3 release.
@@ -94,4 +86,4 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
     def _check_server(self, server):
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
-        self.assertTrue(b"side-band-64k" in caps)
+        self.assertIn(b"side-band-64k", caps)

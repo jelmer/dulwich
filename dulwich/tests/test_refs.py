@@ -1,5 +1,4 @@
 # test_refs.py -- tests for refs.py
-# encoding: utf-8
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -21,38 +20,22 @@
 
 """Tests for dulwich.refs."""
 
-from io import BytesIO
 import os
 import sys
 import tempfile
+from io import BytesIO
 
 from dulwich import errors
-from dulwich.file import (
-    GitFile,
-)
+from dulwich.file import GitFile
 from dulwich.objects import ZERO_SHA
-from dulwich.refs import (
-    DictRefsContainer,
-    InfoRefsContainer,
-    check_ref_format,
-    _split_ref_line,
-    parse_symref_value,
-    read_packed_refs_with_peeled,
-    read_packed_refs,
-    strip_peeled_refs,
-    write_packed_refs,
-)
+from dulwich.refs import (DictRefsContainer, InfoRefsContainer, SymrefLoop,
+                          _split_ref_line, check_ref_format,
+                          parse_symref_value, read_packed_refs,
+                          read_packed_refs_with_peeled, strip_peeled_refs,
+                          write_packed_refs)
 from dulwich.repo import Repo
-
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
-
-from dulwich.tests.utils import (
-    open_repo,
-    tear_down_repo,
-)
+from dulwich.tests import SkipTest, TestCase
+from dulwich.tests.utils import open_repo, tear_down_repo
 
 
 class CheckRefFormatTests(TestCase):
@@ -171,7 +154,7 @@ _TEST_REFS = {
 }
 
 
-class RefsContainerTests(object):
+class RefsContainerTests:
     def test_keys(self):
         actual_keys = set(self._refs.keys())
         self.assertEqual(set(self._refs.allkeys()), actual_keys)
@@ -246,9 +229,9 @@ class RefsContainerTests(object):
         self.assertEqual(nines, self._refs[b"refs/heads/master"])
 
         self.assertTrue(
-            self._refs.set_if_equals(b"refs/heads/nonexistant", ZERO_SHA, nines)
+            self._refs.set_if_equals(b"refs/heads/nonexistent", ZERO_SHA, nines)
         )
-        self.assertEqual(nines, self._refs[b"refs/heads/nonexistant"])
+        self.assertEqual(nines, self._refs[b"refs/heads/nonexistent"])
 
     def test_add_if_new(self):
         nines = b"9" * 40
@@ -274,7 +257,7 @@ class RefsContainerTests(object):
 
     def test_set_symbolic_ref_overwrite(self):
         nines = b"9" * 40
-        self.assertFalse(b"refs/heads/symbolic" in self._refs)
+        self.assertNotIn(b"refs/heads/symbolic", self._refs)
         self._refs[b"refs/heads/symbolic"] = nines
         self.assertEqual(nines, self._refs.read_loose_ref(b"refs/heads/symbolic"))
         self._refs.set_symbolic_ref(b"refs/heads/symbolic", b"refs/heads/master")
@@ -298,8 +281,8 @@ class RefsContainerTests(object):
         )
 
     def test_contains(self):
-        self.assertTrue(b"refs/heads/master" in self._refs)
-        self.assertFalse(b"refs/heads/bar" in self._refs)
+        self.assertIn(b"refs/heads/master", self._refs)
+        self.assertNotIn(b"refs/heads/bar", self._refs)
 
     def test_delitem(self):
         self.assertEqual(
@@ -321,7 +304,7 @@ class RefsContainerTests(object):
             )
         )
         self.assertTrue(self._refs.remove_if_equals(b"refs/tags/refs-0.2", ZERO_SHA))
-        self.assertFalse(b"refs/tags/refs-0.2" in self._refs)
+        self.assertNotIn(b"refs/tags/refs-0.2", self._refs)
 
     def test_import_refs_name(self):
         self._refs[
@@ -354,38 +337,6 @@ class RefsContainerTests(object):
             self._refs[b"refs/remotes/origin/master"],
         )
         self.assertNotIn(b"refs/remotes/origin/other", self._refs)
-
-    def test_watch(self):
-        try:
-            watcher = self._refs.watch()
-        except (NotImplementedError, ImportError):
-            self.skipTest("watching not supported")
-        with watcher:
-            self._refs[
-                b"refs/remotes/origin/other"
-            ] = b"48d01bd4b77fed026b154d16493e5deab78f02ec"
-            change = next(watcher)
-            self.assertEqual(
-                (
-                    b"refs/remotes/origin/other",
-                    b"48d01bd4b77fed026b154d16493e5deab78f02ec",
-                ),
-                change,
-            )
-            self._refs[
-                b"refs/remotes/origin/other"
-            ] = b"48d01bd4b77fed026b154d16493e5deab78f02ed"
-            change = next(watcher)
-            self.assertEqual(
-                (
-                    b"refs/remotes/origin/other",
-                    b"48d01bd4b77fed026b154d16493e5deab78f02ed",
-                ),
-                change,
-            )
-            del self._refs[b"refs/remotes/origin/other"]
-            change = next(watcher)
-            self.assertEqual((b"refs/remotes/origin/other", None), change)
 
 
 class DictRefsContainerTests(RefsContainerTests, TestCase):
@@ -478,6 +429,66 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
         )
 
+        # this shouldn't overwrite the packed refs
+        self.assertEqual(
+            {b"refs/heads/packed": b"42d06bd4b77fed026b154d16493e5deab78f02ec"},
+            self._refs.get_packed_refs(),
+        )
+
+    def test_add_packed_refs(self):
+        # first, create a non-packed ref
+        self._refs[b"refs/heads/packed"] = b"3ec9c43c84ff242e3ef4a9fc5bc111fd780a76a8"
+
+        packed_ref_path = os.path.join(self._refs.path, b"refs", b"heads", b"packed")
+        self.assertTrue(os.path.exists(packed_ref_path))
+
+        # now overwrite that with a packed ref
+        packed_refs_file_path = os.path.join(self._refs.path, b"packed-refs")
+        self._refs.add_packed_refs(
+            {
+                b"refs/heads/packed": b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+            }
+        )
+
+        # that should kill the file
+        self.assertFalse(os.path.exists(packed_ref_path))
+
+        # now delete the packed ref
+        self._refs.add_packed_refs(
+            {
+                b"refs/heads/packed": None,
+            }
+        )
+
+        # and it's gone!
+        self.assertFalse(os.path.exists(packed_ref_path))
+
+        self.assertRaises(
+            KeyError,
+            self._refs.__getitem__,
+            b"refs/heads/packed",
+        )
+
+        # just in case, make sure we can't pack HEAD
+        self.assertRaises(
+            ValueError,
+            self._refs.add_packed_refs,
+            {b"HEAD": "02ac81614bcdbd585a37b4b0edf8cb8a"},
+        )
+
+        # delete all packed refs
+        self._refs.add_packed_refs({ref: None for ref in self._refs.get_packed_refs()})
+
+        self.assertEqual({}, self._refs.get_packed_refs())
+
+        # remove the packed ref file, and check that adding nothing doesn't affect that
+        os.remove(packed_refs_file_path)
+
+        # adding nothing doesn't make it reappear
+        self._refs.add_packed_refs({})
+
+        self.assertFalse(os.path.exists(packed_refs_file_path))
+
     def test_setitem_symbolic(self):
         ones = b"1" * 40
         self._refs[b"HEAD"] = ones
@@ -526,7 +537,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         nines = b"9" * 40
         self.assertEqual(b"ref: refs/heads/master", refs.read_ref(b"HEAD"))
-        self.assertFalse(b"refs/heads/master" in refs)
+        self.assertNotIn(b"refs/heads/master", refs)
         self.assertTrue(refs.add_if_new(b"HEAD", nines))
         self.assertEqual(b"ref: refs/heads/master", refs.read_ref(b"HEAD"))
         self.assertEqual(nines, refs[b"HEAD"])
@@ -550,13 +561,21 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             ),
             self._refs.follow(b"refs/heads/master"),
         )
-        self.assertRaises(KeyError, self._refs.follow, b"refs/heads/loop")
+        self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
+
+    def test_set_overwrite_loop(self):
+        self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
+        self._refs[b'refs/heads/loop'] = (
+            b"42d06bd4b77fed026b154d16493e5deab78f02ec")
+        self.assertEqual(
+            ([b'refs/heads/loop'], b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
+            self._refs.follow(b"refs/heads/loop"))
 
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)
         ref_file = os.path.join(self._refs.path, b"refs", b"heads", b"master")
         self.assertFalse(os.path.exists(ref_file))
-        self.assertFalse(b"refs/heads/master" in self._refs.get_packed_refs())
+        self.assertNotIn(b"refs/heads/master", self._refs.get_packed_refs())
 
     def test_delitem_symbolic(self):
         self.assertEqual(b"ref: refs/heads/master", self._refs.read_loose_ref(b"HEAD"))
@@ -654,7 +673,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
             self._refs.read_ref(b"refs/heads/packed"),
         )
-        self.assertEqual(None, self._refs.read_ref(b"nonexistant"))
+        self.assertEqual(None, self._refs.read_ref(b"nonexistent"))
 
     def test_read_loose_ref(self):
         self._refs[b"refs/heads/foo"] = b"df6800012397fb85c56e7418dd4eb9405dee075c"
@@ -663,9 +682,11 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_non_ascii(self):
         try:
-            encoded_ref = os.fsencode(u"refs/tags/schön")
-        except UnicodeEncodeError:
-            raise SkipTest("filesystem encoding doesn't support special character")
+            encoded_ref = os.fsencode("refs/tags/schön")
+        except UnicodeEncodeError as exc:
+            raise SkipTest(
+                "filesystem encoding doesn't support special character"
+            ) from exc
         p = os.path.join(os.fsencode(self._repo.path), encoded_ref)
         with open(p, "w") as f:
             f.write("00" * 20)
@@ -745,8 +766,8 @@ class InfoRefsContainerTests(TestCase):
 
     def test_contains(self):
         refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))
-        self.assertTrue(b"refs/heads/master" in refs)
-        self.assertFalse(b"refs/heads/bar" in refs)
+        self.assertIn(b"refs/heads/master", refs)
+        self.assertNotIn(b"refs/heads/bar", refs)
 
     def test_get_peeled(self):
         refs = InfoRefsContainer(BytesIO(_TEST_REFS_SERIALIZED))

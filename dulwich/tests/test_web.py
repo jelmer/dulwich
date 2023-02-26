@@ -20,54 +20,26 @@
 
 """Tests for the Git HTTP server."""
 
-from io import BytesIO
 import gzip
-import re
 import os
+import re
+from io import BytesIO
 from typing import Type
 
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Blob,
-)
-from dulwich.repo import (
-    BaseRepo,
-    MemoryRepo,
-)
-from dulwich.server import (
-    DictBackend,
-)
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.web import (
-    HTTP_OK,
-    HTTP_NOT_FOUND,
-    HTTP_FORBIDDEN,
-    HTTP_ERROR,
-    GunzipFilter,
-    send_file,
-    get_text_file,
-    get_loose_object,
-    get_pack_file,
-    get_idx_file,
-    get_info_refs,
-    get_info_packs,
-    handle_service_request,
-    _LengthLimitedFile,
-    HTTPGitRequest,
-    HTTPGitApplication,
-)
-
-from dulwich.tests.utils import (
-    make_object,
-    make_tag,
-)
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob
+from dulwich.repo import BaseRepo, MemoryRepo
+from dulwich.server import DictBackend
+from dulwich.tests import TestCase
+from dulwich.tests.utils import make_object, make_tag
+from dulwich.web import (HTTP_ERROR, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_OK,
+                         GunzipFilter, HTTPGitApplication, HTTPGitRequest,
+                         _LengthLimitedFile, get_idx_file, get_info_packs,
+                         get_info_refs, get_loose_object, get_pack_file,
+                         get_text_file, handle_service_request, send_file)
 
 
-class MinimalistWSGIInputStream(object):
+class MinimalistWSGIInputStream:
     """WSGI input stream with no 'seek()' and 'tell()' methods."""
 
     def __init__(self, data):
@@ -78,7 +50,7 @@ class MinimalistWSGIInputStream(object):
         start = self.pos
         end = self.pos + howmuch
         if start >= len(self.data):
-            return ""
+            return b""
         self.pos = end
         return self.data[start:end]
 
@@ -110,10 +82,10 @@ class TestHTTPGitRequest(HTTPGitRequest):
 class WebTestCase(TestCase):
     """Base TestCase with useful instance vars and utility functions."""
 
-    _req_class = TestHTTPGitRequest  # type: Type[HTTPGitRequest]
+    _req_class: Type[HTTPGitRequest] = TestHTTPGitRequest
 
     def setUp(self):
-        super(WebTestCase, self).setUp()
+        super().setUp()
         self._environ = {}
         self._req = self._req_class(
             self._environ, self._start_response, handlers=self._handlers()
@@ -131,7 +103,7 @@ class WebTestCase(TestCase):
         return None
 
     def assertContentTypeEquals(self, expected):
-        self.assertTrue(("Content-Type", expected) in self._headers)
+        self.assertIn(("Content-Type", expected), self._headers)
 
 
 def _test_backend(objects, refs=None, named_files=None):
@@ -168,7 +140,7 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertTrue(f.closed)
 
     def test_send_file_error(self):
-        class TestFile(object):
+        class TestFile:
             def __init__(self, exc_class):
                 self.closed = False
                 self._exc_class = exc_class
@@ -221,7 +193,7 @@ class DumbHandlersTestCase(WebTestCase):
         mat = re.search("^(..)(.{38})$", blob.id.decode("ascii"))
 
         def as_legacy_object_error(self):
-            raise IOError
+            raise OSError
 
         self.addCleanup(setattr, Blob, "as_legacy_object", Blob.as_legacy_object)
         Blob.as_legacy_object = as_legacy_object_error
@@ -296,11 +268,11 @@ class DumbHandlersTestCase(WebTestCase):
         self.assertContentTypeEquals("text/plain")
 
     def test_get_info_packs(self):
-        class TestPackData(object):
+        class TestPackData:
             def __init__(self, sha):
                 self.filename = "pack-%s.pack" % sha
 
-        class TestPack(object):
+        class TestPack:
             def __init__(self, sha):
                 self.data = TestPackData(sha)
 
@@ -327,7 +299,7 @@ class DumbHandlersTestCase(WebTestCase):
 
 
 class SmartHandlersTestCase(WebTestCase):
-    class _TestUploadPackHandler(object):
+    class _TestUploadPackHandler:
         def __init__(
             self,
             backend,
@@ -355,7 +327,7 @@ class SmartHandlersTestCase(WebTestCase):
         mat = re.search(".*", "/git-evil-handler")
         content = list(handle_service_request(self._req, "backend", mat))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
-        self.assertFalse(b"git-evil-handler" in b"".join(content))
+        self.assertNotIn(b"git-evil-handler", b"".join(content))
         self.assertFalse(self._req.cached)
 
     def _run_handle_service_request(self, content_length=None):
@@ -364,7 +336,7 @@ class SmartHandlersTestCase(WebTestCase):
             self._environ["CONTENT_LENGTH"] = content_length
         mat = re.search(".*", "/git-upload-pack")
 
-        class Backend(object):
+        class Backend:
             def open_repository(self, path):
                 return None
 
@@ -390,13 +362,13 @@ class SmartHandlersTestCase(WebTestCase):
     def test_get_info_refs_unknown(self):
         self._environ["QUERY_STRING"] = "service=git-evil-handler"
 
-        class Backend(object):
+        class Backend:
             def open_repository(self, url):
                 return None
 
         mat = re.search(".*", "/git-evil-pack")
         content = list(get_info_refs(self._req, Backend(), mat))
-        self.assertFalse(b"git-evil-handler" in b"".join(content))
+        self.assertNotIn(b"git-evil-handler", b"".join(content))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertFalse(self._req.cached)
 
@@ -404,7 +376,7 @@ class SmartHandlersTestCase(WebTestCase):
         self._environ["wsgi.input"] = BytesIO(b"foo")
         self._environ["QUERY_STRING"] = "service=git-upload-pack"
 
-        class Backend(object):
+        class Backend:
             def open_repository(self, url):
                 return None
 
@@ -454,14 +426,14 @@ class HTTPGitRequestTestCase(WebTestCase):
         message = "Something not found"
         self.assertEqual(message.encode("ascii"), self._req.not_found(message))
         self.assertEqual(HTTP_NOT_FOUND, self._status)
-        self.assertEqual(set([("Content-Type", "text/plain")]), set(self._headers))
+        self.assertEqual({("Content-Type", "text/plain")}, set(self._headers))
 
     def test_forbidden(self):
         self._req.cache_forever()  # cache headers should be discarded
         message = "Something not found"
         self.assertEqual(message.encode("ascii"), self._req.forbidden(message))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
-        self.assertEqual(set([("Content-Type", "text/plain")]), set(self._headers))
+        self.assertEqual({("Content-Type", "text/plain")}, set(self._headers))
 
     def test_respond_ok(self):
         self._req.respond()
@@ -476,16 +448,14 @@ class HTTPGitRequestTestCase(WebTestCase):
             headers=[("X-Foo", "foo"), ("X-Bar", "bar")],
         )
         self.assertEqual(
-            set(
-                [
-                    ("X-Foo", "foo"),
-                    ("X-Bar", "bar"),
-                    ("Content-Type", "some/type"),
-                    ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
-                    ("Pragma", "no-cache"),
-                    ("Cache-Control", "no-cache, max-age=0, must-revalidate"),
-                ]
-            ),
+            {
+                ("X-Foo", "foo"),
+                ("X-Bar", "bar"),
+                ("Content-Type", "some/type"),
+                ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
+                ("Pragma", "no-cache"),
+                ("Cache-Control", "no-cache, max-age=0, must-revalidate"),
+            },
             set(self._headers),
         )
         self.assertEqual(402, self._status)
@@ -493,7 +463,7 @@ class HTTPGitRequestTestCase(WebTestCase):
 
 class HTTPGitApplicationTestCase(TestCase):
     def setUp(self):
-        super(HTTPGitApplicationTestCase, self).setUp()
+        super().setUp()
         self._app = HTTPGitApplication("backend")
 
         self._environ = {
@@ -533,14 +503,14 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
     example_text = __doc__.encode("ascii")
 
     def setUp(self):
-        super(GunzipTestCase, self).setUp()
+        super().setUp()
         self._app = GunzipFilter(self._app)
         self._environ["HTTP_CONTENT_ENCODING"] = "gzip"
         self._environ["REQUEST_METHOD"] = "POST"
 
     def _get_zstream(self, text):
         zstream = BytesIO()
-        zfile = gzip.GzipFile(fileobj=zstream, mode="w")
+        zfile = gzip.GzipFile(fileobj=zstream, mode="wb")
         zfile.write(text)
         zfile.close()
         zlength = zstream.tell()

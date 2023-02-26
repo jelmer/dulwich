@@ -1,4 +1,289 @@
-0.20.25	UNRELEASED
+0.21.4	UNRELEASED
+
+0.21.3	2023-02-17
+
+ * Add support for ``worktreeconfig`` extension.
+   (Jelmer Vernooĳ)
+
+ * Deprecate ``Commit.extra``; the Git project specifically
+   discourages adding custom lines, and the contents of
+   ``Commit.extra`` are unpredictable as contents
+   may be different between different versions of Dulwich
+   with support for different headers.
+
+   ``Commit._extra`` still exists.
+   (Jelmer Vernooĳ)
+
+0.21.2	2023-01-18
+
+ * Fix early file close bug in ``dulwich.pack.extend_pack``.
+   (Jelmer Vernooĳ)
+
+0.21.1	2023-01-17
+
+ * Factor out ``dulwich.pack.extend_pack``.
+   (Jelmer Vernooĳ)
+
+0.21.0	2023-01-16
+
+ * Pack internals have been significantly refactored, including
+   significant low-level API changes.
+
+   As a consequence of this, Dulwich now reuses pack deltas
+   when communicating with remote servers, which brings a
+   big boost to network performance.
+   (Jelmer Vernooĳ)
+
+ * Add 'pack-refs' command.
+   (Dan Villiom Podlaski Christiansen)
+
+ * Handle more errors when trying to read a ref
+   (Dan Villiom Podlaski Christiansen)
+
+ * Allow for reuse of existing deltas while creating pack files
+   (Stefan Sperling)
+
+ * cli: fix argument parsing for pack-objects --stdout
+   (Stefan Sperling)
+
+ * cli: open pack-objects output files in binary mode to avoid write() error
+   (Stefan Sperling)
+
+ * Bump minimum python version to 3.7. (Jelmer Vernooĳ)
+
+ * honor no_proxy environment variable (#1098, afaul)
+
+ * In HTTP Git Client, allow missing Content-Type.
+   (Jelmer Vernooĳ)
+
+ * Fix --pure builds (Jelmer Vernooĳ, #1093)
+
+ * Allow passing abbrev to describe (#1084, Seppo Yli-Olli)
+
+0.20.50	2022-10-30
+
+ * Add --deltify option to ``dulwich pack-objects`` which enables
+   deltification, and add initial support for reusing suitable
+   deltas found in an existing pack file.
+   (Stefan Sperling)
+
+ * Fix Repo.reset_index.
+   Previously, it instead took the union with the given tree.
+   (Christian Sattler, #1072)
+
+ * Add -b argument to ``dulwich clone``.
+   (Jelmer Vernooĳ)
+
+ * On Windows, provide a hint about developer mode
+   when creating symlinks fails due to a permission
+   error. (Jelmer Vernooĳ, #1005)
+
+ * Add new ``ObjectID`` type in ``dulwich.objects``,
+   currently just an alias for ``bytes``.
+   (Jelmer Vernooĳ)
+
+ * Support repository format version 1.
+   (Jelmer Vernooĳ, #1056)
+
+ * Support \r\n line endings with continuations when parsing
+   configuration files.  (Jelmer Vernooĳ)
+
+ * Fix handling of SymrefLoop in RefsContainer.__setitem__.
+   (Dominic Davis-Foster, Jelmer Vernooĳ)
+
+0.20.46	2022-09-06
+
+ * Apply insteadOf to rsync-style location strings
+   (previously it was just applied to URLs).
+   (Jelmer Vernooĳ, python-poetry/poetry#6329)
+
+ * Drop use of certifi, instead relying on urllib3's default
+   code to find system CAs. (Jelmer Vernooĳ, #1025)
+
+ * Implement timezone parsing in porcelain.
+   (springheeledjack0, #1026)
+
+ * Drop support for running without setuptools.
+   (Jelmer Vernooĳ)
+
+ * Ensure configuration is loaded when
+   running "dulwich clone".
+   (Jelmer Vernooĳ)
+
+ * Build 32 bit wheels for Windows.
+   (Benjamin Parzella)
+
+ * tests: Ignore errors when deleting GNUPG 
+   home directory. Fixes spurious errors racing
+   gnupg-agent. Thanks, Matěj Cepl. Fixes #1000
+
+ * config: Support closing brackets in quotes in section
+   names. (Jelmer Vernooĳ, #10124)
+
+ * Various and formatting fixes. (Kian-Meng Ang)
+
+ * Document basic authentication in dulwich.porcelain.clone.
+   (TuringTux)
+
+ * Flush before calling fsync, ensuring buffers
+   are filled. (wernha)
+
+ * Support GPG commit signing. (springheeledjack0)
+
+ * Add python 3.11 support. (Saugat Pachhai)
+
+ * Allow missing GPG during tests. (Jakub Kulík)
+
+ * status: return posix-style untracked paths instead of nt-style paths on
+   win32 (Daniele Trifirò)
+
+ * Honour PATH environment when running C Git for testing.
+   (Stefan Sperling)
+
+ * Split out exception for symbolic reference loops.
+   (Jelmer Vernooĳ)
+
+ * Move various long-deprecated methods.
+   (Jelmer Vernooĳ)
+
+
+0.20.45	2022-07-15
+
+ * Add basic ``dulwich.porcelain.submodule_list`` and ``dulwich.porcelain.submodule_add``
+  (Jelmer Vernooĳ)
+
+0.20.44	2022-06-30
+
+ * Fix reading of chunks in server. (Jelmer Vernooĳ, #977)
+
+ * Support applying of URL rewriting using ``insteadOf`` / ``pushInsteadOf``.
+   (Jelmer Vernooĳ, #706)
+
+0.20.43	2022-06-07
+
+ * Lazily import url2pathname.
+   (Jelmer Vernooĳ)
+
+ * Drop caching of full HTTP response. Attempt #2.
+   (jelmer Vernooĳ, Antoine Lambert, #966)
+
+0.20.42	2022-05-24
+
+ * Drop ``RefsContainer.watch`` that was always flaky.
+   (Jelmer Vernooĳ, #886)
+
+0.20.41	2022-05-24
+
+ * Fix wheel uploading, properly. (Ruslan Kuprieiev)
+
+0.20.40	2022-05-19
+
+ * Fix wheel uploading. (Daniele Trifirò, Jelmer Vernooĳ)
+
+0.20.39	2022-05-19
+
+0.20.38	2022-05-17
+
+ * Disable paramiko tests if paramiko is not available. (Michał Górny)
+
+ * Set flag to re-enable paramiko server side on gentoo for running paramiko
+   tests. (Michał Górny)
+
+ * Increase tolerance when comparing time stamps; fixes some
+   spurious test failures on slow CI systems. (Jelmer Vernooĳ)
+
+ * Revert removal of caching of full HTTP response. This breaks
+   access to some HTTP servers.
+   (Jelmer Vernooĳ)
+
+0.20.37	2022-05-16
+
+ * Avoid making an extra copy when fetching pack files.
+   (Jelmer Vernooĳ)
+
+ * Add ``porcelain.remote_remove``.
+   (Jelmer Vernooĳ, #923)
+
+0.20.36	2022-05-15
+
+ * Add ``walk_untracked`` argument to ``porcelain.status``.
+   (Daniele Trifirò)
+
+ * Add tests for paramiko SSH Vendor.
+   (Filipp Frizzy)
+
+0.20.35	2022-03-20
+
+ * Document the ``path`` attribute for ``Repo``.
+   (Jelmer Vernooĳ, #854)
+
+0.20.34	2022-03-14
+
+ * Add support for multivars in configuration.
+   (Jelmer Vernooĳ, #718)
+
+0.20.33	2022-03-05
+
+ * Fix handling of escaped characters in ignore patterns.
+   (Jelmer Vernooĳ, #930)
+
+ * Add ``dulwich.contrib.requests_vendor``. (epopcon)
+
+ * Ensure git config is available in a linked working tree.
+   (Jesse Cureton, #926)
+
+0.20.32	2022-01-24
+
+ * Properly close result repository during test.
+   (Jelmer Vernooĳ, #928)
+
+0.20.31	2022-01-21
+
+ * Add GitClient.clone(). (Jelmer Vernooĳ, #920)
+
+0.20.30	2022-01-08
+
+0.20.29	2022-01-08
+
+ * Support staging submodules.
+   (Jelmer Vernooĳ)
+
+ * Drop deprecated Index.iterblobs and iter_fresh_blobs.
+   (Jelmer Vernooĳ)
+
+ * Unify clone behaviour of ``Repo.clone`` and
+   ``porcelain.clone``, and add branch parameter for
+   clone. (Peter Rowlands, #851)
+
+0.20.28	2022-01-05
+
+ * Fix hook test on Mac OSX / Linux when dulwich is
+   not installed system-wide. (Jelmer Vernooĳ, #919)
+
+ * Cope with gecos being unset.
+   (Jelmer Vernooĳ, #917)
+
+0.20.27	2022-01-04
+
+ * Allow adding files to repository in pre-commit hook.
+   (Jelmer Vernooĳ, #916)
+
+ * Raise SubmoduleEncountered in ``tree_lookup_path``.
+   (Jelmer Vernooĳ)
+
+0.20.26	2021-10-29
+
+ * Support os.PathLike arguments to Repo.stage().
+   (Jan Wiśniewski, #907)
+
+ * Drop support for Python 3.5.  (Jelmer Vernooĳ)
+
+ * Add ``dulwich.porcelain._reset_file``.
+   (Ded_Secer)
+
+ * Add ``Repo.unstage``. (Ded_Secer)
+
+0.20.25	2021-08-23
 
  * Fix ``dulwich`` script when installed via setup.py.
    (Dan Villiom Podlaski Christiansen)
@@ -849,7 +1134,7 @@
     probing the filesystem for trustable permissions.
     (Koen Martens)
 
-  * Fix ``porcelain.reset`` to respect the comittish argument.
+  * Fix ``porcelain.reset`` to respect the committish argument.
     (Koen Martens)
 
   * Fix dulwich.porcelain.ls_remote() on Python 3.
@@ -1886,7 +2171,7 @@ FEATURES
 
   * Provide strnlen() on mingw32 which doesn't have it. (Hans Kolek)
 
-  * Set bare=true in the configuratin for bare repositories. (Dirk Neumann)
+  * Set bare=true in the configuration for bare repositories. (Dirk Neumann)
 
  FEATURES
 
@@ -1970,7 +2255,7 @@ FEATURES
 
  FEATURES
 
-  * Move named file initilization to BaseRepo. (Dave Borowitz)
+  * Move named file initialization to BaseRepo. (Dave Borowitz)
 
   * Add logging utilities and git/HTTP server logging. (Dave Borowitz)
 
@@ -2051,7 +2336,7 @@ note: This list is most likely incomplete for 0.6.0.
   * Fix RefsContainer.add_if_new to support dangling symrefs.
     (Dave Borowitz)
 
-  * Non-existant index files in non-bare repositories are now treated as 
+  * Non-existent index files in non-bare repositories are now treated as 
     empty. (Dave Borowitz)
 
   * Always update ShaFile.id when the contents of the object get changed. 

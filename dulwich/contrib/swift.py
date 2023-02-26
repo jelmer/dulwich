@@ -26,70 +26,32 @@
 # TODO(fbo): Second attempt to _send() must be notified via real log
 # TODO(fbo): More logs for operations
 
+import json
 import os
-import stat
-import zlib
-import tempfile
 import posixpath
-
+import stat
+import sys
+import tempfile
 import urllib.parse as urlparse
-
-from io import BytesIO
+import zlib
 from configparser import ConfigParser
+from io import BytesIO
+
 from geventhttpclient import HTTPClient
 
-from dulwich.greenthreads import (
-    GreenThreadsMissingObjectFinder,
-    GreenThreadsObjectStoreIterator,
-)
-
+from dulwich.greenthreads import GreenThreadsMissingObjectFinder
 from dulwich.lru_cache import LRUSizeCache
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tree,
-    Tag,
-    S_ISGITLINK,
-)
-from dulwich.object_store import (
-    PackBasedObjectStore,
-    PACKDIR,
-    INFODIR,
-)
-from dulwich.pack import (
-    PackData,
-    Pack,
-    PackIndexer,
-    PackStreamCopier,
-    write_pack_header,
-    compute_file_sha,
-    iter_sha1,
-    write_pack_index_v2,
-    load_pack_index_file,
-    read_pack_header,
-    _compute_object_size,
-    unpack_object,
-    write_pack_object,
-)
+from dulwich.object_store import INFODIR, PACKDIR, PackBasedObjectStore
+from dulwich.objects import S_ISGITLINK, Blob, Commit, Tag, Tree
+from dulwich.pack import (Pack, PackData, PackIndexer, PackStreamCopier,
+                          _compute_object_size, compute_file_sha, iter_sha1,
+                          load_pack_index_file, read_pack_header,
+                          unpack_object, write_pack_header,
+                          write_pack_index_v2, write_pack_object)
 from dulwich.protocol import TCP_GIT_PORT
-from dulwich.refs import (
-    InfoRefsContainer,
-    read_info_refs,
-    write_info_refs,
-)
-from dulwich.repo import (
-    BaseRepo,
-    OBJECTDIR,
-)
-from dulwich.server import (
-    Backend,
-    TCPGitServer,
-)
-
-import json
-
-import sys
-
+from dulwich.refs import InfoRefsContainer, read_info_refs, write_info_refs
+from dulwich.repo import OBJECTDIR, BaseRepo
+from dulwich.server import Backend, TCPGitServer
 
 """
 # Configuration file sample
@@ -117,15 +79,6 @@ chunk_length = 12228
 # Cache size (MBytes) (Default 20)
 cache_length = 20
 """
-
-
-class PackInfoObjectStoreIterator(GreenThreadsObjectStoreIterator):
-    def __len__(self):
-        while self.finder.objects_to_send:
-            for _ in range(0, len(self.finder.objects_to_send)):
-                sha = self.finder.next()
-                self._shas.append(sha)
-        return len(self._shas)
 
 
 class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
@@ -170,8 +123,9 @@ def load_conf(path=None, file=None):
     if not path:
         try:
             confpath = os.environ["DULWICH_SWIFT_CFG"]
-        except KeyError:
-            raise Exception("You need to specify a configuration file")
+        except KeyError as exc:
+            raise Exception(
+                "You need to specify a configuration file") from exc
     else:
         confpath = path
     if not os.path.isfile(confpath):
@@ -233,7 +187,7 @@ class SwiftException(Exception):
     pass
 
 
-class SwiftConnector(object):
+class SwiftConnector:
     """A Connector to swift that manage authentication and errors catching"""
 
     def __init__(self, root, conf):
@@ -500,13 +454,13 @@ class SwiftConnector(object):
             )
 
 
-class SwiftPackReader(object):
+class SwiftPackReader:
     """A SwiftPackReader that mimic read and sync method
 
     The reader allows to read a specified amount of bytes from
-    a given offset of a Swift object. A read offset is kept internaly.
+    a given offset of a Swift object. A read offset is kept internally.
     The reader will read from Swift a specified amount of data to complete
-    its internal buffer. chunk_length specifiy the amount of data
+    its internal buffer. chunk_length specify the amount of data
     to read from Swift.
     """
 
@@ -531,7 +485,7 @@ class SwiftPackReader(object):
             self.buff_length = self.buff_length * 2
         offset = self.base_offset
         r = min(self.base_offset + self.buff_length, self.pack_length)
-        ret = self.scon.get_object(self.filename, range="%s-%s" % (offset, r))
+        ret = self.scon.get_object(self.filename, range="{}-{}".format(offset, r))
         self.buff = ret
 
     def read(self, length):
@@ -628,7 +582,7 @@ class SwiftPack(Pack):
     def __init__(self, *args, **kwargs):
         self.scon = kwargs["scon"]
         del kwargs["scon"]
-        super(SwiftPack, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._pack_info_path = self._basename + ".info"
         self._pack_info = None
         self._pack_info_load = lambda: load_pack_info(self._pack_info_path, self.scon)
@@ -656,7 +610,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         Args:
           scon: A `SwiftConnector` instance
         """
-        super(SwiftObjectStore, self).__init__()
+        super().__init__()
         self.scon = scon
         self.root = self.scon.root
         self.pack_dir = posixpath.join(OBJECTDIR, PACKDIR)
@@ -679,19 +633,6 @@ class SwiftObjectStore(PackBasedObjectStore):
     def _iter_loose_objects(self):
         """Loose objects are not supported by this repository"""
         return []
-
-    def iter_shas(self, finder):
-        """An iterator over pack's ObjectStore.
-
-        Returns: a `ObjectStoreIterator` or `GreenThreadsObjectStoreIterator`
-                 instance if gevent is enabled
-        """
-        shas = iter(finder.next, None)
-        return PackInfoObjectStoreIterator(self, shas, finder, self.scon.concurrency)
-
-    def find_missing_objects(self, *args, **kwargs):
-        kwargs["concurrency"] = self.scon.concurrency
-        return PackInfoMissingObjectFinder(self, *args, **kwargs)
 
     def pack_info_get(self, sha):
         for pack in self.packs:
@@ -859,7 +800,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         f = self.scon.get_object(self.filename)
         if not f:
             f = BytesIO(b"")
-        super(SwiftInfoRefsContainer, self).__init__(f)
+        super().__init__(f)
 
     def _load_check_ref(self, name, old_ref):
         self._check_refname(name)
@@ -1065,7 +1006,7 @@ def main(argv=sys.argv):
     }
 
     if len(sys.argv) < 2:
-        print("Usage: %s <%s> [OPTIONS...]" % (sys.argv[0], "|".join(commands.keys())))
+        print("Usage: {} <{}> [OPTIONS...]".format(sys.argv[0], "|".join(commands.keys())))
         sys.exit(1)
 
     cmd = sys.argv[1]

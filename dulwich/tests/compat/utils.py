@@ -32,18 +32,16 @@ import tempfile
 import time
 from typing import Tuple
 
-from dulwich.repo import Repo
 from dulwich.protocol import TCP_GIT_PORT
-
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
+from dulwich.repo import Repo
+from dulwich.tests import SkipTest, TestCase
 
 _DEFAULT_GIT = "git"
 _VERSION_LEN = 4
 _REPOS_DATA_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), os.pardir, "data", "repos")
+    os.path.join(
+        os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
+        "testdata", "repos")
 )
 
 
@@ -82,7 +80,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
 
     Args:
       required_version: A tuple of ints of the form (major, minor, point,
-        sub-point); ommitted components default to 0.
+        sub-point); omitted components default to 0.
       git_path: Path to the git executable; defaults to the version in
         the system path.
     Raises:
@@ -92,7 +90,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     found_version = git_version(git_path=git_path)
     if found_version is None:
         raise SkipTest(
-            "Test requires git >= %s, but c git not found" % (required_version,)
+            "Test requires git >= {}, but c git not found".format(required_version)
         )
 
     if len(required_version) > _VERSION_LEN:
@@ -110,12 +108,13 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
         required_version = ".".join(map(str, required_version))
         found_version = ".".join(map(str, found_version))
         raise SkipTest(
-            "Test requires git >= %s, found %s" % (required_version, found_version)
+            "Test requires git >= {}, found {}".format(required_version, found_version)
         )
 
 
 def run_git(
-    args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False, **popen_kwargs
+    args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
+    capture_stderr=False, **popen_kwargs
 ):
     """Run a git command.
 
@@ -129,14 +128,16 @@ def run_git(
       capture_stdout: Whether to capture and return stdout.
       popen_kwargs: Additional kwargs for subprocess.Popen;
         stdin/stdout args are ignored.
-    Returns: A tuple of (returncode, stdout contents). If capture_stdout is
-        False, None will be returned as stdout contents.
+    Returns: A tuple of (returncode, stdout contents, stderr contents).
+        If capture_stdout is False, None will be returned as stdout contents.
+        If capture_stderr is False, None will be returned as stderr contents.
     Raises:
       OSError: if the git executable was not found.
     """
 
     env = popen_kwargs.pop("env", {})
     env["LC_ALL"] = env["LANG"] = "C"
+    env["PATH"] = os.getenv("PATH")
 
     args = [git_path] + args
     popen_kwargs["stdin"] = subprocess.PIPE
@@ -144,21 +145,26 @@ def run_git(
         popen_kwargs["stdout"] = subprocess.PIPE
     else:
         popen_kwargs.pop("stdout", None)
+    if capture_stderr:
+        popen_kwargs["stderr"] = subprocess.PIPE
+    else:
+        popen_kwargs.pop("stderr", None)
     p = subprocess.Popen(args, env=env, **popen_kwargs)
     stdout, stderr = p.communicate(input=input)
-    return (p.returncode, stdout)
+    return (p.returncode, stdout, stderr)
 
 
 def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     """Run a git command, capture stdout/stderr, and fail if git fails."""
     if "stderr" not in popen_kwargs:
         popen_kwargs["stderr"] = subprocess.STDOUT
-    returncode, stdout = run_git(
-        args, git_path=git_path, input=input, capture_stdout=True, **popen_kwargs
+    returncode, stdout, stderr = run_git(
+        args, git_path=git_path, input=input, capture_stdout=True,
+        capture_stderr=True, **popen_kwargs
     )
     if returncode != 0:
         raise AssertionError(
-            "git with args %r failed with %d: %r" % (args, returncode, stdout)
+            "git with args %r failed with %d: stdout=%r stderr=%r" % (args, returncode, stdout, stderr)
         )
     return stdout
 
@@ -206,7 +212,7 @@ def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
             return True
         except socket.timeout:
             pass
-        except socket.error as e:
+        except OSError as e:
             if getattr(e, "errno", False) and e.errno != errno.ECONNREFUSED:
                 raise
             elif e.args[0] != errno.ECONNREFUSED:
@@ -223,10 +229,10 @@ class CompatTestCase(TestCase):
     min_git_version.
     """
 
-    min_git_version = (1, 5, 0)  # type: Tuple[int, ...]
+    min_git_version: Tuple[int, ...] = (1, 5, 0)
 
     def setUp(self):
-        super(CompatTestCase, self).setUp()
+        super().setUp()
         require_git_version(self.min_git_version)
 
     def assertObjectStoreEqual(self, store1, store2):

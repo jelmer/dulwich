@@ -21,23 +21,15 @@
 
 """Fast export/import functionality."""
 
-from dulwich.index import (
-    commit_tree,
-)
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tag,
-    ZERO_SHA,
-)
-from fastimport import (  # noqa: E402
-    commands,
-    errors as fastimport_errors,
-    parser,
-    processor,
-)
+import stat
 
-import stat  # noqa: E402
+from fastimport import commands
+from fastimport import errors as fastimport_errors
+from fastimport import parser, processor
+
+from dulwich.index import commit_tree
+from dulwich.object_store import iter_tree_contents
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tag
 
 
 def split_email(text):
@@ -45,7 +37,7 @@ def split_email(text):
     return (name, email.rstrip(b">"))
 
 
-class GitFastExporter(object):
+class GitFastExporter:
     """Generate a fast-export output stream for Git objects."""
 
     def __init__(self, outf, store):
@@ -232,7 +224,7 @@ class GitImportProcessor(processor.ImportProcessor):
                 path,
                 mode,
                 hexsha,
-            ) in self.repo.object_store.iter_tree_contents(tree_id):
+            ) in iter_tree_contents(self.repo.object_store, tree_id):
                 self._contents[path] = (mode, hexsha)
 
     def reset_handler(self, cmd):

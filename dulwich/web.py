@@ -21,41 +21,21 @@
 
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
-from io import BytesIO
-import shutil
-import tempfile
-import gzip
 import os
 import re
 import sys
 import time
-from typing import List, Tuple, Optional
-from wsgiref.simple_server import (
-    WSGIRequestHandler,
-    ServerHandler,
-    WSGIServer,
-    make_server,
-)
-
+from io import BytesIO
+from typing import List, Optional, Tuple
 from urllib.parse import parse_qs
-
+from wsgiref.simple_server import (ServerHandler, WSGIRequestHandler,
+                                   WSGIServer, make_server)
 
 from dulwich import log_utils
-from dulwich.protocol import (
-    ReceivableProtocol,
-)
-from dulwich.repo import (
-    BaseRepo,
-    NotGitRepository,
-    Repo,
-)
-from dulwich.server import (
-    DictBackend,
-    DEFAULT_HANDLERS,
-    generate_info_refs,
-    generate_objects_info_packs,
-)
-
+from dulwich.protocol import ReceivableProtocol
+from dulwich.repo import BaseRepo, NotGitRepository, Repo
+from dulwich.server import (DEFAULT_HANDLERS, DictBackend, generate_info_refs,
+                            generate_objects_info_packs)
 
 logger = log_utils.getLogger(__name__)
 
@@ -65,6 +45,23 @@ HTTP_OK = "200 OK"
 HTTP_NOT_FOUND = "404 Not Found"
 HTTP_FORBIDDEN = "403 Forbidden"
 HTTP_ERROR = "500 Internal Server Error"
+
+
+NO_CACHE_HEADERS = [
+    ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
+    ("Pragma", "no-cache"),
+    ("Cache-Control", "no-cache, max-age=0, must-revalidate"),
+]
+
+
+def cache_forever_headers(now=None):
+    if now is None:
+        now = time.time()
+    return [
+        ("Date", date_time_string(now)),
+        ("Expires", date_time_string(now + 31536000)),
+        ("Cache-Control", "public, max-age=31536000"),
+    ]
 
 
 def date_time_string(timestamp: Optional[float] = None) -> str:
@@ -140,7 +137,7 @@ def send_file(req, f, content_type):
             if not data:
                 break
             yield data
-    except IOError:
+    except OSError:
         yield req.error("Error reading file")
     finally:
         f.close()
@@ -166,7 +163,7 @@ def get_loose_object(req, backend, mat):
         return
     try:
         data = object_store[sha].as_legacy_object()
-    except IOError:
+    except OSError:
         yield req.error("Error reading object")
         return
     req.cache_forever()
@@ -216,7 +213,7 @@ def get_info_refs(req, backend, mat):
             backend,
             [url_prefix(mat)],
             proto,
-            stateless_rpc=req,
+            stateless_rpc=True,
             advertise_refs=True,
         )
         handler.proto.write_pkt_line(b"# service=" + service.encode("ascii") + b"\n")
@@ -228,8 +225,7 @@ def get_info_refs(req, backend, mat):
         req.nocache()
         req.respond(HTTP_OK, "text/plain")
         logger.info("Emulating dumb info/refs")
-        for text in generate_info_refs(repo):
-            yield text
+        yield from generate_info_refs(repo)
 
 
 def get_info_packs(req, backend, mat):
@@ -239,7 +235,35 @@ def get_info_packs(req, backend, mat):
     return generate_objects_info_packs(get_repo(backend, mat))
 
 
-class _LengthLimitedFile(object):
+def _chunk_iter(f):
+    while True:
+        line = f.readline()
+        length = int(line.rstrip(), 16)
+        chunk = f.read(length + 2)
+        if length == 0:
+            break
+        yield chunk[:-2]
+
+
+class ChunkReader:
+
+    def __init__(self, f):
+        self._iter = _chunk_iter(f)
+        self._buffer = []
+
+    def read(self, n):
+        while sum(map(len, self._buffer)) < n:
+            try:
+                self._buffer.append(next(self._iter))
+            except StopIteration:
+                break
+        f = b''.join(self._buffer)
+        ret = f[:n]
+        self._buffer = [f[n:]]
+        return ret
+
+
+class _LengthLimitedFile:
     """Wrapper class to limit the length of reads from a file-like object.
 
     This is used to ensure EOF is read from the wsgi.input object once
@@ -276,17 +300,22 @@ def handle_service_request(req, backend, mat):
         return
     req.nocache()
     write = req.respond(HTTP_OK, "application/x-%s-result" % service)
-    proto = ReceivableProtocol(req.environ["wsgi.input"].read, write)
+    if req.environ.get('HTTP_TRANSFER_ENCODING') == 'chunked':
+        read = ChunkReader(req.environ["wsgi.input"]).read
+    else:
+        read = req.environ["wsgi.input"].read
+    proto = ReceivableProtocol(read, write)
     # TODO(jelmer): Find a way to pass in repo, rather than having handler_cls
     # reopen.
-    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=req)
+    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
     handler.handle()
 
 
-class HTTPGitRequest(object):
+class HTTPGitRequest:
     """Class encapsulating the state of a single git HTTP request.
 
-    :ivar environ: the WSGI environment for the request.
+    Attributes:
+      environ: the WSGI environment for the request.
     """
 
     def __init__(self, environ, start_response, dumb: bool = False, handlers=None):
@@ -294,8 +323,8 @@ class HTTPGitRequest(object):
         self.dumb = dumb
         self.handlers = handlers
         self._start_response = start_response
-        self._cache_headers = []  # type: List[Tuple[str, str]]
-        self._headers = []  # type: List[Tuple[str, str]]
+        self._cache_headers: List[Tuple[str, str]] = []
+        self._headers: List[Tuple[str, str]] = []
 
     def add_header(self, name, value):
         """Add a header to the response."""
@@ -339,26 +368,18 @@ class HTTPGitRequest(object):
 
     def nocache(self) -> None:
         """Set the response to never be cached by the client."""
-        self._cache_headers = [
-            ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
-            ("Pragma", "no-cache"),
-            ("Cache-Control", "no-cache, max-age=0, must-revalidate"),
-        ]
+        self._cache_headers = NO_CACHE_HEADERS
 
     def cache_forever(self) -> None:
         """Set the response to be cached forever by the client."""
-        now = time.time()
-        self._cache_headers = [
-            ("Date", date_time_string(now)),
-            ("Expires", date_time_string(now + 31536000)),
-            ("Cache-Control", "public, max-age=31536000"),
-        ]
+        self._cache_headers = cache_forever_headers()
 
 
-class HTTPGitApplication(object):
+class HTTPGitApplication:
     """Class encapsulating the state of a git WSGI application.
 
-    :ivar backend: the Backend object backing this application
+    Attributes:
+      backend: the Backend object backing this application
     """
 
     services = {
@@ -416,7 +437,7 @@ class HTTPGitApplication(object):
         return handler(req, self.backend, mat)
 
 
-class GunzipFilter(object):
+class GunzipFilter:
     """WSGI middleware that unzips gzip-encoded requests before
     passing on to the underlying application.
     """
@@ -425,21 +446,10 @@ class GunzipFilter(object):
         self.app = application
 
     def __call__(self, environ, start_response):
+        import gzip
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
-            try:
-                environ["wsgi.input"].tell()
-                wsgi_input = environ["wsgi.input"]
-            except (AttributeError, IOError, NotImplementedError):
-                # The gzip implementation in the standard library of Python 2.x
-                # requires working '.seek()' and '.tell()' methods on the input
-                # stream.  Read the data into a temporary file to work around
-                # this limitation.
-                wsgi_input = tempfile.SpooledTemporaryFile(16 * 1024 * 1024)
-                shutil.copyfileobj(environ["wsgi.input"], wsgi_input)
-                wsgi_input.seek(0)
-
             environ["wsgi.input"] = gzip.GzipFile(
-                filename=None, fileobj=wsgi_input, mode="r"
+                filename=None, fileobj=environ["wsgi.input"], mode="rb"
             )
             del environ["HTTP_CONTENT_ENCODING"]
             if "CONTENT_LENGTH" in environ:
@@ -448,7 +458,7 @@ class GunzipFilter(object):
         return self.app(environ, start_response)
 
 
-class LimitedInputFilter(object):
+class LimitedInputFilter:
     """WSGI middleware that limits the input length of a request to that
     specified in Content-Length.
     """

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # test_index.py -- Tests for merge
 # encoding: utf-8
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
@@ -21,11 +20,10 @@
 
 """Tests for dulwich.graph."""
 
+from dulwich.graph import _find_lcas, can_fast_forward
+from dulwich.repo import MemoryRepo
 from dulwich.tests import TestCase
 from dulwich.tests.utils import make_commit
-from dulwich.repo import MemoryRepo
-
-from dulwich.graph import _find_lcas, can_fast_forward
 
 
 class FindMergeBaseTests(TestCase):
@@ -48,7 +46,7 @@ class FindMergeBaseTests(TestCase):
             "1": [],
             "0": [],
         }
-        self.assertEqual(self.run_test(graph, ["4", "5"]), set(["1", "2"]))
+        self.assertEqual(self.run_test(graph, ["4", "5"]), {"1", "2"})
 
     def test_no_common_ancestor(self):
         # no common ancestor
@@ -59,7 +57,7 @@ class FindMergeBaseTests(TestCase):
             "1": ["0"],
             "0": [],
         }
-        self.assertEqual(self.run_test(graph, ["4", "3"]), set([]))
+        self.assertEqual(self.run_test(graph, ["4", "3"]), set())
 
     def test_ancestor(self):
         # ancestor
@@ -72,7 +70,7 @@ class FindMergeBaseTests(TestCase):
             "B": ["A"],
             "A": [],
         }
-        self.assertEqual(self.run_test(graph, ["D", "C"]), set(["C"]))
+        self.assertEqual(self.run_test(graph, ["D", "C"]), {"C"})
 
     def test_direct_parent(self):
         # parent
@@ -85,7 +83,7 @@ class FindMergeBaseTests(TestCase):
             "B": ["A"],
             "A": [],
         }
-        self.assertEqual(self.run_test(graph, ["G", "D"]), set(["D"]))
+        self.assertEqual(self.run_test(graph, ["G", "D"]), {"D"})
 
     def test_another_crossover(self):
         # Another cross over
@@ -98,7 +96,7 @@ class FindMergeBaseTests(TestCase):
             "B": ["A"],
             "A": [],
         }
-        self.assertEqual(self.run_test(graph, ["D", "F"]), set(["E", "C"]))
+        self.assertEqual(self.run_test(graph, ["D", "F"]), {"E", "C"})
 
     def test_three_way_merge_lca(self):
         # three way merge commit straight from git docs
@@ -121,7 +119,7 @@ class FindMergeBaseTests(TestCase):
         }
         # assumes a theoretical merge M exists that merges B and C first
         # which actually means find the first LCA from either of B OR C with A
-        self.assertEqual(self.run_test(graph, ["A", "B", "C"]), set(["1"]))
+        self.assertEqual(self.run_test(graph, ["A", "B", "C"]), {"1"})
 
     def test_octopus(self):
         # octopus algorithm test
@@ -156,7 +154,7 @@ class FindMergeBaseTests(TestCase):
                 res = _find_lcas(lookup_parents, cmt, [ca])
                 next_lcas.extend(res)
             lcas = next_lcas[:]
-        self.assertEqual(set(lcas), set(["2"]))
+        self.assertEqual(set(lcas), {"2"})
 
 
 class CanFastForwardTests(TestCase):

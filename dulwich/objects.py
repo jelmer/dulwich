@@ -22,33 +22,22 @@
 """Access to base git objects."""
 
 import binascii
-from io import BytesIO
-from collections import namedtuple
 import os
 import posixpath
 import stat
-from typing import (
-    Optional,
-    Dict,
-    Iterable,
-    Union,
-    Type,
-)
 import warnings
 import zlib
+from collections import namedtuple
 from hashlib import sha1
+from io import BytesIO
+from typing import Dict, Iterable, Iterator, List, Optional, Type, Union
 
-from dulwich.errors import (
-    ChecksumMismatch,
-    NotBlobError,
-    NotCommitError,
-    NotTagError,
-    NotTreeError,
-    ObjectFormatException,
-    FileFormatException,
-)
+from _hashlib import HASH
+
+from dulwich.errors import (ChecksumMismatch, FileFormatException,
+                            NotBlobError, NotCommitError, NotTagError,
+                            NotTreeError, ObjectFormatException)
 from dulwich.file import GitFile
-
 
 ZERO_SHA = b"0" * 40
 
@@ -76,6 +65,9 @@ MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
 BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
 
 
+ObjectID = bytes
+
+
 class EmptyFileException(FileFormatException):
     """An unexpectedly empty file was encountered."""
 
@@ -100,7 +92,7 @@ def _decompress(string):
 def sha_to_hex(sha):
     """Takes a string and returns the hex of the sha within"""
     hexsha = binascii.hexlify(sha)
-    assert len(hexsha) == 40, "Incorrect length of sha1 string: %d" % hexsha
+    assert len(hexsha) == 40, "Incorrect length of sha1 string: %r" % hexsha
     return hexsha
 
 
@@ -112,7 +104,7 @@ def hex_to_sha(hex):
     except TypeError as exc:
         if not isinstance(hex, bytes):
             raise
-        raise ValueError(exc.args[0])
+        raise ValueError(exc.args[0]) from exc
 
 
 def valid_hexsha(hex):
@@ -131,7 +123,7 @@ def hex_to_filename(path, hex):
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
     # as path.
-    if getattr(path, "encode", None) is not None:
+    if type(path) != type(hex) and getattr(path, "encode", None) is not None:
         hex = hex.decode("ascii")
     dir = hex[:2]
     file = hex[2:]
@@ -154,7 +146,10 @@ def filename_to_hex(filename):
 
 def object_header(num_type: int, length: int) -> bytes:
     """Return an object header for the given numeric type and text length."""
-    return object_class(num_type).type_name + b" " + str(length).encode("ascii") + b"\0"
+    cls = object_class(num_type)
+    if cls is None:
+        raise AssertionError("unsupported class type num: %d" % num_type)
+    return cls.type_name + b" " + str(length).encode("ascii") + b"\0"
 
 
 def serializable_property(name: str, docstring: Optional[str] = None):
@@ -170,7 +165,7 @@ def serializable_property(name: str, docstring: Optional[str] = None):
     return property(get, set, doc=docstring)
 
 
-def object_class(type):
+def object_class(type: Union[bytes, int]) -> Optional[Type["ShaFile"]]:
     """Get the object class corresponding to the given type.
 
     Args:
@@ -191,10 +186,10 @@ def check_hexsha(hex, error_msg):
       ObjectFormatException: Raised when the string is not valid
     """
     if not valid_hexsha(hex):
-        raise ObjectFormatException("%s %s" % (error_msg, hex))
+        raise ObjectFormatException("{} {}".format(error_msg, hex))
 
 
-def check_identity(identity, error_msg):
+def check_identity(identity: bytes, error_msg: str) -> None:
     """Check if the specified identity is valid.
 
     This will raise an exception if the identity is not valid.
@@ -203,16 +198,16 @@ def check_identity(identity, error_msg):
       identity: Identity string
       error_msg: Error message to use in exception
     """
-    email_start = identity.find(b"<")
-    email_end = identity.find(b">")
-    if (
-        email_start < 0
-        or email_end < 0
-        or email_end <= email_start
-        or identity.find(b"<", email_start + 1) >= 0
-        or identity.find(b">", email_end + 1) >= 0
-        or not identity.endswith(b">")
-    ):
+    email_start = identity.find(b'<')
+    email_end = identity.find(b'>')
+    if not all([
+        email_start >= 1,
+        identity[email_start - 1] == b' '[0],
+        identity.find(b'<', email_start + 1) == -1,
+        email_end == len(identity) - 1,
+        b'\0' not in identity,
+        b'\n' not in identity,
+    ]):
         raise ObjectFormatException(error_msg)
 
 
@@ -222,7 +217,7 @@ def check_time(time_seconds):
     This will raise an exception if the time is not valid.
 
     Args:
-      time_info: author/committer/tagger info
+      time_seconds: time in seconds
 
     """
     # Prevent overflow error
@@ -235,7 +230,7 @@ def git_line(*items):
     return b" ".join(items) + b"\n"
 
 
-class FixedSha(object):
+class FixedSha:
     """SHA object that behaves like hashlib's but is given a fixed value."""
 
     __slots__ = ("_hexsha", "_sha")
@@ -257,16 +252,19 @@ class FixedSha(object):
         return self._hexsha.decode("ascii")
 
 
-class ShaFile(object):
+class ShaFile:
     """A git SHA file."""
 
     __slots__ = ("_chunked_text", "_sha", "_needs_serialization")
 
-    type_name = None  # type: bytes
-    type_num = None  # type: int
+    _needs_serialization: bool
+    type_name: bytes
+    type_num: int
+    _chunked_text: Optional[List[bytes]]
+    _sha: Union[FixedSha, None, HASH]
 
     @staticmethod
-    def _parse_legacy_object_header(magic, f):
+    def _parse_legacy_object_header(magic, f) -> "ShaFile":
         """Parse a legacy object, creating it but not reading the file."""
         bufsize = 1024
         decomp = zlib.decompressobj()
@@ -283,14 +281,15 @@ class ShaFile(object):
         type_name, size = header.split(b" ", 1)
         try:
             int(size)  # sanity check
-        except ValueError as e:
-            raise ObjectFormatException("Object size not an integer: %s" % e)
+        except ValueError as exc:
+            raise ObjectFormatException(
+                "Object size not an integer: %s" % exc) from exc
         obj_class = object_class(type_name)
         if not obj_class:
-            raise ObjectFormatException("Not a known type: %s" % type_name)
+            raise ObjectFormatException("Not a known type: %s" % type_name.decode('ascii'))
         return obj_class()
 
-    def _parse_legacy_object(self, map):
+    def _parse_legacy_object(self, map) -> None:
         """Parse a legacy object, setting the raw string."""
         text = _decompress(map)
         header_end = text.find(b"\0")
@@ -298,7 +297,8 @@ class ShaFile(object):
             raise ObjectFormatException("Invalid object header, no \\0")
         self.set_raw_string(text[header_end + 1 :])
 
-    def as_legacy_object_chunks(self, compression_level=-1):
+    def as_legacy_object_chunks(
+            self, compression_level: int = -1) -> Iterator[bytes]:
         """Return chunks representing the object in the experimental format.
 
         Returns: List of strings
@@ -309,13 +309,13 @@ class ShaFile(object):
             yield compobj.compress(chunk)
         yield compobj.flush()
 
-    def as_legacy_object(self, compression_level=-1):
+    def as_legacy_object(self, compression_level: int = -1) -> bytes:
         """Return string representing the object in the experimental format."""
         return b"".join(
             self.as_legacy_object_chunks(compression_level=compression_level)
         )
 
-    def as_raw_chunks(self):
+    def as_raw_chunks(self) -> List[bytes]:
         """Return chunks with serialization of the object.
 
         Returns: List of strings, not necessarily one per line
@@ -324,16 +324,16 @@ class ShaFile(object):
             self._sha = None
             self._chunked_text = self._serialize()
             self._needs_serialization = False
-        return self._chunked_text
+        return self._chunked_text  # type: ignore
 
-    def as_raw_string(self):
+    def as_raw_string(self) -> bytes:
         """Return raw string with serialization of the object.
 
         Returns: String object
         """
         return b"".join(self.as_raw_chunks())
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         """Return raw string serialization of this object."""
         return self.as_raw_string()
 
@@ -341,24 +341,27 @@ class ShaFile(object):
         """Return unique hash for this object."""
         return hash(self.id)
 
-    def as_pretty_string(self):
+    def as_pretty_string(self) -> bytes:
         """Return a string representing this object, fit for display."""
         return self.as_raw_string()
 
-    def set_raw_string(self, text, sha=None):
+    def set_raw_string(
+            self, text: bytes, sha: Optional[ObjectID] = None) -> None:
         """Set the contents of this object from a serialized string."""
         if not isinstance(text, bytes):
             raise TypeError("Expected bytes for text, got %r" % text)
         self.set_raw_chunks([text], sha)
 
-    def set_raw_chunks(self, chunks, sha=None):
+    def set_raw_chunks(
+            self, chunks: List[bytes],
+            sha: Optional[ObjectID] = None) -> None:
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
         self._deserialize(chunks)
         if sha is None:
             self._sha = None
         else:
-            self._sha = FixedSha(sha)
+            self._sha = FixedSha(sha)  # type: ignore
         self._needs_serialization = False
 
     @staticmethod
@@ -370,7 +373,7 @@ class ShaFile(object):
             raise ObjectFormatException("Not a known type %d" % num_type)
         return obj_class()
 
-    def _parse_object(self, map):
+    def _parse_object(self, map) -> None:
         """Parse a new style object, setting self._text."""
         # skip type and size; type must have already been determined, and
         # we trust zlib to fail if it's otherwise corrupted
@@ -383,7 +386,7 @@ class ShaFile(object):
         self.set_raw_string(_decompress(raw))
 
     @classmethod
-    def _is_legacy_object(cls, magic):
+    def _is_legacy_object(cls, magic: bytes) -> bool:
         b0 = ord(magic[0:1])
         b1 = ord(magic[1:2])
         word = (b0 << 8) + b1
@@ -428,8 +431,8 @@ class ShaFile(object):
             obj = cls._parse_file(f)
             obj._sha = None
             return obj
-        except (IndexError, ValueError):
-            raise ObjectFormatException("invalid object header")
+        except (IndexError, ValueError) as exc:
+            raise ObjectFormatException("invalid object header") from exc
 
     @staticmethod
     def from_raw_string(type_num, string, sha=None):
@@ -440,12 +443,17 @@ class ShaFile(object):
           string: The raw uncompressed contents.
           sha: Optional known sha for the object
         """
-        obj = object_class(type_num)()
+        cls = object_class(type_num)
+        if cls is None:
+            raise AssertionError("unsupported class type num: %d" % type_num)
+        obj = cls()
         obj.set_raw_string(string, sha)
         return obj
 
     @staticmethod
-    def from_raw_chunks(type_num, chunks, sha=None):
+    def from_raw_chunks(
+            type_num: int, chunks: List[bytes],
+            sha: Optional[ObjectID] = None):
         """Creates an object of the indicated type from the raw chunks given.
 
         Args:
@@ -453,7 +461,10 @@ class ShaFile(object):
           chunks: An iterable of the raw uncompressed contents.
           sha: Optional known sha for the object
         """
-        obj = object_class(type_num)()
+        cls = object_class(type_num)
+        if cls is None:
+            raise AssertionError("unsupported class type num: %d" % type_num)
+        obj = cls()
         obj.set_raw_chunks(chunks, sha)
         return obj
 
@@ -477,7 +488,7 @@ class ShaFile(object):
         if getattr(self, member, None) is None:
             raise ObjectFormatException(error_msg)
 
-    def check(self):
+    def check(self) -> None:
         """Check this object for internal consistency.
 
         Raises:
@@ -494,20 +505,17 @@ class ShaFile(object):
             self._deserialize(self.as_raw_chunks())
             self._sha = None
             new_sha = self.id
-        except Exception as e:
-            raise ObjectFormatException(e)
+        except Exception as exc:
+            raise ObjectFormatException(exc) from exc
         if old_sha != new_sha:
             raise ChecksumMismatch(new_sha, old_sha)
 
     def _header(self):
-        return object_header(self.type, self.raw_length())
+        return object_header(self.type_num, self.raw_length())
 
-    def raw_length(self):
+    def raw_length(self) -> int:
         """Returns the length of the raw string of this object."""
-        ret = 0
-        for chunk in self.as_raw_chunks():
-            ret += len(chunk)
-        return ret
+        return sum(map(len, self.as_raw_chunks()))
 
     def sha(self):
         """The SHA1 object that is the name of this object."""
@@ -522,27 +530,18 @@ class ShaFile(object):
 
     def copy(self):
         """Create a new copy of this SHA1 object from its raw string"""
-        obj_class = object_class(self.get_type())
-        return obj_class.from_raw_string(self.get_type(), self.as_raw_string(), self.id)
+        obj_class = object_class(self.type_num)
+        if obj_class is None:
+            raise AssertionError('invalid type num %d' % self.type_num)
+        return obj_class.from_raw_string(self.type_num, self.as_raw_string(), self.id)
 
     @property
     def id(self):
         """The hex SHA of this object."""
         return self.sha().hexdigest().encode("ascii")
 
-    def get_type(self):
-        """Return the type number for this object class."""
-        return self.type_num
-
-    def set_type(self, type):
-        """Set the type number for this object class."""
-        self.type_num = type
-
-    # DEPRECATED: use type_num or type_name as needed.
-    type = property(get_type, set_type)
-
     def __repr__(self):
-        return "<%s %s>" % (self.__class__.__name__, self.id)
+        return "<{} {}>".format(self.__class__.__name__, self.id)
 
     def __ne__(self, other):
         """Check whether this object does not match the other."""
@@ -564,12 +563,6 @@ class ShaFile(object):
             raise TypeError
         return self.id <= other.id
 
-    def __cmp__(self, other):
-        """Compare the SHA of this object with that of the other object."""
-        if not isinstance(other, ShaFile):
-            raise TypeError
-        return cmp(self.id, other.id)  # noqa: F821
-
 
 class Blob(ShaFile):
     """A Git Blob object."""
@@ -579,8 +572,10 @@ class Blob(ShaFile):
     type_name = b"blob"
     type_num = 3
 
+    _chunked_text: List[bytes]
+
     def __init__(self):
-        super(Blob, self).__init__()
+        super().__init__()
         self._chunked_text = []
         self._needs_serialization = False
 
@@ -597,7 +592,7 @@ class Blob(ShaFile):
     def _get_chunked(self):
         return self._chunked_text
 
-    def _set_chunked(self, chunks):
+    def _set_chunked(self, chunks: List[bytes]):
         self._chunked_text = chunks
 
     def _serialize(self):
@@ -625,9 +620,9 @@ class Blob(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Blob, self).check()
+        super().check()
 
-    def splitlines(self):
+    def splitlines(self) -> List[bytes]:
         """Return list of lines in this blob.
 
         This preserves the original line endings.
@@ -655,7 +650,7 @@ class Blob(ShaFile):
         return ret
 
 
-def _parse_message(chunks):
+def _parse_message(chunks: Iterable[bytes]):
     """Parse a message with a list of fields and a body.
 
     Args:
@@ -666,7 +661,7 @@ def _parse_message(chunks):
     """
     f = BytesIO(b"".join(chunks))
     k = None
-    v = ""
+    v = b""
     eof = False
 
     def _strip_last_newline(value):
@@ -727,8 +722,10 @@ class Tag(ShaFile):
         "_signature",
     )
 
+    _tagger: Optional[bytes]
+
     def __init__(self):
-        super(Tag, self).__init__()
+        super().__init__()
         self._tagger = None
         self._tag_time = None
         self._tag_timezone = None
@@ -748,7 +745,8 @@ class Tag(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Tag, self).check()
+        super().check()
+        assert self._chunked_text is not None
         self._check_has_member("_object_sha", "missing object sha")
         self._check_has_member("_object_class", "missing object type")
         self._check_has_member("_name", "missing tag name")
@@ -758,7 +756,7 @@ class Tag(ShaFile):
 
         check_hexsha(self._object_sha, "invalid object sha")
 
-        if getattr(self, "_tagger", None):
+        if self._tagger is not None:
             check_identity(self._tagger, "invalid tagger")
 
         self._check_has_member("_tag_time", "missing tag time")
@@ -949,8 +947,9 @@ def parse_tree(text, strict=False):
             raise ObjectFormatException("Invalid mode '%s'" % mode_text)
         try:
             mode = int(mode_text, 8)
-        except ValueError:
-            raise ObjectFormatException("Invalid mode '%s'" % mode_text)
+        except ValueError as exc:
+            raise ObjectFormatException(
+                "Invalid mode '%s'" % mode_text) from exc
         name_end = text.index(b"\0", mode_end)
         name = text[mode_end + 1 : name_end]
         count = name_end + 21
@@ -974,7 +973,7 @@ def serialize_tree(items):
         )
 
 
-def sorted_tree_items(entries, name_order):
+def sorted_tree_items(entries, name_order: bool):
     """Iterate over a tree entries dictionary.
 
     Args:
@@ -984,7 +983,10 @@ def sorted_tree_items(entries, name_order):
       entries: Dictionary mapping names to (mode, sha) tuples
     Returns: Iterator over (name, mode, hexsha)
     """
-    key_func = name_order and key_entry_name_order or key_entry
+    if name_order:
+        key_func = key_entry_name_order
+    else:
+        key_func = key_entry
     for name, entry in sorted(entries.items(), key=key_func):
         mode, hexsha = entry
         # Stricter type checks than normal to mirror checks in the C version.
@@ -1024,12 +1026,20 @@ def pretty_format_tree_entry(name, mode, hexsha, encoding="utf-8"):
         kind = "tree"
     else:
         kind = "blob"
-    return "%04o %s %s\t%s\n" % (
+    return "{:04o} {} {}\t{}\n".format(
         mode,
         kind,
         hexsha.decode("ascii"),
         name.decode(encoding, "replace"),
     )
+
+
+class SubmoduleEncountered(Exception):
+    """A submodule was encountered while resolving a path."""
+
+    def __init__(self, path, sha):
+        self.path = path
+        self.sha = sha
 
 
 class Tree(ShaFile):
@@ -1041,7 +1051,7 @@ class Tree(ShaFile):
     __slots__ = "_entries"
 
     def __init__(self):
-        super(Tree, self).__init__()
+        super().__init__()
         self._entries = {}
 
     @classmethod
@@ -1089,13 +1099,6 @@ class Tree(ShaFile):
           name: The name of the entry, as a string.
           hexsha: The hex SHA of the entry as a string.
         """
-        if isinstance(name, int) and isinstance(mode, bytes):
-            (name, mode) = (mode, name)
-            warnings.warn(
-                "Please use Tree.add(name, mode, hexsha)",
-                category=DeprecationWarning,
-                stacklevel=2,
-            )
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
 
@@ -1120,12 +1123,12 @@ class Tree(ShaFile):
         """Grab the entries in the tree"""
         try:
             parsed_entries = parse_tree(b"".join(chunks))
-        except ValueError as e:
-            raise ObjectFormatException(e)
+        except ValueError as exc:
+            raise ObjectFormatException(exc) from exc
         # TODO: list comprehension is for efficiency in the common (small)
         # case; if memory efficiency in the large case is a concern, use a
         # genexp.
-        self._entries = dict([(n, (m, s)) for n, m, s in parsed_entries])
+        self._entries = {n: (m, s) for n, m, s in parsed_entries}
 
     def check(self):
         """Check this object for internal consistency.
@@ -1133,7 +1136,8 @@ class Tree(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Tree, self).check()
+        super().check()
+        assert self._chunked_text is not None
         last = None
         allowed_modes = (
             stat.S_IFREG | 0o755,
@@ -1182,9 +1186,11 @@ class Tree(ShaFile):
         parts = path.split(b"/")
         sha = self.id
         mode = None
-        for p in parts:
+        for i, p in enumerate(parts):
             if not p:
                 continue
+            if mode is not None and S_ISGITLINK(mode):
+                raise SubmoduleEncountered(b'/'.join(parts[:i]), sha)
             obj = lookup_obj(sha)
             if not isinstance(obj, Tree):
                 raise NotTreeError(sha)
@@ -1259,8 +1265,8 @@ def parse_time_entry(value):
         timetext, timezonetext = rest.rsplit(b" ", 1)
         time = int(timetext)
         timezone, timezone_neg_utc = parse_timezone(timezonetext)
-    except ValueError as e:
-        raise ObjectFormatException(e)
+    except ValueError as exc:
+        raise ObjectFormatException(exc) from exc
     return person, time, (timezone, timezone_neg_utc)
 
 
@@ -1340,7 +1346,7 @@ class Commit(ShaFile):
     )
 
     def __init__(self):
-        super(Commit, self).__init__()
+        super().__init__()
         self._parents = []
         self._encoding = None
         self._mergetag = []
@@ -1385,7 +1391,8 @@ class Commit(ShaFile):
         Raises:
           ObjectFormatException: if the object is malformed in some way
         """
-        super(Commit, self).check()
+        super().check()
+        assert self._chunked_text is not None
         self._check_has_member("_tree", "missing tree")
         self._check_has_member("_author", "missing author")
         self._check_has_member("_committer", "missing committer")
@@ -1424,6 +1431,62 @@ class Commit(ShaFile):
 
         # TODO: optionally check for duplicate parents
 
+    def sign(self, keyid: Optional[str] = None):
+        import gpg
+        with gpg.Context(armor=True) as c:
+            if keyid is not None:
+                key = c.get_key(keyid)
+                with gpg.Context(armor=True, signers=[key]) as ctx:
+                    self.gpgsig, unused_result = ctx.sign(
+                        self.as_raw_string(),
+                        mode=gpg.constants.sig.mode.DETACH,
+                    )
+            else:
+                self.gpgsig, unused_result = c.sign(
+                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
+                )
+
+    def verify(self, keyids: Optional[Iterable[str]] = None):
+        """Verify GPG signature for this commit (if it is signed).
+
+        Args:
+          keyids: Optional iterable of trusted keyids for this commit.
+            If this commit is not signed by any key in keyids verification will
+            fail. If not specified, this function only verifies that the commit
+            has a valid signature.
+
+        Raises:
+          gpg.errors.BadSignatures: if GPG signature verification fails
+          gpg.errors.MissingSignatures: if commit was not signed by a key
+            specified in keyids
+        """
+        if self._gpgsig is None:
+            return
+
+        import gpg
+
+        with gpg.Context() as ctx:
+            self_without_gpgsig = self.copy()
+            self_without_gpgsig._gpgsig = None
+            self_without_gpgsig.gpgsig = None
+            data, result = ctx.verify(
+                self_without_gpgsig.as_raw_string(),
+                signature=self._gpgsig,
+            )
+            if keyids:
+                keys = [
+                    ctx.get_key(key)
+                    for key in keyids
+                ]
+                for key in keys:
+                    for subkey in keys:
+                        for sig in result.signatures:
+                            if subkey.can_sign and subkey.fpr == sig.fpr:
+                                return
+                raise gpg.errors.MissingSignatures(
+                    result, keys, results=(data, result)
+                )
+
     def _serialize(self):
         chunks = []
         tree_bytes = self._tree.id if isinstance(self._tree, Tree) else self._tree
@@ -1459,9 +1522,9 @@ class Commit(ShaFile):
             # No trailing empty line
             if chunks[-1].endswith(b" \n"):
                 chunks[-1] = chunks[-1][:-2]
-        for k, v in self.extra:
+        for k, v in self._extra:
             if b"\n" in k or b"\n" in v:
-                raise AssertionError("newline in extra data: %r -> %r" % (k, v))
+                raise AssertionError("newline in extra data: {!r} -> {!r}".format(k, v))
             chunks.append(git_line(k, v))
         if self.gpgsig:
             sig_chunks = self.gpgsig.split(b"\n")
@@ -1491,6 +1554,9 @@ class Commit(ShaFile):
 
     def _get_extra(self):
         """Return extra settings of this commit."""
+        warnings.warn(
+            'Commit.extra is deprecated. Use Commit._extra instead.',
+            DeprecationWarning, stacklevel=2)
         return self._extra
 
     extra = property(
@@ -1542,7 +1608,7 @@ OBJECT_CLASSES = (
     Tag,
 )
 
-_TYPE_MAP = {}  # type: Dict[Union[bytes, int], Type[ShaFile]]
+_TYPE_MAP: Dict[Union[bytes, int], Type[ShaFile]] = {}
 
 for cls in OBJECT_CLASSES:
     _TYPE_MAP[cls.type_name] = cls

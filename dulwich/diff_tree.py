@@ -20,20 +20,13 @@
 
 """Utilities for diffing files and trees."""
 
-from collections import (
-    defaultdict,
-    namedtuple,
-)
-
+import stat
+from collections import defaultdict, namedtuple
 from io import BytesIO
 from itertools import chain
-import stat
+from typing import Dict, List, Optional
 
-from dulwich.objects import (
-    S_ISGITLINK,
-    TreeEntry,
-)
-
+from dulwich.objects import S_ISGITLINK, Tree, TreeEntry
 
 # TreeChange type constants.
 CHANGE_ADD = "add"
@@ -65,8 +58,8 @@ class TreeChange(namedtuple("TreeChange", ["type", "old", "new"])):
         return cls(CHANGE_DELETE, old, _NULL_ENTRY)
 
 
-def _tree_entries(path, tree):
-    result = []
+def _tree_entries(path: str, tree: Tree) -> List[TreeEntry]:
+    result: List[TreeEntry] = []
     if not tree:
         return result
     for entry in tree.iteritems(name_order=True):
@@ -130,7 +123,7 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
       store: An ObjectStore for looking up objects.
       tree1_id: The SHA of the first Tree object to iterate, or None.
       tree2_id: The SHA of the second Tree object to iterate, or None.
-      param prune_identical: If True, identical subtrees will not be walked.
+      prune_identical: If True, identical subtrees will not be walked.
     Returns:
       Iterator over Pairs of TreeEntry objects for each pair of entries
         in the trees and their subtrees recursively. If an entry exists in one
@@ -189,13 +182,12 @@ def tree_changes(
         source and target tree.
     """
     if rename_detector is not None and tree1_id is not None and tree2_id is not None:
-        for change in rename_detector.changes_with_renames(
+        yield from rename_detector.changes_with_renames(
             tree1_id,
             tree2_id,
             want_unchanged=want_unchanged,
             include_trees=include_trees,
-        ):
-            yield change
+        )
         return
 
     entries = walk_trees(
@@ -269,7 +261,7 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None
         for t in parent_tree_ids
     ]
     num_parents = len(parent_tree_ids)
-    changes_by_path = defaultdict(lambda: [None] * num_parents)
+    changes_by_path: Dict[str, List[Optional[TreeChange]]] = defaultdict(lambda: [None] * num_parents)
 
     # Organize by path.
     for i, parent_changes in enumerate(all_parent_changes):
@@ -315,7 +307,7 @@ def _count_blocks(obj):
     Returns:
       A dict of block hashcode -> total bytes occurring.
     """
-    block_counts = defaultdict(int)
+    block_counts: Dict[int, int] = defaultdict(int)
     block = BytesIO()
     n = 0
 
@@ -345,8 +337,8 @@ def _common_bytes(blocks1, blocks2):
     """Count the number of common bytes in two block count dicts.
 
     Args:
-      block1: The first dict of block hashcode -> total bytes.
-      block2: The second dict of block hashcode -> total bytes.
+      blocks1: The first dict of block hashcode -> total bytes.
+      blocks2: The second dict of block hashcode -> total bytes.
     Returns:
       The number of bytes in common between blocks1 and blocks2. This is
       only approximate due to possible hash collisions.
@@ -400,7 +392,7 @@ def _tree_change_key(entry):
     return (path1, path2)
 
 
-class RenameDetector(object):
+class RenameDetector:
     """Object for handling rename detection between two trees."""
 
     def __init__(
@@ -639,10 +631,7 @@ _merge_entries_py = _merge_entries
 _count_blocks_py = _count_blocks
 try:
     # Try to import C versions
-    from dulwich._diff_tree import (  # type: ignore
-        _is_tree,
-        _merge_entries,
-        _count_blocks,
-    )
+    from dulwich._diff_tree import (_count_blocks, _is_tree,  # type: ignore
+                                    _merge_entries)
 except ImportError:
     pass

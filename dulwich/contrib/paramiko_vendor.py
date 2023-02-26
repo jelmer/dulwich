@@ -34,7 +34,7 @@ import paramiko
 import paramiko.client
 
 
-class _ParamikoWrapper(object):
+class _ParamikoWrapper:
     def __init__(self, client, channel):
         self.client = client
         self.channel = channel
@@ -44,7 +44,7 @@ class _ParamikoWrapper(object):
 
     @property
     def stderr(self):
-        return self.channel.makefile_stderr()
+        return self.channel.makefile_stderr('rb')
 
     def can_read(self):
         return self.channel.recv_ready()
@@ -70,7 +70,7 @@ class _ParamikoWrapper(object):
         self.channel.close()
 
 
-class ParamikoSSHVendor(object):
+class ParamikoSSHVendor:
     # http://docs.paramiko.org/en/2.4/api/client.html
 
     def __init__(self, **kwargs):

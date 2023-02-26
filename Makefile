@@ -41,6 +41,9 @@ check-pypy:: clean
 check-noextensions:: clean
 	$(RUNTEST) dulwich.tests.test_suite
 
+check-contrib:: clean
+	$(RUNTEST) -v dulwich.contrib.test_suite
+
 check-all: check check-pypy check-noextensions
 
 typing:
@@ -67,3 +70,8 @@ coverage:
 
 coverage-html: coverage
 	$(COVERAGE) html
+
+.PHONY: apidocs
+
+apidocs:
+	pydoctor --intersphinx http://urllib3.readthedocs.org/en/latest/objects.inv --intersphinx http://docs.python.org/3/objects.inv --docformat=google dulwich --project-url=https://www.dulwich.io/ --project-name=dulwich

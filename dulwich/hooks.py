@@ -23,12 +23,10 @@
 import os
 import subprocess
 
-from dulwich.errors import (
-    HookError,
-)
+from dulwich.errors import HookError
 
 
-class Hook(object):
+class Hook:
     """Generic hook object."""
 
     def execute(self, *args):
@@ -100,7 +98,9 @@ class ShellHook(Hook):
             args = self.pre_exec_callback(*args)
 
         try:
-            ret = subprocess.call([self.filepath] + list(args), cwd=self.cwd)
+            ret = subprocess.call(
+                [os.path.relpath(self.filepath, self.cwd)] + list(args),
+                cwd=self.cwd)
             if ret != 0:
                 if self.post_exec_callback is not None:
                     self.post_exec_callback(0, *args)
@@ -117,10 +117,10 @@ class ShellHook(Hook):
 class PreCommitShellHook(ShellHook):
     """pre-commit shell hook"""
 
-    def __init__(self, controldir):
+    def __init__(self, cwd, controldir):
         filepath = os.path.join(controldir, "hooks", "pre-commit")
 
-        ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=controldir)
+        ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=cwd)
 
 
 class PostCommitShellHook(ShellHook):
@@ -134,11 +134,6 @@ class PostCommitShellHook(ShellHook):
 
 class CommitMsgShellHook(ShellHook):
     """commit-msg shell hook
-
-    Args:
-      args[0]: commit message
-    Returns:
-      new commit message or None
     """
 
     def __init__(self, controldir):
@@ -173,7 +168,7 @@ class PostReceiveShellHook(ShellHook):
     def __init__(self, controldir):
         self.controldir = controldir
         filepath = os.path.join(controldir, "hooks", "post-receive")
-        ShellHook.__init__(self, "post-receive", filepath, 0)
+        ShellHook.__init__(self, "post-receive", path=filepath, numparam=0)
 
     def execute(self, client_refs):
         # do nothing if the script doesn't exist
@@ -193,14 +188,14 @@ class PostReceiveShellHook(ShellHook):
             )
 
             # client_refs is a list of (oldsha, newsha, ref)
-            in_data = "\n".join([" ".join(ref) for ref in client_refs])
+            in_data = b"\n".join([b" ".join(ref) for ref in client_refs])
 
             out_data, err_data = p.communicate(in_data)
 
             if (p.returncode != 0) or err_data:
-                err_fmt = "post-receive exit code: %d\n" + "stdout:\n%s\nstderr:\n%s"
+                err_fmt = b"post-receive exit code: %d\n" + b"stdout:\n%s\nstderr:\n%s"
                 err_msg = err_fmt % (p.returncode, out_data, err_data)
                 raise HookError(err_msg.decode('utf-8', 'backslashreplace'))
             return out_data
         except OSError as err:
-            raise HookError(repr(err))
+            raise HookError(repr(err)) from err

@@ -34,22 +34,16 @@ DULWICH_SWIFT_CFG=/tmp/conf.cfg PYTHONPATH=. python -m unittest \
 """
 
 import os
-import unittest
-import tempfile
 import shutil
+import tempfile
+import unittest
 
 import gevent
 from gevent import monkey
 
 monkey.patch_all()
 
-from dulwich import (  # noqa:E402
-    server,
-    repo,
-    index,
-    client,
-    objects,
-)
+from dulwich import client, index, objects, repo, server  # noqa:E402
 from dulwich.contrib import swift  # noqa:E402
 
 
@@ -123,7 +117,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)
         remote_refs = tcp_client.fetch(self.fakerepo, local_repo)
-        # The remote repo is empty (no refs retreived)
+        # The remote repo is empty (no refs retrieved)
         self.assertEqual(remote_refs, None)
 
     def test_push_commit(self):

@@ -18,42 +18,27 @@
 # License, Version 2.0.
 #
 
-from io import BytesIO
 import stat
+from io import BytesIO
 
-
-from dulwich.object_store import (
-    MemoryObjectStore,
-)
-from dulwich.objects import (
-    Blob,
-    Commit,
-    Tree,
-    ZERO_SHA,
-)
-from dulwich.repo import (
-    MemoryRepo,
-)
-from dulwich.tests import (
-    SkipTest,
-    TestCase,
-)
-from dulwich.tests.utils import (
-    build_commit_graph,
-)
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
+from dulwich.repo import MemoryRepo
+from dulwich.tests import SkipTest, TestCase
+from dulwich.tests.utils import build_commit_graph
 
 
 class GitFastExporterTests(TestCase):
     """Tests for the GitFastExporter tests."""
 
     def setUp(self):
-        super(GitFastExporterTests, self).setUp()
+        super().setUp()
         self.store = MemoryObjectStore()
         self.stream = BytesIO()
         try:
             from dulwich.fastexport import GitFastExporter
-        except ImportError:
-            raise SkipTest("python-fastimport not available")
+        except ImportError as exc:
+            raise SkipTest("python-fastimport not available") from exc
         self.fastexporter = GitFastExporter(self.stream, self.store)
 
     def test_emit_blob(self):
@@ -96,12 +81,12 @@ class GitImportProcessorTests(TestCase):
     """Tests for the GitImportProcessor tests."""
 
     def setUp(self):
-        super(GitImportProcessorTests, self).setUp()
+        super().setUp()
         self.repo = MemoryRepo()
         try:
             from dulwich.fastexport import GitImportProcessor
-        except ImportError:
-            raise SkipTest("python-fastimport not available")
+        except ImportError as exc:
+            raise SkipTest("python-fastimport not available") from exc
         self.processor = GitImportProcessor(self.repo)
 
     def test_reset_handler(self):
@@ -197,8 +182,8 @@ M 100644 :1 a
             )
         )
         self.assertEqual(2, len(markers))
-        self.assertTrue(isinstance(self.repo[markers[b"1"]], Blob))
-        self.assertTrue(isinstance(self.repo[markers[b"2"]], Commit))
+        self.assertIsInstance(self.repo[markers[b"1"]], Blob)
+        self.assertIsInstance(self.repo[markers[b"2"]], Commit)
 
     def test_file_add(self):
         from fastimport import commands

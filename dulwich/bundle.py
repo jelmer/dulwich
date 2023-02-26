@@ -21,18 +21,25 @@
 """Bundle format support.
 """
 
-from typing import Dict, List, Tuple, Optional, Union, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple, Union
+
 from .pack import PackData, write_pack_data
 
 
-class Bundle(object):
+class Bundle:
 
-    version = None  # type: Optional[int]
+    version: Optional[int] = None
 
-    capabilities = {}  # type: Dict[str, str]
-    prerequisites = []  # type: List[Tuple[bytes, str]]
-    references = {}  # type: Dict[str, bytes]
-    pack_data = []  # type: Union[PackData, Sequence[bytes]]
+    capabilities: Dict[str, str] = {}
+    prerequisites: List[Tuple[bytes, str]] = []
+    references: Dict[str, bytes] = {}
+    pack_data: Union[PackData, Sequence[bytes]] = []
+
+    def __repr__(self):
+        return (f"<{type(self).__name__}(version={self.version}, "
+                f"capabilities={self.capabilities}, "
+                f"prerequisites={self.prerequisites}, "
+                f"references={self.references})>")
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
@@ -119,4 +126,4 @@ def write_bundle(f, bundle):
     for ref, obj_id in bundle.references.items():
         f.write(b"%s %s\n" % (obj_id, ref))
     f.write(b"\n")
-    write_pack_data(f, len(bundle.pack_data), iter(bundle.pack_data))
+    write_pack_data(f.write, num_records=len(bundle.pack_data), records=bundle.pack_data.iter_unpacked())

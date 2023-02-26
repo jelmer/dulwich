@@ -23,26 +23,13 @@
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
 
-from dulwich.objects import (
-    Blob,
-)
-from dulwich.objectspec import (
-    parse_object,
-    parse_commit,
-    parse_commit_range,
-    parse_ref,
-    parse_refs,
-    parse_reftuple,
-    parse_reftuples,
-    parse_tree,
-)
+from dulwich.objects import Blob
+from dulwich.objectspec import (parse_commit, parse_commit_range, parse_object,
+                                parse_ref, parse_refs, parse_reftuple,
+                                parse_reftuples, parse_tree)
 from dulwich.repo import MemoryRepo
-from dulwich.tests import (
-    TestCase,
-)
-from dulwich.tests.utils import (
-    build_commit_graph,
-)
+from dulwich.tests import TestCase
+from dulwich.tests.utils import build_commit_graph
 
 
 class ParseObjectTests(TestCase):
@@ -258,3 +245,9 @@ class ParseTreeTests(TestCase):
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertEqual(r[c1.tree], parse_tree(r, c1.id))
         self.assertEqual(r[c1.tree], parse_tree(r, c1.tree))
+
+    def test_from_ref(self):
+        r = MemoryRepo()
+        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        r.refs[b'refs/heads/foo'] = c1.id
+        self.assertEqual(r[c1.tree], parse_tree(r, b'foo'))

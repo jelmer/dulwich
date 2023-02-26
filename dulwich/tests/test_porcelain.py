@@ -38,6 +38,7 @@ from unittest import skipIf
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError, DirNotCleanError
+from dulwich.index import _fs_to_tree_path
 from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
 from dulwich.repo import NoIndexPresent, Repo
 from dulwich.server import DictBackend

@@ -1858,6 +1858,33 @@ def reset_file(repo, file_path: str, target: bytes = b'HEAD',
     build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)
 
 
+def _determine_tracked_changes(repo, current_tree, target_tree):
+    """Determine the tracked files changed
+
+    Args:
+      repo: dulwich Repo object
+      current_tree: A git object for the current tree state
+      target_tree: A gut object for the target tree state
+    Returns: List of tracked changed files
+    """
+    tracked_changes = []
+    for change in repo.open_index().changes_from_tree(repo.object_store, target_tree.id):
+        file = change[0][0] or change[0][1]  # No matter whether the file is added, modified, or deleted.
+        try:
+            current_entry = current_tree.lookup_path(repo.object_store.__getitem__, file)
+        except KeyError:
+            current_entry = None
+        try:
+            target_entry = target_tree.lookup_path(repo.object_store.__getitem__, file)
+        except KeyError:
+            target_entry = None
+
+        if current_entry or target_entry:
+            tracked_changes.append(file.decode())
+
+    return tracked_changes
+
+
 def checkout(repo, target: bytes, force: bool = False):
     """switch branches or restore working tree files
     Args:
@@ -1904,21 +1931,7 @@ def checkout(repo, target: bytes, force: bool = False):
             update_head(repo, target, detached=True)
 
     # Un-stage files in the current_tree or target_tree.
-    tracked_changes = []
-    for change in repo.open_index().changes_from_tree(repo.object_store, target_tree.id):
-        file = change[0][0] or change[0][1]  # No matter whether the file is added, modified, or deleted.
-        try:
-            current_entry = current_tree.lookup_path(repo.object_store.__getitem__, file)
-        except KeyError:
-            current_entry = None
-        try:
-            target_entry = target_tree.lookup_path(repo.object_store.__getitem__, file)
-        except KeyError:
-            target_entry = None
-
-        if current_entry or target_entry:
-            tracked_changes.append(file.decode())
-
+    tracked_changes = _determine_tracked_changes(repo, current_tree, target_tree)
     repo.unstage(tracked_changes)
 
     target_sha = target_tree.sha()

@@ -1672,7 +1672,7 @@ class CheckoutTests(PorcelainTestCase):
         porcelain.add(self.repo, [os.path.join(self.repo.path, 'bar')])
         porcelain.checkout(self.repo, b'master')
         status = list(porcelain.status(self.repo))
-        self.assertEqual([{'add': [b'bar'], 'delete': [], 'modify': []}, [], []], status)
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['bar']], status)
         self.assertEqual(b'master', porcelain.active_branch(self.repo))
 
     def test_checkout_to_commit_sha(self):

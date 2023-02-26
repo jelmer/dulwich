@@ -1584,20 +1584,25 @@ class ResetFileTests(PorcelainTestCase):
 
 
 class CheckoutTests(PorcelainTestCase):
-    def test_checkout_to_branch_with_different_file(self):
-        foo_path = os.path.join(self.repo.path, 'foo')
-        with open(foo_path, 'w') as f:
+    def setUp(self):
+        super().setUp()
+        file = 'foo'
+        self._foo_path = os.path.join(self.repo.path, file)
+
+        with open(self._foo_path, 'w') as f:
             f.write('hello')
-        porcelain.add(self.repo, paths=[foo_path])
-        porcelain.commit(
+        porcelain.add(self.repo, paths=[self._foo_path])
+        self._sha = porcelain.commit(
             self.repo,
             message=b"add foo",
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
         )
+
+    def test_checkout_to_branch_with_different_file(self):
         porcelain.branch_create(self.repo, 'uni')
-        os.remove(foo_path)
-        porcelain.add(self.repo, paths=[_fs_to_tree_path(foo_path).decode()])
+        os.remove(self._foo_path)
+        porcelain.add(self.repo, paths=[self._foo_path])
         porcelain.commit(
             self.repo,
             message=b"remove foo",
@@ -1610,23 +1615,10 @@ class CheckoutTests(PorcelainTestCase):
         self.assertEqual(['.git'], sorted(os.listdir(self.repo.path)))
 
     def test_checkout_with_modified_files(self):
-        file = 'foo'
-        full_path = os.path.join(self.repo.path, file)
-
-        with open(full_path, 'w') as f:
-            f.write('hello')
-        porcelain.add(self.repo, paths=[full_path])
-        porcelain.commit(
-            self.repo,
-            message=b"unitest",
-            committer=b"Jane <jane@example.com>",
-            author=b"John <john@example.com>",
-        )
-
         porcelain.branch_create(self.repo, 'uni')
-        with open(full_path, 'a') as f:
+        with open(self._foo_path, 'a') as f:
             f.write('new message')
-        porcelain.add(self.repo, paths=[full_path])
+        porcelain.add(self.repo, paths=[self._foo_path])
 
         # raise error when working directory is not clean
         with self.assertRaises(DirNotCleanError):
@@ -1644,19 +1636,7 @@ class CheckoutTests(PorcelainTestCase):
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
         self.assertEqual(b'master', porcelain.active_branch(self.repo))
 
-    def test_checkout_with_untrack_files(self):
-        file = 'foo'
-        full_path = os.path.join(self.repo.path, file)
-
-        with open(full_path, 'w') as f:
-            f.write('hello')
-        porcelain.add(self.repo, paths=[full_path])
-        porcelain.commit(
-            self.repo,
-            message=b"unitest",
-            committer=b"Jane <jane@example.com>",
-            author=b"John <john@example.com>",
-        )
+    def test_checkout_with_untracked_files(self):
         porcelain.branch_create(self.repo, 'uni')
 
         # add new file `bar`
@@ -1675,23 +1655,10 @@ class CheckoutTests(PorcelainTestCase):
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['bar']], status)
         self.assertEqual(b'master', porcelain.active_branch(self.repo))
 
-    def test_checkout_to_commit_sha(self):
-        file = 'foo'
-        full_path = os.path.join(self.repo.path, file)
-
-        with open(full_path, 'w') as f:
-            f.write('hello')
-        porcelain.add(self.repo, paths=[full_path])
-        sha = porcelain.commit(
-            self.repo,
-            message=b"unitest",
-            committer=b"Jane <jane@example.com>",
-            author=b"John <john@example.com>",
-        )
-
-        with open(full_path, 'a') as f:
+    def _checkout_to_commit_sha(self, sha):
+        with open(self._foo_path, 'a') as f:
             f.write('something wrong')
-        porcelain.add(self.repo, paths=[full_path])
+        porcelain.add(self.repo, paths=[self._foo_path])
         porcelain.commit(
             self.repo,
             message=b"I may added something wrong",
@@ -1699,7 +1666,101 @@ class CheckoutTests(PorcelainTestCase):
             author=b"John <john@example.com>",
         )
         porcelain.checkout(self.repo, sha)
-        self.assertEqual(sha, self.repo.head())
+        self.assertEqual(self._sha, self.repo.head())
+
+    def test_checkout_to_commit_sha(self):
+        with open(self._foo_path, 'a') as f:
+            f.write('something wrong')
+        porcelain.add(self.repo, paths=[self._foo_path])
+        porcelain.commit(
+            self.repo,
+            message=b"I may added something wrong",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.checkout(self.repo, self._sha)
+        self.assertEqual(self._sha, self.repo.head())
+
+    def test_checkout_to_head(self):
+        with open(self._foo_path, 'a') as f:
+            f.write('something wrong')
+        porcelain.add(self.repo, paths=[self._foo_path])
+        new_sha = porcelain.commit(
+            self.repo,
+            message=b"I may added something wrong",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        porcelain.checkout(self.repo, b"HEAD")
+        self.assertEqual(new_sha, self.repo.head())
+
+    def test_checkout_remote_branch(self):
+        errstream = BytesIO()
+        outstream = BytesIO()
+
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(
+            self.repo.path, target=clone_path, errstream=errstream
+        )
+        try:
+            self.assertEqual(target_repo[b"HEAD"], self.repo[b"HEAD"])
+        finally:
+            target_repo.close()
+
+        # create a second file to be pushed back to origin
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
+        porcelain.add(repo=clone_path, paths=[fullpath])
+        porcelain.commit(
+            repo=clone_path,
+            message=b"push",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Setup a non-checked out branch in the remote
+        refs_path = b"refs/heads/foo"
+        new_id = self.repo[b"HEAD"].id
+        self.assertNotEqual(new_id, ZERO_SHA)
+        self.repo.refs[refs_path] = new_id
+
+        # Push to the remote
+        porcelain.push(
+            clone_path,
+            "origin",
+            b"HEAD:" + refs_path,
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        self.assertEqual(
+            target_repo.refs[b"refs/remotes/origin/foo"],
+            target_repo.refs[b"HEAD"],
+        )
+
+        porcelain.checkout(target_repo, b"origin/foo")
+        original_id = target_repo[b"HEAD"].id
+
+        self.assertEqual(
+                {
+                    b"HEAD": original_id,
+                    b"refs/heads/master": original_id,
+                    b"refs/heads/foo": original_id,
+                    b"refs/remotes/origin/foo": original_id,
+                    b"refs/remotes/origin/HEAD": new_id,
+                    b"refs/remotes/origin/master": new_id,
+                },
+                target_repo.get_refs(),
+            )
 
 
 class SubmoduleTests(PorcelainTestCase):

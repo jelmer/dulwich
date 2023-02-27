@@ -1665,6 +1665,7 @@ class CheckoutTests(PorcelainTestCase):
 
         porcelain.remove(self.repo.path, [os.path.join(self.repo.path, 'foo')])
         status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [b'foo'], 'modify': []}, [], []], status)
 
         porcelain.checkout(self.repo, b'uni')
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
@@ -1673,7 +1674,9 @@ class CheckoutTests(PorcelainTestCase):
         porcelain.branch_create(self.repo, 'uni')
         with open(self._foo_path, 'a') as f:
             f.write('new message')
-        # porcelain.add(self.repo, paths=[self._foo_path])
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 
         # raise error when working directory is not clean
         with self.assertRaises(DirNotCleanError):

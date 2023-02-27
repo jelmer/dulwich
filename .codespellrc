@@ -1,0 +1,3 @@
+[codespell]
+skip = .git,.mypy_cache,build
+ignore-words-list = fpr,claus,feld,nd,bu,ue,te,fo

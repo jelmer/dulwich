@@ -47,6 +47,10 @@ jobs:
       - name: Build
         run: |
           python setup.py build_ext -i
+      - name: codespell
+        run: |
+          pip install --upgrade codespell
+          codespell .
       - name: Coverage test suite run
         run: |
           pip install --upgrade coverage

@@ -26,14 +26,14 @@ import os
 import posixpath
 import stat
 from typing import (
-    Sequence,
     Optional,
     Dict,
     Iterable,
-    Union,
-    Type,
     Iterator,
     List,
+    Tuple,
+    Type,
+    Union,
 )
 import zlib
 from collections import namedtuple
@@ -421,10 +421,10 @@ class ShaFile:
         self._chunked_text = []
         self._needs_serialization = True
 
-    def _deserialize(self, chunks: Iterator[bytes]) -> None:
+    def _deserialize(self, chunks: List[bytes]) -> None:
         raise NotImplementedError(self._deserialize)
 
-    def _serialize(self) -> Sequence[bytes]:
+    def _serialize(self) -> List[bytes]:
         raise NotImplementedError(self._serialize)
 
     @classmethod
@@ -659,7 +659,7 @@ class Blob(ShaFile):
         return ret
 
 
-def _parse_message(chunks: Iterable[bytes]) -> Iterator[tuple[Optional[bytes], Optional[bytes]]]:
+def _parse_message(chunks: Iterable[bytes]) -> Iterator[Tuple[Optional[bytes], Optional[bytes]]]:
     """Parse a message with a list of fields and a body.
 
     Args:

@@ -37,7 +37,7 @@ from unittest import skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
-from dulwich.errors import CommitError, DirNotCleanError
+from dulwich.errors import CommitError
 from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
 from dulwich.repo import NoIndexPresent, Repo
 from dulwich.server import DictBackend
@@ -1626,7 +1626,7 @@ class CheckoutTests(PorcelainTestCase):
         porcelain.add(self.repo, paths=[self._foo_path])
 
         # raise error when working directory is not clean
-        with self.assertRaises(DirNotCleanError):
+        with self.assertRaises(porcelain.DirNotCleanError):
             porcelain.checkout(self.repo, b'uni')
 
         # force checkout to branch 'uni'
@@ -1679,7 +1679,7 @@ class CheckoutTests(PorcelainTestCase):
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 
         # raise error when working directory is not clean
-        with self.assertRaises(DirNotCleanError):
+        with self.assertRaises(porcelain.DirNotCleanError):
             porcelain.checkout(self.repo, b'uni')
 
     def _commit_something_wrong(self):

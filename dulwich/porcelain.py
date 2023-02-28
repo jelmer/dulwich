@@ -81,7 +81,7 @@ from dulwich.config import Config, ConfigFile, StackedConfig, read_submodules
 from dulwich.diff_tree import (CHANGE_ADD, CHANGE_COPY, CHANGE_DELETE,
                                CHANGE_MODIFY, CHANGE_RENAME,
                                RENAME_CHANGE_TYPES)
-from dulwich.errors import SendPackError, DirNotCleanError
+from dulwich.errors import SendPackError
 from dulwich.graph import can_fast_forward
 from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (_fs_to_tree_path, blob_from_path_and_stat,
@@ -140,6 +140,10 @@ class RemoteExists(Error):
 
 class TimezoneFormatError(Error):
     """Raised when the timezone cannot be determined from a given string."""
+
+
+class DirNotCleanError(Error):
+    """Indicates that the working directory is not clean while trying to checkout."""
 
 
 def parse_timezone_format(tz_str):

@@ -1792,15 +1792,6 @@ class CheckoutTests(PorcelainTestCase):
         self.assertTrue(os.path.isfile(os.path.join(target_repo.path, 'bar')))
 
 
-def tree(root_dir):
-    list_dirs = os.walk(root_dir)
-    for root, dirs, files in list_dirs:
-        for d in dirs:
-            print(os.path.join(root, d))
-        for f in files:
-            print(os.path.join(root, f))
-
-
 class SubmoduleTests(PorcelainTestCase):
 
     def test_empty(self):

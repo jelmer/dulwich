@@ -25,7 +25,7 @@ Currently implemented:
  * add
  * branch{_create,_delete,_list}
  * check-ignore
- * checkout
+ * checkout_branch
  * clone
  * commit
  * commit-tree
@@ -1889,7 +1889,7 @@ def _determine_tracked_changes(repo, current_tree, target_tree):
     return tracked_changes
 
 
-def checkout(repo, target: bytes, force: bool = False):
+def checkout_branch(repo, target: bytes, force: bool = False):
     """switch branches or restore working tree files
     Args:
       repo: dulwich Repo object

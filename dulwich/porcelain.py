@@ -86,7 +86,7 @@ from dulwich.file import ensure_dir_exists
 from dulwich.graph import can_fast_forward
 from dulwich.ignore import IgnoreFilterManager
 from dulwich.index import (_fs_to_tree_path, blob_from_path_and_stat,
-                           build_file_from_blob, get_unstaged_changes)
+                           build_file_from_blob, get_unstaged_changes, index_entry_from_stat)
 from dulwich.object_store import tree_lookup_path, iter_tree_contents
 from dulwich.objects import (Commit, Tag, format_timezone, parse_timezone,
                              pretty_format_tree_entry)
@@ -1924,6 +1924,7 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
             target_tree = parse_tree(repo, checkout_target)
 
         dealt_with = []
+        repo_index = repo.open_index()
         for entry in iter_tree_contents(repo.object_store, target_tree.id):
             dealt_with.append(entry.path)
             if entry.path in changes:
@@ -1931,7 +1932,23 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
             full_path = os.path.join(os.fsencode(repo.path), entry.path)
             blob = repo.object_store[entry.sha]
             ensure_dir_exists(os.path.dirname(full_path))
-            build_file_from_blob(blob, entry.mode, full_path)
+            st = build_file_from_blob(blob, entry.mode, full_path)
+            st_tuple = (
+                entry.mode,
+                st.st_ino,
+                st.st_dev,
+                st.st_nlink,
+                st.st_uid,
+                st.st_gid,
+                st.st_size,
+                st.st_atime,
+                st.st_mtime,
+                st.st_ctime,
+            )
+            st = st.__class__(st_tuple)
+            repo_index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
+
+        repo_index.write()
 
         for entry in iter_tree_contents(repo.object_store, current_tree.id):
             if entry.path not in dealt_with:

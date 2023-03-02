@@ -39,6 +39,7 @@ from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError
 from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
+from dulwich.porcelain import AbortCheckout
 from dulwich.repo import NoIndexPresent, Repo
 from dulwich.server import DictBackend
 from dulwich.tests import TestCase
@@ -1602,85 +1603,195 @@ class CheckoutTests(PorcelainTestCase):
 
     def setUp(self):
         super().setUp()
-        self._sha, self._foo_path = _commit_file_with_content(self.repo, 'foo', 'hello')
-
-    def test_checkout_to_branch_with_different_file(self):
+        self._sha, self._foo_path = _commit_file_with_content(self.repo, 'foo', 'hello\n')
         porcelain.branch_create(self.repo, 'uni')
-        os.remove(self._foo_path)
-        porcelain.add(self.repo, paths=[self._foo_path])
-        porcelain.commit(
-            self.repo,
-            message=b"remove foo",
-            committer=b"Jane <jane@example.com>",
-            author=b"John <john@example.com>",
-        )
+
+    def test_checkout_to_existing_branch(self):
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
         porcelain.checkout_branch(self.repo, b'uni')
-        self.assertEqual(['.git', 'foo'], sorted(os.listdir(self.repo.path)))
-        porcelain.checkout_branch(self.repo, b'master')
-        self.assertEqual(['.git'], sorted(os.listdir(self.repo.path)))
+        self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
-    def test_checkout_with_modified_files(self):
-        porcelain.branch_create(self.repo, 'uni')
+    def test_checkout_to_non_existing_branch(self):
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+        with self.assertRaises(KeyError):
+            porcelain.checkout_branch(self.repo, b'bob')
+
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+    def test_checkout_to_branch_with_modified_files(self):
         with open(self._foo_path, 'a') as f:
-            f.write('new message')
+            f.write('new message\n')
         porcelain.add(self.repo, paths=[self._foo_path])
 
-        # raise error when working directory is not clean
-        with self.assertRaises(porcelain.DirNotCleanError):
-            porcelain.checkout_branch(self.repo, b'uni')
-
-        # force checkout to branch 'uni'
-        porcelain.checkout_branch(self.repo, b'uni', force=True)
         status = list(porcelain.status(self.repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
-        self.assertEqual(b'uni', porcelain.active_branch(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': [b"foo"]}, [], []], status)
 
-        # checkout to branch 'master' and check if the working directory is clean
-        porcelain.checkout_branch(self.repo, b'master')
-        status = list(porcelain.status(self.repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
-        self.assertEqual(b'master', porcelain.active_branch(self.repo))
-
-    def test_checkout_with_untracked_files(self):
-        porcelain.branch_create(self.repo, 'uni')
-
-        # add new file `bar`
-        with open(os.path.join(self.repo.path, 'bar'), 'w') as f:
-            f.write('b')
-
+        # Both branches have file 'foo' checkout should be fine.
         porcelain.checkout_branch(self.repo, b'uni')
-        status = list(porcelain.status(self.repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['bar']], status)
-        self.assertEqual(b'uni', porcelain.active_branch(self.repo))
+        self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
-        # stage the file `bar` and checkout to master
-        porcelain.add(self.repo, [os.path.join(self.repo.path, 'bar')])
-        porcelain.checkout_branch(self.repo, b'master')
         status = list(porcelain.status(self.repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['bar']], status)
-        self.assertEqual(b'master', porcelain.active_branch(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': [b"foo"]}, [], []], status)
 
     def test_checkout_with_deleted_files(self):
-        porcelain.branch_create(self.repo, 'uni')
-
         porcelain.remove(self.repo.path, [os.path.join(self.repo.path, 'foo')])
         status = list(porcelain.status(self.repo))
         self.assertEqual([{'add': [], 'delete': [b'foo'], 'modify': []}, [], []], status)
 
+        # Both branches have file 'foo' checkout should be fine.
         porcelain.checkout_branch(self.repo, b'uni')
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
-    def test_checkout_with_unstaged_files(self):
-        porcelain.branch_create(self.repo, 'uni')
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [b"foo"], 'modify': []}, [], []], status)
+
+    def test_checkout_to_branch_with_added_files(self):
+        file_path = os.path.join(self.repo.path, 'bar')
+
+        with open(file_path, 'w') as f:
+            f.write('bar content\n')
+        porcelain.add(self.repo, paths=[file_path])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [b'bar'], 'delete': [], 'modify': []}, [], []], status)
+
+        # Both branches have file 'foo' checkout should be fine.
+        porcelain.checkout_branch(self.repo, b'uni')
+        self.assertEqual(b'uni', porcelain.active_branch(self.repo))
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [b'bar'], 'delete': [], 'modify': []}, [], []], status)
+
+    def test_checkout_to_branch_with_modified_file_not_present(self):
+        # Commit a new file that the other branch doesn't have.
+        _, nee_path = _commit_file_with_content(self.repo, 'nee', 'Good content\n')
+
+        # Modify the file the other branch doesn't have.
+        with open(nee_path, 'a') as f:
+            f.write('bar content\n')
+        porcelain.add(self.repo, paths=[nee_path])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': [b'nee']}, [], []], status)
+
+        # 'uni' branch doesn't have 'nee' and it has been modified, should result in the checkout being aborted.
+        with self.assertRaises(AbortCheckout):
+            porcelain.checkout_branch(self.repo, b'uni')
+
+        self.assertEqual(b'master', porcelain.active_branch(self.repo))
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': [b'nee']}, [], []], status)
+
+    def test_checkout_to_branch_with_modified_file_not_present_forced(self):
+        # Commit a new file that the other branch doesn't have.
+        _, nee_path = _commit_file_with_content(self.repo, 'nee', 'Good content\n')
+
+        # Modify the file the other branch doesn't have.
+        with open(nee_path, 'a') as f:
+            f.write('bar content\n')
+        porcelain.add(self.repo, paths=[nee_path])
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': [b'nee']}, [], []], status)
+
+        # 'uni' branch doesn't have 'nee' and it has been modified, but we force to reset the entire index.
+        porcelain.checkout_branch(self.repo, b'uni', force=True)
+
+        self.assertEqual(b'uni', porcelain.active_branch(self.repo))
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
+    def test_checkout_to_branch_with_unstaged_files(self):
+        # Edit `foo`.
         with open(self._foo_path, 'a') as f:
             f.write('new message')
 
         status = list(porcelain.status(self.repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
 
-        # raise error when working directory is not clean
-        with self.assertRaises(porcelain.DirNotCleanError):
-            porcelain.checkout_branch(self.repo, b'uni')
+        porcelain.checkout_branch(self.repo, b'uni')
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
+
+    def test_checkout_to_branch_with_untracked_files(self):
+        with open(os.path.join(self.repo.path, 'neu'), 'a') as f:
+            f.write('new message\n')
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['neu']], status)
+
+        porcelain.checkout_branch(self.repo, b'uni')
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['neu']], status)
+
+    def test_checkout_to_branch_with_file_in_sub_directory(self):
+        sub_directory = os.path.join(self.repo.path, 'sub1', 'sub2')
+        os.makedirs(sub_directory)
+
+        sub_directory_file = os.path.join(sub_directory, 'neu')
+        with open(sub_directory_file, 'w') as f:
+            f.write('new message\n')
+
+        porcelain.add(self.repo, paths=[sub_directory_file])
+        porcelain.commit(
+            self.repo,
+            message=b"add " + sub_directory_file.encode(),
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
+        self.assertTrue(os.path.isdir(sub_directory))
+        self.assertTrue(os.path.isdir(os.path.dirname(sub_directory)))
+
+        porcelain.checkout_branch(self.repo, b'uni')
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
+        self.assertFalse(os.path.isdir(sub_directory))
+        self.assertFalse(os.path.isdir(os.path.dirname(sub_directory)))
+
+        porcelain.checkout_branch(self.repo, b'master')
+
+        self.assertTrue(os.path.isdir(sub_directory))
+        self.assertTrue(os.path.isdir(os.path.dirname(sub_directory)))
+
+    def test_checkout_to_branch_with_multiple_files_in_sub_directory(self):
+        sub_directory = os.path.join(self.repo.path, 'sub1', 'sub2')
+        os.makedirs(sub_directory)
+
+        sub_directory_file_1 = os.path.join(sub_directory, 'neu')
+        with open(sub_directory_file_1, 'w') as f:
+            f.write('new message\n')
+
+        sub_directory_file_2 = os.path.join(sub_directory, 'gus')
+        with open(sub_directory_file_2, 'w') as f:
+            f.write('alternative message\n')
+
+        porcelain.add(self.repo, paths=[sub_directory_file_1, sub_directory_file_2])
+        porcelain.commit(
+            self.repo,
+            message=b"add files neu and gus.",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
+        self.assertTrue(os.path.isdir(sub_directory))
+        self.assertTrue(os.path.isdir(os.path.dirname(sub_directory)))
+
+        porcelain.checkout_branch(self.repo, b'uni')
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
+        self.assertFalse(os.path.isdir(sub_directory))
+        self.assertFalse(os.path.isdir(os.path.dirname(sub_directory)))
 
     def _commit_something_wrong(self):
         with open(self._foo_path, 'a') as f:
@@ -1761,12 +1872,14 @@ class CheckoutTests(PorcelainTestCase):
 
         porcelain.checkout_branch(target_repo, b"origin/foo")
         original_id = target_repo[b"HEAD"].id
+        uni_id = target_repo[b"refs/remotes/origin/uni"].id
 
         expected_refs = {
             b"HEAD": original_id,
             b"refs/heads/master": original_id,
             b"refs/heads/foo": original_id,
             b"refs/remotes/origin/foo": original_id,
+            b"refs/remotes/origin/uni": uni_id,
             b"refs/remotes/origin/HEAD": new_id,
             b"refs/remotes/origin/master": new_id,
         }
@@ -1780,14 +1893,16 @@ class CheckoutTests(PorcelainTestCase):
     def test_checkout_remote_branch_then_master_then_remote_branch_again(self):
         target_repo = self._checkout_remote_branch()
         self.assertEqual(b"foo", porcelain.active_branch(target_repo))
-        _commit_file_with_content(target_repo, 'bar', 'something')
+        _commit_file_with_content(target_repo, 'bar', 'something\n')
         self.assertTrue(os.path.isfile(os.path.join(target_repo.path, 'bar')))
 
         porcelain.checkout_branch(target_repo, b"master")
+
         self.assertEqual(b"master", porcelain.active_branch(target_repo))
         self.assertFalse(os.path.isfile(os.path.join(target_repo.path, 'bar')))
 
         porcelain.checkout_branch(target_repo, b"origin/foo")
+
         self.assertEqual(b"foo", porcelain.active_branch(target_repo))
         self.assertTrue(os.path.isfile(os.path.join(target_repo.path, 'bar')))
 

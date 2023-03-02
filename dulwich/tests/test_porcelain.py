@@ -1726,6 +1726,27 @@ class CheckoutTests(PorcelainTestCase):
         status = list(porcelain.status(self.repo))
         self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['neu']], status)
 
+    def test_checkout_to_branch_with_new_files(self):
+        porcelain.checkout_branch(self.repo, b'uni')
+        sub_directory = os.path.join(self.repo.path, 'sub1')
+        os.mkdir(sub_directory)
+        for index in range(5):
+            _commit_file_with_content(self.repo, 'new_file_' + str(index + 1), "Some content\n")
+            _commit_file_with_content(self.repo, os.path.join('sub1', 'new_file_' + str(index + 10)), "Good content\n")
+
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
+        porcelain.checkout_branch(self.repo, b'master')
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
+        porcelain.checkout_branch(self.repo, b'uni')
+        self.assertEqual(b"uni", porcelain.active_branch(self.repo))
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], []], status)
+
     def test_checkout_to_branch_with_file_in_sub_directory(self):
         sub_directory = os.path.join(self.repo.path, 'sub1', 'sub2')
         os.makedirs(sub_directory)

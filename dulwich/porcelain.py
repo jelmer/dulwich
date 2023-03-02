@@ -1938,8 +1938,8 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
                 repo.unstage([entry.path])
 
     # Remove the untracked files which are in the current_file_set.
-    index = repo.open_index()
-    for change in index.changes_from_tree(repo.object_store, current_tree.id):
+    repo_index = repo.open_index()
+    for change in repo_index.changes_from_tree(repo.object_store, current_tree.id):
         path_change = change[0]
         if path_change[1] is None:
             file_name = path_change[0]

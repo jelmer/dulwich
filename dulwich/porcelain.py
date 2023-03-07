@@ -1933,19 +1933,6 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
             blob = repo.object_store[entry.sha]
             ensure_dir_exists(os.path.dirname(full_path))
             st = build_file_from_blob(blob, entry.mode, full_path)
-            st_tuple = (
-                entry.mode,
-                st.st_ino,
-                st.st_dev,
-                st.st_nlink,
-                st.st_uid,
-                st.st_gid,
-                st.st_size,
-                st.st_atime,
-                st.st_mtime,
-                st.st_ctime,
-            )
-            st = st.__class__(st_tuple)
             repo_index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
 
         repo_index.write()

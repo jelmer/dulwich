@@ -125,6 +125,7 @@ class NoneStream(RawIOBase):
 default_bytes_out_stream = getattr(sys.stdout, "buffer", None) or NoneStream()
 default_bytes_err_stream = getattr(sys.stderr, "buffer", None) or NoneStream()
 
+
 DEFAULT_ENCODING = "utf-8"
 
 
@@ -1888,7 +1889,13 @@ def _update_head_during_checkout_branch(repo, target):
 
 
 def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
-    """switch branches or restore working tree files
+    """switch branches or restore working tree files.
+
+    The implementation of this function will probably not scale well
+    for branches with lots of local changes.
+    This is due to the analysis of a diff between branches before any
+    changes are applied.
+
     Args:
       repo: dulwich Repo object
       target: branch name or commit sha to checkout

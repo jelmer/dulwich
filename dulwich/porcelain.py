@@ -144,7 +144,7 @@ class TimezoneFormatError(Error):
     """Raised when the timezone cannot be determined from a given string."""
 
 
-class AbortCheckout(Error):
+class CheckoutError(Error):
     """Indicates that a checkout cannot be performed."""
 
 
@@ -1921,7 +1921,7 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
                     target_tree.lookup_path(repo.object_store.__getitem__, change)
                     index += 1
                 except KeyError:
-                    raise AbortCheckout('Your local changes to the following files would be overwritten by checkout: ' + change.decode())
+                    raise CheckoutError('Your local changes to the following files would be overwritten by checkout: ' + change.decode())
             except KeyError:
                 changes.pop(index)
 

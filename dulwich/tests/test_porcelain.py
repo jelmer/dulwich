@@ -39,7 +39,7 @@ from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError
 from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
-from dulwich.porcelain import AbortCheckout
+from dulwich.porcelain import CheckoutError
 from dulwich.repo import NoIndexPresent, Repo
 from dulwich.server import DictBackend
 from dulwich.tests import TestCase
@@ -1674,7 +1674,7 @@ class CheckoutTests(PorcelainTestCase):
         self.assertEqual([{'add': [], 'delete': [], 'modify': [b'nee']}, [], []], status)
 
         # 'uni' branch doesn't have 'nee' and it has been modified, should result in the checkout being aborted.
-        with self.assertRaises(AbortCheckout):
+        with self.assertRaises(CheckoutError):
             porcelain.checkout_branch(self.repo, b'uni')
 
         self.assertEqual(b'master', porcelain.active_branch(self.repo))

@@ -1603,7 +1603,7 @@ def active_branch(repo):
         active_ref = r.refs.follow(b"HEAD")[0][1]
         if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
             raise ValueError(active_ref)
-        return active_ref[len(LOCAL_BRANCH_PREFIX):]
+        return active_ref[len(LOCAL_BRANCH_PREFIX) :]
 
 
 def get_branch_remote(repo):
@@ -1930,10 +1930,10 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
         if checkout_target is not None:
             target_tree = parse_tree(repo, checkout_target)
 
-        dealt_with = []
+        dealt_with = set()
         repo_index = repo.open_index()
         for entry in iter_tree_contents(repo.object_store, target_tree.id):
-            dealt_with.append(entry.path)
+            dealt_with.add(entry.path)
             if entry.path in changes:
                 continue
             full_path = os.path.join(os.fsencode(repo.path), entry.path)

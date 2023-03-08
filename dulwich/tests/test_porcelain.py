@@ -1909,7 +1909,8 @@ class CheckoutTests(PorcelainTestCase):
         return target_repo
 
     def test_checkout_remote_branch(self):
-        self._checkout_remote_branch()
+        repo = self._checkout_remote_branch()
+        repo.close()
 
     def test_checkout_remote_branch_then_master_then_remote_branch_again(self):
         target_repo = self._checkout_remote_branch()
@@ -1926,6 +1927,8 @@ class CheckoutTests(PorcelainTestCase):
 
         self.assertEqual(b"foo", porcelain.active_branch(target_repo))
         self.assertTrue(os.path.isfile(os.path.join(target_repo.path, 'bar')))
+
+        target_repo.close()
 
 
 class SubmoduleTests(PorcelainTestCase):

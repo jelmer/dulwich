@@ -1,3 +1,68 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61.2"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "dulwich"
+description = "Python Git Library"
+readme = "README.rst"
+authors = [{name = "Jelmer Vernooij", email = "jelmer@jelmer.uk"}]
+license = {text = "Apachev2 or later or GPLv2"}
+keywords = ["vcs", "git"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Operating System :: POSIX",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Version Control",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "urllib3>=1.25",
+    'typing_extensions;python_version<="3.7"',
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://www.dulwich.io/"
+Repository = "https://www.dulwich.io/code/"
+GitHub = "https://github.com/dulwich/dulwich"
+"Bug Tracker" = "https://github.com/dulwich/dulwich/issues"
+
+[project.optional-dependencies]
+fastimport = ["fastimport"]
+https = ["urllib3>=1.24.1"]
+pgp = ["gpg"]
+paramiko = ["paramiko"]
+
+[project.scripts]
+dulwich = "dulwich.cli:main"
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.setuptools]
+packages = [
+    "dulwich",
+    "dulwich.cloud",
+    "dulwich.tests",
+    "dulwich.tests.compat",
+    "dulwich.contrib",
+]
+include-package-data = true
+zip-safe = false
+script-files = [
+    "bin/dul-receive-pack",
+    "bin/dul-upload-pack",
+]
+license-files = ["COPYING"]
+
+[tool.setuptools.dynamic]
+version = {attr = "dulwich.__version__"}

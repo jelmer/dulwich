@@ -22,6 +22,7 @@
 
 import os
 import sys
+import warnings
 
 
 def ensure_dir_exists(dirname):
@@ -200,6 +201,11 @@ class _GitFile:
                     # renames
                     _fancy_rename(self._lockfilename, self._filename)
         finally:
+            self.abort()
+
+    def __del__(self):
+        if not getattr(self, '_closed', True):
+            warnings.warn('unclosed %r' % self, ResourceWarning, stacklevel=2)
             self.abort()
 
     def __enter__(self):

@@ -1042,6 +1042,7 @@ class HttpGitClientTests(TestCase):
 
         test_data = {
             "https://gitlab.com/inkscape/inkscape/": {
+                "location": "https://gitlab.com/inkscape/inkscape.git/",
                 "redirect_url": "https://gitlab.com/inkscape/inkscape.git/",
                 "refs_data": (
                     b"001e# service=git-upload-pack\n00000032"
@@ -1050,10 +1051,21 @@ class HttpGitClientTests(TestCase):
                 ),
             },
             "https://github.com/jelmer/dulwich/": {
+                "location": "https://github.com/jelmer/dulwich/",
                 "redirect_url": "https://github.com/jelmer/dulwich/",
                 "refs_data": (
                     b"001e# service=git-upload-pack\n00000032"
                     b"3ff25e09724aa4d86ea5bca7d5dd0399a3c8bfcf "
+                    b"HEAD\n0000"
+                ),
+            },
+            # check for absolute-path URI reference as location
+            "https://codeberg.org/ashwinvis/radicale-sh.git/": {
+                "location": "/ashwinvis/radicale-auth-sh/",
+                "redirect_url": "https://codeberg.org/ashwinvis/radicale-auth-sh/",
+                "refs_data": (
+                    b"001e# service=git-upload-pack\n00000032"
+                    b"470f8603768b608fc988675de2fae8f963c21158 "
                     b"HEAD\n0000"
                 ),
             },
@@ -1069,7 +1081,7 @@ class HttpGitClientTests(TestCase):
 
             def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
                 base_url = url[: -len(tail)]
-                redirect_base_url = test_data[base_url]["redirect_url"]
+                redirect_base_url = test_data[base_url]["location"]
                 redirect_url = redirect_base_url + tail
                 headers = {
                     "Content-Type": "application/x-git-upload-pack-advertisement"
@@ -1083,8 +1095,9 @@ class HttpGitClientTests(TestCase):
                     request_url = url
                     if redirect_base_url != base_url:
                         body = b""
-                        headers["location"] = redirect_url
+                        headers["location"] = test_data[base_url]["location"]
                         status = 301
+
                 return HTTPResponse(
                     body=BytesIO(body),
                     headers=headers,
@@ -1107,12 +1120,13 @@ class HttpGitClientTests(TestCase):
 
             # check expected behavior of urllib3
             redirect_location = resp.get_redirect_location()
+
             if resp.status == 200:
                 self.assertFalse(redirect_location)
 
             if redirect_location:
                 # check that url redirection has been correctly detected
-                self.assertEqual(processed_url, redirect_location[: -len(tail)])
+                self.assertEqual(processed_url, test_data[base_url]["redirect_url"])
             else:
                 # check also the no redirection case
                 self.assertEqual(processed_url, base_url)

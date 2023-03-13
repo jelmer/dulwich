@@ -1947,7 +1947,7 @@ class AbstractHttpGitClient(GitClient):
                     "Redirected from URL %s to URL %s without %s"
                     % (url, resp.redirect_location, tail)
                 )
-            base_url = resp.redirect_location[: -len(tail)]
+            base_url = urljoin(url, resp.redirect_location[: -len(tail)])
 
         try:
             self.dumb = (

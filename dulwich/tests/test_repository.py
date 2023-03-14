@@ -124,6 +124,12 @@ class MemoryRepoTests(TestCase):
         r.set_description(description)
         self.assertEqual(description, r.get_description())
 
+    def test_pull_into(self):
+        r = MemoryRepo.init_bare([], {})
+        repo = open_repo("a.git")
+        self.addCleanup(tear_down_repo, repo)
+        repo.fetch(r)
+
 
 class RepositoryRootTests(TestCase):
     def mkdtemp(self):

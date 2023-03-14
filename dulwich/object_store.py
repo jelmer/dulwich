@@ -1048,6 +1048,16 @@ class MemoryObjectStore(BaseObjectStore):
 
         return f, commit, abort
 
+    def add_pack_data(self, count: int, unpacked_objects: Iterator[UnpackedObject], progress=None) -> None:
+        """Add pack data to this object store.
+
+        Args:
+          count: Number of items to add
+          pack_data: Iterator over pack data tuples
+        """
+        for unpacked_object in unpacked_objects:
+            self.add_object(unpacked_object.sha_file())
+
     def add_thin_pack(self, read_all, read_some, progress=None):
         """Add a new thin pack to this object store.
 

@@ -2,6 +2,8 @@
 
  * Deprecate ``dulwich.objects.parse_commit``.
 
+ * Fix fetching into MemoryRepo. (Jelmer Vernooĳ, #1157)
+
 0.21.3	2023-02-17
 
  * Add support for ``worktreeconfig`` extension.

@@ -22,6 +22,7 @@
 For details for the matching rules, see https://git-scm.com/docs/gitignore
 """
 
+from contextlib import suppress
 import os.path
 import re
 from typing import (TYPE_CHECKING, BinaryIO, Dict, Iterable, List, Optional,
@@ -380,10 +381,8 @@ class IgnoreFilterManager:
             os.path.join(repo.controldir(), "info", "exclude"),
             default_user_ignore_filter_path(repo.get_config_stack()),
         ]:
-            try:
+            with suppress(OSError):
                 global_filters.append(IgnoreFilter.from_path(os.path.expanduser(p)))
-            except OSError:
-                pass
         config = repo.get_config_stack()
         ignorecase = config.get_boolean((b"core"), (b"ignorecase"), False)
         return cls(repo.path, global_filters, ignorecase)

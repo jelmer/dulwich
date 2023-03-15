@@ -734,10 +734,8 @@ class DiskRefsContainer(RefsContainer):
                 # remove any loose refs pointing to this one -- please
                 # note that this bypasses remove_if_equals as we don't
                 # want to affect packed refs in here
-                try:
+                with suppress(OSError):
                     os.remove(self.refpath(ref))
-                except OSError:
-                    pass
 
                 if target is not None:
                     packed_refs[ref] = target

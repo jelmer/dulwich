@@ -26,6 +26,7 @@ TODO:
    subsections
 """
 
+from contextlib import suppress
 import os
 import sys
 from typing import (BinaryIO, Iterable, Iterator, KeysView, List,
@@ -641,13 +642,11 @@ def _find_git_in_win_reg():
         )
 
     for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore
-        try:
+        with suppress(OSError):
             with winreg.OpenKey(key, subkey) as k:  # type: ignore
                 val, typ = winreg.QueryValueEx(k, "InstallLocation")  # type: ignore
                 if typ == winreg.REG_SZ:  # type: ignore
                     yield val
-        except OSError:
-            pass
 
 
 # There is no set standard for system config dirs on windows. We try the

@@ -223,7 +223,7 @@ class Protocol:
         except ConnectionResetError as exc:
             raise HangupException() from exc
         except OSError as exc:
-            raise GitProtocolError(exc) from exc
+            raise GitProtocolError(str(exc)) from exc
         else:
             if len(pkt_contents) + 4 != size:
                 raise GitProtocolError(
@@ -286,7 +286,7 @@ class Protocol:
             if self.report_activity:
                 self.report_activity(len(line), "write")
         except OSError as exc:
-            raise GitProtocolError(exc) from exc
+            raise GitProtocolError(str(exc)) from exc
 
     def write_sideband(self, channel, blob):
         """Write multiplexed data to the sideband.

@@ -20,6 +20,7 @@
 
 """Compatibility tests between the Dulwich client and the cgit server."""
 
+from contextlib import suppress
 import copy
 import http.server
 import os
@@ -386,11 +387,9 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             ctypes.windll.kernel32.TerminateProcess(handle, -1)
             ctypes.windll.kernel32.CloseHandle(handle)
         else:
-            try:
+            with suppress(OSError):
                 os.kill(pid, signal.SIGKILL)
                 os.unlink(self.pidfile)
-            except OSError:
-                pass
         self.process.wait()
         self.process.stdout.close()
         self.process.stderr.close()

@@ -134,17 +134,6 @@ class SendPackError(GitProtocolError):
     """An error occurred during send_pack."""
 
 
-# N.B.: UpdateRefsError is no longer used and will be result in
-# Dulwich 0.21.
-# remove: >= 0.21
-class UpdateRefsError(GitProtocolError):
-    """The server reported errors updating refs."""
-
-    def __init__(self, *args, **kwargs):
-        self.ref_status = kwargs.pop("ref_status")
-        super().__init__(*args, **kwargs)
-
-
 class HangupException(GitProtocolError):
     """Hangup exception."""
 

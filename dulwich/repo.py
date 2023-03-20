@@ -85,7 +85,7 @@ BASE_DIRECTORIES = [
     ["info"],
 ]
 
-DEFAULT_REF = b"refs/heads/master"
+DEFAULT_BRANCH = b"master"
 
 
 class InvalidUserIdentity(Exception):
@@ -1590,18 +1590,28 @@ class Repo(BaseRepo):
         self._put_named_file("description", description)
 
     @classmethod
-    def _init_maybe_bare(cls, path, controldir, bare, object_store=None):
+    def _init_maybe_bare(
+            cls, path, controldir, bare, object_store=None, config=None,
+            default_branch=None):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(controldir, *d))
         if object_store is None:
             object_store = DiskObjectStore.init(os.path.join(controldir, OBJECTDIR))
         ret = cls(path, bare=bare, object_store=object_store)
-        ret.refs.set_symbolic_ref(b"HEAD", DEFAULT_REF)
+        if default_branch is None:
+            if config is None:
+                from dulwich.config import StackedConfig
+                config = StackedConfig.default()
+            try:
+                default_branch = config.get("init", "defaultBranch")
+            except KeyError:
+                default_branch = DEFAULT_BRANCH
+        ret.refs.set_symbolic_ref(b"HEAD", LOCAL_BRANCH_PREFIX + default_branch)
         ret._init_files(bare)
         return ret
 
     @classmethod
-    def init(cls, path: str, mkdir: bool = False) -> "Repo":
+    def init(cls, path: str, *, mkdir: bool = False, config=None, default_branch=None) -> "Repo":
         """Create a new repository.
 
         Args:
@@ -1614,7 +1624,9 @@ class Repo(BaseRepo):
         controldir = os.path.join(path, CONTROLDIR)
         os.mkdir(controldir)
         _set_filesystem_hidden(controldir)
-        return cls._init_maybe_bare(path, controldir, False)
+        return cls._init_maybe_bare(
+            path, controldir, False, config=config,
+            default_branch=default_branch)
 
     @classmethod
     def _init_new_working_directory(cls, path, main_repo, identifier=None, mkdir=False):
@@ -1655,7 +1667,7 @@ class Repo(BaseRepo):
         return r
 
     @classmethod
-    def init_bare(cls, path, mkdir=False, object_store=None):
+    def init_bare(cls, path, *, mkdir=False, object_store=None, config=None, default_branch=None):
         """Create a new bare repository.
 
         ``path`` should already exist and be an empty directory.
@@ -1666,7 +1678,7 @@ class Repo(BaseRepo):
         """
         if mkdir:
             os.mkdir(path)
-        return cls._init_maybe_bare(path, path, True, object_store=object_store)
+        return cls._init_maybe_bare(path, path, True, object_store=object_store, config=config, default_branch=default_branch)
 
     create = init_bare
 

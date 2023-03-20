@@ -4,6 +4,9 @@
 
  * Fix fetching into MemoryRepo. (Jelmer Vernooĳ, #1157)
 
+ * Support ``init.defaultBranch`` config.
+   (Jelmer Vernooĳ)
+
 0.21.3	2023-02-17
 
  * Add support for ``worktreeconfig`` extension.

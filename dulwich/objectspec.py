@@ -20,16 +20,21 @@
 
 """Object specification."""
 
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, TYPE_CHECKING, Optional, Iterator
+
+if TYPE_CHECKING:
+    from dulwich.objects import ShaFile, Commit, Tree
+    from dulwich.refs import RefsContainer, Ref
+    from dulwich.repo import Repo
 
 
-def to_bytes(text):
+def to_bytes(text: Union[str, bytes]) -> bytes:
     if getattr(text, "encode", None) is not None:
-        text = text.encode("ascii")
-    return text
+        text = text.encode("ascii")  # type: ignore
+    return text  # type: ignore
 
 
-def parse_object(repo, objectish):
+def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
     """Parse a string referring to an object.
 
     Args:
@@ -43,7 +48,7 @@ def parse_object(repo, objectish):
     return repo[objectish]
 
 
-def parse_tree(repo, treeish):
+def parse_tree(repo: "Repo", treeish: Union[bytes, str]) -> "Tree":
     """Parse a string referring to a tree.
 
     Args:
@@ -64,7 +69,7 @@ def parse_tree(repo, treeish):
     return o
 
 
-def parse_ref(container, refspec):
+def parse_ref(container: Union["Repo", "RefsContainer"], refspec: Union[str, bytes]) -> "Ref":
     """Parse a string referring to a reference.
 
     Args:
@@ -89,7 +94,10 @@ def parse_ref(container, refspec):
     raise KeyError(refspec)
 
 
-def parse_reftuple(lh_container, rh_container, refspec, force=False):
+def parse_reftuple(
+        lh_container: Union["Repo", "RefsContainer"],
+        rh_container: Union["Repo", "RefsContainer"], refspec: Union[str, bytes],
+        force: bool = False) -> Tuple[Optional["Ref"], Optional["Ref"], bool]:
     """Parse a reftuple spec.
 
     Args:
@@ -104,6 +112,8 @@ def parse_reftuple(lh_container, rh_container, refspec, force=False):
     if refspec.startswith(b"+"):
         force = True
         refspec = refspec[1:]
+    lh: Optional[bytes]
+    rh: Optional[bytes]
     if b":" in refspec:
         (lh, rh) = refspec.split(b":")
     else:
@@ -125,8 +135,9 @@ def parse_reftuple(lh_container, rh_container, refspec, force=False):
 
 
 def parse_reftuples(
-        lh_container, rh_container,
-        refspecs: Union[bytes, List[bytes], List[Tuple[bytes, bytes]]],
+        lh_container: Union["Repo", "RefsContainer"],
+        rh_container: Union["Repo", "RefsContainer"],
+        refspecs: Union[bytes, List[bytes]],
         force: bool = False):
     """Parse a list of reftuple specs to a list of reftuples.
 
@@ -167,7 +178,7 @@ def parse_refs(container, refspecs):
     return ret
 
 
-def parse_commit_range(repo, committishs):
+def parse_commit_range(repo: "Repo", committishs: Union[str, bytes]) -> Iterator["Commit"]:
     """Parse a string referring to a range of commits.
 
     Args:
@@ -206,7 +217,7 @@ def scan_for_short_id(object_store, prefix):
     raise AmbiguousShortId(prefix, ret)
 
 
-def parse_commit(repo, committish):
+def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
     """Parse a string referring to a single commit.
 
     Args:

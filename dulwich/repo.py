@@ -1485,17 +1485,17 @@ class Repo(BaseRepo):
             if origin_sha and not origin_head:
                 # set detached HEAD
                 target.refs[b"HEAD"] = origin_sha
-
-            _set_origin_head(target.refs, origin, origin_head)
-            head_ref = _set_default_branch(
-                target.refs, origin, origin_head, branch, ref_message
-            )
-
-            # Update target head
-            if head_ref:
-                head = _set_head(target.refs, head_ref, ref_message)
             else:
-                head = None
+                _set_origin_head(target.refs, origin, origin_head)
+                head_ref = _set_default_branch(
+                    target.refs, origin, origin_head, branch, ref_message
+                )
+
+                # Update target head
+                if head_ref:
+                    head = _set_head(target.refs, head_ref, ref_message)
+                else:
+                    head = None
 
             if checkout and head is not None:
                 target.reset_index()

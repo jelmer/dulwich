@@ -850,6 +850,27 @@ class CloneTests(PorcelainTestCase):
             target_repo.refs.get_symrefs(),
         )
 
+    def test_detached_head(self):
+        f1_1 = make_object(Blob, data=b"f1")
+        commit_spec = [[1], [2, 1], [3, 1, 2]]
+        trees = {
+            1: [(b"f1", f1_1), (b"f2", f1_1)],
+            2: [(b"f1", f1_1), (b"f2", f1_1)],
+            3: [(b"f1", f1_1), (b"f2", f1_1)],
+        }
+
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs.remove_if_equals(b"HEAD", None)
+        self.repo.refs[b"HEAD"] = c3.id
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        errstream = porcelain.NoneStream()
+        with porcelain.clone(
+            self.repo.path, target_path, checkout=True, errstream=errstream
+        ) as r:
+            self.assertEqual(c3.id, r.refs[b"HEAD"])
+
 
 class InitTests(TestCase):
     def test_non_bare(self):

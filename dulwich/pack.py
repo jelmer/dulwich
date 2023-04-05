@@ -1387,7 +1387,8 @@ class DeltaChainIterator(Generic[T]):
             except KeyError:
                 if not allow_missing:
                     raise
-            todo.add(off)
+            else:
+                todo.add(off)
         done = set()
         while todo:
             off = todo.pop()

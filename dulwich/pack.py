@@ -1059,6 +1059,7 @@ class PackStreamCopier(PackStreamReader):
         See PackStreamReader.iterobjects for a list of exceptions this may
         throw.
         """
+        i = 0  # default count of entries if read_objects() is empty
         for i, unpacked in enumerate(self.read_objects()):
             if self._delta_iter:
                 self._delta_iter.record(unpacked)

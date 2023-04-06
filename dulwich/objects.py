@@ -34,6 +34,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    BinaryIO,
 )
 import zlib
 from collections import namedtuple
@@ -252,11 +253,11 @@ class FixedSha:
         self._hexsha = hexsha
         self._sha = hex_to_sha(hexsha)
 
-    def digest(self):
+    def digest(self) -> bytes:
         """Return the raw SHA digest."""
         return self._sha
 
-    def hexdigest(self):
+    def hexdigest(self) -> str:
         """Return the hex SHA digest."""
         return self._hexsha.decode("ascii")
 
@@ -273,7 +274,7 @@ class ShaFile:
     _sha: Union[FixedSha, None, HASH]
 
     @staticmethod
-    def _parse_legacy_object_header(magic, f) -> "ShaFile":
+    def _parse_legacy_object_header(magic, f: BinaryIO) -> "ShaFile":
         """Parse a legacy object, creating it but not reading the file."""
         bufsize = 1024
         decomp = zlib.decompressobj()
@@ -823,6 +824,7 @@ class Tag(ShaFile):
             if field == _OBJECT_HEADER:
                 self._object_sha = value
             elif field == _TYPE_HEADER:
+                assert isinstance(value, bytes)
                 obj_class = object_class(value)
                 if not obj_class:
                     raise ObjectFormatException("Not a known type: %s" % value)
@@ -895,7 +897,7 @@ class Tag(ShaFile):
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 
-    def verify(self, keyids: Optional[Iterable[str]] = None):
+    def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this tag (if it is signed).
 
         Args:
@@ -937,7 +939,7 @@ class Tag(ShaFile):
 class TreeEntry(namedtuple("TreeEntry", ["path", "mode", "sha"])):
     """Named tuple encapsulating a single tree entry."""
 
-    def in_path(self, path):
+    def in_path(self, path: bytes):
         """Return a copy of this entry with the given path prepended."""
         if not isinstance(self.path, bytes):
             raise TypeError("Expected bytes for path, got %r" % path)
@@ -1011,11 +1013,11 @@ def sorted_tree_items(entries, name_order: bool):
         yield TreeEntry(name, mode, hexsha)
 
 
-def key_entry(entry):
+def key_entry(entry) -> bytes:
     """Sort key for tree entry.
 
     Args:
-      entry: (name, value) tuplee
+      entry: (name, value) tuple
     """
     (name, value) = entry
     if stat.S_ISDIR(value[0]):
@@ -1028,7 +1030,7 @@ def key_entry_name_order(entry):
     return entry[0]
 
 
-def pretty_format_tree_entry(name, mode, hexsha, encoding="utf-8"):
+def pretty_format_tree_entry(name, mode, hexsha, encoding="utf-8") -> str:
     """Pretty format tree entry.
 
     Args:
@@ -1185,7 +1187,7 @@ class Tree(ShaFile):
         return list(serialize_tree(self.iteritems()))
 
     def as_pretty_string(self):
-        text = []
+        text: List[str] = []
         for name, mode, hexsha in self.iteritems():
             text.append(pretty_format_tree_entry(name, mode, hexsha))
         return "".join(text)

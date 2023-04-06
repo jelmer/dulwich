@@ -7,6 +7,10 @@
  * Support ``init.defaultBranch`` config.
    (Jelmer Vernooĳ)
 
+ * Fix ``ObjectStore.iterobjects_subset()`` when
+   hex shas are passed for objects that live in packs.
+   (Jelmer Vernooĳ, #1166)
+
 0.21.3	2023-02-17
 
  * Add support for ``worktreeconfig`` extension.

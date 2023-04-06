@@ -2389,16 +2389,16 @@ class Pack:
             PackInflater.for_pack_data(self.data, resolve_ext_ref=self.resolve_ext_ref)
         )
 
-    def iterobjects_subset(self, shas, *, allow_missing: bool = False) -> Iterator[ShaFile]:
+    def iterobjects_subset(self, shas: Iterable[ObjectID], *, allow_missing: bool = False) -> Iterator[ShaFile]:
         return (
             uo
             for uo in
             PackInflater.for_pack_subset(
                 self, shas, allow_missing=allow_missing,
                 resolve_ext_ref=self.resolve_ext_ref)
-            if uo.sha() in shas)
+            if uo.id in shas)
 
-    def iter_unpacked_subset(self, shas, *, include_comp: bool = False, allow_missing: bool = False, convert_ofs_delta: bool = False) -> Iterator[UnpackedObject]:
+    def iter_unpacked_subset(self, shas: Iterable[ObjectID], *, include_comp: bool = False, allow_missing: bool = False, convert_ofs_delta: bool = False) -> Iterator[UnpackedObject]:
         ofs_pending: Dict[int, List[UnpackedObject]] = defaultdict(list)
         ofs: Dict[bytes, int] = {}
         todo = set(shas)

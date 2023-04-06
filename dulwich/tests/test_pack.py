@@ -494,6 +494,12 @@ class TestPack(PackTests):
             self.assertIsInstance(objs[tree_sha], Tree)
             self.assertIsInstance(objs[commit_sha], Commit)
 
+    def test_iterobjects_subset(self):
+        with self.get_pack(pack1_sha) as p:
+            objs = {o.id: o for o in p.iterobjects_subset([commit_sha])}
+            self.assertEqual(1, len(objs))
+            self.assertIsInstance(objs[commit_sha], Commit)
+
 
 class TestThinPack(PackTests):
     def setUp(self):
@@ -1003,6 +1009,9 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([], entries, self.make_pack_iter_subset(f, []))
         f.seek(0)
         self.assertEntriesMatch([1, 0], entries, self.make_pack_iter_subset(f, [entries[0][3], entries[1][3]]))
+        f.seek(0)
+        self.assertEntriesMatch(
+            [1, 0], entries, self.make_pack_iter_subset(f, [sha_to_hex(entries[0][3]), sha_to_hex(entries[1][3])]))
 
     def test_ofs_deltas(self):
         f = BytesIO()

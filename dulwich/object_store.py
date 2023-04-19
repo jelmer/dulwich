@@ -36,22 +36,19 @@ try:
 except ImportError:  # python << 3.8
     from typing_extensions import Protocol  # type: ignore
 
-from dulwich.errors import NotTreeError
-from dulwich.file import GitFile
-from dulwich.objects import (S_ISGITLINK, ZERO_SHA, Blob, Commit, ObjectID,
-                             ShaFile, Tag, Tree, TreeEntry, hex_to_filename,
-                             hex_to_sha, object_class, sha_to_hex,
-                             valid_hexsha)
-from dulwich.pack import (PACK_SPOOL_FILE_MAX_SIZE, ObjectContainer, Pack,
-                          PackData, PackedObjectContainer, PackFileDisappeared,
-                          PackHint, PackIndexer, PackInflater,
-                          PackStreamCopier, UnpackedObject, extend_pack,
-                          full_unpacked_object, generate_unpacked_objects,
-                          iter_sha1, load_pack_index_file,
-                          pack_objects_to_data, write_pack_data,
-                          write_pack_index)
-from dulwich.protocol import DEPTH_INFINITE
-from dulwich.refs import PEELED_TAG_SUFFIX, Ref
+from .errors import NotTreeError
+from .file import GitFile
+from .objects import (S_ISGITLINK, ZERO_SHA, Blob, Commit, ObjectID, ShaFile,
+                      Tag, Tree, TreeEntry, hex_to_filename, hex_to_sha,
+                      object_class, sha_to_hex, valid_hexsha)
+from .pack import (PACK_SPOOL_FILE_MAX_SIZE, ObjectContainer, Pack, PackData,
+                   PackedObjectContainer, PackFileDisappeared, PackHint,
+                   PackIndexer, PackInflater, PackStreamCopier, UnpackedObject,
+                   extend_pack, full_unpacked_object,
+                   generate_unpacked_objects, iter_sha1, load_pack_index_file,
+                   pack_objects_to_data, write_pack_data, write_pack_index)
+from .protocol import DEPTH_INFINITE
+from .refs import PEELED_TAG_SUFFIX, Ref
 
 INFODIR = "info"
 PACKDIR = "pack"
@@ -161,7 +158,7 @@ class BaseObjectStore:
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
 
-        from dulwich.diff_tree import tree_changes
+        from .diff_tree import tree_changes
         for change in tree_changes(
             self,
             source,

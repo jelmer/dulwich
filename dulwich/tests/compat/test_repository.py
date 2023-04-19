@@ -26,10 +26,10 @@ import tempfile
 from io import BytesIO
 from itertools import chain
 
-from dulwich.objects import hex_to_sha
-from dulwich.repo import Repo, check_ref_format
-from dulwich.tests.compat.utils import (CompatTestCase, require_git_version,
-                                        rmtree_ro, run_git_or_fail)
+from ...objects import hex_to_sha
+from ...repo import Repo, check_ref_format
+from .utils import (CompatTestCase, require_git_version, rmtree_ro,
+                    run_git_or_fail)
 
 
 class ObjectStoreTestCase(CompatTestCase):

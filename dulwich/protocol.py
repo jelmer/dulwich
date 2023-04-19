@@ -25,7 +25,8 @@ from io import BytesIO
 from os import SEEK_END
 
 import dulwich
-from dulwich.errors import GitProtocolError, HangupException
+
+from .errors import GitProtocolError, HangupException
 
 TCP_GIT_PORT = 9418
 

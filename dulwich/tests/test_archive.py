@@ -25,11 +25,12 @@ import tarfile
 from io import BytesIO
 from unittest import skipUnless
 
-from dulwich.archive import tar_stream
-from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import Blob, Tree
 from dulwich.tests import TestCase
-from dulwich.tests.utils import build_commit_graph
+
+from ..archive import tar_stream
+from ..object_store import MemoryObjectStore
+from ..objects import Blob, Tree
+from .utils import build_commit_graph
 
 try:
     from unittest.mock import patch

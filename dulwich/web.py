@@ -32,10 +32,11 @@ from wsgiref.simple_server import (ServerHandler, WSGIRequestHandler,
                                    WSGIServer, make_server)
 
 from dulwich import log_utils
-from dulwich.protocol import ReceivableProtocol
-from dulwich.repo import BaseRepo, NotGitRepository, Repo
-from dulwich.server import (DEFAULT_HANDLERS, DictBackend, generate_info_refs,
-                            generate_objects_info_packs)
+
+from .protocol import ReceivableProtocol
+from .repo import BaseRepo, NotGitRepository, Repo
+from .server import (DEFAULT_HANDLERS, DictBackend, generate_info_refs,
+                     generate_objects_info_packs)
 
 logger = log_utils.getLogger(__name__)
 

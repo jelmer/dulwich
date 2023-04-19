@@ -26,16 +26,16 @@ import tempfile
 from io import BytesIO
 
 from dulwich import errors
-from dulwich.file import GitFile
-from dulwich.objects import ZERO_SHA
-from dulwich.refs import (DictRefsContainer, InfoRefsContainer, SymrefLoop,
-                          _split_ref_line, check_ref_format,
-                          parse_symref_value, read_packed_refs,
-                          read_packed_refs_with_peeled, strip_peeled_refs,
-                          write_packed_refs)
-from dulwich.repo import Repo
 from dulwich.tests import SkipTest, TestCase
-from dulwich.tests.utils import open_repo, tear_down_repo
+
+from ..file import GitFile
+from ..objects import ZERO_SHA
+from ..refs import (DictRefsContainer, InfoRefsContainer, SymrefLoop,
+                    _split_ref_line, check_ref_format, parse_symref_value,
+                    read_packed_refs, read_packed_refs_with_peeled,
+                    strip_peeled_refs, write_packed_refs)
+from ..repo import Repo
+from .utils import open_repo, tear_down_repo
 
 
 class CheckRefFormatTests(TestCase):

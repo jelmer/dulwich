@@ -26,11 +26,11 @@ import shutil
 import tempfile
 from io import BytesIO
 
-from dulwich.ignore import (IgnoreFilter, IgnoreFilterManager,
-                            IgnoreFilterStack, Pattern, match_pattern,
-                            read_ignore_patterns, translate)
-from dulwich.repo import Repo
 from dulwich.tests import TestCase
+
+from ..ignore import (IgnoreFilter, IgnoreFilterManager, IgnoreFilterStack,
+                      Pattern, match_pattern, read_ignore_patterns, translate)
+from ..repo import Repo
 
 POSITIVE_MATCH_TESTS = [
     (b"foo.c", b"*.c"),

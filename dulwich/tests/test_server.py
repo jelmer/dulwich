@@ -26,21 +26,21 @@ import sys
 import tempfile
 from io import BytesIO
 
-from dulwich.errors import (GitProtocolError, HangupException,
-                            NotGitRepository, UnexpectedCommandError)
-from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import Tree
-from dulwich.protocol import ZERO_SHA, format_capability_line
-from dulwich.repo import MemoryRepo, Repo
-from dulwich.server import (Backend, DictBackend, FileSystemBackend,
-                            MultiAckDetailedGraphWalkerImpl,
-                            MultiAckGraphWalkerImpl, PackHandler,
-                            ReceivePackHandler, SingleAckGraphWalkerImpl,
-                            UploadPackHandler, _find_shallow,
-                            _ProtocolGraphWalker, _split_proto_line,
-                            serve_command, update_server_info)
 from dulwich.tests import TestCase
-from dulwich.tests.utils import make_commit, make_tag
+
+from ..errors import (GitProtocolError, HangupException, NotGitRepository,
+                      UnexpectedCommandError)
+from ..object_store import MemoryObjectStore
+from ..objects import Tree
+from ..protocol import ZERO_SHA, format_capability_line
+from ..repo import MemoryRepo, Repo
+from ..server import (Backend, DictBackend, FileSystemBackend,
+                      MultiAckDetailedGraphWalkerImpl, MultiAckGraphWalkerImpl,
+                      PackHandler, ReceivePackHandler,
+                      SingleAckGraphWalkerImpl, UploadPackHandler,
+                      _find_shallow, _ProtocolGraphWalker, _split_proto_line,
+                      serve_command, update_server_info)
+from .utils import make_commit, make_tag
 
 ONE = b"1" * 40
 TWO = b"2" * 40

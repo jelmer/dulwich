@@ -30,15 +30,15 @@ import tempfile
 import warnings
 
 from dulwich import errors, objects, porcelain
-from dulwich.config import Config
-from dulwich.errors import NotGitRepository
-from dulwich.object_store import tree_lookup_path
-from dulwich.repo import (InvalidUserIdentity, MemoryRepo, Repo,
-                          UnsupportedExtension, UnsupportedVersion,
-                          check_user_identity)
 from dulwich.tests import TestCase, skipIf
-from dulwich.tests.utils import (open_repo, setup_warning_catcher,
-                                 tear_down_repo)
+
+from ..config import Config
+from ..errors import NotGitRepository
+from ..object_store import tree_lookup_path
+from ..repo import (InvalidUserIdentity, MemoryRepo, Repo,
+                    UnsupportedExtension, UnsupportedVersion,
+                    check_user_identity)
+from .utils import open_repo, setup_warning_catcher, tear_down_repo
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
 

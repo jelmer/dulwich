@@ -32,7 +32,7 @@ except ImportError:
     has_paramiko = False
 else:
     has_paramiko = True
-    from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
+    from .paramiko_vendor import ParamikoSSHVendor
 
     class Server(paramiko.ServerInterface):
         """http://docs.paramiko.org/en/2.4/api/server.html"""

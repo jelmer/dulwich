@@ -28,11 +28,11 @@ import sys
 from typing import (Any, BinaryIO, Callable, Dict, Iterable, Iterator, List,
                     Optional, Tuple, Union)
 
-from dulwich.file import GitFile
-from dulwich.object_store import iter_tree_contents
-from dulwich.objects import (S_IFGITLINK, S_ISGITLINK, Blob, ObjectID, Tree,
-                             hex_to_sha, sha_to_hex)
-from dulwich.pack import ObjectContainer, SHA1Reader, SHA1Writer
+from .file import GitFile
+from .object_store import iter_tree_contents
+from .objects import (S_IFGITLINK, S_ISGITLINK, Blob, ObjectID, Tree,
+                      hex_to_sha, sha_to_hex)
+from .pack import ObjectContainer, SHA1Reader, SHA1Writer
 
 # TODO(jelmer): Switch to dataclass?
 IndexEntry = collections.namedtuple(
@@ -774,8 +774,8 @@ def read_submodule_head(path: Union[str, bytes]) -> Optional[bytes]:
       path: path to the submodule
     Returns: HEAD sha, None if not a valid head/repository
     """
-    from dulwich.errors import NotGitRepository
-    from dulwich.repo import Repo
+    from .errors import NotGitRepository
+    from .repo import Repo
 
     # Repo currently expects a "str", so decode if necessary.
     # TODO(jelmer): Perhaps move this into Repo() ?

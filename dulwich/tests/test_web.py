@@ -26,17 +26,18 @@ import re
 from io import BytesIO
 from typing import Type
 
-from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import Blob
-from dulwich.repo import BaseRepo, MemoryRepo
-from dulwich.server import DictBackend
 from dulwich.tests import TestCase
-from dulwich.tests.utils import make_object, make_tag
-from dulwich.web import (HTTP_ERROR, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_OK,
-                         GunzipFilter, HTTPGitApplication, HTTPGitRequest,
-                         _LengthLimitedFile, get_idx_file, get_info_packs,
-                         get_info_refs, get_loose_object, get_pack_file,
-                         get_text_file, handle_service_request, send_file)
+
+from ..object_store import MemoryObjectStore
+from ..objects import Blob
+from ..repo import BaseRepo, MemoryRepo
+from ..server import DictBackend
+from ..web import (HTTP_ERROR, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_OK,
+                   GunzipFilter, HTTPGitApplication, HTTPGitRequest,
+                   _LengthLimitedFile, get_idx_file, get_info_packs,
+                   get_info_refs, get_loose_object, get_pack_file,
+                   get_text_file, handle_service_request, send_file)
+from .utils import make_object, make_tag
 
 
 class MinimalistWSGIInputStream:

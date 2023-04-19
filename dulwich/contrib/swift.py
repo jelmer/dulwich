@@ -39,19 +39,18 @@ from io import BytesIO
 
 from geventhttpclient import HTTPClient
 
-from dulwich.greenthreads import GreenThreadsMissingObjectFinder
-from dulwich.lru_cache import LRUSizeCache
-from dulwich.object_store import INFODIR, PACKDIR, PackBasedObjectStore
-from dulwich.objects import S_ISGITLINK, Blob, Commit, Tag, Tree
-from dulwich.pack import (Pack, PackData, PackIndexer, PackStreamCopier,
-                          _compute_object_size, compute_file_sha, iter_sha1,
-                          load_pack_index_file, read_pack_header,
-                          unpack_object, write_pack_header,
-                          write_pack_index_v2, write_pack_object)
-from dulwich.protocol import TCP_GIT_PORT
-from dulwich.refs import InfoRefsContainer, read_info_refs, write_info_refs
-from dulwich.repo import OBJECTDIR, BaseRepo
-from dulwich.server import Backend, TCPGitServer
+from ..greenthreads import GreenThreadsMissingObjectFinder
+from ..lru_cache import LRUSizeCache
+from ..object_store import INFODIR, PACKDIR, PackBasedObjectStore
+from ..objects import S_ISGITLINK, Blob, Commit, Tag, Tree
+from ..pack import (Pack, PackData, PackIndexer, PackStreamCopier,
+                    _compute_object_size, compute_file_sha, iter_sha1,
+                    load_pack_index_file, read_pack_header, unpack_object,
+                    write_pack_header, write_pack_index_v2, write_pack_object)
+from ..protocol import TCP_GIT_PORT
+from ..refs import InfoRefsContainer, read_info_refs, write_info_refs
+from ..repo import OBJECTDIR, BaseRepo
+from ..server import Backend, TCPGitServer
 
 """
 # Configuration file sample

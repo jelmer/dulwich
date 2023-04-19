@@ -23,8 +23,9 @@
 import shutil
 import tempfile
 
-from dulwich.repo import Repo
 from dulwich.tests import BlackboxTestCase
+
+from ..repo import Repo
 
 
 class GitReceivePackTests(BlackboxTestCase):

@@ -36,15 +36,16 @@ from io import BytesIO, StringIO
 from unittest import skipIf
 
 from dulwich import porcelain
-from dulwich.diff_tree import tree_changes
-from dulwich.errors import CommitError
-from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
-from dulwich.porcelain import CheckoutError
-from dulwich.repo import NoIndexPresent, Repo
-from dulwich.server import DictBackend
 from dulwich.tests import TestCase
-from dulwich.tests.utils import build_commit_graph, make_commit, make_object
-from dulwich.web import make_server, make_wsgi_chain
+
+from ..diff_tree import tree_changes
+from ..errors import CommitError
+from ..objects import ZERO_SHA, Blob, Tag, Tree
+from ..porcelain import CheckoutError
+from ..repo import NoIndexPresent, Repo
+from ..server import DictBackend
+from ..web import make_server, make_wsgi_chain
+from .utils import build_commit_graph, make_commit, make_object
 
 try:
     import gpg

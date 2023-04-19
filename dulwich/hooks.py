@@ -23,7 +23,7 @@
 import os
 import subprocess
 
-from dulwich.errors import HookError
+from .errors import HookError
 
 
 class Hook:

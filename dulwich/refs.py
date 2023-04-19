@@ -27,10 +27,10 @@ import warnings
 from contextlib import suppress
 from typing import Dict, Optional
 
-from dulwich.errors import PackedRefsException, RefFormatError
-from dulwich.file import GitFile, ensure_dir_exists
-from dulwich.objects import ZERO_SHA, ObjectID, Tag, git_line, valid_hexsha
-from dulwich.pack import ObjectContainer
+from .errors import PackedRefsException, RefFormatError
+from .file import GitFile, ensure_dir_exists
+from .objects import ZERO_SHA, ObjectID, Tag, git_line, valid_hexsha
+from .pack import ObjectContainer
 
 Ref = bytes
 
@@ -1145,7 +1145,7 @@ def read_info_refs(f):
 def write_info_refs(refs, store: ObjectContainer):
     """Generate info refs."""
     # TODO: Avoid recursive import :(
-    from dulwich.object_store import peel_sha
+    from .object_store import peel_sha
     for name, sha in sorted(refs.items()):
         # get_refs() includes HEAD as a special case, but we don't want to
         # advertise it
@@ -1273,7 +1273,7 @@ def _import_remote_refs(
 
 def serialize_refs(store, refs):
     # TODO: Avoid recursive import :(
-    from dulwich.object_store import peel_sha
+    from .object_store import peel_sha
     ret = {}
     for ref, sha in refs.items():
         try:

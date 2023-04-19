@@ -49,7 +49,7 @@ import re
 import sys
 import time
 
-from dulwich.repo import Repo
+from ..repo import Repo
 
 # CONSTANTS
 PROJDIR = "."

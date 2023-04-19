@@ -22,16 +22,16 @@
 For details for the matching rules, see https://git-scm.com/docs/gitignore
 """
 
-from contextlib import suppress
 import os.path
 import re
+from contextlib import suppress
 from typing import (TYPE_CHECKING, BinaryIO, Dict, Iterable, List, Optional,
                     Union)
 
 if TYPE_CHECKING:
-    from dulwich.repo import Repo
+    from .repo import Repo
 
-from dulwich.config import Config, get_xdg_config_home_path
+from .config import Config, get_xdg_config_home_path
 
 
 def _translate_segment(segment: bytes) -> bytes:

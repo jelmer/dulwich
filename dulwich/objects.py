@@ -25,29 +25,20 @@ import binascii
 import os
 import posixpath
 import stat
-from typing import (
-    Optional,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Tuple,
-    Type,
-    Union,
-    BinaryIO,
-)
+import warnings
 import zlib
 from collections import namedtuple
 from hashlib import sha1
 from io import BytesIO
-import warnings
+from typing import (BinaryIO, Dict, Iterable, Iterator, List, Optional, Tuple,
+                    Type, Union)
 
 from _hashlib import HASH
 
-from dulwich.errors import (ChecksumMismatch, FileFormatException,
-                            NotBlobError, NotCommitError, NotTagError,
-                            NotTreeError, ObjectFormatException)
-from dulwich.file import GitFile
+from .errors import (ChecksumMismatch, FileFormatException, NotBlobError,
+                     NotCommitError, NotTagError, NotTreeError,
+                     ObjectFormatException)
+from .file import GitFile
 
 ZERO_SHA = b"0" * 40
 

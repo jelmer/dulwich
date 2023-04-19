@@ -30,17 +30,16 @@ from contextlib import contextmanager
 from io import BytesIO
 from itertools import permutations
 
-from dulwich.errors import ObjectFormatException
-from dulwich.objects import (MAX_TIME, Blob, Commit, ShaFile, Tag, Tree,
-                             TreeEntry, _parse_tree_py, _sorted_tree_items_py,
-                             check_hexsha, check_identity, format_timezone,
-                             hex_to_filename, hex_to_sha, object_class,
-                             parse_timezone, parse_tree,
-                             pretty_format_tree_entry, sha_to_hex,
-                             sorted_tree_items)
 from dulwich.tests import TestCase
-from dulwich.tests.utils import (ext_functest_builder, functest_builder,
-                                 make_commit, make_object)
+
+from ..errors import ObjectFormatException
+from ..objects import (MAX_TIME, Blob, Commit, ShaFile, Tag, Tree, TreeEntry,
+                       _parse_tree_py, _sorted_tree_items_py, check_hexsha,
+                       check_identity, format_timezone, hex_to_filename,
+                       hex_to_sha, object_class, parse_timezone, parse_tree,
+                       pretty_format_tree_entry, sha_to_hex, sorted_tree_items)
+from .utils import (ext_functest_builder, functest_builder, make_commit,
+                    make_object)
 
 a_sha = b"6f670c0fb53f9463760b7295fbb814e965fb20c8"
 b_sha = b"2969be3e8ee1c0222396a5611407e4769f14e54b"

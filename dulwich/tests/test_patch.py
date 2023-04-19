@@ -22,12 +22,12 @@
 
 from io import BytesIO, StringIO
 
-from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
-from dulwich.patch import (get_summary, git_am_patch_split, write_blob_diff,
-                           write_commit_patch, write_object_diff,
-                           write_tree_diff)
 from dulwich.tests import SkipTest, TestCase
+
+from ..object_store import MemoryObjectStore
+from ..objects import S_IFGITLINK, Blob, Commit, Tree
+from ..patch import (get_summary, git_am_patch_split, write_blob_diff,
+                     write_commit_patch, write_object_diff, write_tree_diff)
 
 
 class WriteCommitPatchTests(TestCase):

@@ -26,10 +26,10 @@ import heapq
 from itertools import chain
 from typing import Deque, List, Optional, Set, Tuple
 
-from dulwich.diff_tree import (RENAME_CHANGE_TYPES, RenameDetector,
-                               tree_changes, tree_changes_for_merge)
-from dulwich.errors import MissingCommitError
-from dulwich.objects import Commit, ObjectID, Tag
+from .diff_tree import (RENAME_CHANGE_TYPES, RenameDetector, tree_changes,
+                        tree_changes_for_merge)
+from .errors import MissingCommitError
+from .objects import Commit, ObjectID, Tag
 
 ORDER_DATE = "date"
 ORDER_TOPO = "topo"

@@ -20,12 +20,12 @@
 
 """Object specification."""
 
-from typing import List, Tuple, Union, TYPE_CHECKING, Optional, Iterator
+from typing import TYPE_CHECKING, Iterator, List, Optional, Tuple, Union
 
 if TYPE_CHECKING:
-    from dulwich.objects import ShaFile, Commit, Tree
-    from dulwich.refs import RefsContainer, Ref
-    from dulwich.repo import Repo
+    from .objects import Commit, ShaFile, Tree
+    from .refs import Ref, RefsContainer
+    from .repo import Repo
 
 
 def to_bytes(text: Union[str, bytes]) -> bytes:

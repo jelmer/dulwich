@@ -41,30 +41,29 @@ if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
     # as possible to reduce start-up time for anything that doesn't need
     # these imports.
-    from dulwich.config import StackedConfig, ConfigFile
-    from dulwich.index import Index
+    from .config import StackedConfig, ConfigFile
+    from .index import Index
 
-from dulwich.errors import (CommitError, HookError, NoIndexPresent,
-                            NotBlobError, NotCommitError, NotGitRepository,
-                            NotTagError, NotTreeError, RefFormatError)
-from dulwich.file import GitFile
-from dulwich.hooks import (CommitMsgShellHook, Hook, PostCommitShellHook,
-                           PostReceiveShellHook, PreCommitShellHook)
-from dulwich.line_ending import BlobNormalizer, TreeBlobNormalizer
-from dulwich.object_store import (DiskObjectStore, MemoryObjectStore,
-                                  MissingObjectFinder, ObjectStoreGraphWalker,
-                                  PackBasedObjectStore, peel_sha)
-from dulwich.objects import (Blob, Commit, ObjectID, ShaFile, Tag, Tree,
-                             check_hexsha, valid_hexsha)
-from dulwich.pack import generate_unpacked_objects
-from dulwich.refs import (ANNOTATED_TAG_SUFFIX,  # noqa: F401
-                          LOCAL_BRANCH_PREFIX, LOCAL_TAG_PREFIX, SYMREF,
-                          DictRefsContainer, DiskRefsContainer,
-                          InfoRefsContainer, Ref, RefsContainer,
-                          _set_default_branch, _set_head, _set_origin_head,
-                          check_ref_format, read_packed_refs,
-                          read_packed_refs_with_peeled, serialize_refs,
-                          write_packed_refs)
+from .errors import (CommitError, HookError, NoIndexPresent, NotBlobError,
+                     NotCommitError, NotGitRepository, NotTagError,
+                     NotTreeError, RefFormatError)
+from .file import GitFile
+from .hooks import (CommitMsgShellHook, Hook, PostCommitShellHook,
+                    PostReceiveShellHook, PreCommitShellHook)
+from .line_ending import BlobNormalizer, TreeBlobNormalizer
+from .object_store import (DiskObjectStore, MemoryObjectStore,
+                           MissingObjectFinder, ObjectStoreGraphWalker,
+                           PackBasedObjectStore, peel_sha)
+from .objects import (Blob, Commit, ObjectID, ShaFile, Tag, Tree, check_hexsha,
+                      valid_hexsha)
+from .pack import generate_unpacked_objects
+from .refs import (ANNOTATED_TAG_SUFFIX, LOCAL_BRANCH_PREFIX,  # noqa: F401
+                   LOCAL_TAG_PREFIX, SYMREF,
+                   DictRefsContainer, DiskRefsContainer, InfoRefsContainer,
+                   Ref, RefsContainer, _set_default_branch, _set_head,
+                   _set_origin_head, check_ref_format, read_packed_refs,
+                   read_packed_refs_with_peeled, serialize_refs,
+                   write_packed_refs)
 
 CONTROLDIR = ".git"
 OBJECTDIR = "objects"
@@ -331,7 +330,7 @@ class BaseRepo:
 
     def _init_files(self, bare: bool) -> None:
         """Initialize a default set of named files."""
-        from dulwich.config import ConfigFile
+        from .config import ConfigFile
 
         self._put_named_file("description", b"Unnamed repository")
         f = BytesIO()
@@ -659,7 +658,7 @@ class BaseRepo:
 
         Returns: `Config` instance for this repository
         """
-        from dulwich.config import ConfigFile, StackedConfig
+        from .config import ConfigFile, StackedConfig
 
         local_config = self.get_config()
         backends: List[ConfigFile] = [local_config]
@@ -740,7 +739,7 @@ class BaseRepo:
             Walker.
         Returns: A `Walker` object
         """
-        from dulwich.walk import Walker
+        from .walk import Walker
 
         if include is None:
             include = [self.head()]
@@ -1286,7 +1285,7 @@ class Repo(BaseRepo):
           NoIndexPresent: If no index is present
         Returns: The matching `Index`
         """
-        from dulwich.index import Index
+        from .index import Index
 
         if not self.has_index():
             raise NoIndexPresent()
@@ -1311,9 +1310,8 @@ class Repo(BaseRepo):
             fs_paths = [fs_paths]
         fs_paths = list(fs_paths)
 
-        from dulwich.index import (_fs_to_tree_path, blob_from_path_and_stat,
-                                   index_entry_from_directory,
-                                   index_entry_from_stat)
+        from .index import (_fs_to_tree_path, blob_from_path_and_stat,
+                            index_entry_from_directory, index_entry_from_stat)
 
         index = self.open_index()
         blob_normalizer = self.get_blob_normalizer()
@@ -1363,7 +1361,7 @@ class Repo(BaseRepo):
           fs_paths: a list of files to unstage,
             relative to the repository path
         """
-        from dulwich.index import IndexEntry, _fs_to_tree_path
+        from .index import IndexEntry, _fs_to_tree_path
 
         index = self.open_index()
         try:
@@ -1514,9 +1512,9 @@ class Repo(BaseRepo):
         Args:
           tree: Tree SHA to reset to, None for current HEAD tree.
         """
-        from dulwich.index import (build_index_from_tree,
-                                   validate_path_element_default,
-                                   validate_path_element_ntfs)
+        from .index import (build_index_from_tree,
+                            validate_path_element_default,
+                            validate_path_element_ntfs)
 
         if tree is None:
             head = self[b"HEAD"]
@@ -1541,7 +1539,7 @@ class Repo(BaseRepo):
         )
 
     def get_worktree_config(self) -> "ConfigFile":
-        from dulwich.config import ConfigFile
+        from .config import ConfigFile
         path = os.path.join(self.commondir(), "config.worktree")
         try:
             return ConfigFile.from_path(path)
@@ -1555,7 +1553,7 @@ class Repo(BaseRepo):
 
         Returns: `ConfigFile` object for the ``.git/config`` file.
         """
-        from dulwich.config import ConfigFile
+        from .config import ConfigFile
 
         path = os.path.join(self._commondir, "config")
         try:
@@ -1600,7 +1598,7 @@ class Repo(BaseRepo):
         ret = cls(path, bare=bare, object_store=object_store)
         if default_branch is None:
             if config is None:
-                from dulwich.config import StackedConfig
+                from .config import StackedConfig
                 config = StackedConfig.default()
             try:
                 default_branch = config.get("init", "defaultBranch")
@@ -1717,7 +1715,7 @@ class MemoryRepo(BaseRepo):
     """
 
     def __init__(self):
-        from dulwich.config import ConfigFile
+        from .config import ConfigFile
 
         self._reflog = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)

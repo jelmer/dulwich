@@ -26,7 +26,7 @@ from io import BytesIO
 from itertools import chain
 from typing import Dict, List, Optional
 
-from dulwich.objects import S_ISGITLINK, Tree, TreeEntry
+from .objects import S_ISGITLINK, Tree, TreeEntry
 
 # TreeChange type constants.
 CHANGE_ADD = "add"

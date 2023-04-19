@@ -27,9 +27,9 @@ from fastimport import commands
 from fastimport import errors as fastimport_errors
 from fastimport import parser, processor
 
-from dulwich.index import commit_tree
-from dulwich.object_store import iter_tree_contents
-from dulwich.objects import ZERO_SHA, Blob, Commit, Tag
+from .index import commit_tree
+from .object_store import iter_tree_contents
+from .objects import ZERO_SHA, Blob, Commit, Tag
 
 
 def split_email(text):

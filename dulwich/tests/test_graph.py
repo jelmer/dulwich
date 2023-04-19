@@ -20,10 +20,11 @@
 
 """Tests for dulwich.graph."""
 
-from dulwich.graph import _find_lcas, can_fast_forward
-from dulwich.repo import MemoryRepo
 from dulwich.tests import TestCase
-from dulwich.tests.utils import make_commit
+
+from ..graph import _find_lcas, can_fast_forward
+from ..repo import MemoryRepo
+from .utils import make_commit
 
 
 class FindMergeBaseTests(TestCase):

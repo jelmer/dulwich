@@ -30,13 +30,13 @@ import threading
 from typing import Tuple
 from wsgiref import simple_server
 
-from dulwich.server import DictBackend, ReceivePackHandler, UploadPackHandler
 from dulwich.tests import SkipTest, skipIf
-from dulwich.tests.compat.server_utils import (NoSideBand64kReceivePackHandler,
-                                               ServerTests)
-from dulwich.tests.compat.utils import CompatTestCase
-from dulwich.web import (HTTPGitApplication, WSGIRequestHandlerLogger,
-                         WSGIServerLogger, make_wsgi_chain)
+
+from ...server import DictBackend, ReceivePackHandler, UploadPackHandler
+from ...web import (HTTPGitApplication, WSGIRequestHandlerLogger,
+                    WSGIServerLogger, make_wsgi_chain)
+from .server_utils import NoSideBand64kReceivePackHandler, ServerTests
+from .utils import CompatTestCase
 
 
 @skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")

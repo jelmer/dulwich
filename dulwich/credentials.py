@@ -28,7 +28,7 @@ import sys
 from typing import Iterator, Optional
 from urllib.parse import ParseResult, urlparse
 
-from dulwich.config import ConfigDict, SectionLike
+from .config import ConfigDict, SectionLike
 
 
 def match_urls(url: ParseResult, url_prefix: ParseResult) -> bool:

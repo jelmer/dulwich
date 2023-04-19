@@ -29,11 +29,11 @@ import os
 import sys
 import threading
 
-from dulwich.server import DictBackend, TCPGitServer
 from dulwich.tests import skipIf
-from dulwich.tests.compat.server_utils import (NoSideBand64kReceivePackHandler,
-                                               ServerTests)
-from dulwich.tests.compat.utils import CompatTestCase, require_git_version
+
+from ...server import DictBackend, TCPGitServer
+from .server_utils import NoSideBand64kReceivePackHandler, ServerTests
+from .utils import CompatTestCase, require_git_version
 
 
 @skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")

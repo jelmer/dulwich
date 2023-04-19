@@ -26,9 +26,9 @@ import sys
 import tempfile
 
 from dulwich import errors
-from dulwich.hooks import (CommitMsgShellHook, PostCommitShellHook,
-                           PreCommitShellHook)
 from dulwich.tests import TestCase
+
+from ..hooks import CommitMsgShellHook, PostCommitShellHook, PreCommitShellHook
 
 
 class ShellHookTests(TestCase):

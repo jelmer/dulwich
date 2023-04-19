@@ -21,11 +21,12 @@
 import stat
 from io import BytesIO
 
-from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
-from dulwich.repo import MemoryRepo
 from dulwich.tests import SkipTest, TestCase
-from dulwich.tests.utils import build_commit_graph
+
+from ..object_store import MemoryObjectStore
+from ..objects import ZERO_SHA, Blob, Commit, Tree
+from ..repo import MemoryRepo
+from .utils import build_commit_graph
 
 
 class GitFastExporterTests(TestCase):
@@ -36,7 +37,7 @@ class GitFastExporterTests(TestCase):
         self.store = MemoryObjectStore()
         self.stream = BytesIO()
         try:
-            from dulwich.fastexport import GitFastExporter
+            from ..fastexport import GitFastExporter
         except ImportError as exc:
             raise SkipTest("python-fastimport not available") from exc
         self.fastexporter = GitFastExporter(self.stream, self.store)
@@ -84,7 +85,7 @@ class GitImportProcessorTests(TestCase):
         super().setUp()
         self.repo = MemoryRepo()
         try:
-            from dulwich.fastexport import GitImportProcessor
+            from ..fastexport import GitImportProcessor
         except ImportError as exc:
             raise SkipTest("python-fastimport not available") from exc
         self.processor = GitImportProcessor(self.repo)

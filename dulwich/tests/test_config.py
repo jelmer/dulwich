@@ -26,11 +26,12 @@ from io import BytesIO
 from unittest import skipIf
 from unittest.mock import patch
 
-from dulwich.config import (ConfigDict, ConfigFile, StackedConfig,
-                            _check_section_name, _check_variable_name,
-                            _escape_value, _format_string, _parse_string,
-                            apply_instead_of, parse_submodules)
 from dulwich.tests import TestCase
+
+from ..config import (ConfigDict, ConfigFile, StackedConfig,
+                      _check_section_name, _check_variable_name, _escape_value,
+                      _format_string, _parse_string, apply_instead_of,
+                      parse_submodules)
 
 
 class ConfigFileTests(TestCase):
@@ -302,7 +303,7 @@ class StackedConfigTests(TestCase):
 
     @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_path(self):
-        from dulwich.config import get_win_system_paths
+        from ..config import get_win_system_paths
 
         install_dir = os.path.join("C:", "foo", "Git")
         self.overrideEnv("PATH", os.path.join(install_dir, "cmd"))
@@ -320,7 +321,7 @@ class StackedConfigTests(TestCase):
     def test_windows_config_from_reg(self):
         import winreg
 
-        from dulwich.config import get_win_system_paths
+        from ..config import get_win_system_paths
 
         self.overrideEnv("PATH", None)
         install_dir = os.path.join("C:", "foo", "Git")

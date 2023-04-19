@@ -31,24 +31,23 @@ from urllib.parse import urlparse
 
 import dulwich
 from dulwich import client
-from dulwich.client import (FetchPackResult, GitProtocolError, HangupException,
-                            HttpGitClient, InvalidWants, LocalGitClient,
-                            PLinkSSHVendor, ReportStatusParser, SendPackError,
-                            SSHGitClient, StrangeHostname, SubprocessSSHVendor,
-                            TCPGitClient, TraditionalGitClient,
-                            _remote_error_from_stderr, check_wants,
-                            default_urllib3_manager,
-                            get_credentials_from_store, get_transport_and_path,
-                            get_transport_and_path_from_url, parse_rsync_url)
-from dulwich.config import ConfigDict
-from dulwich.objects import Commit, Tree
-from dulwich.pack import (pack_objects_to_data, write_pack_data,
-                          write_pack_objects)
-from dulwich.protocol import TCP_GIT_PORT, Protocol
-from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests import TestCase, skipIf
-from dulwich.tests.utils import (open_repo, setup_warning_catcher,
-                                 tear_down_repo)
+
+from ..client import (FetchPackResult, GitProtocolError, HangupException,
+                      HttpGitClient, InvalidWants, LocalGitClient,
+                      PLinkSSHVendor, ReportStatusParser, SendPackError,
+                      SSHGitClient, StrangeHostname, SubprocessSSHVendor,
+                      TCPGitClient, TraditionalGitClient,
+                      _remote_error_from_stderr, check_wants,
+                      default_urllib3_manager, get_credentials_from_store,
+                      get_transport_and_path, get_transport_and_path_from_url,
+                      parse_rsync_url)
+from ..config import ConfigDict
+from ..objects import Commit, Tree
+from ..pack import pack_objects_to_data, write_pack_data, write_pack_objects
+from ..protocol import TCP_GIT_PORT, Protocol
+from ..repo import MemoryRepo, Repo
+from .utils import open_repo, setup_warning_catcher, tear_down_repo
 
 
 class DummyClient(TraditionalGitClient):

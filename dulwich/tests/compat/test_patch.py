@@ -25,8 +25,9 @@ import tempfile
 from io import BytesIO
 
 from dulwich import porcelain
-from dulwich.repo import Repo
-from dulwich.tests.compat.utils import CompatTestCase, run_git_or_fail
+
+from ...repo import Repo
+from .utils import CompatTestCase, run_git_or_fail
 
 
 class CompatPatchTestCase(CompatTestCase):

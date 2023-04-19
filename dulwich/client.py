@@ -56,30 +56,28 @@ if TYPE_CHECKING:
     import urllib3
 
 import dulwich
-from dulwich.config import Config, apply_instead_of, get_xdg_config_home_path
-from dulwich.errors import GitProtocolError, NotGitRepository, SendPackError
-from dulwich.pack import (PACK_SPOOL_FILE_MAX_SIZE, PackChunkGenerator,
-                          UnpackedObject, write_pack_from_container)
-from dulwich.protocol import (_RBUFSIZE, CAPABILITIES_REF, CAPABILITY_AGENT,
-                              CAPABILITY_DELETE_REFS, CAPABILITY_INCLUDE_TAG,
-                              CAPABILITY_MULTI_ACK,
-                              CAPABILITY_MULTI_ACK_DETAILED,
-                              CAPABILITY_OFS_DELTA, CAPABILITY_QUIET,
-                              CAPABILITY_REPORT_STATUS, CAPABILITY_SHALLOW,
-                              CAPABILITY_SIDE_BAND_64K, CAPABILITY_SYMREF,
-                              CAPABILITY_THIN_PACK, COMMAND_DEEPEN,
-                              COMMAND_DONE, COMMAND_HAVE, COMMAND_SHALLOW,
-                              COMMAND_UNSHALLOW, COMMAND_WANT,
-                              KNOWN_RECEIVE_CAPABILITIES,
-                              KNOWN_UPLOAD_CAPABILITIES,
-                              SIDE_BAND_CHANNEL_DATA, SIDE_BAND_CHANNEL_FATAL,
-                              SIDE_BAND_CHANNEL_PROGRESS, TCP_GIT_PORT,
-                              ZERO_SHA, HangupException, PktLineParser,
-                              Protocol, agent_string, capability_agent,
-                              extract_capabilities, extract_capability_names,
-                              parse_capability, pkt_line)
-from dulwich.refs import PEELED_TAG_SUFFIX, _import_remote_refs, read_info_refs
-from dulwich.repo import Repo
+
+from .config import Config, apply_instead_of, get_xdg_config_home_path
+from .errors import GitProtocolError, NotGitRepository, SendPackError
+from .pack import (PACK_SPOOL_FILE_MAX_SIZE, PackChunkGenerator,
+                   UnpackedObject, write_pack_from_container)
+from .protocol import (_RBUFSIZE, CAPABILITIES_REF, CAPABILITY_AGENT,
+                       CAPABILITY_DELETE_REFS, CAPABILITY_INCLUDE_TAG,
+                       CAPABILITY_MULTI_ACK, CAPABILITY_MULTI_ACK_DETAILED,
+                       CAPABILITY_OFS_DELTA, CAPABILITY_QUIET,
+                       CAPABILITY_REPORT_STATUS, CAPABILITY_SHALLOW,
+                       CAPABILITY_SIDE_BAND_64K, CAPABILITY_SYMREF,
+                       CAPABILITY_THIN_PACK, COMMAND_DEEPEN, COMMAND_DONE,
+                       COMMAND_HAVE, COMMAND_SHALLOW, COMMAND_UNSHALLOW,
+                       COMMAND_WANT, KNOWN_RECEIVE_CAPABILITIES,
+                       KNOWN_UPLOAD_CAPABILITIES, SIDE_BAND_CHANNEL_DATA,
+                       SIDE_BAND_CHANNEL_FATAL, SIDE_BAND_CHANNEL_PROGRESS,
+                       TCP_GIT_PORT, ZERO_SHA, HangupException, PktLineParser,
+                       Protocol, agent_string, capability_agent,
+                       extract_capabilities, extract_capability_names,
+                       parse_capability, pkt_line)
+from .refs import PEELED_TAG_SUFFIX, _import_remote_refs, read_info_refs
+from .repo import Repo
 
 # url2pathname is lazily imported
 url2pathname = None
@@ -1663,7 +1661,7 @@ def ParamikoSSHVendor(**kwargs):
         "ParamikoSSHVendor has been moved to dulwich.contrib.paramiko_vendor.",
         DeprecationWarning,
     )
-    from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
+    from .contrib.paramiko_vendor import ParamikoSSHVendor
 
     return ParamikoSSHVendor(**kwargs)
 

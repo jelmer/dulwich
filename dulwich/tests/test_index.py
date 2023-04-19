@@ -30,17 +30,17 @@ import sys
 import tempfile
 from io import BytesIO
 
-from dulwich.index import (Index, IndexEntry, _fs_to_tree_path,
-                           _tree_to_fs_path, build_index_from_tree,
-                           cleanup_mode, commit_tree, get_unstaged_changes,
-                           index_entry_from_stat, read_index, read_index_dict,
-                           validate_path_element_default,
-                           validate_path_element_ntfs, write_cache_time,
-                           write_index, write_index_dict)
-from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
-from dulwich.repo import Repo
 from dulwich.tests import TestCase, skipIf
+
+from ..index import (Index, IndexEntry, _fs_to_tree_path, _tree_to_fs_path,
+                     build_index_from_tree, cleanup_mode, commit_tree,
+                     get_unstaged_changes, index_entry_from_stat, read_index,
+                     read_index_dict, validate_path_element_default,
+                     validate_path_element_ntfs, write_cache_time, write_index,
+                     write_index_dict)
+from ..object_store import MemoryObjectStore
+from ..objects import S_IFGITLINK, Blob, Commit, Tree
+from ..repo import Repo
 
 
 def can_symlink():

@@ -23,7 +23,7 @@
 
 import collections
 
-from dulwich.objects import ZERO_SHA, format_timezone, parse_timezone
+from .objects import ZERO_SHA, format_timezone, parse_timezone
 
 Entry = collections.namedtuple(
     "Entry",

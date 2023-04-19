@@ -26,9 +26,10 @@ import sys
 from unittest import skipIf
 
 from dulwich import porcelain
-from dulwich.tests.compat.utils import CompatTestCase, run_git_or_fail
-from dulwich.tests.test_porcelain import PorcelainGpgTestCase
-from dulwich.tests.utils import build_commit_graph
+
+from ..test_porcelain import PorcelainGpgTestCase
+from ..utils import build_commit_graph
+from .utils import CompatTestCase, run_git_or_fail
 
 
 @skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")

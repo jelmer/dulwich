@@ -72,11 +72,10 @@ else:
 if sys.platform == "Plan9":
     has_mmap = False
 
-from dulwich.errors import ApplyDeltaError, ChecksumMismatch
-from dulwich.file import GitFile
-from dulwich.lru_cache import LRUSizeCache
-from dulwich.objects import (ObjectID, ShaFile, hex_to_sha, object_header,
-                             sha_to_hex)
+from .errors import ApplyDeltaError, ChecksumMismatch
+from .file import GitFile
+from .lru_cache import LRUSizeCache
+from .objects import ObjectID, ShaFile, hex_to_sha, object_header, sha_to_hex
 
 OFS_DELTA = 6
 REF_DELTA = 7
@@ -2593,7 +2592,7 @@ def extend_pack(f: BinaryIO, object_ids: Set[ObjectID], get_raw, *, compression_
 
 
 try:
-    from dulwich._pack import (apply_delta,  # type: ignore # noqa: F811
-                               bisect_find_sha)
+    from dulwich._pack import apply_delta  # type: ignore # noqa: F811
+    from dulwich._pack import bisect_find_sha  # type: ignore # noqa: F811
 except ImportError:
     pass

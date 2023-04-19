@@ -33,9 +33,9 @@ from io import BytesIO
 
 from requests import Session
 
-from dulwich.client import (AbstractHttpGitClient, HTTPProxyUnauthorized,
-                            HTTPUnauthorized, default_user_agent_string)
-from dulwich.errors import GitProtocolError, NotGitRepository
+from ..client import (AbstractHttpGitClient, HTTPProxyUnauthorized,
+                      HTTPUnauthorized, default_user_agent_string)
+from ..errors import GitProtocolError, NotGitRepository
 
 
 class RequestsHttpGitClient(AbstractHttpGitClient):

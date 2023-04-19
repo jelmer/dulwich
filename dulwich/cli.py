@@ -37,12 +37,13 @@ from getopt import getopt
 from typing import Dict, Optional, Type
 
 from dulwich import porcelain
-from dulwich.client import GitProtocolError, get_transport_and_path
-from dulwich.errors import ApplyDeltaError
-from dulwich.index import Index
-from dulwich.objectspec import parse_commit
-from dulwich.pack import Pack, sha_to_hex
-from dulwich.repo import Repo
+
+from .client import GitProtocolError, get_transport_and_path
+from .errors import ApplyDeltaError
+from .index import Index
+from .objectspec import parse_commit
+from .pack import Pack, sha_to_hex
+from .repo import Repo
 
 
 def signal_int(signal, frame):
@@ -383,7 +384,8 @@ class cmd_reset(Command):
 class cmd_daemon(Command):
     def run(self, args):
         from dulwich import log_utils
-        from dulwich.protocol import TCP_GIT_PORT
+
+        from .protocol import TCP_GIT_PORT
 
         parser = optparse.OptionParser()
         parser.add_option(

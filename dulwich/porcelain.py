@@ -75,32 +75,32 @@ from io import BytesIO, RawIOBase
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
-from dulwich.archive import tar_stream
-from dulwich.client import get_transport_and_path
-from dulwich.config import Config, ConfigFile, StackedConfig, read_submodules
-from dulwich.diff_tree import (CHANGE_ADD, CHANGE_COPY, CHANGE_DELETE,
-                               CHANGE_MODIFY, CHANGE_RENAME,
-                               RENAME_CHANGE_TYPES)
-from dulwich.errors import SendPackError
-from dulwich.file import ensure_dir_exists
-from dulwich.graph import can_fast_forward
-from dulwich.ignore import IgnoreFilterManager
-from dulwich.index import (_fs_to_tree_path, blob_from_path_and_stat,
-                           build_file_from_blob, get_unstaged_changes, index_entry_from_stat)
-from dulwich.object_store import tree_lookup_path, iter_tree_contents
-from dulwich.objects import (Commit, Tag, format_timezone, parse_timezone,
-                             pretty_format_tree_entry)
-from dulwich.objectspec import (parse_commit, parse_object, parse_ref,
-                                parse_reftuples, parse_tree, to_bytes)
-from dulwich.pack import write_pack_from_container, write_pack_index
-from dulwich.patch import write_tree_diff
-from dulwich.protocol import ZERO_SHA, Protocol
-from dulwich.refs import (LOCAL_BRANCH_PREFIX, LOCAL_REMOTE_PREFIX,
-                          LOCAL_TAG_PREFIX, _import_remote_refs)
-from dulwich.repo import BaseRepo, Repo
-from dulwich.server import (FileSystemBackend, ReceivePackHandler,
-                            TCPGitServer, UploadPackHandler)
-from dulwich.server import update_server_info as server_update_server_info
+from .archive import tar_stream
+from .client import get_transport_and_path
+from .config import Config, ConfigFile, StackedConfig, read_submodules
+from .diff_tree import (CHANGE_ADD, CHANGE_COPY, CHANGE_DELETE, CHANGE_MODIFY,
+                        CHANGE_RENAME, RENAME_CHANGE_TYPES)
+from .errors import SendPackError
+from .file import ensure_dir_exists
+from .graph import can_fast_forward
+from .ignore import IgnoreFilterManager
+from .index import (_fs_to_tree_path, blob_from_path_and_stat,
+                    build_file_from_blob, get_unstaged_changes,
+                    index_entry_from_stat)
+from .object_store import iter_tree_contents, tree_lookup_path
+from .objects import (Commit, Tag, format_timezone, parse_timezone,
+                      pretty_format_tree_entry)
+from .objectspec import (parse_commit, parse_object, parse_ref,
+                         parse_reftuples, parse_tree, to_bytes)
+from .pack import write_pack_from_container, write_pack_index
+from .patch import write_tree_diff
+from .protocol import ZERO_SHA, Protocol
+from .refs import (LOCAL_BRANCH_PREFIX, LOCAL_REMOTE_PREFIX, LOCAL_TAG_PREFIX,
+                   _import_remote_refs)
+from .repo import BaseRepo, Repo
+from .server import (FileSystemBackend, ReceivePackHandler, TCPGitServer,
+                     UploadPackHandler)
+from .server import update_server_info as server_update_server_info
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -1461,8 +1461,8 @@ def web_daemon(path=".", address=None, port=None):
       address: Optional address to listen on (defaults to ::)
       port: Optional port to listen on (defaults to 80)
     """
-    from dulwich.web import (WSGIRequestHandlerLogger, WSGIServerLogger,
-                             make_server, make_wsgi_chain)
+    from .web import (WSGIRequestHandlerLogger, WSGIServerLogger, make_server,
+                      make_wsgi_chain)
 
     backend = FileSystemBackend(path)
     app = make_wsgi_chain(backend)
@@ -1974,7 +1974,7 @@ def check_mailmap(repo, contact):
     Returns: Canonical contact data
     """
     with open_repo_closing(repo) as r:
-        from dulwich.mailmap import Mailmap
+        from .mailmap import Mailmap
 
         try:
             mailmap = Mailmap.from_path(os.path.join(r.path, ".mailmap"))
@@ -2005,7 +2005,7 @@ def fsck(repo):
 def stash_list(repo):
     """List all stashes in a repository."""
     with open_repo_closing(repo) as r:
-        from dulwich.stash import Stash
+        from .stash import Stash
 
         stash = Stash.from_repo(r)
         return enumerate(list(stash.stashes()))
@@ -2014,7 +2014,7 @@ def stash_list(repo):
 def stash_push(repo):
     """Push a new stash onto the stack."""
     with open_repo_closing(repo) as r:
-        from dulwich.stash import Stash
+        from .stash import Stash
 
         stash = Stash.from_repo(r)
         stash.push()
@@ -2023,7 +2023,7 @@ def stash_push(repo):
 def stash_pop(repo, index):
     """Pop a stash from the stack."""
     with open_repo_closing(repo) as r:
-        from dulwich.stash import Stash
+        from .stash import Stash
 
         stash = Stash.from_repo(r)
         stash.pop(index)
@@ -2032,7 +2032,7 @@ def stash_pop(repo, index):
 def stash_drop(repo, index):
     """Drop a stash from the stack."""
     with open_repo_closing(repo) as r:
-        from dulwich.stash import Stash
+        from .stash import Stash
 
         stash = Stash.from_repo(r)
         stash.drop(index)

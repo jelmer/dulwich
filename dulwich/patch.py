@@ -29,8 +29,8 @@ import time
 from difflib import SequenceMatcher
 from typing import BinaryIO, Optional, TextIO, Union
 
-from dulwich.objects import S_ISGITLINK, Blob, Commit
-from dulwich.pack import ObjectContainer
+from .objects import S_ISGITLINK, Blob, Commit
+from .pack import ObjectContainer
 
 FIRST_FEW_BYTES = 8000
 

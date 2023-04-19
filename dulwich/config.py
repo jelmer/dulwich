@@ -26,13 +26,13 @@ TODO:
    subsections
 """
 
-from contextlib import suppress
 import os
 import sys
+from contextlib import suppress
 from typing import (BinaryIO, Iterable, Iterator, KeysView, List,
                     MutableMapping, Optional, Tuple, Union, overload)
 
-from dulwich.file import GitFile
+from .file import GitFile
 
 SENTINEL = object()
 

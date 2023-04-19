@@ -23,11 +23,11 @@ import os
 import shutil
 import tempfile
 
-from dulwich.errors import ObjectFormatException
-from dulwich.objects import Tree
-from dulwich.repo import (MemoryRepo, Repo, parse_graftpoints,
-                          serialize_graftpoints)
 from dulwich.tests import TestCase
+
+from ..errors import ObjectFormatException
+from ..objects import Tree
+from ..repo import MemoryRepo, Repo, parse_graftpoints, serialize_graftpoints
 
 
 def makesha(digit):

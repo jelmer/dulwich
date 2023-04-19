@@ -136,9 +136,9 @@ Sources:
 - https://adaptivepatchwork.com/2012/03/01/mind-the-end-of-your-line/
 """
 
-from dulwich.object_store import iter_tree_contents
-from dulwich.objects import Blob
-from dulwich.patch import is_binary
+from .object_store import iter_tree_contents
+from .objects import Blob
+from .patch import is_binary
 
 CRLF = b"\r\n"
 LF = b"\n"

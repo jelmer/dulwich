@@ -23,9 +23,9 @@
 
 import os
 
-from dulwich.file import GitFile
-from dulwich.index import commit_tree, iter_fresh_objects
-from dulwich.reflog import drop_reflog_entry, read_reflog
+from .file import GitFile
+from .index import commit_tree, iter_fresh_objects
+from .reflog import drop_reflog_entry, read_reflog
 
 DEFAULT_STASH_REF = b"refs/stash"
 

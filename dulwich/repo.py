@@ -328,7 +328,14 @@ class BaseRepo:
         """
         raise NotImplementedError(self._determine_file_mode)
 
-    def _init_files(self, bare: bool) -> None:
+    def _determine_symlinks(self) -> bool:
+        """Probe the filesystem to determine whether symlinks can be created.
+
+        Returns: True if symlinks can be created, False otherwise.
+        """
+        raise NotImplementedError(self._determine_symlinks)
+
+    def _init_files(self, *, bare: bool, symlinks: Optional[bool] = None) -> None:
         """Initialize a default set of named files."""
         from .config import ConfigFile
 
@@ -340,6 +347,12 @@ class BaseRepo:
             cf.set("core", "filemode", True)
         else:
             cf.set("core", "filemode", False)
+
+        if symlinks is None and not bare:
+            symlinks = self._determine_symlinks()
+
+        if symlinks is False:
+            cf.set("core", "symlinks", symlinks)
 
         cf.set("core", "bare", bare)
         cf.set("core", "logallrefupdates", True)
@@ -1069,7 +1082,6 @@ class Repo(BaseRepo):
         object_store: Optional[PackBasedObjectStore] = None,
         bare: Optional[bool] = None
     ) -> None:
-        self.symlink_fn = None
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
             if (os.path.isfile(hidden_path)
@@ -1233,6 +1245,14 @@ class Repo(BaseRepo):
         st2_has_exec = (st2.st_mode & stat.S_IXUSR) != 0
 
         return mode_differs and st2_has_exec
+
+    def _determine_symlinks(self):
+        """Probe the filesystem to determine whether symlinks can be created.
+
+        Returns: True if symlinks can be created, False otherwise.
+        """
+        # TODO(jelmer): Actually probe disk / look at filesystem
+        return sys.platform != "win32"
 
     def _put_named_file(self, path, contents):
         """Write a file to the control dir with the given name and contents.
@@ -1418,6 +1438,7 @@ class Repo(BaseRepo):
     def clone(
         self,
         target_path,
+        *,
         mkdir=True,
         bare=False,
         origin=b"origin",
@@ -1425,7 +1446,8 @@ class Repo(BaseRepo):
         branch=None,
         progress=None,
         depth=None,
-    ):
+        symlinks=None,
+    ) -> "Repo":
         """Clone this repository.
 
         Args:
@@ -1439,6 +1461,7 @@ class Repo(BaseRepo):
             instead of this repository's HEAD.
           progress: Optional progress function
           depth: Depth at which to fetch
+          symlinks: Symlinks setting (default to autodetect)
         Returns: Created repository as `Repo`
         """
 
@@ -1448,9 +1471,8 @@ class Repo(BaseRepo):
             os.mkdir(target_path)
 
         try:
-            target = None
             if not bare:
-                target = Repo.init(target_path)
+                target = Repo.init(target_path, symlinks=symlinks)
                 if checkout is None:
                     checkout = True
             else:
@@ -1458,48 +1480,50 @@ class Repo(BaseRepo):
                     raise ValueError("checkout and bare are incompatible")
                 target = Repo.init_bare(target_path)
 
-            target_config = target.get_config()
-            target_config.set((b"remote", origin), b"url", encoded_path)
-            target_config.set(
-                (b"remote", origin),
-                b"fetch",
-                b"+refs/heads/*:refs/remotes/" + origin + b"/*",
-            )
-            target_config.write_to_path()
+            try:
+                target_config = target.get_config()
+                target_config.set((b"remote", origin), b"url", encoded_path)
+                target_config.set(
+                    (b"remote", origin),
+                    b"fetch",
+                    b"+refs/heads/*:refs/remotes/" + origin + b"/*",
+                )
+                target_config.write_to_path()
 
-            ref_message = b"clone: from " + encoded_path
-            self.fetch(target, depth=depth)
-            target.refs.import_refs(
-                b"refs/remotes/" + origin,
-                self.refs.as_dict(b"refs/heads"),
-                message=ref_message,
-            )
-            target.refs.import_refs(
-                b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
-            )
-
-            head_chain, origin_sha = self.refs.follow(b"HEAD")
-            origin_head = head_chain[-1] if head_chain else None
-            if origin_sha and not origin_head:
-                # set detached HEAD
-                target.refs[b"HEAD"] = origin_sha
-            else:
-                _set_origin_head(target.refs, origin, origin_head)
-                head_ref = _set_default_branch(
-                    target.refs, origin, origin_head, branch, ref_message
+                ref_message = b"clone: from " + encoded_path
+                self.fetch(target, depth=depth)
+                target.refs.import_refs(
+                    b"refs/remotes/" + origin,
+                    self.refs.as_dict(b"refs/heads"),
+                    message=ref_message,
+                )
+                target.refs.import_refs(
+                    b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
                 )
 
-                # Update target head
-                if head_ref:
-                    head = _set_head(target.refs, head_ref, ref_message)
+                head_chain, origin_sha = self.refs.follow(b"HEAD")
+                origin_head = head_chain[-1] if head_chain else None
+                if origin_sha and not origin_head:
+                    # set detached HEAD
+                    target.refs[b"HEAD"] = origin_sha
                 else:
-                    head = None
+                    _set_origin_head(target.refs, origin, origin_head)
+                    head_ref = _set_default_branch(
+                        target.refs, origin, origin_head, branch, ref_message
+                    )
 
-            if checkout and head is not None:
-                target.reset_index()
-        except BaseException:
-            if target is not None:
+                    # Update target head
+                    if head_ref:
+                        head = _set_head(target.refs, head_ref, ref_message)
+                    else:
+                        head = None
+
+                if checkout and head is not None:
+                    target.reset_index()
+            except BaseException:
                 target.close()
+                raise
+        except BaseException:
             if mkdir:
                 import shutil
                 shutil.rmtree(target_path)
@@ -1513,6 +1537,7 @@ class Repo(BaseRepo):
           tree: Tree SHA to reset to, None for current HEAD tree.
         """
         from .index import (build_index_from_tree,
+                            symlink,
                             validate_path_element_default,
                             validate_path_element_ntfs)
 
@@ -1528,6 +1553,12 @@ class Repo(BaseRepo):
             validate_path_element = validate_path_element_ntfs
         else:
             validate_path_element = validate_path_element_default
+        if config.get_boolean(b"core", b"symlinks", True):
+            symlink_fn = symlink
+        else:
+            def symlink_fn(source, target):  # type: ignore
+                with open(target, 'w' + ('b' if isinstance(source, bytes) else '')) as f:
+                    f.write(source)
         return build_index_from_tree(
             self.path,
             self.index_path(),
@@ -1535,7 +1566,7 @@ class Repo(BaseRepo):
             tree,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
-            symlink_fn=self.symlink_fn,
+            symlink_fn=symlink_fn
         )
 
     def get_worktree_config(self) -> "ConfigFile":
@@ -1590,7 +1621,7 @@ class Repo(BaseRepo):
     @classmethod
     def _init_maybe_bare(
             cls, path, controldir, bare, object_store=None, config=None,
-            default_branch=None):
+            default_branch=None, symlinks: Optional[bool] = None):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(controldir, *d))
         if object_store is None:
@@ -1605,11 +1636,11 @@ class Repo(BaseRepo):
             except KeyError:
                 default_branch = DEFAULT_BRANCH
         ret.refs.set_symbolic_ref(b"HEAD", LOCAL_BRANCH_PREFIX + default_branch)
-        ret._init_files(bare)
+        ret._init_files(bare=bare, symlinks=symlinks)
         return ret
 
     @classmethod
-    def init(cls, path: str, *, mkdir: bool = False, config=None, default_branch=None) -> "Repo":
+    def init(cls, path: str, *, mkdir: bool = False, config=None, default_branch=None, symlinks: Optional[bool] = None) -> "Repo":
         """Create a new repository.
 
         Args:
@@ -1624,7 +1655,8 @@ class Repo(BaseRepo):
         _set_filesystem_hidden(controldir)
         return cls._init_maybe_bare(
             path, controldir, False, config=config,
-            default_branch=default_branch)
+            default_branch=default_branch,
+            symlinks=symlinks)
 
     @classmethod
     def _init_new_working_directory(cls, path, main_repo, identifier=None, mkdir=False):
@@ -1735,6 +1767,13 @@ class MemoryRepo(BaseRepo):
         return self._description
 
     def _determine_file_mode(self):
+        """Probe the file-system to determine whether permissions can be trusted.
+
+        Returns: True if permissions can be trusted, False otherwise.
+        """
+        return sys.platform != "win32"
+
+    def _determine_symlinks(self):
         """Probe the file-system to determine whether permissions can be trusted.
 
         Returns: True if permissions can be trusted, False otherwise.

@@ -1,5 +1,7 @@
 0.21.4	UNRELEASED
 
+ * Support ``core.symlinks=false``. (Jelmer Vernooĳ, #1169)
+
  * Deprecate ``dulwich.objects.parse_commit``.
 
  * Fix fetching into MemoryRepo. (Jelmer Vernooĳ, #1157)

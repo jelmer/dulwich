@@ -435,12 +435,13 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
         )
 
 
-def init(path=".", bare=False):
+def init(path=".", *, bare=False, symlinks: Optional[bool] = None):
     """Create a new git repository.
 
     Args:
       path: Path to repository.
       bare: Whether to create a bare repository.
+      symlinks: Whether to create actual symlinks (defaults to autodetect)
     Returns: A Repo instance
     """
     if not os.path.exists(path):
@@ -449,7 +450,7 @@ def init(path=".", bare=False):
     if bare:
         return Repo.init_bare(path)
     else:
-        return Repo.init(path)
+        return Repo.init(path, symlinks=symlinks)
 
 
 def clone(

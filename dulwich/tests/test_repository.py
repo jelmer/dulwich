@@ -430,6 +430,43 @@ class RepositoryRootTests(TestCase):
         self.addCleanup(shutil.rmtree, tmp_dir)
         r.clone(tmp_dir, mkdir=False, bare=True)
 
+    def test_reset_index_symlink_enabled(self):
+        if sys.platform == 'win32':
+            self.skipTest("symlinks are not supported on Windows")
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        o = Repo.init(os.path.join(tmp_dir, "s"), mkdir=True)
+        os.symlink("foo", os.path.join(tmp_dir, "s", "bar"))
+        o.stage("bar")
+        o.do_commit(b"add symlink")
+
+        t = o.clone(os.path.join(tmp_dir, "t"), symlinks=True)
+        o.close()
+        bar_path = os.path.join(tmp_dir, 't', 'bar')
+        if sys.platform == 'win32':
+            with open(bar_path, 'r') as f:
+                self.assertEqual('foo', f.read())
+        else:
+            self.assertEqual('foo', os.readlink(bar_path))
+        t.close()
+
+    def test_reset_index_symlink_disabled(self):
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        o = Repo.init(os.path.join(tmp_dir, "s"), mkdir=True)
+        o.close()
+        os.symlink("foo", os.path.join(tmp_dir, "s", "bar"))
+        o.stage("bar")
+        o.do_commit(b"add symlink")
+
+        t = o.clone(os.path.join(tmp_dir, "t"), symlinks=False)
+        with open(os.path.join(tmp_dir, "t", 'bar'), 'r') as f:
+            self.assertEqual('foo', f.read())
+
+        t.close()
+
     def test_clone_bare(self):
         r = self.open_repo("a.git")
         tmp_dir = self.mkdtemp()

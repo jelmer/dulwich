@@ -335,7 +335,7 @@ class BaseRepo:
         """
         raise NotImplementedError(self._determine_symlinks)
 
-    def _init_files(self, *, bare: bool, symlinks: Optional[bool] = None) -> None:
+    def _init_files(self, bare: bool, symlinks: Optional[bool] = None) -> None:
         """Initialize a default set of named files."""
         from .config import ConfigFile
 

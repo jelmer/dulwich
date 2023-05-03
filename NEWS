@@ -13,6 +13,9 @@
    hex shas are passed for objects that live in packs.
    (Jelmer Vernooĳ, #1166)
 
+ * client: Handle absolute path as redirect location in HTTP client.
+   (Antoine Lambert)
+
 0.21.3	2023-02-17
 
  * Add support for ``worktreeconfig`` extension.

@@ -108,7 +108,7 @@ NAK_LINE = b"NAK\n"
 
 
 def agent_string():
-    return ("dulwich/%d.%d.%d" % dulwich.__version__).encode("ascii")
+    return ("dulwich/" + ".".join(map(str, dulwich.__version__))).encode("ascii")
 
 
 def capability_agent():

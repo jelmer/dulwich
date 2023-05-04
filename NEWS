@@ -1,4 +1,4 @@
-0.21.4.1	UNRELEASED
+0.21.4.1	2023-05-04
 
  * Support ``core.symlinks=false``. (Jelmer Vernooĳ, #1169)
 

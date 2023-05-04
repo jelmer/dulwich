@@ -1,5 +1,8 @@
 0.21.5	UNRELEASED
 
+ * Be more tolerant to non-3-length tuple versions.
+   (Jelmer Vernooĳ)
+
 0.21.4.1	2023-05-04
 
  * Support ``core.symlinks=false``. (Jelmer Vernooĳ, #1169)

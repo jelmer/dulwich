@@ -31,6 +31,7 @@ from io import BytesIO
 from typing import (
     Callable,
     Dict,
+    FrozenSet,
     Iterable,
     Iterator,
     List,
@@ -360,7 +361,7 @@ class BaseObjectStore:
 
 class PackBasedObjectStore(BaseObjectStore):
     def __init__(self, pack_compression_level=-1) -> None:
-        self._pack_cache = {}
+        self._pack_cache: Dict[str, Pack] = {}
         self.pack_compression_level = pack_compression_level
 
     def add_pack(
@@ -995,7 +996,7 @@ class MemoryObjectStore(BaseObjectStore):
 
     def __init__(self) -> None:
         super().__init__()
-        self._data = {}
+        self._data: Dict[str, ShaFile] = {}
         self.pack_compression_level = -1
 
     def _to_hexsha(self, sha):
@@ -1269,7 +1270,7 @@ class MissingObjectFinder:
 
         # in fact, what we 'want' is commits, tags, and others
         # we've found missing
-        self.objects_to_send = {
+        self.objects_to_send: Set[Tuple[ObjectID, Optional[bytes], Optional[int], bool]] = {
             (w, None, Commit.type_num, False)
             for w in missing_commits}
         missing_tags = want_tags.difference(have_tags)
@@ -1293,7 +1294,7 @@ class MissingObjectFinder:
     def add_todo(self, entries: Iterable[Tuple[ObjectID, Optional[bytes], Optional[int], bool]]):
         self.objects_to_send.update([e for e in entries if e[0] not in self.sha_done])
 
-    def __next__(self) -> Tuple[bytes, PackHint]:
+    def __next__(self) -> Tuple[bytes, Optional[PackHint]]:
         while True:
             if not self.objects_to_send:
                 self.progress(("counting objects: %d, done.\n" % len(self.sha_done)).encode("ascii"))
@@ -1321,7 +1322,11 @@ class MissingObjectFinder:
         self.sha_done.add(sha)
         if len(self.sha_done) % 1000 == 0:
             self.progress(("counting objects: %d\r" % len(self.sha_done)).encode("ascii"))
-        return (sha, (type_num, name))
+        if type_num is None:
+            pack_hint = None
+        else:
+            pack_hint = (type_num, name)
+        return (sha, pack_hint)
 
     def __iter__(self):
         return self
@@ -1344,7 +1349,7 @@ class ObjectStoreGraphWalker:
         """
         self.heads = set(local_heads)
         self.get_parents = get_parents
-        self.parents = {}
+        self.parents: Dict[ObjectID, Optional[List[ObjectID]]] = {}
         if shallow is None:
             shallow = set()
         self.shallow = shallow
@@ -1610,8 +1615,8 @@ class BucketBasedObjectStore(PackBasedObjectStore):
 def _collect_ancestors(
     store: ObjectContainer,
     heads,
-    common=frozenset(),
-    shallow=frozenset(),
+    common: FrozenSet[ObjectID] = frozenset(),
+    shallow: FrozenSet[ObjectID] = frozenset(),
     get_parents=lambda commit: commit.parents,
 ):
     """Collect all ancestors of heads up to (excluding) those in common.

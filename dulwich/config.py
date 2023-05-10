@@ -40,6 +40,8 @@ from typing import (
     Tuple,
     Union,
     overload,
+    Any,
+    Dict,
 )
 
 from .file import GitFile
@@ -60,8 +62,8 @@ def lower_key(key):
 class CaseInsensitiveOrderedMultiDict(MutableMapping):
 
     def __init__(self) -> None:
-        self._real = []
-        self._keyed = {}
+        self._real: List[Any] = []
+        self._keyed: Dict[Any, Any] = {}
 
     @classmethod
     def make(cls, dict_in=None):

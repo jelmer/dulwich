@@ -227,7 +227,7 @@ class PackHandler(Handler):
 
     def __init__(self, backend, proto, stateless_rpc=False) -> None:
         super().__init__(backend, proto, stateless_rpc)
-        self._client_capabilities = None
+        self._client_capabilities: Optional[Set[bytes]] = None
         # Flags needed for the no-done capability
         self._done_received = False
 
@@ -763,7 +763,7 @@ class SingleAckGraphWalkerImpl:
 
     def __init__(self, walker) -> None:
         self.walker = walker
-        self._common = []
+        self._common: List[bytes] = []
 
     def ack(self, have_ref):
         if not self._common:
@@ -808,7 +808,7 @@ class MultiAckGraphWalkerImpl:
     def __init__(self, walker) -> None:
         self.walker = walker
         self._found_base = False
-        self._common = []
+        self._common: List[bytes] = []
 
     def ack(self, have_ref):
         self._common.append(have_ref)
@@ -866,7 +866,7 @@ class MultiAckDetailedGraphWalkerImpl:
 
     def __init__(self, walker) -> None:
         self.walker = walker
-        self._common = []
+        self._common: List[bytes] = []
 
     def ack(self, have_ref):
         # Should only be called iff have_ref is common

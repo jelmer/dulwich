@@ -23,7 +23,7 @@
 import os
 import warnings
 from contextlib import suppress
-from typing import Dict, Optional
+from typing import Dict, Optional, Set, Any
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists
@@ -442,8 +442,8 @@ class DictRefsContainer(RefsContainer):
     def __init__(self, refs, logger=None) -> None:
         super().__init__(logger=logger)
         self._refs = refs
-        self._peeled = {}
-        self._watchers = set()
+        self._peeled: Dict[bytes, ObjectID] = {}
+        self._watchers: Set[Any] = set()
 
     def allkeys(self):
         return self._refs.keys()

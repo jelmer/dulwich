@@ -1076,7 +1076,7 @@ class Tree(ShaFile):
 
     def __init__(self) -> None:
         super().__init__()
-        self._entries = {}
+        self._entries: Dict[bytes, Tuple[int, bytes]] = {}
 
     @classmethod
     def from_path(cls, filename):
@@ -1381,11 +1381,11 @@ class Commit(ShaFile):
 
     def __init__(self) -> None:
         super().__init__()
-        self._parents = []
+        self._parents: List[bytes] = []
         self._encoding = None
-        self._mergetag = []
+        self._mergetag: List[Tag] = []
         self._gpgsig = None
-        self._extra = []
+        self._extra: List[Tuple[bytes, bytes]] = []
         self._author_timezone_neg_utc = False
         self._commit_timezone_neg_utc = False
 
@@ -1412,6 +1412,7 @@ class Commit(ShaFile):
             if field == _TREE_HEADER:
                 self._tree = value
             elif field == _PARENT_HEADER:
+                assert value is not None
                 self._parents.append(value)
             elif field == _AUTHOR_HEADER:
                 author_info = parse_time_entry(value)
@@ -1420,6 +1421,7 @@ class Commit(ShaFile):
             elif field == _ENCODING_HEADER:
                 self._encoding = value
             elif field == _MERGETAG_HEADER:
+                assert value is not None
                 self._mergetag.append(Tag.from_string(value + b"\n"))
             elif field == _GPGSIG_HEADER:
                 self._gpgsig = value

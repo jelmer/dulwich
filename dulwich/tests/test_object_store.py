@@ -34,12 +34,26 @@ from dulwich.tests import TestCase
 
 from ..errors import NotTreeError
 from ..index import commit_tree
-from ..object_store import (DiskObjectStore, MemoryObjectStore,
-                            ObjectStoreGraphWalker, OverlayObjectStore,
-                            commit_tree_changes, iter_tree_contents, peel_sha,
-                            read_packs_file, tree_lookup_path)
-from ..objects import (S_IFGITLINK, Blob, EmptyFileException,
-                       SubmoduleEncountered, Tree, TreeEntry, sha_to_hex)
+from ..object_store import (
+    DiskObjectStore,
+    MemoryObjectStore,
+    ObjectStoreGraphWalker,
+    OverlayObjectStore,
+    commit_tree_changes,
+    iter_tree_contents,
+    peel_sha,
+    read_packs_file,
+    tree_lookup_path,
+)
+from ..objects import (
+    S_IFGITLINK,
+    Blob,
+    EmptyFileException,
+    SubmoduleEncountered,
+    Tree,
+    TreeEntry,
+    sha_to_hex,
+)
 from ..pack import REF_DELTA, write_pack_objects
 from ..protocol import DEPTH_INFINITE
 from .utils import build_pack, make_object, make_tag
@@ -427,7 +441,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual(oct(mode), packmode)
 
     def test_corrupted_object_raise_exception(self):
-        """Corrupted sha1 disk file should raise specific exception"""
+        """Corrupted sha1 disk file should raise specific exception."""
         self.store.add_object(testobject)
         self.assertEqual(
             (Blob.type_num, b"yummy data"), self.store.get_raw(testobject.id)

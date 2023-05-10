@@ -18,8 +18,7 @@
 # License, Version 2.0.
 #
 
-"""Working with Git submodules.
-"""
+"""Working with Git submodules."""
 
 from typing import Iterator, Tuple
 
@@ -28,7 +27,7 @@ from .objects import S_ISGITLINK
 
 
 def iter_cached_submodules(store, root_tree_id: bytes) -> Iterator[Tuple[str, bytes]]:
-    """iterate over cached submodules.
+    """Iterate over cached submodules.
 
     Args:
       store: Object store to iterate

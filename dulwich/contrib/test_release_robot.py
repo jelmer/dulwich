@@ -40,10 +40,10 @@ def gmtime_to_datetime(gmt):
 
 
 class TagPatternTests(unittest.TestCase):
-    """test tag patterns"""
+    """test tag patterns."""
 
     def test_tag_pattern(self):
-        """test tag patterns"""
+        """Test tag patterns."""
         test_cases = {
             "0.3": "0.3",
             "v0.3": "0.3",
@@ -63,7 +63,7 @@ class TagPatternTests(unittest.TestCase):
 
 
 class GetRecentTagsTest(unittest.TestCase):
-    """test get recent tags"""
+    """test get recent tags."""
 
     # Git repo for dulwich project
     test_repo = os.path.join(BASEDIR, "dulwich_test_repo.zip")
@@ -116,7 +116,7 @@ class GetRecentTagsTest(unittest.TestCase):
         shutil.rmtree(cls.projdir)
 
     def test_get_recent_tags(self):
-        """test get recent tags"""
+        """Test get recent tags."""
         tags = release_robot.get_recent_tags(self.projdir)  # get test tags
         for tag, metadata in tags:
             tag = tag.encode("utf-8")

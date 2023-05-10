@@ -46,8 +46,20 @@ import subprocess
 import sys
 from contextlib import closing
 from io import BufferedReader, BytesIO
-from typing import (IO, TYPE_CHECKING, Any, Callable, Dict, Iterable, Iterator,
-                    List, Optional, Set, Tuple, Union)
+from typing import (
+    IO,
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 from urllib.parse import quote as urlquote
 from urllib.parse import unquote as urlunquote
 from urllib.parse import urljoin, urlparse, urlunparse, urlunsplit
@@ -59,23 +71,50 @@ import dulwich
 
 from .config import Config, apply_instead_of, get_xdg_config_home_path
 from .errors import GitProtocolError, NotGitRepository, SendPackError
-from .pack import (PACK_SPOOL_FILE_MAX_SIZE, PackChunkGenerator,
-                   UnpackedObject, write_pack_from_container)
-from .protocol import (_RBUFSIZE, CAPABILITIES_REF, CAPABILITY_AGENT,
-                       CAPABILITY_DELETE_REFS, CAPABILITY_INCLUDE_TAG,
-                       CAPABILITY_MULTI_ACK, CAPABILITY_MULTI_ACK_DETAILED,
-                       CAPABILITY_OFS_DELTA, CAPABILITY_QUIET,
-                       CAPABILITY_REPORT_STATUS, CAPABILITY_SHALLOW,
-                       CAPABILITY_SIDE_BAND_64K, CAPABILITY_SYMREF,
-                       CAPABILITY_THIN_PACK, COMMAND_DEEPEN, COMMAND_DONE,
-                       COMMAND_HAVE, COMMAND_SHALLOW, COMMAND_UNSHALLOW,
-                       COMMAND_WANT, KNOWN_RECEIVE_CAPABILITIES,
-                       KNOWN_UPLOAD_CAPABILITIES, SIDE_BAND_CHANNEL_DATA,
-                       SIDE_BAND_CHANNEL_FATAL, SIDE_BAND_CHANNEL_PROGRESS,
-                       TCP_GIT_PORT, ZERO_SHA, HangupException, PktLineParser,
-                       Protocol, agent_string, capability_agent,
-                       extract_capabilities, extract_capability_names,
-                       parse_capability, pkt_line)
+from .pack import (
+    PACK_SPOOL_FILE_MAX_SIZE,
+    PackChunkGenerator,
+    UnpackedObject,
+    write_pack_from_container,
+)
+from .protocol import (
+    _RBUFSIZE,
+    CAPABILITIES_REF,
+    CAPABILITY_AGENT,
+    CAPABILITY_DELETE_REFS,
+    CAPABILITY_INCLUDE_TAG,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_OFS_DELTA,
+    CAPABILITY_QUIET,
+    CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SHALLOW,
+    CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_SYMREF,
+    CAPABILITY_THIN_PACK,
+    COMMAND_DEEPEN,
+    COMMAND_DONE,
+    COMMAND_HAVE,
+    COMMAND_SHALLOW,
+    COMMAND_UNSHALLOW,
+    COMMAND_WANT,
+    KNOWN_RECEIVE_CAPABILITIES,
+    KNOWN_UPLOAD_CAPABILITIES,
+    SIDE_BAND_CHANNEL_DATA,
+    SIDE_BAND_CHANNEL_FATAL,
+    SIDE_BAND_CHANNEL_PROGRESS,
+    TCP_GIT_PORT,
+    ZERO_SHA,
+    HangupException,
+    PktLineParser,
+    Protocol,
+    agent_string,
+    capability_agent,
+    extract_capabilities,
+    extract_capability_names,
+    parse_capability,
+    pkt_line,
+)
 from .refs import PEELED_TAG_SUFFIX, _import_remote_refs, read_info_refs
 from .repo import Repo
 
@@ -89,7 +128,7 @@ logger = logging.getLogger(__name__)
 class InvalidWants(Exception):
     """Invalid wants."""
 
-    def __init__(self, wants):
+    def __init__(self, wants) -> None:
         Exception.__init__(
             self, "requested wants not in server provided refs: %r" % wants
         )
@@ -98,7 +137,7 @@ class InvalidWants(Exception):
 class HTTPUnauthorized(Exception):
     """Raised when authentication fails."""
 
-    def __init__(self, www_authenticate, url):
+    def __init__(self, www_authenticate, url) -> None:
         Exception.__init__(self, "No valid credentials provided")
         self.www_authenticate = www_authenticate
         self.url = url
@@ -107,7 +146,7 @@ class HTTPUnauthorized(Exception):
 class HTTPProxyUnauthorized(Exception):
     """Raised when proxy authentication fails."""
 
-    def __init__(self, proxy_authenticate, url):
+    def __init__(self, proxy_authenticate, url) -> None:
         Exception.__init__(self, "No valid proxy credentials provided")
         self.proxy_authenticate = proxy_authenticate
         self.url = url
@@ -148,7 +187,7 @@ RECEIVE_CAPABILITIES = [
 class ReportStatusParser:
     """Handle status as reported by servers with 'report-status' capability."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._done = False
         self._pack_status = None
         self._ref_statuses = []
@@ -241,7 +280,7 @@ class FetchPackResult:
         "viewvalues",
     ]
 
-    def __init__(self, refs, symrefs, agent, new_shallow=None, new_unshallow=None):
+    def __init__(self, refs, symrefs, agent, new_shallow=None, new_unshallow=None) -> None:
         self.refs = refs
         self.symrefs = symrefs
         self.agent = agent
@@ -267,7 +306,7 @@ class FetchPackResult:
             and self.agent == other.agent
         )
 
-    def __contains__(self, name):
+    def __contains__(self, name) -> bool:
         self._warn_deprecated()
         return name in self.refs
 
@@ -275,7 +314,7 @@ class FetchPackResult:
         self._warn_deprecated()
         return self.refs[name]
 
-    def __len__(self):
+    def __len__(self) -> int:
         self._warn_deprecated()
         return len(self.refs)
 
@@ -289,7 +328,7 @@ class FetchPackResult:
             return getattr(self.refs, name)
         return super().__getattribute__(name)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}({!r}, {!r}, {!r})".format(
             self.__class__.__name__,
             self.refs,
@@ -325,7 +364,7 @@ class SendPackResult:
         "viewvalues",
     ]
 
-    def __init__(self, refs, agent=None, ref_status=None):
+    def __init__(self, refs, agent=None, ref_status=None) -> None:
         self.refs = refs
         self.agent = agent
         self.ref_status = ref_status
@@ -345,7 +384,7 @@ class SendPackResult:
             return self.refs == other
         return self.refs == other.refs and self.agent == other.agent
 
-    def __contains__(self, name):
+    def __contains__(self, name) -> bool:
         self._warn_deprecated()
         return name in self.refs
 
@@ -353,7 +392,7 @@ class SendPackResult:
         self._warn_deprecated()
         return self.refs[name]
 
-    def __len__(self):
+    def __len__(self) -> int:
         self._warn_deprecated()
         return len(self.refs)
 
@@ -367,7 +406,7 @@ class SendPackResult:
             return getattr(self.refs, name)
         return super().__getattribute__(name)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}({!r}, {!r})".format(self.__class__.__name__, self.refs, self.agent)
 
 
@@ -387,7 +426,7 @@ def _read_shallow_updates(pkt_seq):
 
 class _v1ReceivePackHeader:
 
-    def __init__(self, capabilities, old_refs, new_refs):
+    def __init__(self, capabilities, old_refs, new_refs) -> None:
         self.want = []
         self.have = []
         self._it = self._handle_receive_pack_head(capabilities, old_refs, new_refs)
@@ -596,7 +635,7 @@ class GitClient:
         report_activity=None,
         quiet=False,
         include_tags=False,
-    ):
+    ) -> None:
         """Create a new GitClient instance.
 
         Args:
@@ -924,8 +963,7 @@ class GitClient:
         subdirs=None,
         prefix=None,
     ):
-        """Retrieve an archive of the specified tree.
-        """
+        """Retrieve an archive of the specified tree."""
         raise NotImplementedError(self.archive)
 
 
@@ -961,7 +999,7 @@ class TraditionalGitClient(GitClient):
 
     DEFAULT_ENCODING = "utf-8"
 
-    def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs):
+    def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs) -> None:
         self._remote_path_encoding = path_encoding
         super().__init__(**kwargs)
 
@@ -1203,7 +1241,7 @@ class TraditionalGitClient(GitClient):
 class TCPGitClient(TraditionalGitClient):
     """A Git Client that works over TCP directly (i.e. git://)."""
 
-    def __init__(self, host, port=None, **kwargs):
+    def __init__(self, host, port=None, **kwargs) -> None:
         if port is None:
             port = TCP_GIT_PORT
         self._host = host
@@ -1269,7 +1307,7 @@ class TCPGitClient(TraditionalGitClient):
 class SubprocessWrapper:
     """A socket-like object that talks to a subprocess via pipes."""
 
-    def __init__(self, proc):
+    def __init__(self, proc) -> None:
         self.proc = proc
         self.read = BufferedReader(proc.stdout).read
         self.write = proc.stdin.write
@@ -1350,7 +1388,7 @@ class LocalGitClient(GitClient):
     """Git Client that just uses a local Repo."""
 
     def __init__(self, thin_packs=True, report_activity=None,
-                 config: Optional[Config] = None):
+                 config: Optional[Config] = None) -> None:
         """Create a new LocalGitClient instance.
 
         Args:
@@ -1503,7 +1541,6 @@ class LocalGitClient(GitClient):
 
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
-
         with self._open_repo(path) as target:
             return target.get_refs()
 
@@ -1548,7 +1585,7 @@ class SSHVendor:
 class StrangeHostname(Exception):
     """Refusing to connect to strange SSH hostname."""
 
-    def __init__(self, hostname):
+    def __init__(self, hostname) -> None:
         super().__init__(hostname)
 
 
@@ -1682,7 +1719,7 @@ class SSHGitClient(TraditionalGitClient):
         key_filename=None,
         ssh_command=None,
         **kwargs
-    ):
+    ) -> None:
         self.host = host
         self.port = port
         self.username = username
@@ -1907,7 +1944,7 @@ class AbstractHttpGitClient(GitClient):
     _http_request method.
     """
 
-    def __init__(self, base_url, dumb=False, **kwargs):
+    def __init__(self, base_url, dumb=False, **kwargs) -> None:
         self._base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         GitClient.__init__(self, **kwargs)
@@ -1927,7 +1964,6 @@ class AbstractHttpGitClient(GitClient):
           method for the response data.
 
         """
-
         raise NotImplementedError(self._http_request)
 
     def _discover_references(self, service, base_url):
@@ -2150,7 +2186,7 @@ class AbstractHttpGitClient(GitClient):
             kwargs["username"] = urlunquote(username)
         return cls(urlunparse(parsedurl), **kwargs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}({!r}, dumb={!r})".format(
             type(self).__name__,
             self._base_url,
@@ -2168,7 +2204,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         username=None,
         password=None,
         **kwargs
-    ):
+    ) -> None:
         self._username = username
         self._password = password
 

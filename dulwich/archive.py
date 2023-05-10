@@ -19,9 +19,7 @@
 # License, Version 2.0.
 #
 
-"""Generates tarballs for Git trees.
-
-"""
+"""Generates tarballs for Git trees."""
 
 import posixpath
 import stat
@@ -43,7 +41,7 @@ class ChunkedBytesIO:
             list_of_bytestrings)
     """
 
-    def __init__(self, contents):
+    def __init__(self, contents) -> None:
         self.contents = contents
         self.pos = (0, 0)
 

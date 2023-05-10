@@ -26,8 +26,12 @@ import heapq
 from itertools import chain
 from typing import Deque, List, Optional, Set, Tuple
 
-from .diff_tree import (RENAME_CHANGE_TYPES, RenameDetector, tree_changes,
-                        tree_changes_for_merge)
+from .diff_tree import (
+    RENAME_CHANGE_TYPES,
+    RenameDetector,
+    tree_changes,
+    tree_changes_for_merge,
+)
 from .errors import MissingCommitError
 from .objects import Commit, ObjectID, Tag
 
@@ -43,7 +47,7 @@ _MAX_EXTRA_COMMITS = 5
 class WalkEntry:
     """Object encapsulating a single result from a walk."""
 
-    def __init__(self, walker, commit):
+    def __init__(self, walker, commit) -> None:
         self.commit = commit
         self._store = walker.store
         self._get_parents = walker.get_parents
@@ -111,7 +115,7 @@ class WalkEntry:
             self._changes[path_prefix] = cached
         return self._changes[path_prefix]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<WalkEntry commit={}, changes={!r}>".format(
             self.commit.id,
             self.changes(),
@@ -121,7 +125,7 @@ class WalkEntry:
 class _CommitTimeQueue:
     """Priority queue of WalkEntry objects by commit time."""
 
-    def __init__(self, walker: "Walker"):
+    def __init__(self, walker: "Walker") -> None:
         self._walker = walker
         self._store = walker.store
         self._get_parents = walker.get_parents
@@ -244,7 +248,7 @@ class Walker:
         until: Optional[int] = None,
         get_parents=lambda commit: commit.parents,
         queue_cls=_CommitTimeQueue,
-    ):
+    ) -> None:
         """Constructor.
 
         Args:

@@ -36,7 +36,7 @@ class Stash:
     Note that this doesn't currently update the working tree.
     """
 
-    def __init__(self, repo, ref=DEFAULT_STASH_REF):
+    def __init__(self, repo, ref=DEFAULT_STASH_REF) -> None:
         self._ref = ref
         self._repo = repo
 
@@ -128,5 +128,5 @@ class Stash:
     def __getitem__(self, index):
         return list(self.stashes())[index]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(list(self.stashes()))

@@ -19,9 +19,7 @@
 #
 
 
-"""Ref handling.
-
-"""
+"""Ref handling."""
 import os
 import warnings
 from contextlib import suppress
@@ -49,7 +47,7 @@ ANNOTATED_TAG_SUFFIX = PEELED_TAG_SUFFIX
 class SymrefLoop(Exception):
     """There is a loop between one or more symrefs."""
 
-    def __init__(self, ref, depth):
+    def __init__(self, ref, depth) -> None:
         self.ref = ref
         self.depth = depth
 
@@ -103,7 +101,7 @@ def check_ref_format(refname: Ref):
 class RefsContainer:
     """A container for refs."""
 
-    def __init__(self, logger=None):
+    def __init__(self, logger=None) -> None:
         self._logger = logger
 
     def _log(
@@ -260,6 +258,7 @@ class RefsContainer:
 
         Args:
           name: The name of the reference.
+
         Raises:
           KeyError: if a refname is not HEAD or is otherwise not valid.
         """
@@ -311,7 +310,7 @@ class RefsContainer:
                 raise SymrefLoop(name, depth)
         return refnames, contents
 
-    def __contains__(self, refname):
+    def __contains__(self, refname) -> bool:
         if self.read_ref(refname):
             return True
         return False
@@ -362,7 +361,7 @@ class RefsContainer:
         """
         raise NotImplementedError(self.add_if_new)
 
-    def __setitem__(self, name, ref):
+    def __setitem__(self, name, ref) -> None:
         """Set a reference name to point to the given SHA1.
 
         This method follows all symbolic references if applicable for the
@@ -402,7 +401,7 @@ class RefsContainer:
         """
         raise NotImplementedError(self.remove_if_equals)
 
-    def __delitem__(self, name):
+    def __delitem__(self, name) -> None:
         """Remove a refname.
 
         This method does not follow symbolic references, even if applicable for
@@ -440,7 +439,7 @@ class DictRefsContainer(RefsContainer):
     threadsafe.
     """
 
-    def __init__(self, refs, logger=None):
+    def __init__(self, refs, logger=None) -> None:
         super().__init__(logger=logger)
         self._refs = refs
         self._peeled = {}
@@ -581,7 +580,7 @@ class DictRefsContainer(RefsContainer):
 class InfoRefsContainer(RefsContainer):
     """Refs container that reads refs from a info/refs file."""
 
-    def __init__(self, f):
+    def __init__(self, f) -> None:
         self._refs = {}
         self._peeled = {}
         for line in f.readlines():
@@ -615,7 +614,7 @@ class InfoRefsContainer(RefsContainer):
 class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 
-    def __init__(self, path, worktree_path=None, logger=None):
+    def __init__(self, path, worktree_path=None, logger=None) -> None:
         super().__init__(logger=logger)
         if getattr(path, "encode", None) is not None:
             path = os.fsencode(path)
@@ -628,7 +627,7 @@ class DiskRefsContainer(RefsContainer):
         self._packed_refs = None
         self._peeled_refs = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, self.path)
 
     def subkeys(self, base):
@@ -775,6 +774,7 @@ class DiskRefsContainer(RefsContainer):
           name: the refname to read, relative to refpath
         Returns: The contents of the ref file, or None if the file does not
             exist.
+
         Raises:
           IOError: if any other error occurs
         """
@@ -1166,7 +1166,7 @@ def is_local_branch(x):
 
 
 def strip_peeled_refs(refs):
-    """Remove all peeled refs"""
+    """Remove all peeled refs."""
     return {
         ref: sha
         for (ref, sha) in refs.items()
@@ -1187,8 +1187,7 @@ def _set_origin_head(refs, origin, origin_head):
 def _set_default_branch(
         refs: RefsContainer, origin: bytes, origin_head: bytes, branch: bytes,
         ref_message: Optional[bytes]) -> bytes:
-    """Set the default branch.
-    """
+    """Set the default branch."""
     origin_base = b"refs/remotes/" + origin + b"/"
     if branch:
         origin_ref = origin_base + branch

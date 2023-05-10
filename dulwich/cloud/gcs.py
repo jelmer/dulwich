@@ -25,20 +25,19 @@ import posixpath
 import tempfile
 
 from ..object_store import BucketBasedObjectStore
-from ..pack import (PACK_SPOOL_FILE_MAX_SIZE, Pack, PackData,
-                    load_pack_index_file)
+from ..pack import PACK_SPOOL_FILE_MAX_SIZE, Pack, PackData, load_pack_index_file
 
 # TODO(jelmer): For performance, read ranges?
 
 
 class GcsObjectStore(BucketBasedObjectStore):
 
-    def __init__(self, bucket, subpath=''):
+    def __init__(self, bucket, subpath='') -> None:
         super().__init__()
         self.bucket = bucket
         self.subpath = subpath
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}({!r}, subpath={!r})".format(
             type(self).__name__, self.bucket, self.subpath)
 

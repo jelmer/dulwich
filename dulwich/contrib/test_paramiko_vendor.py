@@ -35,8 +35,8 @@ else:
     from .paramiko_vendor import ParamikoSSHVendor
 
     class Server(paramiko.ServerInterface):
-        """http://docs.paramiko.org/en/2.4/api/server.html"""
-        def __init__(self, commands, *args, **kwargs):
+        """http://docs.paramiko.org/en/2.4/api/server.html."""
+        def __init__(self, commands, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
             self.commands = commands
 

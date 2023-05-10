@@ -61,7 +61,7 @@ def read_mailmap(f):
 class Mailmap:
     """Class for accessing a mailmap file."""
 
-    def __init__(self, map=None):
+    def __init__(self, map=None) -> None:
         self._table = {}
         if map:
             for (canonical_identity, from_identity) in map:

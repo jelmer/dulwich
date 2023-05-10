@@ -197,7 +197,7 @@ def parse_commit_range(repo: "Repo", committishs: Union[str, bytes]) -> Iterator
 class AmbiguousShortId(Exception):
     """The short id is ambiguous."""
 
-    def __init__(self, prefix, options):
+    def __init__(self, prefix, options) -> None:
         self.prefix = prefix
         self.options = options
 

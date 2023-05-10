@@ -43,10 +43,21 @@ from ..greenthreads import GreenThreadsMissingObjectFinder
 from ..lru_cache import LRUSizeCache
 from ..object_store import INFODIR, PACKDIR, PackBasedObjectStore
 from ..objects import S_ISGITLINK, Blob, Commit, Tag, Tree
-from ..pack import (Pack, PackData, PackIndexer, PackStreamCopier,
-                    _compute_object_size, compute_file_sha, iter_sha1,
-                    load_pack_index_file, read_pack_header, unpack_object,
-                    write_pack_header, write_pack_index_v2, write_pack_object)
+from ..pack import (
+    Pack,
+    PackData,
+    PackIndexer,
+    PackStreamCopier,
+    _compute_object_size,
+    compute_file_sha,
+    iter_sha1,
+    load_pack_index_file,
+    read_pack_header,
+    unpack_object,
+    write_pack_header,
+    write_pack_index_v2,
+    write_pack_object,
+)
 from ..protocol import TCP_GIT_PORT
 from ..refs import InfoRefsContainer, read_info_refs, write_info_refs
 from ..repo import OBJECTDIR, BaseRepo
@@ -104,7 +115,7 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
 
 
 def load_conf(path=None, file=None):
-    """Load configuration in global var CONF
+    """Load configuration in global var CONF.
 
     Args:
       path: The path to the configuration file
@@ -134,7 +145,7 @@ def load_conf(path=None, file=None):
 
 
 def swift_load_pack_index(scon, filename):
-    """Read a pack index file from Swift
+    """Read a pack index file from Swift.
 
     Args:
       scon: a `SwiftConnector` instance
@@ -187,10 +198,10 @@ class SwiftException(Exception):
 
 
 class SwiftConnector:
-    """A Connector to swift that manage authentication and errors catching"""
+    """A Connector to swift that manage authentication and errors catching."""
 
-    def __init__(self, root, conf):
-        """Initialize a SwiftConnector
+    def __init__(self, root, conf) -> None:
+        """Initialize a SwiftConnector.
 
         Args:
           root: The swift container that will act as Git bare repository
@@ -301,7 +312,7 @@ class SwiftConnector:
         return endpoint[self.endpoint_type], token
 
     def test_root_exists(self):
-        """Check that Swift container exist
+        """Check that Swift container exist.
 
         Returns: True if exist or None it not
         """
@@ -315,7 +326,7 @@ class SwiftConnector:
         return True
 
     def create_root(self):
-        """Create the Swift container
+        """Create the Swift container.
 
         Raises:
           SwiftException: if unable to create
@@ -328,7 +339,7 @@ class SwiftConnector:
                 )
 
     def get_container_objects(self):
-        """Retrieve objects list in a container
+        """Retrieve objects list in a container.
 
         Returns: A list of dict that describe objects
                  or None if container does not exist
@@ -346,7 +357,7 @@ class SwiftConnector:
         return json.loads(content)
 
     def get_object_stat(self, name):
-        """Retrieve object stat
+        """Retrieve object stat.
 
         Args:
           name: The object name
@@ -367,7 +378,7 @@ class SwiftConnector:
         return resp_headers
 
     def put_object(self, name, content):
-        """Put an object
+        """Put an object.
 
         Args:
           name: The object name
@@ -397,7 +408,7 @@ class SwiftConnector:
             )
 
     def get_object(self, name, range=None):
-        """Retrieve an object
+        """Retrieve an object.
 
         Args:
           name: The object name
@@ -424,7 +435,7 @@ class SwiftConnector:
         return BytesIO(content)
 
     def del_object(self, name):
-        """Delete an object
+        """Delete an object.
 
         Args:
           name: The object name
@@ -439,7 +450,7 @@ class SwiftConnector:
             )
 
     def del_root(self):
-        """Delete the root container by removing container content
+        """Delete the root container by removing container content.
 
         Raises:
           SwiftException: if unable to delete
@@ -454,7 +465,7 @@ class SwiftConnector:
 
 
 class SwiftPackReader:
-    """A SwiftPackReader that mimic read and sync method
+    """A SwiftPackReader that mimic read and sync method.
 
     The reader allows to read a specified amount of bytes from
     a given offset of a Swift object. A read offset is kept internally.
@@ -463,8 +474,8 @@ class SwiftPackReader:
     to read from Swift.
     """
 
-    def __init__(self, scon, filename, pack_length):
-        """Initialize a SwiftPackReader
+    def __init__(self, scon, filename, pack_length) -> None:
+        """Initialize a SwiftPackReader.
 
         Args:
           scon: a `SwiftConnector` instance
@@ -488,7 +499,7 @@ class SwiftPackReader:
         self.buff = ret
 
     def read(self, length):
-        """Read a specified amount of Bytes form the pack object
+        """Read a specified amount of Bytes form the pack object.
 
         Args:
           length: amount of bytes to read
@@ -509,7 +520,7 @@ class SwiftPackReader:
         return data
 
     def seek(self, offset):
-        """Seek to a specified offset
+        """Seek to a specified offset.
 
         Args:
           offset: the offset to seek to
@@ -519,7 +530,7 @@ class SwiftPackReader:
         self.offset = 0
 
     def read_checksum(self):
-        """Read the checksum from the pack
+        """Read the checksum from the pack.
 
         Returns: the checksum bytestring
         """
@@ -533,8 +544,8 @@ class SwiftPackData(PackData):
     using the Range header feature of Swift.
     """
 
-    def __init__(self, scon, filename):
-        """Initialize a SwiftPackReader
+    def __init__(self, scon, filename) -> None:
+        """Initialize a SwiftPackReader.
 
         Args:
           scon: a `SwiftConnector` instance
@@ -578,7 +589,7 @@ class SwiftPack(Pack):
     PackData.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.scon = kwargs["scon"]
         del kwargs["scon"]
         super().__init__(*args, **kwargs)
@@ -597,13 +608,13 @@ class SwiftPack(Pack):
 
 
 class SwiftObjectStore(PackBasedObjectStore):
-    """A Swift Object Store
+    """A Swift Object Store.
 
     Allow to manage a bare Git repository from Openstack Swift.
     This object store only supports pack files and not loose objects.
     """
 
-    def __init__(self, scon):
+    def __init__(self, scon) -> None:
         """Open a Swift object store.
 
         Args:
@@ -630,7 +641,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         return ret
 
     def _iter_loose_objects(self):
-        """Loose objects are not supported by this repository"""
+        """Loose objects are not supported by this repository."""
         return []
 
     def pack_info_get(self, sha):
@@ -712,7 +723,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         return None
 
     def add_thin_pack(self, read_all, read_some):
-        """Read a thin pack
+        """Read a thin pack.
 
         Read it from a stream and complete it in a temporary file.
         Then the pack and the corresponding index file are uploaded to Swift.
@@ -792,7 +803,7 @@ class SwiftObjectStore(PackBasedObjectStore):
 class SwiftInfoRefsContainer(InfoRefsContainer):
     """Manage references in info/refs object."""
 
-    def __init__(self, scon, store):
+    def __init__(self, scon, store) -> None:
         self.scon = scon
         self.filename = "info/refs"
         self.store = store
@@ -850,7 +861,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
 
 class SwiftRepo(BaseRepo):
-    def __init__(self, root, conf):
+    def __init__(self, root, conf) -> None:
         """Init a Git bare Repository on top of a Swift container.
 
         References are managed in info/refs objects by
@@ -884,7 +895,7 @@ class SwiftRepo(BaseRepo):
         return False
 
     def _put_named_file(self, filename, contents):
-        """Put an object in a Swift container
+        """Put an object in a Swift container.
 
         Args:
           filename: the path to the object to put on Swift
@@ -916,7 +927,7 @@ class SwiftRepo(BaseRepo):
 
 
 class SwiftSystemBackend(Backend):
-    def __init__(self, logger, conf):
+    def __init__(self, logger, conf) -> None:
         self.conf = conf
         self.logger = logger
 

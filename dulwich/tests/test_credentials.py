@@ -24,8 +24,7 @@ from urllib.parse import urlparse
 from dulwich.tests import TestCase
 
 from ..config import ConfigDict
-from ..credentials import (match_partial_url, match_urls,
-                           urlmatch_credential_sections)
+from ..credentials import match_partial_url, match_urls, urlmatch_credential_sections
 
 
 class TestCredentialHelpersUtils(TestCase):

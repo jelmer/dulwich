@@ -28,15 +28,23 @@ import time
 from io import BytesIO
 from typing import List, Optional, Tuple
 from urllib.parse import parse_qs
-from wsgiref.simple_server import (ServerHandler, WSGIRequestHandler,
-                                   WSGIServer, make_server)
+from wsgiref.simple_server import (
+    ServerHandler,
+    WSGIRequestHandler,
+    WSGIServer,
+    make_server,
+)
 
 from dulwich import log_utils
 
 from .protocol import ReceivableProtocol
 from .repo import BaseRepo, NotGitRepository, Repo
-from .server import (DEFAULT_HANDLERS, DictBackend, generate_info_refs,
-                     generate_objects_info_packs)
+from .server import (
+    DEFAULT_HANDLERS,
+    DictBackend,
+    generate_info_refs,
+    generate_objects_info_packs,
+)
 
 logger = log_utils.getLogger(__name__)
 
@@ -248,7 +256,7 @@ def _chunk_iter(f):
 
 class ChunkReader:
 
-    def __init__(self, f):
+    def __init__(self, f) -> None:
         self._iter = _chunk_iter(f)
         self._buffer = []
 
@@ -272,7 +280,7 @@ class _LengthLimitedFile:
     but not implemented in wsgiref as of 2.5.
     """
 
-    def __init__(self, input, max_bytes):
+    def __init__(self, input, max_bytes) -> None:
         self._input = input
         self._bytes_avail = max_bytes
 
@@ -319,7 +327,7 @@ class HTTPGitRequest:
       environ: the WSGI environment for the request.
     """
 
-    def __init__(self, environ, start_response, dumb: bool = False, handlers=None):
+    def __init__(self, environ, start_response, dumb: bool = False, handlers=None) -> None:
         self.environ = environ
         self.dumb = dumb
         self.handlers = handlers
@@ -405,7 +413,7 @@ class HTTPGitApplication:
         ("POST", re.compile("/git-receive-pack$")): handle_service_request,
     }
 
-    def __init__(self, backend, dumb: bool = False, handlers=None, fallback_app=None):
+    def __init__(self, backend, dumb: bool = False, handlers=None, fallback_app=None) -> None:
         self.backend = backend
         self.dumb = dumb
         self.handlers = dict(DEFAULT_HANDLERS)
@@ -443,7 +451,7 @@ class GunzipFilter:
     passing on to the underlying application.
     """
 
-    def __init__(self, application):
+    def __init__(self, application) -> None:
         self.app = application
 
     def __call__(self, environ, start_response):
@@ -464,7 +472,7 @@ class LimitedInputFilter:
     specified in Content-Length.
     """
 
-    def __init__(self, application):
+    def __init__(self, application) -> None:
         self.app = application
 
     def __call__(self, environ, start_response):
@@ -521,8 +529,7 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
         logger.error(*args)
 
     def handle(self):
-        """Handle a single HTTP request"""
-
+        """Handle a single HTTP request."""
         self.raw_requestline = self.rfile.readline()
         if not self.parse_request():  # An error code has been sent, just exit
             return
@@ -536,7 +543,7 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
 
 class WSGIServerLogger(WSGIServer):
     def handle_error(self, request, client_address):
-        """Handle an error. """
+        """Handle an error."""
         logger.exception(
             "Exception happened during processing of request from %s"
             % str(client_address)

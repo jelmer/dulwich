@@ -28,18 +28,32 @@ from io import BytesIO
 
 from dulwich.tests import TestCase
 
-from ..errors import (GitProtocolError, HangupException, NotGitRepository,
-                      UnexpectedCommandError)
+from ..errors import (
+    GitProtocolError,
+    HangupException,
+    NotGitRepository,
+    UnexpectedCommandError,
+)
 from ..object_store import MemoryObjectStore
 from ..objects import Tree
 from ..protocol import ZERO_SHA, format_capability_line
 from ..repo import MemoryRepo, Repo
-from ..server import (Backend, DictBackend, FileSystemBackend,
-                      MultiAckDetailedGraphWalkerImpl, MultiAckGraphWalkerImpl,
-                      PackHandler, ReceivePackHandler,
-                      SingleAckGraphWalkerImpl, UploadPackHandler,
-                      _find_shallow, _ProtocolGraphWalker, _split_proto_line,
-                      serve_command, update_server_info)
+from ..server import (
+    Backend,
+    DictBackend,
+    FileSystemBackend,
+    MultiAckDetailedGraphWalkerImpl,
+    MultiAckGraphWalkerImpl,
+    PackHandler,
+    ReceivePackHandler,
+    SingleAckGraphWalkerImpl,
+    UploadPackHandler,
+    _find_shallow,
+    _ProtocolGraphWalker,
+    _split_proto_line,
+    serve_command,
+    update_server_info,
+)
 from .utils import make_commit, make_tag
 
 ONE = b"1" * 40
@@ -51,7 +65,7 @@ SIX = b"6" * 40
 
 
 class TestProto:
-    def __init__(self):
+    def __init__(self) -> None:
         self._output = []
         self._received = {0: [], 1: [], 2: [], 3: []}
 
@@ -81,7 +95,7 @@ class TestProto:
 
 
 class TestGenericPackHandler(PackHandler):
-    def __init__(self):
+    def __init__(self) -> None:
         PackHandler.__init__(self, Backend(), None)
 
     @classmethod
@@ -573,7 +587,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
 
 class TestProtocolGraphWalker:
-    def __init__(self):
+    def __init__(self) -> None:
         self.acks = []
         self.lines = []
         self.wants_satisified = False

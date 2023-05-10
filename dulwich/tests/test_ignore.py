@@ -28,8 +28,15 @@ from io import BytesIO
 
 from dulwich.tests import TestCase
 
-from ..ignore import (IgnoreFilter, IgnoreFilterManager, IgnoreFilterStack,
-                      Pattern, match_pattern, read_ignore_patterns, translate)
+from ..ignore import (
+    IgnoreFilter,
+    IgnoreFilterManager,
+    IgnoreFilterStack,
+    Pattern,
+    match_pattern,
+    read_ignore_patterns,
+    translate,
+)
 from ..repo import Repo
 
 POSITIVE_MATCH_TESTS = [

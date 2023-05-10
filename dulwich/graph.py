@@ -18,9 +18,7 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 
-"""
-Implementation of merge-base following the approach of git
-"""
+"""Implementation of merge-base following the approach of git."""
 
 from collections import deque
 from typing import Deque
@@ -83,7 +81,7 @@ def _find_lcas(lookup_parents, c1, c2s):
 
 
 def find_merge_base(repo, commit_ids):
-    """Find lowest common ancestors of commit_ids[0] and *any* of commits_ids[1:]
+    """Find lowest common ancestors of commit_ids[0] and *any* of commits_ids[1:].
 
     Args:
       repo: Repository object
@@ -104,7 +102,7 @@ def find_merge_base(repo, commit_ids):
 
 
 def find_octopus_base(repo, commit_ids):
-    """Find lowest common ancestors of *all* provided commit_ids
+    """Find lowest common ancestors of *all* provided commit_ids.
 
     Args:
       repo: Repository
@@ -112,7 +110,6 @@ def find_octopus_base(repo, commit_ids):
     Returns:
       list of lowest common ancestor commit_ids
     """
-
     if not commit_ids:
         return []
     if len(commit_ids) <= 2:

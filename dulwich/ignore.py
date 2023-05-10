@@ -25,8 +25,7 @@ For details for the matching rules, see https://git-scm.com/docs/gitignore
 import os.path
 import re
 from contextlib import suppress
-from typing import (TYPE_CHECKING, BinaryIO, Dict, Iterable, List, Optional,
-                    Union)
+from typing import TYPE_CHECKING, BinaryIO, Dict, Iterable, List, Optional, Union
 
 if TYPE_CHECKING:
     from .repo import Repo
@@ -80,7 +79,6 @@ def translate(pat: bytes) -> bytes:
     Originally copied from fnmatch in Python 2.7, but modified for Dulwich
     to cope with features in Git ignore patterns.
     """
-
     res = b"(?ms)"
 
     if b"/" not in pat[:-1]:
@@ -115,7 +113,6 @@ def read_ignore_patterns(f: BinaryIO) -> Iterable[bytes]:
       f: File-like object to read from
     Returns: List of patterns
     """
-
     for line in f:
         line = line.rstrip(b"\r\n")
 
@@ -151,7 +148,7 @@ def match_pattern(path: bytes, pattern: bytes, ignorecase: bool = False) -> bool
 class Pattern:
     """A single ignore pattern."""
 
-    def __init__(self, pattern: bytes, ignorecase: bool = False):
+    def __init__(self, pattern: bytes, ignorecase: bool = False) -> None:
         self.pattern = pattern
         self.ignorecase = ignorecase
         if pattern[0:1] == b"!":
@@ -197,7 +194,7 @@ class Pattern:
 
 
 class IgnoreFilter:
-    def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False, path=None):
+    def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False, path=None) -> None:
         self._patterns: List[Pattern] = []
         self._ignorecase = ignorecase
         self._path = path
@@ -251,7 +248,7 @@ class IgnoreFilter:
 class IgnoreFilterStack:
     """Check for ignore status in multiple filters."""
 
-    def __init__(self, filters):
+    def __init__(self, filters) -> None:
         self._filters = filters
 
     def is_ignored(self, path: str) -> Optional[bool]:
@@ -297,7 +294,7 @@ class IgnoreFilterManager:
         top_path: str,
         global_filters: List[IgnoreFilter],
         ignorecase: bool,
-    ):
+    ) -> None:
         self._path_filters: Dict[str, Optional[IgnoreFilter]] = {}
         self._top_path = top_path
         self._global_filters = global_filters

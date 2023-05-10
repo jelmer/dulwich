@@ -37,7 +37,7 @@ from .utils import require_git_version, run_git_or_fail
 class _StubRepo:
     """A stub repo that just contains a path to tear down."""
 
-    def __init__(self, name):
+    def __init__(self, name) -> None:
         temp_dir = tempfile.mkdtemp()
         self.path = os.path.join(temp_dir, name)
         os.mkdir(self.path)

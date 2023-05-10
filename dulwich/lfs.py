@@ -26,7 +26,7 @@ import tempfile
 class LFSStore:
     """Stores objects on disk, indexed by SHA256."""
 
-    def __init__(self, path):
+    def __init__(self, path) -> None:
         self.path = path
 
     @classmethod

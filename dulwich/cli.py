@@ -21,7 +21,7 @@
 # License, Version 2.0.
 #
 
-"""Simple command-line interface to Dulwich>
+"""Simple command-line interface to Dulwich>.
 
 This is a very simple command-line wrapper for Dulwich. It is by
 no means intended to be a full-blown Git command-line interface but just

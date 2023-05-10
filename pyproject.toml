@@ -66,3 +66,18 @@ license-files = ["COPYING"]
 
 [tool.setuptools.dynamic]
 version = {attr = "dulwich.__version__"}
+
+[tool.ruff]
+select = [
+    "ANN",
+    "D",
+    "E",
+    "F",
+    "I"
+]
+ignore = [
+    "ANN101",  # missing-type-self
+]
+
+[tool.ruff.pydocstyle]
+convention = "google"

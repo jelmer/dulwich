@@ -23,14 +23,18 @@
 
 from dulwich.tests import TestCase
 
-from ..line_ending import (convert_crlf_to_lf, convert_lf_to_crlf,
-                           get_checkin_filter_autocrlf,
-                           get_checkout_filter_autocrlf, normalize_blob)
+from ..line_ending import (
+    convert_crlf_to_lf,
+    convert_lf_to_crlf,
+    get_checkin_filter_autocrlf,
+    get_checkout_filter_autocrlf,
+    normalize_blob,
+)
 from ..objects import Blob
 
 
 class LineEndingConversion(TestCase):
-    """Test the line ending conversion functions in various cases"""
+    """Test the line ending conversion functions in various cases."""
 
     def test_convert_crlf_to_lf_no_op(self):
         self.assertEqual(convert_crlf_to_lf(b"foobar"), b"foobar")

@@ -34,11 +34,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
 # If Python itself provides an exception, use that
 import unittest
-from unittest import SkipTest
+from unittest import SkipTest, expectedFailure, skipIf
 from unittest import TestCase as _TestCase  # noqa: F401
-from unittest import expectedFailure, skipIf
 
 
 class TestCase(_TestCase):

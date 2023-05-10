@@ -18,8 +18,7 @@
 # License, Version 2.0.
 #
 
-"""Utilities for reading and generating reflogs.
-"""
+"""Utilities for reading and generating reflogs."""
 
 import collections
 

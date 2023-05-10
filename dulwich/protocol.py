@@ -178,7 +178,7 @@ class Protocol:
         Documentation/technical/protocol-common.txt
     """
 
-    def __init__(self, read, write, close=None, report_activity=None):
+    def __init__(self, read, write, close=None, report_activity=None) -> None:
         self.read = read
         self.write = write
         self._close = close
@@ -256,6 +256,7 @@ class Protocol:
 
         Args:
           data: The data to unread, without the length prefix.
+
         Raises:
           ValueError: If more than one pkt-line is unread.
         """
@@ -315,7 +316,7 @@ class Protocol:
         self.write_pkt_line(format_cmd_pkt(cmd, *args))
 
     def read_cmd(self):
-        """Read a command and some arguments from the git client
+        """Read a command and some arguments from the git client.
 
         Only used for the TCP git protocol (git://).
 
@@ -342,7 +343,7 @@ class ReceivableProtocol(Protocol):
 
     def __init__(
         self, recv, write, close=None, report_activity=None, rbufsize=_RBUFSIZE
-    ):
+    ) -> None:
         super().__init__(
             self.read, write, close=close, report_activity=report_activity
         )
@@ -483,7 +484,7 @@ class BufferedPktLineWriter:
     (including length prefix) reach the buffer size.
     """
 
-    def __init__(self, write, bufsize=65515):
+    def __init__(self, write, bufsize=65515) -> None:
         """Initialize the BufferedPktLineWriter.
 
         Args:
@@ -522,7 +523,7 @@ class BufferedPktLineWriter:
 class PktLineParser:
     """Packet line parser that hands completed packets off to a callback."""
 
-    def __init__(self, handle_pkt):
+    def __init__(self, handle_pkt) -> None:
         self.handle_pkt = handle_pkt
         self._readahead = BytesIO()
 

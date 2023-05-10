@@ -592,7 +592,7 @@ class TimezoneTests(PorcelainTestCase):
 
 class CleanTests(PorcelainTestCase):
     def put_files(self, tracked, ignored, untracked, empty_dirs):
-        """Put the described files in the wd"""
+        """Put the described files in the wd."""
         all_files = tracked | ignored | untracked
         for file_path in all_files:
             abs_path = os.path.join(self.repo.path, file_path)
@@ -617,7 +617,7 @@ class CleanTests(PorcelainTestCase):
         porcelain.commit(repo=self.repo.path, message="init commit")
 
     def assert_wd(self, expected_paths):
-        """Assert paths of files and dirs in wd are same as expected_paths"""
+        """Assert paths of files and dirs in wd are same as expected_paths."""
         control_dir_rel = os.path.relpath(self.repo._controldir, self.repo.path)
 
         # normalize paths to simplify comparison across platforms
@@ -1981,8 +1981,7 @@ class SubmoduleTests(PorcelainTestCase):
 
 class PushTests(PorcelainTestCase):
     def test_simple(self):
-        """
-        Basic test of porcelain push where self.repo is the remote.  First
+        """Basic test of porcelain push where self.repo is the remote.  First
         clone the remote, commit a file to the clone, then push the changes
         back to the remote.
         """
@@ -2392,7 +2391,6 @@ class StatusTests(PorcelainTestCase):
 
     def test_status_base(self):
         """Integration test for `status` functionality."""
-
         # Commit a dummy file then modify it
         fullpath = os.path.join(self.repo.path, "foo")
         with open(fullpath, "w") as f:
@@ -2561,7 +2559,6 @@ class StatusTests(PorcelainTestCase):
 
     def test_get_tree_changes_add(self):
         """Unit test for get_tree_changes add."""
-
         # Make a dummy file, stage
         filename = "bar"
         fullpath = os.path.join(self.repo.path, filename)
@@ -2589,7 +2586,6 @@ class StatusTests(PorcelainTestCase):
 
     def test_get_tree_changes_modify(self):
         """Unit test for get_tree_changes modify."""
-
         # Make a dummy file, stage, commit, modify
         filename = "foo"
         fullpath = os.path.join(self.repo.path, filename)
@@ -2614,7 +2610,6 @@ class StatusTests(PorcelainTestCase):
 
     def test_get_tree_changes_delete(self):
         """Unit test for get_tree_changes delete."""
-
         # Make a dummy file, stage, commit, remove
         filename = "foo"
         fullpath = os.path.join(self.repo.path, filename)

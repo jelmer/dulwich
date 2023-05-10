@@ -33,8 +33,12 @@ from wsgiref import simple_server
 from dulwich.tests import SkipTest, skipIf
 
 from ...server import DictBackend, ReceivePackHandler, UploadPackHandler
-from ...web import (HTTPGitApplication, WSGIRequestHandlerLogger,
-                    WSGIServerLogger, make_wsgi_chain)
+from ...web import (
+    HTTPGitApplication,
+    WSGIRequestHandlerLogger,
+    WSGIServerLogger,
+    make_wsgi_chain,
+)
 from .server_utils import NoSideBand64kReceivePackHandler, ServerTests
 from .utils import CompatTestCase
 

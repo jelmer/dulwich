@@ -25,21 +25,36 @@ import shutil
 import sys
 import tempfile
 from io import BytesIO
+from typing import Dict, List
 
 from dulwich.tests import TestCase
 
-from ..errors import (GitProtocolError, HangupException, NotGitRepository,
-                      UnexpectedCommandError)
+from ..errors import (
+    GitProtocolError,
+    HangupException,
+    NotGitRepository,
+    UnexpectedCommandError,
+)
 from ..object_store import MemoryObjectStore
 from ..objects import Tree
 from ..protocol import ZERO_SHA, format_capability_line
 from ..repo import MemoryRepo, Repo
-from ..server import (Backend, DictBackend, FileSystemBackend,
-                      MultiAckDetailedGraphWalkerImpl, MultiAckGraphWalkerImpl,
-                      PackHandler, ReceivePackHandler,
-                      SingleAckGraphWalkerImpl, UploadPackHandler,
-                      _find_shallow, _ProtocolGraphWalker, _split_proto_line,
-                      serve_command, update_server_info)
+from ..server import (
+    Backend,
+    DictBackend,
+    FileSystemBackend,
+    MultiAckDetailedGraphWalkerImpl,
+    MultiAckGraphWalkerImpl,
+    PackHandler,
+    ReceivePackHandler,
+    SingleAckGraphWalkerImpl,
+    UploadPackHandler,
+    _find_shallow,
+    _ProtocolGraphWalker,
+    _split_proto_line,
+    serve_command,
+    update_server_info,
+)
 from .utils import make_commit, make_tag
 
 ONE = b"1" * 40
@@ -51,9 +66,9 @@ SIX = b"6" * 40
 
 
 class TestProto:
-    def __init__(self):
-        self._output = []
-        self._received = {0: [], 1: [], 2: [], 3: []}
+    def __init__(self) -> None:
+        self._output: List[bytes] = []
+        self._received: Dict[int, List[bytes]] = {0: [], 1: [], 2: [], 3: []}
 
     def set_output(self, output_lines):
         self._output = output_lines
@@ -81,7 +96,7 @@ class TestProto:
 
 
 class TestGenericPackHandler(PackHandler):
-    def __init__(self):
+    def __init__(self) -> None:
         PackHandler.__init__(self, Backend(), None)
 
     @classmethod
@@ -573,9 +588,9 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
 
 class TestProtocolGraphWalker:
-    def __init__(self):
-        self.acks = []
-        self.lines = []
+    def __init__(self) -> None:
+        self.acks: List[bytes] = []
+        self.lines: List[bytes] = []
         self.wants_satisified = False
         self.stateless_rpc = None
         self.advertise_refs = False

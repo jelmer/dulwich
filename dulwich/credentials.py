@@ -19,7 +19,7 @@
 # License, Version 2.0.
 #
 
-"""Support for git credential helpers
+"""Support for git credential helpers.
 
 https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
 
@@ -43,7 +43,7 @@ def match_urls(url: ParseResult, url_prefix: ParseResult) -> bool:
 
 
 def match_partial_url(valid_url: ParseResult, partial_url: str) -> bool:
-    """matches a parsed url with a partial url (no scheme/netloc)"""
+    """Matches a parsed url with a partial url (no scheme/netloc)."""
     if "://" not in partial_url:
         parsed = urlparse("scheme://" + partial_url)
     else:
@@ -67,7 +67,7 @@ def match_partial_url(valid_url: ParseResult, partial_url: str) -> bool:
 def urlmatch_credential_sections(
     config: ConfigDict, url: Optional[str]
 ) -> Iterator[SectionLike]:
-    """Returns credential sections from the config which match the given URL"""
+    """Returns credential sections from the config which match the given URL."""
     encoding = config.encoding or sys.getdefaultencoding()
     parsed_url = urlparse(url or "")
     for config_section in config.sections():

@@ -33,9 +33,16 @@ from dulwich.tests import SkipTest, skipIf  # noqa: F401
 
 from ..index import commit_tree
 from ..objects import Commit, FixedSha, Tag, object_class
-from ..pack import (DELTA_TYPES, OFS_DELTA, REF_DELTA, SHA1Writer,
-                    create_delta, obj_sha, write_pack_header,
-                    write_pack_object)
+from ..pack import (
+    DELTA_TYPES,
+    OFS_DELTA,
+    REF_DELTA,
+    SHA1Writer,
+    create_delta,
+    obj_sha,
+    write_pack_header,
+    write_pack_object,
+)
 from ..repo import Repo
 
 # Plain files are very frequently used in tests, so let the mode be very short.
@@ -295,6 +302,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
       attrs: A dict of commit number -> (dict of attribute -> value) for
         assigning additional values to the commits.
     Returns: The list of commit objects created.
+
     Raises:
       ValueError: If an undefined commit identifier is listed as a parent.
     """
@@ -345,7 +353,6 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
 
 def setup_warning_catcher():
     """Wrap warnings.showwarning with code that records warnings."""
-
     caught_warnings = []
     original_showwarning = warnings.showwarning
 

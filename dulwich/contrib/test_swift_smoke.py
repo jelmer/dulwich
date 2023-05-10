@@ -20,7 +20,7 @@
 # License, Version 2.0.
 #
 
-"""Start functional tests
+"""Start functional tests.
 
 A Swift installation must be available before
 starting those tests. The account and authentication method used
@@ -48,9 +48,9 @@ from dulwich.contrib import swift  # noqa:E402
 
 
 class DulwichServer:
-    """Start the TCPGitServer with Swift backend"""
+    """Start the TCPGitServer with Swift backend."""
 
-    def __init__(self, backend, port):
+    def __init__(self, backend, port) -> None:
         self.port = port
         self.backend = backend
 

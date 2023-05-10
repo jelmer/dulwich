@@ -21,8 +21,7 @@
 
 """A simple least-recently-used (LRU) cache."""
 
-from typing import (Callable, Dict, Generic, Iterable, Iterator, Optional,
-                    TypeVar)
+from typing import Callable, Dict, Generic, Iterable, Iterator, Optional, TypeVar
 
 _null_key = object()
 
@@ -40,7 +39,7 @@ class _LRUNode(Generic[K, V]):
     next_key: K
     size: Optional[int]
 
-    def __init__(self, key: K, value: V, cleanup=None):
+    def __init__(self, key: K, value: V, cleanup=None) -> None:
         self.prev = None
         self.next_key = _null_key  # type: ignore
         self.key = key
@@ -51,7 +50,7 @@ class _LRUNode(Generic[K, V]):
         #       actually costs us much of anything in normal usage
         self.size = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.prev is None:
             prev_key = None
         else:

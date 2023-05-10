@@ -28,10 +28,18 @@ from unittest.mock import patch
 
 from dulwich.tests import TestCase
 
-from ..config import (ConfigDict, ConfigFile, StackedConfig,
-                      _check_section_name, _check_variable_name, _escape_value,
-                      _format_string, _parse_string, apply_instead_of,
-                      parse_submodules)
+from ..config import (
+    ConfigDict,
+    ConfigFile,
+    StackedConfig,
+    _check_section_name,
+    _check_variable_name,
+    _escape_value,
+    _format_string,
+    _parse_string,
+    apply_instead_of,
+    parse_submodules,
+)
 
 
 class ConfigFileTests(TestCase):

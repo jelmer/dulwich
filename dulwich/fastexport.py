@@ -22,10 +22,10 @@
 """Fast export/import functionality."""
 
 import stat
+from typing import Dict, Tuple
 
-from fastimport import commands
+from fastimport import commands, parser, processor
 from fastimport import errors as fastimport_errors
-from fastimport import parser, processor
 
 from .index import commit_tree
 from .object_store import iter_tree_contents
@@ -40,10 +40,10 @@ def split_email(text):
 class GitFastExporter:
     """Generate a fast-export output stream for Git objects."""
 
-    def __init__(self, outf, store):
+    def __init__(self, outf, store) -> None:
         self.outf = outf
         self.store = store
-        self.markers = {}
+        self.markers: Dict[bytes, bytes] = {}
         self._marker_idx = 0
 
     def print_cmd(self, cmd):
@@ -122,12 +122,12 @@ class GitImportProcessor(processor.ImportProcessor):
 
     # FIXME: Batch creation of objects?
 
-    def __init__(self, repo, params=None, verbose=False, outf=None):
+    def __init__(self, repo, params=None, verbose=False, outf=None) -> None:
         processor.ImportProcessor.__init__(self, params, verbose)
         self.repo = repo
         self.last_commit = ZERO_SHA
-        self.markers = {}
-        self._contents = {}
+        self.markers: Dict[bytes, bytes] = {}
+        self._contents: Dict[bytes, Tuple[int, bytes]] = {}
 
     def lookup_object(self, objectish):
         if objectish.startswith(b":"):

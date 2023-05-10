@@ -30,14 +30,29 @@ import zlib
 from collections import namedtuple
 from hashlib import sha1
 from io import BytesIO
-from typing import (BinaryIO, Dict, Iterable, Iterator, List, Optional, Tuple,
-                    Type, Union)
+from typing import (
+    BinaryIO,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 from _hashlib import HASH
 
-from .errors import (ChecksumMismatch, FileFormatException, NotBlobError,
-                     NotCommitError, NotTagError, NotTreeError,
-                     ObjectFormatException)
+from .errors import (
+    ChecksumMismatch,
+    FileFormatException,
+    NotBlobError,
+    NotCommitError,
+    NotTagError,
+    NotTreeError,
+    ObjectFormatException,
+)
 from .file import GitFile
 
 ZERO_SHA = b"0" * 40
@@ -91,14 +106,14 @@ def _decompress(string):
 
 
 def sha_to_hex(sha):
-    """Takes a string and returns the hex of the sha within"""
+    """Takes a string and returns the hex of the sha within."""
     hexsha = binascii.hexlify(sha)
     assert len(hexsha) == 40, "Incorrect length of sha1 string: %r" % hexsha
     return hexsha
 
 
 def hex_to_sha(hex):
-    """Takes a hex sha and returns a binary sha"""
+    """Takes a hex sha and returns a binary sha."""
     assert len(hex) == 40, "Incorrect length of hexsha: %s" % hex
     try:
         return binascii.unhexlify(hex)
@@ -236,7 +251,7 @@ class FixedSha:
 
     __slots__ = ("_hexsha", "_sha")
 
-    def __init__(self, hexsha):
+    def __init__(self, hexsha) -> None:
         if getattr(hexsha, "encode", None) is not None:
             hexsha = hexsha.encode("ascii")
         if not isinstance(hexsha, bytes):
@@ -407,8 +422,8 @@ class ShaFile:
             obj._parse_object(map)
         return obj
 
-    def __init__(self):
-        """Don't call this directly"""
+    def __init__(self) -> None:
+        """Don't call this directly."""
         self._sha = None
         self._chunked_text = []
         self._needs_serialization = True
@@ -530,7 +545,7 @@ class ShaFile:
         return self._sha
 
     def copy(self):
-        """Create a new copy of this SHA1 object from its raw string"""
+        """Create a new copy of this SHA1 object from its raw string."""
         obj_class = object_class(self.type_num)
         if obj_class is None:
             raise AssertionError('invalid type num %d' % self.type_num)
@@ -541,7 +556,7 @@ class ShaFile:
         """The hex SHA of this object."""
         return self.sha().hexdigest().encode("ascii")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<{} {}>".format(self.__class__.__name__, self.id)
 
     def __ne__(self, other):
@@ -575,7 +590,7 @@ class Blob(ShaFile):
 
     _chunked_text: List[bytes]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._chunked_text = []
         self._needs_serialization = False
@@ -666,7 +681,7 @@ def _parse_message(chunks: Iterable[bytes]) -> Iterator[Tuple[Optional[bytes], O
     eof = False
 
     def _strip_last_newline(value):
-        """Strip the last newline from value"""
+        """Strip the last newline from value."""
         if value and value.endswith(b"\n"):
             return value[:-1]
         return value
@@ -736,7 +751,7 @@ class Tag(ShaFile):
 
     _tagger: Optional[bytes]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._tagger = None
         self._tag_time = None
@@ -806,7 +821,7 @@ class Tag(ShaFile):
         return list(_format_message(headers, body))
 
     def _deserialize(self, chunks):
-        """Grab the metadata attached to the tag"""
+        """Grab the metadata attached to the tag."""
         self._tagger = None
         self._tag_time = None
         self._tag_timezone = None
@@ -943,6 +958,7 @@ def parse_tree(text, strict=False):
     Args:
       text: Serialized text to parse
     Returns: iterator of tuples of (name, mode, sha)
+
     Raises:
       ObjectFormatException: if the object was malformed in some way
     """
@@ -1045,20 +1061,20 @@ def pretty_format_tree_entry(name, mode, hexsha, encoding="utf-8") -> str:
 class SubmoduleEncountered(Exception):
     """A submodule was encountered while resolving a path."""
 
-    def __init__(self, path, sha):
+    def __init__(self, path, sha) -> None:
         self.path = path
         self.sha = sha
 
 
 class Tree(ShaFile):
-    """A Git tree object"""
+    """A Git tree object."""
 
     type_name = b"tree"
     type_num = 2
 
     __slots__ = "_entries"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._entries = {}
 
@@ -1069,13 +1085,13 @@ class Tree(ShaFile):
             raise NotTreeError(filename)
         return tree
 
-    def __contains__(self, name):
+    def __contains__(self, name) -> bool:
         return name in self._entries
 
     def __getitem__(self, name):
         return self._entries[name]
 
-    def __setitem__(self, name, value):
+    def __setitem__(self, name, value) -> None:
         """Set a tree entry by name.
 
         Args:
@@ -1088,11 +1104,11 @@ class Tree(ShaFile):
         self._entries[name] = (mode, hexsha)
         self._needs_serialization = True
 
-    def __delitem__(self, name):
+    def __delitem__(self, name) -> None:
         del self._entries[name]
         self._needs_serialization = True
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._entries)
 
     def __iter__(self):
@@ -1128,7 +1144,7 @@ class Tree(ShaFile):
         return list(self.iteritems())
 
     def _deserialize(self, chunks):
-        """Grab the entries in the tree"""
+        """Grab the entries in the tree."""
         try:
             parsed_entries = parse_tree(b"".join(chunks))
         except ValueError as exc:
@@ -1218,7 +1234,7 @@ def parse_timezone(text):
     # cgit parses the first character as the sign, and the rest
     #  as an integer (using strtol), which could also be negative.
     #  We do the same for compatibility. See #697828.
-    if not text[0] in b"+-":
+    if text[0] not in b"+-":
         raise ValueError("Timezone must start with + or - (%(text)s)" % vars())
     sign = text[:1]
     offset = int(text[1:])
@@ -1254,7 +1270,7 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
 
 
 def parse_time_entry(value):
-    """Parse event
+    """Parse event.
 
     Args:
       value: Bytes representing a git commit/tag line
@@ -1279,8 +1295,7 @@ def parse_time_entry(value):
 
 
 def format_time_entry(person, time, timezone_info):
-    """Format an event
-    """
+    """Format an event."""
     (timezone, timezone_neg_utc) = timezone_info
     return b" ".join([
         person,
@@ -1341,7 +1356,7 @@ def parse_commit(chunks):
 
 
 class Commit(ShaFile):
-    """A git commit object"""
+    """A git commit object."""
 
     type_name = b"commit"
     type_num = 1
@@ -1364,7 +1379,7 @@ class Commit(ShaFile):
         "_gpgsig",
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._parents = []
         self._encoding = None

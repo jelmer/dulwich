@@ -25,8 +25,11 @@
 import gevent
 from gevent import pool
 
-from .object_store import (MissingObjectFinder, _collect_ancestors,
-                           _collect_filetree_revs)
+from .object_store import (
+    MissingObjectFinder,
+    _collect_ancestors,
+    _collect_filetree_revs,
+)
 from .objects import Commit, Tag
 
 
@@ -75,7 +78,7 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         get_tagged=None,
         concurrency=1,
         get_parents=None,
-    ):
+    ) -> None:
         def collect_tree_sha(sha):
             self.sha_done.add(sha)
             cmt = object_store[sha]

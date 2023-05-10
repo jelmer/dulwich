@@ -32,7 +32,7 @@ import binascii
 class ChecksumMismatch(Exception):
     """A checksum didn't match the expected contents."""
 
-    def __init__(self, expected, got, extra=None):
+    def __init__(self, expected, got, extra=None) -> None:
         if len(expected) == 20:
             expected = binascii.hexlify(expected)
         if len(got) == 20:
@@ -63,7 +63,7 @@ class WrongObjectException(Exception):
 
     type_name: str
 
-    def __init__(self, sha, *args, **kwargs):
+    def __init__(self, sha, *args, **kwargs) -> None:
         Exception.__init__(self, "{} is not a {}".format(sha, self.type_name))
 
 
@@ -92,9 +92,9 @@ class NotBlobError(WrongObjectException):
 
 
 class MissingCommitError(Exception):
-    """Indicates that a commit was not found in the repository"""
+    """Indicates that a commit was not found in the repository."""
 
-    def __init__(self, sha, *args, **kwargs):
+    def __init__(self, sha, *args, **kwargs) -> None:
         self.sha = sha
         Exception.__init__(self, "%s is not in the revision store" % sha)
 
@@ -102,28 +102,28 @@ class MissingCommitError(Exception):
 class ObjectMissing(Exception):
     """Indicates that a requested object is missing."""
 
-    def __init__(self, sha, *args, **kwargs):
+    def __init__(self, sha, *args, **kwargs) -> None:
         Exception.__init__(self, "%s is not in the pack" % sha)
 
 
 class ApplyDeltaError(Exception):
     """Indicates that applying a delta failed."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         Exception.__init__(self, *args, **kwargs)
 
 
 class NotGitRepository(Exception):
     """Indicates that no Git repository was found."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         Exception.__init__(self, *args, **kwargs)
 
 
 class GitProtocolError(Exception):
     """Git protocol exception."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         Exception.__init__(self, *args, **kwargs)
 
     def __eq__(self, other):
@@ -137,7 +137,7 @@ class SendPackError(GitProtocolError):
 class HangupException(GitProtocolError):
     """Hangup exception."""
 
-    def __init__(self, stderr_lines=None):
+    def __init__(self, stderr_lines=None) -> None:
         if stderr_lines:
             super().__init__(
                 "\n".join(
@@ -157,7 +157,7 @@ class HangupException(GitProtocolError):
 class UnexpectedCommandError(GitProtocolError):
     """Unexpected command received in a proto line."""
 
-    def __init__(self, command):
+    def __init__(self, command) -> None:
         if command is None:
             command = "flush-pkt"
         else:

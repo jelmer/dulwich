@@ -23,6 +23,7 @@ import os
 import shutil
 import sys
 import tempfile
+from typing import Dict
 import warnings
 from io import BytesIO
 from unittest.mock import patch
@@ -1090,7 +1091,7 @@ class HttpGitClientTests(TestCase):
         # otherwise without an active internet connection
         class PoolManagerMock:
             def __init__(self) -> None:
-                self.headers = {}
+                self.headers: Dict[str, str] = {}
 
             def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
                 base_url = url[: -len(tail)]

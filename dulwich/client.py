@@ -190,7 +190,7 @@ class ReportStatusParser:
     def __init__(self) -> None:
         self._done = False
         self._pack_status = None
-        self._ref_statuses = []
+        self._ref_statuses: List[bytes] = []
 
     def check(self):
         """Check if there were any errors and, if so, raise exceptions.
@@ -427,8 +427,8 @@ def _read_shallow_updates(pkt_seq):
 class _v1ReceivePackHeader:
 
     def __init__(self, capabilities, old_refs, new_refs) -> None:
-        self.want = []
-        self.have = []
+        self.want: List[bytes] = []
+        self.have: List[bytes] = []
         self._it = self._handle_receive_pack_head(capabilities, old_refs, new_refs)
         self.sent_capabilities = False
 
@@ -646,7 +646,7 @@ class GitClient:
             to
         """
         self._report_activity = report_activity
-        self._report_status_parser = None
+        self._report_status_parser: Optional[ReportStatusParser] = None
         self._fetch_capabilities = set(UPLOAD_CAPABILITIES)
         self._fetch_capabilities.add(capability_agent())
         self._send_capabilities = set(RECEIVE_CAPABILITIES)
@@ -915,6 +915,7 @@ class GitClient:
                     pass
 
             if CAPABILITY_REPORT_STATUS in capabilities:
+                assert self._report_status_parser is not None
                 pktline_parser = PktLineParser(self._report_status_parser.handle_packet)
             for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
                 if chan == SIDE_BAND_CHANNEL_DATA:
@@ -927,6 +928,7 @@ class GitClient:
                         "Invalid sideband channel %d" % chan)
         else:
             if CAPABILITY_REPORT_STATUS in capabilities:
+                assert self._report_status_parser
                 for pkt in proto.read_pkt_seq():
                     self._report_status_parser.handle_packet(pkt)
         if self._report_status_parser is not None:
@@ -1729,7 +1731,7 @@ class SSHGitClient(TraditionalGitClient):
             "GIT_SSH_COMMAND", os.environ.get("GIT_SSH")
         )
         super().__init__(**kwargs)
-        self.alternative_paths = {}
+        self.alternative_paths: Dict[bytes, bytes] = {}
         if vendor is not None:
             self.ssh_vendor = vendor
         else:

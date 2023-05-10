@@ -46,6 +46,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    Any
 )
 
 if TYPE_CHECKING:
@@ -1797,10 +1798,10 @@ class MemoryRepo(BaseRepo):
     def __init__(self) -> None:
         from .config import ConfigFile
 
-        self._reflog = []
+        self._reflog: List[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
-        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)
-        self._named_files = {}
+        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)  # type: ignore
+        self._named_files: Dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()
         self._description = None

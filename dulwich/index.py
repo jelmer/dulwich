@@ -25,13 +25,30 @@ import os
 import stat
 import struct
 import sys
-from typing import (Any, BinaryIO, Callable, Dict, Iterable, Iterator, List,
-                    Optional, Tuple, Union)
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from .file import GitFile
 from .object_store import iter_tree_contents
-from .objects import (S_IFGITLINK, S_ISGITLINK, Blob, ObjectID, Tree,
-                      hex_to_sha, sha_to_hex)
+from .objects import (
+    S_IFGITLINK,
+    S_ISGITLINK,
+    Blob,
+    ObjectID,
+    Tree,
+    hex_to_sha,
+    sha_to_hex,
+)
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
 
 # TODO(jelmer): Switch to dataclass?
@@ -78,6 +95,7 @@ def pathsplit(path: bytes) -> Tuple[bytes, bytes]:
 
     Args:
       path: The path to split.
+
     Returns:
       Tuple with directory name and basename
     """
@@ -211,7 +229,7 @@ def write_cache_entry(f, name: bytes, entry: IndexEntry, version: int) -> None:
 class UnsupportedIndexFormat(Exception):
     """An unsupported index format was encountered."""
 
-    def __init__(self, version):
+    def __init__(self, version) -> None:
         self.index_format_version = version
 
 
@@ -274,6 +292,7 @@ def cleanup_mode(mode: int) -> int:
 
     Args:
       mode: Mode to clean up.
+
     Returns:
       mode
     """
@@ -292,7 +311,7 @@ def cleanup_mode(mode: int) -> int:
 class Index:
     """A Git Index file."""
 
-    def __init__(self, filename: Union[bytes, str], read=True):
+    def __init__(self, filename: Union[bytes, str], read=True) -> None:
         """Create an index object associated with the given filename.
 
         Args:
@@ -310,7 +329,7 @@ class Index:
     def path(self):
         return self._filename
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, self._filename)
 
     def write(self) -> None:
@@ -371,13 +390,13 @@ class Index:
         """Remove all contents from this index."""
         self._byname = {}
 
-    def __setitem__(self, name: bytes, x: IndexEntry):
+    def __setitem__(self, name: bytes, x: IndexEntry) -> None:
         assert isinstance(name, bytes)
         assert len(x) == len(IndexEntry._fields)
         # Remove the old entry if any
         self._byname[name] = IndexEntry(*x)
 
-    def __delitem__(self, name: bytes):
+    def __delitem__(self, name: bytes) -> None:
         assert isinstance(name, bytes)
         del self._byname[name]
 
@@ -570,7 +589,7 @@ if sys.platform == 'win32':
 
     class WindowsSymlinkPermissionError(PermissionError):
 
-        def __init__(self, errno, msg, filename):
+        def __init__(self, errno, msg, filename) -> None:
             super(PermissionError, self).__init__(
                 errno, "Unable to create symlink; "
                 "do you have developer mode enabled? %s" % msg,
@@ -668,7 +687,7 @@ def build_index_from_tree(
     validate_path_element=validate_path_element_default,
     symlink_fn=None
 ):
-    """Generate and materialize index from a tree
+    """Generate and materialize index from a tree.
 
     Args:
       tree_id: Tree to materialize
@@ -995,7 +1014,7 @@ class locked_index:
 
     Works as a context manager.
     """
-    def __init__(self, path: Union[bytes, str]):
+    def __init__(self, path: Union[bytes, str]) -> None:
         self._path = path
 
     def __enter__(self):

@@ -26,9 +26,16 @@
 from dulwich.tests import TestCase
 
 from ..objects import Blob
-from ..objectspec import (parse_commit, parse_commit_range, parse_object,
-                          parse_ref, parse_refs, parse_reftuple,
-                          parse_reftuples, parse_tree)
+from ..objectspec import (
+    parse_commit,
+    parse_commit_range,
+    parse_object,
+    parse_ref,
+    parse_refs,
+    parse_reftuple,
+    parse_reftuples,
+    parse_tree,
+)
 from ..repo import MemoryRepo
 from .utils import build_commit_graph
 

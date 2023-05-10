@@ -354,7 +354,7 @@ class TestLRUSizeCache(TestCase):
         self.assertEqual([("test", "key that is too big")], cleanup_calls)
 
     def test_adding_clears_cache_based_on_size(self):
-        """The cache is cleared in LRU order until small enough"""
+        """The cache is cleared in LRU order until small enough."""
         cache = lru_cache.LRUSizeCache(max_size=20)
         cache.add("key1", "value")  # 5 chars
         cache.add("key2", "value2")  # 6 chars

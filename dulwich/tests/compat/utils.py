@@ -84,6 +84,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
         sub-point); omitted components default to 0.
       git_path: Path to the git executable; defaults to the version in
         the system path.
+
     Raises:
       ValueError: if the required version tuple has too many parts.
       SkipTest: if no suitable git version was found at the given path.
@@ -132,10 +133,10 @@ def run_git(
     Returns: A tuple of (returncode, stdout contents, stderr contents).
         If capture_stdout is False, None will be returned as stdout contents.
         If capture_stderr is False, None will be returned as stderr contents.
+
     Raises:
       OSError: if the git executable was not found.
     """
-
     env = popen_kwargs.pop("env", {})
     env["LC_ALL"] = env["LANG"] = "C"
     env["PATH"] = os.getenv("PATH")

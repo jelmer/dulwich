@@ -46,14 +46,27 @@ import os
 import struct
 import sys
 from itertools import chain
-from typing import (BinaryIO, Callable, Deque, Dict, Generic, Iterable,
-                    Iterator, List, Optional, Sequence, Set, Tuple, TypeVar,
-                    Union)
+from typing import (
+    BinaryIO,
+    Callable,
+    Deque,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 try:
     from typing import Protocol
 except ImportError:  # python << 3.8
-    from typing_extensions import Protocol   # type: ignore
+    from typing_extensions import Protocol  # type: ignore
 
 import warnings
 import zlib
@@ -156,7 +169,7 @@ def take_msb_bytes(read: Callable[[int], bytes], crc32: Optional[int] = None) ->
 
 
 class PackFileDisappeared(Exception):
-    def __init__(self, obj):
+    def __init__(self, obj) -> None:
         self.obj = obj
 
 
@@ -188,10 +201,11 @@ class UnpackedObject:
     obj_chunks: Optional[List[bytes]]
     delta_base: Union[None, bytes, int]
     decomp_chunks: List[bytes]
+    comp_chunks: Optional[List[bytes]]
 
     # TODO(dborowitz): read_zlib_chunks and unpack_object could very well be
     # methods of this object.
-    def __init__(self, pack_type_num, *, delta_base=None, decomp_len=None, crc32=None, sha=None, decomp_chunks=None, offset=None):
+    def __init__(self, pack_type_num, *, delta_base=None, decomp_len=None, crc32=None, sha=None, decomp_chunks=None, offset=None) -> None:
         self.offset = offset
         self._sha = sha
         self.pack_type_num = pack_type_num
@@ -244,7 +258,7 @@ class UnpackedObject:
     def __ne__(self, other):
         return not (self == other)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         data = ["{}={!r}".format(s, getattr(self, s)) for s in self.__slots__]
         return "{}({})".format(self.__class__.__name__, ", ".join(data))
 
@@ -276,6 +290,7 @@ def read_zlib_chunks(
       include_comp: If True, include compressed data in the result.
       buffer_size: Size of the read buffer.
     Returns: Leftover unused data from the decompression.
+
     Raises:
       zlib.error: if a decompression error occurred.
     """
@@ -503,7 +518,7 @@ class PackIndex:
 class MemoryPackIndex(PackIndex):
     """Pack index that is stored entirely in memory."""
 
-    def __init__(self, entries, pack_checksum=None):
+    def __init__(self, entries, pack_checksum=None) -> None:
         """Create a new MemoryPackIndex.
 
         Args:
@@ -521,7 +536,7 @@ class MemoryPackIndex(PackIndex):
     def get_pack_checksum(self):
         return self._pack_checksum
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._entries)
 
     def object_offset(self, sha):
@@ -561,7 +576,7 @@ class FilePackIndex(PackIndex):
 
     _fan_out_table: List[int]
 
-    def __init__(self, filename, file=None, contents=None, size=None):
+    def __init__(self, filename, file=None, contents=None, size=None) -> None:
         """Create a pack index object.
 
         Provide it with the name of the index file to consider, and it will map
@@ -711,7 +726,7 @@ class FilePackIndex(PackIndex):
 class PackIndex1(FilePackIndex):
     """Version 1 Pack Index file."""
 
-    def __init__(self, filename: str, file=None, contents=None, size=None):
+    def __init__(self, filename: str, file=None, contents=None, size=None) -> None:
         super().__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
@@ -736,7 +751,7 @@ class PackIndex1(FilePackIndex):
 class PackIndex2(FilePackIndex):
     """Version 2 Pack Index file."""
 
-    def __init__(self, filename: str, file=None, contents=None, size=None):
+    def __init__(self, filename: str, file=None, contents=None, size=None) -> None:
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
             raise AssertionError("Not a v2 pack index file")
@@ -967,7 +982,7 @@ class PackStreamReader:
             return data
         return self._read(self.read_some, size)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._num_objects
 
     def read_objects(self, compute_crc32=False) -> Iterator[UnpackedObject]:
@@ -984,6 +999,7 @@ class PackStreamReader:
             decomp_chunks
             decomp_len
             crc32 (if compute_crc32 is True)
+
         Raises:
           ChecksumMismatch: if the checksum of the pack contents does not
             match the checksum in the pack trailer.
@@ -1030,7 +1046,7 @@ class PackStreamCopier(PackStreamReader):
     appropriate and written out to the given file-like object.
     """
 
-    def __init__(self, read_all, read_some, outfile, delta_iter=None):
+    def __init__(self, read_all, read_some, outfile, delta_iter=None) -> None:
         """Initialize the copier.
 
         Args:
@@ -1135,7 +1151,7 @@ class PackData:
     position.  It will all just throw a zlib or KeyError.
     """
 
-    def __init__(self, filename, file=None, size=None):
+    def __init__(self, filename, file=None, size=None) -> None:
         """Create a PackData object representing the pack in the given filename.
 
         The file must exist and stay readable until the object is disposed of.
@@ -1152,7 +1168,7 @@ class PackData:
         else:
             self._file = file
         (version, self._num_objects) = read_pack_header(self._file.read)
-        self._offset_cache = LRUSizeCache(
+        self._offset_cache = LRUSizeCache[int, Tuple[int, OldUnpackedObject]](
             1024 * 1024 * 20, compute_size=_compute_object_size
         )
 
@@ -1199,7 +1215,7 @@ class PackData:
             raise AssertionError(errmsg)
         return self._size
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of objects in this pack."""
         return self._num_objects
 
@@ -1224,7 +1240,7 @@ class PackData:
             # Back up over unused data.
             self._file.seek(-len(unused), SEEK_CUR)
 
-    def iterentries(self, progress: Optional[ProgressFn] = None, resolve_ext_ref: Optional[ResolveExtRefFn] = None):
+    def iterentries(self, progress=None, resolve_ext_ref: Optional[ResolveExtRefFn] = None):
         """Yield entries summarizing the contents of this pack.
 
         Args:
@@ -1306,8 +1322,7 @@ class PackData:
             raise ChecksumMismatch(stored, actual)
 
     def get_unpacked_object_at(self, offset: int, *, include_comp: bool = False) -> UnpackedObject:
-        """Given offset in the packfile return a UnpackedObject.
-        """
+        """Given offset in the packfile return a UnpackedObject."""
         assert offset >= self._header_size
         self._file.seek(offset)
         unpacked, _ = unpack_object(self._file.read, include_comp=include_comp)
@@ -1522,7 +1537,7 @@ class PackInflater(DeltaChainIterator[ShaFile]):
 class SHA1Reader:
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
-    def __init__(self, f):
+    def __init__(self, f) -> None:
         self.f = f
         self.sha1 = sha1(b"")
 
@@ -1546,7 +1561,7 @@ class SHA1Reader:
 class SHA1Writer:
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
-    def __init__(self, f):
+    def __init__(self, f) -> None:
         self.f = f
         self.length = 0
         self.sha1 = sha1(b"")
@@ -1799,7 +1814,7 @@ def pack_objects_to_data(
         delta_window_size: Optional[int] = None,
         ofs_delta: bool = True,
         progress=None) -> Tuple[int, Iterator[UnpackedObject]]:
-    """Create pack data from objects
+    """Create pack data from objects.
 
     Args:
       objects: Pack objects
@@ -1837,7 +1852,7 @@ def generate_unpacked_objects(
         ofs_delta: bool = True,
         other_haves: Optional[Set[bytes]] = None,
         progress=None) -> Iterator[UnpackedObject]:
-    """Create pack data from objects
+    """Create pack data from objects.
 
     Args:
       objects: Pack objects
@@ -1941,9 +1956,9 @@ def write_pack_objects(
 
 class PackChunkGenerator:
 
-    def __init__(self, num_records=None, records=None, progress=None, compression_level=-1, reuse_compressed=True):
+    def __init__(self, num_records=None, records=None, progress=None, compression_level=-1, reuse_compressed=True) -> None:
         self.cs = sha1(b"")
-        self.entries = {}
+        self.entries: Dict[Union[int, bytes], Tuple[int, int]] = {}
         self._it = self._pack_data_chunks(
             num_records=num_records, records=records, progress=progress, compression_level=compression_level, reuse_compressed=reuse_compressed)
 
@@ -2256,7 +2271,7 @@ class Pack:
     _data: Optional[PackData]
     _idx: Optional[PackIndex]
 
-    def __init__(self, basename, resolve_ext_ref: Optional[ResolveExtRefFn] = None):
+    def __init__(self, basename, resolve_ext_ref: Optional[ResolveExtRefFn] = None) -> None:
         self._basename = basename
         self._data = None
         self._idx = None
@@ -2269,7 +2284,8 @@ class Pack:
     @classmethod
     def from_lazy_objects(cls, data_fn, idx_fn):
         """Create a new pack object from callables to load pack data and
-        index objects."""
+        index objects.
+        """
         ret = cls("")
         ret._data_load = data_fn
         ret._idx_load = idx_fn
@@ -2325,11 +2341,11 @@ class Pack:
     def __eq__(self, other):
         return isinstance(self, type(other)) and self.index == other.index
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Number of entries in this pack."""
         return len(self.index)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}({!r})".format(self.__class__.__name__, self._basename)
 
     def __iter__(self):
@@ -2592,7 +2608,9 @@ def extend_pack(f: BinaryIO, object_ids: Set[ObjectID], get_raw, *, compression_
 
 
 try:
-    from dulwich._pack import apply_delta  # type: ignore # noqa: F811
-    from dulwich._pack import bisect_find_sha  # type: ignore # noqa: F811
+    from dulwich._pack import (  # type: ignore  # noqa: F811
+        apply_delta,  # type: ignore # noqa: F811
+        bisect_find_sha,  # type: ignore # noqa: F811
+    )
 except ImportError:
     pass

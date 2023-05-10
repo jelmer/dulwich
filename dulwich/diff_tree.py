@@ -74,6 +74,7 @@ def _merge_entries(path, tree1, tree2):
       path: A path to prepend to all tree entry names.
       tree1: The first Tree object to iterate, or None.
       tree2: The second Tree object to iterate, or None.
+
     Returns:
       A list of pairs of TreeEntry objects for each pair of entries in
         the trees. If an entry exists in one tree but not the other, the other
@@ -124,6 +125,7 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
       tree1_id: The SHA of the first Tree object to iterate, or None.
       tree2_id: The SHA of the second Tree object to iterate, or None.
       prune_identical: If True, identical subtrees will not be walked.
+
     Returns:
       Iterator over Pairs of TreeEntry objects for each pair of entries
         in the trees and their subtrees recursively. If an entry exists in one
@@ -177,6 +179,7 @@ def tree_changes(
       rename_detector: RenameDetector object for detecting renames.
       change_type_same: Whether to report change types in the same
         entry or as delete+add.
+
     Returns:
       Iterator over TreeChange instances for each change between the
         source and target tree.
@@ -304,6 +307,7 @@ def _count_blocks(obj):
 
     Args:
       obj: The object to count blocks for.
+
     Returns:
       A dict of block hashcode -> total bytes occurring.
     """
@@ -339,6 +343,7 @@ def _common_bytes(blocks1, blocks2):
     Args:
       blocks1: The first dict of block hashcode -> total bytes.
       blocks2: The second dict of block hashcode -> total bytes.
+
     Returns:
       The number of bytes in common between blocks1 and blocks2. This is
       only approximate due to possible hash collisions.
@@ -362,6 +367,7 @@ def _similarity_score(obj1, obj2, block_cache=None):
       obj2: The second object to score.
       block_cache: An optional dict of SHA to block counts to cache
         results between calls.
+
     Returns:
       The similarity score between the two objects, defined as the
         number of bytes in common between the two objects divided by the
@@ -402,7 +408,7 @@ class RenameDetector:
         max_files=MAX_FILES,
         rewrite_threshold=REWRITE_THRESHOLD,
         find_copies_harder=False,
-    ):
+    ) -> None:
         """Initialize the rename detector.
 
         Args:
@@ -631,7 +637,10 @@ _merge_entries_py = _merge_entries
 _count_blocks_py = _count_blocks
 try:
     # Try to import C versions
-    from dulwich._diff_tree import (_count_blocks, _is_tree,  # type: ignore
-                                    _merge_entries)
+    from dulwich._diff_tree import (  # type: ignore
+        _count_blocks,
+        _is_tree,
+        _merge_entries,
+    )
 except ImportError:
     pass

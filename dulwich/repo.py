@@ -34,36 +34,86 @@ import sys
 import time
 import warnings
 from io import BytesIO
-from typing import (TYPE_CHECKING, BinaryIO, Callable, Dict, FrozenSet,
-                    Iterable, List, Optional, Set, Tuple, Union)
+from typing import (
+    TYPE_CHECKING,
+    BinaryIO,
+    Callable,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    Any
+)
 
 if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
     # as possible to reduce start-up time for anything that doesn't need
     # these imports.
-    from .config import StackedConfig, ConfigFile
+    from .config import ConfigFile, StackedConfig
     from .index import Index
 
-from .errors import (CommitError, HookError, NoIndexPresent, NotBlobError,
-                     NotCommitError, NotGitRepository, NotTagError,
-                     NotTreeError, RefFormatError)
+from .errors import (
+    CommitError,
+    HookError,
+    NoIndexPresent,
+    NotBlobError,
+    NotCommitError,
+    NotGitRepository,
+    NotTagError,
+    NotTreeError,
+    RefFormatError,
+)
 from .file import GitFile
-from .hooks import (CommitMsgShellHook, Hook, PostCommitShellHook,
-                    PostReceiveShellHook, PreCommitShellHook)
+from .hooks import (
+    CommitMsgShellHook,
+    Hook,
+    PostCommitShellHook,
+    PostReceiveShellHook,
+    PreCommitShellHook,
+)
 from .line_ending import BlobNormalizer, TreeBlobNormalizer
-from .object_store import (DiskObjectStore, MemoryObjectStore,
-                           MissingObjectFinder, ObjectStoreGraphWalker,
-                           PackBasedObjectStore, peel_sha)
-from .objects import (Blob, Commit, ObjectID, ShaFile, Tag, Tree, check_hexsha,
-                      valid_hexsha)
+from .object_store import (
+    DiskObjectStore,
+    MemoryObjectStore,
+    MissingObjectFinder,
+    ObjectStoreGraphWalker,
+    PackBasedObjectStore,
+    peel_sha,
+)
+from .objects import (
+    Blob,
+    Commit,
+    ObjectID,
+    ShaFile,
+    Tag,
+    Tree,
+    check_hexsha,
+    valid_hexsha,
+)
 from .pack import generate_unpacked_objects
-from .refs import (ANNOTATED_TAG_SUFFIX, LOCAL_BRANCH_PREFIX,  # noqa: F401
-                   LOCAL_TAG_PREFIX, SYMREF,
-                   DictRefsContainer, DiskRefsContainer, InfoRefsContainer,
-                   Ref, RefsContainer, _set_default_branch, _set_head,
-                   _set_origin_head, check_ref_format, read_packed_refs,
-                   read_packed_refs_with_peeled, serialize_refs,
-                   write_packed_refs)
+from .refs import (  # noqa: F401
+    ANNOTATED_TAG_SUFFIX,
+    LOCAL_BRANCH_PREFIX,
+    LOCAL_TAG_PREFIX,
+    SYMREF,
+    DictRefsContainer,
+    DiskRefsContainer,
+    InfoRefsContainer,
+    Ref,
+    RefsContainer,
+    _set_default_branch,
+    _set_head,
+    _set_origin_head,
+    check_ref_format,
+    read_packed_refs,
+    read_packed_refs_with_peeled,
+    serialize_refs,
+    write_packed_refs,
+)
 
 CONTROLDIR = ".git"
 OBJECTDIR = "objects"
@@ -88,9 +138,9 @@ DEFAULT_BRANCH = b"master"
 
 
 class InvalidUserIdentity(Exception):
-    """User identity is not of the format 'user <email>'"""
+    """User identity is not of the format 'user <email>'."""
 
-    def __init__(self, identity):
+    def __init__(self, identity) -> None:
         self.identity = identity
 
 
@@ -200,7 +250,7 @@ def check_user_identity(identity):
 def parse_graftpoints(
     graftpoints: Iterable[bytes],
 ) -> Dict[bytes, List[bytes]]:
-    """Convert a list of graftpoints into a dict
+    """Convert a list of graftpoints into a dict.
 
     Args:
       graftpoints: Iterator of graftpoint lines
@@ -231,7 +281,7 @@ def parse_graftpoints(
 
 
 def serialize_graftpoints(graftpoints: Dict[bytes, List[bytes]]) -> bytes:
-    """Convert a dictionary of grafts into string
+    """Convert a dictionary of grafts into string.
 
     The graft dictionary is:
         <commit sha1>: [<parent sha1>*]
@@ -275,7 +325,7 @@ def _set_filesystem_hidden(path):
 
 
 class ParentsProvider:
-    def __init__(self, store, grafts={}, shallows=[]):
+    def __init__(self, store, grafts={}, shallows=[]) -> None:
         self.store = store
         self.grafts = grafts
         self.shallows = set(shallows)
@@ -305,7 +355,7 @@ class BaseRepo:
         repository
     """
 
-    def __init__(self, object_store: PackBasedObjectStore, refs: RefsContainer):
+    def __init__(self, object_store: PackBasedObjectStore, refs: RefsContainer) -> None:
         """Open a repository.
 
         This shouldn't be called directly, but rather through one of the
@@ -497,7 +547,7 @@ class BaseRepo:
                 def get_remote_has(self):
                     return None
 
-                def __len__(self):
+                def __len__(self) -> int:
                     return 0
 
                 def __iter__(self):
@@ -642,8 +692,7 @@ class BaseRepo:
         raise NotImplementedError(self.get_config)
 
     def get_worktree_config(self) -> "ConfigFile":
-        """Retrieve the worktree config object.
-        """
+        """Retrieve the worktree config object."""
         raise NotImplementedError(self.get_worktree_config)
 
     def get_description(self):
@@ -795,7 +844,7 @@ class BaseRepo:
         else:
             return name in self.refs
 
-    def __setitem__(self, name: bytes, value: Union[ShaFile, bytes]):
+    def __setitem__(self, name: bytes, value: Union[ShaFile, bytes]) -> None:
         """Set a ref.
 
         Args:
@@ -812,7 +861,7 @@ class BaseRepo:
         else:
             raise ValueError(name)
 
-    def __delitem__(self, name: bytes):
+    def __delitem__(self, name: bytes) -> None:
         """Remove a ref.
 
         Args:
@@ -830,12 +879,11 @@ class BaseRepo:
         return get_user_identity(config)
 
     def _add_graftpoints(self, updated_graftpoints: Dict[bytes, List[bytes]]):
-        """Add or modify graftpoints
+        """Add or modify graftpoints.
 
         Args:
           updated_graftpoints: Dict of commit shas to list of parent shas
         """
-
         # Simple validation
         for commit, parents in updated_graftpoints.items():
             for sha in [commit] + parents:
@@ -844,7 +892,7 @@ class BaseRepo:
         self._graftpoints.update(updated_graftpoints)
 
     def _remove_graftpoints(self, to_remove: List[bytes] = []) -> None:
-        """Remove graftpoints
+        """Remove graftpoints.
 
         Args:
           to_remove: List of commit shas
@@ -904,7 +952,6 @@ class BaseRepo:
         Returns:
           New commit SHA1
         """
-
         try:
             if not no_verify:
                 self.hooks["pre-commit"].execute()
@@ -1043,14 +1090,14 @@ def read_gitfile(f):
 class UnsupportedVersion(Exception):
     """Unsupported repository version."""
 
-    def __init__(self, version):
+    def __init__(self, version) -> None:
         self.version = version
 
 
 class UnsupportedExtension(Exception):
     """Unsupported repository extension."""
 
-    def __init__(self, extension):
+    def __init__(self, extension) -> None:
         self.extension = extension
 
 
@@ -1067,7 +1114,6 @@ class Repo(BaseRepo):
     up those resources.
 
     Attributes:
-
       path: Path to the working copy (if it exists) or repository control
         directory (if the repository is bare)
       bare: Whether this is a bare repository
@@ -1190,7 +1236,7 @@ class Repo(BaseRepo):
 
     @classmethod
     def discover(cls, start="."):
-        """Iterate parent directories to discover a repository
+        """Iterate parent directories to discover a repository.
 
         Return a Repo object for the first parent directory that looks like a
         Git repository.
@@ -1323,15 +1369,18 @@ class Repo(BaseRepo):
         Args:
           fs_paths: List of paths, relative to the repository path
         """
-
         root_path_bytes = os.fsencode(self.path)
 
         if isinstance(fs_paths, (str, bytes, os.PathLike)):
             fs_paths = [fs_paths]
         fs_paths = list(fs_paths)
 
-        from .index import (_fs_to_tree_path, blob_from_path_and_stat,
-                            index_entry_from_directory, index_entry_from_stat)
+        from .index import (
+            _fs_to_tree_path,
+            blob_from_path_and_stat,
+            index_entry_from_directory,
+            index_entry_from_stat,
+        )
 
         index = self.open_index()
         blob_normalizer = self.get_blob_normalizer()
@@ -1376,10 +1425,10 @@ class Repo(BaseRepo):
         index.write()
 
     def unstage(self, fs_paths: List[str]):
-        """unstage specific file in the index
+        """Unstage specific file in the index
         Args:
           fs_paths: a list of files to unstage,
-            relative to the repository path
+            relative to the repository path.
         """
         from .index import IndexEntry, _fs_to_tree_path
 
@@ -1464,7 +1513,6 @@ class Repo(BaseRepo):
           symlinks: Symlinks setting (default to autodetect)
         Returns: Created repository as `Repo`
         """
-
         encoded_path = os.fsencode(self.path)
 
         if mkdir:
@@ -1536,10 +1584,12 @@ class Repo(BaseRepo):
         Args:
           tree: Tree SHA to reset to, None for current HEAD tree.
         """
-        from .index import (build_index_from_tree,
-                            symlink,
-                            validate_path_element_default,
-                            validate_path_element_ntfs)
+        from .index import (
+            build_index_from_tree,
+            symlink,
+            validate_path_element_default,
+            validate_path_element_ntfs,
+        )
 
         if tree is None:
             head = self[b"HEAD"]
@@ -1606,7 +1656,7 @@ class Repo(BaseRepo):
         except FileNotFoundError:
             return None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Repo at %r>" % self.path
 
     def set_description(self, description):
@@ -1615,7 +1665,6 @@ class Repo(BaseRepo):
         Args:
           description: Text to set as description for this repository.
         """
-
         self._put_named_file("description", description)
 
     @classmethod
@@ -1723,7 +1772,7 @@ class Repo(BaseRepo):
         self.close()
 
     def get_blob_normalizer(self):
-        """Return a BlobNormalizer object"""
+        """Return a BlobNormalizer object."""
         # TODO Parse the git attributes files
         git_attributes = {}
         config_stack = self.get_config_stack()
@@ -1746,13 +1795,13 @@ class MemoryRepo(BaseRepo):
     those have a stronger dependency on the filesystem.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         from .config import ConfigFile
 
-        self._reflog = []
+        self._reflog: List[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
-        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)
-        self._named_files = {}
+        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)  # type: ignore
+        self._named_files: Dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()
         self._description = None

@@ -32,18 +32,31 @@ from ..object_store import MemoryObjectStore
 from ..objects import Blob
 from ..repo import BaseRepo, MemoryRepo
 from ..server import DictBackend
-from ..web import (HTTP_ERROR, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_OK,
-                   GunzipFilter, HTTPGitApplication, HTTPGitRequest,
-                   _LengthLimitedFile, get_idx_file, get_info_packs,
-                   get_info_refs, get_loose_object, get_pack_file,
-                   get_text_file, handle_service_request, send_file)
+from ..web import (
+    HTTP_ERROR,
+    HTTP_FORBIDDEN,
+    HTTP_NOT_FOUND,
+    HTTP_OK,
+    GunzipFilter,
+    HTTPGitApplication,
+    HTTPGitRequest,
+    _LengthLimitedFile,
+    get_idx_file,
+    get_info_packs,
+    get_info_refs,
+    get_loose_object,
+    get_pack_file,
+    get_text_file,
+    handle_service_request,
+    send_file,
+)
 from .utils import make_object, make_tag
 
 
 class MinimalistWSGIInputStream:
     """WSGI input stream with no 'seek()' and 'tell()' methods."""
 
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         self.data = data
         self.pos = 0
 
@@ -69,7 +82,7 @@ class MinimalistWSGIInputStream2(MinimalistWSGIInputStream):
 class TestHTTPGitRequest(HTTPGitRequest):
     """HTTPGitRequest with overridden methods to help test caching."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         HTTPGitRequest.__init__(self, *args, **kwargs)
         self.cached = None
 
@@ -142,7 +155,7 @@ class DumbHandlersTestCase(WebTestCase):
 
     def test_send_file_error(self):
         class TestFile:
-            def __init__(self, exc_class):
+            def __init__(self, exc_class) -> None:
                 self.closed = False
                 self._exc_class = exc_class
 
@@ -270,11 +283,11 @@ class DumbHandlersTestCase(WebTestCase):
 
     def test_get_info_packs(self):
         class TestPackData:
-            def __init__(self, sha):
+            def __init__(self, sha) -> None:
                 self.filename = "pack-%s.pack" % sha
 
         class TestPack:
-            def __init__(self, sha):
+            def __init__(self, sha) -> None:
                 self.data = TestPackData(sha)
 
         packs = [TestPack(str(i) * 40) for i in range(1, 4)]
@@ -308,7 +321,7 @@ class SmartHandlersTestCase(WebTestCase):
             proto,
             stateless_rpc=None,
             advertise_refs=False,
-        ):
+        ) -> None:
             self.args = args
             self.proto = proto
             self.stateless_rpc = stateless_rpc
@@ -536,10 +549,9 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         self._test_call(self.example_text, *self._get_zstream(self.example_text))
 
     def test_call_no_seek(self):
-        """
-        This ensures that the gunzipping code doesn't require any methods on
+        """This ensures that the gunzipping code doesn't require any methods on
         'wsgi.input' except for '.read()'.  (In particular, it shouldn't
-        require '.seek()'. See https://github.com/jelmer/dulwich/issues/140.)
+        require '.seek()'. See https://github.com/jelmer/dulwich/issues/140.).
         """
         zstream, zlength = self._get_zstream(self.example_text)
         self._test_call(
@@ -549,8 +561,7 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
         )
 
     def test_call_no_working_seek(self):
-        """
-        Similar to 'test_call_no_seek', but this time the methods are available
+        """Similar to 'test_call_no_seek', but this time the methods are available
         (but defunct).  See https://github.com/jonashaag/klaus/issues/154.
         """
         zstream, zlength = self._get_zstream(self.example_text)

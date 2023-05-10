@@ -28,8 +28,19 @@ import sys
 import warnings
 from contextlib import suppress
 from io import BytesIO
-from typing import (Callable, Dict, Iterable, Iterator, List, Optional,
-                    Sequence, Set, Tuple, cast)
+from typing import (
+    Callable,
+    Dict,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    cast,
+)
 
 try:
     from typing import Protocol
@@ -38,15 +49,43 @@ except ImportError:  # python << 3.8
 
 from .errors import NotTreeError
 from .file import GitFile
-from .objects import (S_ISGITLINK, ZERO_SHA, Blob, Commit, ObjectID, ShaFile,
-                      Tag, Tree, TreeEntry, hex_to_filename, hex_to_sha,
-                      object_class, sha_to_hex, valid_hexsha)
-from .pack import (PACK_SPOOL_FILE_MAX_SIZE, ObjectContainer, Pack, PackData,
-                   PackedObjectContainer, PackFileDisappeared, PackHint,
-                   PackIndexer, PackInflater, PackStreamCopier, UnpackedObject,
-                   extend_pack, full_unpacked_object,
-                   generate_unpacked_objects, iter_sha1, load_pack_index_file,
-                   pack_objects_to_data, write_pack_data, write_pack_index)
+from .objects import (
+    S_ISGITLINK,
+    ZERO_SHA,
+    Blob,
+    Commit,
+    ObjectID,
+    ShaFile,
+    Tag,
+    Tree,
+    TreeEntry,
+    hex_to_filename,
+    hex_to_sha,
+    object_class,
+    sha_to_hex,
+    valid_hexsha,
+)
+from .pack import (
+    PACK_SPOOL_FILE_MAX_SIZE,
+    ObjectContainer,
+    Pack,
+    PackData,
+    PackedObjectContainer,
+    PackFileDisappeared,
+    PackHint,
+    PackIndexer,
+    PackInflater,
+    PackStreamCopier,
+    UnpackedObject,
+    extend_pack,
+    full_unpacked_object,
+    generate_unpacked_objects,
+    iter_sha1,
+    load_pack_index_file,
+    pack_objects_to_data,
+    write_pack_data,
+    write_pack_index,
+)
 from .protocol import DEPTH_INFINITE
 from .refs import PEELED_TAG_SUFFIX, Ref
 
@@ -145,7 +184,7 @@ class BaseObjectStore:
         change_type_same=False,
         rename_detector=None,
     ):
-        """Find the differences between the contents of two trees
+        """Find the differences between the contents of two trees.
 
         Args:
           source: SHA1 of the source tree
@@ -157,7 +196,6 @@ class BaseObjectStore:
         Returns: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
-
         from .diff_tree import tree_changes
         for change in tree_changes(
             self,
@@ -322,8 +360,8 @@ class BaseObjectStore:
 
 
 class PackBasedObjectStore(BaseObjectStore):
-    def __init__(self, pack_compression_level=-1):
-        self._pack_cache = {}
+    def __init__(self, pack_compression_level=-1) -> None:
+        self._pack_cache: Dict[str, Pack] = {}
         self.pack_compression_level = pack_compression_level
 
     def add_pack(
@@ -374,7 +412,7 @@ class PackBasedObjectStore(BaseObjectStore):
                 pass
         return False
 
-    def __contains__(self, sha):
+    def __contains__(self, sha) -> bool:
         """Check if a particular object is present by SHA1.
 
         This method makes no distinction between loose and packed objects.
@@ -655,7 +693,7 @@ class PackBasedObjectStore(BaseObjectStore):
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
-    def __init__(self, path, loose_compression_level=-1, pack_compression_level=-1):
+    def __init__(self, path, loose_compression_level=-1, pack_compression_level=-1) -> None:
         """Open an object store.
 
         Args:
@@ -672,7 +710,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self.loose_compression_level = loose_compression_level
         self.pack_compression_level = pack_compression_level
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<{}({!r})>".format(self.__class__.__name__, self.path)
 
     @classmethod
@@ -956,9 +994,9 @@ class DiskObjectStore(PackBasedObjectStore):
 class MemoryObjectStore(BaseObjectStore):
     """Object store that keeps all objects in memory."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self._data = {}
+        self._data: Dict[str, ShaFile] = {}
         self.pack_compression_level = -1
 
     def _to_hexsha(self, sha):
@@ -999,7 +1037,7 @@ class MemoryObjectStore(BaseObjectStore):
     def __getitem__(self, name: ObjectID):
         return self._data[self._to_hexsha(name)].copy()
 
-    def __delitem__(self, name: ObjectID):
+    def __delitem__(self, name: ObjectID) -> None:
         """Delete an object from this store, for testing only."""
         del self._data[self._to_hexsha(name)]
 
@@ -1068,7 +1106,6 @@ class MemoryObjectStore(BaseObjectStore):
           read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
         """
-
         f, commit, abort = self.add_pack()
         try:
             copier = PackStreamCopier(read_all, read_some, f)
@@ -1185,7 +1222,7 @@ class MissingObjectFinder:
         progress=None,
         get_tagged=None,
         get_parents=lambda commit: commit.parents,
-    ):
+    ) -> None:
         self.object_store = object_store
         if shallow is None:
             shallow = set()
@@ -1233,7 +1270,7 @@ class MissingObjectFinder:
 
         # in fact, what we 'want' is commits, tags, and others
         # we've found missing
-        self.objects_to_send = {
+        self.objects_to_send: Set[Tuple[ObjectID, Optional[bytes], Optional[int], bool]] = {
             (w, None, Commit.type_num, False)
             for w in missing_commits}
         missing_tags = want_tags.difference(have_tags)
@@ -1255,9 +1292,9 @@ class MissingObjectFinder:
         return self.remote_has
 
     def add_todo(self, entries: Iterable[Tuple[ObjectID, Optional[bytes], Optional[int], bool]]):
-        self.objects_to_send.update([e for e in entries if not e[0] in self.sha_done])
+        self.objects_to_send.update([e for e in entries if e[0] not in self.sha_done])
 
-    def __next__(self) -> Tuple[bytes, PackHint]:
+    def __next__(self) -> Tuple[bytes, Optional[PackHint]]:
         while True:
             if not self.objects_to_send:
                 self.progress(("counting objects: %d, done.\n" % len(self.sha_done)).encode("ascii"))
@@ -1285,7 +1322,11 @@ class MissingObjectFinder:
         self.sha_done.add(sha)
         if len(self.sha_done) % 1000 == 0:
             self.progress(("counting objects: %d\r" % len(self.sha_done)).encode("ascii"))
-        return (sha, (type_num, name))
+        if type_num is None:
+            pack_hint = None
+        else:
+            pack_hint = (type_num, name)
+        return (sha, pack_hint)
 
     def __iter__(self):
         return self
@@ -1299,7 +1340,7 @@ class ObjectStoreGraphWalker:
       get_parents: Function to retrieve parents in the local repo
     """
 
-    def __init__(self, local_heads, get_parents, shallow=None):
+    def __init__(self, local_heads, get_parents, shallow=None) -> None:
         """Create a new instance.
 
         Args:
@@ -1308,7 +1349,7 @@ class ObjectStoreGraphWalker:
         """
         self.heads = set(local_heads)
         self.get_parents = get_parents
-        self.parents = {}
+        self.parents: Dict[ObjectID, Optional[List[ObjectID]]] = {}
         if shallow is None:
             shallow = set()
         self.shallow = shallow
@@ -1409,7 +1450,7 @@ def commit_tree_changes(object_store, tree, changes):
 class OverlayObjectStore(BaseObjectStore):
     """Object store that can overlay multiple object stores."""
 
-    def __init__(self, bases, add_store=None):
+    def __init__(self, bases, add_store=None) -> None:
         self.bases = bases
         self.add_store = add_store
 
@@ -1489,8 +1530,7 @@ def read_packs_file(f):
 
 
 class BucketBasedObjectStore(PackBasedObjectStore):
-    """Object store implementation that uses a bucket store like S3 as backend.
-    """
+    """Object store implementation that uses a bucket store like S3 as backend."""
 
     def _iter_loose_objects(self):
         """Iterate over the SHAs of all loose objects."""
@@ -1575,8 +1615,8 @@ class BucketBasedObjectStore(PackBasedObjectStore):
 def _collect_ancestors(
     store: ObjectContainer,
     heads,
-    common=frozenset(),
-    shallow=frozenset(),
+    common: FrozenSet[ObjectID] = frozenset(),
+    shallow: FrozenSet[ObjectID] = frozenset(),
     get_parents=lambda commit: commit.parents,
 ):
     """Collect all ancestors of heads up to (excluding) those in common.

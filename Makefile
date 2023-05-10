@@ -75,3 +75,6 @@ coverage-html: coverage
 
 apidocs:
 	pydoctor --intersphinx http://urllib3.readthedocs.org/en/latest/objects.inv --intersphinx http://docs.python.org/3/objects.inv --docformat=google dulwich --project-url=https://www.dulwich.io/ --project-name=dulwich
+
+fix:
+	ruff check --fix .

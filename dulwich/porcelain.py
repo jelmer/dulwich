@@ -78,28 +78,57 @@ from typing import Optional, Tuple, Union
 from .archive import tar_stream
 from .client import get_transport_and_path
 from .config import Config, ConfigFile, StackedConfig, read_submodules
-from .diff_tree import (CHANGE_ADD, CHANGE_COPY, CHANGE_DELETE, CHANGE_MODIFY,
-                        CHANGE_RENAME, RENAME_CHANGE_TYPES)
+from .diff_tree import (
+    CHANGE_ADD,
+    CHANGE_COPY,
+    CHANGE_DELETE,
+    CHANGE_MODIFY,
+    CHANGE_RENAME,
+    RENAME_CHANGE_TYPES,
+)
 from .errors import SendPackError
 from .file import ensure_dir_exists
 from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
-from .index import (_fs_to_tree_path, blob_from_path_and_stat,
-                    build_file_from_blob, get_unstaged_changes,
-                    index_entry_from_stat)
+from .index import (
+    _fs_to_tree_path,
+    blob_from_path_and_stat,
+    build_file_from_blob,
+    get_unstaged_changes,
+    index_entry_from_stat,
+)
 from .object_store import iter_tree_contents, tree_lookup_path
-from .objects import (Commit, Tag, format_timezone, parse_timezone,
-                      pretty_format_tree_entry)
-from .objectspec import (parse_commit, parse_object, parse_ref,
-                         parse_reftuples, parse_tree, to_bytes)
+from .objects import (
+    Commit,
+    Tag,
+    format_timezone,
+    parse_timezone,
+    pretty_format_tree_entry,
+)
+from .objectspec import (
+    parse_commit,
+    parse_object,
+    parse_ref,
+    parse_reftuples,
+    parse_tree,
+    to_bytes,
+)
 from .pack import write_pack_from_container, write_pack_index
 from .patch import write_tree_diff
 from .protocol import ZERO_SHA, Protocol
-from .refs import (LOCAL_BRANCH_PREFIX, LOCAL_REMOTE_PREFIX, LOCAL_TAG_PREFIX,
-                   _import_remote_refs)
+from .refs import (
+    LOCAL_BRANCH_PREFIX,
+    LOCAL_REMOTE_PREFIX,
+    LOCAL_TAG_PREFIX,
+    _import_remote_refs,
+)
 from .repo import BaseRepo, Repo
-from .server import (FileSystemBackend, ReceivePackHandler, TCPGitServer,
-                     UploadPackHandler)
+from .server import (
+    FileSystemBackend,
+    ReceivePackHandler,
+    TCPGitServer,
+    UploadPackHandler,
+)
 from .server import update_server_info as server_update_server_info
 
 # Module level tuple definition for status output
@@ -130,9 +159,9 @@ DEFAULT_ENCODING = "utf-8"
 
 
 class Error(Exception):
-    """Porcelain-based error. """
+    """Porcelain-based error."""
 
-    def __init__(self, msg):
+    def __init__(self, msg) -> None:
         super().__init__(msg)
 
 
@@ -162,7 +191,7 @@ def parse_timezone_format(tz_str):
     Returns: Timezone offset as integer
     Raises:
       TimezoneFormatError: if timezone information cannot be extracted
-   """
+    """
     import re
 
     # Git internal format
@@ -203,7 +232,7 @@ def parse_timezone_format(tz_str):
 def get_user_timezones():
     """Retrieve local timezone as described in
     https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
-    Returns: A tuple containing author timezone, committer timezone
+    Returns: A tuple containing author timezone, committer timezone.
     """
     local_timezone = time.localtime().tm_gmtoff
 
@@ -286,7 +315,7 @@ def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
 class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
-    def __init__(self, current_sha, new_sha):
+    def __init__(self, current_sha, new_sha) -> None:
         self.current_sha = current_sha
         self.new_sha = new_sha
 
@@ -321,7 +350,6 @@ def archive(
       outstream: Output stream (defaults to stdout)
       errstream: Error stream (defaults to stderr)
     """
-
     if committish is None:
         committish = "HEAD"
     with open_repo_closing(repo) as repo_obj:
@@ -566,7 +594,7 @@ def add(repo=".", paths=None):
 
 
 def _is_subdir(subdir, parentdir):
-    """Check whether subdir is parentdir or a subdir of parentdir
+    """Check whether subdir is parentdir or a subdir of parentdir.
 
     If parentdir or subdir is a relative path, it will be disamgibuated
     relative to the pwd.
@@ -578,7 +606,7 @@ def _is_subdir(subdir, parentdir):
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
 def clean(repo=".", target_dir=None):
-    """Remove any untracked files from the target directory recursively
+    """Remove any untracked files from the target directory recursively.
 
     Equivalent to running ``git clean -fd`` in target_dir.
 
@@ -1016,7 +1044,6 @@ def tag_create(
         pass True to use default GPG key,
         pass a str containing Key ID to use a specific GPG key)
     """
-
     with open_repo_closing(repo) as r:
         object = parse_object(r, objectish)
 
@@ -1087,7 +1114,6 @@ def reset(repo, mode, treeish="HEAD"):
       mode: Mode ("hard", "soft", "mixed")
       treeish: Treeish to reset to
     """
-
     if mode != "hard":
         raise Error("hard is the only mode currently supported")
 
@@ -1129,7 +1155,7 @@ def push(
     force=False,
     **kwargs
 ):
-    """Remote push with dulwich via dulwich.client
+    """Remote push with dulwich via dulwich.client.
 
     Args:
       repo: Path to repository
@@ -1139,7 +1165,6 @@ def push(
       errstream: A stream file to write errors
       force: Force overwriting refs
     """
-
     # Open the repo
     with open_repo_closing(repo) as r:
         if refspecs is None:
@@ -1215,7 +1240,7 @@ def pull(
     force=False,
     **kwargs
 ):
-    """Pull from remote via dulwich.client
+    """Pull from remote via dulwich.client.
 
     Args:
       repo: Path to repository
@@ -1315,7 +1340,7 @@ def status(repo=".", ignored=False, untracked_files="all"):
 
 
 def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
-    """Get path, is_dir for files in working dir from frompath
+    """Get path, is_dir for files in working dir from frompath.
 
     Args:
       frompath: Path to begin walk
@@ -1462,8 +1487,12 @@ def web_daemon(path=".", address=None, port=None):
       address: Optional address to listen on (defaults to ::)
       port: Optional port to listen on (defaults to 80)
     """
-    from .web import (WSGIRequestHandlerLogger, WSGIServerLogger, make_server,
-                      make_wsgi_chain)
+    from .web import (
+        WSGIRequestHandlerLogger,
+        WSGIServerLogger,
+        make_server,
+        make_wsgi_chain,
+    )
 
     backend = FileSystemBackend(path)
     app = make_wsgi_chain(backend)
@@ -1782,7 +1811,7 @@ def remote_add(repo: Repo, name: Union[bytes, str], url: Union[bytes, str]):
 
 
 def remote_remove(repo: Repo, name: Union[bytes, str]):
-    """Remove a remote
+    """Remove a remote.
 
     Args:
       repo: Path to the repository
@@ -1890,7 +1919,7 @@ def _update_head_during_checkout_branch(repo, target):
 
 
 def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
-    """switch branches or restore working tree files.
+    """Switch branches or restore working tree files.
 
     The implementation of this function will probably not scale well
     for branches with lots of local changes.

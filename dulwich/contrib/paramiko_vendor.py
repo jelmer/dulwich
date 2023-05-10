@@ -35,7 +35,7 @@ import paramiko.client
 
 
 class _ParamikoWrapper:
-    def __init__(self, client, channel):
+    def __init__(self, client, channel) -> None:
         self.client = client
         self.channel = channel
 
@@ -73,7 +73,7 @@ class _ParamikoWrapper:
 class ParamikoSSHVendor:
     # http://docs.paramiko.org/en/2.4/api/client.html
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         self.kwargs = kwargs
 
     def run_command(

@@ -24,12 +24,24 @@ from itertools import permutations
 
 from dulwich.tests import TestCase
 
-from ..diff_tree import (CHANGE_COPY, CHANGE_MODIFY, CHANGE_RENAME,
-                         CHANGE_UNCHANGED, RenameDetector, TreeChange,
-                         _count_blocks, _count_blocks_py, _is_tree,
-                         _is_tree_py, _merge_entries, _merge_entries_py,
-                         _similarity_score, _tree_change_key, tree_changes,
-                         tree_changes_for_merge)
+from ..diff_tree import (
+    CHANGE_COPY,
+    CHANGE_MODIFY,
+    CHANGE_RENAME,
+    CHANGE_UNCHANGED,
+    RenameDetector,
+    TreeChange,
+    _count_blocks,
+    _count_blocks_py,
+    _is_tree,
+    _is_tree_py,
+    _merge_entries,
+    _merge_entries_py,
+    _similarity_score,
+    _tree_change_key,
+    tree_changes,
+    tree_changes_for_merge,
+)
 from ..index import commit_tree
 from ..object_store import MemoryObjectStore
 from ..objects import Blob, ShaFile, Tree, TreeEntry

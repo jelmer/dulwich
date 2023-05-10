@@ -88,7 +88,7 @@ def create_swift_connector(store={}):
 
 
 class Response:
-    def __init__(self, headers={}, status=200, content=None):
+    def __init__(self, headers={}, status=200, content=None) -> None:
         self.headers = headers
         self.status_code = status
         self.content = content
@@ -179,7 +179,7 @@ def create_commits(length=1, marker=b"Default"):
 
 @skipIf(missing_libs, skipmsg)
 class FakeSwiftConnector:
-    def __init__(self, root, conf, store=None):
+    def __init__(self, root, conf, store=None) -> None:
         if store:
             self.store = store
         else:
@@ -301,7 +301,7 @@ class TestSwiftInfoRefsContainer(TestCase):
         self.object_store = {}
 
     def test_init(self):
-        """info/refs does not exists"""
+        """info/refs does not exists."""
         irc = swift.SwiftInfoRefsContainer(self.fsc, self.object_store)
         self.assertEqual(len(irc._refs), 0)
         self.fsc.store = self.store

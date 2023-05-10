@@ -18,8 +18,7 @@
 # License, Version 2.0.
 #
 
-"""Bundle format support.
-"""
+"""Bundle format support."""
 
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
@@ -35,7 +34,7 @@ class Bundle:
     references: Dict[str, bytes] = {}
     pack_data: Union[PackData, Sequence[bytes]] = []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f"<{type(self).__name__}(version={self.version}, "
                 f"capabilities={self.capabilities}, "
                 f"prerequisites={self.prerequisites}, "

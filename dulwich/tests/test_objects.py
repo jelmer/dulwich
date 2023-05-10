@@ -33,13 +33,29 @@ from itertools import permutations
 from dulwich.tests import TestCase
 
 from ..errors import ObjectFormatException
-from ..objects import (MAX_TIME, Blob, Commit, ShaFile, Tag, Tree, TreeEntry,
-                       _parse_tree_py, _sorted_tree_items_py, check_hexsha,
-                       check_identity, format_timezone, hex_to_filename,
-                       hex_to_sha, object_class, parse_timezone, parse_tree,
-                       pretty_format_tree_entry, sha_to_hex, sorted_tree_items)
-from .utils import (ext_functest_builder, functest_builder, make_commit,
-                    make_object)
+from ..objects import (
+    MAX_TIME,
+    Blob,
+    Commit,
+    ShaFile,
+    Tag,
+    Tree,
+    TreeEntry,
+    _parse_tree_py,
+    _sorted_tree_items_py,
+    check_hexsha,
+    check_identity,
+    format_timezone,
+    hex_to_filename,
+    hex_to_sha,
+    object_class,
+    parse_timezone,
+    parse_tree,
+    pretty_format_tree_entry,
+    sha_to_hex,
+    sorted_tree_items,
+)
+from .utils import ext_functest_builder, functest_builder, make_commit, make_object
 
 a_sha = b"6f670c0fb53f9463760b7295fbb814e965fb20c8"
 b_sha = b"2969be3e8ee1c0222396a5611407e4769f14e54b"
@@ -57,14 +73,14 @@ class TestHexToSha(TestCase):
 
 
 class BlobReadTests(TestCase):
-    """Test decompression of blobs"""
+    """Test decompression of blobs."""
 
     def get_sha_file(self, cls, base, sha):
         dir = os.path.join(os.path.dirname(__file__), "..", "..", "testdata", base)
         return cls.from_path(hex_to_filename(dir, sha))
 
     def get_blob(self, sha):
-        """Return the blob named sha from the test data dir"""
+        """Return the blob named sha from the test data dir."""
         return self.get_sha_file(Blob, "blobs", sha)
 
     def get_tree(self, sha):
@@ -665,7 +681,7 @@ class CommitParseTests(ShaFileCheckTests):
         )
 
     def test_check_commit_with_overflow_date(self):
-        """Date with overflow should raise an ObjectFormatException when checked"""
+        """Date with overflow should raise an ObjectFormatException when checked."""
         identity_with_wrong_time = (
             b"Igor Sysoev <igor@sysoev.ru> 18446743887488505614 +42707004"
         )
@@ -686,7 +702,7 @@ class CommitParseTests(ShaFileCheckTests):
                 commit.check()
 
     def test_mangled_author_line(self):
-        """Mangled author line should successfully parse"""
+        """Mangled author line should successfully parse."""
         author_line = (
             b'Karl MacMillan <kmacmill@redhat.com> <"Karl MacMillan '
             b'<kmacmill@redhat.com>"> 1197475547 -0500'
@@ -1116,7 +1132,7 @@ class TagParseTests(ShaFileCheckTests):
         )
 
     def test_check_tag_with_overflow_time(self):
-        """Date with overflow should raise an ObjectFormatException when checked"""
+        """Date with overflow should raise an ObjectFormatException when checked."""
         author = "Some Dude <some@dude.org> {} +0000".format(MAX_TIME + 1)
         tag = Tag.from_string(self.make_tag_text(tagger=(author.encode())))
         with self.assertRaises(ObjectFormatException):

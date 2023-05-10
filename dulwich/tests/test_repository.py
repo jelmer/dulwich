@@ -35,9 +35,14 @@ from dulwich.tests import TestCase, skipIf
 from ..config import Config
 from ..errors import NotGitRepository
 from ..object_store import tree_lookup_path
-from ..repo import (InvalidUserIdentity, MemoryRepo, Repo,
-                    UnsupportedExtension, UnsupportedVersion,
-                    check_user_identity)
+from ..repo import (
+    InvalidUserIdentity,
+    MemoryRepo,
+    Repo,
+    UnsupportedExtension,
+    UnsupportedVersion,
+    check_user_identity,
+)
 from .utils import open_repo, setup_warning_catcher, tear_down_repo
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
@@ -565,13 +570,11 @@ class RepositoryRootTests(TestCase):
         self.assertIsInstance(r.get_config_stack(), Config)
 
     def test_common_revisions(self):
-        """
-        This test demonstrates that ``find_common_revisions()`` actually
+        """This test demonstrates that ``find_common_revisions()`` actually
         returns common heads, not revisions; dulwich already uses
         ``find_common_revisions()`` in such a manner (see
         ``Repo.find_objects()``).
         """
-
         expected_shas = {b"60dacdc733de308bb77bb76ce0fb0f9b44c9769e"}
 
         # Source for objects.

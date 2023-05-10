@@ -61,30 +61,61 @@ import zlib
 from dulwich import log_utils
 
 from .archive import tar_stream
-from .errors import (ApplyDeltaError, ChecksumMismatch, GitProtocolError,
-                     HookError, NotGitRepository, ObjectFormatException,
-                     UnexpectedCommandError)
+from .errors import (
+    ApplyDeltaError,
+    ChecksumMismatch,
+    GitProtocolError,
+    HookError,
+    NotGitRepository,
+    ObjectFormatException,
+    UnexpectedCommandError,
+)
 from .object_store import peel_sha
 from .objects import Commit, ObjectID, valid_hexsha
-from .pack import (ObjectContainer, PackedObjectContainer,
-                   write_pack_from_container)
-from .protocol import (CAPABILITIES_REF, CAPABILITY_AGENT,
-                       CAPABILITY_DELETE_REFS, CAPABILITY_INCLUDE_TAG,
-                       CAPABILITY_MULTI_ACK, CAPABILITY_MULTI_ACK_DETAILED,
-                       CAPABILITY_NO_DONE, CAPABILITY_NO_PROGRESS,
-                       CAPABILITY_OFS_DELTA, CAPABILITY_QUIET,
-                       CAPABILITY_REPORT_STATUS, CAPABILITY_SHALLOW,
-                       CAPABILITY_SIDE_BAND_64K, CAPABILITY_THIN_PACK,
-                       COMMAND_DEEPEN, COMMAND_DONE, COMMAND_HAVE,
-                       COMMAND_SHALLOW, COMMAND_UNSHALLOW, COMMAND_WANT,
-                       MULTI_ACK, MULTI_ACK_DETAILED, NAK_LINE,
-                       SIDE_BAND_CHANNEL_DATA, SIDE_BAND_CHANNEL_FATAL,
-                       SIDE_BAND_CHANNEL_PROGRESS, SINGLE_ACK, TCP_GIT_PORT,
-                       ZERO_SHA, BufferedPktLineWriter, Protocol,
-                       ReceivableProtocol, ack_type, capability_agent,
-                       extract_capabilities, extract_want_line_capabilities,
-                       format_ack_line, format_ref_line, format_shallow_line,
-                       format_unshallow_line, symref_capabilities)
+from .pack import ObjectContainer, PackedObjectContainer, write_pack_from_container
+from .protocol import (
+    CAPABILITIES_REF,
+    CAPABILITY_AGENT,
+    CAPABILITY_DELETE_REFS,
+    CAPABILITY_INCLUDE_TAG,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_NO_DONE,
+    CAPABILITY_NO_PROGRESS,
+    CAPABILITY_OFS_DELTA,
+    CAPABILITY_QUIET,
+    CAPABILITY_REPORT_STATUS,
+    CAPABILITY_SHALLOW,
+    CAPABILITY_SIDE_BAND_64K,
+    CAPABILITY_THIN_PACK,
+    COMMAND_DEEPEN,
+    COMMAND_DONE,
+    COMMAND_HAVE,
+    COMMAND_SHALLOW,
+    COMMAND_UNSHALLOW,
+    COMMAND_WANT,
+    MULTI_ACK,
+    MULTI_ACK_DETAILED,
+    NAK_LINE,
+    SIDE_BAND_CHANNEL_DATA,
+    SIDE_BAND_CHANNEL_FATAL,
+    SIDE_BAND_CHANNEL_PROGRESS,
+    SINGLE_ACK,
+    TCP_GIT_PORT,
+    ZERO_SHA,
+    BufferedPktLineWriter,
+    Protocol,
+    ReceivableProtocol,
+    ack_type,
+    capability_agent,
+    extract_capabilities,
+    extract_want_line_capabilities,
+    format_ack_line,
+    format_ref_line,
+    format_shallow_line,
+    format_unshallow_line,
+    symref_capabilities,
+)
 from .refs import PEELED_TAG_SUFFIX, RefsContainer, write_info_refs
 from .repo import BaseRepo, Repo
 
@@ -117,8 +148,7 @@ class BackendRepo(TypingProtocol):
     refs: RefsContainer
 
     def get_refs(self) -> Dict[bytes, bytes]:
-        """
-        Get all the refs in the repository
+        """Get all the refs in the repository.
 
         Returns: dict of name -> sha
         """
@@ -137,8 +167,7 @@ class BackendRepo(TypingProtocol):
         return None
 
     def find_missing_objects(self, determine_wants, graph_walker, progress, get_tagged=None):
-        """
-        Yield the objects required for a list of commits.
+        """Yield the objects required for a list of commits.
 
         Args:
           progress: is a callback to send progress messages to the client
@@ -151,7 +180,7 @@ class BackendRepo(TypingProtocol):
 class DictBackend(Backend):
     """Trivial backend that looks up Git repositories in a dictionary."""
 
-    def __init__(self, repos):
+    def __init__(self, repos) -> None:
         self.repos = repos
 
     def open_repository(self, path: str) -> BaseRepo:
@@ -167,7 +196,7 @@ class DictBackend(Backend):
 class FileSystemBackend(Backend):
     """Simple backend looking up Git repositories in the local file system."""
 
-    def __init__(self, root=os.sep):
+    def __init__(self, root=os.sep) -> None:
         super().__init__()
         self.root = (os.path.abspath(root) + os.sep).replace(os.sep * 2, os.sep)
 
@@ -184,7 +213,7 @@ class FileSystemBackend(Backend):
 class Handler:
     """Smart protocol command handler base class."""
 
-    def __init__(self, backend, proto, stateless_rpc=False):
+    def __init__(self, backend, proto, stateless_rpc=False) -> None:
         self.backend = backend
         self.proto = proto
         self.stateless_rpc = stateless_rpc
@@ -196,9 +225,9 @@ class Handler:
 class PackHandler(Handler):
     """Protocol handler for packs."""
 
-    def __init__(self, backend, proto, stateless_rpc=False):
+    def __init__(self, backend, proto, stateless_rpc=False) -> None:
         super().__init__(backend, proto, stateless_rpc)
-        self._client_capabilities = None
+        self._client_capabilities: Optional[Set[bytes]] = None
         # Flags needed for the no-done capability
         self._done_received = False
 
@@ -253,7 +282,7 @@ class PackHandler(Handler):
 class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
+    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False) -> None:
         super().__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
@@ -528,7 +557,7 @@ class _ProtocolGraphWalker:
     any calls to next() or ack() are made.
     """
 
-    def __init__(self, handler, object_store: ObjectContainer, get_peeled, get_symrefs):
+    def __init__(self, handler, object_store: ObjectContainer, get_peeled, get_symrefs) -> None:
         self.handler = handler
         self.store: ObjectContainer = object_store
         self.get_peeled = get_peeled
@@ -660,6 +689,7 @@ class _ProtocolGraphWalker:
         Args:
           allowed: An iterable of command names that should be allowed.
         Returns: A tuple of (command, value); see _split_proto_line.
+
         Raises:
           UnexpectedCommandError: If an error occurred reading the line.
         """
@@ -731,9 +761,9 @@ _GRAPH_WALKER_COMMANDS = (COMMAND_HAVE, COMMAND_DONE, None)
 class SingleAckGraphWalkerImpl:
     """Graph walker implementation that speaks the single-ack protocol."""
 
-    def __init__(self, walker):
+    def __init__(self, walker) -> None:
         self.walker = walker
-        self._common = []
+        self._common: List[bytes] = []
 
     def ack(self, have_ref):
         if not self._common:
@@ -775,10 +805,10 @@ class SingleAckGraphWalkerImpl:
 class MultiAckGraphWalkerImpl:
     """Graph walker implementation that speaks the multi-ack protocol."""
 
-    def __init__(self, walker):
+    def __init__(self, walker) -> None:
         self.walker = walker
         self._found_base = False
-        self._common = []
+        self._common: List[bytes] = []
 
     def ack(self, have_ref):
         self._common.append(have_ref)
@@ -834,9 +864,9 @@ class MultiAckGraphWalkerImpl:
 class MultiAckDetailedGraphWalkerImpl:
     """Graph walker implementation speaking the multi-ack-detailed protocol."""
 
-    def __init__(self, walker):
+    def __init__(self, walker) -> None:
         self.walker = walker
-        self._common = []
+        self._common: List[bytes] = []
 
     def ack(self, have_ref):
         # Should only be called iff have_ref is common
@@ -899,7 +929,7 @@ class MultiAckDetailedGraphWalkerImpl:
 class ReceivePackHandler(PackHandler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False):
+    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False) -> None:
         super().__init__(
             backend, proto, stateless_rpc=stateless_rpc
         )
@@ -1063,7 +1093,7 @@ class ReceivePackHandler(PackHandler):
 
 
 class UploadArchiveHandler(Handler):
-    def __init__(self, backend, args, proto, stateless_rpc=False):
+    def __init__(self, backend, args, proto, stateless_rpc=False) -> None:
         super().__init__(backend, proto, stateless_rpc)
         self.repo = backend.open_repository(args[0])
 
@@ -1111,7 +1141,7 @@ DEFAULT_HANDLERS = {
 
 
 class TCPGitRequestHandler(socketserver.StreamRequestHandler):
-    def __init__(self, handlers, *args, **kwargs):
+    def __init__(self, handlers, *args, **kwargs) -> None:
         self.handlers = handlers
         socketserver.StreamRequestHandler.__init__(self, *args, **kwargs)
 
@@ -1135,7 +1165,7 @@ class TCPGitServer(socketserver.TCPServer):
     def _make_handler(self, *args, **kwargs):
         return TCPGitRequestHandler(self.handlers, *args, **kwargs)
 
-    def __init__(self, backend, listen_addr, port=TCP_GIT_PORT, handlers=None):
+    def __init__(self, backend, listen_addr, port=TCP_GIT_PORT, handlers=None) -> None:
         self.handlers = dict(DEFAULT_HANDLERS)
         if handlers is not None:
             self.handlers.update(handlers)

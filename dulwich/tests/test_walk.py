@@ -25,8 +25,7 @@ from unittest import expectedFailure
 
 from dulwich.tests import TestCase
 
-from ..diff_tree import (CHANGE_MODIFY, CHANGE_RENAME, RenameDetector,
-                         TreeChange)
+from ..diff_tree import CHANGE_MODIFY, CHANGE_RENAME, RenameDetector, TreeChange
 from ..errors import MissingCommitError
 from ..object_store import MemoryObjectStore
 from ..objects import Blob, Commit
@@ -35,11 +34,11 @@ from .utils import F, build_commit_graph, make_object, make_tag
 
 
 class TestWalkEntry:
-    def __init__(self, commit, changes):
+    def __init__(self, commit, changes) -> None:
         self.commit = commit
         self.changes = changes
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<TestWalkEntry commit={}, changes={!r}>".format(
             self.commit.id,
             self.changes,

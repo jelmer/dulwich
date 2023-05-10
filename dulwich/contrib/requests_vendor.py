@@ -33,8 +33,12 @@ from io import BytesIO
 
 from requests import Session
 
-from ..client import (AbstractHttpGitClient, HTTPProxyUnauthorized,
-                      HTTPUnauthorized, default_user_agent_string)
+from ..client import (
+    AbstractHttpGitClient,
+    HTTPProxyUnauthorized,
+    HTTPUnauthorized,
+    default_user_agent_string,
+)
 from ..errors import GitProtocolError, NotGitRepository
 
 
@@ -47,7 +51,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
             username=None,
             password=None,
             **kwargs
-    ):
+    ) -> None:
         self._username = username
         self._password = password
 

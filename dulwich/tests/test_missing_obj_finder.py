@@ -96,14 +96,14 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         self.assertMissingMatch([self.cmt(1).id], [self.cmt(3).id], self.missing_1_3)
 
     def test_bogus_haves(self):
-        """Ensure non-existent SHA in haves are tolerated"""
+        """Ensure non-existent SHA in haves are tolerated."""
         bogus_sha = self.cmt(2).id[::-1]
         haves = [self.cmt(1).id, bogus_sha]
         wants = [self.cmt(3).id]
         self.assertMissingMatch(haves, wants, self.missing_1_3)
 
     def test_bogus_wants_failure(self):
-        """Ensure non-existent SHA in wants are not tolerated"""
+        """Ensure non-existent SHA in wants are not tolerated."""
         bogus_sha = self.cmt(2).id[::-1]
         haves = [self.cmt(1).id]
         wants = [self.cmt(3).id, bogus_sha]

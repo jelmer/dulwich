@@ -38,8 +38,14 @@ from urllib.parse import unquote
 from dulwich import client, file, index, objects, protocol, repo
 from dulwich.tests import SkipTest, expectedFailure
 
-from .utils import (_DEFAULT_GIT, CompatTestCase, check_for_daemon,
-                    import_repo_to_dir, rmtree_ro, run_git_or_fail)
+from .utils import (
+    _DEFAULT_GIT,
+    CompatTestCase,
+    check_for_daemon,
+    import_repo_to_dir,
+    rmtree_ro,
+    run_git_or_fail,
+)
 
 if sys.platform == "win32":
     import ctypes
@@ -621,7 +627,7 @@ class HTTPGitServer(http.server.HTTPServer):
 
     allow_reuse_address = True
 
-    def __init__(self, server_address, root_path):
+    def __init__(self, server_address, root_path) -> None:
         http.server.HTTPServer.__init__(self, server_address, GitHTTPRequestHandler)
         self.root_path = root_path
         self.server_name = "localhost"

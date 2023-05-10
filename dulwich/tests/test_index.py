@@ -32,12 +32,24 @@ from io import BytesIO
 
 from dulwich.tests import TestCase, skipIf
 
-from ..index import (Index, IndexEntry, _fs_to_tree_path, _tree_to_fs_path,
-                     build_index_from_tree, cleanup_mode, commit_tree,
-                     get_unstaged_changes, index_entry_from_stat, read_index,
-                     read_index_dict, validate_path_element_default,
-                     validate_path_element_ntfs, write_cache_time, write_index,
-                     write_index_dict)
+from ..index import (
+    Index,
+    IndexEntry,
+    _fs_to_tree_path,
+    _tree_to_fs_path,
+    build_index_from_tree,
+    cleanup_mode,
+    commit_tree,
+    get_unstaged_changes,
+    index_entry_from_stat,
+    read_index,
+    read_index_dict,
+    validate_path_element_default,
+    validate_path_element_ntfs,
+    write_cache_time,
+    write_index,
+    write_index_dict,
+)
 from ..object_store import MemoryObjectStore
 from ..objects import S_IFGITLINK, Blob, Commit, Tree
 from ..repo import Repo
@@ -643,7 +655,6 @@ class BuildIndexTests(TestCase):
 class GetUnstagedChangesTests(TestCase):
     def test_get_unstaged_changes(self):
         """Unit test for get_unstaged_changes."""
-
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
@@ -676,7 +687,6 @@ class GetUnstagedChangesTests(TestCase):
 
     def test_get_unstaged_deleted_changes(self):
         """Unit test for get_unstaged_changes."""
-
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
@@ -701,7 +711,6 @@ class GetUnstagedChangesTests(TestCase):
 
     def test_get_unstaged_changes_removed_replaced_by_directory(self):
         """Unit test for get_unstaged_changes."""
-
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
@@ -728,7 +737,6 @@ class GetUnstagedChangesTests(TestCase):
     @skipIf(not can_symlink(), "Requires symlink support")
     def test_get_unstaged_changes_removed_replaced_by_link(self):
         """Unit test for get_unstaged_changes."""
-
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:

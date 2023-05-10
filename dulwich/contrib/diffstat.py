@@ -110,13 +110,14 @@ def _parse_patch(lines: List[bytes]) -> Tuple[List[bytes], List[bool], List[Tupl
 # may not be encodable even to utf-8
 def diffstat(lines, max_width=80):
     """Generate summary statistics from a git style diff ala
-       (git diff tag1 tag2 --stat)
+       (git diff tag1 tag2 --stat).
+
     Args:
       lines: list of byte string "lines" from the diff to be parsed
       max_width: maximum line length for generating the summary
                  statistics (default 80)
     Returns: A byte string that lists the changed files with change
-             counts and histogram
+             counts and histogram.
     """
     names, nametypes, counts = _parse_patch(lines)
     insert = []

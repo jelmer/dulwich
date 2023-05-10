@@ -20,7 +20,7 @@
 
 """Reading and writing Git configuration files.
 
-TODO:
+Todo:
  * preserve formatting when updating configuration files
  * treat subsection names as case-insensitive for [branch.foo] style
    subsections
@@ -29,8 +29,20 @@ TODO:
 import os
 import sys
 from contextlib import suppress
-from typing import (BinaryIO, Iterable, Iterator, KeysView, List,
-                    MutableMapping, Optional, Tuple, Union, overload)
+from typing import (
+    BinaryIO,
+    Iterable,
+    Iterator,
+    KeysView,
+    List,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Union,
+    overload,
+    Any,
+    Dict,
+)
 
 from .file import GitFile
 
@@ -49,9 +61,9 @@ def lower_key(key):
 
 class CaseInsensitiveOrderedMultiDict(MutableMapping):
 
-    def __init__(self):
-        self._real = []
-        self._keyed = {}
+    def __init__(self) -> None:
+        self._real: List[Any] = []
+        self._keyed: Dict[Any, Any] = {}
 
     @classmethod
     def make(cls, dict_in=None):
@@ -72,7 +84,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
 
         return out
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._keyed)
 
     def keys(self) -> KeysView[Tuple[bytes, ...]]:
@@ -87,11 +99,11 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def values(self):
         return self._keyed.values()
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         self._real.append((key, value))
         self._keyed[lower_key(key)] = value
 
-    def __delitem__(self, key):
+    def __delitem__(self, key) -> None:
         key = lower_key(key)
         del self._keyed[key]
         for i, (actual, unused_value) in reversed(list(enumerate(self._real))):
@@ -181,6 +193,7 @@ class Config:
           section: Tuple with section name and optional subsection name
           name: Name of the setting, including section and possible
             subsection.
+
         Returns:
           Contents of the setting
         """
@@ -670,7 +683,7 @@ class StackedConfig(Config):
 
     def __init__(
         self, backends: List[ConfigFile], writable: Optional[ConfigFile] = None
-    ):
+    ) -> None:
         self.backends = backends
         self.writable = writable
 
@@ -744,7 +757,7 @@ class StackedConfig(Config):
 
 
 def read_submodules(path: str) -> Iterator[Tuple[bytes, bytes, bytes]]:
-    """read a .gitmodules file."""
+    """Read a .gitmodules file."""
     cfg = ConfigFile.from_path(path)
     return parse_submodules(cfg)
 
@@ -767,8 +780,7 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
 
 
 def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:
-    """Iterate over insteadOf / pushInsteadOf values.
-    """
+    """Iterate over insteadOf / pushInsteadOf values."""
     for section in config.sections():
         if section[0] != b'url':
             continue
@@ -788,8 +800,7 @@ def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, s
 
 
 def apply_instead_of(config: Config, orig_url: str, push: bool = False) -> str:
-    """Apply insteadOf / pushInsteadOf to a URL.
-    """
+    """Apply insteadOf / pushInsteadOf to a URL."""
     longest_needle = ""
     updated_url = orig_url
     for needle, replacement in iter_instead_of(config, push):

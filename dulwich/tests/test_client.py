@@ -23,6 +23,7 @@ import os
 import shutil
 import sys
 import tempfile
+from typing import Dict
 import warnings
 from io import BytesIO
 from unittest.mock import patch
@@ -33,15 +34,29 @@ import dulwich
 from dulwich import client
 from dulwich.tests import TestCase, skipIf
 
-from ..client import (FetchPackResult, GitProtocolError, HangupException,
-                      HttpGitClient, InvalidWants, LocalGitClient,
-                      PLinkSSHVendor, ReportStatusParser, SendPackError,
-                      SSHGitClient, StrangeHostname, SubprocessSSHVendor,
-                      TCPGitClient, TraditionalGitClient,
-                      _remote_error_from_stderr, check_wants,
-                      default_urllib3_manager, get_credentials_from_store,
-                      get_transport_and_path, get_transport_and_path_from_url,
-                      parse_rsync_url)
+from ..client import (
+    FetchPackResult,
+    GitProtocolError,
+    HangupException,
+    HttpGitClient,
+    InvalidWants,
+    LocalGitClient,
+    PLinkSSHVendor,
+    ReportStatusParser,
+    SendPackError,
+    SSHGitClient,
+    StrangeHostname,
+    SubprocessSSHVendor,
+    TCPGitClient,
+    TraditionalGitClient,
+    _remote_error_from_stderr,
+    check_wants,
+    default_urllib3_manager,
+    get_credentials_from_store,
+    get_transport_and_path,
+    get_transport_and_path_from_url,
+    parse_rsync_url,
+)
 from ..config import ConfigDict
 from ..objects import Commit, Tree
 from ..pack import pack_objects_to_data, write_pack_data, write_pack_objects
@@ -51,7 +66,7 @@ from .utils import open_repo, setup_warning_catcher, tear_down_repo
 
 
 class DummyClient(TraditionalGitClient):
-    def __init__(self, can_read, read, write):
+    def __init__(self, can_read, read, write) -> None:
         self.can_read = can_read
         self.read = read
         self.write = write
@@ -62,7 +77,7 @@ class DummyClient(TraditionalGitClient):
 
 
 class DummyPopen:
-    def __init__(self, *args, **kwards):
+    def __init__(self, *args, **kwards) -> None:
         self.stdin = BytesIO(b"stdin")
         self.stdout = BytesIO(b"stdout")
         self.stderr = BytesIO(b"stderr")
@@ -680,7 +695,7 @@ class TestGetTransportAndPathFromUrl(TestCase):
 
 
 class TestSSHVendor:
-    def __init__(self):
+    def __init__(self) -> None:
         self.host = None
         self.command = ""
         self.username = None
@@ -1075,8 +1090,8 @@ class HttpGitClientTests(TestCase):
         # we need to mock urllib3.PoolManager as this test will fail
         # otherwise without an active internet connection
         class PoolManagerMock:
-            def __init__(self):
-                self.headers = {}
+            def __init__(self) -> None:
+                self.headers: Dict[str, str] = {}
 
             def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
                 base_url = url[: -len(tail)]

@@ -17,7 +17,7 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 #
-"""All line-ending related functions, from conversions to config processing
+"""All line-ending related functions, from conversions to config processing.
 
 Line-ending normalization is a complex beast. Here is some notes and details
 about how it seems to work.
@@ -145,7 +145,7 @@ LF = b"\n"
 
 
 def convert_crlf_to_lf(text_hunk):
-    """Convert CRLF in text hunk into LF
+    """Convert CRLF in text hunk into LF.
 
     Args:
       text_hunk: A bytes string representing a text hunk
@@ -155,7 +155,7 @@ def convert_crlf_to_lf(text_hunk):
 
 
 def convert_lf_to_crlf(text_hunk):
-    """Convert LF in text hunk into CRLF
+    """Convert LF in text hunk into CRLF.
 
     Args:
       text_hunk: A bytes string representing a text hunk
@@ -167,7 +167,7 @@ def convert_lf_to_crlf(text_hunk):
 
 
 def get_checkout_filter(core_eol, core_autocrlf, git_attributes):
-    """Returns the correct checkout filter based on the passed arguments"""
+    """Returns the correct checkout filter based on the passed arguments."""
     # TODO this function should process the git_attributes for the path and if
     # the text attribute is not defined, fallback on the
     # get_checkout_filter_autocrlf function with the autocrlf value
@@ -175,7 +175,7 @@ def get_checkout_filter(core_eol, core_autocrlf, git_attributes):
 
 
 def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
-    """Returns the correct checkin filter based on the passed arguments"""
+    """Returns the correct checkin filter based on the passed arguments."""
     # TODO this function should process the git_attributes for the path and if
     # the text attribute is not defined, fallback on the
     # get_checkin_filter_autocrlf function with the autocrlf value
@@ -183,7 +183,7 @@ def get_checkin_filter(core_eol, core_autocrlf, git_attributes):
 
 
 def get_checkout_filter_autocrlf(core_autocrlf):
-    """Returns the correct checkout filter base on autocrlf value
+    """Returns the correct checkout filter base on autocrlf value.
 
     Args:
       core_autocrlf: The bytes configuration value of core.autocrlf.
@@ -191,7 +191,6 @@ def get_checkout_filter_autocrlf(core_autocrlf):
     Returns: Either None if no filter has to be applied or a function
         accepting a single argument, a binary text hunk
     """
-
     if core_autocrlf == b"true":
         return convert_lf_to_crlf
 
@@ -199,7 +198,7 @@ def get_checkout_filter_autocrlf(core_autocrlf):
 
 
 def get_checkin_filter_autocrlf(core_autocrlf):
-    """Returns the correct checkin filter base on autocrlf value
+    """Returns the correct checkin filter base on autocrlf value.
 
     Args:
       core_autocrlf: The bytes configuration value of core.autocrlf.
@@ -207,7 +206,6 @@ def get_checkin_filter_autocrlf(core_autocrlf):
     Returns: Either None if no filter has to be applied or a function
         accepting a single argument, a binary text hunk
     """
-
     if core_autocrlf == b"true" or core_autocrlf == b"input":
         return convert_crlf_to_lf
 
@@ -217,10 +215,10 @@ def get_checkin_filter_autocrlf(core_autocrlf):
 
 class BlobNormalizer:
     """An object to store computation result of which filter to apply based
-    on configuration, gitattributes, path and operation (checkin or checkout)
+    on configuration, gitattributes, path and operation (checkin or checkout).
     """
 
-    def __init__(self, config_stack, gitattributes):
+    def __init__(self, config_stack, gitattributes) -> None:
         self.config_stack = config_stack
         self.gitattributes = gitattributes
 
@@ -243,7 +241,7 @@ class BlobNormalizer:
         )
 
     def checkin_normalize(self, blob, tree_path):
-        """Normalize a blob during a checkin operation"""
+        """Normalize a blob during a checkin operation."""
         if self.fallback_write_filter is not None:
             return normalize_blob(
                 blob, self.fallback_write_filter, binary_detection=True
@@ -252,7 +250,7 @@ class BlobNormalizer:
         return blob
 
     def checkout_normalize(self, blob, tree_path):
-        """Normalize a blob during a checkout operation"""
+        """Normalize a blob during a checkout operation."""
         if self.fallback_read_filter is not None:
             return normalize_blob(
                 blob, self.fallback_read_filter, binary_detection=True
@@ -264,7 +262,7 @@ class BlobNormalizer:
 def normalize_blob(blob, conversion, binary_detection):
     """Takes a blob as input returns either the original blob if
     binary_detection is True and the blob content looks like binary, else
-    return a new blob with converted data
+    return a new blob with converted data.
     """
     # Read the original blob
     data = blob.data
@@ -286,7 +284,7 @@ def normalize_blob(blob, conversion, binary_detection):
 
 
 class TreeBlobNormalizer(BlobNormalizer):
-    def __init__(self, config_stack, git_attributes, object_store, tree=None):
+    def __init__(self, config_stack, git_attributes, object_store, tree=None) -> None:
         super().__init__(config_stack, git_attributes)
         if tree:
             self.existing_paths = {

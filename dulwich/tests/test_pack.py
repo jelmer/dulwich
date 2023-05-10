@@ -29,6 +29,7 @@ import tempfile
 import zlib
 from hashlib import sha1
 from io import BytesIO
+from typing import Set
 
 from dulwich.tests import TestCase
 
@@ -36,13 +37,30 @@ from ..errors import ApplyDeltaError, ChecksumMismatch
 from ..file import GitFile
 from ..object_store import MemoryObjectStore
 from ..objects import Blob, Commit, Tree, hex_to_sha, sha_to_hex
-from ..pack import (OFS_DELTA, REF_DELTA, DeltaChainIterator, MemoryPackIndex,
-                    Pack, PackData, PackStreamReader, UnpackedObject,
-                    _delta_encode_size, _encode_copy_operation, apply_delta,
-                    compute_file_sha, create_delta, deltify_pack_objects,
-                    load_pack_index, read_zlib_chunks, unpack_object,
-                    write_pack, write_pack_header, write_pack_index_v1,
-                    write_pack_index_v2, write_pack_object)
+from ..pack import (
+    OFS_DELTA,
+    REF_DELTA,
+    DeltaChainIterator,
+    MemoryPackIndex,
+    Pack,
+    PackData,
+    PackStreamReader,
+    UnpackedObject,
+    _delta_encode_size,
+    _encode_copy_operation,
+    apply_delta,
+    compute_file_sha,
+    create_delta,
+    deltify_pack_objects,
+    load_pack_index,
+    read_zlib_chunks,
+    unpack_object,
+    write_pack,
+    write_pack_header,
+    write_pack_index_v1,
+    write_pack_index_v2,
+    write_pack_object,
+)
 from .utils import build_pack, make_object
 
 pack1_sha = b"bc63ddad95e7321ee734ea11a7a62d314e0d7481"
@@ -54,7 +72,7 @@ indexmode = "0o100644" if sys.platform != "win32" else "0o100666"
 
 
 class PackTests(TestCase):
-    """Base class for testing packs"""
+    """Base class for testing packs."""
 
     def setUp(self):
         super().setUp()
@@ -64,13 +82,13 @@ class PackTests(TestCase):
     datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../testdata/packs"))
 
     def get_pack_index(self, sha):
-        """Returns a PackIndex from the datadir with the given sha"""
+        """Returns a PackIndex from the datadir with the given sha."""
         return load_pack_index(
             os.path.join(self.datadir, "pack-%s.idx" % sha.decode("ascii"))
         )
 
     def get_pack_data(self, sha):
-        """Returns a PackData object from the datadir with the given sha"""
+        """Returns a PackData object from the datadir with the given sha."""
         return PackData(
             os.path.join(self.datadir, "pack-%s.pack" % sha.decode("ascii"))
         )
@@ -86,7 +104,7 @@ class PackTests(TestCase):
 
 
 class PackIndexTests(PackTests):
-    """Class that tests the index of packfiles"""
+    """Class that tests the index of packfiles."""
 
     def test_object_offset(self):
         """Tests that the correct object offset is returned from the index."""
@@ -377,7 +395,7 @@ class TestPack(PackTests):
             self.assertEqual(3, len(tuples))
 
     def test_get_object_at(self):
-        """Tests random access for non-delta objects"""
+        """Tests random access for non-delta objects."""
         with self.get_pack(pack1_sha) as p:
             obj = p[a_sha]
             self.assertEqual(obj.type_name, b"blob")
@@ -924,9 +942,9 @@ class TestPackIterator(DeltaChainIterator):
 
     _compute_crc32 = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._unpacked_offsets = set()
+        self._unpacked_offsets: Set[int] = set()
 
     def _result(self, unpacked):
         """Return entries in the same format as build_pack."""

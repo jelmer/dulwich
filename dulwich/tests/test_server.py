@@ -25,6 +25,7 @@ import shutil
 import sys
 import tempfile
 from io import BytesIO
+from typing import Dict, List
 
 from dulwich.tests import TestCase
 
@@ -66,8 +67,8 @@ SIX = b"6" * 40
 
 class TestProto:
     def __init__(self) -> None:
-        self._output = []
-        self._received = {0: [], 1: [], 2: [], 3: []}
+        self._output: List[bytes] = []
+        self._received: Dict[int, List[bytes]] = {0: [], 1: [], 2: [], 3: []}
 
     def set_output(self, output_lines):
         self._output = output_lines
@@ -588,8 +589,8 @@ class ProtocolGraphWalkerTestCase(TestCase):
 
 class TestProtocolGraphWalker:
     def __init__(self) -> None:
-        self.acks = []
-        self.lines = []
+        self.acks: List[bytes] = []
+        self.lines: List[bytes] = []
         self.wants_satisified = False
         self.stateless_rpc = None
         self.advertise_refs = False

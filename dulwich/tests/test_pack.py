@@ -29,6 +29,7 @@ import tempfile
 import zlib
 from hashlib import sha1
 from io import BytesIO
+from typing import Set
 
 from dulwich.tests import TestCase
 
@@ -943,7 +944,7 @@ class TestPackIterator(DeltaChainIterator):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._unpacked_offsets = set()
+        self._unpacked_offsets: Set[int] = set()
 
     def _result(self, unpacked):
         """Return entries in the same format as build_pack."""

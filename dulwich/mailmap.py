@@ -20,6 +20,8 @@
 
 """Mailmap file reader."""
 
+from typing import Dict, Tuple, Optional
+
 
 def parse_identity(text):
     # TODO(jelmer): Integrate this with dulwich.fastexport.split_email and
@@ -62,7 +64,7 @@ class Mailmap:
     """Class for accessing a mailmap file."""
 
     def __init__(self, map=None) -> None:
-        self._table = {}
+        self._table: Dict[Tuple[Optional[str], str], Tuple[str, str]] = {}
         if map:
             for (canonical_identity, from_identity) in map:
                 self.add_entry(canonical_identity, from_identity)

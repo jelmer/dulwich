@@ -258,7 +258,7 @@ class ChunkReader:
 
     def __init__(self, f) -> None:
         self._iter = _chunk_iter(f)
-        self._buffer = []
+        self._buffer: List[bytes] = []
 
     def read(self, n):
         while sum(map(len, self._buffer)) < n:

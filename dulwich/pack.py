@@ -201,6 +201,7 @@ class UnpackedObject:
     obj_chunks: Optional[List[bytes]]
     delta_base: Union[None, bytes, int]
     decomp_chunks: List[bytes]
+    comp_chunks: Optional[List[bytes]]
 
     # TODO(dborowitz): read_zlib_chunks and unpack_object could very well be
     # methods of this object.
@@ -1167,7 +1168,7 @@ class PackData:
         else:
             self._file = file
         (version, self._num_objects) = read_pack_header(self._file.read)
-        self._offset_cache = LRUSizeCache(
+        self._offset_cache = LRUSizeCache[int, Tuple[int, OldUnpackedObject]](
             1024 * 1024 * 20, compute_size=_compute_object_size
         )
 
@@ -1239,7 +1240,7 @@ class PackData:
             # Back up over unused data.
             self._file.seek(-len(unused), SEEK_CUR)
 
-    def iterentries(self, progress: Optional[ProgressFn] = None, resolve_ext_ref: Optional[ResolveExtRefFn] = None):
+    def iterentries(self, progress=None, resolve_ext_ref: Optional[ResolveExtRefFn] = None):
         """Yield entries summarizing the contents of this pack.
 
         Args:
@@ -1957,7 +1958,7 @@ class PackChunkGenerator:
 
     def __init__(self, num_records=None, records=None, progress=None, compression_level=-1, reuse_compressed=True) -> None:
         self.cs = sha1(b"")
-        self.entries = {}
+        self.entries: Dict[Union[int, bytes], Tuple[int, int]] = {}
         self._it = self._pack_data_chunks(
             num_records=num_records, records=records, progress=progress, compression_level=compression_level, reuse_compressed=reuse_compressed)
 
@@ -2607,7 +2608,7 @@ def extend_pack(f: BinaryIO, object_ids: Set[ObjectID], get_raw, *, compression_
 
 
 try:
-    from dulwich._pack import (
+    from dulwich._pack import (  # type: ignore  # noqa: F811
         apply_delta,  # type: ignore # noqa: F811
         bisect_find_sha,  # type: ignore # noqa: F811
     )

@@ -24,11 +24,12 @@
 import collections
 import heapq
 from itertools import chain
-from typing import Deque, List, Optional, Set, Tuple
+from typing import Deque, List, Optional, Set, Tuple, Dict
 
 from .diff_tree import (
     RENAME_CHANGE_TYPES,
     RenameDetector,
+    TreeChange,
     tree_changes,
     tree_changes_for_merge,
 )
@@ -51,7 +52,7 @@ class WalkEntry:
         self.commit = commit
         self._store = walker.store
         self._get_parents = walker.get_parents
-        self._changes = {}
+        self._changes: Dict[str, List[TreeChange]] = {}
         self._rename_detector = walker.rename_detector
 
     def changes(self, path_prefix=None):

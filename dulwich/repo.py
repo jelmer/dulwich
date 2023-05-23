@@ -383,7 +383,8 @@ class BaseRepo:
 
         Returns: True if symlinks can be created, False otherwise.
         """
-        raise NotImplementedError(self._determine_symlinks)
+        # For now, just mimic the old behaviour
+        return sys.platform != "win32"
 
     def _init_files(self, bare: bool, symlinks: Optional[bool] = None) -> None:
         """Initialize a default set of named files."""

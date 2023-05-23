@@ -26,13 +26,13 @@ If you don't want to install the C bindings, specify the --pure argument to setu
 
 or if you are installing from pip::
 
-    $ pip install dulwich --global-option="--pure"
+    $ pip install --no-binary dulwich dulwich --config-settings "--build-option=--pure"
 
-Note that you can also specify --global-option in a
-`requirements.txt <https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers>`_
+Note that you can also specify --build-option in a
+`requirements.txt <https://pip.pypa.io/en/stable/reference/requirement-specifiers/>`_
 file, e.g. like this::
 
-    dulwich --global-option=--pure
+    dulwich --config-settings "--build-option=--pure"
 
 Getting started
 ---------------

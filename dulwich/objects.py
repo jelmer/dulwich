@@ -31,6 +31,7 @@ from collections import namedtuple
 from hashlib import sha1
 from io import BytesIO
 from typing import (
+    TYPE_CHECKING,
     BinaryIO,
     Dict,
     Iterable,
@@ -42,8 +43,6 @@ from typing import (
     Union,
 )
 
-from _hashlib import HASH
-
 from .errors import (
     ChecksumMismatch,
     FileFormatException,
@@ -54,6 +53,9 @@ from .errors import (
     ObjectFormatException,
 )
 from .file import GitFile
+
+if TYPE_CHECKING:
+    from _hashlib import HASH
 
 ZERO_SHA = b"0" * 40
 
@@ -277,7 +279,7 @@ class ShaFile:
     type_name: bytes
     type_num: int
     _chunked_text: Optional[List[bytes]]
-    _sha: Union[FixedSha, None, HASH]
+    _sha: Union[FixedSha, None, "HASH"]
 
     @staticmethod
     def _parse_legacy_object_header(magic, f: BinaryIO) -> "ShaFile":

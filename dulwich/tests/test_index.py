@@ -1,5 +1,4 @@
 # test_index.py -- Tests for the git index
-# encoding: utf-8
 # Copyright (C) 2008-2009 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -222,7 +221,7 @@ class CommitTreeTests(TestCase):
 
 class CleanupModeTests(TestCase):
     def assertModeEqual(self, expected, got):
-        self.assertEqual(expected, got, "{:o} != {:o}".format(expected, got))
+        self.assertEqual(expected, got, f"{expected:o} != {got:o}")
 
     def test_file(self):
         self.assertModeEqual(0o100644, cleanup_mode(0o100000))

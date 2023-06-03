@@ -78,12 +78,12 @@ class ServerTests:
         self._new_repo = self.import_repo("server_new.export")
 
     def url(self, port):
-        return "{}://localhost:{}/".format(self.protocol, port)
+        return f"{self.protocol}://localhost:{port}/"
 
     def branch_args(self, branches=None):
         if branches is None:
             branches = ["master", "branch"]
-        return ["{}:{}".format(b, b) for b in branches]
+        return [f"{b}:{b}" for b in branches]
 
     def test_push_to_dulwich(self):
         self.import_repos()

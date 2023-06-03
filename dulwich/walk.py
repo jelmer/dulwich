@@ -24,7 +24,7 @@
 import collections
 import heapq
 from itertools import chain
-from typing import Deque, List, Optional, Set, Tuple, Dict
+from typing import Deque, Dict, List, Optional, Set, Tuple
 
 from .diff_tree import (
     RENAME_CHANGE_TYPES,

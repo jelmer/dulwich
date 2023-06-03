@@ -204,7 +204,7 @@ def check_hexsha(hex, error_msg):
       ObjectFormatException: Raised when the string is not valid
     """
     if not valid_hexsha(hex):
-        raise ObjectFormatException("{} {}".format(error_msg, hex))
+        raise ObjectFormatException(f"{error_msg} {hex}")
 
 
 def check_identity(identity: bytes, error_msg: str) -> None:
@@ -559,7 +559,7 @@ class ShaFile:
         return self.sha().hexdigest().encode("ascii")
 
     def __repr__(self) -> str:
-        return "<{} {}>".format(self.__class__.__name__, self.id)
+        return f"<{self.__class__.__name__} {self.id}>"
 
     def __ne__(self, other):
         """Check whether this object does not match the other."""
@@ -1237,7 +1237,7 @@ def parse_timezone(text):
     #  as an integer (using strtol), which could also be negative.
     #  We do the same for compatibility. See #697828.
     if text[0] not in b"+-":
-        raise ValueError("Timezone must start with + or - (%(text)s)" % vars())
+        raise ValueError("Timezone must start with + or - ({text})".format(**vars()))
     sign = text[:1]
     offset = int(text[1:])
     if sign == b"-":

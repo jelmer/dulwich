@@ -39,14 +39,14 @@ class MissingObjectFinderTest(TestCase):
             self.assertIn(
                 sha,
                 expected,
-                "({},{}) erroneously reported as missing".format(sha, path)
+                f"({sha},{path}) erroneously reported as missing"
             )
             expected.remove(sha)
 
         self.assertEqual(
             len(expected),
             0,
-            "some objects are not reported as missing: {}".format(expected),
+            f"some objects are not reported as missing: {expected}",
         )
 
 

@@ -22,17 +22,17 @@
 
 """Utility module for querying an ObjectStore with gevent."""
 
+from typing import FrozenSet, Optional, Set, Tuple
+
 import gevent
 from gevent import pool
-
-from typing import Set, Tuple, Optional, FrozenSet
 
 from .object_store import (
     MissingObjectFinder,
     _collect_ancestors,
     _collect_filetree_revs,
 )
-from .objects import Commit, Tag, ObjectID
+from .objects import Commit, ObjectID, Tag
 
 
 def _split_commits_and_tags(obj_store, lst, *, ignore_unknown=False, pool=None):

@@ -259,7 +259,7 @@ class UnpackedObject:
         return not (self == other)
 
     def __repr__(self) -> str:
-        data = ["{}={!r}".format(s, getattr(self, s)) for s in self.__slots__]
+        data = [f"{s}={getattr(self, s)!r}" for s in self.__slots__]
         return "{}({})".format(self.__class__.__name__, ", ".join(data))
 
 
@@ -2346,7 +2346,7 @@ class Pack:
         return len(self.index)
 
     def __repr__(self) -> str:
-        return "{}({!r})".format(self.__class__.__name__, self._basename)
+        return f"{self.__class__.__name__}({self._basename!r})"
 
     def __iter__(self):
         """Iterate over all the sha1s of the objects in this pack."""

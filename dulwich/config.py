@@ -30,7 +30,9 @@ import os
 import sys
 from contextlib import suppress
 from typing import (
+    Any,
     BinaryIO,
+    Dict,
     Iterable,
     Iterator,
     KeysView,
@@ -40,8 +42,6 @@ from typing import (
     Tuple,
     Union,
     overload,
-    Any,
-    Dict,
 )
 
 from .file import GitFile
@@ -268,7 +268,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
         self._values = CaseInsensitiveOrderedMultiDict.make(values)
 
     def __repr__(self) -> str:
-        return "{}({!r})".format(self.__class__.__name__, self._values)
+        return f"{self.__class__.__name__}({self._values!r})"
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, self.__class__) and other._values == self._values
@@ -688,7 +688,7 @@ class StackedConfig(Config):
         self.writable = writable
 
     def __repr__(self) -> str:
-        return "<{} for {!r}>".format(self.__class__.__name__, self.backends)
+        return f"<{self.__class__.__name__} for {self.backends!r}>"
 
     @classmethod
     def default(cls) -> "StackedConfig":

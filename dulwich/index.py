@@ -330,7 +330,7 @@ class Index:
         return self._filename
 
     def __repr__(self) -> str:
-        return "{}({!r})".format(self.__class__.__name__, self._filename)
+        return f"{self.__class__.__name__}({self._filename!r})"
 
     def write(self) -> None:
         """Write current contents of index to disk."""

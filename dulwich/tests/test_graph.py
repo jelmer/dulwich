@@ -1,5 +1,4 @@
 # test_index.py -- Tests for merge
-# encoding: utf-8
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU

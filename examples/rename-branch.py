@@ -27,4 +27,4 @@ def update_refs(refs):
 
 
 client.send_pack(path, update_refs, generate_pack_data)
-print("Renamed {} to {}".format(args.old_ref, args.new_ref))
+print(f"Renamed {args.old_ref} to {args.new_ref}")

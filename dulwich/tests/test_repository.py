@@ -450,7 +450,7 @@ class RepositoryRootTests(TestCase):
         o.close()
         bar_path = os.path.join(tmp_dir, 't', 'bar')
         if sys.platform == 'win32':
-            with open(bar_path, 'r') as f:
+            with open(bar_path) as f:
                 self.assertEqual('foo', f.read())
         else:
             self.assertEqual('foo', os.readlink(bar_path))
@@ -467,7 +467,7 @@ class RepositoryRootTests(TestCase):
         o.do_commit(b"add symlink")
 
         t = o.clone(os.path.join(tmp_dir, "t"), symlinks=False)
-        with open(os.path.join(tmp_dir, "t", 'bar'), 'r') as f:
+        with open(os.path.join(tmp_dir, "t", 'bar')) as f:
             self.assertEqual('foo', f.read())
 
         t.close()
@@ -846,7 +846,7 @@ exit 1
                 break
         else:
             raise AssertionError(
-                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
+                f"Expected warning {expected_warning!r} not in {warnings_list!r}"
             )
         self.assertEqual([commit_sha], r[commit_sha2].parents)
 

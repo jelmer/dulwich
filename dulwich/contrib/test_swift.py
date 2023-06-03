@@ -171,7 +171,7 @@ def create_commit(data, marker=b"Default", blob=None):
 def create_commits(length=1, marker=b"Default"):
     data = []
     for i in range(0, length):
-        _marker = ("{}_{}".format(marker, i)).encode()
+        _marker = (f"{marker}_{i}").encode()
         blob, tree, tag, cmt = create_commit(data, _marker)
         data.extend([blob, tree, tag, cmt])
     return data

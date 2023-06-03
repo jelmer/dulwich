@@ -102,7 +102,7 @@ def get_summary(commit):
 
 #  Unified Diff
 def _format_range_unified(start, stop):
-    'Convert range to the "ed" format.'
+    """Convert range to the "ed" format."""
     # Per the diff spec at http://www.unix.org/single_unix_specification/
     beginning = start + 1  # lines start numbering with one
     length = stop - start

@@ -92,7 +92,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     found_version = git_version(git_path=git_path)
     if found_version is None:
         raise SkipTest(
-            "Test requires git >= {}, but c git not found".format(required_version)
+            f"Test requires git >= {required_version}, but c git not found"
         )
 
     if len(required_version) > _VERSION_LEN:
@@ -110,7 +110,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
         required_version = ".".join(map(str, required_version))
         found_version = ".".join(map(str, found_version))
         raise SkipTest(
-            "Test requires git >= {}, found {}".format(required_version, found_version)
+            f"Test requires git >= {required_version}, found {found_version}"
         )
 
 

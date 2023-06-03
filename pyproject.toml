@@ -73,11 +73,34 @@ select = [
     "D",
     "E",
     "F",
-    "I"
+    "I",
+    "UP",
 ]
 ignore = [
+    "ANN001",
+    "ANN002",
+    "ANN003",
     "ANN101",  # missing-type-self
+    "ANN102",
+    "ANN201",
+    "ANN202",
+    "ANN204",
+    "ANN205",
+    "ANN206",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D107",
+    "D204",
+    "D205",
+    "D417",
+    "E501",  # line too long
+    "E741",  # ambiguous variable name
 ]
+target-version = "py37"
 
 [tool.ruff.pydocstyle]
 convention = "google"

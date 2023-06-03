@@ -1029,7 +1029,7 @@ def tag_create(
     sign=False,
     encoding=DEFAULT_ENCODING
 ):
-    """Creates a tag in git via dulwich calls:
+    """Creates a tag in git via dulwich calls.
 
     Args:
       repo: Path to repository

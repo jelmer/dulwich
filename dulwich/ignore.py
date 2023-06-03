@@ -240,7 +240,7 @@ class IgnoreFilter:
     def __repr__(self) -> str:
         path = getattr(self, "_path", None)
         if path is not None:
-            return "{}.from_path({!r})".format(type(self).__name__, path)
+            return f"{type(self).__name__}.from_path({path!r})"
         else:
             return "<%s>" % (type(self).__name__)
 

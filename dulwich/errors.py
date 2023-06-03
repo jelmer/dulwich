@@ -43,12 +43,12 @@ class ChecksumMismatch(Exception):
         if self.extra is None:
             Exception.__init__(
                 self,
-                "Checksum mismatch: Expected {}, got {}".format(expected, got),
+                f"Checksum mismatch: Expected {expected}, got {got}",
             )
         else:
             Exception.__init__(
                 self,
-                "Checksum mismatch: Expected {}, got {}; {}".format(expected, got, extra),
+                f"Checksum mismatch: Expected {expected}, got {got}; {extra}",
             )
 
 
@@ -64,7 +64,7 @@ class WrongObjectException(Exception):
     type_name: str
 
     def __init__(self, sha, *args, **kwargs) -> None:
-        Exception.__init__(self, "{} is not a {}".format(sha, self.type_name))
+        Exception.__init__(self, f"{sha} is not a {self.type_name}")
 
 
 class NotCommitError(WrongObjectException):

@@ -36,6 +36,7 @@ import warnings
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
+    Any,
     BinaryIO,
     Callable,
     Dict,
@@ -46,7 +47,6 @@ from typing import (
     Set,
     Tuple,
     Union,
-    Any
 )
 
 if TYPE_CHECKING:
@@ -649,7 +649,7 @@ class BaseRepo:
                 raise NotTagError(ret)
             else:
                 raise Exception(
-                    "Type invalid: {!r} != {!r}".format(ret.type_name, cls.type_name)
+                    f"Type invalid: {ret.type_name!r} != {cls.type_name!r}"
                 )
         return ret
 
@@ -1139,7 +1139,7 @@ class Repo(BaseRepo):
                 bare = True
             else:
                 raise NotGitRepository(
-                    "No git repository was found at %(path)s" % dict(path=root)
+                    "No git repository was found at {path}".format(**dict(path=root))
                 )
 
         self.bare = bare
@@ -1253,7 +1253,7 @@ class Repo(BaseRepo):
             except NotGitRepository:
                 path, remaining = os.path.split(path)
         raise NotGitRepository(
-            "No git repository was found at %(path)s" % dict(path=start)
+            "No git repository was found at {path}".format(**dict(path=start))
         )
 
     def controldir(self):

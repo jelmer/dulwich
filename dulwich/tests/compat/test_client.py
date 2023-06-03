@@ -633,7 +633,7 @@ class HTTPGitServer(http.server.HTTPServer):
         self.server_name = "localhost"
 
     def get_url(self):
-        return "http://{}:{}/".format(self.server_name, self.server_port)
+        return f"http://{self.server_name}:{self.server_port}/"
 
 
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):

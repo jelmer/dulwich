@@ -570,7 +570,7 @@ class PackBasedObjectStore(BaseObjectStore):
             sha = name
             hexsha = None
         else:
-            raise AssertionError("Invalid object name {!r}".format(name))
+            raise AssertionError(f"Invalid object name {name!r}")
         for pack in self._iter_cached_packs():
             try:
                 return pack.get_raw(sha)
@@ -653,7 +653,7 @@ class PackBasedObjectStore(BaseObjectStore):
             sha = sha1
             hexsha = None
         else:
-            raise AssertionError("Invalid object sha1 {!r}".format(sha1))
+            raise AssertionError(f"Invalid object sha1 {sha1!r}")
         for pack in self._iter_cached_packs():
             try:
                 return pack.get_unpacked_object(sha, include_comp=include_comp)
@@ -711,7 +711,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_compression_level = pack_compression_level
 
     def __repr__(self) -> str:
-        return "<{}({!r})>".format(self.__class__.__name__, self.path)
+        return f"<{self.__class__.__name__}({self.path!r})>"
 
     @classmethod
     def from_config(cls, path, config):
@@ -1005,7 +1005,7 @@ class MemoryObjectStore(BaseObjectStore):
         elif len(sha) == 20:
             return sha_to_hex(sha)
         else:
-            raise ValueError("Invalid sha {!r}".format(sha))
+            raise ValueError(f"Invalid sha {sha!r}")
 
     def contains_loose(self, sha):
         """Check if a particular object is present by SHA1 and is loose."""

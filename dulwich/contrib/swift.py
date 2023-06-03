@@ -258,8 +258,7 @@ class SwiftConnector:
         if ret.status_code < 200 or ret.status_code >= 300:
             raise SwiftException(
                 "AUTH v1.0 request failed on "
-                + "%s with error code %s (%s)"
-                % (
+                + "{} with error code {} ({})".format(
                     str(auth_httpclient.get_base_url()) + path,
                     ret.status_code,
                     str(ret.items()),
@@ -294,8 +293,7 @@ class SwiftConnector:
         if ret.status_code < 200 or ret.status_code >= 300:
             raise SwiftException(
                 "AUTH v2.0 request failed on "
-                + "%s with error code %s (%s)"
-                % (
+                + "{} with error code {} ({})".format(
                     str(auth_httpclient.get_base_url()) + path,
                     ret.status_code,
                     str(ret.items()),
@@ -495,7 +493,7 @@ class SwiftPackReader:
             self.buff_length = self.buff_length * 2
         offset = self.base_offset
         r = min(self.base_offset + self.buff_length, self.pack_length)
-        ret = self.scon.get_object(self.filename, range="{}-{}".format(offset, r))
+        ret = self.scon.get_object(self.filename, range=f"{offset}-{r}")
         self.buff = ret
 
     def read(self, length):

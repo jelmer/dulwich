@@ -7,7 +7,7 @@ import sys
 
 from setuptools import Extension, setup
 
-if sys.version_info < (3, 6):
+if sys.version_info < (3, 7):
     raise Exception(
         'Dulwich only supports Python 3.6 and later. '
         'For 2.7 support, please install a version prior to 0.20')

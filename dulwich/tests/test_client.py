@@ -23,9 +23,9 @@ import os
 import shutil
 import sys
 import tempfile
-from typing import Dict
 import warnings
 from io import BytesIO
+from typing import Dict
 from unittest.mock import patch
 from urllib.parse import quote as urlquote
 from urllib.parse import urlparse
@@ -1046,7 +1046,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(original_password, c._password)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = "{}:{}".format(original_username, original_password)
+        auth_string = f"{original_username}:{original_password}"
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
         self.assertEqual(basic_auth, expected_basic_auth)
@@ -1518,7 +1518,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
+                f"Expected warning {expected_warning!r} not in {warnings_list!r}"
             )
 
         args = command.proc.args
@@ -1563,7 +1563,7 @@ class PLinkSSHVendorTests(TestCase):
                 break
         else:
             raise AssertionError(
-                "Expected warning {!r} not in {!r}".format(expected_warning, warnings_list)
+                f"Expected warning {expected_warning!r} not in {warnings_list!r}"
             )
 
         args = command.proc.args

@@ -228,8 +228,7 @@ class Protocol:
         else:
             if len(pkt_contents) + 4 != size:
                 raise GitProtocolError(
-                    "Length of pkt read %04x does not match length prefix %04x"
-                    % (len(pkt_contents) + 4, size)
+                    f"Length of pkt read {len(pkt_contents) + 4:04x} does not match length prefix {size:04x}"
                 )
             return pkt_contents
 

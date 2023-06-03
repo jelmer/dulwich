@@ -132,7 +132,7 @@ class cmd_fetch(Command):
         refs = client.fetch(path, r, progress=sys.stdout.write)
         print("Remote refs:")
         for item in refs.items():
-            print("%s -> %s" % item)
+            print("{} -> {}".format(*item))
 
 
 class cmd_fsck(Command):
@@ -140,7 +140,7 @@ class cmd_fsck(Command):
         opts, args = getopt(args, "", [])
         opts = dict(opts)
         for (obj, msg) in porcelain.fsck("."):
-            print("{}: {}".format(obj, msg))
+            print(f"{obj}: {msg}")
 
 
 class cmd_log(Command):
@@ -203,9 +203,9 @@ class cmd_dump_pack(Command):
             try:
                 print("\t%s" % x[name])
             except KeyError as k:
-                print("\t{}: Unable to resolve base {}".format(name, k))
+                print(f"\t{name}: Unable to resolve base {k}")
             except ApplyDeltaError as e:
-                print("\t{}: Unable to apply delta: {!r}".format(name, e))
+                print(f"\t{name}: Unable to apply delta: {e!r}")
 
 
 class cmd_dump_index(Command):
@@ -488,7 +488,7 @@ class cmd_status(Command):
             for kind, names in status.staged.items():
                 for name in names:
                     sys.stdout.write(
-                        "\t{}: {}\n".format(kind, name.decode(sys.getfilesystemencoding()))
+                        f"\t{kind}: {name.decode(sys.getfilesystemencoding())}\n"
                     )
             sys.stdout.write("\n")
         if status.unstaged:
@@ -511,7 +511,7 @@ class cmd_ls_remote(Command):
             sys.exit(1)
         refs = porcelain.ls_remote(args[0])
         for ref in sorted(refs):
-            sys.stdout.write("{}\t{}\n".format(ref, refs[ref]))
+            sys.stdout.write(f"{ref}\t{refs[ref]}\n")
 
 
 class cmd_ls_tree(Command):
@@ -635,7 +635,7 @@ class cmd_submodule_list(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(argv)
         for path, sha in porcelain.submodule_list("."):
-            sys.stdout.write(' {} {}\n'.format(sha, path))
+            sys.stdout.write(f' {sha} {path}\n')
 
 
 class cmd_submodule_init(Command):

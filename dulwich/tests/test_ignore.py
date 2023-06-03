@@ -98,8 +98,7 @@ class TranslateTests(TestCase):
             self.assertEqual(
                 regex,
                 translate(pattern),
-                "orig pattern: %r, regex: %r, expected: %r"
-                % (pattern, translate(pattern), regex),
+                f"orig pattern: {pattern!r}, regex: {translate(pattern)!r}, expected: {regex!r}",
             )
 
 
@@ -133,14 +132,14 @@ class MatchPatternTests(TestCase):
         for (path, pattern) in POSITIVE_MATCH_TESTS:
             self.assertTrue(
                 match_pattern(path, pattern),
-                "path: {!r}, pattern: {!r}".format(path, pattern),
+                f"path: {path!r}, pattern: {pattern!r}",
             )
 
     def test_no_matches(self):
         for (path, pattern) in NEGATIVE_MATCH_TESTS:
             self.assertFalse(
                 match_pattern(path, pattern),
-                "path: {!r}, pattern: {!r}".format(path, pattern),
+                f"path: {path!r}, pattern: {pattern!r}",
             )
 
 

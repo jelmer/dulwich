@@ -49,7 +49,6 @@ from io import BufferedReader, BytesIO
 from typing import (
     IO,
     TYPE_CHECKING,
-    Any,
     Callable,
     Dict,
     Iterable,
@@ -407,7 +406,7 @@ class SendPackResult:
         return super().__getattribute__(name)
 
     def __repr__(self) -> str:
-        return "{}({!r}, {!r})".format(self.__class__.__name__, self.refs, self.agent)
+        return f"{self.__class__.__name__}({self.refs!r}, {self.agent!r})"
 
 
 def _read_shallow_updates(pkt_seq):
@@ -454,12 +453,12 @@ class _v1ReceivePackHeader:
             old_sha1 = old_refs.get(refname, ZERO_SHA)
             if not isinstance(old_sha1, bytes):
                 raise TypeError(
-                    "old sha1 for {!r} is not a bytestring: {!r}".format(refname, old_sha1)
+                    f"old sha1 for {refname!r} is not a bytestring: {old_sha1!r}"
                 )
             new_sha1 = new_refs.get(refname, ZERO_SHA)
             if not isinstance(new_sha1, bytes):
                 raise TypeError(
-                    "old sha1 for {!r} is not a bytestring {!r}".format(refname, new_sha1)
+                    f"old sha1 for {refname!r} is not a bytestring {new_sha1!r}"
                 )
 
             if old_sha1 != new_sha1:
@@ -510,9 +509,6 @@ def _handle_upload_pack_head(
       can_read: function that returns a boolean that indicates
     whether there is extra graph data to read on proto
       depth: Depth for request
-
-    Returns:
-
     """
     assert isinstance(wants, list) and isinstance(wants[0], bytes)
     proto.write_pkt_line(
@@ -582,9 +578,6 @@ def _handle_upload_pack_tail(
       pack_data: Function to call with pack data
       progress: Optional progress reporting function
       rbufsize: Read buffer size
-
-    Returns:
-
     """
     pkt = proto.read_pkt_line()
     while pkt:
@@ -866,9 +859,6 @@ class GitClient:
 
         Args:
           path: Path to the repo to fetch from. (as bytestring)
-
-        Returns:
-
         """
         raise NotImplementedError(self.get_refs)
 
@@ -975,9 +965,6 @@ def check_wants(wants, refs):
     Args:
       wants: Set of object SHAs to fetch
       refs: Refs dictionary to check against
-
-    Returns:
-
     """
     missing = set(wants) - {
         v for (k, v) in refs.items() if not k.endswith(PEELED_TAG_SUFFIX)
@@ -1269,7 +1256,7 @@ class TCPGitClient(TraditionalGitClient):
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM
         )
         s = None
-        err = socket.error("no address found for %s" % self._host)
+        err = OSError("no address found for %s" % self._host)
         for (family, socktype, proto, canonname, sockaddr) in sockaddrs:
             s = socket.socket(family, socktype, proto)
             s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -1465,7 +1452,7 @@ class LocalGitClient(GitClient):
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
                 if new_sha1 != ZERO_SHA:
                     if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
-                        msg = "unable to set {} to {}".format(refname, new_sha1)
+                        msg = f"unable to set {refname} to {new_sha1}"
                         progress(msg)
                         ref_status[refname] = msg
                 else:
@@ -1577,9 +1564,6 @@ class SSHVendor:
           password: Optional ssh password for login or private key
           key_filename: Optional path to private keyfile
           ssh_command: Optional SSH command
-
-        Returns:
-
         """
         raise NotImplementedError(self.run_command)
 
@@ -1624,7 +1608,7 @@ class SubprocessSSHVendor(SSHVendor):
             args.extend(["-i", str(key_filename)])
 
         if username:
-            host = "{}@{}".format(username, host)
+            host = f"{username}@{host}"
         if host.startswith("-"):
             raise StrangeHostname(hostname=host)
         args.append(host)
@@ -1678,7 +1662,7 @@ class PLinkSSHVendor(SSHVendor):
             args.extend(["-i", str(key_filename)])
 
         if username:
-            host = "{}@{}".format(username, host)
+            host = f"{username}@{host}"
         if host.startswith("-"):
             raise StrangeHostname(hostname=host)
         args.append(host)
@@ -1981,8 +1965,7 @@ class AbstractHttpGitClient(GitClient):
             # Something changed (redirect!), so let's update the base URL
             if not resp.redirect_location.endswith(tail):
                 raise GitProtocolError(
-                    "Redirected from URL %s to URL %s without %s"
-                    % (url, resp.redirect_location, tail)
+                    f"Redirected from URL {url} to URL {resp.redirect_location} without {tail}"
                 )
             base_url = urljoin(url, resp.redirect_location[: -len(tail)])
 
@@ -2374,7 +2357,7 @@ def get_transport_and_path(
     location: str,
     config: Optional[Config] = None,
     operation: Optional[str] = None,
-    **kwargs: Any
+    **kwargs
 ) -> Tuple[GitClient, str]:
     """Obtain a git client from a URL.
 

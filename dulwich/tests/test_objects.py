@@ -1133,7 +1133,7 @@ class TagParseTests(ShaFileCheckTests):
 
     def test_check_tag_with_overflow_time(self):
         """Date with overflow should raise an ObjectFormatException when checked."""
-        author = "Some Dude <some@dude.org> {} +0000".format(MAX_TIME + 1)
+        author = f"Some Dude <some@dude.org> {MAX_TIME + 1} +0000"
         tag = Tag.from_string(self.make_tag_text(tagger=(author.encode())))
         with self.assertRaises(ObjectFormatException):
             tag.check()

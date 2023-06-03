@@ -23,7 +23,7 @@
 import os
 import warnings
 from contextlib import suppress
-from typing import Dict, Optional, Set, Any
+from typing import Any, Dict, Optional, Set
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists
@@ -628,7 +628,7 @@ class DiskRefsContainer(RefsContainer):
         self._peeled_refs = None
 
     def __repr__(self) -> str:
-        return "{}({!r})".format(self.__class__.__name__, self.path)
+        return f"{self.__class__.__name__}({self.path!r})"
 
     def subkeys(self, base):
         subkeys = set()
@@ -1279,8 +1279,7 @@ def serialize_refs(store, refs):
             unpeeled, peeled = peel_sha(store, sha)
         except KeyError:
             warnings.warn(
-                "ref %s points at non-present sha %s"
-                % (ref.decode("utf-8", "replace"), sha.decode("ascii")),
+                "ref {} points at non-present sha {}".format(ref.decode("utf-8", "replace"), sha.decode("ascii")),
                 UserWarning,
             )
             continue

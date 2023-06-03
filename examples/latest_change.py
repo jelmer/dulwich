@@ -7,7 +7,7 @@ import time
 from dulwich.repo import Repo
 
 if len(sys.argv) < 2:
-    print("usage: {} filename".format(sys.argv[0]))
+    print(f"usage: {sys.argv[0]} filename")
     sys.exit(1)
 
 r = Repo(".")

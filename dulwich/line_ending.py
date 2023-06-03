@@ -17,7 +17,7 @@
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
 #
-"""All line-ending related functions, from conversions to config processing.
+r"""All line-ending related functions, from conversions to config processing.
 
 Line-ending normalization is a complex beast. Here is some notes and details
 about how it seems to work.
@@ -61,23 +61,23 @@ There is multiple variables that impact the normalization.
 First, a repository can contains a ``.gitattributes`` file (or more than one...)
 that can further customize the operation on some file patterns, for example:
 
-    \\*.txt text
+    \*.txt text
 
 Force all ``.txt`` files to be treated as text files and to have their lines
 endings normalized.
 
-    \\*.jpg -text
+    \*.jpg -text
 
 Force all ``.jpg`` files to be treated as binary files and to not have their
 lines endings converted.
 
-    \\*.vcproj text eol=crlf
+    \*.vcproj text eol=crlf
 
 Force all ``.vcproj`` files to be treated as text files and to have their lines
 endings converted into ``CRLF`` in working directory no matter the native EOL of
 the platform.
 
-    \\*.sh text eol=lf
+    \*.sh text eol=lf
 
 Force all ``.sh`` files to be treated as text files and to have their lines
 endings converted into ``LF`` in working directory no matter the native EOL of
@@ -86,7 +86,7 @@ the platform.
 If the ``eol`` attribute is not defined, Git uses the ``core.eol`` configuration
 value described later.
 
-    \\* text=auto
+    \* text=auto
 
 Force all files to be scanned by the text file heuristic detection and to have
 their line endings normalized in case they are detected as text files.

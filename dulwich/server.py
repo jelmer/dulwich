@@ -189,7 +189,7 @@ class DictBackend(Backend):
             return self.repos[path]
         except KeyError as exc:
             raise NotGitRepository(
-                "No git repository was found at %(path)s" % dict(path=path)
+                "No git repository was found at {path}".format(**dict(path=path))
             ) from exc
 
 
@@ -206,7 +206,7 @@ class FileSystemBackend(Backend):
         normcase_abspath = os.path.normcase(abspath)
         normcase_root = os.path.normcase(self.root)
         if not normcase_abspath.startswith(normcase_root):
-            raise NotGitRepository("Path {!r} not inside root {!r}".format(path, self.root))
+            raise NotGitRepository(f"Path {path!r} not inside root {self.root!r}")
         return Repo(abspath)
 
 

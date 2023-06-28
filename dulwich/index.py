@@ -1,3 +1,4 @@
+# index.py -- File parser/writer for the git index file
 # Copyright (C) 2008-2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU

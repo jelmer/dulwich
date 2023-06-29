@@ -394,7 +394,7 @@ class Index:
         # there is a conflict return 'this' entry
         return self._bynamestage[(key, 2)]
 
-    def __iter__(self) -> Iterator[Tuple[bytes, int]]:
+    def __iter__(self) -> Iterator[bytes]:
         """Iterate over the paths and stages in this index."""
         for (name, stage) in self._bynamestage:
             if stage == 1 or stage == 3:
@@ -491,7 +491,7 @@ class Index:
         if (name, 3) in self._bynamestage:
             del self._bynamestage[(name, 3)]
 
-    def iteritems(self) -> Iterator[Tuple[Tuple[bytes, int], IndexEntry]]:
+    def iteritems(self) -> Iterator[Tuple[bytes, IndexEntry]]:
         for (name, stage), entry in self._bynamestage.items():
             yield name, entry
 

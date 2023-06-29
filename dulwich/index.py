@@ -90,6 +90,7 @@ EXTENDED_FLAG_INTEND_TO_ADD = 0x2000
 
 DEFAULT_VERSION = 2
 
+
 def read_stage(entry: IndexEntry) -> int:
     """Stage of an Entry
        0 - normal
@@ -255,7 +256,7 @@ def read_index(f: BinaryIO):
         yield read_cache_entry(f, version)
 
 
-def read_index_dict(f) -> Dict[Tuple[bytes,int], IndexEntry]:
+def read_index_dict(f) -> Dict[Tuple[bytes, int], IndexEntry]:
     """Read an index file and return it as a dictionary.
        Dict Key is tuple of path and stage number, as
             path alone is not unique
@@ -415,7 +416,7 @@ class Index:
 
     def get_mode(self, path: bytes, stage: int = 0) -> int:
         """Return the POSIX file mode for the object at a path."""
-        return self[(path,stage)].mode
+        return self[(path, stage)].mode
 
     def iterobjects(self) -> Iterable[Tuple[bytes, bytes, int]]:
         """Iterate over path, sha, mode tuples for use with commit_tree."""
@@ -454,23 +455,23 @@ class Index:
         """Remove all contents from this index."""
         self._bynamestage = {}
 
-    def __setitem__(self, key: Union[Tuple[bytes,int], bytes], x: IndexEntry) -> None:
+    def __setitem__(self, key: Union[Tuple[bytes, int], bytes], x: IndexEntry) -> None:
         assert len(x) == len(IndexEntry._fields)
         if isinstance(key, tuple):
             name, stage = key
         else:
             name = key
-            stage = 0 # default when stage not explicitly specified
+            stage = 0  # default when stage not explicitly specified
         assert isinstance(name, bytes)
         # Remove merge conflict entries if new entry is stage 0
         # Remove stage 0 entry if new entry has conflicts (stage > 0)
         if stage == 0:
-            if (name,1) in self._bynamestage:
-                del self._bynamestage[(name,1)]
-            if (name,2) in self._bynamestage:
-                del self._bynamestage[(name,2)]
-            if (name,3) in self._bynamestage:
-                del self._bynamestage[(name,3)]
+            if (name, 1) in self._bynamestage:
+                del self._bynamestage[(name, 1)]
+            if (name, 2) in self._bynamestage:
+                del self._bynamestage[(name, 2)]
+            if (name, 3) in self._bynamestage:
+                del self._bynamestage[(name, 3)]
         if stage > 0 and (name, 0) in self._bynamestage:
             del self._bynamestage[(name, 0)]
         self._bynamestage[(name, stage)] = IndexEntry(*x)
@@ -490,21 +491,20 @@ class Index:
         if (name, 3) in self._bynamestage:
             del self._bynamestage[(name, 3)]
 
-
-    def iteritems(self) -> Iterator[Tuple[Tuple[bytes,int], IndexEntry]]:
+    def iteritems(self) -> Iterator[Tuple[Tuple[bytes, int], IndexEntry]]:
         for (name, stage), entry in self._bynamestage.items():
             yield name, entry
 
-    def items(self) -> Iterator[Tuple[Tuple[bytes,int], IndexEntry]]:
+    def items(self) -> Iterator[Tuple[Tuple[bytes, int], IndexEntry]]:
         return self._bynamestage.items()
 
-    def update(self, entries: Dict[Tuple[bytes,int], IndexEntry]):
+    def update(self, entries: Dict[Tuple[bytes, int], IndexEntry]):
         for key, value in entries.items():
             self[key] = value
 
     def paths(self):
         for (name, stage) in self._bynamestage.keys():
-            if stage == 0 or stage == 2: # normal or conflict this
+            if stage == 0 or stage == 2:  # normal or conflict 'this'
                 yield name
     
     def changes_from_tree(

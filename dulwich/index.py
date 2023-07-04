@@ -87,8 +87,12 @@ EXTENDED_FLAG_SKIP_WORKTREE = 0x4000
 # used by "git add -N"
 EXTENDED_FLAG_INTEND_TO_ADD = 0x2000
 
-
 DEFAULT_VERSION = 2
+
+
+class UnmergedEntriesInIndexEx(Exception):
+    def __init__(self, message):
+        super().__init__(message)
 
 
 def read_stage(entry: IndexEntry) -> int:
@@ -421,12 +425,7 @@ class Index:
     def iterobjects(self) -> Iterable[Tuple[bytes, bytes, int]]:
         """Iterate over path, sha, mode tuples for use with commit_tree."""
         for path in self:
-            # FIXME: do not allow commit or commit tree to be built if entries
-            # with merge conflicts exist (ie. entries with stage values > 0
             entry = self[path]
-            stage = read_stage(entry)
-            if stage > 0:
-                raise
             yield path, entry.sha, cleanup_mode(entry.mode)
 
     def has_conflicts(self):
@@ -539,6 +538,9 @@ class Index:
         Returns:
           Root tree SHA
         """
+        # as with git check for unmerged entries in the index and fail if found
+        if self.has_conflicts():
+            raise UnmergedEntriesInIndexEx('Unmerged entries exist in index these need to be handled first')
         return commit_tree(object_store, self.iterobjects())
 
 
@@ -553,6 +555,7 @@ def commit_tree(
     Returns:
       SHA1 of the created tree.
     """
+
     trees: Dict[bytes, Any] = {b"": {}}
 
     def add_tree(path):

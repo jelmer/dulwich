@@ -428,6 +428,12 @@ class Index:
             entry = self[path]
             yield path, entry.sha, cleanup_mode(entry.mode)
 
+    def iterconflicts(self) -> Iterable[Tuple[int, bytes, int, bytes]]:
+        """Iterate over path, sha, mode tuples for use with commit_tree."""
+        for (name, stage), entry in self._bynamestage.items():
+            if stage > 0:
+                yield cleanup_mode(entry.mode), entry.sha, stage, name
+
     def has_conflicts(self):
         for (name, stage) in self._bynamestage.keys():
             if stage > 0:

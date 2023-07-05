@@ -2007,7 +2007,7 @@ class AbstractHttpGitClient(GitClient):
         if isinstance(data, bytes):
             headers["Content-Length"] = str(len(data))
         resp, read = self._http_request(url, headers, data)
-        if resp.content_type != result_content_type:
+        if not resp.content_type.startswith(result_content_type):
             raise GitProtocolError(
                 "Invalid content-type from server: %s" % resp.content_type
             )

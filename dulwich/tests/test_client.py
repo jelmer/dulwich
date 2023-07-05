@@ -1145,6 +1145,30 @@ class HttpGitClientTests(TestCase):
                 # check also the no redirection case
                 self.assertEqual(processed_url, base_url)
 
+    def test_smart_request_content_type_with_directive_check(self):
+        from urllib3.response import HTTPResponse
+
+        # we need to mock urllib3.PoolManager as this test will fail
+        # otherwise without an active internet connection
+        class PoolManagerMock:
+            def __init__(self) -> None:
+                self.headers: Dict[str, str] = {}
+
+            def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
+                return HTTPResponse(
+                    headers={
+                        "Content-Type": "application/x-git-upload-pack-result; charset=utf-8"
+                    },
+                    request_method=method,
+                    request_url=url,
+                    preload_content=preload_content,
+                    status=200,
+                )
+
+        clone_url = "https://hacktivis.me/git/blog.git/"
+        client = HttpGitClient(clone_url, pool_manager=PoolManagerMock(), config=None)
+        self.assertTrue(client._smart_request("git-upload-pack", clone_url, data=None))
+
 
 class TCPGitClientTests(TestCase):
     def test_get_url(self):

@@ -620,9 +620,15 @@ def _find_git_in_win_path():
     for exe in ("git.exe", "git.cmd"):
         for path in os.environ.get("PATH", "").split(";"):
             if os.path.exists(os.path.join(path, exe)):
-                # exe path is .../Git/bin/git.exe or .../Git/cmd/git.exe
+                # in windows native shells (powershell/cmd) exe path is
+                # .../Git/bin/git.exe or .../Git/cmd/git.exe
+                #
+                # in git-bash exe path is .../Git/mingw64/bin/git.exe
                 git_dir, _bin_dir = os.path.split(path)
                 yield git_dir
+                parent_dir, basename = os.path.split(git_dir)
+                if basename == "mingw32" or basename == "mingw64":
+                    yield parent_dir
                 break
 
 

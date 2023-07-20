@@ -92,7 +92,7 @@ class SimpleIndexTestCase(IndexTestCase):
 
     def test_getitem(self):
         self.assertEqual(
-            (
+            IndexEntry(
                 (1230680220, 0),
                 (1230680220, 0),
                 2050,
@@ -298,9 +298,9 @@ class IndexEntryFromStatTests(TestCase):
 
 class BuildIndexTests(TestCase):
     def assertReasonableIndexEntry(self, index_entry, mode, filesize, sha):
-        self.assertEqual(index_entry[4], mode)  # mode
-        self.assertEqual(index_entry[7], filesize)  # filesize
-        self.assertEqual(index_entry[8], sha)  # sha
+        self.assertEqual(index_entry.mode, mode)  # mode
+        self.assertEqual(index_entry.size, filesize)  # filesize
+        self.assertEqual(index_entry.sha, sha)  # sha
 
     def assertFileContents(self, path, contents, symlink=False):
         if symlink:
@@ -573,8 +573,8 @@ class BuildIndexTests(TestCase):
             # dir c
             cpath = os.path.join(repo.path, "c")
             self.assertTrue(os.path.isdir(cpath))
-            self.assertEqual(index[b"c"][4], S_IFGITLINK)  # mode
-            self.assertEqual(index[b"c"][8], c.id)  # sha
+            self.assertEqual(index[b"c"].mode, S_IFGITLINK)  # mode
+            self.assertEqual(index[b"c"].sha, c.id)  # sha
 
     def test_git_submodule_exists(self):
         repo_dir = tempfile.mkdtemp()
@@ -614,8 +614,8 @@ class BuildIndexTests(TestCase):
             # dir c
             cpath = os.path.join(repo.path, "c")
             self.assertTrue(os.path.isdir(cpath))
-            self.assertEqual(index[b"c"][4], S_IFGITLINK)  # mode
-            self.assertEqual(index[b"c"][8], c.id)  # sha
+            self.assertEqual(index[b"c"].mode, S_IFGITLINK)  # mode
+            self.assertEqual(index[b"c"].sha, c.id)  # sha
 
 
 class GetUnstagedChangesTests(TestCase):

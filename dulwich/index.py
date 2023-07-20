@@ -20,7 +20,7 @@
 
 """Parser for the git index file format."""
 
-import collections
+from dataclasses import dataclass
 import os
 import stat
 import struct
@@ -52,23 +52,19 @@ from .objects import (
 )
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
 
-# TODO(jelmer): Switch to dataclass?
-IndexEntry = collections.namedtuple(
-    "IndexEntry",
-    [
-        "ctime",
-        "mtime",
-        "dev",
-        "ino",
-        "mode",
-        "uid",
-        "gid",
-        "size",
-        "sha",
-        "flags",
-        "extended_flags",
-    ],
-)
+@dataclass
+class IndexEntry:
+    ctime: int | float | Tuple[int, int]
+    mtime: int | float | Tuple[int, int]
+    dev: int
+    ino: int
+    mode: int
+    uid: int
+    gid: int
+    size: int
+    sha: bytes
+    flags: int
+    extended_flags: int
 
 
 class ConflictedIndexEntry:

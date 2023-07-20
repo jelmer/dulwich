@@ -168,7 +168,7 @@ class ReadIndexDictTests(IndexTestCase):
 
     def test_simple_write(self):
         entries = {
-            b"barbla": IndexEntry(
+            (b"barbla", 0): IndexEntry(
                 (1230680220, 0),
                 (1230680220, 0),
                 2050,

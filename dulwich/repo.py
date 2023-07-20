@@ -1422,7 +1422,7 @@ class Repo(BaseRepo):
                     blob = blob_from_path_and_stat(full_path, st)
                     blob = blob_normalizer.checkin_normalize(blob, fs_path)
                     self.object_store.add_object(blob)
-                    index[tree_path] = index_entry_from_stat(st, blob.id, 0)
+                    index[tree_path] = index_entry_from_stat(st, blob.id)
         index.write()
 
     def unstage(self, fs_paths: List[str]):
@@ -1478,8 +1478,6 @@ class Repo(BaseRepo):
                 gid=st.st_gid if st else 0,
                 size=len(self[tree_entry[1]].data),
                 sha=tree_entry[1],
-                flags=0,
-                extended_flags=0
             )
 
             index[tree_path] = index_entry

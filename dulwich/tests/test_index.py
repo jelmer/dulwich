@@ -43,7 +43,6 @@ from ..index import (
     get_unstaged_changes,
     index_entry_from_stat,
     read_index,
-    read_index_dict,
     validate_path_element_default,
     validate_path_element_ntfs,
     write_cache_time,
@@ -156,39 +155,6 @@ class SimpleIndexWriterTestCase(IndexTestCase):
 
         with open(filename, "rb") as x:
             self.assertEqual(entries, list(read_index(x)))
-
-
-class ReadIndexDictTests(IndexTestCase):
-    def setUp(self):
-        IndexTestCase.setUp(self)
-        self.tempdir = tempfile.mkdtemp()
-
-    def tearDown(self):
-        IndexTestCase.tearDown(self)
-        shutil.rmtree(self.tempdir)
-
-    def test_simple_write(self):
-        entries = {
-            (b"barbla", Stage.NORMAL): IndexEntry(
-                (1230680220, 0),
-                (1230680220, 0),
-                2050,
-                3761020,
-                33188,
-                1000,
-                1000,
-                0,
-                b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
-                0,
-                0,
-            )
-        }
-        filename = os.path.join(self.tempdir, "test-simple-write-index")
-        with open(filename, "wb+") as x:
-            write_index_dict(x, entries)
-
-        with open(filename, "rb") as x:
-            self.assertEqual(entries, read_index_dict(x))
 
 
 class CommitTreeTests(TestCase):

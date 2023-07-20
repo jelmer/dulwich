@@ -34,6 +34,7 @@ from dulwich.tests import TestCase, skipIf
 from ..index import (
     Index,
     IndexEntry,
+    Stage,
     _fs_to_tree_path,
     _tree_to_fs_path,
     build_index_from_tree,
@@ -168,7 +169,7 @@ class ReadIndexDictTests(IndexTestCase):
 
     def test_simple_write(self):
         entries = {
-            (b"barbla", 0): IndexEntry(
+            (b"barbla", Stage.NORMAL): IndexEntry(
                 (1230680220, 0),
                 (1230680220, 0),
                 2050,

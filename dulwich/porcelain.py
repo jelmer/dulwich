@@ -1970,7 +1970,7 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
             blob = repo.object_store[entry.sha]
             ensure_dir_exists(os.path.dirname(full_path))
             st = build_file_from_blob(blob, entry.mode, full_path)
-            repo_index[entry.path] = index_entry_from_stat(st, entry.sha, 0)
+            repo_index[entry.path] = index_entry_from_stat(st, entry.sha)
 
         repo_index.write()
 

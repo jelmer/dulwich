@@ -34,7 +34,7 @@ from dulwich.tests import TestCase, skipIf
 from ..index import (
     Index,
     IndexEntry,
-    Stage,
+    SerializedIndexEntry,
     _fs_to_tree_path,
     _tree_to_fs_path,
     build_index_from_tree,
@@ -93,7 +93,7 @@ class SimpleIndexTestCase(IndexTestCase):
 
     def test_getitem(self):
         self.assertEqual(
-            (
+            IndexEntry(
                 (1230680220, 0),
                 (1230680220, 0),
                 2050,
@@ -103,8 +103,6 @@ class SimpleIndexTestCase(IndexTestCase):
                 1000,
                 0,
                 b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
-                0,
-                0,
             ),
             self.get_simple_index("index")[b"bla"],
         )
@@ -135,8 +133,8 @@ class SimpleIndexWriterTestCase(IndexTestCase):
     def test_simple_write(self):
         entries = [
             (
-                b"barbla",
-                IndexEntry(
+                SerializedIndexEntry(
+                    b"barbla",
                     (1230680220, 0),
                     (1230680220, 0),
                     2050,
@@ -159,6 +157,7 @@ class SimpleIndexWriterTestCase(IndexTestCase):
 
 
 class ReadIndexDictTests(IndexTestCase):
+
     def setUp(self):
         IndexTestCase.setUp(self)
         self.tempdir = tempfile.mkdtemp()
@@ -169,7 +168,7 @@ class ReadIndexDictTests(IndexTestCase):
 
     def test_simple_write(self):
         entries = {
-            (b"barbla", Stage.NORMAL): IndexEntry(
+            b"barbla": IndexEntry(
                 (1230680220, 0),
                 (1230680220, 0),
                 2050,
@@ -179,8 +178,6 @@ class ReadIndexDictTests(IndexTestCase):
                 1000,
                 0,
                 b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
-                0,
-                0,
             )
         }
         filename = os.path.join(self.tempdir, "test-simple-write-index")
@@ -278,7 +275,7 @@ class IndexEntryFromStatTests(TestCase):
                 1324180496,
             )
         )
-        entry = index_entry_from_stat(st, "22" * 20, 0)
+        entry = index_entry_from_stat(st, b"22" * 20)
         self.assertEqual(
             entry,
             IndexEntry(
@@ -290,9 +287,7 @@ class IndexEntryFromStatTests(TestCase):
                 1000,
                 1000,
                 12288,
-                "2222222222222222222222222222222222222222",
-                0,
-                None,
+                b"2222222222222222222222222222222222222222",
             ),
         )
 
@@ -311,7 +306,7 @@ class IndexEntryFromStatTests(TestCase):
                 1324180496,
             )
         )
-        entry = index_entry_from_stat(st, "22" * 20, 0, mode=stat.S_IFREG + 0o755)
+        entry = index_entry_from_stat(st, b"22" * 20, mode=stat.S_IFREG + 0o755)
         self.assertEqual(
             entry,
             IndexEntry(
@@ -323,18 +318,16 @@ class IndexEntryFromStatTests(TestCase):
                 1000,
                 1000,
                 12288,
-                "2222222222222222222222222222222222222222",
-                0,
-                None,
+                b"2222222222222222222222222222222222222222",
             ),
         )
 
 
 class BuildIndexTests(TestCase):
     def assertReasonableIndexEntry(self, index_entry, mode, filesize, sha):
-        self.assertEqual(index_entry[4], mode)  # mode
-        self.assertEqual(index_entry[7], filesize)  # filesize
-        self.assertEqual(index_entry[8], sha)  # sha
+        self.assertEqual(index_entry.mode, mode)  # mode
+        self.assertEqual(index_entry.size, filesize)  # filesize
+        self.assertEqual(index_entry.sha, sha)  # sha
 
     def assertFileContents(self, path, contents, symlink=False):
         if symlink:
@@ -607,8 +600,8 @@ class BuildIndexTests(TestCase):
             # dir c
             cpath = os.path.join(repo.path, "c")
             self.assertTrue(os.path.isdir(cpath))
-            self.assertEqual(index[b"c"][4], S_IFGITLINK)  # mode
-            self.assertEqual(index[b"c"][8], c.id)  # sha
+            self.assertEqual(index[b"c"].mode, S_IFGITLINK)  # mode
+            self.assertEqual(index[b"c"].sha, c.id)  # sha
 
     def test_git_submodule_exists(self):
         repo_dir = tempfile.mkdtemp()
@@ -648,8 +641,8 @@ class BuildIndexTests(TestCase):
             # dir c
             cpath = os.path.join(repo.path, "c")
             self.assertTrue(os.path.isdir(cpath))
-            self.assertEqual(index[b"c"][4], S_IFGITLINK)  # mode
-            self.assertEqual(index[b"c"][8], c.id)  # sha
+            self.assertEqual(index[b"c"].mode, S_IFGITLINK)  # mode
+            self.assertEqual(index[b"c"].sha, c.id)  # sha
 
 
 class GetUnstagedChangesTests(TestCase):

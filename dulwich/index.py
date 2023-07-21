@@ -82,8 +82,8 @@ class Stage(Enum):
 @dataclass
 class SerializedIndexEntry:
     name: bytes
-    ctime: int | float | Tuple[int, int]
-    mtime: int | float | Tuple[int, int]
+    ctime: Union[int, float, Tuple[int, int]]
+    mtime: Union[int, float, Tuple[int, int]]
     dev: int
     ino: int
     mode: int
@@ -100,8 +100,8 @@ class SerializedIndexEntry:
 
 @dataclass
 class IndexEntry:
-    ctime: int | float | Tuple[int, int]
-    mtime: int | float | Tuple[int, int]
+    ctime: Union[int, float, Tuple[int, int]]
+    mtime: Union[int, float, Tuple[int, int]]
     dev: int
     ino: int
     mode: int
@@ -312,14 +312,14 @@ def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
         yield read_cache_entry(f, version)
 
 
-def read_index_dict(f) -> Dict[bytes, IndexEntry | ConflictedIndexEntry]:
+def read_index_dict(f) -> Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
     """Read an index file and return it as a dictionary.
        Dict Key is tuple of path and stage number, as
             path alone is not unique
     Args:
       f: File object to read fromls.
     """
-    ret: Dict[bytes, IndexEntry | ConflictedIndexEntry] = {}
+    ret: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
     for entry in read_index(f):
         stage = entry.stage()
         if stage == Stage.NORMAL:
@@ -355,7 +355,7 @@ def write_index(f: BinaryIO, entries: List[SerializedIndexEntry], version: Optio
 
 def write_index_dict(
     f: BinaryIO,
-    entries: Dict[bytes, IndexEntry | ConflictedIndexEntry],
+    entries: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]],
     version: Optional[int] = None,
 ) -> None:
     """Write an index file based on the contents of a dictionary.
@@ -402,7 +402,7 @@ def cleanup_mode(mode: int) -> int:
 class Index:
     """A Git Index file."""
 
-    _byname: Dict[bytes, IndexEntry | ConflictedIndexEntry]
+    _byname: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
 
     def __init__(self, filename: Union[bytes, str], read=True) -> None:
         """Create an index object associated with the given filename.
@@ -452,7 +452,7 @@ class Index:
         """Number of entries in this index file."""
         return len(self._byname)
 
-    def __getitem__(self, key: bytes) -> IndexEntry | ConflictedIndexEntry:
+    def __getitem__(self, key: bytes) -> Union[IndexEntry, ConflictedIndexEntry]:
         """Retrieve entry by relative path and stage.
 
         Returns: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha,
@@ -499,20 +499,20 @@ class Index:
         """Remove all contents from this index."""
         self._byname = {}
 
-    def __setitem__(self, name: bytes, value: IndexEntry | ConflictedIndexEntry) -> None:
+    def __setitem__(self, name: bytes, value: Union[IndexEntry, ConflictedIndexEntry]) -> None:
         assert isinstance(name, bytes)
         self._byname[name] = value
 
     def __delitem__(self, name: bytes) -> None:
         del self._byname[name]
 
-    def iteritems(self) -> Iterator[Tuple[bytes, IndexEntry | ConflictedIndexEntry]]:
+    def iteritems(self) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 
-    def items(self) -> Iterator[Tuple[bytes, IndexEntry | ConflictedIndexEntry]]:
+    def items(self) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 
-    def update(self, entries: Dict[bytes, IndexEntry | ConflictedIndexEntry]):
+    def update(self, entries: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]):
         for key, value in entries.items():
             self[key] = value
 

@@ -32,9 +32,12 @@ class FindMergeBaseTests(TestCase):
         def lookup_parents(commit_id):
             return dag[commit_id]
 
+        def lookup_stamp(commit_id):
+            return 100
+
         c1 = inputs[0]
         c2s = inputs[1:]
-        return set(_find_lcas(lookup_parents, c1, c2s))
+        return set(_find_lcas(lookup_parents, c1, c2s, lookup_stamp))
 
     def test_multiple_lca(self):
         # two lowest common ancestors
@@ -146,12 +149,15 @@ class FindMergeBaseTests(TestCase):
         def lookup_parents(cid):
             return graph[cid]
 
+        def lookup_stamp(commit_id):
+            return 100
+
         lcas = ["A"]
         others = ["B", "C"]
         for cmt in others:
             next_lcas = []
             for ca in lcas:
-                res = _find_lcas(lookup_parents, cmt, [ca])
+                res = _find_lcas(lookup_parents, cmt, [ca], lookup_stamp)
                 next_lcas.extend(res)
             lcas = next_lcas[:]
         self.assertEqual(set(lcas), {"2"})

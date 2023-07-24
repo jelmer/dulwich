@@ -64,7 +64,7 @@ class CommitCache(MutableMapping):
 
 
 # priority queue using builtin python minheap tools
-# why they do not have a bultin maxheap is simply ridiculous but
+# why they do not have a builtin maxheap is simply ridiculous but
 # liveable with integer time stamps using negation
 class WrkLst(object):
     def __init__(self):

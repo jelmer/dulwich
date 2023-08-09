@@ -1949,6 +1949,8 @@ class AbstractHttpGitClient(GitClient):
           redirect_location properties, and read is a consumable read
           method for the response data.
 
+        Raises:
+          GitProtocolError
         """
         raise NotImplementedError(self._http_request)
 
@@ -2225,13 +2227,16 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             req_headers.update(headers)
         req_headers["Pragma"] = "no-cache"
 
-        if data is None:
-            resp = self.pool_manager.request(
-                "GET", url, headers=req_headers, preload_content=False)
-        else:
-            resp = self.pool_manager.request(
-                "POST", url, headers=req_headers, body=data, preload_content=False
-            )
+        try:
+            if data is None:
+                resp = self.pool_manager.request(
+                    "GET", url, headers=req_headers, preload_content=False)
+            else:
+                resp = self.pool_manager.request(
+                    "POST", url, headers=req_headers, body=data, preload_content=False
+                )
+        except urllib3.exceptions.HTTPError as e:
+            raise GitProtocolError(str(e)) from e
 
         if resp.status == 404:
             raise NotGitRepository()

@@ -17,6 +17,9 @@
  * objects: Define a stricter return type for _parse_message
    (Vincent Lorentz)
 
+ * Raise GitProtocolError when encountering HTTP Errors in
+   HTTPGitClient. (Jelmer Vernooĳ, #1199)
+
 0.21.5	2023-05-04
 
  * Be more tolerant to non-3-length tuple versions.

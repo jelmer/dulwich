@@ -842,7 +842,7 @@ exit 1
             "non-zero status 1",
         )
         for w in warnings_list:
-            if type(w) == type(expected_warning) and w.args == expected_warning.args:
+            if type(w) is type(expected_warning) and w.args == expected_warning.args:
                 break
         else:
             raise AssertionError(

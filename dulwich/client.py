@@ -413,7 +413,10 @@ def _read_shallow_updates(pkt_seq):
     new_shallow = set()
     new_unshallow = set()
     for pkt in pkt_seq:
-        cmd, sha = pkt.split(b" ", 1)
+        try:
+            cmd, sha = pkt.split(b" ", 1)
+        except ValueError:
+            raise GitProtocolError("unknown command %s" % pkt)
         if cmd == COMMAND_SHALLOW:
             new_shallow.add(sha.strip())
         elif cmd == COMMAND_UNSHALLOW:

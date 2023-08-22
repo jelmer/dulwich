@@ -66,7 +66,7 @@ class CommitCache(MutableMapping):
 # priority queue using builtin python minheap tools
 # why they do not have a builtin maxheap is simply ridiculous but
 # liveable with integer time stamps using negation
-class WrkLst(object):
+class WorkList(object):
     def __init__(self):
         self.pq = []
 
@@ -105,7 +105,7 @@ def _find_lcas(lookup_parents, c1, c2s, lookup_stamp, min_stamp=0):
 
     # initialize the working list states with ancestry info
     # note possibility of c1 being one of c2s should be handled
-    wlst = WrkLst()
+    wlst = WorkList()
     cstates[c1] = _ANC_OF_1
     wlst.add((lookup_stamp(c1), c1))
     for c2 in c2s:

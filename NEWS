@@ -16,6 +16,9 @@
 
 0.21.6	2023-09-02
 
+ * Convert _objects.c to rust.
+   (Jelmer Vernooĳ)
+
  * index: Handle different stages of conflicted paths.
    (Kevin Hendricks, Jelmer Vernooĳ)
 

@@ -26,3 +26,4 @@ docs/api/*.txt
 .eggs
 dulwich.dist-info
 .stestr
+target/

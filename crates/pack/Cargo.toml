@@ -1,0 +1,12 @@
+[package]
+name = "pack-py"
+version = "3.4.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+path = "dulwich/_pack.rs"
+
+[dependencies]
+pyo3 = { version = ">=0.19", features = ["extension-module"]}
+memchr = "2"

@@ -6,7 +6,7 @@ import os
 import sys
 
 from setuptools import Extension, setup
-from setuptools_rust import RustExtension, Binding
+from setuptools_rust import Binding, RustExtension
 
 if sys.platform == "darwin" and os.path.exists("/usr/bin/xcodebuild"):
     # XCode 4.0 dropped support for ppc architecture, which is hardcoded in
@@ -41,7 +41,7 @@ ext_modules = [
 ]
 
 rust_extensions = [
-    RustExtension("dulwich._objects", "crates/objects/Cargo.toml", binding=Binding.PyO3, optional = True),
+    RustExtension("dulwich._objects", "crates/objects/Cargo.toml", binding=Binding.PyO3, optional=True),
 ]
 
 # Ideally, setuptools would just provide a way to do this

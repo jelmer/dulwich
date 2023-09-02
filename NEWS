@@ -1,4 +1,4 @@
-0.21.6	UNRELEASED
+0.21.6	2023-09-02
 
  * index: Handle different stages of conflicted paths.
    (Kevin Hendricks, Jelmer Vernooĳ)

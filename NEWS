@@ -1,3 +1,5 @@
+0.21.7	UNRELEASED
+
 0.21.6	2023-09-02
 
  * index: Handle different stages of conflicted paths.

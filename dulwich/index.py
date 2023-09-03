@@ -455,8 +455,8 @@ class Index:
     def __getitem__(self, key: bytes) -> Union[IndexEntry, ConflictedIndexEntry]:
         """Retrieve entry by relative path and stage.
 
-        Returns: tuple with (ctime, mtime, dev, ino, mode, uid, gid, size, sha,
-            flags)
+        Returns: Either a IndexEntry or a ConflictedIndexEntry
+        Raises KeyError: if the entry does not exist
         """
         return self._byname[key]
 

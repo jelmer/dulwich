@@ -2225,6 +2225,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         return urljoin(self._base_url, path).rstrip("/") + "/"
 
     def _http_request(self, url, headers=None, data=None):
+        import urllib3.exceptions
         req_headers = self.pool_manager.headers.copy()
         if headers is not None:
             req_headers.update(headers)

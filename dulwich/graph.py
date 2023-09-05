@@ -20,47 +20,9 @@
 
 """Implementation of merge-base following the approach of git."""
 
-from collections.abc import MutableMapping
-from collections import OrderedDict
+from .lru_cache import LRUCache
 
 from heapq import heappush, heappop
-
-# Because opening an sha file from the object_store, reading it,
-# then decoding its will be a slow operation, we want to create
-# a cache of Commit objects so that repeat parent and commit time
-# lookup (which are inherent when looking for a common ancestor)
-# will be much faster, so we need to implement a simple Commit cache
-# using an OrderedDict
-
-
-class CommitCache(MutableMapping):
-
-    def __init__(self, maxsize):
-        self.maxsize = maxsize
-        self.d = OrderedDict()
-
-    def __getitem__(self, key):
-        self.d.move_to_end(key)
-        return self.d[key]
-
-    def __setitem__(self, key, value):
-        if key in self.d:
-            self.d.move_to_end(key)
-        elif len(self.d) == self.maxsize:
-            self.d.popitem(last=False)
-        self.d[key] = value
-
-    def __delitem__(self, key):
-        del self.d[key]
-
-    def __iter__(self):
-        return self.d__iter__()
-
-    def __len__(self):
-        return len(self.d)
-
-    def __contains__(self, key):
-        return key in self.d
 
 
 # priority queue using builtin python minheap tools
@@ -163,7 +125,7 @@ def find_merge_base(repo, commit_ids):
     Returns:
       list of lowest common ancestor commit_ids
     """
-    cmtcache = CommitCache(128)
+    cmtcache = LRUCache(max_cache=128)
     parents_provider = repo.parents_provider()
 
     def lookup_stamp(cmtid):
@@ -199,7 +161,7 @@ def find_octopus_base(repo, commit_ids):
     Returns:
       list of lowest common ancestor commit_ids
     """
-    cmtcache = CommitCache(128)
+    cmtcache = LRUCache(max_cache=128)
     parents_provider = repo.parents_provider()
 
     def lookup_stamp(cmtid):
@@ -237,7 +199,7 @@ def can_fast_forward(repo, c1, c2):
       c1: Commit id for first commit
       c2: Commit id for second commit
     """
-    cmtcache = CommitCache(128)
+    cmtcache = LRUCache(max_cache=128)
     parents_provider = repo.parents_provider()
 
     def lookup_stamp(cmtid):

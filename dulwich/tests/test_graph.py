@@ -1,4 +1,4 @@
-# test_index.py -- Tests for merge
+# test_graph.py -- Tests for merge base
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -21,7 +21,7 @@
 
 from dulwich.tests import TestCase
 
-from ..graph import _find_lcas, can_fast_forward
+from ..graph import _find_lcas, can_fast_forward, WorkList
 from ..repo import MemoryRepo
 from .utils import make_commit
 
@@ -33,6 +33,8 @@ class FindMergeBaseTests(TestCase):
             return dag[commit_id]
 
         def lookup_stamp(commit_id):
+            # any constant timestamp value here will work to force
+            # this test to test the same behaviour as done previously
             return 100
 
         c1 = inputs[0]
@@ -150,6 +152,8 @@ class FindMergeBaseTests(TestCase):
             return graph[cid]
 
         def lookup_stamp(commit_id):
+            # any constant timestamp value here will work to force
+            # this test to test the same behaviour as done previously
             return 100
 
         lcas = ["A"]
@@ -186,3 +190,19 @@ class CanFastForwardTests(TestCase):
         self.assertTrue(can_fast_forward(r, c1.id, c2b.id))
         self.assertFalse(can_fast_forward(r, c2a.id, c2b.id))
         self.assertFalse(can_fast_forward(r, c2b.id, c2a.id))
+
+
+class WorkListTest(TestCase):
+    def test_WorkList(self):
+        # tuples of (timestamp, value) are stored in a Priority MaxQueue
+        # repeated use of get should return them in maxheap timestamp
+        # order: largest time value (most recent in time) first then earlier/older
+        wlst = WorkList()
+        wlst.add((100, "Test Value 1"))
+        wlst.add(( 50, "Test Value 2"))
+        wlst.add((200, "Test Value 3"))
+        self.assertTrue(wlst.get() == (200, "Test Value 3"))
+        self.assertTrue(wlst.get() == (100, "Test Value 1"))
+        wlst.add((150, "Test Value 4"))
+        self.assertTrue(wlst.get() == (150, "Test Value 4"))
+        self.assertTrue(wlst.get() == (50, "Test Value 2"))

@@ -144,6 +144,10 @@ class InvalidUserIdentity(Exception):
         self.identity = identity
 
 
+class DefaultIdentityNotFound(Exception):
+    """Default identity could not be determined."""
+
+
 # TODO(jelmer): Cache?
 def _get_default_identity() -> Tuple[str, str]:
     import socket
@@ -172,11 +176,15 @@ def _get_default_identity() -> Tuple[str, str]:
             if username is None:
                 username = entry.pw_name
     if not fullname:
+        if username is None:
+            raise DefaultIdentityNotFound("no username found")
         fullname = username
     email = os.environ.get("EMAIL")
     if email is None:
+        if username is None:
+            raise DefaultIdentityNotFound("no username found")
         email = f"{username}@{socket.gethostname()}"
-    return (fullname, email)  # type: ignore
+    return (fullname, email)
 
 
 def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> bytes:
@@ -876,7 +884,9 @@ class BaseRepo:
     def _get_user_identity(self, config: "StackedConfig",
                            kind: Optional[str] = None) -> bytes:
         """Determine the identity to use for new commits."""
-        # TODO(jelmer): Deprecate this function in favor of get_user_identity
+        warnings.warn(
+            "use get_user_identity() rather than Repo._get_user_identity",
+            DeprecationWarning)
         return get_user_identity(config)
 
     def _add_graftpoints(self, updated_graftpoints: Dict[bytes, List[bytes]]):

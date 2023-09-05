@@ -3,6 +3,9 @@
  * Fix NameError when encountering errors during HTTP operation.
    (Jelmer Vernooĳ, #1208)
 
+ * Raise exception when default identity can't be found.
+   (Jelmer Vernooĳ)
+
 0.21.6	2023-09-02
 
  * index: Handle different stages of conflicted paths.

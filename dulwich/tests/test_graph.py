@@ -199,7 +199,7 @@ class WorkListTest(TestCase):
         # order: largest time value (most recent in time) first then earlier/older
         wlst = WorkList()
         wlst.add((100, "Test Value 1"))
-        wlst.add(( 50, "Test Value 2"))
+        wlst.add((50, "Test Value 2"))
         wlst.add((200, "Test Value 3"))
         self.assertTrue(wlst.get() == (200, "Test Value 3"))
         self.assertTrue(wlst.get() == (100, "Test Value 1"))

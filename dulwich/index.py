@@ -25,7 +25,7 @@ import stat
 import struct
 import sys
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 from typing import (
     Any,
     BinaryIO,
@@ -72,7 +72,7 @@ EXTENDED_FLAG_INTEND_TO_ADD = 0x2000
 DEFAULT_VERSION = 2
 
 
-class Stage(Enum):
+class Stage(IntEnum):
     NORMAL = 0
     MERGE_CONFLICT_ANCESTOR = 1
     MERGE_CONFLICT_THIS = 2
@@ -495,6 +495,27 @@ class Index:
                 return True
         return False
 
+    def set_merge_conflict(self, base_entry, base_time, this_entry, this_time, other_entry, other_time):
+        path, base_index_entry, this_index_entry, other_index_entry = None, None, None, None
+        if this_entry:
+            path = this_entry.path
+            this_index_entry = IndexEntry(this_time, this_time, 0, 0, this_entry.mode,
+                                          0, 0, 0, this_entry.sha)
+        if base_entry:
+            if not path:
+                path = base_entry.path
+            base_index_entry = IndexEntry(base_time, base_time, 0, 0, base_entry.mode,
+                                          0, 0, 0, base_entry.sha)
+        if other_entry:
+            if not path:
+                path = other_entry.path
+            other_index_entry = IndexEntry(other_time, other_time, 0, 0, other_entry.mode,
+                                           0, 0, 0, other_entry.sha)
+        if path:
+            self._byname[path] = ConflictedIndexEntry(ancestor=base_index_entry,
+                                                      this=this_index_entry,
+                                                      other=other_index_entry)
+
     def clear(self):
         """Remove all contents from this index."""
         self._byname = {}
@@ -533,6 +554,8 @@ class Index:
 
         def lookup_entry(path):
             entry = self[path]
+            if isinstance(entry, ConflictedIndexEntry):
+                entry = entry.this
             return entry.sha, cleanup_mode(entry.mode)
 
         yield from changes_from_tree(

@@ -201,7 +201,7 @@ class Protocol:
         This method may read from the readahead buffer; see unread_pkt_line.
 
         Returns: The next string from the stream, without the length prefix, or
-            None for a flush-pkt ('0000').
+            None for a flush-pkt ('0000') or delim-pkt ('0001').
         """
         if self._readahead is None:
             read = self.read
@@ -214,7 +214,7 @@ class Protocol:
             if not sizestr:
                 raise HangupException()
             size = int(sizestr, 16)
-            if size == 0:
+            if size == 0 or size == 1:  # flush-pkt or delim-pkt
                 if self.report_activity:
                     self.report_activity(4, "read")
                 return None

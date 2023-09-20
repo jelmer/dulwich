@@ -1330,11 +1330,15 @@ def find_git_command() -> List[str]:
     if sys.platform == "win32":  # support .exe, .bat and .cmd
         try:  # to avoid overhead
             import win32api
+            import pywintypes
         except ImportError:  # run through cmd.exe with some overhead
             return ["cmd", "/c", "git"]
         else:
-            status, git = win32api.FindExecutable("git")
-            return [git]
+            try:
+                status, git = win32api.FindExecutable("git")
+                return [git]
+            except pywintypes.error:
+                return ["cmd", "/c", "git"]
     else:
         return ["git"]
 

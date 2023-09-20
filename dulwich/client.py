@@ -1333,8 +1333,11 @@ def find_git_command() -> List[str]:
         except ImportError:  # run through cmd.exe with some overhead
             return ["cmd", "/c", "git"]
         else:
-            status, git = win32api.FindExecutable("git")
-            return [git]
+            try:
+                status, git = win32api.FindExecutable("git")
+                return [git]
+            except win32api.pywintypes.error:
+                return ["cmd", "/c", "git"]
     else:
         return ["git"]
 

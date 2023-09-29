@@ -136,12 +136,8 @@ def unified_diff(
             started = True
             fromdate = f"\t{fromfiledate}" if fromfiledate else ""
             todate = f"\t{tofiledate}" if tofiledate else ""
-            yield "--- {}{}{}".format(
-                fromfile.decode(tree_encoding), fromdate, lineterm
-            ).encode(output_encoding)
-            yield "+++ {}{}{}".format(
-                tofile.decode(tree_encoding), todate, lineterm
-            ).encode(output_encoding)
+            yield f"--- {fromfile.decode(tree_encoding)}{fromdate}{lineterm}".encode(output_encoding)
+            yield f"+++ {tofile.decode(tree_encoding)}{todate}{lineterm}".encode(output_encoding)
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])

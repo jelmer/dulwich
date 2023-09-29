@@ -38,8 +38,7 @@ class GcsObjectStore(BucketBasedObjectStore):
         self.subpath = subpath
 
     def __repr__(self) -> str:
-        return "{}({!r}, subpath={!r})".format(
-            type(self).__name__, self.bucket, self.subpath)
+        return f"{type(self).__name__}({self.bucket!r}, subpath={self.subpath!r})"
 
     def _remove_pack(self, name):
         self.bucket.delete_blobs([

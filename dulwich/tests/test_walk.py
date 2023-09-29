@@ -39,10 +39,7 @@ class TestWalkEntry:
         self.changes = changes
 
     def __repr__(self) -> str:
-        return "<TestWalkEntry commit={}, changes={!r}>".format(
-            self.commit.id,
-            self.changes,
-        )
+        return f"<TestWalkEntry commit={self.commit.id}, changes={self.changes!r}>"
 
     def __eq__(self, other):
         if not isinstance(other, WalkEntry) or self.commit != other.commit:

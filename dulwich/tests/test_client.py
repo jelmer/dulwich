@@ -1037,9 +1037,7 @@ class HttpGitClientTests(TestCase):
         original_password = "Ya#1$2%3"
         quoted_password = urlquote(original_password)
 
-        url = "https://{username}:{password}@github.com/jelmer/dulwich".format(
-            username=quoted_username, password=quoted_password
-        )
+        url = f"https://{quoted_username}:{quoted_password}@github.com/jelmer/dulwich"
 
         c = HttpGitClient.from_parsedurl(urlparse(url))
         self.assertEqual(original_username, c._username)

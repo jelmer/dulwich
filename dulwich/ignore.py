@@ -177,11 +177,7 @@ class Pattern:
         )
 
     def __repr__(self) -> str:
-        return "{}({!r}, {!r})".format(
-            type(self).__name__,
-            self.pattern,
-            self.ignorecase,
-        )
+        return f"{type(self).__name__}({self.pattern!r}, {self.ignorecase!r})"
 
     def match(self, path: bytes) -> bool:
         """Try to match a path against this ignore pattern.

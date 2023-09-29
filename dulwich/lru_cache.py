@@ -131,31 +131,31 @@ class LRUCache(Generic[K, V]):
                 raise AssertionError(
                     "the _most_recently_used entry is not"
                     " supposed to have a previous entry"
-                    " {}".format(node)
+                    f" {node}"
                 )
         while node is not None:
             if node.next_key is _null_key:
                 if node is not self._least_recently_used:
                     raise AssertionError(
-                        "only the last node should have" " no next value: {}".format(node)
+                        "only the last node should have" f" no next value: {node}"
                     )
                 node_next = None
             else:
                 node_next = self._cache[node.next_key]
                 if node_next.prev is not node:
                     raise AssertionError(
-                        "inconsistency found, node.next.prev" " != node: {}".format(node)
+                        "inconsistency found, node.next.prev" f" != node: {node}"
                     )
             if node.prev is None:
                 if node is not self._most_recently_used:
                     raise AssertionError(
                         "only the _most_recently_used should"
-                        " not have a previous node: {}".format(node)
+                        f" not have a previous node: {node}"
                     )
             else:
                 if node.prev.next_key != node.key:
                     raise AssertionError(
-                        "inconsistency found, node.prev.next" " != node: {}".format(node)
+                        "inconsistency found, node.prev.next" f" != node: {node}"
                     )
             yield node
             node = node_next

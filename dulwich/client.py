@@ -1329,8 +1329,8 @@ def find_git_command() -> List[str]:
     """Find command to run for system Git (usually C Git)."""
     if sys.platform == "win32":  # support .exe, .bat and .cmd
         try:  # to avoid overhead
-            import win32api
             import pywintypes
+            import win32api
         except ImportError:  # run through cmd.exe with some overhead
             return ["cmd", "/c", "git"]
         else:
@@ -2181,11 +2181,7 @@ class AbstractHttpGitClient(GitClient):
         return cls(urlunparse(parsedurl), **kwargs)
 
     def __repr__(self) -> str:
-        return "{}({!r}, dumb={!r})".format(
-            type(self).__name__,
-            self._base_url,
-            self.dumb,
-        )
+        return f"{type(self).__name__}({self._base_url!r}, dumb={self.dumb!r})"
 
 
 class Urllib3HttpGitClient(AbstractHttpGitClient):

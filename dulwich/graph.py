@@ -20,15 +20,15 @@
 
 """Implementation of merge-base following the approach of git."""
 
-from .lru_cache import LRUCache
+from heapq import heappop, heappush
 
-from heapq import heappush, heappop
+from .lru_cache import LRUCache
 
 
 # priority queue using builtin python minheap tools
 # why they do not have a builtin maxheap is simply ridiculous but
 # liveable with integer time stamps using negation
-class WorkList(object):
+class WorkList:
     def __init__(self):
         self.pq = []
 
@@ -108,7 +108,7 @@ def _find_lcas(lookup_parents, c1, c2s, lookup_stamp, min_stamp=0):
     # remove any duplicates and sort it so that earliest is first
     results = []
     for dt, cmt in cands:
-        if not ((cstates[cmt] & _DNC) == _DNC) and not (dt, cmt) in results:
+        if not ((cstates[cmt] & _DNC) == _DNC) and (dt, cmt) not in results:
             results.append((dt, cmt))
     results.sort(key=lambda x: x[0])
     lcas = [cmt for dt, cmt in results]

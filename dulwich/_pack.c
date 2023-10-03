@@ -41,7 +41,7 @@ static size_t get_delta_header_size(uint8_t *delta, size_t *index, size_t length
 	size_t size = 0;
 	size_t i = 0;
 	while ((*index) < length) {
-		uint8_t cmd = delta[*index];
+		size_t cmd = delta[*index];
 		(*index)++;
 		size |= (cmd & ~0x80) << i;
 		i += 7;
@@ -130,14 +130,14 @@ static PyObject *py_apply_delta(PyObject *self, PyObject *args)
 			int i;
 			for (i = 0; i < 4; i++) {
 				if (cmd & (1 << i)) {
-					uint8_t x = delta[index];
+					unsigned x = delta[index];
 					index++;
 					cp_off |= x << (i * 8);
 				}
 			}
 			for (i = 0; i < 3; i++) {
 				if (cmd & (1 << (4+i))) {
-					uint8_t x = delta[index];
+					unsigned x = delta[index];
 					index++;
 					cp_size |= x << (i * 8);
 				}

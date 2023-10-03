@@ -46,6 +46,7 @@ from ..pack import (
     PackData,
     PackStreamReader,
     UnpackedObject,
+    UnresolvedDeltas,
     _delta_encode_size,
     _encode_copy_operation,
     apply_delta,
@@ -592,7 +593,7 @@ class TestThinPack(PackTests):
 
     def test_iterobjects(self):
         with self.make_pack(False) as p:
-            self.assertRaises(KeyError, list, p.iterobjects())
+            self.assertRaises(UnresolvedDeltas, list, p.iterobjects())
         with self.make_pack(True) as p:
             self.assertEqual(
                 sorted(
@@ -1216,8 +1217,8 @@ class DeltaChainIteratorTests(TestCase):
         try:
             list(pack_iter._walk_all_chains())
             self.fail()
-        except KeyError as e:
-            self.assertEqual(([blob.id],), e.args)
+        except UnresolvedDeltas as e:
+            self.assertEqual([blob.id], e.shas)
 
     def test_bad_ext_ref_thin_pack(self):
         b1, b2, b3 = self.store_blobs([b"foo", b"bar", b"baz"])
@@ -1238,8 +1239,8 @@ class DeltaChainIteratorTests(TestCase):
         try:
             list(pack_iter._walk_all_chains())
             self.fail()
-        except KeyError as e:
-            self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.args[0]),))
+        except UnresolvedDeltas as e:
+            self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.shas),))
 
 
 class DeltaEncodeSizeTests(TestCase):

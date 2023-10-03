@@ -6,6 +6,9 @@
  * Raise exception when default identity can't be found.
    (Jelmer Vernooĳ)
 
+ * Add a dedicated exception class for unresolved
+   deltas. (Jelmer Vernooĳ, #1221)
+
 0.21.6	2023-09-02
 
  * index: Handle different stages of conflicted paths.

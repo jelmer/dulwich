@@ -2210,7 +2210,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             import urllib3.util
 
             basic_auth = urllib3.util.make_headers(basic_auth=credentials)
-            self.pool_manager.headers.update(basic_auth)
+            self.pool_manager.headers.update(basic_auth)  # type: ignore
 
         self.config = config
 

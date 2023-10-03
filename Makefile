@@ -78,3 +78,8 @@ apidocs:
 
 fix:
 	ruff check --fix .
+
+.PHONY: codespell
+
+codespell:
+	codespell --config .codespellrc .

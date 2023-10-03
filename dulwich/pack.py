@@ -108,6 +108,13 @@ ProgressFn = Callable[[int, str], None]
 PackHint = Tuple[int, Optional[bytes]]
 
 
+class UnresolvedDeltas(Exception):
+    """"Delta objects could not be resolved."""
+
+    def __init__(self, shas):
+        self.shas = shas
+
+
 class ObjectContainer(Protocol):
 
     def add_object(self, obj: ShaFile) -> None:
@@ -1443,7 +1450,7 @@ class DeltaChainIterator(Generic[T]):
 
     def _ensure_no_pending(self) -> None:
         if self._pending_ref:
-            raise KeyError([sha_to_hex(s) for s in self._pending_ref])
+            raise UnresolvedDeltas([sha_to_hex(s) for s in self._pending_ref])
 
     def _walk_ref_chains(self):
         if not self._resolve_ext_ref:
@@ -2442,7 +2449,7 @@ class Pack:
                 yield child
         assert not ofs_pending
         if not allow_missing and todo:
-            raise KeyError(todo.pop())
+            raise UnresolvedDeltas(todo)
 
     def iter_unpacked(self, include_comp=False):
         ofs_to_entries = {ofs: (sha, crc32) for (sha, ofs, crc32) in self.index.iterentries()}

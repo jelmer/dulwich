@@ -438,6 +438,31 @@ class SubmodulesTests(TestCase):
             got,
         )
 
+    def testMalformedSubmodules(self):
+        cf = ConfigFile.from_file(
+            BytesIO(
+                b"""\
+[submodule "core/lib"]
+\tpath = core/lib
+\turl = https://github.com/phhusson/QuasselC.git
+
+[submodule "dulwich"]
+\turl = https://github.com/jelmer/dulwich
+"""
+            )
+        )
+        got = list(parse_submodules(cf))
+        self.assertEqual(
+            [
+                (
+                    b"core/lib",
+                    b"https://github.com/phhusson/QuasselC.git",
+                    b"core/lib",
+                )
+            ],
+            got,
+        )
+
 
 class ApplyInsteadOfTests(TestCase):
     def test_none(self):

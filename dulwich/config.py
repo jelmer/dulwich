@@ -780,9 +780,15 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
     for section in config.keys():
         section_kind, section_name = section
         if section_kind == b"submodule":
-            sm_path = config.get(section, b"path")
-            sm_url = config.get(section, b"url")
-            yield (sm_path, sm_url, section_name)
+            try:
+                sm_path = config.get(section, b"path")
+                sm_url = config.get(section, b"url")
+                yield (sm_path, sm_url, section_name)
+            except KeyError:
+                # If either path or url is missing, just ignore this
+                # submodule entry and move on to the next one. This is
+                # how git itself handles malformed .gitmodule entries.
+                pass
 
 
 def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:

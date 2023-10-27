@@ -115,7 +115,7 @@ class ConfigFileTests(TestCase):
     def test_from_file_multiple(self):
         cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
         self.assertEqual([b"bar", b"blah"], list(cf.get_multivar((b"core",), b"foo")))
-        self.assertEqual([], list(cf.get_multivar((b"core", ), b"blah")))
+        self.assertEqual([], list(cf.get_multivar((b"core",), b"blah")))
 
     def test_from_file_utf8_bom(self):
         text = "[core]\nfoo = b\u00e4r\n".encode("utf-8-sig")
@@ -199,14 +199,15 @@ class ConfigFileTests(TestCase):
         cf = self.from_file(
             b"[alias]\r\n"
             b"c = '!f() { \\\r\n"
-            b" printf '[git commit -m \\\"%s\\\"]\\n' \\\"$*\\\" && \\\r\n"
-            b" git commit -m \\\"$*\\\"; \\\r\n"
-            b" }; f'\r\n")
-        self.assertEqual(list(cf.sections()), [(b'alias', )])
+            b' printf \'[git commit -m \\"%s\\"]\\n\' \\"$*\\" && \\\r\n'
+            b' git commit -m \\"$*\\"; \\\r\n'
+            b" }; f'\r\n"
+        )
+        self.assertEqual(list(cf.sections()), [(b"alias",)])
         self.assertEqual(
-            b'\'!f() { printf \'[git commit -m "%s"]\n\' '
-            b'"$*" && git commit -m "$*"',
-            cf.get((b"alias", ), b"c"))
+            b"'!f() { printf '[git commit -m \"%s\"]\n' " b'"$*" && git commit -m "$*"',
+            cf.get((b"alias",), b"c"),
+        )
 
     def test_quoted(self):
         cf = self.from_file(
@@ -468,25 +469,24 @@ class ApplyInsteadOfTests(TestCase):
     def test_none(self):
         config = ConfigDict()
         self.assertEqual(
-            'https://example.com/', apply_instead_of(config, 'https://example.com/'))
+            "https://example.com/", apply_instead_of(config, "https://example.com/")
+        )
 
     def test_apply(self):
         config = ConfigDict()
-        config.set(
-            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
+        config.set(("url", "https://samba.org/"), "insteadOf", "https://example.com/")
         self.assertEqual(
-            'https://samba.org/',
-            apply_instead_of(config, 'https://example.com/'))
+            "https://samba.org/", apply_instead_of(config, "https://example.com/")
+        )
 
     def test_apply_multiple(self):
         config = ConfigDict()
-        config.set(
-            ('url', 'https://samba.org/'), 'insteadOf', 'https://blah.com/')
-        config.set(
-            ('url', 'https://samba.org/'), 'insteadOf', 'https://example.com/')
+        config.set(("url", "https://samba.org/"), "insteadOf", "https://blah.com/")
+        config.set(("url", "https://samba.org/"), "insteadOf", "https://example.com/")
         self.assertEqual(
-            [b'https://blah.com/', b'https://example.com/'],
-            list(config.get_multivar(('url', 'https://samba.org/'), 'insteadOf')))
+            [b"https://blah.com/", b"https://example.com/"],
+            list(config.get_multivar(("url", "https://samba.org/"), "insteadOf")),
+        )
         self.assertEqual(
-            'https://samba.org/',
-            apply_instead_of(config, 'https://example.com/'))
+            "https://samba.org/", apply_instead_of(config, "https://example.com/")
+        )

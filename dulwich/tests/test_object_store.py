@@ -84,27 +84,21 @@ class ObjectStoreTests:
         self.store.add_object(testobject)
         refs = {b"refs/heads/foo": testobject.id}
         with patch.object(self.store, "_get_depth", return_value=1) as m:
-            self.assertEqual(
-                [], self.store.determine_wants_all(refs, depth=0)
-            )
+            self.assertEqual([], self.store.determine_wants_all(refs, depth=0))
             self.assertEqual(
                 [testobject.id],
                 self.store.determine_wants_all(refs, depth=DEPTH_INFINITE),
             )
             m.assert_not_called()
 
-            self.assertEqual(
-                [], self.store.determine_wants_all(refs, depth=1)
-            )
+            self.assertEqual([], self.store.determine_wants_all(refs, depth=1))
             m.assert_called_with(testobject.id)
             self.assertEqual(
                 [testobject.id], self.store.determine_wants_all(refs, depth=2)
             )
 
     def test_get_depth(self):
-        self.assertEqual(
-            0, self.store._get_depth(testobject.id)
-        )
+        self.assertEqual(0, self.store._get_depth(testobject.id))
 
         self.store.add_object(testobject)
         self.assertEqual(
@@ -598,8 +592,12 @@ class TreeLookupPathTests(TestCase):
     def test_lookup_submodule(self):
         tree_lookup_path(self.get_object, self.tree_id, b"d")[1]
         self.assertRaises(
-            SubmoduleEncountered, tree_lookup_path, self.get_object,
-            self.tree_id, b"d/a")
+            SubmoduleEncountered,
+            tree_lookup_path,
+            self.get_object,
+            self.tree_id,
+            b"d/a",
+        )
 
     def test_lookup_nonexistent(self):
         self.assertRaises(

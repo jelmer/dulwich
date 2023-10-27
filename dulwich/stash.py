@@ -42,9 +42,7 @@ class Stash:
 
     @property
     def _reflog_path(self):
-        return os.path.join(
-            self._repo.commondir(), "logs", os.fsdecode(self._ref)
-        )
+        return os.path.join(self._repo.commondir(), "logs", os.fsdecode(self._ref))
 
     def stashes(self):
         try:
@@ -95,7 +93,7 @@ class Stash:
             message=b"Index stash",
             merge_heads=[self._repo.head()],
             no_verify=True,
-            **commit_kwargs
+            **commit_kwargs,
         )
 
         # Then, the working tree one.
@@ -120,7 +118,7 @@ class Stash:
             message=message,
             merge_heads=[index_commit_id],
             no_verify=True,
-            **commit_kwargs
+            **commit_kwargs,
         )
 
         return cid

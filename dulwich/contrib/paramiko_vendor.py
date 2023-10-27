@@ -44,7 +44,7 @@ class _ParamikoWrapper:
 
     @property
     def stderr(self):
-        return self.channel.makefile_stderr('rb')
+        return self.channel.makefile_stderr("rb")
 
     def can_read(self):
         return self.channel.recv_ready()
@@ -85,9 +85,8 @@ class ParamikoSSHVendor:
         password=None,
         pkey=None,
         key_filename=None,
-        **kwargs
+        **kwargs,
     ):
-
         client = paramiko.SSHClient()
 
         connection_kwargs = {"hostname": host}

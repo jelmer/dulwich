@@ -413,10 +413,10 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_delete_refs_container(self):
         # We shouldn't delete the refs directory
-        self._refs[b'refs/heads/blah'] = b"42d06bd4b77fed026b154d16493e5deab78f02ec"
+        self._refs[b"refs/heads/blah"] = b"42d06bd4b77fed026b154d16493e5deab78f02ec"
         for ref in self._refs.allkeys():
             del self._refs[ref]
-        self.assertTrue(os.path.exists(os.path.join(self._refs.path, b'refs')))
+        self.assertTrue(os.path.exists(os.path.join(self._refs.path, b"refs")))
 
     def test_setitem_packed(self):
         with open(os.path.join(self._refs.path, b"packed-refs"), "w") as f:
@@ -573,11 +573,11 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_set_overwrite_loop(self):
         self.assertRaises(SymrefLoop, self._refs.follow, b"refs/heads/loop")
-        self._refs[b'refs/heads/loop'] = (
-            b"42d06bd4b77fed026b154d16493e5deab78f02ec")
+        self._refs[b"refs/heads/loop"] = b"42d06bd4b77fed026b154d16493e5deab78f02ec"
         self.assertEqual(
-            ([b'refs/heads/loop'], b'42d06bd4b77fed026b154d16493e5deab78f02ec'),
-            self._refs.follow(b"refs/heads/loop"))
+            ([b"refs/heads/loop"], b"42d06bd4b77fed026b154d16493e5deab78f02ec"),
+            self._refs.follow(b"refs/heads/loop"),
+        )
 
     def test_delitem(self):
         RefsContainerTests.test_delitem(self)
@@ -795,7 +795,6 @@ class ParseSymrefValueTests(TestCase):
 
 
 class StripPeeledRefsTests(TestCase):
-
     all_refs = {
         b"refs/heads/master": b"8843d7f92416211de9ebb963ff4ce28125932878",
         b"refs/heads/testing": b"186a005b134d8639a58b6731c7c1ea821a6eedba",

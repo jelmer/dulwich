@@ -271,9 +271,7 @@ class FindShallowTests(TestCase):
     def test_linear(self):
         c1, c2, c3 = self.make_linear_commits(3)
 
-        self.assertEqual(
-            ({c3.id}, set()), _find_shallow(self._store, [c3.id], 1)
-        )
+        self.assertEqual(({c3.id}, set()), _find_shallow(self._store, [c3.id], 1))
         self.assertEqual(
             ({c2.id}, {c3.id}),
             _find_shallow(self._store, [c3.id], 2),
@@ -676,7 +674,6 @@ class AckGraphWalkerImplTestCase(TestCase):
 
 
 class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
-
     impl_cls = SingleAckGraphWalkerImpl
 
     def test_single_ack(self):
@@ -744,7 +741,6 @@ class SingleAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
 
 class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
-
     impl_cls = MultiAckGraphWalkerImpl
 
     def test_multi_ack(self):
@@ -819,7 +815,6 @@ class MultiAckGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
 
 
 class MultiAckDetailedGraphWalkerImplTestCase(AckGraphWalkerImplTestCase):
-
     impl_cls = MultiAckDetailedGraphWalkerImpl
 
     def test_multi_ack(self):

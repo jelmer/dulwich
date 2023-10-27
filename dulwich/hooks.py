@@ -98,8 +98,8 @@ class ShellHook(Hook):
 
         try:
             ret = subprocess.call(
-                [os.path.relpath(self.filepath, self.cwd)] + list(args),
-                cwd=self.cwd)
+                [os.path.relpath(self.filepath, self.cwd)] + list(args), cwd=self.cwd
+            )
             if ret != 0:
                 if self.post_exec_callback is not None:
                     self.post_exec_callback(0, *args)
@@ -193,7 +193,7 @@ class PostReceiveShellHook(ShellHook):
             if (p.returncode != 0) or err_data:
                 err_fmt = b"post-receive exit code: %d\n" + b"stdout:\n%s\nstderr:\n%s"
                 err_msg = err_fmt % (p.returncode, out_data, err_data)
-                raise HookError(err_msg.decode('utf-8', 'backslashreplace'))
+                raise HookError(err_msg.decode("utf-8", "backslashreplace"))
             return out_data
         except OSError as err:
             raise HookError(repr(err)) from err

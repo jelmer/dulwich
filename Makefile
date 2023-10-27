@@ -79,6 +79,9 @@ apidocs:
 fix:
 	ruff check --fix .
 
+reformat:
+	ruff format .
+
 .PHONY: codespell
 
 codespell:

@@ -21,11 +21,11 @@
 """Tests for Dulwich."""
 
 __all__ = [
-    'SkipTest',
-    'TestCase',
-    'BlackboxTestCase',
-    'skipIf',
-    'expectedFailure',
+    "SkipTest",
+    "TestCase",
+    "BlackboxTestCase",
+    "skipIf",
+    "expectedFailure",
 ]
 
 import doctest
@@ -203,7 +203,7 @@ def tutorial_test_suite():
         package="dulwich.tests",
         setUp=setup,
         tearDown=teardown,
-        *tutorial_files
+        *tutorial_files,
     )
 
 

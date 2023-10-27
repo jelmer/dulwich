@@ -257,5 +257,5 @@ class ParseTreeTests(TestCase):
     def test_from_ref(self):
         r = MemoryRepo()
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
-        r.refs[b'refs/heads/foo'] = c1.id
-        self.assertEqual(r[c1.tree], parse_tree(r, b'foo'))
+        r.refs[b"refs/heads/foo"] = c1.id
+        self.assertEqual(r[c1.tree], parse_tree(r, b"foo"))

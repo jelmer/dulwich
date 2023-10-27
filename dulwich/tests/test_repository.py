@@ -73,15 +73,15 @@ class CreateRepositoryTests(TestCase):
             self.assertIn(barestr, config_text, "%r" % config_text)
 
         if isinstance(repo, Repo):
-            expected_mode = '0o100644' if expect_filemode else '0o100666'
+            expected_mode = "0o100644" if expect_filemode else "0o100666"
             expected = {
-                'HEAD': expected_mode,
-                'config': expected_mode,
-                'description': expected_mode,
+                "HEAD": expected_mode,
+                "config": expected_mode,
+                "description": expected_mode,
             }
             actual = {
-                f[len(repo._controldir) + 1:]: oct(os.stat(f).st_mode)
-                for f in glob.glob(os.path.join(repo._controldir, '*'))
+                f[len(repo._controldir) + 1 :]: oct(os.stat(f).st_mode)
+                for f in glob.glob(os.path.join(repo._controldir, "*"))
                 if os.path.isfile(f)
             }
 
@@ -405,7 +405,9 @@ class RepositoryRootTests(TestCase):
     def test_clone_no_head(self):
         temp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, temp_dir)
-        repo_dir = os.path.join(os.path.dirname(__file__), "..", "..", "testdata", "repos")
+        repo_dir = os.path.join(
+            os.path.dirname(__file__), "..", "..", "testdata", "repos"
+        )
         dest_dir = os.path.join(temp_dir, "a.git")
         shutil.copytree(os.path.join(repo_dir, "a.git"), dest_dir, symlinks=True)
         r = Repo(dest_dir)
@@ -436,7 +438,7 @@ class RepositoryRootTests(TestCase):
         r.clone(tmp_dir, mkdir=False, bare=True)
 
     def test_reset_index_symlink_enabled(self):
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             self.skipTest("symlinks are not supported on Windows")
         tmp_dir = self.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
@@ -448,12 +450,12 @@ class RepositoryRootTests(TestCase):
 
         t = o.clone(os.path.join(tmp_dir, "t"), symlinks=True)
         o.close()
-        bar_path = os.path.join(tmp_dir, 't', 'bar')
-        if sys.platform == 'win32':
+        bar_path = os.path.join(tmp_dir, "t", "bar")
+        if sys.platform == "win32":
             with open(bar_path) as f:
-                self.assertEqual('foo', f.read())
+                self.assertEqual("foo", f.read())
         else:
-            self.assertEqual('foo', os.readlink(bar_path))
+            self.assertEqual("foo", os.readlink(bar_path))
         t.close()
 
     def test_reset_index_symlink_disabled(self):
@@ -467,8 +469,8 @@ class RepositoryRootTests(TestCase):
         o.do_commit(b"add symlink")
 
         t = o.clone(os.path.join(tmp_dir, "t"), symlinks=False)
-        with open(os.path.join(tmp_dir, "t", 'bar')) as f:
-            self.assertEqual('foo', f.read())
+        with open(os.path.join(tmp_dir, "t", "bar")) as f:
+            self.assertEqual("foo", f.read())
 
         t.close()
 
@@ -734,17 +736,18 @@ r = Repo('.')
 r.stage(['foo'])
 """.format(
             executable=sys.executable,
-            path=[os.path.join(os.path.dirname(__file__), '..', '..')] + sys.path)
+            path=[os.path.join(os.path.dirname(__file__), "..", "..")] + sys.path,
+        )
 
         repo_dir = os.path.join(self.mkdtemp())
         self.addCleanup(shutil.rmtree, repo_dir)
         r = Repo.init(repo_dir)
         self.addCleanup(r.close)
 
-        with open(os.path.join(repo_dir, 'blah'), 'w') as f:
-            f.write('blah')
+        with open(os.path.join(repo_dir, "blah"), "w") as f:
+            f.write("blah")
 
-        r.stage(['blah'])
+        r.stage(["blah"])
 
         pre_commit = os.path.join(r.controldir(), "hooks", "pre-commit")
 
@@ -764,7 +767,7 @@ r.stage(['foo'])
         self.assertEqual([], r[commit_sha].parents)
 
         tree = r[r[commit_sha].tree]
-        self.assertEqual({b'blah', b'foo'}, set(tree))
+        self.assertEqual({b"blah", b"foo"}, set(tree))
 
     def test_shell_hook_post_commit(self):
         if os.name != "posix":
@@ -968,9 +971,7 @@ class BuildRepoRootTests(TestCase):
             {b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"},
             self._repo.get_shallow(),
         )
-        self._repo.update_shallow(
-            None, [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"]
-        )
+        self._repo.update_shallow(None, [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"])
         self.assertEqual(set(), self._repo.get_shallow())
         self.assertEqual(
             False,
@@ -1132,20 +1133,20 @@ class BuildRepoRootTests(TestCase):
         r = self._repo
         c = r.get_config()
         c.set(("core",), "repositoryformatversion", "1")
-        c.set(("extensions", ), "worktreeconfig", True)
+        c.set(("extensions",), "worktreeconfig", True)
         c.write_to_path()
         c = r.get_worktree_config()
         c.set(("user",), "repositoryformatversion", "1")
         c.set((b"user",), b"name", b"Jelmer")
         c.write_to_path()
         cs = r.get_config_stack()
-        self.assertEqual(cs.get(("user", ), "name"), b"Jelmer")
+        self.assertEqual(cs.get(("user",), "name"), b"Jelmer")
 
     def test_repositoryformatversion_1_extension(self):
         r = self._repo
         c = r.get_config()
         c.set(("core",), "repositoryformatversion", "1")
-        c.set(("extensions", ), "unknownextension", True)
+        c.set(("extensions",), "unknownextension", True)
         c.write_to_path()
         self.assertRaises(UnsupportedExtension, Repo, self._repo_dir)
 
@@ -1372,16 +1373,16 @@ class BuildRepoRootTests(TestCase):
     def test_stage_submodule(self):
         r = self._repo
         s = Repo.init(os.path.join(r.path, "sub"), mkdir=True)
-        s.do_commit(b'message')
+        s.do_commit(b"message")
         r.stage(["sub"])
         self.assertEqual([b"a", b"sub"], list(r.open_index()))
 
     def test_unstage_midify_file_with_dir(self):
-        os.mkdir(os.path.join(self._repo.path, 'new_dir'))
-        full_path = os.path.join(self._repo.path, 'new_dir', 'foo')
+        os.mkdir(os.path.join(self._repo.path, "new_dir"))
+        full_path = os.path.join(self._repo.path, "new_dir", "foo")
 
-        with open(full_path, 'w') as f:
-            f.write('hello')
+        with open(full_path, "w") as f:
+            f.write("hello")
         porcelain.add(self._repo, paths=[full_path])
         porcelain.commit(
             self._repo,
@@ -1389,24 +1390,26 @@ class BuildRepoRootTests(TestCase):
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
         )
-        with open(full_path, 'a') as f:
-            f.write('something new')
-        self._repo.unstage(['new_dir/foo'])
+        with open(full_path, "a") as f:
+            f.write("something new")
+        self._repo.unstage(["new_dir/foo"])
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'new_dir/foo'], []], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [b"new_dir/foo"], []], status
+        )
 
     def test_unstage_while_no_commit(self):
-        file = 'foo'
+        file = "foo"
         full_path = os.path.join(self._repo.path, file)
-        with open(full_path, 'w') as f:
-            f.write('hello')
+        with open(full_path, "w") as f:
+            f.write("hello")
         porcelain.add(self._repo, paths=[full_path])
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['foo']], status)
+        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
 
     def test_unstage_add_file(self):
-        file = 'foo'
+        file = "foo"
         full_path = os.path.join(self._repo.path, file)
         porcelain.commit(
             self._repo,
@@ -1414,18 +1417,18 @@ class BuildRepoRootTests(TestCase):
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
         )
-        with open(full_path, 'w') as f:
-            f.write('hello')
+        with open(full_path, "w") as f:
+            f.write("hello")
         porcelain.add(self._repo, paths=[full_path])
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['foo']], status)
+        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
 
     def test_unstage_modify_file(self):
-        file = 'foo'
+        file = "foo"
         full_path = os.path.join(self._repo.path, file)
-        with open(full_path, 'w') as f:
-            f.write('hello')
+        with open(full_path, "w") as f:
+            f.write("hello")
         porcelain.add(self._repo, paths=[full_path])
         porcelain.commit(
             self._repo,
@@ -1433,19 +1436,21 @@ class BuildRepoRootTests(TestCase):
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
         )
-        with open(full_path, 'a') as f:
-            f.write('broken')
+        with open(full_path, "a") as f:
+            f.write("broken")
         porcelain.add(self._repo, paths=[full_path])
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
 
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
+        )
 
     def test_unstage_remove_file(self):
-        file = 'foo'
+        file = "foo"
         full_path = os.path.join(self._repo.path, file)
-        with open(full_path, 'w') as f:
-            f.write('hello')
+        with open(full_path, "w") as f:
+            f.write("hello")
         porcelain.add(self._repo, paths=[full_path])
         porcelain.commit(
             self._repo,
@@ -1456,20 +1461,24 @@ class BuildRepoRootTests(TestCase):
         os.remove(full_path)
         self._repo.unstage([file])
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [b'foo'], []], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
+        )
 
     def test_reset_index(self):
         r = self._repo
-        with open(os.path.join(r.path, 'a'), 'wb') as f:
-            f.write(b'changed')
-        with open(os.path.join(r.path, 'b'), 'wb') as f:
-            f.write(b'added')
-        r.stage(['a', 'b'])
+        with open(os.path.join(r.path, "a"), "wb") as f:
+            f.write(b"changed")
+        with open(os.path.join(r.path, "b"), "wb") as f:
+            f.write(b"added")
+        r.stage(["a", "b"])
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{'add': [b'b'], 'delete': [], 'modify': [b'a']}, [], []], status)
+        self.assertEqual(
+            [{"add": [b"b"], "delete": [], "modify": [b"a"]}, [], []], status
+        )
         r.reset_index()
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{'add': [], 'delete': [], 'modify': []}, [], ['b']], status)
+        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["b"]], status)
 
     @skipIf(
         sys.platform in ("win32", "darwin"),
@@ -1536,8 +1545,8 @@ class CheckUserIdentityTests(TestCase):
             InvalidUserIdentity, check_user_identity, b"Fullname >order<>"
         )
         self.assertRaises(
-            InvalidUserIdentity, check_user_identity, b'Contains\0null byte <>'
+            InvalidUserIdentity, check_user_identity, b"Contains\0null byte <>"
         )
         self.assertRaises(
-            InvalidUserIdentity, check_user_identity, b'Contains\nnewline byte <>'
+            InvalidUserIdentity, check_user_identity, b"Contains\nnewline byte <>"
         )

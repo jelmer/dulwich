@@ -39,7 +39,7 @@ from typing import List, Optional, Tuple
 # only needs to detect git style diffs as this is for
 # use with dulwich
 
-_git_header_name = re.compile(br"diff --git a/(.*) b/(.*)")
+_git_header_name = re.compile(rb"diff --git a/(.*) b/(.*)")
 
 _GIT_HEADER_START = b"diff --git a/"
 _GIT_BINARY_START = b"Binary file"
@@ -55,7 +55,9 @@ _GIT_UNCHANGED_START = b" "
 # properly interface with diffstat routine
 
 
-def _parse_patch(lines: List[bytes]) -> Tuple[List[bytes], List[bool], List[Tuple[int, int]]]:
+def _parse_patch(
+    lines: List[bytes]
+) -> Tuple[List[bytes], List[bool], List[Tuple[int, int]]]:
     """Parse a git style diff or patch to generate diff stats.
 
     Args:

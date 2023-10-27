@@ -90,7 +90,6 @@ exit 0
         hook.execute()
 
     def test_hook_commit_msg(self):
-
         repo_dir = os.path.join(tempfile.mkdtemp())
         os.mkdir(os.path.join(repo_dir, "hooks"))
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -135,7 +134,6 @@ if [ "$(pwd)" = '"""
         hook.execute(b"empty commit")
 
     def test_hook_post_commit(self):
-
         (fd, path) = tempfile.mkstemp()
         os.close(fd)
 

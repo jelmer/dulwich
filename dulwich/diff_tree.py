@@ -264,7 +264,9 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None
         for t in parent_tree_ids
     ]
     num_parents = len(parent_tree_ids)
-    changes_by_path: Dict[str, List[Optional[TreeChange]]] = defaultdict(lambda: [None] * num_parents)
+    changes_by_path: Dict[str, List[Optional[TreeChange]]] = defaultdict(
+        lambda: [None] * num_parents
+    )
 
     # Organize by path.
     for i, parent_changes in enumerate(all_parent_changes):
@@ -517,7 +519,7 @@ class RenameDetector:
         self._prune(add_paths, delete_paths)
 
     def _should_find_content_renames(self):
-        return len(self._adds) * len(self._deletes) <= self._max_files ** 2
+        return len(self._adds) * len(self._deletes) <= self._max_files**2
 
     def _rename_type(self, check_paths, delete, add):
         if check_paths and delete.old.path == add.new.path:

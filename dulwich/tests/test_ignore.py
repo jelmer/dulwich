@@ -90,7 +90,7 @@ TRANSLATE_TESTS = [
 
 class TranslateTests(TestCase):
     def test_translate(self):
-        for (pattern, regex) in TRANSLATE_TESTS:
+        for pattern, regex in TRANSLATE_TESTS:
             if re.escape(b"/") == b"/":
                 # Slash is no longer escaped in Python3.7, so undo the escaping
                 # in the expected return value..
@@ -129,14 +129,14 @@ with escaped trailing whitespace\\
 
 class MatchPatternTests(TestCase):
     def test_matches(self):
-        for (path, pattern) in POSITIVE_MATCH_TESTS:
+        for path, pattern in POSITIVE_MATCH_TESTS:
             self.assertTrue(
                 match_pattern(path, pattern),
                 f"path: {path!r}, pattern: {pattern!r}",
             )
 
     def test_no_matches(self):
-        for (path, pattern) in NEGATIVE_MATCH_TESTS:
+        for path, pattern in NEGATIVE_MATCH_TESTS:
             self.assertFalse(
                 match_pattern(path, pattern),
                 f"path: {path!r}, pattern: {pattern!r}",
@@ -237,19 +237,19 @@ class IgnoreFilterManagerTests(TestCase):
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo = Repo.init(tmp_dir)
 
-        with open(os.path.join(repo.path, '.gitignore'), 'wb') as f:
-            f.write(b'/*\n')
-            f.write(b'!/foo\n')
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"/*\n")
+            f.write(b"!/foo\n")
 
-        os.mkdir(os.path.join(repo.path, 'foo'))
-        with open(os.path.join(repo.path, 'foo', '.gitignore'), 'wb') as f:
-            f.write(b'/bar\n')
+        os.mkdir(os.path.join(repo.path, "foo"))
+        with open(os.path.join(repo.path, "foo", ".gitignore"), "wb") as f:
+            f.write(b"/bar\n")
 
-        with open(os.path.join(repo.path, 'foo', 'bar'), 'wb') as f:
-            f.write(b'IGNORED')
+        with open(os.path.join(repo.path, "foo", "bar"), "wb") as f:
+            f.write(b"IGNORED")
 
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertTrue(m.is_ignored('foo/bar'))
+        self.assertTrue(m.is_ignored("foo/bar"))
 
     def test_load_ignore_ignorecase(self):
         tmp_dir = tempfile.mkdtemp()

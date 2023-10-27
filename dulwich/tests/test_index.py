@@ -71,7 +71,6 @@ def can_symlink():
 
 
 class IndexTestCase(TestCase):
-
     datadir = os.path.join(os.path.dirname(__file__), "../../testdata/indexes")
 
     def get_simple_index(self, name):
@@ -145,7 +144,8 @@ class SimpleIndexWriterTestCase(IndexTestCase):
                     0,
                     b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
                     0,
-                    0)
+                    0,
+                )
             )
         ]
         filename = os.path.join(self.tempdir, "test-simple-write-index")
@@ -157,7 +157,6 @@ class SimpleIndexWriterTestCase(IndexTestCase):
 
 
 class ReadIndexDictTests(IndexTestCase):
-
     def setUp(self):
         IndexTestCase.setUp(self)
         self.tempdir = tempfile.mkdtemp()
@@ -358,7 +357,6 @@ class BuildIndexTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Populate repo
             filea = Blob.from_string(b"file a")
             filee = Blob.from_string(b"d")
@@ -393,7 +391,6 @@ class BuildIndexTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Populate repo
             filea = Blob.from_string(b"file a")
             fileb = Blob.from_string(b"file b")
@@ -491,7 +488,6 @@ class BuildIndexTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Populate repo
             filed = Blob.from_string(b"file d")
             filee = Blob.from_string(b"d")
@@ -525,7 +521,6 @@ class BuildIndexTests(TestCase):
         repo_dir_bytes = os.fsencode(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Populate repo
             file = Blob.from_string(b"foo")
 
@@ -651,7 +646,6 @@ class GetUnstagedChangesTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Commit a dummy file then modify it
             foo1_fullpath = os.path.join(repo_dir, "foo1")
             with open(foo1_fullpath, "wb") as f:
@@ -683,7 +677,6 @@ class GetUnstagedChangesTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Commit a dummy file then remove it
             foo1_fullpath = os.path.join(repo_dir, "foo1")
             with open(foo1_fullpath, "wb") as f:
@@ -707,7 +700,6 @@ class GetUnstagedChangesTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Commit a dummy file then modify it
             foo1_fullpath = os.path.join(repo_dir, "foo1")
             with open(foo1_fullpath, "wb") as f:
@@ -733,7 +725,6 @@ class GetUnstagedChangesTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         with Repo.init(repo_dir) as repo:
-
             # Commit a dummy file then modify it
             foo1_fullpath = os.path.join(repo_dir, "foo1")
             with open(foo1_fullpath, "wb") as f:

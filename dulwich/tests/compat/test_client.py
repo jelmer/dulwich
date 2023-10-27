@@ -417,7 +417,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
     def test_send_remove_branch(self):
         # This test fails intermittently on my machine, probably due to some sort
         # of race condition. Probably also related to #1015
-        self.skipTest('skip flaky test; see #1015')
+        self.skipTest("skip flaky test; see #1015")
 
 
 class TestSSHVendor:
@@ -596,7 +596,7 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         if self.command.lower() == "post":
             if nbytes > 0:
                 data = self.rfile.read(nbytes)
-            elif self.headers.get('transfer-encoding') == 'chunked':
+            elif self.headers.get("transfer-encoding") == "chunked":
                 chunks = []
                 while True:
                     line = self.rfile.readline()
@@ -605,7 +605,7 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     chunks.append(chunk[:-2])
                     if length == 0:
                         break
-                data = b''.join(chunks)
+                data = b"".join(chunks)
                 env["CONTENT_LENGTH"] = str(len(data))
             else:
                 raise AssertionError
@@ -624,7 +624,6 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 class HTTPGitServer(http.server.HTTPServer):
-
     allow_reuse_address = True
 
     def __init__(self, server_address, root_path) -> None:
@@ -637,7 +636,6 @@ class HTTPGitServer(http.server.HTTPServer):
 
 
 class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
-
     min_git_version = (1, 7, 0, 2)
 
     def setUp(self):

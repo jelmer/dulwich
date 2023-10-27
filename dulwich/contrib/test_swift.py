@@ -396,9 +396,7 @@ class TestSwiftConnector(TestCase):
     def test_get_container_objects(self):
         with patch(
             "geventhttpclient.HTTPClient.request",
-            lambda *args: Response(
-                content=json.dumps(({"name": "a"}, {"name": "b"}))
-            ),
+            lambda *args: Response(content=json.dumps(({"name": "a"}, {"name": "b"}))),
         ):
             self.assertEqual(len(self.conn.get_container_objects()), 2)
 

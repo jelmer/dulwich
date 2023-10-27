@@ -351,8 +351,9 @@ class RefsContainer:
         """
         raise NotImplementedError(self.set_if_equals)
 
-    def add_if_new(self, name, ref, committer=None, timestamp=None,
-                   timezone=None, message=None):
+    def add_if_new(
+        self, name, ref, committer=None, timestamp=None, timezone=None, message=None
+    ):
         """Add a new reference only if it does not already exist.
 
         Args:
@@ -1040,7 +1041,7 @@ class DiskRefsContainer(RefsContainer):
             except ValueError:
                 break
 
-            if parent == b'refs':
+            if parent == b"refs":
                 break
             parent_filename = self.refpath(parent)
             try:
@@ -1146,6 +1147,7 @@ def write_info_refs(refs, store: ObjectContainer):
     """Generate info refs."""
     # TODO: Avoid recursive import :(
     from .object_store import peel_sha
+
     for name, sha in sorted(refs.items()):
         # get_refs() includes HEAD as a special case, but we don't want to
         # advertise it
@@ -1168,9 +1170,7 @@ def is_local_branch(x):
 def strip_peeled_refs(refs):
     """Remove all peeled refs."""
     return {
-        ref: sha
-        for (ref, sha) in refs.items()
-        if not ref.endswith(PEELED_TAG_SUFFIX)
+        ref: sha for (ref, sha) in refs.items() if not ref.endswith(PEELED_TAG_SUFFIX)
     }
 
 
@@ -1185,24 +1185,24 @@ def _set_origin_head(refs, origin, origin_head):
 
 
 def _set_default_branch(
-        refs: RefsContainer, origin: bytes, origin_head: bytes, branch: bytes,
-        ref_message: Optional[bytes]) -> bytes:
+    refs: RefsContainer,
+    origin: bytes,
+    origin_head: bytes,
+    branch: bytes,
+    ref_message: Optional[bytes],
+) -> bytes:
     """Set the default branch."""
     origin_base = b"refs/remotes/" + origin + b"/"
     if branch:
         origin_ref = origin_base + branch
         if origin_ref in refs:
             local_ref = LOCAL_BRANCH_PREFIX + branch
-            refs.add_if_new(
-                local_ref, refs[origin_ref], ref_message
-            )
+            refs.add_if_new(local_ref, refs[origin_ref], ref_message)
             head_ref = local_ref
         elif LOCAL_TAG_PREFIX + branch in refs:
             head_ref = LOCAL_TAG_PREFIX + branch
         else:
-            raise ValueError(
-                "%r is not a valid branch or tag" % os.fsencode(branch)
-            )
+            raise ValueError("%r is not a valid branch or tag" % os.fsencode(branch))
     elif origin_head:
         head_ref = origin_head
         if origin_head.startswith(LOCAL_BRANCH_PREFIX):
@@ -1210,13 +1210,11 @@ def _set_default_branch(
         else:
             origin_ref = origin_head
         try:
-            refs.add_if_new(
-                head_ref, refs[origin_ref], ref_message
-            )
+            refs.add_if_new(head_ref, refs[origin_ref], ref_message)
         except KeyError:
             pass
     else:
-        raise ValueError('neither origin_head nor branch are provided')
+        raise ValueError("neither origin_head nor branch are provided")
     return head_ref
 
 
@@ -1228,9 +1226,7 @@ def _set_head(refs, head_ref, ref_message):
             _cls, obj = head.object
             head = obj.get_object(obj).id
         del refs[HEADREF]
-        refs.set_if_equals(
-            HEADREF, None, head, message=ref_message
-        )
+        refs.set_if_equals(HEADREF, None, head, message=ref_message)
     else:
         # set HEAD to specific branch
         try:
@@ -1267,19 +1263,24 @@ def _import_remote_refs(
         for (n, v) in stripped_refs.items()
         if n.startswith(LOCAL_TAG_PREFIX) and not n.endswith(PEELED_TAG_SUFFIX)
     }
-    refs_container.import_refs(LOCAL_TAG_PREFIX, tags, message=message, prune=prune_tags)
+    refs_container.import_refs(
+        LOCAL_TAG_PREFIX, tags, message=message, prune=prune_tags
+    )
 
 
 def serialize_refs(store, refs):
     # TODO: Avoid recursive import :(
     from .object_store import peel_sha
+
     ret = {}
     for ref, sha in refs.items():
         try:
             unpeeled, peeled = peel_sha(store, sha)
         except KeyError:
             warnings.warn(
-                "ref {} points at non-present sha {}".format(ref.decode("utf-8", "replace"), sha.decode("ascii")),
+                "ref {} points at non-present sha {}".format(
+                    ref.decode("utf-8", "replace"), sha.decode("ascii")
+                ),
                 UserWarning,
             )
             continue

@@ -60,14 +60,12 @@ def lower_key(key):
 
 
 class CaseInsensitiveOrderedMultiDict(MutableMapping):
-
     def __init__(self) -> None:
         self._real: List[Any] = []
         self._keyed: Dict[Any, Any] = {}
 
     @classmethod
     def make(cls, dict_in=None):
-
         if isinstance(dict_in, cls):
             return dict_in
 
@@ -208,10 +206,7 @@ class Config:
         raise ValueError("not a valid boolean string: %r" % value)
 
     def set(
-        self,
-        section: SectionLike,
-        name: NameLike,
-        value: Union[ValueLike, bool]
+        self, section: SectionLike, name: NameLike, value: Union[ValueLike, bool]
     ) -> None:
         """Set a configuration value.
 
@@ -259,7 +254,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
         values: Union[
             MutableMapping[Section, MutableMapping[Name, Value]], None
         ] = None,
-        encoding: Union[str, None] = None
+        encoding: Union[str, None] = None,
     ) -> None:
         """Create a new ConfigDict."""
         if encoding is None:
@@ -276,11 +271,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
     def __getitem__(self, key: Section) -> MutableMapping[Name, Value]:
         return self._values.__getitem__(key)
 
-    def __setitem__(
-        self,
-        key: Section,
-        value: MutableMapping[Name, Value]
-    ) -> None:
+    def __setitem__(self, key: Section, value: MutableMapping[Name, Value]) -> None:
         return self._values.__setitem__(key, value)
 
     def __delitem__(self, key: Section) -> None:
@@ -301,9 +292,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
             return (parts[0], None, parts[1])
 
     def _check_section_and_name(
-        self,
-        section: SectionLike,
-        name: NameLike
+        self, section: SectionLike, name: NameLike
     ) -> Tuple[Section, Name]:
         if not isinstance(section, tuple):
             section = (section,)
@@ -322,11 +311,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
 
         return checked_section, name
 
-    def get_multivar(
-        self,
-        section: SectionLike,
-        name: NameLike
-    ) -> Iterator[Value]:
+    def get_multivar(self, section: SectionLike, name: NameLike) -> Iterator[Value]:
         section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
@@ -369,8 +354,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
         self._values.setdefault(section)[name] = value
 
     def items(  # type: ignore[override]
-        self,
-        section: Section
+        self, section: Section
     ) -> Iterator[Tuple[Name, Value]]:
         return self._values.get(section).items()
 
@@ -498,15 +482,15 @@ def _parse_section_header_line(line: bytes) -> Tuple[Section, bytes]:
             continue
         if c == ord(b'"'):
             in_quotes = not in_quotes
-        if c == ord(b'\\'):
+        if c == ord(b"\\"):
             escaped = True
-        if c == ord(b']') and not in_quotes:
+        if c == ord(b"]") and not in_quotes:
             last = i
             break
     else:
         raise ValueError("expected trailing ]")
     pts = line[1:last].split(b" ", 1)
-    line = line[last + 1:]
+    line = line[last + 1 :]
     section: Section
     if len(pts) == 2:
         if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
@@ -535,7 +519,7 @@ class ConfigFile(ConfigDict):
         values: Union[
             MutableMapping[Section, MutableMapping[Name, Value]], None
         ] = None,
-        encoding: Union[str, None] = None
+        encoding: Union[str, None] = None,
     ) -> None:
         super().__init__(values=values, encoding=encoding)
         self.path: Optional[str] = None
@@ -548,7 +532,7 @@ class ConfigFile(ConfigDict):
         setting = None
         continuation = None
         for lineno, line in enumerate(f.readlines()):
-            if lineno == 0 and line.startswith(b'\xef\xbb\xbf'):
+            if lineno == 0 and line.startswith(b"\xef\xbb\xbf"):
                 line = line[3:]
             line = line.lstrip()
             if setting is None:
@@ -655,10 +639,7 @@ def _find_git_in_win_reg():
             "CurrentVersion\\Uninstall\\Git_is1"
         )
     else:
-        subkey = (
-            "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\"
-            "Uninstall\\Git_is1"
-        )
+        subkey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\" "Uninstall\\Git_is1"
 
     for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore
         with suppress(OSError):
@@ -744,10 +725,7 @@ class StackedConfig(Config):
                 pass
 
     def set(
-        self,
-        section: SectionLike,
-        name: NameLike,
-        value: Union[ValueLike, bool]
+        self, section: SectionLike, name: NameLike, value: Union[ValueLike, bool]
     ) -> None:
         if self.writable is None:
             raise NotImplementedError(self.set)
@@ -794,7 +772,7 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
 def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:
     """Iterate over insteadOf / pushInsteadOf values."""
     for section in config.sections():
-        if section[0] != b'url':
+        if section[0] != b"url":
             continue
         replacement = section[1]
         try:
@@ -808,7 +786,7 @@ def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, s
                 pass
         for needle in needles:
             assert isinstance(needle, bytes)
-            yield needle.decode('utf-8'), replacement.decode('utf-8')
+            yield needle.decode("utf-8"), replacement.decode("utf-8")
 
 
 def apply_instead_of(config: Config, orig_url: str, push: bool = False) -> str:
@@ -820,5 +798,5 @@ def apply_instead_of(config: Config, orig_url: str, push: bool = False) -> str:
             continue
         if len(longest_needle) < len(needle):
             longest_needle = needle
-            updated_url = replacement + orig_url[len(needle):]
+            updated_url = replacement + orig_url[len(needle) :]
     return updated_url

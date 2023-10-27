@@ -166,7 +166,9 @@ class BackendRepo(TypingProtocol):
         """
         return None
 
-    def find_missing_objects(self, determine_wants, graph_walker, progress, get_tagged=None):
+    def find_missing_objects(
+        self, determine_wants, graph_walker, progress, get_tagged=None
+    ):
         """Yield the objects required for a list of commits.
 
         Args:
@@ -282,10 +284,10 @@ class PackHandler(Handler):
 class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False) -> None:
-        super().__init__(
-            backend, proto, stateless_rpc=stateless_rpc
-        )
+    def __init__(
+        self, backend, args, proto, stateless_rpc=False, advertise_refs=False
+    ) -> None:
+        super().__init__(backend, proto, stateless_rpc=stateless_rpc)
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
         self.advertise_refs = advertise_refs
@@ -324,9 +326,13 @@ class UploadPackHandler(PackHandler):
             # The provided haves are processed, and it is safe to send side-
             # band data now.
             if not self.has_capability(CAPABILITY_NO_PROGRESS):
-                self.progress = partial(self.proto.write_sideband, SIDE_BAND_CHANNEL_PROGRESS)
+                self.progress = partial(
+                    self.proto.write_sideband, SIDE_BAND_CHANNEL_PROGRESS
+                )
 
-            self.write_pack_data = partial(self.proto.write_sideband, SIDE_BAND_CHANNEL_DATA)
+            self.write_pack_data = partial(
+                self.proto.write_sideband, SIDE_BAND_CHANNEL_DATA
+            )
         else:
             self.write_pack_data = self.proto.write
 
@@ -408,7 +414,9 @@ class UploadPackHandler(PackHandler):
             ("counting objects: %d, done.\n" % len(object_ids)).encode("ascii")
         )
 
-        write_pack_from_container(self.write_pack_data, self.repo.object_store, object_ids)
+        write_pack_from_container(
+            self.write_pack_data, self.repo.object_store, object_ids
+        )
         # we are done
         self.proto.write_pkt_line(None)
 
@@ -557,7 +565,9 @@ class _ProtocolGraphWalker:
     any calls to next() or ack() are made.
     """
 
-    def __init__(self, handler, object_store: ObjectContainer, get_peeled, get_symrefs) -> None:
+    def __init__(
+        self, handler, object_store: ObjectContainer, get_peeled, get_symrefs
+    ) -> None:
         self.handler = handler
         self.store: ObjectContainer = object_store
         self.get_peeled = get_peeled
@@ -604,18 +614,20 @@ class _ProtocolGraphWalker:
                     # logic.
                     continue
                 if i == 0:
-                    logger.info(
-                        "Sending capabilities: %s", self.handler.capabilities())
+                    logger.info("Sending capabilities: %s", self.handler.capabilities())
                     line = format_ref_line(
-                        ref, sha,
+                        ref,
+                        sha,
                         self.handler.capabilities()
-                        + symref_capabilities(symrefs.items()))
+                        + symref_capabilities(symrefs.items()),
+                    )
                 else:
                     line = format_ref_line(ref, sha)
                 self.proto.write_pkt_line(line)
                 if peeled_sha != sha:
                     self.proto.write_pkt_line(
-                        format_ref_line(ref + PEELED_TAG_SUFFIX, peeled_sha))
+                        format_ref_line(ref + PEELED_TAG_SUFFIX, peeled_sha)
+                    )
 
             # i'm done..
             self.proto.write_pkt_line(None)
@@ -929,10 +941,10 @@ class MultiAckDetailedGraphWalkerImpl:
 class ReceivePackHandler(PackHandler):
     """Protocol handler for downloading a pack from the client."""
 
-    def __init__(self, backend, args, proto, stateless_rpc=False, advertise_refs=False) -> None:
-        super().__init__(
-            backend, proto, stateless_rpc=stateless_rpc
-        )
+    def __init__(
+        self, backend, args, proto, stateless_rpc=False, advertise_refs=False
+    ) -> None:
+        super().__init__(backend, proto, stateless_rpc=stateless_rpc)
         self.repo = backend.open_repository(args[0])
         self.advertise_refs = advertise_refs
 
@@ -1043,7 +1055,7 @@ class ReceivePackHandler(PackHandler):
             if output:
                 self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, output)
         except HookError as err:
-            self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, str(err).encode('utf-8'))
+            self.proto.write_sideband(SIDE_BAND_CHANNEL_FATAL, str(err).encode("utf-8"))
 
     def handle(self) -> None:
         if self.advertise_refs or not self.stateless_rpc:
@@ -1052,12 +1064,14 @@ class ReceivePackHandler(PackHandler):
 
             if not refs:
                 refs = [(CAPABILITIES_REF, ZERO_SHA)]
-            logger.info(
-                "Sending capabilities: %s", self.capabilities())
+            logger.info("Sending capabilities: %s", self.capabilities())
             self.proto.write_pkt_line(
                 format_ref_line(
-                    refs[0][0], refs[0][1],
-                    self.capabilities() + symref_capabilities(symrefs)))
+                    refs[0][0],
+                    refs[0][1],
+                    self.capabilities() + symref_capabilities(symrefs),
+                )
+            )
             for i in range(1, len(refs)):
                 ref = refs[i]
                 self.proto.write_pkt_line(format_ref_line(ref[0], ref[1]))
@@ -1158,7 +1172,6 @@ class TCPGitRequestHandler(socketserver.StreamRequestHandler):
 
 
 class TCPGitServer(socketserver.TCPServer):
-
     allow_reuse_address = True
     serve = socketserver.TCPServer.serve_forever
 

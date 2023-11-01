@@ -109,7 +109,7 @@ PackHint = Tuple[int, Optional[bytes]]
 
 
 class UnresolvedDeltas(Exception):
-    """ "Delta objects could not be resolved."""
+    """Delta objects could not be resolved."""
 
     def __init__(self, shas):
         self.shas = shas
@@ -1914,9 +1914,9 @@ def pack_objects_to_data(
         return (
             count,
             deltify_pack_objects(
-                iter(objects), window_size=delta_window_size, progress=progress
+                iter(objects), window_size=delta_window_size, progress=progress  # type: ignore
             ),
-        )  # type: ignore
+        )
     else:
 
         def iter_without_path():

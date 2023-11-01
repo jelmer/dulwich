@@ -109,7 +109,7 @@ PackHint = Tuple[int, Optional[bytes]]
 
 
 class UnresolvedDeltas(Exception):
-    """ "Delta objects could not be resolved."""
+    """Delta objects could not be resolved."""
 
     def __init__(self, shas):
         self.shas = shas

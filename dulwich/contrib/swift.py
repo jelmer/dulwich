@@ -134,8 +134,7 @@ def load_conf(path=None, file=None):
         try:
             confpath = os.environ["DULWICH_SWIFT_CFG"]
         except KeyError as exc:
-            raise Exception(
-                "You need to specify a configuration file") from exc
+            raise Exception("You need to specify a configuration file") from exc
     else:
         confpath = path
     if not os.path.isfile(confpath):
@@ -1014,7 +1013,9 @@ def main(argv=sys.argv):
     }
 
     if len(sys.argv) < 2:
-        print("Usage: {} <{}> [OPTIONS...]".format(sys.argv[0], "|".join(commands.keys())))
+        print(
+            "Usage: {} <{}> [OPTIONS...]".format(sys.argv[0], "|".join(commands.keys()))
+        )
         sys.exit(1)
 
     cmd = sys.argv[1]

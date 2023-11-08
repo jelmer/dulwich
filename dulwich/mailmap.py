@@ -66,7 +66,7 @@ class Mailmap:
     def __init__(self, map=None) -> None:
         self._table: Dict[Tuple[Optional[str], str], Tuple[str, str]] = {}
         if map:
-            for (canonical_identity, from_identity) in map:
+            for canonical_identity, from_identity in map:
                 self.add_entry(canonical_identity, from_identity)
 
     def add_entry(self, canonical_identity, from_identity=None):

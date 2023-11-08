@@ -108,7 +108,7 @@ def tar_stream(store, tree, mtime, prefix=b"", format=""):
 
             info = tarfile.TarInfo()
             # tarfile only works with ascii.
-            info.name = entry_abspath.decode('utf-8', 'surrogateescape')
+            info.name = entry_abspath.decode("utf-8", "surrogateescape")
             info.size = blob.raw_length()
             info.mode = entry.mode
             info.mtime = mtime

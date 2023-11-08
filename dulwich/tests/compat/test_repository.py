@@ -203,8 +203,16 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
 
         # Read the config values in the worktree with the git cli and assert they match
         # the dulwich-parsed configs
-        output_name = run_git_or_fail(["config", "user.name"], cwd=self._mainworktree_repo.path).decode().rstrip("\n")
-        output_email = run_git_or_fail(["config", "user.email"], cwd=self._mainworktree_repo.path).decode().rstrip("\n")
+        output_name = (
+            run_git_or_fail(["config", "user.name"], cwd=self._mainworktree_repo.path)
+            .decode()
+            .rstrip("\n")
+        )
+        output_email = (
+            run_git_or_fail(["config", "user.email"], cwd=self._mainworktree_repo.path)
+            .decode()
+            .rstrip("\n")
+        )
         self.assertEqual(test_name, output_name)
         self.assertEqual(test_email, output_email)
 

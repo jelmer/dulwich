@@ -431,7 +431,6 @@ class LengthLimitedFileTestCase(TestCase):
 
 
 class HTTPGitRequestTestCase(WebTestCase):
-
     # This class tests the contents of the actual cache headers
     _req_class = HTTPGitRequest
 

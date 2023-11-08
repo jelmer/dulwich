@@ -28,7 +28,6 @@ from ..credentials import match_partial_url, match_urls, urlmatch_credential_sec
 
 
 class TestCredentialHelpersUtils(TestCase):
-
     def test_match_urls(self):
         url = urlparse("https://github.com/jelmer/dulwich/")
         url_1 = urlparse("https://github.com/jelmer/dulwich")
@@ -56,17 +55,22 @@ class TestCredentialHelpersUtils(TestCase):
         config.set(b"credential", b"helper", "bar")
 
         self.assertEqual(
-            list(urlmatch_credential_sections(config, "https://github.com")), [
+            list(urlmatch_credential_sections(config, "https://github.com")),
+            [
                 (b"credential", b"https://github.com"),
                 (b"credential",),
-            ])
+            ],
+        )
 
         self.assertEqual(
-            list(urlmatch_credential_sections(config, "https://git.sr.ht")), [
+            list(urlmatch_credential_sections(config, "https://git.sr.ht")),
+            [
                 (b"credential", b"git.sr.ht"),
                 (b"credential",),
-            ])
+            ],
+        )
 
         self.assertEqual(
-            list(urlmatch_credential_sections(config, "missing_url")), [
-                (b"credential",)])
+            list(urlmatch_credential_sections(config, "missing_url")),
+            [(b"credential",)],
+        )

@@ -145,9 +145,7 @@ class HangupException(GitProtocolError):
                 )
             )
         else:
-            super().__init__(
-                "The remote server unexpectedly closed the connection."
-            )
+            super().__init__("The remote server unexpectedly closed the connection.")
         self.stderr_lines = stderr_lines
 
     def __eq__(self, other):
@@ -162,9 +160,7 @@ class UnexpectedCommandError(GitProtocolError):
             command = "flush-pkt"
         else:
             command = "command %s" % command
-        super().__init__(
-            "Protocol got unexpected %s" % command
-        )
+        super().__init__("Protocol got unexpected %s" % command)
 
 
 class FileFormatException(Exception):

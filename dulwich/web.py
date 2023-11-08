@@ -255,7 +255,6 @@ def _chunk_iter(f):
 
 
 class ChunkReader:
-
     def __init__(self, f) -> None:
         self._iter = _chunk_iter(f)
         self._buffer: List[bytes] = []
@@ -266,7 +265,7 @@ class ChunkReader:
                 self._buffer.append(next(self._iter))
             except StopIteration:
                 break
-        f = b''.join(self._buffer)
+        f = b"".join(self._buffer)
         ret = f[:n]
         self._buffer = [f[n:]]
         return ret
@@ -309,7 +308,7 @@ def handle_service_request(req, backend, mat):
         return
     req.nocache()
     write = req.respond(HTTP_OK, "application/x-%s-result" % service)
-    if req.environ.get('HTTP_TRANSFER_ENCODING') == 'chunked':
+    if req.environ.get("HTTP_TRANSFER_ENCODING") == "chunked":
         read = ChunkReader(req.environ["wsgi.input"]).read
     else:
         read = req.environ["wsgi.input"].read
@@ -327,7 +326,9 @@ class HTTPGitRequest:
       environ: the WSGI environment for the request.
     """
 
-    def __init__(self, environ, start_response, dumb: bool = False, handlers=None) -> None:
+    def __init__(
+        self, environ, start_response, dumb: bool = False, handlers=None
+    ) -> None:
         self.environ = environ
         self.dumb = dumb
         self.handlers = handlers
@@ -413,7 +414,9 @@ class HTTPGitApplication:
         ("POST", re.compile("/git-receive-pack$")): handle_service_request,
     }
 
-    def __init__(self, backend, dumb: bool = False, handlers=None, fallback_app=None) -> None:
+    def __init__(
+        self, backend, dumb: bool = False, handlers=None, fallback_app=None
+    ) -> None:
         self.backend = backend
         self.dumb = dumb
         self.handlers = dict(DEFAULT_HANDLERS)
@@ -456,6 +459,7 @@ class GunzipFilter:
 
     def __call__(self, environ, start_response):
         import gzip
+
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
             environ["wsgi.input"] = gzip.GzipFile(
                 filename=None, fileobj=environ["wsgi.input"], mode="rb"

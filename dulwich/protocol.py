@@ -343,9 +343,7 @@ class ReceivableProtocol(Protocol):
     def __init__(
         self, recv, write, close=None, report_activity=None, rbufsize=_RBUFSIZE
     ) -> None:
-        super().__init__(
-            self.read, write, close=close, report_activity=report_activity
-        )
+        super().__init__(self.read, write, close=close, report_activity=report_activity)
         self._recv = recv
         self._rbuf = BytesIO()
         self._rbufsize = rbufsize
@@ -558,10 +556,7 @@ def format_ref_line(ref, sha, capabilities=None):
     if capabilities is None:
         return sha + b" " + ref + b"\n"
     else:
-        return (
-            sha + b" " + ref + b"\0"
-            + format_capability_line(capabilities)
-            + b"\n")
+        return sha + b" " + ref + b"\0" + format_capability_line(capabilities) + b"\n"
 
 
 def format_shallow_line(sha):

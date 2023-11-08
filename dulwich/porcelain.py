@@ -205,6 +205,7 @@ def parse_timezone_format(tz_str):
 
     # RFC 2822
     import email.utils
+
     rfc_2822 = email.utils.parsedate_tz(tz_str)
     if rfc_2822:
         return rfc_2822[9]
@@ -213,7 +214,9 @@ def parse_timezone_format(tz_str):
 
     # Supported offsets:
     # sHHMM, sHH:MM, sHH
-    iso_8601_pattern = re.compile("[0-9] ?([+-])([0-9]{2})(?::(?=[0-9]{2}))?([0-9]{2})?$")
+    iso_8601_pattern = re.compile(
+        "[0-9] ?([+-])([0-9]{2})(?::(?=[0-9]{2}))?([0-9]{2})?$"
+    )
     match = re.search(iso_8601_pattern, tz_str)
     total_secs = 0
     if match:
@@ -492,7 +495,7 @@ def clone(
     depth: Optional[int] = None,
     branch: Optional[Union[str, bytes]] = None,
     config: Optional[Config] = None,
-    **kwargs
+    **kwargs,
 ):
     """Clone a local or remote git repository.
 
@@ -536,8 +539,7 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
-    (client, path) = get_transport_and_path(
-        source, config=config, **kwargs)
+    (client, path) = get_transport_and_path(source, config=config, **kwargs)
 
     return client.clone(
         path,
@@ -958,8 +960,8 @@ def rev_list(repo, commits, outstream=sys.stdout):
 
 
 def _canonical_part(url: str) -> str:
-    name = url.rsplit('/', 1)[-1]
-    if name.endswith('.git'):
+    name = url.rsplit("/", 1)[-1]
+    if name.endswith(".git"):
         name = name[:-4]
     return name
 
@@ -998,10 +1000,10 @@ def submodule_init(repo):
     """
     with open_repo_closing(repo) as r:
         config = r.get_config()
-        gitmodules_path = os.path.join(r.path, '.gitmodules')
+        gitmodules_path = os.path.join(r.path, ".gitmodules")
         for path, url, name in read_submodules(gitmodules_path):
-            config.set((b'submodule', name), b'active', True)
-            config.set((b'submodule', name), b'url', url)
+            config.set((b"submodule", name), b"active", True)
+            config.set((b"submodule", name), b"url", url)
         config.write_to_path()
 
 
@@ -1012,6 +1014,7 @@ def submodule_list(repo):
       repo: Path to repository
     """
     from .submodule import iter_cached_submodules
+
     with open_repo_closing(repo) as r:
         for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
             yield path, sha.decode(DEFAULT_ENCODING)
@@ -1027,7 +1030,7 @@ def tag_create(
     tag_time=None,
     tag_timezone=None,
     sign=False,
-    encoding=DEFAULT_ENCODING
+    encoding=DEFAULT_ENCODING,
 ):
     """Creates a tag in git via dulwich calls.
 
@@ -1153,7 +1156,7 @@ def push(
     outstream=default_bytes_out_stream,
     errstream=default_bytes_err_stream,
     force=False,
-    **kwargs
+    **kwargs,
 ):
     """Remote push with dulwich via dulwich.client.
 
@@ -1183,7 +1186,7 @@ def push(
             selected_refs.extend(parse_reftuples(r.refs, refs, refspecs, force=force))
             new_refs = {}
             # TODO: Handle selected_refs == {None: None}
-            for (lh, rh, force_ref) in selected_refs:
+            for lh, rh, force_ref in selected_refs:
                 if lh is None:
                     new_refs[rh] = ZERO_SHA
                     remote_changed_refs[rh] = None
@@ -1191,9 +1194,7 @@ def push(
                     try:
                         localsha = r.refs[lh]
                     except KeyError as exc:
-                        raise Error(
-                            "No valid ref %s in local repository" % lh
-                        ) from exc
+                        raise Error("No valid ref %s in local repository" % lh) from exc
                     if not force_ref and rh in refs:
                         check_diverged(r, refs[rh], localsha)
                     new_refs[rh] = localsha
@@ -1238,7 +1239,7 @@ def pull(
     errstream=default_bytes_err_stream,
     fast_forward=True,
     force=False,
-    **kwargs
+    **kwargs,
 ):
     """Pull from remote via dulwich.client.
 
@@ -1273,7 +1274,7 @@ def pull(
         fetch_result = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants
         )
-        for (lh, rh, force_ref) in selected_refs:
+        for lh, rh, force_ref in selected_refs:
             if not force_ref and rh in r.refs:
                 try:
                     check_diverged(r, r.refs.follow(rh)[1], fetch_result.refs[lh])
@@ -1281,8 +1282,7 @@ def pull(
                     if fast_forward:
                         raise
                     else:
-                        raise NotImplementedError(
-                            "merge is not yet supported") from exc
+                        raise NotImplementedError("merge is not yet supported") from exc
             r.refs[rh] = fetch_result.refs[lh]
         if selected_refs:
             r[b"HEAD"] = fetch_result.refs[selected_refs[0][1]]
@@ -1666,7 +1666,7 @@ def fetch(
     prune=False,
     prune_tags=False,
     force=False,
-    **kwargs
+    **kwargs,
 ):
     """Fetch objects from a remote server.
 
@@ -1729,7 +1729,15 @@ def repack(repo):
         r.object_store.pack_loose_objects()
 
 
-def pack_objects(repo, object_ids, packf, idxf, delta_window_size=None, deltify=None, reuse_deltas=True):
+def pack_objects(
+    repo,
+    object_ids,
+    packf,
+    idxf,
+    delta_window_size=None,
+    deltify=None,
+    reuse_deltas=True,
+):
     """Pack objects into a file.
 
     Args:
@@ -1774,7 +1782,7 @@ def ls_tree(
     """
 
     def list_tree(store, treeid, base):
-        for (name, mode, sha) in store[treeid].iteritems():
+        for name, mode, sha in store[treeid].iteritems():
             if base:
                 name = posixpath.join(base, name)
             if name_only:
@@ -1875,8 +1883,7 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
-def reset_file(repo, file_path: str, target: bytes = b'HEAD',
-               symlink_fn=None):
+def reset_file(repo, file_path: str, target: bytes = b"HEAD", symlink_fn=None):
     """Reset the file to specific commit or branch.
 
     Args:
@@ -1896,7 +1903,7 @@ def reset_file(repo, file_path: str, target: bytes = b'HEAD',
 
 def _update_head_during_checkout_branch(repo, target):
     checkout_target = None
-    if target == b'HEAD':  # Do not update head while trying to checkout to HEAD.
+    if target == b"HEAD":  # Do not update head while trying to checkout to HEAD.
         pass
     elif target in repo.refs.keys(base=LOCAL_BRANCH_PREFIX):
         update_head(repo, target)
@@ -1908,7 +1915,9 @@ def _update_head_during_checkout_branch(repo, target):
         if config.has_section(section):
             checkout_target = target.replace(name + b"/", b"")
             try:
-                branch_create(repo, checkout_target, (LOCAL_REMOTE_PREFIX + target).decode())
+                branch_create(
+                    repo, checkout_target, (LOCAL_REMOTE_PREFIX + target).decode()
+                )
             except Error:
                 pass
             update_head(repo, LOCAL_BRANCH_PREFIX + checkout_target)
@@ -1941,7 +1950,14 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
         _update_head_during_checkout_branch(repo, target)
     else:
         status_report = status(repo)
-        changes = list(set(status_report[0]['add'] + status_report[0]['delete'] + status_report[0]['modify'] + status_report[1]))
+        changes = list(
+            set(
+                status_report[0]["add"]
+                + status_report[0]["delete"]
+                + status_report[0]["modify"]
+                + status_report[1]
+            )
+        )
         index = 0
         while index < len(changes):
             change = changes[index]
@@ -1951,7 +1967,10 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
                     target_tree.lookup_path(repo.object_store.__getitem__, change)
                     index += 1
                 except KeyError:
-                    raise CheckoutError('Your local changes to the following files would be overwritten by checkout: ' + change.decode())
+                    raise CheckoutError(
+                        "Your local changes to the following files would be overwritten by checkout: "
+                        + change.decode()
+                    )
             except KeyError:
                 changes.pop(index)
 

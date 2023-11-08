@@ -170,7 +170,9 @@ class GitClientTests(TestCase):
             b"0000"
         )
         self.rin.seek(0)
-        ret = self.client.fetch_pack(b"bla", lambda heads, **kwargs: [], None, None, None)
+        ret = self.client.fetch_pack(
+            b"bla", lambda heads, **kwargs: [], None, None, None
+        )
         self.assertEqual(
             {b"HEAD": b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"}, ret.refs
         )
@@ -856,8 +858,8 @@ class LocalGitClientTests(TestCase):
         result_repo = c.clone(s.path, target, mkdir=False)
         self.addCleanup(result_repo.close)
         expected = dict(s.get_refs())
-        expected[b'refs/remotes/origin/HEAD'] = expected[b'HEAD']
-        expected[b'refs/remotes/origin/master'] = expected[b'refs/heads/master']
+        expected[b"refs/remotes/origin/HEAD"] = expected[b"HEAD"]
+        expected[b"refs/remotes/origin/master"] = expected[b"refs/heads/master"]
         self.assertEqual(expected, result_repo.get_refs())
 
     def test_fetch_empty(self):
@@ -1025,7 +1027,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(c._password, None)
 
         basic_auth = c.pool_manager.headers["authorization"]
-        auth_string = username.encode('ascii') + b":"
+        auth_string = username.encode("ascii") + b":"
         b64_credentials = base64.b64encode(auth_string)
         expected_basic_auth = f"Basic {b64_credentials.decode('ascii')}"
         self.assertEqual(basic_auth, expected_basic_auth)
@@ -1091,7 +1093,15 @@ class HttpGitClientTests(TestCase):
             def __init__(self) -> None:
                 self.headers: Dict[str, str] = {}
 
-            def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
+            def request(
+                self,
+                method,
+                url,
+                fields=None,
+                headers=None,
+                redirect=True,
+                preload_content=True,
+            ):
                 base_url = url[: -len(tail)]
                 redirect_base_url = test_data[base_url]["location"]
                 redirect_url = redirect_base_url + tail
@@ -1152,7 +1162,15 @@ class HttpGitClientTests(TestCase):
             def __init__(self) -> None:
                 self.headers: Dict[str, str] = {}
 
-            def request(self, method, url, fields=None, headers=None, redirect=True, preload_content=True):
+            def request(
+                self,
+                method,
+                url,
+                fields=None,
+                headers=None,
+                redirect=True,
+                preload_content=True,
+            ):
                 return HTTPResponse(
                     headers={
                         "Content-Type": "application/x-git-upload-pack-result; charset=utf-8"
@@ -1355,7 +1373,9 @@ class DefaultUrllib3ManagerTest(TestCase):
 
         config = ConfigDict()
         self.overrideEnv("http_proxy", "http://myproxy:8080")
-        self.overrideEnv("no_proxy", "xyz,abc.def.gh,ff80:1::/64,192.168.0.0/24,ample.com")
+        self.overrideEnv(
+            "no_proxy", "xyz,abc.def.gh,ff80:1::/64,192.168.0.0/24,ample.com"
+        )
         base_url = "http://192.168.0.10/path/port"
         manager = default_urllib3_manager(config=config, base_url=base_url)
         self.assertNotIsInstance(manager, urllib3.ProxyManager)
@@ -1388,7 +1408,9 @@ class DefaultUrllib3ManagerTest(TestCase):
 
         config = ConfigDict()
         self.overrideEnv("http_proxy", "http://myproxy:8080")
-        self.overrideEnv("no_proxy", "xyz,abc.def.gh,192.168.0.0/24,ff80:1::/64,ample.com")
+        self.overrideEnv(
+            "no_proxy", "xyz,abc.def.gh,192.168.0.0/24,ff80:1::/64,ample.com"
+        )
         base_url = "http://[ff80:1::affe]/path/port"
         manager = default_urllib3_manager(config=config, base_url=base_url)
         self.assertNotIsInstance(manager, urllib3.ProxyManager)

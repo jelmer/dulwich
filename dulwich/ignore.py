@@ -190,7 +190,9 @@ class Pattern:
 
 
 class IgnoreFilter:
-    def __init__(self, patterns: Iterable[bytes], ignorecase: bool = False, path=None) -> None:
+    def __init__(
+        self, patterns: Iterable[bytes], ignorecase: bool = False, path=None
+    ) -> None:
         self._patterns: List[Pattern] = []
         self._ignorecase = ignorecase
         self._path = path

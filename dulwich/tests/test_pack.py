@@ -80,7 +80,9 @@ class PackTests(TestCase):
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
-    datadir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../testdata/packs"))
+    datadir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../testdata/packs")
+    )
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha."""
@@ -160,7 +162,6 @@ class PackIndexTests(PackTests):
 
 
 class TestPackDeltas(TestCase):
-
     test_string1 = b"The answer was flailing in the wind"
     test_string2 = b"The answer was falling down the pipe"
     test_string3 = b"zzzzz"
@@ -171,8 +172,7 @@ class TestPackDeltas(TestCase):
 
     def _test_roundtrip(self, base, target):
         self.assertEqual(
-            target,
-            b"".join(apply_delta(base, list(create_delta(base, target))))
+            target, b"".join(apply_delta(base, list(create_delta(base, target))))
         )
 
     def test_nochange(self):
@@ -285,9 +285,24 @@ class TestPackData(PackTests):
             actual = list(p.iter_unpacked())
             self.assertEqual(
                 [
-                    UnpackedObject(offset=12, pack_type_num=1, decomp_chunks=[commit_data], crc32=None),
-                    UnpackedObject(offset=138, pack_type_num=2, decomp_chunks=[tree_data], crc32=None),
-                    UnpackedObject(offset=178, pack_type_num=3, decomp_chunks=[b"test 1\n"], crc32=None),
+                    UnpackedObject(
+                        offset=12,
+                        pack_type_num=1,
+                        decomp_chunks=[commit_data],
+                        crc32=None,
+                    ),
+                    UnpackedObject(
+                        offset=138,
+                        pack_type_num=2,
+                        decomp_chunks=[tree_data],
+                        crc32=None,
+                    ),
+                    UnpackedObject(
+                        offset=178,
+                        pack_type_num=3,
+                        decomp_chunks=[b"test 1\n"],
+                        crc32=None,
+                    ),
                 ],
                 actual,
             )
@@ -486,9 +501,7 @@ class TestPack(PackTests):
             bad_data = PackData("", file=bad_file)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(AssertionError, lambda: bad_pack.data)
-            self.assertRaises(
-                AssertionError, bad_pack.check_length_and_checksum
-            )
+            self.assertRaises(AssertionError, bad_pack.check_length_and_checksum)
 
     def test_checksum_mismatch(self):
         with self.get_pack_data(pack1_sha) as data:
@@ -500,9 +513,7 @@ class TestPack(PackTests):
             bad_data = PackData("", file=bad_file)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
-            self.assertRaises(
-                ChecksumMismatch, bad_pack.check_length_and_checksum
-            )
+            self.assertRaises(ChecksumMismatch, bad_pack.check_length_and_checksum)
 
     def test_iterobjects_2(self):
         with self.get_pack(pack1_sha) as p:
@@ -551,7 +562,8 @@ class TestThinPack(PackTests):
         with self.make_pack(True) as pack:
             with PackData(pack._data_path) as data:
                 data.create_index(
-                    self.pack_prefix + ".idx", resolve_ext_ref=pack.resolve_ext_ref)
+                    self.pack_prefix + ".idx", resolve_ext_ref=pack.resolve_ext_ref
+                )
 
         del self.store[self.blobs[b"bar"].id]
 
@@ -573,7 +585,7 @@ class TestThinPack(PackTests):
             expected = UnpackedObject(
                 7,
                 delta_base=b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
-                decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
+                decomp_chunks=[b"\x03\x07\x90\x03\x041234"],
             )
             expected.offset = 12
             got = p.get_unpacked_object(self.blobs[b"foo1234"].id)
@@ -582,7 +594,7 @@ class TestThinPack(PackTests):
             expected = UnpackedObject(
                 7,
                 delta_base=b"\x19\x10(\x15f=#\xf8\xb7ZG\xe7\xa0\x19e\xdc\xdc\x96F\x8c",
-                decomp_chunks=[b'\x03\x07\x90\x03\x041234'],
+                decomp_chunks=[b"\x03\x07\x90\x03\x041234"],
             )
             expected.offset = 12
             got = p.get_unpacked_object(self.blobs[b"foo1234"].id)
@@ -646,7 +658,9 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a, compression_level=6)
+        write_pack_object(
+            f.write, Blob.type_num, b"blob", sha=sha_a, compression_level=6
+        )
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -675,7 +689,7 @@ class BaseTestPackIndexWriting:
         entry2_sha = hex_to_sha("e98f071751bd77f59967bfa671cd2caebdccc9a2")
         entries = [
             (entry1_sha, 0xF2972D0830529B87, 24),
-            (entry2_sha, (~0xF2972D0830529B87) & (2 ** 64 - 1), 92),
+            (entry2_sha, (~0xF2972D0830529B87) & (2**64 - 1), 92),
         ]
         if not self._supports_large:
             self.assertRaises(
@@ -779,7 +793,6 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
 
 
 class ReadZlibTests(TestCase):
-
     decomp = (
         b"tree 4ada885c9196b6b6fa08744b5862bf92896fc002\n"
         b"parent None\n"
@@ -794,7 +807,9 @@ class ReadZlibTests(TestCase):
     def setUp(self):
         super().setUp()
         self.read = BytesIO(self.comp + self.extra).read
-        self.unpacked = UnpackedObject(Tree.type_num, decomp_len=len(self.decomp), crc32=0)
+        self.unpacked = UnpackedObject(
+            Tree.type_num, decomp_len=len(self.decomp), crc32=0
+        )
 
     def test_decompress_size(self):
         good_decomp_len = len(self.decomp)
@@ -865,7 +880,14 @@ class DeltifyTests(TestCase):
     def test_single(self):
         b = Blob.from_string(b"foo")
         self.assertEqual(
-            [UnpackedObject(b.type_num, sha=b.sha().digest(), delta_base=None, decomp_chunks=b.as_raw_chunks())],
+            [
+                UnpackedObject(
+                    b.type_num,
+                    sha=b.sha().digest(),
+                    delta_base=None,
+                    decomp_chunks=b.as_raw_chunks(),
+                )
+            ],
             list(deltify_pack_objects([(b, b"")])),
         )
 
@@ -875,8 +897,18 @@ class DeltifyTests(TestCase):
         delta = list(create_delta(b1.as_raw_chunks(), b2.as_raw_chunks()))
         self.assertEqual(
             [
-                UnpackedObject(b1.type_num, sha=b1.sha().digest(), delta_base=None, decomp_chunks=b1.as_raw_chunks()),
-                UnpackedObject(b2.type_num, sha=b2.sha().digest(), delta_base=b1.sha().digest(), decomp_chunks=delta),
+                UnpackedObject(
+                    b1.type_num,
+                    sha=b1.sha().digest(),
+                    delta_base=None,
+                    decomp_chunks=b1.as_raw_chunks(),
+                ),
+                UnpackedObject(
+                    b2.type_num,
+                    sha=b2.sha().digest(),
+                    delta_base=b1.sha().digest(),
+                    decomp_chunks=delta,
+                ),
             ],
             list(deltify_pack_objects([(b1, b""), (b2, b"")])),
         )
@@ -919,7 +951,7 @@ class TestPackStreamReader(TestCase):
             unpacked_delta.delta_base,
         )
         delta = create_delta(b"blob", b"blob1")
-        self.assertEqual(b''.join(delta), b"".join(unpacked_delta.decomp_chunks))
+        self.assertEqual(b"".join(delta), b"".join(unpacked_delta.decomp_chunks))
         self.assertEqual(entries[1][4], unpacked_delta.crc32)
 
     def test_read_objects_buffered(self):
@@ -940,7 +972,6 @@ class TestPackStreamReader(TestCase):
 
 
 class TestPackIterator(DeltaChainIterator):
-
     _compute_crc32 = True
 
     def __init__(self, *args, **kwargs) -> None:
@@ -962,9 +993,7 @@ class TestPackIterator(DeltaChainIterator):
             "Attempted to re-inflate offset %i" % offset
         )
         self._unpacked_offsets.add(offset)
-        return super()._resolve_object(
-            offset, pack_type_num, base_chunks
-        )
+        return super()._resolve_object(offset, pack_type_num, base_chunks)
 
 
 class DeltaChainIteratorTests(TestCase):
@@ -985,9 +1014,7 @@ class DeltaChainIteratorTests(TestCase):
         """Wrapper around store.get_raw that doesn't allow repeat lookups."""
         hex_sha = sha_to_hex(bin_sha)
         self.assertNotIn(
-            hex_sha,
-            self.fetched,
-            "Attempted to re-fetch object %s" % hex_sha
+            hex_sha, self.fetched, "Attempted to re-fetch object %s" % hex_sha
         )
         self.fetched.add(hex_sha)
         return self.store.get_raw(hex_sha)
@@ -1007,7 +1034,9 @@ class DeltaChainIteratorTests(TestCase):
         assert data
         index = MemoryPackIndex.for_pack(data)
         pack = Pack.from_objects(data, index)
-        return TestPackIterator.for_pack_subset(pack, subset, resolve_ext_ref=resolve_ext_ref)
+        return TestPackIterator.for_pack_subset(
+            pack, subset, resolve_ext_ref=resolve_ext_ref
+        )
 
     def assertEntriesMatch(self, expected_indexes, entries, pack_iter):
         expected = [entries[i] for i in expected_indexes]
@@ -1027,10 +1056,19 @@ class DeltaChainIteratorTests(TestCase):
         f.seek(0)
         self.assertEntriesMatch([], entries, self.make_pack_iter_subset(f, []))
         f.seek(0)
-        self.assertEntriesMatch([1, 0], entries, self.make_pack_iter_subset(f, [entries[0][3], entries[1][3]]))
+        self.assertEntriesMatch(
+            [1, 0],
+            entries,
+            self.make_pack_iter_subset(f, [entries[0][3], entries[1][3]]),
+        )
         f.seek(0)
         self.assertEntriesMatch(
-            [1, 0], entries, self.make_pack_iter_subset(f, [sha_to_hex(entries[0][3]), sha_to_hex(entries[1][3])]))
+            [1, 0],
+            entries,
+            self.make_pack_iter_subset(
+                f, [sha_to_hex(entries[0][3]), sha_to_hex(entries[1][3])]
+            ),
+        )
 
     def test_ofs_deltas(self):
         f = BytesIO()
@@ -1046,8 +1084,10 @@ class DeltaChainIteratorTests(TestCase):
         self.assertEntriesMatch([0, 2, 1], entries, self.make_pack_iter(f))
         f.seek(0)
         self.assertEntriesMatch(
-            [0, 2, 1], entries,
-            self.make_pack_iter_subset(f, [entries[1][3], entries[2][3]]))
+            [0, 2, 1],
+            entries,
+            self.make_pack_iter_subset(f, [entries[1][3], entries[2][3]]),
+        )
 
     def test_ofs_deltas_chain(self):
         f = BytesIO()
@@ -1112,7 +1152,8 @@ class DeltaChainIteratorTests(TestCase):
                 (OFS_DELTA, (0, b"blob1")),
                 (OFS_DELTA, (1, b"blob3")),
                 (OFS_DELTA, (0, b"bob")),
-            ])
+            ],
+        )
         # Delta resolution changed to DFS
         self.assertEntriesMatch([0, 4, 2, 1, 3], entries, self.make_pack_iter(f))
 

@@ -36,6 +36,7 @@ else:
 
     class Server(paramiko.ServerInterface):
         """http://docs.paramiko.org/en/2.4/api/server.html."""
+
         def __init__(self, commands, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
             self.commands = commands
@@ -64,8 +65,8 @@ else:
             return "password,publickey"
 
 
-USER = 'testuser'
-PASSWORD = 'test'
+USER = "testuser"
+PASSWORD = "test"
 SERVER_KEY = """\
 -----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEAy/L1sSYAzxsMprtNXW4u/1jGXXkQmQ2xtmKVlR+RlIL3a1BH
@@ -126,7 +127,6 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 
 @skipIf(not has_paramiko, "paramiko is not installed")
 class ParamikoSSHVendorTests(TestCase):
-
     def setUp(self):
         import paramiko.transport
 
@@ -138,7 +138,7 @@ class ParamikoSSHVendorTests(TestCase):
         socket.setdefaulttimeout(10)
         self.addCleanup(socket.setdefaulttimeout, None)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind(('127.0.0.1', 0))
+        self.socket.bind(("127.0.0.1", 0))
         self.socket.listen(5)
         self.addCleanup(self.socket.close)
         self.port = self.socket.getsockname()[1]
@@ -161,40 +161,61 @@ class ParamikoSSHVendorTests(TestCase):
         self.transport.start_server(server=server)
 
     def test_run_command_password(self):
-        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False,)
+        vendor = ParamikoSSHVendor(
+            allow_agent=False,
+            look_for_keys=False,
+        )
         vendor.run_command(
-            '127.0.0.1', 'test_run_command_password',
-            username=USER, port=self.port, password=PASSWORD)
+            "127.0.0.1",
+            "test_run_command_password",
+            username=USER,
+            port=self.port,
+            password=PASSWORD,
+        )
 
-        self.assertIn(b'test_run_command_password', self.commands)
+        self.assertIn(b"test_run_command_password", self.commands)
 
     def test_run_command_with_privkey(self):
         key = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
 
-        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False,)
+        vendor = ParamikoSSHVendor(
+            allow_agent=False,
+            look_for_keys=False,
+        )
         vendor.run_command(
-            '127.0.0.1', 'test_run_command_with_privkey',
-            username=USER, port=self.port, pkey=key)
+            "127.0.0.1",
+            "test_run_command_with_privkey",
+            username=USER,
+            port=self.port,
+            pkey=key,
+        )
 
-        self.assertIn(b'test_run_command_with_privkey', self.commands)
+        self.assertIn(b"test_run_command_with_privkey", self.commands)
 
     def test_run_command_data_transfer(self):
-        vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False,)
+        vendor = ParamikoSSHVendor(
+            allow_agent=False,
+            look_for_keys=False,
+        )
         con = vendor.run_command(
-            '127.0.0.1', 'test_run_command_data_transfer',
-            username=USER, port=self.port, password=PASSWORD)
+            "127.0.0.1",
+            "test_run_command_data_transfer",
+            username=USER,
+            port=self.port,
+            password=PASSWORD,
+        )
 
-        self.assertIn(b'test_run_command_data_transfer', self.commands)
+        self.assertIn(b"test_run_command_data_transfer", self.commands)
 
         channel = self.transport.accept(5)
-        channel.send(b'stdout\n')
-        channel.send_stderr(b'stderr\n')
+        channel.send(b"stdout\n")
+        channel.send_stderr(b"stderr\n")
         channel.close()
 
         # Fixme: it's return false
         # self.assertTrue(con.can_read())
 
-        self.assertEqual(b'stdout\n', con.read(4096))
+        self.assertEqual(b"stdout\n", con.read(4096))
 
         # Fixme: it's return empty string
         # self.assertEqual(b'stderr\n', con.read_stderr(4096))

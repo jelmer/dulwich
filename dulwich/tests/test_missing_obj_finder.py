@@ -37,9 +37,7 @@ class MissingObjectFinderTest(TestCase):
     def assertMissingMatch(self, haves, wants, expected):
         for sha, path in MissingObjectFinder(self.store, haves, wants, shallow=set()):
             self.assertIn(
-                sha,
-                expected,
-                f"({sha},{path}) erroneously reported as missing"
+                sha, expected, f"({sha},{path}) erroneously reported as missing"
             )
             expected.remove(sha)
 
@@ -108,7 +106,8 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
         haves = [self.cmt(1).id]
         wants = [self.cmt(3).id, bogus_sha]
         self.assertRaises(
-            KeyError, MissingObjectFinder, self.store, haves, wants, shallow=set())
+            KeyError, MissingObjectFinder, self.store, haves, wants, shallow=set()
+        )
 
     def test_no_changes(self):
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])

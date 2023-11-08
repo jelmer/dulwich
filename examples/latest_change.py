@@ -12,7 +12,7 @@ if len(sys.argv) < 2:
 
 r = Repo(".")
 
-path = sys.argv[1].encode('utf-8')
+path = sys.argv[1].encode("utf-8")
 
 w = r.get_walker(paths=[path], max_entries=1)
 try:
@@ -20,5 +20,8 @@ try:
 except StopIteration:
     print("No file %s anywhere in history." % sys.argv[1])
 else:
-    print("{} was last changed by {} at {} (commit {})".format(
-        sys.argv[1], c.author, time.ctime(c.author_time), c.id))
+    print(
+        "{} was last changed by {} at {} (commit {})".format(
+            sys.argv[1], c.author, time.ctime(c.author_time), c.id
+        )
+    )

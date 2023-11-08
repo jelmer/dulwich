@@ -32,7 +32,10 @@ from ..utils import build_commit_graph
 from .utils import CompatTestCase, run_git_or_fail
 
 
-@skipIf(platform.python_implementation() == "PyPy" or sys.platform == "win32", "gpgme not easily available or supported on Windows and PyPy")
+@skipIf(
+    platform.python_implementation() == "PyPy" or sys.platform == "win32",
+    "gpgme not easily available or supported on Windows and PyPy",
+)
 class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
     def setUp(self):
         super().setUp()
@@ -57,13 +60,8 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
         )
 
         run_git_or_fail(
-            [
-                f"--git-dir={self.repo.controldir()}",
-                "tag",
-                "-v",
-                "tryme"
-            ],
-            env={'GNUPGHOME': os.environ['GNUPGHOME']},
+            [f"--git-dir={self.repo.controldir()}", "tag", "-v", "tryme"],
+            env={"GNUPGHOME": os.environ["GNUPGHOME"]},
         )
 
     def test_verify(self):
@@ -85,9 +83,9 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
                 "verifyme",
             ],
             env={
-                'GNUPGHOME': os.environ['GNUPGHOME'],
-                'GIT_COMMITTER_NAME': 'Joe Example',
-                'GIT_COMMITTER_EMAIL': 'joe@example.com',
+                "GNUPGHOME": os.environ["GNUPGHOME"],
+                "GIT_COMMITTER_NAME": "Joe Example",
+                "GIT_COMMITTER_EMAIL": "joe@example.com",
             },
         )
         tag = self.repo[b"refs/tags/verifyme"]

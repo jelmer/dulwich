@@ -148,9 +148,12 @@ class ConflictedIndexEntry:
     this: Optional[IndexEntry]
     other: Optional[IndexEntry]
 
-    def __init__(self, ancestor: Optional[IndexEntry] = None,
-                 this: Optional[IndexEntry] = None,
-                 other: Optional[IndexEntry] = None) -> None:
+    def __init__(
+        self,
+        ancestor: Optional[IndexEntry] = None,
+        this: Optional[IndexEntry] = None,
+        other: Optional[IndexEntry] = None,
+    ) -> None:
         self.ancestor = ancestor
         self.this = this
         self.other = other
@@ -231,9 +234,8 @@ def read_cache_entry(f, version: int) -> SerializedIndexEntry:
     ) = struct.unpack(">LLLLLL20sH", f.read(20 + 4 * 6 + 2))
     if flags & FLAG_EXTENDED:
         if version < 3:
-            raise AssertionError(
-                'extended flag set in index with version < 3')
-        (extended_flags, ) = struct.unpack(">H", f.read(2))
+            raise AssertionError("extended flag set in index with version < 3")
+        (extended_flags,) = struct.unpack(">H", f.read(2))
     else:
         extended_flags = 0
     name = f.read(flags & FLAG_NAMEMASK)
@@ -271,7 +273,7 @@ def write_cache_entry(f, entry: SerializedIndexEntry, version: int) -> None:
     if entry.extended_flags:
         flags |= FLAG_EXTENDED
     if flags & FLAG_EXTENDED and version is not None and version < 3:
-        raise AssertionError('unable to use extended flags in version < 3')
+        raise AssertionError("unable to use extended flags in version < 3")
     f.write(
         struct.pack(
             b">LLLLLL20sH",
@@ -337,7 +339,9 @@ def read_index_dict(f) -> Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
     return ret
 
 
-def write_index(f: BinaryIO, entries: List[SerializedIndexEntry], version: Optional[int] = None):
+def write_index(
+    f: BinaryIO, entries: List[SerializedIndexEntry], version: Optional[int] = None
+):
     """Write an index file.
 
     Args:
@@ -366,11 +370,17 @@ def write_index_dict(
         value = entries[key]
         if isinstance(value, ConflictedIndexEntry):
             if value.ancestor is not None:
-                entries_list.append(value.ancestor.serialize(key, Stage.MERGE_CONFLICT_ANCESTOR))
+                entries_list.append(
+                    value.ancestor.serialize(key, Stage.MERGE_CONFLICT_ANCESTOR)
+                )
             if value.this is not None:
-                entries_list.append(value.this.serialize(key, Stage.MERGE_CONFLICT_THIS))
+                entries_list.append(
+                    value.this.serialize(key, Stage.MERGE_CONFLICT_THIS)
+                )
             if value.other is not None:
-                entries_list.append(value.other.serialize(key, Stage.MERGE_CONFLICT_OTHER))
+                entries_list.append(
+                    value.other.serialize(key, Stage.MERGE_CONFLICT_OTHER)
+                )
         else:
             entries_list.append(value.serialize(key, Stage.NORMAL))
     write_index(f, entries_list, version=version)
@@ -499,14 +509,18 @@ class Index:
         """Remove all contents from this index."""
         self._byname = {}
 
-    def __setitem__(self, name: bytes, value: Union[IndexEntry, ConflictedIndexEntry]) -> None:
+    def __setitem__(
+        self, name: bytes, value: Union[IndexEntry, ConflictedIndexEntry]
+    ) -> None:
         assert isinstance(name, bytes)
         self._byname[name] = value
 
     def __delitem__(self, name: bytes) -> None:
         del self._byname[name]
 
-    def iteritems(self) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
+    def iteritems(
+        self
+    ) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 
     def items(self) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
@@ -520,7 +534,8 @@ class Index:
         yield from self._byname.keys()
 
     def changes_from_tree(
-            self, object_store, tree: ObjectID, want_unchanged: bool = False):
+        self, object_store, tree: ObjectID, want_unchanged: bool = False
+    ):
         """Find the differences between the contents of this index and a tree.
 
         Args:
@@ -639,7 +654,7 @@ def changes_from_tree(
     other_names = set(names)
 
     if tree is not None:
-        for (name, mode, sha) in iter_tree_contents(object_store, tree):
+        for name, mode, sha in iter_tree_contents(object_store, tree):
             try:
                 (other_sha, other_mode) = lookup_entry(name)
             except KeyError:
@@ -661,7 +676,9 @@ def changes_from_tree(
 
 
 def index_entry_from_stat(
-    stat_val, hex_sha: bytes, mode: Optional[int] = None,
+    stat_val,
+    hex_sha: bytes,
+    mode: Optional[int] = None,
 ):
     """Create a new index entry from a stat value.
 
@@ -685,7 +702,7 @@ def index_entry_from_stat(
     )
 
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     # On Windows, creating symlinks either requires administrator privileges
     # or developer mode. Raise a more helpful error when we're unable to
     # create symlinks
@@ -693,28 +710,33 @@ if sys.platform == 'win32':
     # https://github.com/jelmer/dulwich/issues/1005
 
     class WindowsSymlinkPermissionError(PermissionError):
-
         def __init__(self, errno, msg, filename) -> None:
             super(PermissionError, self).__init__(
-                errno, "Unable to create symlink; "
+                errno,
+                "Unable to create symlink; "
                 "do you have developer mode enabled? %s" % msg,
-                filename)
+                filename,
+            )
 
     def symlink(src, dst, target_is_directory=False, *, dir_fd=None):
         try:
             return os.symlink(
-                src, dst, target_is_directory=target_is_directory,
-                dir_fd=dir_fd)
+                src, dst, target_is_directory=target_is_directory, dir_fd=dir_fd
+            )
         except PermissionError as e:
-            raise WindowsSymlinkPermissionError(
-                e.errno, e.strerror, e.filename) from e
+            raise WindowsSymlinkPermissionError(e.errno, e.strerror, e.filename) from e
 else:
     symlink = os.symlink
 
 
 def build_file_from_blob(
-        blob: Blob, mode: int, target_path: bytes, *, honor_filemode=True,
-        tree_encoding="utf-8", symlink_fn=None
+    blob: Blob,
+    mode: int,
+    target_path: bytes,
+    *,
+    honor_filemode=True,
+    tree_encoding="utf-8",
+    symlink_fn=None,
 ):
     """Build a file or symlink on disk based on a Git object.
 
@@ -772,8 +794,7 @@ def validate_path_element_ntfs(element: bytes) -> bool:
     return True
 
 
-def validate_path(path: bytes,
-                  element_validator=validate_path_element_default) -> bool:
+def validate_path(path: bytes, element_validator=validate_path_element_default) -> bool:
     """Default path validator that just checks for .git/."""
     parts = path.split(b"/")
     for p in parts:
@@ -790,7 +811,7 @@ def build_index_from_tree(
     tree_id: bytes,
     honor_filemode: bool = True,
     validate_path_element=validate_path_element_default,
-    symlink_fn=None
+    symlink_fn=None,
 ):
     """Generate and materialize index from a tree.
 
@@ -829,7 +850,9 @@ def build_index_from_tree(
             obj = object_store[entry.sha]
             assert isinstance(obj, Blob)
             st = build_file_from_blob(
-                obj, entry.mode, full_path,
+                obj,
+                entry.mode,
+                full_path,
                 honor_filemode=honor_filemode,
                 symlink_fn=symlink_fn,
             )
@@ -859,8 +882,7 @@ def build_index_from_tree(
     index.write()
 
 
-def blob_from_path_and_mode(fs_path: bytes, mode: int,
-                            tree_encoding="utf-8"):
+def blob_from_path_and_mode(fs_path: bytes, mode: int, tree_encoding="utf-8"):
     """Create a blob from a path and a stat object.
 
     Args:
@@ -943,8 +965,8 @@ def _has_directory_changed(tree_path: bytes, entry):
 
 
 def get_unstaged_changes(
-        index: Index, root_path: Union[str, bytes],
-        filter_blob_callback=None):
+    index: Index, root_path: Union[str, bytes], filter_blob_callback=None
+):
     """Walk through an index and check for differences against working tree.
 
     Args:
@@ -1035,7 +1057,7 @@ def index_entry_from_directory(st, path: bytes) -> Optional[IndexEntry]:
 
 
 def index_entry_from_path(
-        path: bytes, object_store: Optional[ObjectContainer] = None
+    path: bytes, object_store: Optional[ObjectContainer] = None
 ) -> Optional[IndexEntry]:
     """Create an index from a filesystem path.
 
@@ -1064,8 +1086,9 @@ def index_entry_from_path(
 
 
 def iter_fresh_entries(
-    paths: Iterable[bytes], root_path: bytes,
-    object_store: Optional[ObjectContainer] = None
+    paths: Iterable[bytes],
+    root_path: bytes,
+    object_store: Optional[ObjectContainer] = None,
 ) -> Iterator[Tuple[bytes, Optional[IndexEntry]]]:
     """Iterate over current versions of index entries on disk.
 
@@ -1085,9 +1108,8 @@ def iter_fresh_entries(
 
 
 def iter_fresh_objects(
-        paths: Iterable[bytes], root_path: bytes, include_deleted=False,
-        object_store=None) -> Iterator[
-            Tuple[bytes, Optional[bytes], Optional[int]]]:
+    paths: Iterable[bytes], root_path: bytes, include_deleted=False, object_store=None
+) -> Iterator[Tuple[bytes, Optional[bytes], Optional[int]]]:
     """Iterate over versions of objects on disk referenced by index.
 
     Args:
@@ -1097,8 +1119,7 @@ def iter_fresh_objects(
       object_store: Optional object store to report new items to
     Returns: Iterator over path, sha, mode
     """
-    for path, entry in iter_fresh_entries(
-            paths, root_path, object_store=object_store):
+    for path, entry in iter_fresh_entries(paths, root_path, object_store=object_store):
         if entry is None:
             if include_deleted:
                 yield path, None, None
@@ -1125,6 +1146,7 @@ class locked_index:
 
     Works as a context manager.
     """
+
     def __init__(self, path: Union[bytes, str]) -> None:
         self._path = path
 

@@ -32,7 +32,7 @@ class GitVersionTests(TestCase):
 
         def run_git(args, **unused_kwargs):
             self.assertEqual(["--version"], args)
-            return 0, self._version_str, ''
+            return 0, self._version_str, ""
 
         utils.run_git = run_git
 

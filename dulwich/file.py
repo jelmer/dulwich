@@ -205,8 +205,8 @@ class _GitFile:
             self.abort()
 
     def __del__(self) -> None:
-        if not getattr(self, '_closed', True):
-            warnings.warn('unclosed %r' % self, ResourceWarning, stacklevel=2)
+        if not getattr(self, "_closed", True):
+            warnings.warn("unclosed %r" % self, ResourceWarning, stacklevel=2)
             self.abort()
 
     def __enter__(self):

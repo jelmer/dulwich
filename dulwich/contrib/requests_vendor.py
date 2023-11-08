@@ -44,13 +44,7 @@ from ..errors import GitProtocolError, NotGitRepository
 
 class RequestsHttpGitClient(AbstractHttpGitClient):
     def __init__(
-            self,
-            base_url,
-            dumb=None,
-            config=None,
-            username=None,
-            password=None,
-            **kwargs
+        self, base_url, dumb=None, config=None, username=None, password=None, **kwargs
     ) -> None:
         self._username = username
         self._password = password
@@ -60,8 +54,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         if username is not None:
             self.session.auth = (username, password)
 
-        super().__init__(
-            base_url=base_url, dumb=dumb, **kwargs)
+        super().__init__(base_url=base_url, dumb=dumb, **kwargs)
 
     def _http_request(self, url, headers=None, data=None, allow_compression=False):
         req_headers = self.session.headers.copy()
@@ -143,8 +136,5 @@ def get_session(config):
         session.verify = ssl_verify
 
     if proxy_server:
-        session.proxies.update({
-            "http": proxy_server,
-            "https": proxy_server
-        })
+        session.proxies.update({"http": proxy_server, "https": proxy_server})
     return session

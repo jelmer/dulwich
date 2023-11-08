@@ -44,7 +44,7 @@ class WorkList:
         return None
 
     def iter(self):
-        for (pr, cmt) in self.pq:
+        for pr, cmt in self.pq:
             yield (-pr, cmt)
 
 
@@ -96,7 +96,7 @@ def _find_lcas(lookup_parents, c1, c2s, lookup_stamp, min_stamp=0):
                 pflags = cstates.get(pcmt, 0)
                 # if this parent was already visited with no new ancestry/flag information
                 # do not add it to the working list again
-                if ((pflags & cflags) == cflags):
+                if (pflags & cflags) == cflags:
                     continue
                 pdt = lookup_stamp(pcmt)
                 if pdt < min_stamp:

@@ -65,7 +65,9 @@ def open_repo(name, temp_dir=None):
     """
     if temp_dir is None:
         temp_dir = tempfile.mkdtemp()
-    repo_dir = os.path.join(os.path.dirname(__file__), "..", "..", "testdata", "repos", name)
+    repo_dir = os.path.join(
+        os.path.dirname(__file__), "..", "..", "testdata", "repos", name
+    )
     temp_repo_dir = os.path.join(temp_dir, name)
     shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)
     return Repo(temp_repo_dir)

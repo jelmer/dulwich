@@ -41,8 +41,8 @@ _DEFAULT_GIT = "git"
 _VERSION_LEN = 4
 _REPOS_DATA_DIR = os.path.abspath(
     os.path.join(
-        os.path.dirname(__file__), os.pardir, os.pardir, os.pardir,
-        "testdata", "repos")
+        os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, "testdata", "repos"
+    )
 )
 
 
@@ -91,9 +91,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
     """
     found_version = git_version(git_path=git_path)
     if found_version is None:
-        raise SkipTest(
-            f"Test requires git >= {required_version}, but c git not found"
-        )
+        raise SkipTest(f"Test requires git >= {required_version}, but c git not found")
 
     if len(required_version) > _VERSION_LEN:
         raise ValueError(
@@ -115,8 +113,12 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT):
 
 
 def run_git(
-    args, git_path=_DEFAULT_GIT, input=None, capture_stdout=False,
-    capture_stderr=False, **popen_kwargs
+    args,
+    git_path=_DEFAULT_GIT,
+    input=None,
+    capture_stdout=False,
+    capture_stderr=False,
+    **popen_kwargs,
 ):
     """Run a git command.
 
@@ -161,12 +163,17 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     if "stderr" not in popen_kwargs:
         popen_kwargs["stderr"] = subprocess.STDOUT
     returncode, stdout, stderr = run_git(
-        args, git_path=git_path, input=input, capture_stdout=True,
-        capture_stderr=True, **popen_kwargs
+        args,
+        git_path=git_path,
+        input=input,
+        capture_stdout=True,
+        capture_stderr=True,
+        **popen_kwargs,
     )
     if returncode != 0:
         raise AssertionError(
-            "git with args %r failed with %d: stdout=%r stderr=%r" % (args, returncode, stdout, stderr)
+            "git with args %r failed with %d: stdout=%r stderr=%r"
+            % (args, returncode, stdout, stderr)
         )
     return stdout
 

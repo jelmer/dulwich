@@ -236,7 +236,7 @@ class Walker:
         store,
         include: List[bytes],
         exclude: Optional[List[bytes]] = None,
-        order: str = 'date',
+        order: str = "date",
         reverse: bool = False,
         max_entries: Optional[int] = None,
         paths: Optional[List[bytes]] = None,

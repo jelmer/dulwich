@@ -69,7 +69,9 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str]) -> "Tree":
     return o
 
 
-def parse_ref(container: Union["Repo", "RefsContainer"], refspec: Union[str, bytes]) -> "Ref":
+def parse_ref(
+    container: Union["Repo", "RefsContainer"], refspec: Union[str, bytes]
+) -> "Ref":
     """Parse a string referring to a reference.
 
     Args:
@@ -95,9 +97,11 @@ def parse_ref(container: Union["Repo", "RefsContainer"], refspec: Union[str, byt
 
 
 def parse_reftuple(
-        lh_container: Union["Repo", "RefsContainer"],
-        rh_container: Union["Repo", "RefsContainer"], refspec: Union[str, bytes],
-        force: bool = False) -> Tuple[Optional["Ref"], Optional["Ref"], bool]:
+    lh_container: Union["Repo", "RefsContainer"],
+    rh_container: Union["Repo", "RefsContainer"],
+    refspec: Union[str, bytes],
+    force: bool = False,
+) -> Tuple[Optional["Ref"], Optional["Ref"], bool]:
     """Parse a reftuple spec.
 
     Args:
@@ -135,10 +139,11 @@ def parse_reftuple(
 
 
 def parse_reftuples(
-        lh_container: Union["Repo", "RefsContainer"],
-        rh_container: Union["Repo", "RefsContainer"],
-        refspecs: Union[bytes, List[bytes]],
-        force: bool = False):
+    lh_container: Union["Repo", "RefsContainer"],
+    rh_container: Union["Repo", "RefsContainer"],
+    refspecs: Union[bytes, List[bytes]],
+    force: bool = False,
+):
     """Parse a list of reftuple specs to a list of reftuples.
 
     Args:
@@ -178,7 +183,9 @@ def parse_refs(container, refspecs):
     return ret
 
 
-def parse_commit_range(repo: "Repo", committishs: Union[str, bytes]) -> Iterator["Commit"]:
+def parse_commit_range(
+    repo: "Repo", committishs: Union[str, bytes]
+) -> Iterator["Commit"]:
     """Parse a string referring to a range of commits.
 
     Args:

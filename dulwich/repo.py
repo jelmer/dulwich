@@ -95,24 +95,24 @@ from .objects import (
     valid_hexsha,
 )
 from .pack import generate_unpacked_objects
-from .refs import (  # noqa: F401
-    ANNOTATED_TAG_SUFFIX,
+from .refs import (
+    ANNOTATED_TAG_SUFFIX,  # noqa: F401
     LOCAL_BRANCH_PREFIX,
-    LOCAL_TAG_PREFIX,
-    SYMREF,
+    LOCAL_TAG_PREFIX,  # noqa: F401
+    SYMREF,  # noqa: F401
     DictRefsContainer,
     DiskRefsContainer,
-    InfoRefsContainer,
+    InfoRefsContainer,  # noqa: F401
     Ref,
     RefsContainer,
     _set_default_branch,
     _set_head,
     _set_origin_head,
-    check_ref_format,
-    read_packed_refs,
-    read_packed_refs_with_peeled,
+    check_ref_format,  # noqa: F401
+    read_packed_refs,  # noqa: F401
+    read_packed_refs_with_peeled,  # noqa: F401
     serialize_refs,
-    write_packed_refs,
+    write_packed_refs,  # noqa: F401
 )
 
 CONTROLDIR = ".git"
@@ -1366,7 +1366,7 @@ class Repo(BaseRepo):
         from .index import Index
 
         if not self.has_index():
-            raise NoIndexPresent()
+            raise NoIndexPresent
         return Index(self.index_path())
 
     def has_index(self):
@@ -1915,7 +1915,7 @@ class MemoryRepo(BaseRepo):
         Raises:
           NoIndexPresent: Raised when no index is present
         """
-        raise NoIndexPresent()
+        raise NoIndexPresent
 
     def get_config(self):
         """Retrieve the config object.

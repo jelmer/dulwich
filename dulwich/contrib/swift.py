@@ -305,7 +305,9 @@ class SwiftConnector:
             o_store for o_store in catalogs if o_store["type"] == "object-store"
         )
         endpoints = object_store["endpoints"]
-        endpoint = next(endp for endp in endpoints if endp["region"] == self.region_name)
+        endpoint = next(
+            endp for endp in endpoints if endp["region"] == self.region_name
+        )
         return endpoint[self.endpoint_type], token
 
     def test_root_exists(self):

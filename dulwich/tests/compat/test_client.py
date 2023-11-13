@@ -73,10 +73,10 @@ class DulwichClientTestBase:
                 self.assertReposEqual(src, dest)
 
     def _client(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _build_path(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _do_send_pack(self):
         c = self._client()

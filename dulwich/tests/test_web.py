@@ -160,7 +160,7 @@ class DumbHandlersTestCase(WebTestCase):
                 self._exc_class = exc_class
 
             def read(self, size=-1):
-                raise self._exc_class()
+                raise self._exc_class
 
             def close(self):
                 self.closed = True

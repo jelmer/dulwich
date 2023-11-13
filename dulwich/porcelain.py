@@ -624,9 +624,7 @@ def clean(repo=".", target_dir=None):
             raise Error("target_dir must be in the repo's working dir")
 
         config = r.get_config_stack()
-        require_force = config.get_boolean(  # noqa: F841
-            (b"clean",), b"requireForce", True
-        )
+        config.get_boolean((b"clean",), b"requireForce", True)
 
         # TODO(jelmer): if require_force is set, then make sure that -f, -i or
         # -n is specified.

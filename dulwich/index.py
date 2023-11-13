@@ -481,14 +481,14 @@ class Index:
         """Return the (git object) SHA1 for the object at a path."""
         value = self[path]
         if isinstance(value, ConflictedIndexEntry):
-            raise UnmergedEntries()
+            raise UnmergedEntries
         return value.sha
 
     def get_mode(self, path: bytes) -> int:
         """Return the POSIX file mode for the object at a path."""
         value = self[path]
         if isinstance(value, ConflictedIndexEntry):
-            raise UnmergedEntries()
+            raise UnmergedEntries
         return value.mode
 
     def iterobjects(self) -> Iterable[Tuple[bytes, bytes, int]]:
@@ -496,7 +496,7 @@ class Index:
         for path in self:
             entry = self[path]
             if isinstance(entry, ConflictedIndexEntry):
-                raise UnmergedEntries()
+                raise UnmergedEntries
             yield path, entry.sha, cleanup_mode(entry.mode)
 
     def has_conflicts(self) -> bool:

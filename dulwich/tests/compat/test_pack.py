@@ -101,7 +101,11 @@ class TestPack(PackTests):
             new_blob.data = orig_blob.data + (b"x" * 2**20)
             new_blob_2 = Blob()
             new_blob_2.data = new_blob.data + b"y"
-            all_to_pack = [*list(orig_pack.pack_tuples()), (new_blob, None), (new_blob_2, None)]
+            all_to_pack = [
+                *list(orig_pack.pack_tuples()),
+                (new_blob, None),
+                (new_blob_2, None),
+            ]
             pack_path = os.path.join(self._tempdir, "pack_with_deltas")
             write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
@@ -137,7 +141,11 @@ class TestPack(PackTests):
             new_blob.data = "big blob" + ("x" * 2**25)
             new_blob_2 = Blob()
             new_blob_2.data = new_blob.data + "y"
-            all_to_pack = [*list(orig_pack.pack_tuples()), (new_blob, None), (new_blob_2, None)]
+            all_to_pack = [
+                *list(orig_pack.pack_tuples()),
+                (new_blob, None),
+                (new_blob_2, None),
+            ]
             pack_path = os.path.join(self._tempdir, "pack_with_deltas")
             write_pack(pack_path, all_to_pack, deltify=True)
         output = run_git_or_fail(["verify-pack", "-v", pack_path])

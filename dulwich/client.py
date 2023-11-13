@@ -172,8 +172,18 @@ def _win32_peek_avail(handle):
 
 
 COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
-UPLOAD_CAPABILITIES = [CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK, CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_SHALLOW, *COMMON_CAPABILITIES]
-RECEIVE_CAPABILITIES = [CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, *COMMON_CAPABILITIES]
+UPLOAD_CAPABILITIES = [
+    CAPABILITY_THIN_PACK,
+    CAPABILITY_MULTI_ACK,
+    CAPABILITY_MULTI_ACK_DETAILED,
+    CAPABILITY_SHALLOW,
+    *COMMON_CAPABILITIES,
+]
+RECEIVE_CAPABILITIES = [
+    CAPABILITY_REPORT_STATUS,
+    CAPABILITY_DELETE_REFS,
+    *COMMON_CAPABILITIES,
+]
 
 
 class ReportStatusParser:
@@ -888,9 +898,7 @@ class GitClient:
             k, v = parse_capability(capability)
             if k == CAPABILITY_AGENT:
                 agent = v
-        unknown_capabilities = (  # noqa: F841
-            extract_capability_names(server_capabilities) - KNOWN_RECEIVE_CAPABILITIES
-        )
+        (extract_capability_names(server_capabilities) - KNOWN_RECEIVE_CAPABILITIES)
         # TODO(jelmer): warn about unknown capabilities
         return negotiated_capabilities, agent
 
@@ -940,9 +948,7 @@ class GitClient:
         return None
 
     def _negotiate_upload_pack_capabilities(self, server_capabilities):
-        unknown_capabilities = (  # noqa: F841
-            extract_capability_names(server_capabilities) - KNOWN_UPLOAD_CAPABILITIES
-        )
+        (extract_capability_names(server_capabilities) - KNOWN_UPLOAD_CAPABILITIES)
         # TODO(jelmer): warn about unknown capabilities
         symrefs = {}
         agent = None
@@ -1018,7 +1024,7 @@ class TraditionalGitClient(GitClient):
           cmd: The git service name to which we should connect.
           path: The path we should pass to the service. (as bytestirng)
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def send_pack(self, path, update_refs, generate_pack_data, progress=None):
         """Upload a pack to a remote repository.
@@ -1618,6 +1624,7 @@ class SubprocessSSHVendor(SSHVendor):
 
         if ssh_command:
             import shlex
+
             args = [*shlex.split(ssh_command, posix=sys.platform != "win32"), "-x"]
         else:
             args = ["ssh", "-x"]
@@ -1659,6 +1666,7 @@ class PLinkSSHVendor(SSHVendor):
     ):
         if ssh_command:
             import shlex
+
             args = [*shlex.split(ssh_command, posix=sys.platform != "win32"), "-ssh"]
         elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]
@@ -2268,7 +2276,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             raise GitProtocolError(str(e)) from e
 
         if resp.status == 404:
-            raise NotGitRepository()
+            raise NotGitRepository
         if resp.status == 401:
             raise HTTPUnauthorized(resp.headers.get("WWW-Authenticate"), url)
         if resp.status == 407:

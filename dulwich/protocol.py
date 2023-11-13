@@ -77,10 +77,29 @@ COMMON_CAPABILITIES = [
     CAPABILITY_NO_PROGRESS,
 ]
 KNOWN_UPLOAD_CAPABILITIES = set(
-    [*COMMON_CAPABILITIES, CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK, CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_INCLUDE_TAG, CAPABILITY_DEEPEN_SINCE, CAPABILITY_SYMREF, CAPABILITY_SHALLOW, CAPABILITY_DEEPEN_NOT, CAPABILITY_DEEPEN_RELATIVE, CAPABILITY_ALLOW_TIP_SHA1_IN_WANT, CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT]
+    [
+        *COMMON_CAPABILITIES,
+        CAPABILITY_THIN_PACK,
+        CAPABILITY_MULTI_ACK,
+        CAPABILITY_MULTI_ACK_DETAILED,
+        CAPABILITY_INCLUDE_TAG,
+        CAPABILITY_DEEPEN_SINCE,
+        CAPABILITY_SYMREF,
+        CAPABILITY_SHALLOW,
+        CAPABILITY_DEEPEN_NOT,
+        CAPABILITY_DEEPEN_RELATIVE,
+        CAPABILITY_ALLOW_TIP_SHA1_IN_WANT,
+        CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
+    ]
 )
 KNOWN_RECEIVE_CAPABILITIES = set(
-    [*COMMON_CAPABILITIES, CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, CAPABILITY_QUIET, CAPABILITY_ATOMIC]
+    [
+        *COMMON_CAPABILITIES,
+        CAPABILITY_REPORT_STATUS,
+        CAPABILITY_DELETE_REFS,
+        CAPABILITY_QUIET,
+        CAPABILITY_ATOMIC,
+    ]
 )
 
 DEPTH_INFINITE = 0x7FFFFFFF
@@ -193,7 +212,7 @@ class Protocol:
         try:
             sizestr = read(4)
             if not sizestr:
-                raise HangupException()
+                raise HangupException
             size = int(sizestr, 16)
             if size == 0 or size == 1:  # flush-pkt or delim-pkt
                 if self.report_activity:
@@ -203,7 +222,7 @@ class Protocol:
                 self.report_activity(size, "read")
             pkt_contents = read(size - 4)
         except ConnectionResetError as exc:
-            raise HangupException() from exc
+            raise HangupException from exc
         except OSError as exc:
             raise GitProtocolError(str(exc)) from exc
         else:

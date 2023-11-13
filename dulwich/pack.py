@@ -1914,7 +1914,9 @@ def pack_objects_to_data(
         return (
             count,
             deltify_pack_objects(
-                iter(objects), window_size=delta_window_size, progress=progress  # type: ignore
+                iter(objects),  # type: ignore
+                window_size=delta_window_size,
+                progress=progress,
             ),
         )
     else:

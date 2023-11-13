@@ -72,7 +72,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
             resp = self.session.get(url, headers=req_headers)
 
         if resp.status_code == 404:
-            raise NotGitRepository()
+            raise NotGitRepository
         if resp.status_code == 401:
             raise HTTPUnauthorized(resp.headers.get("WWW-Authenticate"), url)
         if resp.status_code == 407:

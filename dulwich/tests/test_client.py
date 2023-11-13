@@ -726,10 +726,10 @@ class TestSSHVendor:
         class Subprocess:
             pass
 
-        setattr(Subprocess, "read", lambda: None)
-        setattr(Subprocess, "write", lambda: None)
-        setattr(Subprocess, "close", lambda: None)
-        setattr(Subprocess, "can_read", lambda: None)
+        Subprocess.read = lambda: None
+        Subprocess.write = lambda: None
+        Subprocess.close = lambda: None
+        Subprocess.can_read = lambda: None
         return Subprocess()
 
 
@@ -1571,7 +1571,15 @@ class PLinkSSHVendorTests(TestCase):
             binary = ["plink.exe", "-ssh"]
         else:
             binary = ["plink", "-ssh"]
-        expected = [*binary, "-pw", "12345", "-i", "/tmp/id_rsa", "host", "git-clone-url"]
+        expected = [
+            *binary,
+            "-pw",
+            "12345",
+            "-i",
+            "/tmp/id_rsa",
+            "host",
+            "git-clone-url",
+        ]
         self.assertListEqual(expected, args[0])
 
     def test_run_command_password(self):
@@ -1612,7 +1620,15 @@ class PLinkSSHVendorTests(TestCase):
             binary = ["plink.exe", "-ssh"]
         else:
             binary = ["plink", "-ssh"]
-        expected = [*binary, "-P", "2200", "-i", "/tmp/id_rsa", "user@host", "git-clone-url"]
+        expected = [
+            *binary,
+            "-P",
+            "2200",
+            "-i",
+            "/tmp/id_rsa",
+            "user@host",
+            "git-clone-url",
+        ]
 
         vendor = PLinkSSHVendor()
         command = vendor.run_command(

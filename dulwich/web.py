@@ -393,7 +393,12 @@ class HTTPGitApplication:
       backend: the Backend object backing this application
     """
 
-    services: ClassVar[Dict[Tuple[str, re.Pattern], Callable[[HTTPGitRequest, Backend, re.Match], Iterator[bytes]]]] = {
+    services: ClassVar[
+        Dict[
+            Tuple[str, re.Pattern],
+            Callable[[HTTPGitRequest, Backend, re.Match], Iterator[bytes]],
+        ]
+    ] = {
         ("GET", re.compile("/HEAD$")): get_text_file,
         ("GET", re.compile("/info/refs$")): get_info_refs,
         ("GET", re.compile("/objects/info/alternates$")): get_text_file,

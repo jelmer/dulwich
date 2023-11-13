@@ -36,12 +36,12 @@ from ..tests.test_object_store import ObjectStoreTests
 missing_libs = []
 
 try:
-    import gevent  # noqa:F401
+    import gevent  # noqa: F401
 except ModuleNotFoundError:
     missing_libs.append("gevent")
 
 try:
-    import geventhttpclient  # noqa:F401
+    import geventhttpclient  # noqa: F401
 except ModuleNotFoundError:
     missing_libs.append("geventhttpclient")
 
@@ -170,7 +170,7 @@ def create_commit(data, marker=b"Default", blob=None):
 
 def create_commits(length=1, marker=b"Default"):
     data = []
-    for i in range(0, length):
+    for i in range(length):
         _marker = (f"{marker}_{i}").encode()
         blob, tree, tag, cmt = create_commit(data, _marker)
         data.extend([blob, tree, tag, cmt])

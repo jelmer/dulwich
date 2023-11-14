@@ -1,4 +1,3 @@
-#!/usr/bin/python3 -u
 #
 # dulwich - Simple command-line interface to Dulwich
 # Copyright (C) 2008-2011 Jelmer Vernooij <jelmer@jelmer.uk>

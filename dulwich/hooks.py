@@ -98,8 +98,13 @@ class ShellHook(Hook):
 
         try:
             ret = subprocess.call(
+<<<<<<< HEAD
                 [os.path.relpath(self.filepath, self.cwd)] + list(args), cwd=self.cwd
             )
+=======
+                [os.path.relpath(self.filepath, self.cwd), *list(args)],
+                cwd=self.cwd)
+>>>>>>> 14a811d3 (Apply more RUF fixes)
             if ret != 0:
                 if self.post_exec_callback is not None:
                     self.post_exec_callback(0, *args)

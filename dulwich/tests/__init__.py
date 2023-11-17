@@ -101,7 +101,7 @@ class BlackboxTestCase(TestCase):
         # expect the user to set up file associations for .py files.
         #
         # Save us from all that headache and call python with the bin script.
-        argv = [sys.executable, self.bin_path(name)] + args
+        argv = [sys.executable, self.bin_path(name), *args]
         return subprocess.Popen(
             argv,
             stdout=subprocess.PIPE,

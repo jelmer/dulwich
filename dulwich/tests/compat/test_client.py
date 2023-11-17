@@ -434,7 +434,7 @@ class TestSSHVendor:
         cmd = cmd.split("-", 1)
         path = path.replace("'", "")
         p = subprocess.Popen(
-            cmd + [path],
+            [*cmd, path],
             bufsize=0,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

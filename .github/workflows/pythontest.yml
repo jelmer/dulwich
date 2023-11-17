@@ -37,8 +37,8 @@ jobs:
         if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
       - name: Style checks
         run: |
-          pip install --upgrade flake8
-          python -m flake8
+          pip install --upgrade ruff
+          python -m ruff check .
       - name: Typing checks
         run: |
           pip install --upgrade mypy types-paramiko types-requests

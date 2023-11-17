@@ -26,7 +26,7 @@ import re
 import sys
 import time
 from io import BytesIO
-from typing import List, Optional, Tuple
+from typing import Callable, ClassVar, Dict, Iterator, List, Optional, Tuple
 from urllib.parse import parse_qs
 from wsgiref.simple_server import (
     ServerHandler,
@@ -41,6 +41,7 @@ from .protocol import ReceivableProtocol
 from .repo import BaseRepo, NotGitRepository, Repo
 from .server import (
     DEFAULT_HANDLERS,
+    Backend,
     DictBackend,
     generate_info_refs,
     generate_objects_info_packs,
@@ -392,7 +393,7 @@ class HTTPGitApplication:
       backend: the Backend object backing this application
     """
 
-    services = {
+    services: ClassVar[Dict[Tuple[str, re.Pattern], Callable[[HTTPGitRequest, Backend, re.Match], Iterator[bytes]]]] = {
         ("GET", re.compile("/HEAD$")): get_text_file,
         ("GET", re.compile("/info/refs$")): get_info_refs,
         ("GET", re.compile("/objects/info/alternates$")): get_text_file,

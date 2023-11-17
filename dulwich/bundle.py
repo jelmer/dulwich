@@ -26,12 +26,12 @@ from .pack import PackData, write_pack_data
 
 
 class Bundle:
-    version: Optional[int] = None
+    version: Optional[int]
 
-    capabilities: Dict[str, str] = {}
-    prerequisites: List[Tuple[bytes, str]] = []
-    references: Dict[str, bytes] = {}
-    pack_data: Union[PackData, Sequence[bytes]] = []
+    capabilities: Dict[str, str]
+    prerequisites: List[Tuple[bytes, str]]
+    references: Dict[str, bytes]
+    pack_data: Union[PackData, Sequence[bytes]]
 
     def __repr__(self) -> str:
         return (

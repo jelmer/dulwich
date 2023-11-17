@@ -26,6 +26,7 @@ import shutil
 import tempfile
 import time
 import unittest
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 from dulwich.contrib import release_robot
 
@@ -68,10 +69,10 @@ class GetRecentTagsTest(unittest.TestCase):
     # Git repo for dulwich project
     test_repo = os.path.join(BASEDIR, "dulwich_test_repo.zip")
     committer = b"Mark Mikofski <mark.mikofski@sunpowercorp.com>"
-    test_tags = [b"v0.1a", b"v0.1"]
-    tag_test_data = {
-        test_tags[0]: [1484788003, b"3" * 40, None],
-        test_tags[1]: [1484788314, b"1" * 40, (1484788401, b"2" * 40)],
+    test_tags: ClassVar[List[bytes]] = [b"v0.1a", b"v0.1"]
+    tag_test_data: ClassVar[Dict[bytes, Tuple[int, bytes, Optional[Tuple[int, bytes]]]]] = {
+        test_tags[0]: (1484788003, b"3" * 40, None),
+        test_tags[1]: (1484788314, b"1" * 40, (1484788401, b"2" * 40)),
     }
 
     @classmethod

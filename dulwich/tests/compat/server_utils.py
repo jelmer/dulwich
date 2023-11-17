@@ -91,7 +91,7 @@ class ServerTests:
         port = self._start_server(self._old_repo)
 
         run_git_or_fail(
-            ["push", self.url(port)] + self.branch_args(),
+            ["push", self.url(port), *self.branch_args()],
             cwd=self._new_repo.path,
         )
         self.assertReposEqual(self._old_repo, self._new_repo)
@@ -103,7 +103,7 @@ class ServerTests:
         port = self._start_server(self._old_repo)
 
         run_git_or_fail(
-            ["push", self.url(port)] + self.branch_args(),
+            ["push", self.url(port), *self.branch_args()],
             cwd=self._new_repo.path,
         )
         self.assertReposEqual(self._old_repo, self._new_repo)
@@ -124,7 +124,7 @@ class ServerTests:
         port = self._start_server(self._new_repo)
 
         run_git_or_fail(
-            ["fetch", self.url(port)] + self.branch_args(),
+            ["fetch", self.url(port), *self.branch_args()],
             cwd=self._old_repo.path,
         )
         # flush the pack cache so any new packs are picked up
@@ -138,7 +138,7 @@ class ServerTests:
         port = self._start_server(self._new_repo)
 
         run_git_or_fail(
-            ["fetch", self.url(port)] + self.branch_args(),
+            ["fetch", self.url(port), *self.branch_args()],
             cwd=self._old_repo.path,
         )
         # flush the pack cache so any new packs are picked up
@@ -249,7 +249,7 @@ class ServerTests:
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-            ["fetch", "--depth=2", self.url(port)] + self.branch_args(),
+            ["fetch", "--depth=2", self.url(port), *self.branch_args()],
             cwd=self._stub_repo.path,
         )
         expected_shallow = [
@@ -281,13 +281,13 @@ class ServerTests:
 
         # Fetching at the same depth is a no-op.
         run_git_or_fail(
-            ["fetch", "--depth=2", self.url(port)] + self.branch_args(),
+            ["fetch", "--depth=2", self.url(port), *self.branch_args()],
             cwd=self._stub_repo.path,
         )
 
         # The whole repo only has depth 4, so it should equal server_new.
         run_git_or_fail(
-            ["fetch", "--depth=4", self.url(port)] + self.branch_args(),
+            ["fetch", "--depth=4", self.url(port), *self.branch_args()],
             cwd=self._stub_repo.path,
         )
         self.assertEqual([], _get_shallow(clone))

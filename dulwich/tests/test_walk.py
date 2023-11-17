@@ -509,7 +509,7 @@ class WalkEntryTest(TestCase):
 
         # Get the WalkEntry for the commit.
         walker = Walker(self.store, c1.id)
-        walker_entry = list(walker)[0]
+        walker_entry = next(iter(walker))
         changes = walker_entry.changes()
 
         # Compare the changes with the expected values.
@@ -571,7 +571,7 @@ class WalkEntryTest(TestCase):
 
         # Get the WalkEntry for the commit.
         walker = Walker(self.store, c1.id)
-        walker_entry = list(walker)[0]
+        walker_entry = next(iter(walker))
         changes = walker_entry.changes(path_prefix=b"x")
 
         # Compare the changes with the expected values.

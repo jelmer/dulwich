@@ -1174,7 +1174,7 @@ class DeltaChainIteratorTests(TestCase):
         f = BytesIO()
         entries = build_pack(f, objects_spec)
         # Delta resolution changed to DFS
-        indices = [0] + list(range(100, 0, -1))
+        indices = [0, *list(range(100, 0, -1))]
         self.assertEntriesMatch(indices, entries, self.make_pack_iter(f))
 
     def test_ext_ref(self):

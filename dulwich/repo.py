@@ -281,7 +281,7 @@ def parse_graftpoints(
         else:
             parents = []
 
-        for sha in [commit] + parents:
+        for sha in [commit, *parents]:
             check_hexsha(sha, "Invalid graftpoint")
 
         grafts[commit] = parents
@@ -899,7 +899,7 @@ class BaseRepo:
         """
         # Simple validation
         for commit, parents in updated_graftpoints.items():
-            for sha in [commit] + parents:
+            for sha in [commit, *parents]:
                 check_hexsha(sha, "Invalid graftpoint")
 
         self._graftpoints.update(updated_graftpoints)
@@ -920,7 +920,7 @@ class BaseRepo:
         with f:
             return [line.strip() for line in f.readlines() if line.strip()]
 
-    def do_commit(  # noqa: C901
+    def do_commit(
         self,
         message: Optional[bytes] = None,
         committer: Optional[bytes] = None,
@@ -1042,7 +1042,7 @@ class BaseRepo:
         else:
             try:
                 old_head = self.refs[ref]
-                c.parents = [old_head] + merge_heads
+                c.parents = [old_head, *merge_heads]
                 if sign:
                     c.sign(keyid)
                 self.object_store.add_object(c)

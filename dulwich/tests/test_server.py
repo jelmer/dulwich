@@ -175,7 +175,7 @@ class UploadPackHandlerTestCase(TestCase):
         self.assertRaises(IndexError, self._handler.proto.get_received_line, 2)
 
     def test_no_progress(self):
-        caps = list(self._handler.required_capabilities()) + [b"no-progress"]
+        caps = [*list(self._handler.required_capabilities()), b"no-progress"]
         self._handler.set_client_capabilities(caps)
         self._handler.progress(b"first message")
         self._handler.progress(b"second message")
@@ -198,7 +198,7 @@ class UploadPackHandlerTestCase(TestCase):
         self._repo.refs._peeled_refs = peeled
         self._repo.refs.add_packed_refs(refs)
 
-        caps = list(self._handler.required_capabilities()) + [b"include-tag"]
+        caps = [*list(self._handler.required_capabilities()), b"include-tag"]
         self._handler.set_client_capabilities(caps)
         self.assertEqual(
             {b"1234" * 10: ONE, b"5678" * 10: TWO},
@@ -541,7 +541,7 @@ class ProtocolGraphWalkerTestCase(TestCase):
     # TODO: test commit time cutoff
 
     def _handle_shallow_request(self, lines, heads):
-        self._walker.proto.set_output(lines + [None])
+        self._walker.proto.set_output([*lines, None])
         self._walker._handle_shallow_request(heads)
 
     def assertReceived(self, expected):
@@ -1123,7 +1123,7 @@ class ServeCommandTests(TestCase):
     def serve_command(self, handler_cls, args, inf, outf):
         return serve_command(
             handler_cls,
-            [b"test"] + args,
+            [b"test", *args],
             backend=self.backend,
             inf=inf,
             outf=outf,

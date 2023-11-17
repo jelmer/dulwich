@@ -50,6 +50,7 @@ from typing import (
     IO,
     TYPE_CHECKING,
     Callable,
+    ClassVar,
     Dict,
     Iterable,
     Iterator,
@@ -171,16 +172,8 @@ def _win32_peek_avail(handle):
 
 
 COMMON_CAPABILITIES = [CAPABILITY_OFS_DELTA, CAPABILITY_SIDE_BAND_64K]
-UPLOAD_CAPABILITIES = [
-    CAPABILITY_THIN_PACK,
-    CAPABILITY_MULTI_ACK,
-    CAPABILITY_MULTI_ACK_DETAILED,
-    CAPABILITY_SHALLOW,
-] + COMMON_CAPABILITIES
-RECEIVE_CAPABILITIES = [
-    CAPABILITY_REPORT_STATUS,
-    CAPABILITY_DELETE_REFS,
-] + COMMON_CAPABILITIES
+UPLOAD_CAPABILITIES = [CAPABILITY_THIN_PACK, CAPABILITY_MULTI_ACK, CAPABILITY_MULTI_ACK_DETAILED, CAPABILITY_SHALLOW, *COMMON_CAPABILITIES]
+RECEIVE_CAPABILITIES = [CAPABILITY_REPORT_STATUS, CAPABILITY_DELETE_REFS, *COMMON_CAPABILITIES]
 
 
 class ReportStatusParser:
@@ -262,7 +255,7 @@ class FetchPackResult:
       agent: User agent string
     """
 
-    _FORWARDED_ATTRS = [
+    _FORWARDED_ATTRS: ClassVar[Set[str]] = {
         "clear",
         "copy",
         "fromkeys",
@@ -277,7 +270,7 @@ class FetchPackResult:
         "viewitems",
         "viewkeys",
         "viewvalues",
-    ]
+    }
 
     def __init__(
         self, refs, symrefs, agent, new_shallow=None, new_unshallow=None
@@ -348,7 +341,7 @@ class SendPackResult:
         failed to update), or None if it was updated successfully
     """
 
-    _FORWARDED_ATTRS = [
+    _FORWARDED_ATTRS: ClassVar[Set[str]] = {
         "clear",
         "copy",
         "fromkeys",
@@ -363,7 +356,7 @@ class SendPackResult:
         "viewitems",
         "viewkeys",
         "viewvalues",
-    ]
+    }
 
     def __init__(self, refs, agent=None, ref_status=None) -> None:
         self.refs = refs
@@ -1380,7 +1373,7 @@ class SubprocessGitClient(TraditionalGitClient):
             path = path.decode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
-        argv = git_command + [service.decode("ascii"), path]
+        argv = [*git_command, service.decode("ascii"), path]
         p = subprocess.Popen(
             argv,
             bufsize=0,
@@ -1625,8 +1618,7 @@ class SubprocessSSHVendor(SSHVendor):
 
         if ssh_command:
             import shlex
-
-            args = shlex.split(ssh_command, posix=(sys.platform != "win32")) + ["-x"]
+            args = [*shlex.split(ssh_command, posix=sys.platform != "win32"), "-x"]
         else:
             args = ["ssh", "-x"]
 
@@ -1643,7 +1635,7 @@ class SubprocessSSHVendor(SSHVendor):
         args.append(host)
 
         proc = subprocess.Popen(
-            args + [command],
+            [*args, command],
             bufsize=0,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -1667,8 +1659,7 @@ class PLinkSSHVendor(SSHVendor):
     ):
         if ssh_command:
             import shlex
-
-            args = shlex.split(ssh_command, posix=(sys.platform != "win32")) + ["-ssh"]
+            args = [*shlex.split(ssh_command, posix=sys.platform != "win32"), "-ssh"]
         elif sys.platform == "win32":
             args = ["plink.exe", "-ssh"]
         else:
@@ -1696,7 +1687,7 @@ class PLinkSSHVendor(SSHVendor):
         args.append(host)
 
         proc = subprocess.Popen(
-            args + [command],
+            [*args, command],
             bufsize=0,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -1815,7 +1806,7 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib3_manager(  # noqa: C901
+def default_urllib3_manager(
     config,
     pool_manager_cls=None,
     proxy_manager_cls=None,
@@ -2026,7 +2017,7 @@ class AbstractHttpGitClient(GitClient):
                     raise GitProtocolError(
                         "unexpected first line %r from smart server" % pkt
                     )
-                return read_pkt_refs(proto.read_pkt_seq()) + (base_url,)
+                return (*read_pkt_refs(proto.read_pkt_seq()), base_url)
             else:
                 return read_info_refs(resp), set(), base_url
         finally:

@@ -50,6 +50,7 @@ from typing import (
     IO,
     TYPE_CHECKING,
     Callable,
+    ClassVar,
     Dict,
     Iterable,
     Iterator,
@@ -254,7 +255,7 @@ class FetchPackResult:
       agent: User agent string
     """
 
-    _FORWARDED_ATTRS = [
+    _FORWARDED_ATTRS: ClassVar[Set[str]] = {
         "clear",
         "copy",
         "fromkeys",
@@ -269,7 +270,7 @@ class FetchPackResult:
         "viewitems",
         "viewkeys",
         "viewvalues",
-    ]
+    }
 
     def __init__(
         self, refs, symrefs, agent, new_shallow=None, new_unshallow=None
@@ -340,7 +341,7 @@ class SendPackResult:
         failed to update), or None if it was updated successfully
     """
 
-    _FORWARDED_ATTRS = [
+    _FORWARDED_ATTRS: ClassVar[Set[str]] = {
         "clear",
         "copy",
         "fromkeys",
@@ -355,7 +356,7 @@ class SendPackResult:
         "viewitems",
         "viewkeys",
         "viewvalues",
-    ]
+    }
 
     def __init__(self, refs, agent=None, ref_status=None) -> None:
         self.refs = refs
@@ -1805,7 +1806,7 @@ def default_user_agent_string():
     return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
 
 
-def default_urllib3_manager(  # noqa: C901
+def default_urllib3_manager(
     config,
     pool_manager_cls=None,
     proxy_manager_cls=None,

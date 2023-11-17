@@ -38,7 +38,7 @@ jobs:
       - name: Style checks
         run: |
           pip install --upgrade ruff
-          python -m ruff
+          python -m ruff check .
       - name: Typing checks
         run: |
           pip install --upgrade mypy types-paramiko types-requests

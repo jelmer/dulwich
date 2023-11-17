@@ -71,8 +71,8 @@ class GetRecentTagsTest(unittest.TestCase):
     committer = b"Mark Mikofski <mark.mikofski@sunpowercorp.com>"
     test_tags: ClassVar[List[bytes]] = [b"v0.1a", b"v0.1"]
     tag_test_data: ClassVar[Dict[bytes, Tuple[int, bytes, Optional[Tuple[int, bytes]]]]] = {
-        test_tags[0]: [1484788003, b"3" * 40, None],
-        test_tags[1]: [1484788314, b"1" * 40, (1484788401, b"2" * 40)],
+        test_tags[0]: (1484788003, b"3" * 40, None),
+        test_tags[1]: (1484788314, b"1" * 40, (1484788401, b"2" * 40)),
     }
 
     @classmethod

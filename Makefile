@@ -1,7 +1,7 @@
 PYTHON = python3
 PYFLAKES = $(PYTHON) -m pyflakes
 PEP8 = pep8
-FLAKE8 ?= $(PYTHON) -m flake8
+RUFF ?= $(PYTHON) -m ruff 
 SETUP = $(PYTHON) setup.py
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=$(shell pwd)$(if $(PYTHONPATH),:$(PYTHONPATH),) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
@@ -60,7 +60,7 @@ pep8:
 	$(PEP8) dulwich
 
 style:
-	$(FLAKE8)
+	$(RUFF) check .
 
 before-push: check
 	git diff origin/master | $(PEP8) --diff

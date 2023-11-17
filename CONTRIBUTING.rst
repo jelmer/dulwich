@@ -9,7 +9,7 @@ New functionality and bug fixes should be accompanied by matching unit tests.
 
 Coding style
 ------------
-Where possible, please follow PEP8 with regard to coding style. Run flake8.
+Where possible, please follow PEP8 with regard to coding style. Run ruff.
 
 Furthermore, triple-quotes should always be """, single quotes are ' unless
 using " would result in less escaping within the string.

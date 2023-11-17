@@ -301,11 +301,11 @@ class SwiftConnector:
         auth_ret_json = json.loads(ret.read())
         token = auth_ret_json["access"]["token"]["id"]
         catalogs = auth_ret_json["access"]["serviceCatalog"]
-        object_store = [
+        object_store = next(
             o_store for o_store in catalogs if o_store["type"] == "object-store"
-        ][0]
+        )
         endpoints = object_store["endpoints"]
-        endpoint = [endp for endp in endpoints if endp["region"] == self.region_name][0]
+        endpoint = next(endp for endp in endpoints if endp["region"] == self.region_name)
         return endpoint[self.endpoint_type], token
 
     def test_root_exists(self):

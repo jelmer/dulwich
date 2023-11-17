@@ -434,7 +434,7 @@ class TestSSHVendor:
         cmd = cmd.split("-", 1)
         path = path.replace("'", "")
         p = subprocess.Popen(
-            cmd + [path],
+            [*cmd, path],
             bufsize=0,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -498,7 +498,7 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Let's be quiet, the test suite is noisy enough already
         pass
 
-    def run_backend(self):  # noqa: C901
+    def run_backend(self):
         """Call out to git http-backend."""
         # Based on CGIHTTPServer.CGIHTTPRequestHandler.run_cgi:
         # Copyright (c) 2001-2010 Python Software Foundation;

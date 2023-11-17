@@ -143,7 +143,7 @@ def run_git(
     env["LC_ALL"] = env["LANG"] = "C"
     env["PATH"] = os.getenv("PATH")
 
-    args = [git_path] + args
+    args = [git_path, *args]
     popen_kwargs["stdin"] = subprocess.PIPE
     if capture_stdout:
         popen_kwargs["stdout"] = subprocess.PIPE

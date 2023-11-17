@@ -38,7 +38,7 @@ import tempfile
 # If Python itself provides an exception, use that
 import unittest
 from unittest import SkipTest, expectedFailure, skipIf
-from unittest import TestCase as _TestCase  # noqa: F401
+from unittest import TestCase as _TestCase
 
 
 class TestCase(_TestCase):

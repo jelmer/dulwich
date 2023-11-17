@@ -920,7 +920,7 @@ class BaseRepo:
         with f:
             return [line.strip() for line in f.readlines() if line.strip()]
 
-    def do_commit(  # noqa: C901
+    def do_commit(
         self,
         message: Optional[bytes] = None,
         committer: Optional[bytes] = None,

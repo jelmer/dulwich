@@ -33,6 +33,7 @@ Currently implemented:
  * describe
  * diff-tree
  * fetch
+ * for-each-ref
  * init
  * ls-files
  * ls-remote
@@ -64,6 +65,7 @@ Functions should generally accept both unicode strings and bytestrings
 """
 
 import datetime
+import fnmatch
 import os
 import posixpath
 import stat
@@ -73,7 +75,7 @@ from collections import namedtuple
 from contextlib import closing, contextmanager
 from io import BytesIO, RawIOBase
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from .archive import tar_stream
 from .client import get_transport_and_path
@@ -1700,6 +1702,64 @@ def fetch(
                 prune_tags=prune_tags,
             )
     return fetch_result
+
+
+def for_each_ref(
+    repo: Union[Repo, str] = ".",
+    pattern: Optional[Union[str, bytes]] = None,
+    **kwargs,
+) -> List[Tuple[bytes, bytes, bytes]]:
+    """Iterate over all refs that match the (optional) pattern.
+
+    Args:
+      repo: Path to the repository
+      pattern: Optional glob (7) patterns to filter the refs with
+    Returns:
+      List of bytes tuples with: (sha, object_type, ref_name)
+    """
+    if kwargs:
+        raise NotImplementedError(f"{''.join(kwargs.keys())}")
+
+    if isinstance(pattern, str):
+        pattern = os.fsencode(pattern)
+
+    with open_repo_closing(repo) as r:
+        refs = r.get_refs()
+
+    if pattern:
+        matching_refs: Dict[bytes, bytes] = {}
+        pattern_parts = pattern.split(b"/")
+        for ref, sha in refs.items():
+            matches = False
+
+            # git for-each-ref uses glob (7) style patterns, but fnmatch
+            # is greedy and also matches slashes, unlike glob.glob.
+            # We have to check parts of the pattern individually.
+            # See https://github.com/python/cpython/issues/72904
+            ref_parts = ref.split(b"/")
+            if len(ref_parts) > len(pattern_parts):
+                continue
+
+            for pat, ref_part in zip(pattern_parts, ref_parts):
+                matches = fnmatch.fnmatchcase(ref_part, pat)
+                if not matches:
+                    break
+
+            if matches:
+                matching_refs[ref] = sha
+
+        refs = matching_refs
+
+    ret: List[Tuple[bytes, bytes, bytes]] = [
+        (sha, r.get_object(sha).type_name, ref)
+        for ref, sha in sorted(
+            refs.items(),
+            key=lambda ref_sha: ref_sha[0],
+        )
+        if ref != b"HEAD"
+    ]
+
+    return ret
 
 
 def ls_remote(remote, config: Optional[Config] = None, **kwargs):

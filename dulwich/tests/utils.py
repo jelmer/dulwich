@@ -29,7 +29,7 @@ import time
 import types
 import warnings
 
-from dulwich.tests import SkipTest, skipIf  # noqa: F401
+from dulwich.tests import SkipTest
 
 from ..index import commit_tree
 from ..objects import Commit, FixedSha, Tag, object_class
@@ -99,8 +99,6 @@ def make_object(cls, **attrs):
         monkey-patched in, so this is a class that is exactly the same only
         with a __dict__ instead of __slots__.
         """
-
-        pass
 
     TestObject.__name__ = "TestObject_" + cls.__name__
 

@@ -148,7 +148,6 @@ class GitImportProcessor(processor.ImportProcessor):
 
     def checkpoint_handler(self, cmd):
         """Process a CheckpointCommand."""
-        pass
 
     def commit_handler(self, cmd):
         """Process a CommitCommand."""
@@ -211,7 +210,6 @@ class GitImportProcessor(processor.ImportProcessor):
 
     def progress_handler(self, cmd):
         """Process a ProgressCommand."""
-        pass
 
     def _reset_base(self, commit_id):
         if self.last_commit == commit_id:

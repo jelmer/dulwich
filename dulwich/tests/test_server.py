@@ -82,7 +82,7 @@ class TestProto:
                 # flush-pkt ('0000').
                 return None
         else:
-            raise HangupException()
+            raise HangupException
 
     def write_sideband(self, band, data):
         self._received[band].append(data)

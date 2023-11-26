@@ -364,11 +364,9 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
 
 def _format_string(value: bytes) -> bytes:
     if (
-        value.startswith(b" ")
-        or value.startswith(b"\t")
-        or value.endswith(b" ")
+        value.startswith((b" ", b"\t"))
+        or value.endswith((b" ", b"\t"))
         or b"#" in value
-        or value.endswith(b"\t")
     ):
         return b'"' + _escape_value(value) + b'"'
     else:

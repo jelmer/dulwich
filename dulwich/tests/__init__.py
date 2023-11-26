@@ -156,11 +156,6 @@ def self_test_suite():
 
 
 def tutorial_test_suite():
-    import dulwich.client
-    import dulwich.config
-    import dulwich.index
-    import dulwich.patch  # noqa: F401
-
     tutorial = [
         "introduction",
         "file-format",

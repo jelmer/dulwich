@@ -1705,7 +1705,6 @@ def fetch(
 def for_each_ref(
     repo: Union[Repo, str] = ".",
     pattern: Optional[Union[str, bytes]] = None,
-    **kwargs,
 ) -> List[Tuple[bytes, bytes, bytes]]:
     """Iterate over all refs that match the (optional) pattern.
 
@@ -1715,9 +1714,6 @@ def for_each_ref(
     Returns:
       List of bytes tuples with: (sha, object_type, ref_name)
     """
-    if kwargs:
-        raise NotImplementedError(f"{''.join(kwargs.keys())}")
-
     if isinstance(pattern, str):
         pattern = os.fsencode(pattern)
 

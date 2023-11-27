@@ -11,6 +11,8 @@
 
  * Support credentials in proxy URL. (Jelmer Vernooĳ, #1227)
 
+ * Add ``dulwich.porcelain.for_each_ref``. (Daniele Trifirò)
+
 0.21.6	2023-09-02
 
  * index: Handle different stages of conflicted paths.

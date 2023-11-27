@@ -133,6 +133,15 @@ class cmd_fetch(Command):
             print("{} -> {}".format(*item))
 
 
+class cmd_for_each_ref(Command):
+    def run(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("pattern", type=str, nargs="?")
+        args = parser.parse_args(args)
+        for sha, object_type, ref in porcelain.for_each_ref(".", args.pattern):
+            print(f"{sha.decode()} {object_type.decode()}\t{ref.decode()}")
+
+
 class cmd_fsck(Command):
     def run(self, args):
         opts, args = getopt(args, "", [])
@@ -765,6 +774,7 @@ commands = {
     "dump-index": cmd_dump_index,
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
+    "for-each-ref": cmd_for_each_ref,
     "fsck": cmd_fsck,
     "help": cmd_help,
     "init": cmd_init,

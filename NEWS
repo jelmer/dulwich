@@ -9,6 +9,8 @@
  * Add a dedicated exception class for unresolved
    deltas. (Jelmer Vernooĳ, #1221)
 
+ * Support credentials in proxy URL. (Jelmer Vernooĳ, #1227)
+
 0.21.6	2023-09-02
 
  * index: Handle different stages of conflicted paths.

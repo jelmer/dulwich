@@ -1900,7 +1900,7 @@ def default_urllib3_manager(
         proxy_server_url = urlparse(proxy_server)
         if proxy_server_url.username is not None:
             proxy_headers = urllib3.make_headers(
-                proxy_basic_auth=f"{proxy_server_url.username}:{proxy_server_url.password or ''}"
+                proxy_basic_auth=f"{proxy_server_url.username}:{proxy_server_url.password or ''}"  # type: ignore
             )
         else:
             proxy_headers = {}

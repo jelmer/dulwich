@@ -1429,6 +1429,17 @@ class DefaultUrllib3ManagerTest(TestCase):
         )
         self.assertIsInstance(manager, CustomProxyManager)
 
+    def test_config_proxy_creds(self):
+        import urllib3
+
+        config = ConfigDict()
+        config.set(b"http", b"proxy", b"http://jelmer:example@localhost:3128/")
+        manager = default_urllib3_manager(config=config)
+        assert isinstance(manager, urllib3.ProxyManager)
+        self.assertEqual(
+            manager.proxy_headers, {"proxy-authorization": "Basic amVsbWVyOmV4YW1wbGU="}
+        )
+
     def test_config_no_verify_ssl(self):
         manager = default_urllib3_manager(config=None, cert_reqs="CERT_NONE")
         self.assertEqual(manager.connection_pool_kw["cert_reqs"], "CERT_NONE")

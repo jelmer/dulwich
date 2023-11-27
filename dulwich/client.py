@@ -566,7 +566,7 @@ def _handle_upload_pack_tail(
     capabilities: Set[bytes],
     graph_walker,
     pack_data: Callable[[bytes], None],
-    progress=None,
+    progress: Optional[Callable[[bytes], None]] = None,
     rbufsize=_RBUFSIZE,
 ):
     """Handle the tail of a 'git-upload-pack' request.
@@ -708,13 +708,13 @@ class GitClient:
         path,
         target_path,
         mkdir: bool = True,
-        bare=False,
-        origin="origin",
+        bare: bool = False,
+        origin: Optional[str] = "origin",
         checkout=None,
         branch=None,
         progress=None,
         depth=None,
-    ):
+    ) -> Repo:
         """Clone a repository."""
         from .refs import _set_default_branch, _set_head, _set_origin_head
 
@@ -739,22 +739,24 @@ class GitClient:
                 encoded_path = self.get_url(path).encode("utf-8")
 
             assert target is not None
-            target_config = target.get_config()
-            target_config.set((b"remote", origin.encode("utf-8")), b"url", encoded_path)
-            target_config.set(
-                (b"remote", origin.encode("utf-8")),
-                b"fetch",
-                b"+refs/heads/*:refs/remotes/" + origin.encode("utf-8") + b"/*",
-            )
-            target_config.write_to_path()
+            if origin is not None:
+                target_config = target.get_config()
+                target_config.set((b"remote", origin.encode("utf-8")), b"url", encoded_path)
+                target_config.set(
+                    (b"remote", origin.encode("utf-8")),
+                    b"fetch",
+                    b"+refs/heads/*:refs/remotes/" + origin.encode("utf-8") + b"/*",
+                )
+                target_config.write_to_path()
 
             ref_message = b"clone: from " + encoded_path
             result = self.fetch(path, target, progress=progress, depth=depth)
-            _import_remote_refs(target.refs, origin, result.refs, message=ref_message)
+            if origin is not None:
+                _import_remote_refs(target.refs, origin, result.refs, message=ref_message)
 
             origin_head = result.symrefs.get(b"HEAD")
             origin_sha = result.refs.get(b"HEAD")
-            if origin_sha and not origin_head:
+            if origin is None or (origin_sha and not origin_head):
                 # set detached HEAD
                 target.refs[b"HEAD"] = origin_sha
                 head = origin_sha
@@ -852,13 +854,13 @@ class GitClient:
 
     def fetch_pack(
         self,
-        path,
+        path: str,
         determine_wants,
         graph_walker,
         pack_data,
         *,
-        progress=None,
-        depth=None,
+        progress: Optional[Callable[[bytes], None]] = None,
+        depth: Optional[int] = None,
     ):
         """Retrieve a pack from a git smart server.
 
@@ -1895,7 +1897,16 @@ def default_urllib3_manager(
             proxy_manager_cls = urllib3.ProxyManager
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
-        manager = proxy_manager_cls(proxy_server, headers=headers, **kwargs)
+        proxy_server_url = urlparse(proxy_server)
+        if proxy_server_url.username is not None:
+            proxy_headers = urllib3.make_headers(
+                proxy_basic_auth=f"{proxy_server_url.username}:{proxy_server_url.password or ''}"
+            )
+        else:
+            proxy_headers = {}
+        manager = proxy_manager_cls(
+            proxy_server, proxy_headers=proxy_headers, headers=headers, **kwargs
+        )
     else:
         if pool_manager_cls is None:
             pool_manager_cls = urllib3.PoolManager

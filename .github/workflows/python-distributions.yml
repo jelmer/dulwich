@@ -68,6 +68,10 @@ jobs:
       - build-sdist
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/dulwich-')
     steps:
+      - name: Install twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
       - name: Download distributions
         uses: actions/download-artifact@v2
         with:

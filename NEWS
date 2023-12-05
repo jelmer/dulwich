@@ -1,4 +1,5 @@
-0.21.7	UNRELEASED
+0.21.8	UNRELEASED
+
 0.21.7	2023-12-05
  * Fix NameError when encountering errors during HTTP operation.
    (Jelmer Vernooĳ, #1208)

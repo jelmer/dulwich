@@ -552,6 +552,7 @@ def _handle_upload_pack_head(
       can_read: function that returns a boolean that indicates
     whether there is extra graph data to read on proto
       depth: Depth for request
+      protocol_version: desired Git protocol version; defaults to v0
     """
     assert isinstance(wants, list) and isinstance(wants[0], bytes)
     wantcmd = COMMAND_WANT + b" " + wants[0]

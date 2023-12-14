@@ -682,7 +682,7 @@ class GitClient:
         report_activity=None,
         quiet=False,
         include_tags=False,
-	**kwargs
+        **kwargs
     ) -> None:
         """Create a new GitClient instance.
 

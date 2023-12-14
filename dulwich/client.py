@@ -540,7 +540,7 @@ def find_capability(capabilities, key, value):
 
 
 def _handle_upload_pack_head(
-    proto, capabilities, graph_walker, wants, can_read, depth, protocol_version=0,
+    proto, capabilities, graph_walker, wants, can_read, depth, protocol_version=None,
 ):
     """Handle the head of a 'git-upload-pack' request.
 
@@ -555,6 +555,8 @@ def _handle_upload_pack_head(
     """
     assert isinstance(wants, list) and isinstance(wants[0], bytes)
     wantcmd = COMMAND_WANT + b" " + wants[0]
+    if protocol_version is None:
+        protocol_version = 0
     if protocol_version != 2:
         wantcmd += b" " + b" ".join(sorted(capabilities))
     wantcmd += b"\n"

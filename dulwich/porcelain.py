@@ -574,7 +574,7 @@ def clone(
     (client, path) = get_transport_and_path(source, config=config, **kwargs)
 
     if filter_spec:
-        filter_spec = filter_spec.encode('ascii'),
+        filter_spec = filter_spec.encode('ascii')
 
     return client.clone(
         path,

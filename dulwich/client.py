@@ -1091,6 +1091,15 @@ class GitClient:
         """Retrieve an archive of the specified tree."""
         raise NotImplementedError(self.archive)
 
+    @staticmethod
+    def _warn_filter_objects():
+        import warnings
+
+        warnings.warn(
+            "object filtering not recognized by server, ignoring",
+            UserWarning,
+        )
+
 
 def check_wants(wants, refs):
     """Check that a set of wants is valid.
@@ -1332,6 +1341,10 @@ class TraditionalGitClient(GitClient):
                 if find_capability(negotiated_capabilities,
                     CAPABILITY_FETCH, CAPABILITY_FILTER) and filter_spec:
                     proto.write(pkt_line(b"filter %s\n" % filter_spec))
+                elif filter_spec:
+                    self._warn_filter_objects()
+            elif filter_spec:
+                self._warn_filter_objects()
             (new_shallow, new_unshallow) = _handle_upload_pack_head(
                 proto,
                 negotiated_capabilities,
@@ -2483,8 +2496,12 @@ class AbstractHttpGitClient(GitClient):
             if find_capability(negotiated_capabilities,
                 CAPABILITY_FETCH, CAPABILITY_FILTER) and filter_spec:
                 data += pkt_line(b"filter %s\n" % filter_spec)
+            elif filter_spec:
+                self._warn_filter_objects()
             data += req_data.getvalue()
         else:
+            if filter_spec:
+                self._warn_filter_objects()
             data = req_data.getvalue()
         resp, read = self._smart_request( "git-upload-pack", url, data)
         try:

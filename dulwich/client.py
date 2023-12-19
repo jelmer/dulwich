@@ -38,6 +38,7 @@ Known capabilities that are not supported:
  * include-tag
 """
 
+import copy
 import logging
 import os
 import select
@@ -1794,6 +1795,7 @@ class SSHVendor:
         password=None,
         key_filename=None,
         ssh_command=None,
+        protocol_version: Optional[int] = None,
     ):
         """Connect to an SSH server.
 
@@ -1833,6 +1835,7 @@ class SubprocessSSHVendor(SSHVendor):
         password=None,
         key_filename=None,
         ssh_command=None,
+        protocol_version=None,
     ):
         if password is not None:
             raise NotImplementedError(
@@ -1851,6 +1854,9 @@ class SubprocessSSHVendor(SSHVendor):
 
         if key_filename:
             args.extend(["-i", str(key_filename)])
+
+        if protocol_version is None or protocol_version == 2:
+            args.extend(["-o", "SetEnv GIT_PROTOCOL=version=2"])
 
         if username:
             host = f"{username}@{host}"
@@ -1880,6 +1886,7 @@ class PLinkSSHVendor(SSHVendor):
         password=None,
         key_filename=None,
         ssh_command=None,
+        protocol_version: Optional[int] = None,
     ):
         if ssh_command:
             import shlex
@@ -1911,12 +1918,22 @@ class PLinkSSHVendor(SSHVendor):
             raise StrangeHostname(hostname=host)
         args.append(host)
 
+        # plink.exe does not provide a way to pass environment variables
+        # via the command line. The best we can do is set an environment
+        # variable and hope that plink will pass it to the server. If this
+        # does not work then the server should behave as if we had requested
+        # protocol version 0.
+        env = copy.deepcopy(os.environ)
+        if protocol_version is None or protocol_version == 2:
+            env["GIT_PROTOCOL"] = "version=2"
+
         proc = subprocess.Popen(
             [*args, command],
             bufsize=0,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env
         )
         return SubprocessWrapper(proc)
 
@@ -2011,7 +2028,8 @@ class SSHGitClient(TraditionalGitClient):
         if self.ssh_command is not None:
             kwargs["ssh_command"] = self.ssh_command
         con = self.ssh_vendor.run_command(
-            self.host, argv, port=self.port, username=self.username, **kwargs
+            self.host, argv, port=self.port, username=self.username,
+            protocol_version=protocol_version, **kwargs
         )
         return (
             Protocol(

@@ -518,7 +518,8 @@ def clone(
     refspecs=None,
     refspec_encoding=DEFAULT_ENCODING,
     filter_spec=None,
-    **kwargs
+    protocol_version: Optional[int] = None,
+    **kwargs,
 ):
     """Clone a local or remote git repository.
 
@@ -541,6 +542,8 @@ def clone(
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
+      protocol_version: desired Git protocol version. By default the highest
+        mutually supported protocol version will be used.
     Returns: The new repository
     """
     if outstream is not None:
@@ -588,6 +591,7 @@ def clone(
         depth=depth,
         ref_prefix=encoded_refs,
         filter_spec=filter_spec,
+        protocol_version=protocol_version
     )
 
 
@@ -1276,6 +1280,7 @@ def pull(
     force=False,
     refspec_encoding=DEFAULT_ENCODING,
     filter_spec=None,
+    protocol_version=None,
     **kwargs
 ):
     """Pull from remote via dulwich.client.
@@ -1292,6 +1297,8 @@ def pull(
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
+      protocol_version: desired Git protocol version. By default the highest
+        mutually supported protocol version will be used
     """
     # Open the repo
     with open_repo_closing(repo) as r:
@@ -1317,7 +1324,7 @@ def pull(
             filter_spec=filter_spec.encode('ascii')
         fetch_result = client.fetch(
             path, r, progress=errstream.write, determine_wants=determine_wants,
-            ref_prefix=refspecs, filter_spec=filter_spec
+            ref_prefix=refspecs, filter_spec=filter_spec, protocol_version=protocol_version,
         )
         for lh, rh, force_ref in selected_refs:
             if not force_ref and rh in r.refs:

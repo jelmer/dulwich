@@ -72,7 +72,7 @@ class DummyClient(TraditionalGitClient):
         self.write = write
         TraditionalGitClient.__init__(self)
 
-    def _connect(self, service, path):
+    def _connect(self, service, path, protocol_version=None):
         return Protocol(self.read, self.write), self.can_read, None
 
 

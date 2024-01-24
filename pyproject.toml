@@ -27,6 +27,7 @@ requires-python = ">=3.7"
 dependencies = [
     "urllib3>=1.25",
     'typing_extensions;python_version<="3.7"',
+    'setuptools ; python_version >= "3.12"',
 ]
 dynamic = ["version"]
 

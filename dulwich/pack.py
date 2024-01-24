@@ -2779,7 +2779,7 @@ def extend_pack(
 
 
 try:
-    from dulwich._pack import (  # type: ignore  # noqa: F811
+    from dulwich._pack import (  # type: ignore
         apply_delta,  # type: ignore
         bisect_find_sha,  # type: ignore
     )

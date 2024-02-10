@@ -36,12 +36,12 @@ if "__pypy__" not in sys.modules and sys.platform != "win32":
 optional = os.environ.get("CIBUILDWHEEL", "0") != "1"
 
 ext_modules = [
-    Extension("dulwich._pack", ["dulwich/_pack.c"], optional=optional),
     Extension("dulwich._diff_tree", ["dulwich/_diff_tree.c"], optional=optional),
 ]
 
 rust_extensions = [
     RustExtension("dulwich._objects", "crates/objects/Cargo.toml", binding=Binding.PyO3, optional=True),
+    RustExtension("dulwich._pack", "crates/pack/Cargo.toml", binding=Binding.PyO3, optional=True),
 ]
 
 # Ideally, setuptools would just provide a way to do this

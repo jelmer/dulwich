@@ -5,7 +5,7 @@
 import os
 import sys
 
-from setuptools import Extension, setup
+from setuptools import setup
 from setuptools_rust import Binding, RustExtension
 
 if sys.platform == "darwin" and os.path.exists("/usr/bin/xcodebuild"):
@@ -35,23 +35,18 @@ if "__pypy__" not in sys.modules and sys.platform != "win32":
 
 optional = os.environ.get("CIBUILDWHEEL", "0") != "1"
 
-ext_modules = [
-    Extension("dulwich._diff_tree", ["dulwich/_diff_tree.c"], optional=optional),
-]
-
 rust_extensions = [
     RustExtension("dulwich._objects", "crates/objects/Cargo.toml", binding=Binding.PyO3, optional=True),
     RustExtension("dulwich._pack", "crates/pack/Cargo.toml", binding=Binding.PyO3, optional=True),
+    RustExtension("dulwich._diff_tree", "crates/diff-tree/Cargo.toml", binding=Binding.PyO3, optional=True),
 ]
 
 # Ideally, setuptools would just provide a way to do this
 if "--pure" in sys.argv:
     sys.argv.remove("--pure")
-    ext_modules = []
     rust_extensions = []
 
 
 setup(package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
-      ext_modules=ext_modules,
       rust_extensions=rust_extensions,
       tests_require=tests_require)

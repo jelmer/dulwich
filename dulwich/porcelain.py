@@ -124,7 +124,7 @@ from .refs import (
     LOCAL_TAG_PREFIX,
     _import_remote_refs,
 )
-from .repo import BaseRepo, Repo
+from .repo import BaseRepo, Repo, get_user_identity
 from .server import (
     FileSystemBackend,
     ReceivePackHandler,
@@ -1054,8 +1054,7 @@ def tag_create(
             # Create the tag object
             tag_obj = Tag()
             if author is None:
-                # TODO(jelmer): Don't use repo private method.
-                author = r._get_user_identity(r.get_config_stack())
+                author = get_user_identity(r.get_config_stack())
             tag_obj.tagger = author
             tag_obj.message = message + "\n".encode(encoding)
             tag_obj.name = tag

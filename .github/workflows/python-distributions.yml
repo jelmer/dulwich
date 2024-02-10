@@ -37,9 +37,16 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
+          CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH"'
           CIBW_ARCHS_LINUX: x86_64 aarch64
           CIBW_ARCHS_MACOS: x86_64 arm64 universal2
           CIBW_ARCHS_WINDOWS: AMD64 x86
+          CIBW_BEFORE_BUILD: >
+            pip install -U setuptools-rust &&
+            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
+            rustup default nightly &&
+            rustup target add all &&
+            rustup show
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:

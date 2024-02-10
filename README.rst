@@ -20,7 +20,7 @@ By default, Dulwich' setup.py will attempt to build and install the optional C
 extensions. The reason for this is that they significantly improve the performance
 since some low-level operations that are executed often are much slower in CPython.
 
-If you don't want to install the C bindings, specify the --pure argument to setup.py::
+If you don't want to install the Rust bindings, specify the --pure argument to setup.py::
 
     $ python setup.py --pure install
 

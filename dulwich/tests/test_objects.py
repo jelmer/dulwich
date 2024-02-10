@@ -962,10 +962,10 @@ class TreeTests(ShaFileCheckTests):
 
         # ordering
         sha2 = hex_to_sha(b_sha)
-        self.assertCheckSucceeds(t, b"100644 a\0" + sha + b"\n100644 b\0" + sha)
-        self.assertCheckSucceeds(t, b"100644 a\0" + sha + b"\n100644 b\0" + sha2)
-        self.assertCheckFails(t, b"100644 a\0" + sha + b"\n100755 a\0" + sha2)
-        self.assertCheckFails(t, b"100644 b\0" + sha2 + b"\n100644 a\0" + sha)
+        self.assertCheckSucceeds(t, b"100644 a\0" + sha + b"100644 b\0" + sha)
+        self.assertCheckSucceeds(t, b"100644 a\0" + sha + b"100644 b\0" + sha2)
+        self.assertCheckFails(t, b"100644 a\0" + sha + b"100755 a\0" + sha2)
+        self.assertCheckFails(t, b"100644 b\0" + sha2 + b"100644 a\0" + sha)
 
     def test_iter(self):
         t = Tree()

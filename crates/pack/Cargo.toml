@@ -5,7 +5,6 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
-path = "dulwich/_pack.rs"
 
 [dependencies]
 pyo3 = { version = ">=0.19", features = ["extension-module"]}

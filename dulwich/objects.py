@@ -361,9 +361,9 @@ class ShaFile:
         """Return unique hash for this object."""
         return hash(self.id)
 
-    def as_pretty_string(self) -> bytes:
+    def as_pretty_string(self) -> str:
         """Return a string representing this object, fit for display."""
-        return self.as_raw_string()
+        return self.as_raw_string().decode("utf-8", "replace")
 
     def set_raw_string(self, text: bytes, sha: Optional[ObjectID] = None) -> None:
         """Set the contents of this object from a serialized string."""
@@ -1200,7 +1200,7 @@ class Tree(ShaFile):
     def _serialize(self):
         return list(serialize_tree(self.iteritems()))
 
-    def as_pretty_string(self):
+    def as_pretty_string(self) -> str:
         text: List[str] = []
         for name, mode, hexsha in self.iteritems():
             text.append(pretty_format_tree_entry(name, mode, hexsha))

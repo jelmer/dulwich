@@ -69,7 +69,7 @@ license-files = ["COPYING"]
 [tool.setuptools.dynamic]
 version = {attr = "dulwich.__version__"}
 
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     "ANN",
     "D",
@@ -105,7 +105,9 @@ ignore = [
     "E501",  # line too long
     "E741",  # ambiguous variable name
 ]
+
+[tool.ruff]
 target-version = "py37"
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"

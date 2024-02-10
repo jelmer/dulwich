@@ -2780,8 +2780,8 @@ def extend_pack(
 
 try:
     from dulwich._pack import (  # type: ignore
-        apply_delta,  # noqa: F811
-        bisect_find_sha,  # noqa: F811
+        apply_delta,  # type: ignore
+                               bisect_find_sha,  # type: ignore
     )
 except ImportError:
     pass

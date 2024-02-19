@@ -85,6 +85,7 @@ class ParamikoSSHVendor:
         password=None,
         pkey=None,
         key_filename=None,
+        protocol_version=None,
         **kwargs,
     ):
         client = paramiko.SSHClient()
@@ -109,6 +110,9 @@ class ParamikoSSHVendor:
 
         # Open SSH session
         channel = client.get_transport().open_session()
+
+        if protocol_version is None or protocol_version == 2:
+            channel.set_environment_variable(name="GIT_PROTOCOL", value="version=2")
 
         # Run commands
         channel.exec_command(command)

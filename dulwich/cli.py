@@ -263,6 +263,15 @@ class cmd_clone(Command):
             type=str,
             help=("Check out branch instead of branch pointed to by remote " "HEAD"),
         )
+        parser.add_option(
+            "--refspec", dest="refspec", type=str, help="References to fetch", action="append"
+        )
+        parser.add_option(
+            "--filter", dest="filter_spec", type=str, help="git-rev-list-style object filter"
+        )
+        parser.add_option(
+            "--protocol", dest="protocol", type=int, help="Git protocol version to use"
+        )
         options, args = parser.parse_args(args)
 
         if args == []:
@@ -282,6 +291,9 @@ class cmd_clone(Command):
                 bare=options.bare,
                 depth=options.depth,
                 branch=options.branch,
+                refspecs=options.refspec,
+                filter_spec=options.filter_spec,
+                protocol_version=options.protocol
             )
         except GitProtocolError as e:
             print("%s" % e)
@@ -586,13 +598,14 @@ class cmd_pack_objects(Command):
 
 class cmd_pull(Command):
     def run(self, args):
-        parser = optparse.OptionParser()
-        options, args = parser.parse_args(args)
-        try:
-            from_location = args[0]
-        except IndexError:
-            from_location = None
-        porcelain.pull(".", from_location)
+        parser = argparse.ArgumentParser()
+        parser.add_argument('from_location', type=str)
+        parser.add_argument('refspec', type=str, nargs='*')
+        parser.add_argument('--filter', type=str, nargs=1)
+        parser.add_argument('--protocol', type=int, nargs=1)
+        args = parser.parse_args(args)
+        porcelain.pull(".", args.from_location or None, args.refspec or None,
+            filter_spec=args.filter, protocol_version=args.protocol_version or None)
 
 
 class cmd_push(Command):

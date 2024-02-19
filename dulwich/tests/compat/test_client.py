@@ -429,16 +429,22 @@ class TestSSHVendor:
         port=None,
         password=None,
         key_filename=None,
+        protocol_version=None
     ):
         cmd, path = command.split(" ")
         cmd = cmd.split("-", 1)
         path = path.replace("'", "")
+        env = copy.deepcopy(os.environ)
+        if protocol_version is None or protocol_version == 2:
+            env["GIT_PROTOCOL"] = "version=2"
+
         p = subprocess.Popen(
             [*cmd, path],
             bufsize=0,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env
         )
         return client.SubprocessWrapper(p)
 
@@ -570,6 +576,9 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         co = self.headers.get("cookie")
         if co:
             env["HTTP_COOKIE"] = co
+        proto = self.headers.get("Git-Protocol")
+        if proto:
+            env["GIT_PROTOCOL"] = proto
         # XXX Other HTTP_* headers
         # Since we're setting the env in the parent, provide empty
         # values to override previously set values

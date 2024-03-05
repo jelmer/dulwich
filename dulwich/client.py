@@ -2229,6 +2229,17 @@ class AbstractHttpGitClient(GitClient):
         return f"{type(self).__name__}({self._base_url!r}, dumb={self.dumb!r})"
 
 
+def _wrap_urllib3_exceptions(func):
+
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except urllib3.exceptions.ProtocolError as error:
+            raise GitProtocolError(str(error)) from error
+
+    return wrapper
+
+
 class Urllib3HttpGitClient(AbstractHttpGitClient):
     def __init__(
         self,
@@ -2308,7 +2319,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             resp.redirect_location = resp.get_redirect_location()
         else:
             resp.redirect_location = resp_url if resp_url != url else ""
-        return resp, resp.read
+        return resp, _wrap_urllib3_exceptions(resp.read)
 
 
 HttpGitClient = Urllib3HttpGitClient

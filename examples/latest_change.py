@@ -21,7 +21,5 @@ except StopIteration:
     print("No file %s anywhere in history." % sys.argv[1])
 else:
     print(
-        "{} was last changed by {} at {} (commit {})".format(
-            sys.argv[1], c.author, time.ctime(c.author_time), c.id
-        )
+        f"{sys.argv[1]} was last changed by {c.author} at {time.ctime(c.author_time)} (commit {c.id})"
     )

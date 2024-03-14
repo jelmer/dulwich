@@ -333,12 +333,7 @@ class FetchPackResult:
         return super().__getattribute__(name)
 
     def __repr__(self) -> str:
-        return "{}({!r}, {!r}, {!r})".format(
-            self.__class__.__name__,
-            self.refs,
-            self.symrefs,
-            self.agent,
-        )
+        return f"{self.__class__.__name__}({self.refs!r}, {self.symrefs!r}, {self.agent!r})"
 
 
 class SendPackResult:

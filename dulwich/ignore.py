@@ -299,12 +299,7 @@ class IgnoreFilterManager:
         self._ignorecase = ignorecase
 
     def __repr__(self) -> str:
-        return "{}({}, {!r}, {!r})".format(
-            type(self).__name__,
-            self._top_path,
-            self._global_filters,
-            self._ignorecase,
-        )
+        return f"{type(self).__name__}({self._top_path}, {self._global_filters!r}, {self._ignorecase!r})"
 
     def _load_path(self, path: str) -> Optional[IgnoreFilter]:
         try:

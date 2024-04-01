@@ -43,8 +43,7 @@ jobs:
           CIBW_ARCHS_WINDOWS: AMD64 x86
           CIBW_BEFORE_BUILD: >
             pip install -U setuptools-rust &&
-            curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=nightly --profile=minimal -y &&
-            rustup default nightly &&
+            curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y &&
             rustup target add all &&
             rustup show
       - name: Upload wheels

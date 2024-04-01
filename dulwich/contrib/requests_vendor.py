@@ -29,6 +29,7 @@ the dulwich.client.HttpGitClient attribute:
 
 This implementation is experimental and does not have any tests.
 """
+
 from io import BytesIO
 
 from requests import Session

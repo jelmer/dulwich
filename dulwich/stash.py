@@ -20,7 +20,6 @@
 
 """Stash handling."""
 
-
 import os
 
 from .file import GitFile

@@ -1,2 +1,5 @@
 [workspace]
 members = ["crates/*"]
+
+[workspace.dependencies]
+pyo3 = ">=0.19"

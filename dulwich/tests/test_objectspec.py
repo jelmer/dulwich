@@ -22,7 +22,6 @@
 
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
-
 from dulwich.tests import TestCase
 
 from ..objects import Blob

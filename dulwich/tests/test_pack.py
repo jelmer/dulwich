@@ -21,7 +21,6 @@
 
 """Tests for Dulwich packs."""
 
-
 import os
 import shutil
 import sys

@@ -20,7 +20,6 @@
 
 """Tests for the smart protocol utility functions."""
 
-
 from io import BytesIO
 
 from dulwich.tests import TestCase

@@ -56,7 +56,7 @@ _GIT_UNCHANGED_START = b" "
 
 
 def _parse_patch(
-    lines: List[bytes]
+    lines: List[bytes],
 ) -> Tuple[List[bytes], List[bool], List[Tuple[int, int]]]:
     """Parse a git style diff or patch to generate diff stats.
 

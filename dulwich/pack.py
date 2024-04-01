@@ -1829,7 +1829,7 @@ def deltify_pack_objects(
 
 
 def sort_objects_for_delta(
-    objects: Union[Iterator[ShaFile], Iterator[Tuple[ShaFile, Optional[PackHint]]]]
+    objects: Union[Iterator[ShaFile], Iterator[Tuple[ShaFile, Optional[PackHint]]]],
 ) -> Iterator[ShaFile]:
     magic = []
     for entry in objects:
@@ -2781,7 +2781,7 @@ def extend_pack(
 try:
     from dulwich._pack import (  # type: ignore
         apply_delta,  # type: ignore
-                               bisect_find_sha,  # type: ignore
+        bisect_find_sha,  # type: ignore
     )
 except ImportError:
     pass

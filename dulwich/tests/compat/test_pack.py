@@ -20,7 +20,6 @@
 
 """Compatibility tests for git packs."""
 
-
 import binascii
 import os
 import re

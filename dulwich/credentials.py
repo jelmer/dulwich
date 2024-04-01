@@ -24,6 +24,7 @@
 https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
 
 """
+
 import sys
 from typing import Iterator, Optional
 from urllib.parse import ParseResult, urlparse

@@ -670,7 +670,7 @@ class Blob(ShaFile):
 
 
 def _parse_message(
-    chunks: Iterable[bytes]
+    chunks: Iterable[bytes],
 ) -> Iterator[Union[Tuple[None, None], Tuple[Optional[bytes], bytes]]]:
     """Parse a message with a list of fields and a body.
 

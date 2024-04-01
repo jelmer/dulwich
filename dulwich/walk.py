@@ -20,7 +20,6 @@
 
 """General implementation of walking commits and their contents."""
 
-
 import collections
 import heapq
 from itertools import chain

@@ -7,5 +7,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = ">=0.19", features = ["extension-module"]}
+pyo3 = { workspace = true, features = ["extension-module"]}
 memchr = "2"

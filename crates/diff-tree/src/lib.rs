@@ -21,8 +21,8 @@
 
 use pyo3::prelude::*;
 
+use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyBytes, PyList, PyTuple};
-use pyo3::exceptions::{PyTypeError};
 use pyo3::Python;
 
 use std::cmp::Ordering;
@@ -30,12 +30,7 @@ use std::cmp::Ordering;
 const S_IFMT: u32 = 0o170000;
 const S_IFDIR: u32 = 0o040000;
 
-fn add_hash(
-    get: &PyAny,
-    set: &PyAny,
-    string: &[u8],
-    py: Python,
-) -> PyResult<()> {
+fn add_hash(get: &PyAny, set: &PyAny, string: &[u8], py: Python) -> PyResult<()> {
     let str_obj = PyBytes::new(py, string);
     let hash_obj = str_obj.hash()?;
     let value = get.call1((hash_obj,))?;
@@ -55,7 +50,9 @@ fn _count_blocks(py: Python, obj: &PyAny) -> PyResult<PyObject> {
 
     let chunks = obj.call_method0("as_raw_chunks")?;
     if !chunks.is_instance_of::<PyList>() {
-        return Err(PyTypeError::new_err("as_raw_chunks() did not return a list"));
+        return Err(PyTypeError::new_err(
+            "as_raw_chunks() did not return a list",
+        ));
     }
 
     let num_chunks = chunks.extract::<Vec<PyObject>>()?.len();
@@ -85,7 +82,6 @@ fn _count_blocks(py: Python, obj: &PyAny) -> PyResult<PyObject> {
     Ok(counts.to_object(py))
 }
 
-
 #[pyfunction]
 fn _is_tree(_py: Python, entry: &PyAny) -> PyResult<bool> {
     let mode = entry.getattr("mode")?;
@@ -98,11 +94,7 @@ fn _is_tree(_py: Python, entry: &PyAny) -> PyResult<bool> {
     }
 }
 
-fn tree_entries(
-    path: &[u8],
-    tree: &PyAny,
-    py: Python,
-) -> PyResult<Vec<PyObject>> {
+fn tree_entries(path: &[u8], tree: &PyAny, py: Python) -> PyResult<Vec<PyObject>> {
     if tree.is_none() {
         return Ok(Vec::new());
     }
@@ -110,18 +102,20 @@ fn tree_entries(
     let dom = py.import("dulwich.objects")?;
     let tree_entry_cls = dom.getattr("TreeEntry")?;
 
-    let items = tree.call_method1("iteritems", (true,))?.extract::<Vec<PyObject>>()?;
+    let items = tree
+        .call_method1("iteritems", (true,))?
+        .extract::<Vec<PyObject>>()?;
 
     let mut result = Vec::new();
     for item in items {
-        let (name, mode, sha) = item.extract::<(&[u8], u32, PyObject)>(py)?;
+        let (name, mode, sha) = item.extract::<(Vec<u8>, u32, PyObject)>(py)?;
 
         let mut new_path = Vec::with_capacity(path.len() + name.len() + 1);
         if !path.is_empty() {
             new_path.extend_from_slice(path);
             new_path.push(b'/');
         }
-        new_path.extend_from_slice(name);
+        new_path.extend_from_slice(name.as_slice());
 
         let tree_entry = tree_entry_cls.call1((PyBytes::new(py, &new_path), mode, sha))?;
         result.push(tree_entry.to_object(py));
@@ -151,28 +145,22 @@ fn _merge_entries(py: Python, path: &[u8], tree1: &PyAny, tree2: &PyAny) -> PyRe
     while i1 < entries1.len() && i2 < entries2.len() {
         let cmp = entry_path_cmp(entries1[i1].as_ref(py), entries2[i2].as_ref(py))?;
         let (e1, e2) = match cmp {
-            Ordering::Equal => {
-                (entries1[i1].clone(), entries2[i2].clone())
-            }
-            Ordering::Less => {
-                (entries1[i1].clone(), null_entry.clone())
-            }
-            Ordering::Greater => {
-                (null_entry.clone(), entries2[i2].clone())
-            }
+            Ordering::Equal => (entries1[i1].clone(), entries2[i2].clone()),
+            Ordering::Less => (entries1[i1].clone(), null_entry.clone()),
+            Ordering::Greater => (null_entry.clone(), entries2[i2].clone()),
         };
         let pair = PyTuple::new(py, &[e1, e2]);
         result.push(pair);
         match cmp {
             Ordering::Equal => {
-            i1 += 1;
-            i2 += 1;
+                i1 += 1;
+                i2 += 1;
             }
             Ordering::Less => {
-            i1 += 1;
+                i1 += 1;
             }
             Ordering::Greater => {
-            i2 += 1;
+                i2 += 1;
             }
         }
     }

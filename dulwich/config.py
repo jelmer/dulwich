@@ -175,12 +175,12 @@ class Config:
         raise NotImplementedError(self.get_multivar)
 
     @overload
-    def get_boolean(self, section: SectionLike, name: NameLike, default: bool) -> bool:
-        ...
+    def get_boolean(
+        self, section: SectionLike, name: NameLike, default: bool
+    ) -> bool: ...
 
     @overload
-    def get_boolean(self, section: SectionLike, name: NameLike) -> Optional[bool]:
-        ...
+    def get_boolean(self, section: SectionLike, name: NameLike) -> Optional[bool]: ...
 
     def get_boolean(
         self, section: SectionLike, name: NameLike, default: Optional[bool] = None

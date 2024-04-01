@@ -19,6 +19,7 @@
 #
 
 """Tests related to patch compatibility with CGit."""
+
 import os
 import shutil
 import tempfile

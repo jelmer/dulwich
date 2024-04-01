@@ -316,9 +316,9 @@ class RefsContainerTests:
         self.assertNotIn(b"refs/tags/refs-0.2", self._refs)
 
     def test_import_refs_name(self):
-        self._refs[
-            b"refs/remotes/origin/other"
-        ] = b"48d01bd4b77fed026b154d16493e5deab78f02ec"
+        self._refs[b"refs/remotes/origin/other"] = (
+            b"48d01bd4b77fed026b154d16493e5deab78f02ec"
+        )
         self._refs.import_refs(
             b"refs/remotes/origin",
             {b"master": b"42d06bd4b77fed026b154d16493e5deab78f02ec"},
@@ -333,9 +333,9 @@ class RefsContainerTests:
         )
 
     def test_import_refs_name_prune(self):
-        self._refs[
-            b"refs/remotes/origin/other"
-        ] = b"48d01bd4b77fed026b154d16493e5deab78f02ec"
+        self._refs[b"refs/remotes/origin/other"] = (
+            b"48d01bd4b77fed026b154d16493e5deab78f02ec"
+        )
         self._refs.import_refs(
             b"refs/remotes/origin",
             {b"master": b"42d06bd4b77fed026b154d16493e5deab78f02ec"},

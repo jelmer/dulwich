@@ -1,6 +1,4 @@
 PYTHON = python3
-PYFLAKES = $(PYTHON) -m pyflakes
-PEP8 = pep8
 RUFF ?= $(PYTHON) -m ruff 
 SETUP = $(PYTHON) setup.py
 TESTRUNNER ?= unittest
@@ -53,17 +51,8 @@ clean::
 	$(SETUP) clean --all
 	rm -f dulwich/*.so
 
-flakes:
-	$(PYFLAKES) dulwich
-
-pep8:
-	$(PEP8) dulwich
-
 style:
 	$(RUFF) check .
-
-before-push: check
-	git diff origin/master | $(PEP8) --diff
 
 coverage:
 	$(COVERAGE) run -m unittest dulwich.tests.test_suite dulwich.contrib.test_suite

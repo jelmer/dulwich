@@ -519,7 +519,7 @@ class Index:
         del self._byname[name]
 
     def iteritems(
-        self
+        self,
     ) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 

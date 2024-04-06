@@ -20,7 +20,6 @@
 
 """Compatibility tests for dulwich repositories."""
 
-
 import os
 import tempfile
 from io import BytesIO

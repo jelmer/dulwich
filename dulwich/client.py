@@ -738,7 +738,9 @@ class GitClient:
             assert target is not None
             if origin is not None:
                 target_config = target.get_config()
-                target_config.set((b"remote", origin.encode("utf-8")), b"url", encoded_path)
+                target_config.set(
+                    (b"remote", origin.encode("utf-8")), b"url", encoded_path
+                )
                 target_config.set(
                     (b"remote", origin.encode("utf-8")),
                     b"fetch",
@@ -749,7 +751,9 @@ class GitClient:
             ref_message = b"clone: from " + encoded_path
             result = self.fetch(path, target, progress=progress, depth=depth)
             if origin is not None:
-                _import_remote_refs(target.refs, origin, result.refs, message=ref_message)
+                _import_remote_refs(
+                    target.refs, origin, result.refs, message=ref_message
+                )
 
             origin_head = result.symrefs.get(b"HEAD")
             origin_sha = result.refs.get(b"HEAD")
@@ -2225,7 +2229,6 @@ class AbstractHttpGitClient(GitClient):
 
 
 def _wrap_urllib3_exceptions(func):
-
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)

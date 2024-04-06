@@ -20,7 +20,6 @@
 
 """Utility functions common to Dulwich tests."""
 
-
 import datetime
 import os
 import shutil

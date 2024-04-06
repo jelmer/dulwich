@@ -20,7 +20,6 @@
 
 """Tests for the object store interface."""
 
-
 import os
 import shutil
 import stat

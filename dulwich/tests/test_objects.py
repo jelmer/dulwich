@@ -22,7 +22,6 @@
 
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
-
 import datetime
 import os
 import stat

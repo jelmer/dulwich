@@ -36,9 +36,24 @@ if "__pypy__" not in sys.modules and sys.platform != "win32":
 optional = os.environ.get("CIBUILDWHEEL", "0") != "1"
 
 rust_extensions = [
-    RustExtension("dulwich._objects", "crates/objects/Cargo.toml", binding=Binding.PyO3, optional=optional),
-    RustExtension("dulwich._pack", "crates/pack/Cargo.toml", binding=Binding.PyO3, optional=optional),
-    RustExtension("dulwich._diff_tree", "crates/diff-tree/Cargo.toml", binding=Binding.PyO3, optional=optional),
+    RustExtension(
+        "dulwich._objects",
+        "crates/objects/Cargo.toml",
+        binding=Binding.PyO3,
+        optional=optional,
+    ),
+    RustExtension(
+        "dulwich._pack",
+        "crates/pack/Cargo.toml",
+        binding=Binding.PyO3,
+        optional=optional,
+    ),
+    RustExtension(
+        "dulwich._diff_tree",
+        "crates/diff-tree/Cargo.toml",
+        binding=Binding.PyO3,
+        optional=optional,
+    ),
 ]
 
 # Ideally, setuptools would just provide a way to do this
@@ -47,6 +62,8 @@ if "--pure" in sys.argv:
     rust_extensions = []
 
 
-setup(package_data={'': ['../docs/tutorial/*.txt', 'py.typed']},
-      rust_extensions=rust_extensions,
-      tests_require=tests_require)
+setup(
+    package_data={"": ["../docs/tutorial/*.txt", "py.typed"]},
+    rust_extensions=rust_extensions,
+    tests_require=tests_require,
+)

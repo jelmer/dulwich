@@ -111,3 +111,10 @@ target-version = "py37"
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.cibuildwheel]
+environment = {PATH="$HOME/.cargo/bin:$PATH"}
+before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y && rustup show"
+
+[tool.cibuildwheel.linux]
+skip = "*-musllinux_*"

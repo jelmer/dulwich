@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel fastimport paramiko urllib3 cibuildwheel==2.16.2 setuptools-rust
+          pip install setuptools wheel fastimport paramiko urllib3 cibuildwheel setuptools-rust
       - name: Install gpg on supported platforms
         run: pip install -U gpg
         if: "matrix.os != 'windows-latest'"

@@ -54,8 +54,6 @@ ignore_missing_imports = true
 packages = [
     "dulwich",
     "dulwich.cloud",
-    "dulwich.tests",
-    "dulwich.tests.compat",
     "dulwich.contrib",
 ]
 include-package-data = true

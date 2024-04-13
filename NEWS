@@ -1,5 +1,7 @@
 0.21.8	UNRELEASED
 
+ * Move tests to root. (Jelmer Vernooĳ, #1024)
+
  * Convert the optional C implementations to Rust.
    (Jelmer Vernooĳ)
 

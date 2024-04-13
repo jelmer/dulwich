@@ -56,7 +56,7 @@ How to start unittest
 There is no need to have a Swift cluster running to run the unitests.
 Just run the following command in the Dulwich source directory::
 
-    $ PYTHONPATH=. python -m dulwich.contrib.test_swift
+    $ PYTHONPATH=. python -m tests.contrib.test_swift
 
 How to start functional tests
 -----------------------------
@@ -65,7 +65,7 @@ We provide some basic tests to perform smoke tests against a real Swift
 cluster. To run those functional tests you need a properly configured
 configuration file. The tests can be run as follow::
 
-    $ DULWICH_SWIFT_CFG=/etc/swift-dul.conf PYTHONPATH=. python -m dulwich.contrib.test_swift_smoke
+    $ DULWICH_SWIFT_CFG=/etc/swift-dul.conf PYTHONPATH=. python -m tests.contrib.test_swift_smoke
 
 How to install
 --------------

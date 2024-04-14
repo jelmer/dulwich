@@ -63,7 +63,7 @@ if "--pure" in sys.argv:
 
 
 setup(
-    package_data={"": ["../docs/tutorial/*.txt", "py.typed"]},
+    package_data={"": ["py.typed"]},
     rust_extensions=rust_extensions,
     tests_require=tests_require,
 )

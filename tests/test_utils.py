@@ -22,9 +22,9 @@
 
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob
+from dulwich.tests.utils import build_commit_graph, make_object
 
 from . import TestCase
-from .utils import build_commit_graph, make_object
 
 
 class BuildCommitGraphTest(TestCase):

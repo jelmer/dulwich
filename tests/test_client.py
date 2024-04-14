@@ -60,9 +60,9 @@ from dulwich.objects import Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
 from dulwich.protocol import TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
+from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
 from . import TestCase, skipIf
-from .utils import open_repo, setup_warning_catcher, tear_down_repo
 
 
 class DummyClient(TraditionalGitClient):

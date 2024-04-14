@@ -52,9 +52,14 @@ from dulwich.objects import (
     sha_to_hex,
     sorted_tree_items,
 )
+from dulwich.tests.utils import (
+    ext_functest_builder,
+    functest_builder,
+    make_commit,
+    make_object,
+)
 
 from . import TestCase
-from .utils import ext_functest_builder, functest_builder, make_commit, make_object
 
 a_sha = b"6f670c0fb53f9463760b7295fbb814e965fb20c8"
 b_sha = b"2969be3e8ee1c0222396a5611407e4769f14e54b"

@@ -27,10 +27,10 @@ from dulwich.diff_tree import CHANGE_MODIFY, CHANGE_RENAME, RenameDetector, Tree
 from dulwich.errors import MissingCommitError
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Commit
+from dulwich.tests.utils import F, build_commit_graph, make_object, make_tag
 from dulwich.walk import ORDER_TOPO, WalkEntry, Walker, _topo_reorder
 
 from . import TestCase
-from .utils import F, build_commit_graph, make_object, make_tag
 
 
 class TestWalkEntry:

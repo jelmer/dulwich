@@ -27,12 +27,11 @@ import tempfile
 import time
 import types
 import warnings
+from unittest import SkipTest
 
-from dulwich.tests import SkipTest
-
-from ..index import commit_tree
-from ..objects import Commit, FixedSha, Tag, object_class
-from ..pack import (
+from dulwich.index import commit_tree
+from dulwich.objects import Commit, FixedSha, Tag, object_class
+from dulwich.pack import (
     DELTA_TYPES,
     OFS_DELTA,
     REF_DELTA,
@@ -42,7 +41,7 @@ from ..pack import (
     write_pack_header,
     write_pack_object,
 )
-from ..repo import Repo
+from dulwich.repo import Repo
 
 # Plain files are very frequently used in tests, so let the mode be very short.
 F = 0o100644  # Shorthand mode for Files.

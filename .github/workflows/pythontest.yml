@@ -54,4 +54,4 @@ jobs:
       - name: Coverage test suite run
         run: |
           pip install --upgrade coverage
-          python -m coverage run -p -m unittest dulwich.tests.test_suite
+          python -m coverage run -p -m unittest tests.test_suite

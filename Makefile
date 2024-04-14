@@ -22,22 +22,22 @@ install::
 	$(SETUP) install --root="$(DESTDIR)"
 
 check:: build
-	$(RUNTEST) dulwich.tests.test_suite
+	$(RUNTEST) tests.test_suite
 
 check-tutorial:: build
-	$(RUNTEST) dulwich.tests.tutorial_test_suite
+	$(RUNTEST) tests.tutorial_test_suite
 
 check-nocompat:: build
-	$(RUNTEST) dulwich.tests.nocompat_test_suite
+	$(RUNTEST) tests.nocompat_test_suite
 
 check-compat:: build
-	$(RUNTEST) dulwich.tests.compat_test_suite
+	$(RUNTEST) tests.compat_test_suite
 
 check-pypy:: clean
 	$(MAKE) check-noextensions PYTHON=pypy
 
 check-noextensions:: clean
-	$(RUNTEST) dulwich.tests.test_suite
+	$(RUNTEST) tests.test_suite
 
 check-contrib:: clean
 	$(RUNTEST) -v dulwich.contrib.test_suite
@@ -55,7 +55,7 @@ style:
 	$(RUFF) check .
 
 coverage:
-	$(COVERAGE) run -m unittest dulwich.tests.test_suite dulwich.contrib.test_suite
+	$(COVERAGE) run -m unittest tests.test_suite dulwich.contrib.test_suite
 
 coverage-html: coverage
 	$(COVERAGE) html

@@ -1,5 +1,5 @@
-# __init__.py -- Contrib module for Dulwich
-# Copyright (C) 2014 Jelmer Vernooij <jelmer@jelmer.uk>
+# test_stash.py -- tests for stash
+# Copyright (C) 2018 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
@@ -18,3 +18,18 @@
 # License, Version 2.0.
 #
 
+"""Tests for stashes."""
+
+from dulwich.repo import MemoryRepo
+from dulwich.stash import Stash
+
+from . import TestCase
+
+
+class StashTests(TestCase):
+    """Tests for stash."""
+
+    def test_obtain(self):
+        repo = MemoryRepo()
+        stash = Stash.from_repo(repo)
+        self.assertIsInstance(stash, Stash)

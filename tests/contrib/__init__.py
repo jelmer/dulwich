@@ -18,3 +18,14 @@
 # License, Version 2.0.
 #
 
+def test_suite():
+    import unittest
+
+    names = [
+        "paramiko_vendor",
+        "release_robot",
+        "swift",
+    ]
+    module_names = ["tests.contrib.test_" + name for name in names]
+    loader = unittest.TestLoader()
+    return loader.loadTestsFromNames(module_names)

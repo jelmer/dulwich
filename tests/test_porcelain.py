@@ -42,10 +42,10 @@ from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
 from dulwich.porcelain import CheckoutError
 from dulwich.repo import NoIndexPresent, Repo
 from dulwich.server import DictBackend
+from dulwich.tests.utils import build_commit_graph, make_commit, make_object
 from dulwich.web import make_server, make_wsgi_chain
 
 from . import TestCase
-from .utils import build_commit_graph, make_commit, make_object
 
 try:
     import gpg

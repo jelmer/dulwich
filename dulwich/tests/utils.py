@@ -27,6 +27,7 @@ import tempfile
 import time
 import types
 import warnings
+from unittest import SkipTest
 
 from dulwich.index import commit_tree
 from dulwich.objects import Commit, FixedSha, Tag, object_class
@@ -41,8 +42,6 @@ from dulwich.pack import (
     write_pack_object,
 )
 from dulwich.repo import Repo
-
-from . import SkipTest
 
 # Plain files are very frequently used in tests, so let the mode be very short.
 F = 0o100644  # Shorthand mode for Files.
@@ -65,7 +64,7 @@ def open_repo(name, temp_dir=None):
     if temp_dir is None:
         temp_dir = tempfile.mkdtemp()
     repo_dir = os.path.join(
-        os.path.dirname(__file__), "..", "testdata", "repos", name
+        os.path.dirname(__file__), "..", "..", "testdata", "repos", name
     )
     temp_repo_dir = os.path.join(temp_dir, name)
     shutil.copytree(repo_dir, temp_repo_dir, symlinks=True)

@@ -30,6 +30,7 @@ from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob
 from dulwich.repo import BaseRepo, MemoryRepo
 from dulwich.server import DictBackend
+from dulwich.tests.utils import make_object, make_tag
 from dulwich.web import (
     HTTP_ERROR,
     HTTP_FORBIDDEN,
@@ -50,7 +51,6 @@ from dulwich.web import (
 )
 
 from . import TestCase
-from .utils import make_object, make_tag
 
 
 class MinimalistWSGIInputStream:

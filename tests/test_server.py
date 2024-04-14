@@ -53,9 +53,9 @@ from dulwich.server import (
     serve_command,
     update_server_info,
 )
+from dulwich.tests.utils import make_commit, make_tag
 
 from . import TestCase
-from .utils import make_commit, make_tag
 
 ONE = b"1" * 40
 TWO = b"2" * 40

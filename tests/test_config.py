@@ -312,7 +312,7 @@ class StackedConfigTests(TestCase):
 
     @skipIf(sys.platform != "win32", "Windows specific config location.")
     def test_windows_config_from_path(self):
-        from ..config import get_win_system_paths
+        from dulwich.config import get_win_system_paths
 
         install_dir = os.path.join("C:", "foo", "Git")
         self.overrideEnv("PATH", os.path.join(install_dir, "cmd"))
@@ -330,7 +330,7 @@ class StackedConfigTests(TestCase):
     def test_windows_config_from_reg(self):
         import winreg
 
-        from ..config import get_win_system_paths
+        from dulwich.config import get_win_system_paths
 
         self.overrideEnv("PATH", None)
         install_dir = os.path.join("C:", "foo", "Git")

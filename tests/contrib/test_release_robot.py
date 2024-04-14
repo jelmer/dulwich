@@ -30,8 +30,7 @@ from typing import ClassVar, Dict, List, Optional, Tuple
 
 from dulwich.contrib import release_robot
 from dulwich.repo import Repo
-
-from ..utils import make_commit, make_tag
+from dulwich.tests.utils import make_commit, make_tag
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))  # this directory
 

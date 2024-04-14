@@ -59,9 +59,9 @@ from dulwich.pack import (
     write_pack_index_v2,
     write_pack_object,
 )
+from dulwich.tests.utils import build_pack, make_object
 
 from . import TestCase
-from .utils import build_pack, make_object
 
 pack1_sha = b"bc63ddad95e7321ee734ea11a7a62d314e0d7481"
 

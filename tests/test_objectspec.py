@@ -34,9 +34,9 @@ from dulwich.objectspec import (
     parse_tree,
 )
 from dulwich.repo import MemoryRepo
+from dulwich.tests.utils import build_commit_graph
 
 from . import TestCase
-from .utils import build_commit_graph
 
 
 class ParseObjectTests(TestCase):

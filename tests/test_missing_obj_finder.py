@@ -20,9 +20,9 @@
 
 from dulwich.object_store import MemoryObjectStore, MissingObjectFinder
 from dulwich.objects import Blob
+from dulwich.tests.utils import build_commit_graph, make_object, make_tag
 
 from . import TestCase
-from .utils import build_commit_graph, make_object, make_tag
 
 
 class MissingObjectFinderTest(TestCase):

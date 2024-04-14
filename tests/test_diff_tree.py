@@ -43,9 +43,9 @@ from dulwich.diff_tree import (
 from dulwich.index import commit_tree
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, ShaFile, Tree, TreeEntry
+from dulwich.tests.utils import F, ext_functest_builder, functest_builder, make_object
 
 from . import TestCase
-from .utils import F, ext_functest_builder, functest_builder, make_object
 
 
 class DiffTestCase(TestCase):

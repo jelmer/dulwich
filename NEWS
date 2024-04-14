@@ -1,5 +1,7 @@
 0.21.8	UNRELEASED
 
+ * Stop installing docs/ as part of package code. (Jelmer Vernooĳ, #1248)
+
  * Move tests to root. (Jelmer Vernooĳ, #1024)
 
  * Convert the optional C implementations to Rust.

@@ -24,9 +24,9 @@ from io import BytesIO
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
+from dulwich.tests.utils import build_commit_graph
 
 from . import SkipTest, TestCase
-from .utils import build_commit_graph
 
 
 class GitFastExporterTests(TestCase):

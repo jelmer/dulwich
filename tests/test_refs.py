@@ -42,9 +42,9 @@ from dulwich.refs import (
     write_packed_refs,
 )
 from dulwich.repo import Repo
+from dulwich.tests.utils import open_repo, tear_down_repo
 
 from . import SkipTest, TestCase
-from .utils import open_repo, tear_down_repo
 
 
 class CheckRefFormatTests(TestCase):

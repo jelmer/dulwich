@@ -21,9 +21,9 @@
 
 from dulwich.graph import WorkList, _find_lcas, can_fast_forward
 from dulwich.repo import MemoryRepo
+from dulwich.tests.utils import make_commit
 
 from . import TestCase
-from .utils import make_commit
 
 
 class FindMergeBaseTests(TestCase):

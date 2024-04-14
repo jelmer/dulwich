@@ -41,9 +41,9 @@ from dulwich.repo import (
     UnsupportedVersion,
     check_user_identity,
 )
+from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
 from . import TestCase, skipIf
-from .utils import open_repo, setup_warning_catcher, tear_down_repo
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
 

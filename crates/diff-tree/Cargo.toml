@@ -1,6 +1,6 @@
 [package]
 name = "diff-tree-py"
-version = "3.4.0"
+version = { workspace = true }
 edition = "2021"
 
 [lib]

@@ -55,6 +55,7 @@ packages = [
     "dulwich",
     "dulwich.cloud",
     "dulwich.contrib",
+    "dulwich.tests",
 ]
 include-package-data = true
 zip-safe = false

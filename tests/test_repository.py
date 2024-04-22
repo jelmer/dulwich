@@ -1142,6 +1142,22 @@ class BuildRepoRootTests(TestCase):
         cs = r.get_config_stack()
         self.assertEqual(cs.get(("user",), "name"), b"Jelmer")
 
+    def test_worktreeconfig_extension_case(self):
+        """Test that worktree code does not error for alternate case format"""
+        r = self._repo
+        c = r.get_config()
+        c.set(("core",), "repositoryformatversion", "1")
+        # Capitalize "Config"
+        c.set(("extensions",), "worktreeConfig", True)
+        c.write_to_path()
+        c = r.get_worktree_config()
+        c.set(("user",), "repositoryformatversion", "1")
+        c.set((b"user",), b"name", b"Jelmer")
+        c.write_to_path()
+        # The following line errored before
+        # https://github.com/jelmer/dulwich/issues/1285 was addressed
+        Repo(self._repo_dir)
+
     def test_repositoryformatversion_1_extension(self):
         r = self._repo
         c = r.get_config()

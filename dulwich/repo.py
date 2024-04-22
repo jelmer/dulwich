@@ -1191,7 +1191,7 @@ class Repo(BaseRepo):
             raise UnsupportedVersion(format_version)
 
         for extension, _value in config.items((b"extensions",)):
-            if extension not in (b"worktreeconfig",):
+            if extension.lower() not in (b"worktreeconfig",):
                 raise UnsupportedExtension(extension)
 
         if object_store is None:

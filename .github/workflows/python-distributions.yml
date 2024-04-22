@@ -63,18 +63,16 @@ jobs:
       - build-wheels
       - build-sdist
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/dulwich-')
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dulwich
     steps:
-      - name: Install twine
-        run: |
-          python -m pip install --upgrade pip
-          pip install twine
       - name: Download distributions
         uses: actions/download-artifact@v2
         with:
           name: artifact
           path: dist
-      - name: Publish distributions
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: twine upload dist/*
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

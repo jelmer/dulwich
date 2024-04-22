@@ -3,3 +3,6 @@ members = ["crates/*"]
 
 [workspace.dependencies]
 pyo3 = ">=0.19"
+
+[workspace.package]
+version = "0.22.0"

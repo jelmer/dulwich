@@ -1,4 +1,4 @@
-0.21.8	UNRELEASED
+0.22.0	2024-04-22
 
  * Stop installing docs/ as part of package code. (Jelmer Vernooĳ, #1248)
 

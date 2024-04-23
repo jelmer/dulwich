@@ -59,6 +59,21 @@ def lower_key(key):
     return key
 
 
+def case_insensitive_key(key):
+    if isinstance(key, (bytes, str)):
+        class CaseInsensitiveNameLike(type(key)):
+            def __eq__(self, other: object) -> bool:
+                return self.lower() == other.lower()
+            def __hash__(self) -> int:
+                return hash(self.lower())
+        return CaseInsensitiveNameLike(key)
+
+    if isinstance(key, Iterable):
+        return type(key)(map(case_insensitive_key, key))  # type: ignore
+
+    return key
+
+
 class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def __init__(self) -> None:
         self._real: List[Any] = []
@@ -89,7 +104,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
         return self._keyed.keys()
 
     def items(self):
-        return iter(self._real)
+        return ((case_insensitive_key(key), value) for key, value in self._real)
 
     def __iter__(self):
         return self._keyed.__iter__()

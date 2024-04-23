@@ -89,7 +89,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
         return self._keyed.keys()
 
     def items(self):
-        return iter(self._real)
+        return ((lower_key(name), value) for name, value in self._real)
 
     def __iter__(self):
         return self._keyed.__iter__()

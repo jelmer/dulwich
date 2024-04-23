@@ -35,7 +35,7 @@ except ImportError:
     gevent_support = False
 
 if gevent_support:
-    from ..greenthreads import GreenThreadsMissingObjectFinder
+    from dulwich.greenthreads import GreenThreadsMissingObjectFinder
 
 skipmsg = "Gevent library is not installed"
 

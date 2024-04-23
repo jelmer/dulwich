@@ -1,4 +1,8 @@
-0.22.1	UNRELEASED
+0.22.1	2024-04-23
+
+ * Handle alternate case for worktreeconfig setting (Will Shanks, #1285)
+
+ * Ship rust files. (Jelmer Vernooĳ, #1287)
 
 0.22.0	2024-04-22
 

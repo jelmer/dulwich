@@ -63,9 +63,9 @@ def case_insensitive_key(key):
     if isinstance(key, (bytes, str)):
         class CaseInsensitiveNameLike(type(key)):
             def __eq__(self, other: object) -> bool:
-                return self.lower() == other.lower()
+                return lower_key(self) == lower_key(other)
             def __hash__(self) -> int:
-                return hash(self.lower())
+                return hash(lower_key(self))
         return CaseInsensitiveNameLike(key)
 
     if isinstance(key, Iterable):

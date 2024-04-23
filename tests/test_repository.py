@@ -1142,7 +1142,7 @@ class BuildRepoRootTests(TestCase):
         cs = r.get_config_stack()
         self.assertEqual(cs.get(("user",), "name"), b"Jelmer")
 
-def test_worktreeconfig_extension_case(self):
+    def test_worktreeconfig_extension_case(self):
         """Test that worktree code does not error for alternate case format."""
         r = self._repo
         c = r.get_config()

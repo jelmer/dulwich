@@ -17,3 +17,4 @@ include tox.ini
 include dulwich.cfg
 include .testr.conf
 include Cargo.toml
+include Cargo.lock

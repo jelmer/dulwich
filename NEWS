@@ -2,6 +2,8 @@
 
  * Ship ``Cargo.lock``. (Jelmer Vernooĳ, #1287)
 
+ * Ship ``tests/`` and ``testdata/`` in sdist. (Jelmer Vernooĳ, #1292)
+
 0.22.1	2024-04-23
 
  * Handle alternate case for worktreeconfig setting (Will Shanks, #1285)

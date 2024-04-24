@@ -12,7 +12,8 @@ include dulwich/py.typed
 recursive-include docs conf.py *.txt Makefile make.bat
 recursive-include examples *.py
 recursive-include crates *.rs Cargo.toml
-graft dulwich/tests/data
+graft tests/
+graft testdata/
 include tox.ini
 include dulwich.cfg
 include .testr.conf

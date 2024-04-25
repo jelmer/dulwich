@@ -69,7 +69,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install twine
       - name: Download sdist
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: artifact
           path: dist
@@ -91,7 +91,7 @@ jobs:
       url: https://pypi.org/p/dulwich
     steps:
       - name: Download distributions
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: artifact
           path: dist

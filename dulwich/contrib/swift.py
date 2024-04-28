@@ -257,7 +257,7 @@ class SwiftConnector:
         if ret.status_code < 200 or ret.status_code >= 300:
             raise SwiftException(
                 "AUTH v1.0 request failed on "
-                + f"{str(auth_httpclient.get_base_url()) + path} with error code {ret.status_code} ({ret.items()!s})"
+                + f"{self.auth_url} with error code {ret.status_code} ({ret.items()!s})"
             )
         storage_url = ret["X-Storage-Url"]
         token = ret["X-Auth-Token"]

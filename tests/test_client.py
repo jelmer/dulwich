@@ -1185,6 +1185,53 @@ class HttpGitClientTests(TestCase):
         client = HttpGitClient(clone_url, pool_manager=PoolManagerMock(), config=None)
         self.assertTrue(client._smart_request("git-upload-pack", clone_url, data=None))
 
+    def test_urllib3_protocol_error(self):
+        from urllib3.exceptions import ProtocolError
+        from urllib3.response import HTTPResponse
+
+        error_msg = "protocol error"
+
+        # we need to mock urllib3.PoolManager as this test will fail
+        # otherwise without an active internet connection
+        class PoolManagerMock:
+            def __init__(self) -> None:
+                self.headers: Dict[str, str] = {}
+
+            def request(
+                self,
+                method,
+                url,
+                fields=None,
+                headers=None,
+                redirect=True,
+                preload_content=True,
+            ):
+                response = HTTPResponse(
+                    headers={
+                        "Content-Type": "application/x-git-upload-pack-result"
+                    },
+                    request_method=method,
+                    request_url=url,
+                    preload_content=preload_content,
+                    status=200,
+                )
+
+                def read(self):
+                    raise ProtocolError(error_msg)
+
+                # override HTTPResponse.read to throw urllib3.exceptions.ProtocolError
+                response.read = read
+                return response
+
+        def check_heads(heads, **kwargs):
+            self.assertEqual(heads, {})
+            return []
+
+        clone_url = "https://git.example.org/user/project.git/"
+        client = HttpGitClient(clone_url, pool_manager=PoolManagerMock(), config=None)
+        with self.assertRaises(GitProtocolError, msg=error_msg):
+            client.fetch_pack(b"/", check_heads, None, None)
+
 
 class TCPGitClientTests(TestCase):
     def test_get_url(self):

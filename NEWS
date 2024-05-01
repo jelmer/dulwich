@@ -4,6 +4,8 @@
 
  * Ship ``tests/`` and ``testdata/`` in sdist. (Jelmer Vernooĳ, #1292)
 
+ * Add initial integration with OSS-Fuzz for continuous fuzz testing and first fuzzing test (David Lakin, #1302)
+
 0.22.1	2024-04-23
 
  * Handle alternate case for worktreeconfig setting (Will Shanks, #1285)

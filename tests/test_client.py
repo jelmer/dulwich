@@ -994,7 +994,7 @@ class HttpGitClientTests(TestCase):
         basic_auth = c.pool_manager.headers["authorization"]
         auth_string = "{}:{}".format("user", "passwd")
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
-        expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
+        expected_basic_auth = "Basic {}".format(b64_credentials.decode("latin1"))
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_init_username_set_no_password(self):
@@ -1048,7 +1048,7 @@ class HttpGitClientTests(TestCase):
         basic_auth = c.pool_manager.headers["authorization"]
         auth_string = f"{original_username}:{original_password}"
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
-        expected_basic_auth = "Basic %s" % b64_credentials.decode("latin1")
+        expected_basic_auth = "Basic {}".format(b64_credentials.decode("latin1"))
         self.assertEqual(basic_auth, expected_basic_auth)
 
     def test_url_redirect_location(self):

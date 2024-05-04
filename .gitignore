@@ -27,3 +27,5 @@ docs/api/*.txt
 dulwich.dist-info
 .stestr
 target/
+# Files created by OSS-Fuzz when running locally
+fuzz_*.pkg.spec

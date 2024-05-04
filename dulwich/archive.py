@@ -84,7 +84,7 @@ def tar_stream(store, tree, mtime, prefix=b"", format=""):
       Bytestrings
     """
     buf = BytesIO()
-    with closing(tarfile.open(None, "w:%s" % format, buf)) as tar:
+    with closing(tarfile.open(None, f"w:{format}", buf)) as tar:
         if format == "gz":
             # Manually correct the gzip header file modification time so that
             # archives created from the same Git tree are always identical.

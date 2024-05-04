@@ -168,9 +168,9 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         remote_shas = {}
         for branch in ("master", "mybranch", "pullr-108"):
             local_shas[branch] = local_repo.do_commit(
-                "Test commit %s" % branch,
+                f"Test commit {branch}",
                 "fbo@localhost",
-                ref="refs/heads/%s" % branch,
+                ref=f"refs/heads/{branch}",
             )
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)
@@ -180,7 +180,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         swift_repo = swift.SwiftRepo("fakerepo", self.conf)
         for branch in ("master", "mybranch", "pullr-108"):
             remote_shas[branch] = swift_repo.refs.read_loose_ref(
-                "refs/heads/%s" % branch
+                f"refs/heads/{branch}"
             )
         self.assertDictEqual(local_shas, remote_shas)
 
@@ -193,7 +193,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         files = ("testfile", "testfile2", "dir/testfile3")
         i = 0
         for f in files:
-            open(os.path.join(self.temp_d, f), "w").write("DATA %s" % i)
+            open(os.path.join(self.temp_d, f), "w").write(f"DATA {i}")
             i += 1
         local_repo.stage(files)
         local_repo.do_commit("Test commit", "fbo@localhost", ref="refs/heads/master")
@@ -244,7 +244,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         files = ("testfile11", "testfile22", "test/testfile33")
         i = 0
         for f in files:
-            open(os.path.join(self.temp_d, f), "w").write("DATA %s" % i)
+            open(os.path.join(self.temp_d, f), "w").write(f"DATA {i}")
             i += 1
         local_repo.stage(files)
         local_repo.do_commit("Test commit", "fbo@localhost", ref="refs/heads/master")

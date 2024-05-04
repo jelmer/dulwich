@@ -86,17 +86,17 @@ class PackTests(TestCase):
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha."""
         return load_pack_index(
-            os.path.join(self.datadir, "pack-%s.idx" % sha.decode("ascii"))
+            os.path.join(self.datadir, "pack-{}.idx".format(sha.decode("ascii")))
         )
 
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha."""
         return PackData(
-            os.path.join(self.datadir, "pack-%s.pack" % sha.decode("ascii"))
+            os.path.join(self.datadir, "pack-{}.pack".format(sha.decode("ascii")))
         )
 
     def get_pack(self, sha):
-        return Pack(os.path.join(self.datadir, "pack-%s" % sha.decode("ascii")))
+        return Pack(os.path.join(self.datadir, "pack-{}".format(sha.decode("ascii"))))
 
     def assertSucceeds(self, func, *args, **kwargs):
         try:
@@ -256,7 +256,7 @@ class TestPackData(PackTests):
         self.get_pack_data(pack1_sha).close()
 
     def test_from_file(self):
-        path = os.path.join(self.datadir, "pack-%s.pack" % pack1_sha.decode("ascii"))
+        path = os.path.join(self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii")))
         with open(path, "rb") as f:
             PackData.from_file(f, os.path.getsize(path))
 
@@ -1013,7 +1013,7 @@ class DeltaChainIteratorTests(TestCase):
         """Wrapper around store.get_raw that doesn't allow repeat lookups."""
         hex_sha = sha_to_hex(bin_sha)
         self.assertNotIn(
-            hex_sha, self.fetched, "Attempted to re-fetch object %s" % hex_sha
+            hex_sha, self.fetched, f"Attempted to re-fetch object {hex_sha}"
         )
         self.fetched.add(hex_sha)
         return self.store.get_raw(hex_sha)

@@ -356,7 +356,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.setUp(self)
         if check_for_daemon(limit=1):
             raise SkipTest(
-                "git-daemon was already running on port %s" % protocol.TCP_GIT_PORT
+                f"git-daemon was already running on port {protocol.TCP_GIT_PORT}"
             )
         fd, self.pidfile = tempfile.mkstemp(
             prefix="dulwich-test-git-client", suffix=".pid"
@@ -367,8 +367,8 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             "daemon",
             "--verbose",
             "--export-all",
-            "--pid-file=%s" % self.pidfile,
-            "--base-path=%s" % self.gitroot,
+            f"--pid-file={self.pidfile}",
+            f"--base-path={self.gitroot}",
             "--enable=receive-pack",
             "--enable=upload-archive",
             "--listen=localhost",
@@ -584,8 +584,8 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             env.setdefault(k, "")
 
         self.wfile.write(b"HTTP/1.1 200 Script output follows\r\n")
-        self.wfile.write(("Server: %s\r\n" % self.server.server_name).encode("ascii"))
-        self.wfile.write(("Date: %s\r\n" % self.date_time_string()).encode("ascii"))
+        self.wfile.write((f"Server: {self.server.server_name}\r\n").encode("ascii"))
+        self.wfile.write((f"Date: {self.date_time_string()}\r\n").encode("ascii"))
 
         decoded_query = query.replace("+", " ")
 

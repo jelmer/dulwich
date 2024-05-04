@@ -95,14 +95,14 @@ class MissingCommitError(Exception):
 
     def __init__(self, sha, *args, **kwargs) -> None:
         self.sha = sha
-        Exception.__init__(self, "%s is not in the revision store" % sha)
+        Exception.__init__(self, f"{sha} is not in the revision store")
 
 
 class ObjectMissing(Exception):
     """Indicates that a requested object is missing."""
 
     def __init__(self, sha, *args, **kwargs) -> None:
-        Exception.__init__(self, "%s is not in the pack" % sha)
+        Exception.__init__(self, f"{sha} is not in the pack")
 
 
 class ApplyDeltaError(Exception):
@@ -158,8 +158,8 @@ class UnexpectedCommandError(GitProtocolError):
         if command is None:
             command = "flush-pkt"
         else:
-            command = "command %s" % command
-        super().__init__("Protocol got unexpected %s" % command)
+            command = f"command {command}"
+        super().__init__(f"Protocol got unexpected {command}")
 
 
 class FileFormatException(Exception):

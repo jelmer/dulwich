@@ -235,7 +235,7 @@ diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py
  class DiffTests(TestCase):
 """
         text = (
-            """\
+            f"""\
 From dulwich-users-bounces+jelmer=samba.org@lists.launchpad.net \
 Mon Nov 29 00:58:18 2010
 Date: Sun, 28 Nov 2010 17:57:27 -0600
@@ -246,7 +246,7 @@ Content-Transfer-Encoding: 8bit
 
 Change-Id: I5e51313d4ae3a65c3f00c665002a7489121bb0d6
 
-%s
+{expected_diff}
 
 _______________________________________________
 Mailing list: https://launchpad.net/~dulwich-users
@@ -255,7 +255,6 @@ Unsubscribe : https://launchpad.net/~dulwich-users
 More help   : https://help.launchpad.net/ListHelp
 
 """
-            % expected_diff
         )
         c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(expected_diff, diff)

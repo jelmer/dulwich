@@ -240,7 +240,7 @@ class IgnoreFilter:
         if path is not None:
             return f"{type(self).__name__}.from_path({path!r})"
         else:
-            return "<%s>" % (type(self).__name__)
+            return f"<{type(self).__name__}>"
 
 
 class IgnoreFilterStack:
@@ -323,7 +323,7 @@ class IgnoreFilterManager:
           Iterator over Pattern instances
         """
         if os.path.isabs(path):
-            raise ValueError("%s is an absolute path" % path)
+            raise ValueError(f"{path} is an absolute path")
         filters = [(0, f) for f in self._global_filters]
         if os.path.sep != "/":
             path = path.replace(os.path.sep, "/")

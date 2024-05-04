@@ -99,5 +99,5 @@ class ArchiveTests(TestCase):
             self.assertEqual(
                 contents[0],
                 contents[1],
-                "Different file contents for format %r" % format,
+                f"Different file contents for format {format!r}",
             )

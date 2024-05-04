@@ -50,7 +50,7 @@ try:
 except ModuleNotFoundError:
     missing_libs.append("mock")
 
-skipmsg = "Required libraries are not installed (%r)" % missing_libs
+skipmsg = f"Required libraries are not installed ({missing_libs!r})"
 
 
 if not missing_libs:

@@ -65,12 +65,12 @@ class CreateRepositoryTests(TestCase):
         barestr = b"bare = " + str(expect_bare).lower().encode("ascii")
         with repo.get_named_file("config") as f:
             config_text = f.read()
-            self.assertIn(barestr, config_text, "%r" % config_text)
+            self.assertIn(barestr, config_text, f"{config_text!r}")
         expect_filemode = sys.platform != "win32"
         barestr = b"filemode = " + str(expect_filemode).lower().encode("ascii")
         with repo.get_named_file("config") as f:
             config_text = f.read()
-            self.assertIn(barestr, config_text, "%r" % config_text)
+            self.assertIn(barestr, config_text, f"{config_text!r}")
 
         if isinstance(repo, Repo):
             expected_mode = "0o100644" if expect_filemode else "0o100666"

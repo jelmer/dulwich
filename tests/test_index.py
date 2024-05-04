@@ -540,7 +540,7 @@ class BuildIndexTests(TestCase):
             except OSError as e:
                 if e.errno == 92 and sys.platform == "darwin":
                     # Our filename isn't supported by the platform :(
-                    self.skipTest("can not write filename %r" % e.filename)
+                    self.skipTest(f"can not write filename {e.filename!r}")
                 else:
                     raise
             except UnicodeDecodeError:

@@ -48,7 +48,7 @@ import socket
 import sys
 import time
 from functools import partial
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
 
 try:
     from typing import Protocol as TypingProtocol
@@ -220,7 +220,7 @@ class Handler:
         self.proto = proto
         self.stateless_rpc = stateless_rpc
 
-    def handle(self):
+    def handle(self) -> None:
         raise NotImplementedError(self.handle)
 
 
@@ -1111,7 +1111,7 @@ class UploadArchiveHandler(Handler):
         super().__init__(backend, proto, stateless_rpc)
         self.repo = backend.open_repository(args[0])
 
-    def handle(self):
+    def handle(self) -> None:
         def write(x):
             return self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, x)
 
@@ -1135,7 +1135,7 @@ class UploadArchiveHandler(Handler):
                 format = arguments[i].decode("ascii")
             else:
                 commit_sha = self.repo.refs[argument]
-                tree = store[store[commit_sha].tree]
+                tree = store[cast(Commit, store[commit_sha]).tree]
             i += 1
         self.proto.write_pkt_line(b"ACK")
         self.proto.write_pkt_line(None)

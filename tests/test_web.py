@@ -284,7 +284,7 @@ class DumbHandlersTestCase(WebTestCase):
     def test_get_info_packs(self):
         class TestPackData:
             def __init__(self, sha) -> None:
-                self.filename = "pack-%s.pack" % sha
+                self.filename = f"pack-{sha}.pack"
 
         class TestPack:
             def __init__(self, sha) -> None:

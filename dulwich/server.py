@@ -45,18 +45,13 @@ Currently supported capabilities:
 import collections
 import os
 import socket
+import socketserver
 import sys
 import time
+import zlib
 from functools import partial
 from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
-
-try:
-    from typing import Protocol as TypingProtocol
-except ImportError:  # python < 3.8
-    from typing_extensions import Protocol as TypingProtocol  # type: ignore
-
-import socketserver
-import zlib
+from typing import Protocol as TypingProtocol
 
 from dulwich import log_utils
 

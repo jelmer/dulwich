@@ -275,7 +275,7 @@ class Walker:
         # Note: when adding arguments to this method, please also update
         # dulwich.repo.BaseRepo.get_walker
         if order not in ALL_ORDERS:
-            raise ValueError("Unknown walk order %s" % order)
+            raise ValueError(f"Unknown walk order {order}")
         self.store = store
         if isinstance(include, bytes):
             # TODO(jelmer): Really, this should require a single type.

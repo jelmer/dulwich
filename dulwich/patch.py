@@ -268,13 +268,13 @@ def gen_diff_header(paths, modes, shas):
     if old_mode != new_mode:
         if new_mode is not None:
             if old_mode is not None:
-                yield ("old file mode %o\n" % old_mode).encode("ascii")
-            yield ("new file mode %o\n" % new_mode).encode("ascii")
+                yield (f"old file mode {old_mode:o}\n").encode("ascii")
+            yield (f"new file mode {new_mode:o}\n").encode("ascii")
         else:
-            yield ("deleted file mode %o\n" % old_mode).encode("ascii")
+            yield (f"deleted file mode {old_mode:o}\n").encode("ascii")
     yield b"index " + shortid(old_sha) + b".." + shortid(new_sha)
     if new_mode is not None and old_mode is not None:
-        yield (" %o" % new_mode).encode("ascii")
+        yield (f" {new_mode:o}").encode("ascii")
     yield b"\n"
 
 

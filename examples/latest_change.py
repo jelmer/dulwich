@@ -18,7 +18,7 @@ w = r.get_walker(paths=[path], max_entries=1)
 try:
     c = next(iter(w)).commit
 except StopIteration:
-    print("No file %s anywhere in history." % sys.argv[1])
+    print(f"No file {sys.argv[1]} anywhere in history.")
 else:
     print(
         f"{sys.argv[1]} was last changed by {c.author} at {time.ctime(c.author_time)} (commit {c.id})"

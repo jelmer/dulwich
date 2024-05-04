@@ -830,7 +830,7 @@ class BaseRepo:
         """
         if not isinstance(name, bytes):
             raise TypeError(
-                "'name' must be bytestring, not %.80s" % type(name).__name__
+                f"'name' must be bytestring, not {type(name).__name__:.80}"
             )
         if len(name) in (20, 40):
             try:
@@ -1078,7 +1078,7 @@ class BaseRepo:
         try:
             self.hooks["post-commit"].execute()
         except HookError as e:  # silent failure
-            warnings.warn("post-commit hook failed: %s" % e, UserWarning)
+            warnings.warn(f"post-commit hook failed: {e}", UserWarning)
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
@@ -1406,8 +1406,8 @@ class Repo(BaseRepo):
                 fs_path = os.fsencode(fs_path)
             if os.path.isabs(fs_path):
                 raise ValueError(
-                    "path %r should be relative to "
-                    "repository root, not absolute" % fs_path
+                    f"path {fs_path!r} should be relative to "
+                    "repository root, not absolute"
                 )
             tree_path = _fs_to_tree_path(fs_path)
             full_path = os.path.join(root_path_bytes, fs_path)
@@ -1474,7 +1474,7 @@ class Repo(BaseRepo):
                     continue
                 except KeyError as exc:
                     raise KeyError(
-                        "file '%s' not in index" % (tree_path.decode())
+                        f"file '{tree_path.decode()}' not in index"
                     ) from exc
 
             st = None
@@ -1677,7 +1677,7 @@ class Repo(BaseRepo):
             return None
 
     def __repr__(self) -> str:
-        return "<Repo at %r>" % self.path
+        return f"<Repo at {self.path!r}>"
 
     def set_description(self, description):
         """Set the description for this repository.

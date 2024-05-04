@@ -590,11 +590,11 @@ class InfoRefsContainer(RefsContainer):
             if name.endswith(PEELED_TAG_SUFFIX):
                 name = name[:-3]
                 if not check_ref_format(name):
-                    raise ValueError("invalid ref name %r" % name)
+                    raise ValueError(f"invalid ref name {name!r}")
                 self._peeled[name] = sha
             else:
                 if not check_ref_format(name):
-                    raise ValueError("invalid ref name %r" % name)
+                    raise ValueError(f"invalid ref name {name!r}")
                 self._refs[name] = sha
 
     def allkeys(self):
@@ -1061,12 +1061,12 @@ def _split_ref_line(line):
     """Split a single ref line into a tuple of SHA1 and name."""
     fields = line.rstrip(b"\n\r").split(b" ")
     if len(fields) != 2:
-        raise PackedRefsException("invalid ref line %r" % line)
+        raise PackedRefsException(f"invalid ref line {line!r}")
     sha, name = fields
     if not valid_hexsha(sha):
-        raise PackedRefsException("Invalid hex sha %r" % sha)
+        raise PackedRefsException(f"Invalid hex sha {sha!r}")
     if not check_ref_format(name):
-        raise PackedRefsException("invalid ref name %r" % name)
+        raise PackedRefsException(f"invalid ref name {name!r}")
     return (sha, name)
 
 
@@ -1104,7 +1104,7 @@ def read_packed_refs_with_peeled(f):
             if not last:
                 raise PackedRefsException("unexpected peeled ref line")
             if not valid_hexsha(line[1:]):
-                raise PackedRefsException("Invalid hex sha %r" % line[1:])
+                raise PackedRefsException(f"Invalid hex sha {line[1:]!r}")
             sha, name = _split_ref_line(last)
             last = None
             yield (sha, name, line[1:])
@@ -1203,7 +1203,7 @@ def _set_default_branch(
         elif LOCAL_TAG_PREFIX + branch in refs:
             head_ref = LOCAL_TAG_PREFIX + branch
         else:
-            raise ValueError("%r is not a valid branch or tag" % os.fsencode(branch))
+            raise ValueError(f"{os.fsencode(branch)!r} is not a valid branch or tag")
     elif origin_head:
         head_ref = origin_head
         if origin_head.startswith(LOCAL_BRANCH_PREFIX):

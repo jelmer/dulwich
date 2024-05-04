@@ -85,7 +85,7 @@ class BlackboxTestCase(TestCase):
             if os.path.isfile(p):
                 return p
         else:
-            raise SkipTest("Unable to find binary %s" % name)
+            raise SkipTest(f"Unable to find binary {name}")
 
     def run_command(self, name, args):
         """Run a Dulwich command.

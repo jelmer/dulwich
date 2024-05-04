@@ -138,7 +138,7 @@ def load_conf(path=None, file=None):
     else:
         confpath = path
     if not os.path.isfile(confpath):
-        raise Exception("Unable to read configuration file %s" % confpath)
+        raise Exception(f"Unable to read configuration file {confpath}")
     conf.read(confpath)
     return conf
 
@@ -312,7 +312,7 @@ class SwiftConnector:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException(
-                "HEAD request failed with error code %s" % ret.status_code
+                f"HEAD request failed with error code {ret.status_code}"
             )
         return True
 
@@ -326,7 +326,7 @@ class SwiftConnector:
             ret = self.httpclient.request("PUT", self.base_path)
             if ret.status_code < 200 or ret.status_code > 300:
                 raise SwiftException(
-                    "PUT request failed with error code %s" % ret.status_code
+                    f"PUT request failed with error code {ret.status_code}"
                 )
 
     def get_container_objects(self):
@@ -342,7 +342,7 @@ class SwiftConnector:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException(
-                "GET request failed with error code %s" % ret.status_code
+                f"GET request failed with error code {ret.status_code}"
             )
         content = ret.read()
         return json.loads(content)
@@ -361,7 +361,7 @@ class SwiftConnector:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException(
-                "HEAD request failed with error code %s" % ret.status_code
+                f"HEAD request failed with error code {ret.status_code}"
             )
         resp_headers = {}
         for header, value in ret.items():
@@ -395,7 +395,7 @@ class SwiftConnector:
 
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException(
-                "PUT request failed with error code %s" % ret.status_code
+                f"PUT request failed with error code {ret.status_code}"
             )
 
     def get_object(self, name, range=None):
@@ -410,14 +410,14 @@ class SwiftConnector:
         """
         headers = {}
         if range:
-            headers["Range"] = "bytes=%s" % range
+            headers["Range"] = f"bytes={range}"
         path = self.base_path + "/" + name
         ret = self.httpclient.request("GET", path, headers=headers)
         if ret.status_code == 404:
             return None
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException(
-                "GET request failed with error code %s" % ret.status_code
+                f"GET request failed with error code {ret.status_code}"
             )
         content = ret.read()
 
@@ -437,7 +437,7 @@ class SwiftConnector:
         ret = self.httpclient.request("DELETE", path)
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException(
-                "DELETE request failed with error code %s" % ret.status_code
+                f"DELETE request failed with error code {ret.status_code}"
             )
 
     def del_root(self):
@@ -451,7 +451,7 @@ class SwiftConnector:
         ret = self.httpclient.request("DELETE", self.base_path)
         if ret.status_code < 200 or ret.status_code > 300:
             raise SwiftException(
-                "DELETE request failed with error code %s" % ret.status_code
+                f"DELETE request failed with error code {ret.status_code}"
             )
 
 
@@ -680,7 +680,7 @@ class SwiftObjectStore(PackBasedObjectStore):
             if entries:
                 basename = posixpath.join(
                     self.pack_dir,
-                    "pack-%s" % iter_sha1(entry[0] for entry in entries),
+                    f"pack-{iter_sha1(entry[0] for entry in entries)}",
                 )
                 index = BytesIO()
                 write_pack_index_v2(index, entries, pack.get_stored_checksum())
@@ -868,10 +868,10 @@ class SwiftRepo(BaseRepo):
         self.scon = SwiftConnector(self.root, self.conf)
         objects = self.scon.get_container_objects()
         if not objects:
-            raise Exception("There is not any GIT repo here : %s" % self.root)
+            raise Exception(f"There is not any GIT repo here : {self.root}")
         objects = [o["name"].split("/")[0] for o in objects]
         if OBJECTDIR not in objects:
-            raise Exception("This repository (%s) is not bare." % self.root)
+            raise Exception(f"This repository ({self.root}) is not bare.")
         self.bare = True
         self._controldir = self.root
         object_store = SwiftObjectStore(self.scon)
@@ -1014,7 +1014,7 @@ def main(argv=sys.argv):
 
     cmd = sys.argv[1]
     if cmd not in commands:
-        print("No such subcommand: %s" % cmd)
+        print(f"No such subcommand: {cmd}")
         sys.exit(1)
     commands[cmd](sys.argv[2:])
 

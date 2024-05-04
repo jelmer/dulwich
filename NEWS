@@ -6,6 +6,8 @@
 
  * Add initial integration with OSS-Fuzz for continuous fuzz testing and first fuzzing test (David Lakin, #1302)
 
+ * Drop Python 3.7 support. (Jelmer Vernooĳ)
+
 0.22.1	2024-04-23
 
  * Handle alternate case for worktreeconfig setting (Will Shanks, #1285)

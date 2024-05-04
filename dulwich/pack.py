@@ -45,7 +45,12 @@ except ModuleNotFoundError:
 import os
 import struct
 import sys
+import warnings
+import zlib
+from hashlib import sha1
 from itertools import chain
+from os import SEEK_CUR, SEEK_END
+from struct import unpack_from
 from typing import (
     BinaryIO,
     Callable,
@@ -56,23 +61,13 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
     TypeVar,
     Union,
 )
-
-try:
-    from typing import Protocol
-except ImportError:  # python << 3.8
-    from typing_extensions import Protocol  # type: ignore
-
-import warnings
-import zlib
-from hashlib import sha1
-from os import SEEK_CUR, SEEK_END
-from struct import unpack_from
 
 try:
     import mmap

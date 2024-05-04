@@ -2229,10 +2229,12 @@ class AbstractHttpGitClient(GitClient):
 
 
 def _wrap_urllib3_exceptions(func):
+    from urllib3.exceptions import ProtocolError
+
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except urllib3.exceptions.ProtocolError as error:
+        except ProtocolError as error:
             raise GitProtocolError(str(error)) from error
 
     return wrapper

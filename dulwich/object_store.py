@@ -36,16 +36,12 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
     cast,
 )
-
-try:
-    from typing import Protocol
-except ImportError:  # python << 3.8
-    from typing_extensions import Protocol  # type: ignore
 
 from .errors import NotTreeError
 from .file import GitFile

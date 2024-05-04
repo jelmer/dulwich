@@ -57,7 +57,7 @@ def _split_commits_and_tags(obj_store, lst, *, ignore_unknown=False, pool=None):
                 tags.add(sha)
                 commits.add(o.object[1])
             else:
-                raise KeyError("Not a commit or a tag: %s" % sha)
+                raise KeyError(f"Not a commit or a tag: {sha}")
 
     jobs = [pool.spawn(find_commit_type, s) for s in lst]
     gevent.joinall(jobs)

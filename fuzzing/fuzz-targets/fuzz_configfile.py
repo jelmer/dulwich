@@ -1,6 +1,7 @@
-import atheris
 import sys
 from io import BytesIO
+
+import atheris
 
 with atheris.instrument_imports():
     from dulwich.config import ConfigFile

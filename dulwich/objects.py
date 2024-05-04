@@ -845,7 +845,7 @@ class Tag(ShaFile):
                 assert isinstance(value, bytes)
                 obj_class = object_class(value)
                 if not obj_class:
-                    raise ObjectFormatException(f"Not a known type: {value}")
+                    raise ObjectFormatException(f"Not a known type: {value!r}")
                 self._object_class = obj_class
             elif field == _TAG_HEADER:
                 self._name = value

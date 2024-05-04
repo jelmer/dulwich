@@ -99,7 +99,7 @@ def read_bundle(f):
         return _read_bundle(f, 2)
     if firstline == b"# v3 git bundle\n":
         return _read_bundle(f, 3)
-    raise AssertionError("unsupported bundle format header: %r" % firstline)
+    raise AssertionError(f"unsupported bundle format header: {firstline!r}")
 
 
 def write_bundle(f, bundle):

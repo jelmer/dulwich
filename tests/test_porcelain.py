@@ -2001,7 +2001,7 @@ class SubmoduleTests(PorcelainTestCase):
 
     def test_add(self):
         porcelain.submodule_add(self.repo, "../bar.git", "bar")
-        with open("%s/.gitmodules" % self.repo.path) as f:
+        with open(f"{self.repo.path}/.gitmodules") as f:
             self.assertEqual(
                 """\
 [submodule "bar"]

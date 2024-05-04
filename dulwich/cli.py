@@ -202,14 +202,14 @@ class cmd_dump_pack(Command):
 
         basename, _ = os.path.splitext(args[0])
         x = Pack(basename)
-        print("Object names checksum: %s" % x.name())
-        print("Checksum: %s" % sha_to_hex(x.get_stored_checksum()))
+        print(f"Object names checksum: {x.name()}")
+        print(f"Checksum: {sha_to_hex(x.get_stored_checksum())}")
         if not x.check():
             print("CHECKSUM DOES NOT MATCH")
         print("Length: %d" % len(x))
         for name in x:
             try:
-                print("\t%s" % x[name])
+                print(f"\t{x[name]}")
             except KeyError as k:
                 print(f"\t{name}: Unable to resolve base {k}")
             except ApplyDeltaError as e:
@@ -284,7 +284,7 @@ class cmd_clone(Command):
                 branch=options.branch,
             )
         except GitProtocolError as e:
-            print("%s" % e)
+            print(f"{e}")
 
 
 class cmd_commit(Command):
@@ -465,7 +465,7 @@ class cmd_write_tree(Command):
     def run(self, args):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
-        sys.stdout.write("%s\n" % porcelain.write_tree("."))
+        sys.stdout.write("{}\n".format(porcelain.write_tree(".")))
 
 
 class cmd_receive_pack(Command):
@@ -510,12 +510,12 @@ class cmd_status(Command):
         if status.unstaged:
             sys.stdout.write("Changes not staged for commit:\n\n")
             for name in status.unstaged:
-                sys.stdout.write("\t%s\n" % name.decode(sys.getfilesystemencoding()))
+                sys.stdout.write(f"\t{name.decode(sys.getfilesystemencoding())}\n")
             sys.stdout.write("\n")
         if status.untracked:
             sys.stdout.write("Untracked files:\n\n")
             for name in status.untracked:
-                sys.stdout.write("\t%s\n" % name)
+                sys.stdout.write(f"\t{name}\n")
             sys.stdout.write("\n")
 
 
@@ -624,13 +624,13 @@ class SuperCommand(Command):
 
     def run(self, args):
         if not args and not self.default_command:
-            print("Supported subcommands: %s" % ", ".join(self.subcommands.keys()))
+            print("Supported subcommands: {}".format(", ".join(self.subcommands.keys())))
             return False
         cmd = args[0]
         try:
             cmd_kls = self.subcommands[cmd]
         except KeyError:
-            print("No such subcommand: %s" % args[0])
+            print(f"No such subcommand: {args[0]}")
             return False
         return cmd_kls().run(args[1:])
 
@@ -746,7 +746,7 @@ class cmd_help(Command):
         if options.all:
             print("Available commands:")
             for cmd in sorted(commands):
-                print("  %s" % cmd)
+                print(f"  {cmd}")
         else:
             print(
                 """\
@@ -810,14 +810,14 @@ def main(argv=None):
         argv = sys.argv[1:]
 
     if len(argv) < 1:
-        print("Usage: dulwich <%s> [OPTIONS...]" % ("|".join(commands.keys())))
+        print("Usage: dulwich <{}> [OPTIONS...]".format("|".join(commands.keys())))
         return 1
 
     cmd = argv[0]
     try:
         cmd_kls = commands[cmd]
     except KeyError:
-        print("No such subcommand: %s" % cmd)
+        print(f"No such subcommand: {cmd}")
         return 1
     # TODO(jelmer): Return non-0 on errors
     return cmd_kls().run(argv[1:])

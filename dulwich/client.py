@@ -130,7 +130,7 @@ class InvalidWants(Exception):
 
     def __init__(self, wants) -> None:
         Exception.__init__(
-            self, "requested wants not in server provided refs: %r" % wants
+            self, f"requested wants not in server provided refs: {wants!r}"
         )
 
 
@@ -216,7 +216,7 @@ class ReportStatusParser:
             elif status == b"ok":
                 yield rest, None
             else:
-                raise GitProtocolError("invalid ref status %r" % status)
+                raise GitProtocolError(f"invalid ref status {status!r}")
 
     def handle_packet(self, pkt):
         """Handle a packet.
@@ -416,13 +416,13 @@ def _read_shallow_updates(pkt_seq):
         try:
             cmd, sha = pkt.split(b" ", 1)
         except ValueError:
-            raise GitProtocolError("unknown command %s" % pkt)
+            raise GitProtocolError(f"unknown command {pkt}")
         if cmd == COMMAND_SHALLOW:
             new_shallow.add(sha.strip())
         elif cmd == COMMAND_UNSHALLOW:
             new_unshallow.add(sha.strip())
         else:
-            raise GitProtocolError("unknown command %s" % pkt)
+            raise GitProtocolError(f"unknown command {pkt}")
     return (new_shallow, new_unshallow)
 
 
@@ -451,7 +451,7 @@ class _v1ReceivePackHeader:
 
         for refname in new_refs:
             if not isinstance(refname, bytes):
-                raise TypeError("refname is not a bytestring: %r" % refname)
+                raise TypeError(f"refname is not a bytestring: {refname!r}")
             old_sha1 = old_refs.get(refname, ZERO_SHA)
             if not isinstance(old_sha1, bytes):
                 raise TypeError(
@@ -551,7 +551,7 @@ def _handle_upload_pack_head(proto, capabilities, graph_walker, wants, can_read,
                     break
                 else:
                     raise AssertionError(
-                        "%s not in ('continue', 'ready', 'common)" % parts[2]
+                        f"{parts[2]} not in ('continue', 'ready', 'common)"
                     )
         have = next(graph_walker)
     proto.write_pkt_line(COMMAND_DONE + b"\n")
@@ -1238,7 +1238,7 @@ class TraditionalGitClient(GitClient):
             elif pkt.startswith(b"ERR "):
                 raise GitProtocolError(pkt[4:].rstrip(b"\n").decode("utf-8", "replace"))
             else:
-                raise AssertionError("invalid response %r" % pkt)
+                raise AssertionError(f"invalid response {pkt!r}")
             ret = proto.read_pkt_line()
             if ret is not None:
                 raise AssertionError("expected pkt tail")
@@ -1282,7 +1282,7 @@ class TCPGitClient(TraditionalGitClient):
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM
         )
         s = None
-        err = OSError("no address found for %s" % self._host)
+        err = OSError(f"no address found for {self._host}")
         for family, socktype, proto, canonname, sockaddr in sockaddrs:
             s = socket.socket(family, socktype, proto)
             s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -1487,7 +1487,7 @@ class LocalGitClient(GitClient):
                         ref_status[refname] = msg
                 else:
                     if not target.refs.remove_if_equals(refname, old_sha1):
-                        progress("unable to remove %s" % refname)
+                        progress(f"unable to remove {refname}")
                         ref_status[refname] = "unable to remove"
 
         return SendPackResult(new_refs, ref_status=ref_status)
@@ -1814,7 +1814,7 @@ class SSHGitClient(TraditionalGitClient):
 def default_user_agent_string():
     # Start user agent with "git/", because GitHub requires this. :-( See
     # https://github.com/jelmer/dulwich/issues/562 for details.
-    return "git/dulwich/%s" % ".".join([str(x) for x in dulwich.__version__])
+    return "git/dulwich/{}".format(".".join([str(x) for x in dulwich.__version__]))
 
 
 def default_urllib3_manager(
@@ -2008,7 +2008,7 @@ class AbstractHttpGitClient(GitClient):
         tail = "info/refs"
         headers = {"Accept": "*/*"}
         if self.dumb is not True:
-            tail += "?service=%s" % service.decode("ascii")
+            tail += "?service={}".format(service.decode("ascii"))
         url = urljoin(base_url, tail)
         resp, read = self._http_request(url, headers)
 
@@ -2035,7 +2035,7 @@ class AbstractHttpGitClient(GitClient):
                     ) from exc
                 if pkt.rstrip(b"\n") != (b"# service=" + service):
                     raise GitProtocolError(
-                        "unexpected first line %r from smart server" % pkt
+                        f"unexpected first line {pkt!r} from smart server"
                     )
                 return (*read_pkt_refs(proto.read_pkt_seq()), base_url)
             else:
@@ -2051,9 +2051,9 @@ class AbstractHttpGitClient(GitClient):
         """
         assert url[-1] == "/"
         url = urljoin(url, service)
-        result_content_type = "application/x-%s-result" % service
+        result_content_type = f"application/x-{service}-result"
         headers = {
-            "Content-Type": "application/x-%s-request" % service,
+            "Content-Type": f"application/x-{service}-request",
             "Accept": result_content_type,
         }
         if isinstance(data, bytes):
@@ -2061,7 +2061,7 @@ class AbstractHttpGitClient(GitClient):
         resp, read = self._http_request(url, headers, data)
         if resp.content_type.split(";")[0] != result_content_type:
             raise GitProtocolError(
-                "Invalid content-type from server: %s" % resp.content_type
+                f"Invalid content-type from server: {resp.content_type}"
             )
         return resp, read
 
@@ -2398,7 +2398,7 @@ def _get_transport_and_path_from_url(url, config, operation, **kwargs):
             parsed.path,
         )
 
-    raise ValueError("unknown scheme '%s'" % parsed.scheme)
+    raise ValueError(f"unknown scheme '{parsed.scheme}'")
 
 
 def parse_rsync_url(location: str) -> Tuple[Optional[str], str, str]:

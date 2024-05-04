@@ -110,13 +110,13 @@ def _decompress(string):
 def sha_to_hex(sha):
     """Takes a string and returns the hex of the sha within."""
     hexsha = binascii.hexlify(sha)
-    assert len(hexsha) == 40, "Incorrect length of sha1 string: %r" % hexsha
+    assert len(hexsha) == 40, f"Incorrect length of sha1 string: {hexsha!r}"
     return hexsha
 
 
 def hex_to_sha(hex):
     """Takes a hex sha and returns a binary sha."""
-    assert len(hex) == 40, "Incorrect length of hexsha: %s" % hex
+    assert len(hex) == 40, f"Incorrect length of hexsha: {hex}"
     try:
         return binascii.unhexlify(hex)
     except TypeError as exc:
@@ -153,7 +153,7 @@ def filename_to_hex(filename):
     """Takes an object filename and returns its corresponding hex sha."""
     # grab the last (up to) two path components
     names = filename.rsplit(os.path.sep, 2)[-2:]
-    errmsg = "Invalid object filename: %s" % filename
+    errmsg = f"Invalid object filename: {filename}"
     assert len(names) == 2, errmsg
     base, rest = names
     assert len(base) == 2 and len(rest) == 38, errmsg
@@ -242,7 +242,7 @@ def check_time(time_seconds):
     """
     # Prevent overflow error
     if time_seconds > MAX_TIME:
-        raise ObjectFormatException("Date field should not exceed %s" % MAX_TIME)
+        raise ObjectFormatException(f"Date field should not exceed {MAX_TIME}")
 
 
 def git_line(*items):
@@ -259,7 +259,7 @@ class FixedSha:
         if getattr(hexsha, "encode", None) is not None:
             hexsha = hexsha.encode("ascii")
         if not isinstance(hexsha, bytes):
-            raise TypeError("Expected bytes for hexsha, got %r" % hexsha)
+            raise TypeError(f"Expected bytes for hexsha, got {hexsha!r}")
         self._hexsha = hexsha
         self._sha = hex_to_sha(hexsha)
 
@@ -302,11 +302,11 @@ class ShaFile:
         try:
             int(size)  # sanity check
         except ValueError as exc:
-            raise ObjectFormatException("Object size not an integer: %s" % exc) from exc
+            raise ObjectFormatException(f"Object size not an integer: {exc}") from exc
         obj_class = object_class(type_name)
         if not obj_class:
             raise ObjectFormatException(
-                "Not a known type: %s" % type_name.decode("ascii")
+                "Not a known type: {}".format(type_name.decode("ascii"))
             )
         return obj_class()
 
@@ -368,7 +368,7 @@ class ShaFile:
     def set_raw_string(self, text: bytes, sha: Optional[ObjectID] = None) -> None:
         """Set the contents of this object from a serialized string."""
         if not isinstance(text, bytes):
-            raise TypeError("Expected bytes for text, got %r" % text)
+            raise TypeError(f"Expected bytes for text, got {text!r}")
         self.set_raw_chunks([text], sha)
 
     def set_raw_chunks(
@@ -845,7 +845,7 @@ class Tag(ShaFile):
                 assert isinstance(value, bytes)
                 obj_class = object_class(value)
                 if not obj_class:
-                    raise ObjectFormatException("Not a known type: %s" % value)
+                    raise ObjectFormatException(f"Not a known type: {value!r}")
                 self._object_class = obj_class
             elif field == _TAG_HEADER:
                 self._name = value
@@ -869,7 +869,7 @@ class Tag(ShaFile):
                         self._message = value[:sig_idx]
                         self._signature = value[sig_idx:]
             else:
-                raise ObjectFormatException("Unknown field %s" % field)
+                raise ObjectFormatException(f"Unknown field {field}")
 
     def _get_object(self):
         """Get the object pointed to by this tag.
@@ -956,7 +956,7 @@ class TreeEntry(namedtuple("TreeEntry", ["path", "mode", "sha"])):
     def in_path(self, path: bytes):
         """Return a copy of this entry with the given path prepended."""
         if not isinstance(self.path, bytes):
-            raise TypeError("Expected bytes for path, got %r" % path)
+            raise TypeError(f"Expected bytes for path, got {path!r}")
         return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
 
@@ -976,11 +976,11 @@ def parse_tree(text, strict=False):
         mode_end = text.index(b" ", count)
         mode_text = text[count:mode_end]
         if strict and mode_text.startswith(b"0"):
-            raise ObjectFormatException("Invalid mode '%s'" % mode_text)
+            raise ObjectFormatException(f"Invalid mode '{mode_text}'")
         try:
             mode = int(mode_text, 8)
         except ValueError as exc:
-            raise ObjectFormatException("Invalid mode '%s'" % mode_text) from exc
+            raise ObjectFormatException(f"Invalid mode '{mode_text}'") from exc
         name_end = text.index(b"\0", mode_end)
         name = text[mode_end + 1 : name_end]
         count = name_end + 21
@@ -1000,7 +1000,7 @@ def serialize_tree(items):
     """
     for name, mode, hexsha in items:
         yield (
-            ("%04o" % mode).encode("ascii") + b" " + name + b"\0" + hex_to_sha(hexsha)
+            (f"{mode:04o}").encode("ascii") + b" " + name + b"\0" + hex_to_sha(hexsha)
         )
 
 
@@ -1023,7 +1023,7 @@ def sorted_tree_items(entries, name_order: bool):
         # Stricter type checks than normal to mirror checks in the C version.
         mode = int(mode)
         if not isinstance(hexsha, bytes):
-            raise TypeError("Expected bytes for SHA, got %r" % hexsha)
+            raise TypeError(f"Expected bytes for SHA, got {hexsha!r}")
         yield TreeEntry(name, mode, hexsha)
 
 
@@ -1180,21 +1180,21 @@ class Tree(ShaFile):
             stat.S_IFREG | 0o664,
         )
         for name, mode, sha in parse_tree(b"".join(self._chunked_text), True):
-            check_hexsha(sha, "invalid sha %s" % sha)
+            check_hexsha(sha, f"invalid sha {sha}")
             if b"/" in name or name in (b"", b".", b"..", b".git"):
                 raise ObjectFormatException(
-                    "invalid name %s" % name.decode("utf-8", "replace")
+                    "invalid name {}".format(name.decode("utf-8", "replace"))
                 )
 
             if mode not in allowed_modes:
-                raise ObjectFormatException("invalid mode %06o" % mode)
+                raise ObjectFormatException(f"invalid mode {mode:06o}")
 
             entry = (name, (mode, sha))
             if last:
                 if key_entry(last) > key_entry(entry):
                     raise ObjectFormatException("entries not sorted")
                 if name == last[0]:
-                    raise ObjectFormatException("duplicate entry %s" % name)
+                    raise ObjectFormatException(f"duplicate entry {name}")
             last = entry
 
     def _serialize(self):

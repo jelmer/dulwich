@@ -217,7 +217,7 @@ def get_info_refs(req, backend, mat):
             yield req.forbidden("Unsupported service")
             return
         req.nocache()
-        write = req.respond(HTTP_OK, "application/x-%s-advertisement" % service)
+        write = req.respond(HTTP_OK, f"application/x-{service}-advertisement")
         proto = ReceivableProtocol(BytesIO().read, write)
         handler = handler_cls(
             backend,
@@ -308,7 +308,7 @@ def handle_service_request(req, backend, mat):
         yield req.not_found(str(e))
         return
     req.nocache()
-    write = req.respond(HTTP_OK, "application/x-%s-result" % service)
+    write = req.respond(HTTP_OK, f"application/x-{service}-result")
     if req.environ.get("HTTP_TRANSFER_ENCODING") == "chunked":
         read = ChunkReader(req.environ["wsgi.input"]).read
     else:
@@ -555,8 +555,7 @@ class WSGIServerLogger(WSGIServer):
     def handle_error(self, request, client_address):
         """Handle an error."""
         logger.exception(
-            "Exception happened during processing of request from %s"
-            % str(client_address)
+            f"Exception happened during processing of request from {client_address!s}"
         )
 
 

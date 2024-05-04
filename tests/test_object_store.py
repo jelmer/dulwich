@@ -208,7 +208,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
         # add temporary files to the loose store
         for i in range(256):
-            dirname = os.path.join(self.store_dir, "%02x" % i)
+            dirname = os.path.join(self.store_dir, f"{i:02x}")
             if not os.path.isdir(dirname):
                 os.makedirs(dirname)
             fd, n = tempfile.mkstemp(prefix="tmp_obj_", dir=dirname)

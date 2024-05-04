@@ -203,7 +203,7 @@ class Config:
             return True
         elif value.lower() == b"false":
             return False
-        raise ValueError("not a valid boolean string: %r" % value)
+        raise ValueError(f"not a valid boolean string: {value!r}")
 
     def set(
         self, section: SectionLike, name: NameLike, value: Union[ValueLike, bool]
@@ -492,15 +492,15 @@ def _parse_section_header_line(line: bytes) -> Tuple[Section, bytes]:
     section: Section
     if len(pts) == 2:
         if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
-            raise ValueError("Invalid subsection %r" % pts[1])
+            raise ValueError(f"Invalid subsection {pts[1]!r}")
         else:
             pts[1] = pts[1][1:-1]
         if not _check_section_name(pts[0]):
-            raise ValueError("invalid section name %r" % pts[0])
+            raise ValueError(f"invalid section name {pts[0]!r}")
         section = (pts[0], pts[1])
     else:
         if not _check_section_name(pts[0]):
-            raise ValueError("invalid section name %r" % pts[0])
+            raise ValueError(f"invalid section name {pts[0]!r}")
         pts = pts[0].split(b".", 1)
         if len(pts) == 2:
             section = (pts[0], pts[1])
@@ -540,7 +540,7 @@ class ConfigFile(ConfigDict):
                 if _strip_comments(line).strip() == b"":
                     continue
                 if section is None:
-                    raise ValueError("setting %r without section" % line)
+                    raise ValueError(f"setting {line!r} without section")
                 try:
                     setting, value = line.split(b"=", 1)
                 except ValueError:
@@ -548,7 +548,7 @@ class ConfigFile(ConfigDict):
                     value = b"true"
                 setting = setting.strip()
                 if not _check_variable_name(setting):
-                    raise ValueError("invalid variable name %r" % setting)
+                    raise ValueError(f"invalid variable name {setting!r}")
                 if value.endswith(b"\\\n"):
                     continuation = value[:-2]
                 elif value.endswith(b"\\\r\n"):

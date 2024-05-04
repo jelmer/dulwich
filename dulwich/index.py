@@ -306,7 +306,7 @@ def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
     """Read an index file, yielding the individual entries."""
     header = f.read(4)
     if header != b"DIRC":
-        raise AssertionError("Invalid index file header: %r" % header)
+        raise AssertionError(f"Invalid index file header: {header!r}")
     (version, num_entries) = struct.unpack(b">LL", f.read(4 * 2))
     if version not in (1, 2, 3):
         raise UnsupportedIndexFormat(version)
@@ -329,7 +329,7 @@ def read_index_dict(f) -> Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
         else:
             existing = ret.setdefault(entry.name, ConflictedIndexEntry())
             if isinstance(existing, IndexEntry):
-                raise AssertionError("Non-conflicted entry for %r exists" % entry.name)
+                raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
             if stage == Stage.MERGE_CONFLICT_ANCESTOR:
                 existing.ancestor = IndexEntry.from_serialized(entry)
             elif stage == Stage.MERGE_CONFLICT_THIS:
@@ -714,7 +714,7 @@ if sys.platform == "win32":
             super(PermissionError, self).__init__(
                 errno,
                 "Unable to create symlink; "
-                "do you have developer mode enabled? %s" % msg,
+                f"do you have developer mode enabled? {msg}",
                 filename,
             )
 

@@ -26,7 +26,8 @@ from io import BytesIO
 from itertools import chain
 from typing import Dict, List, Optional
 
-from .objects import S_ISGITLINK, Tree, TreeEntry
+from .object_store import BaseObjectStore
+from .objects import S_ISGITLINK, ObjectID, ShaFile, Tree, TreeEntry
 
 # TreeChange type constants.
 CHANGE_ADD = "add"
@@ -238,7 +239,8 @@ def _all_same(seq, key):
     return _all_eq(seq[1:], key, key(seq[0]))
 
 
-def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None):
+def tree_changes_for_merge(
+        store: BaseObjectStore, parent_tree_ids: List[ObjectID], tree_id: ObjectID, rename_detector=None):
     """Get the tree changes for a merge tree relative to all its parents.
 
     Args:
@@ -302,7 +304,7 @@ def tree_changes_for_merge(store, parent_tree_ids, tree_id, rename_detector=None
 _BLOCK_SIZE = 64
 
 
-def _count_blocks(obj):
+def _count_blocks(obj: ShaFile) -> Dict[int, int]:
     """Count the blocks in an object.
 
     Splits the data into blocks either on lines or <=64-byte chunks of lines.
@@ -324,10 +326,10 @@ def _count_blocks(obj):
     block_getvalue = block.getvalue
 
     for c in chain.from_iterable(obj.as_raw_chunks()):
-        c = c.to_bytes(1, "big")
-        block_write(c)
+        cb = c.to_bytes(1, "big")
+        block_write(cb)
         n += 1
-        if c == b"\n" or n == _BLOCK_SIZE:
+        if cb == b"\n" or n == _BLOCK_SIZE:
             value = block_getvalue()
             block_counts[hash(value)] += len(value)
             block_seek(0)

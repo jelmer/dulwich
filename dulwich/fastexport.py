@@ -193,7 +193,7 @@ class GitImportProcessor(processor.ImportProcessor):
             elif filecmd.name == b"filedeleteall":
                 self._contents = {}
             else:
-                raise Exception("Command %s not supported" % filecmd.name)
+                raise Exception(f"Command {filecmd.name} not supported")
         commit.tree = commit_tree(
             self.repo.object_store,
             ((path, hexsha, mode) for (path, (mode, hexsha)) in self._contents.items()),

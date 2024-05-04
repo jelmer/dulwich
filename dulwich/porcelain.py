@@ -386,7 +386,7 @@ def symbolic_ref(repo, ref_name, force=False):
     with open_repo_closing(repo) as repo_obj:
         ref_path = _make_branch_ref(ref_name)
         if not force and ref_path not in repo_obj.refs.keys():
-            raise Error("fatal: ref `%s` is not a ref" % ref_name)
+            raise Error(f"fatal: ref `{ref_name}` is not a ref")
         repo_obj.refs.set_symbolic_ref(b"HEAD", ref_path)
 
 
@@ -670,7 +670,7 @@ def remove(repo=".", paths=None, cached=False):
             try:
                 index_sha = index[tree_path].sha
             except KeyError as exc:
-                raise Error("%s did not match any files" % p) from exc
+                raise Error(f"{p} did not match any files") from exc
 
             if not cached:
                 try:
@@ -693,11 +693,11 @@ def remove(repo=".", paths=None, cached=False):
                         if blob.id != index_sha and index_sha != committed_sha:
                             raise Error(
                                 "file has staged content differing "
-                                "from both the file and head: %s" % p
+                                f"from both the file and head: {p}"
                             )
 
                         if index_sha != committed_sha:
-                            raise Error("file has staged changes: %s" % p)
+                            raise Error(f"file has staged changes: {p}")
                         os.remove(full_path)
             del index[tree_path]
         index.write()
@@ -1103,7 +1103,7 @@ def tag_delete(repo, name):
         elif isinstance(name, list):
             names = name
         else:
-            raise Error("Unexpected tag name type %r" % name)
+            raise Error(f"Unexpected tag name type {name!r}")
         for name in names:
             del r.refs[_make_tag_ref(name)]
 
@@ -1193,7 +1193,7 @@ def push(
                     try:
                         localsha = r.refs[lh]
                     except KeyError as exc:
-                        raise Error("No valid ref %s in local repository" % lh) from exc
+                        raise Error(f"No valid ref {lh} in local repository") from exc
                     if not force_ref and rh in refs:
                         check_diverged(r, refs[rh], localsha)
                     new_refs[rh] = localsha
@@ -1604,7 +1604,7 @@ def branch_create(repo, name, objectish=None, force=False):
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
             if not r.refs.add_if_new(refname, object.id, message=ref_message):
-                raise Error("Branch with name %s already exists." % name)
+                raise Error(f"Branch with name {name} already exists.")
 
 
 def branch_list(repo):

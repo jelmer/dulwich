@@ -124,7 +124,7 @@ class GitFileTests(TestCase):
 
     def test_write(self):
         foo = self.path("foo")
-        foo_lock = "%s.lock" % foo
+        foo_lock = f"{foo}.lock"
 
         orig_f = open(foo, "rb")
         self.assertEqual(orig_f.read(), b"foo contents")
@@ -167,7 +167,7 @@ class GitFileTests(TestCase):
 
     def test_abort(self):
         foo = self.path("foo")
-        foo_lock = "%s.lock" % foo
+        foo_lock = f"{foo}.lock"
 
         orig_f = open(foo, "rb")
         self.assertEqual(orig_f.read(), b"foo contents")

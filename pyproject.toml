@@ -12,7 +12,6 @@ keywords = ["vcs", "git"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -24,10 +23,9 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Topic :: Software Development :: Version Control",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 dependencies = [
     "urllib3>=1.25",
-    'typing_extensions;python_version<="3.7"',
     'setuptools ; python_version >= "3.12"',
 ]
 dynamic = ["version"]

@@ -830,7 +830,7 @@ def read_pack_header(read) -> Tuple[int, int]:
     if not header:
         raise AssertionError("file too short to contain pack")
     if header[:4] != b"PACK":
-        raise AssertionError("Invalid pack header %r" % header)
+        raise AssertionError(f"Invalid pack header {header!r}")
     (version,) = unpack_from(b">L", header, 4)
     if version not in (2, 3):
         raise AssertionError("Version was %d" % version)
@@ -2343,7 +2343,7 @@ def apply_delta(src_buf, delta):
             raise ApplyDeltaError("Invalid opcode 0")
 
     if index != delta_length:
-        raise ApplyDeltaError("delta not empty: %r" % delta[index:])
+        raise ApplyDeltaError(f"delta not empty: {delta[index:]!r}")
 
     if dest_size != chunks_length(out):
         raise ApplyDeltaError("dest size incorrect")
@@ -2610,7 +2610,7 @@ class Pack:
             to determine whether or not a .keep file is obsolete.
         Returns: The path of the .keep file, as a string.
         """
-        keepfile_name = "%s.keep" % self._basename
+        keepfile_name = f"{self._basename}.keep"
         with GitFile(keepfile_name, "wb") as keepfile:
             if msg:
                 keepfile.write(msg)

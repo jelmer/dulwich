@@ -260,12 +260,12 @@ class PackHandler(Handler):
                 continue
             if cap not in allowable_caps:
                 raise GitProtocolError(
-                    "Client asked for capability %r that " "was not advertised." % cap
+                    f"Client asked for capability {cap!r} that " "was not advertised."
                 )
         for cap in self.required_capabilities():
             if cap not in caps:
                 raise GitProtocolError(
-                    "Client does not support required " "capability %r." % cap
+                    "Client does not support required " f"capability {cap!r}."
                 )
         self._client_capabilities = set(caps)
         logger.info("Client capabilities: %s", caps)
@@ -273,7 +273,7 @@ class PackHandler(Handler):
     def has_capability(self, cap: bytes) -> bool:
         if self._client_capabilities is None:
             raise GitProtocolError(
-                "Server attempted to access capability %r " "before asking client" % cap
+                f"Server attempted to access capability {cap!r} " "before asking client"
             )
         return cap in self._client_capabilities
 
@@ -461,7 +461,7 @@ def _split_proto_line(line, allowed):
             return tuple(fields)
         elif command == COMMAND_DEEPEN:
             return command, int(fields[1])
-    raise GitProtocolError("Received invalid line from client: %r" % line)
+    raise GitProtocolError(f"Received invalid line from client: {line!r}")
 
 
 def _find_shallow(store: ObjectContainer, heads, depth):
@@ -648,7 +648,7 @@ class _ProtocolGraphWalker:
         want_revs = []
         while command == COMMAND_WANT:
             if sha not in values:
-                raise GitProtocolError("Client wants invalid object %s" % sha)
+                raise GitProtocolError(f"Client wants invalid object {sha}")
             want_revs.append(sha)
             command, sha = self.read_proto_line(allowed)
 
@@ -676,7 +676,7 @@ class _ProtocolGraphWalker:
 
     def ack(self, have_ref):
         if len(have_ref) != 40:
-            raise ValueError("invalid sha %r" % have_ref)
+            raise ValueError(f"invalid sha {have_ref!r}")
         return self._impl.ack(have_ref)
 
     def reset(self):
@@ -1119,7 +1119,7 @@ class UploadArchiveHandler(Handler):
         for pkt in self.proto.read_pkt_seq():
             (key, value) = pkt.split(b" ", 1)
             if key != b"argument":
-                raise GitProtocolError("unknown command %s" % key)
+                raise GitProtocolError(f"unknown command {key}")
             arguments.append(value.rstrip(b"\n"))
         prefix = b""
         format = "tar"
@@ -1166,7 +1166,7 @@ class TCPGitRequestHandler(socketserver.StreamRequestHandler):
 
         cls = self.handlers.get(command, None)
         if not callable(cls):
-            raise GitProtocolError("Invalid service %s" % command)
+            raise GitProtocolError(f"Invalid service {command}")
         h = cls(self.server.backend, args, proto)
         h.handle()
 

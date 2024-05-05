@@ -115,6 +115,7 @@ before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf
 
 [tool.cibuildwheel.linux]
 skip = "*-musllinux_*"
+archs = ["auto", "aarch64"]
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx_arm64"

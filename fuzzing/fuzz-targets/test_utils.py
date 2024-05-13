@@ -18,3 +18,55 @@ def is_expected_exception(
         if error in str(exception):
             return True
     return False
+
+
+class EnhancedFuzzedDataProvider(atheris.FuzzedDataProvider):  # pragma: no cover
+    """Extends atheris.FuzzedDataProvider to offer additional methods to make fuzz testing slightly more DRY."""
+
+    def __init__(self, data):
+        """Initializes the EnhancedFuzzedDataProvider with fuzzing data from the argument provided to TestOneInput.
+
+        Args:
+            data (bytes): The binary data used for fuzzing.
+        """
+        super().__init__(data)
+
+    def ConsumeRemainingBytes(self) -> bytes:
+        """Consume the remaining bytes in the bytes container.
+
+        Returns:
+          bytes: Zero or more bytes.
+        """
+        return self.ConsumeBytes(self.remaining_bytes())
+
+    def ConsumeRandomBytes(self, max_length=None) -> bytes:
+        """Consume a random count of bytes from the bytes container.
+
+        Args:
+          max_length (int, optional): The maximum length of the string. Defaults to the number of remaining bytes.
+
+        Returns:
+          bytes: Zero or more bytes.
+        """
+        if max_length is None:
+            max_length = self.remaining_bytes()
+        else:
+            max_length = min(max_length, self.remaining_bytes())
+
+        return self.ConsumeBytes(self.ConsumeIntInRange(0, max_length))
+
+    def ConsumeRandomString(self, max_length=None) -> str:
+        """Consume bytes to produce a Unicode string.
+
+        Args:
+          max_length (int, optional): The maximum length of the string. Defaults to the number of remaining bytes.
+
+        Returns:
+         str: A Unicode string.
+        """
+        if max_length is None:
+            max_length = self.remaining_bytes()
+        else:
+            max_length = min(max_length, self.remaining_bytes())
+
+        return self.ConsumeUnicode(self.ConsumeIntInRange(0, max_length))

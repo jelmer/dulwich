@@ -37,7 +37,7 @@ jobs:
         if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
       - name: Style checks
         run: |
-          pip install --upgrade ruff
+          pip install ".[dev]"
           python -m ruff check .
           python -m ruff format --check .
       - name: Typing checks

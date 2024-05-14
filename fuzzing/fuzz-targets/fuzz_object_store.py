@@ -1,5 +1,5 @@
-import sys
 import stat
+import sys
 from io import BytesIO
 
 import atheris
@@ -7,12 +7,13 @@ import atheris
 with atheris.instrument_imports():
     # We instrument `test_utils` as well, so it doesn't block coverage analysis in Fuzz Introspector:
     from test_utils import EnhancedFuzzedDataProvider, is_expected_exception
-    from dulwich.objects import Blob, Tree, Commit, S_IFGITLINK
+
     from dulwich.errors import ObjectFormatException
+    from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
     from dulwich.patch import write_tree_diff
     from dulwich.repo import (
-        MemoryRepo,
         InvalidUserIdentity,
+        MemoryRepo,
     )
 
 

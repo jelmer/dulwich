@@ -1,8 +1,8 @@
 import sys
 from io import BytesIO
-from test_utils import is_expected_exception
 
 import atheris
+from test_utils import is_expected_exception
 
 with atheris.instrument_imports():
     from dulwich.config import ConfigFile

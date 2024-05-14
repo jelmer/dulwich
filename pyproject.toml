@@ -41,6 +41,9 @@ fastimport = ["fastimport"]
 https = ["urllib3>=1.24.1"]
 pgp = ["gpg"]
 paramiko = ["paramiko"]
+dev = [
+    "ruff==0.4.4"
+]
 
 [project.scripts]
 dulwich = "dulwich.cli:main"

@@ -1,5 +1,6 @@
-import atheris  # pragma: no cover
 from typing import List  # pragma: no cover
+
+import atheris  # pragma: no cover
 
 
 @atheris.instrument_func
@@ -8,7 +9,7 @@ def is_expected_exception(
 ):  # pragma: no cover
     """Checks if the message of a given exception matches any of the expected error messages.
 
-     Args:
+    Args:
          error_message_list (List[str]): A list of error message substrings to check against the exception's message.
          exception (Exception): The exception object raised during execution.
 
@@ -82,5 +83,4 @@ class EnhancedFuzzedDataProvider(atheris.FuzzedDataProvider):  # pragma: no cove
         Returns:
           int: An integer.
         """
-
         return self.ConsumeIntInRange(minimum, maximum)

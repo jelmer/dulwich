@@ -6,6 +6,7 @@ import atheris
 with atheris.instrument_imports():
     # We instrument `test_utils` as well, so it doesn't block coverage analysis in Fuzz Introspector:
     from test_utils import EnhancedFuzzedDataProvider, is_expected_exception
+
     from dulwich.bundle import Bundle, read_bundle, write_bundle
     from dulwich.pack import PackData, write_pack_objects
 

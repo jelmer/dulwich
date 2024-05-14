@@ -1207,9 +1207,7 @@ class HttpGitClientTests(TestCase):
                 preload_content=True,
             ):
                 response = HTTPResponse(
-                    headers={
-                        "Content-Type": "application/x-git-upload-pack-result"
-                    },
+                    headers={"Content-Type": "application/x-git-upload-pack-result"},
                     request_method=method,
                     request_url=url,
                     preload_content=preload_content,

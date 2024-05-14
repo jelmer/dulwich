@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 import tempfile
 
 import atheris
@@ -7,9 +7,10 @@ import atheris
 with atheris.instrument_imports():
     # We instrument `test_utils` as well, so it doesn't block coverage analysis in Fuzz Introspector:
     from test_utils import EnhancedFuzzedDataProvider
+
     from dulwich.repo import (
-        Repo,
         InvalidUserIdentity,
+        Repo,
     )
 
 

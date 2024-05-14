@@ -829,9 +829,7 @@ class BaseRepo:
           KeyError: when the specified ref or object does not exist
         """
         if not isinstance(name, bytes):
-            raise TypeError(
-                f"'name' must be bytestring, not {type(name).__name__:.80}"
-            )
+            raise TypeError(f"'name' must be bytestring, not {type(name).__name__:.80}")
         if len(name) in (20, 40):
             try:
                 return self.object_store[name]
@@ -1473,9 +1471,7 @@ class Repo(BaseRepo):
                     del index[tree_path]
                     continue
                 except KeyError as exc:
-                    raise KeyError(
-                        f"file '{tree_path.decode()}' not in index"
-                    ) from exc
+                    raise KeyError(f"file '{tree_path.decode()}' not in index") from exc
 
             st = None
             try:

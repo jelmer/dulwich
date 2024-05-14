@@ -624,7 +624,9 @@ class SuperCommand(Command):
 
     def run(self, args):
         if not args and not self.default_command:
-            print("Supported subcommands: {}".format(", ".join(self.subcommands.keys())))
+            print(
+                "Supported subcommands: {}".format(", ".join(self.subcommands.keys()))
+            )
             return False
         cmd = args[0]
         try:

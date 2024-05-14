@@ -179,9 +179,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         )
         swift_repo = swift.SwiftRepo("fakerepo", self.conf)
         for branch in ("master", "mybranch", "pullr-108"):
-            remote_shas[branch] = swift_repo.refs.read_loose_ref(
-                f"refs/heads/{branch}"
-            )
+            remote_shas[branch] = swift_repo.refs.read_loose_ref(f"refs/heads/{branch}")
         self.assertDictEqual(local_shas, remote_shas)
 
     def test_push_data_branch(self):

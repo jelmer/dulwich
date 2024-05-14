@@ -2,6 +2,7 @@ import atheris  # pragma: no cover
 from typing import List  # pragma: no cover
 
 
+@atheris.instrument_func
 def is_expected_exception(
     error_message_list: List[str], exception: Exception
 ):  # pragma: no cover
@@ -70,3 +71,16 @@ class EnhancedFuzzedDataProvider(atheris.FuzzedDataProvider):  # pragma: no cove
             max_length = min(max_length, self.remaining_bytes())
 
         return self.ConsumeUnicode(self.ConsumeIntInRange(0, max_length))
+
+    def ConsumeRandomInt(self, minimum=0, maximum=1234567890) -> int:
+        """Consume bytes to produce an integer.
+
+        Args:
+          minimum (int, optional): The minimum value of the integer. Defaults to 0.
+          maximum (int, optional): The maximum value of the integer. Defaults to 1234567890.
+
+        Returns:
+          int: An integer.
+        """
+
+        return self.ConsumeIntInRange(minimum, maximum)

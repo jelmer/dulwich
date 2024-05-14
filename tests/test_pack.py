@@ -256,7 +256,9 @@ class TestPackData(PackTests):
         self.get_pack_data(pack1_sha).close()
 
     def test_from_file(self):
-        path = os.path.join(self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii")))
+        path = os.path.join(
+            self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii"))
+        )
         with open(path, "rb") as f:
             PackData.from_file(f, os.path.getsize(path))
 

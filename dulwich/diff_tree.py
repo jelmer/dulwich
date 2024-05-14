@@ -240,7 +240,11 @@ def _all_same(seq, key):
 
 
 def tree_changes_for_merge(
-        store: BaseObjectStore, parent_tree_ids: List[ObjectID], tree_id: ObjectID, rename_detector=None):
+    store: BaseObjectStore,
+    parent_tree_ids: List[ObjectID],
+    tree_id: ObjectID,
+    rename_detector=None,
+):
     """Get the tree changes for a merge tree relative to all its parents.
 
     Args:

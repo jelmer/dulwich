@@ -1,5 +1,6 @@
 import sys
 import stat
+from io import BytesIO
 
 import atheris
 
@@ -8,6 +9,7 @@ with atheris.instrument_imports():
     from test_utils import EnhancedFuzzedDataProvider, is_expected_exception
     from dulwich.objects import Blob, Tree, Commit, S_IFGITLINK
     from dulwich.errors import ObjectFormatException
+    from dulwich.patch import write_tree_diff
     from dulwich.repo import (
         MemoryRepo,
         InvalidUserIdentity,
@@ -45,6 +47,35 @@ def TestOneInput(data):
     except ValueError as e:
         expected_exceptions = [
             "subsection not found",
+            "Unable to handle non-minute offset",
+        ]
+        if is_expected_exception(expected_exceptions, e):
+            return -1
+        else:
+            raise e
+
+    commit2 = Commit()
+    commit2.tree = tree.id
+    commit2.parents = [commit.id]
+    commit2.author = commit.author
+    commit2.committer = commit.committer
+    commit2.commit_time = fdp.ConsumeRandomInt()
+    commit2.commit_timezone = fdp.ConsumeRandomInt()
+    commit2.author_time = fdp.ConsumeRandomInt()
+    commit2.author_timezone = fdp.ConsumeRandomInt()
+    commit2.message = fdp.ConsumeRandomBytes()
+
+    try:
+        blob.data = fdp.ConsumeRandomBytes()
+        repo.object_store.add_object(blob)
+        repo.object_store.add_object(tree)
+        repo.object_store.add_object(commit2)
+        out = BytesIO()
+        write_tree_diff(out, repo.object_store, commit.tree, tree.id)
+    except (InvalidUserIdentity, ObjectFormatException):
+        return -1
+    except ValueError as e:
+        expected_exceptions = [
             "Unable to handle non-minute offset",
         ]
         if is_expected_exception(expected_exceptions, e):

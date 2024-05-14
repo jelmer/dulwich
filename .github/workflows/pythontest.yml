@@ -39,6 +39,7 @@ jobs:
         run: |
           pip install --upgrade ruff
           python -m ruff check .
+          python -m ruff format --check .
       - name: Typing checks
         run: |
           pip install --upgrade mypy types-paramiko types-requests

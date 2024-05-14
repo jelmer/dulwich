@@ -39,7 +39,7 @@ def TestOneInput(data):
             "unsupported bundle format header",
         ]
         if is_expected_exception(expected_exceptions, e):
-            return
+            return -1
         else:
             raise e
 

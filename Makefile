@@ -1,5 +1,5 @@
 PYTHON = python3
-RUFF ?= $(PYTHON) -m ruff 
+RUFF ?= $(PYTHON) -m ruff
 SETUP = $(PYTHON) setup.py
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=$(shell pwd)$(if $(PYTHONPATH),:$(PYTHONPATH),) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
@@ -53,6 +53,7 @@ clean::
 
 style:
 	$(RUFF) check .
+	$(RUFF) format --check .
 
 coverage:
 	$(COVERAGE) run -m unittest tests.test_suite dulwich.contrib.test_suite

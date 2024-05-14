@@ -8,6 +8,8 @@
 
  * Drop Python 3.7 support. (Jelmer Vernooĳ)
 
+ * Improve fuzzing coverage (David Lakin)
+
 0.22.1	2024-04-23
 
  * Handle alternate case for worktreeconfig setting (Will Shanks, #1285)

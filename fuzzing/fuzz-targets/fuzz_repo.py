@@ -6,7 +6,7 @@ import atheris
 
 with atheris.instrument_imports():
     # We instrument `test_utils` as well, so it doesn't block coverage analysis in Fuzz Introspector:
-    from test_utils import EnhancedFuzzedDataProvider
+    from test_utils import EnhancedFuzzedDataProvider, is_expected_exception
 
     from dulwich.repo import (
         InvalidUserIdentity,
@@ -42,6 +42,9 @@ def TestOneInput(data):
             )
         except InvalidUserIdentity:
             return -1
+        except ValueError as e:
+            if is_expected_exception(["Unable to handle non-minute offset"], e):
+                return -1
 
         for file_path in file_paths:
             with open(file_path, "wb") as f:

@@ -57,11 +57,12 @@ class EnhancedFuzzedDataProvider(atheris.FuzzedDataProvider):  # pragma: no cove
 
         return self.ConsumeBytes(self.ConsumeIntInRange(0, max_length))
 
-    def ConsumeRandomString(self, max_length=None) -> str:
+    def ConsumeRandomString(self, max_length=None, without_surrogates=False) -> str:
         """Consume bytes to produce a Unicode string.
 
         Args:
           max_length (int, optional): The maximum length of the string. Defaults to the number of remaining bytes.
+          without_surrogates (bool, optional): If True, never generate surrogate pair characters. Defaults to False.
 
         Returns:
          str: A Unicode string.
@@ -71,7 +72,12 @@ class EnhancedFuzzedDataProvider(atheris.FuzzedDataProvider):  # pragma: no cove
         else:
             max_length = min(max_length, self.remaining_bytes())
 
-        return self.ConsumeUnicode(self.ConsumeIntInRange(0, max_length))
+        count = self.ConsumeIntInRange(0, max_length)
+
+        if without_surrogates:
+            return self.ConsumeUnicodeNoSurrogates(count)
+        else:
+            return self.ConsumeUnicode(count)
 
     def ConsumeRandomInt(self, minimum=0, maximum=1234567890) -> int:
         """Consume bytes to produce an integer.

@@ -21,16 +21,21 @@ def TestOneInput(data):
         repo.set_description(fdp.ConsumeRandomBytes())
         repo.get_description()
 
-        # Generate a minimal set of files based on fuzz data to minimize I/O operations.
-        file_paths = [
-            os.path.join(temp_dir, f"File{i}")
-            for i in range(min(3, fdp.ConsumeIntInRange(1, 3)))
-        ]
-        for file_path in file_paths:
-            with open(file_path, "wb") as f:
-                f.write(fdp.ConsumeRandomBytes())
+        try:
+            # Generate a minimal set of files based on fuzz data to minimize I/O operations.
+            file_names = [
+                f"File{i}{fdp.ConsumeRandomString(without_surrogates=True)}"
+                for i in range(min(3, fdp.ConsumeIntInRange(1, 3)))
+            ]
+            for file in file_names:
+                with open(os.path.join(temp_dir, file), "wb") as f:
+                    f.write(fdp.ConsumeRandomBytes())
+        except (ValueError, OSError):
+            # Exit early if the fuzzer generates an invalid filename.
+            return -1
 
         try:
+            repo.stage(file_names)
             repo.do_commit(
                 message=fdp.ConsumeRandomBytes(),
                 committer=fdp.ConsumeRandomBytes(),
@@ -45,15 +50,8 @@ def TestOneInput(data):
         except ValueError as e:
             if is_expected_exception(["Unable to handle non-minute offset"], e):
                 return -1
-
-        for file_path in file_paths:
-            with open(file_path, "wb") as f:
-                f.write(fdp.ConsumeRandomBytes())
-
-        repo.stage(file_paths)
-        repo.do_commit(
-            message=fdp.ConsumeRandomBytes(),
-        )
+            else:
+                raise e
 
 
 def main():

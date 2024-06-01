@@ -119,4 +119,4 @@ archs = ["auto", "aarch64"]
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx_arm64"
-before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y && rustup target add x86_64-apple-darwin"
+before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y && rustup target add aarch64-apple-darwin x86_64-apple-darwin"

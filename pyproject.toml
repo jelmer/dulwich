@@ -106,9 +106,6 @@ ignore = [
     "E741",  # ambiguous variable name
 ]
 
-[tool.ruff]
-target-version = "py37"
-
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 

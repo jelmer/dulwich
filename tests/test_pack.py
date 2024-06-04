@@ -1284,6 +1284,36 @@ class DeltaChainIteratorTests(TestCase):
         except UnresolvedDeltas as e:
             self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.shas),))
 
+    def test_ext_ref_deltified_object_based_on_itself(self):
+        b1_content = b"foo"
+        (b1,) = self.store_blobs([b1_content])
+        f = BytesIO()
+        build_pack(
+            f,
+            [
+                # b1's content refers to bl1's object ID as delta base
+                (REF_DELTA, (b1.id, b1_content)),
+            ],
+            store=self.store,
+        )
+        fsize = f.tell()
+        f.seek(0)
+        packdata = PackData.from_file(f, fsize)
+        indexfile = BytesIO()
+        packdata.create_index(
+            "test.idx",
+            version=2,
+            resolve_ext_ref=self.get_raw_no_repeat,
+        )
+        indexfile.seek(0)
+        packindex = load_pack_index("test.idx")
+        pack = Pack.from_objects(packdata, packindex)
+        try:
+            # Attempting to open this REF_DELTA object would loop forever
+            pack[b1.id]
+        except UnresolvedDeltas as e:
+            self.assertEqual((b1.id), e.shas)
+
 
 class DeltaEncodeSizeTests(TestCase):
     def test_basic(self):

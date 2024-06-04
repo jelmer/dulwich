@@ -1299,13 +1299,11 @@ class DeltaChainIteratorTests(TestCase):
         fsize = f.tell()
         f.seek(0)
         packdata = PackData.from_file(f, fsize)
-        indexfile = BytesIO()
         packdata.create_index(
             "test.idx",
             version=2,
             resolve_ext_ref=self.get_raw_no_repeat,
         )
-        indexfile.seek(0)
         packindex = load_pack_index("test.idx")
         pack = Pack.from_objects(packdata, packindex)
         try:

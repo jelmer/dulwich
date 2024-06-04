@@ -2655,6 +2655,8 @@ class Pack:
                 assert isinstance(basename, bytes) and len(basename) == 20
                 base_offset, base_type, base_obj = get_ref(basename)
                 assert isinstance(base_type, int)
+                if base_offset == prev_offset:  # object is based on itself
+                    raise UnresolvedDeltas(sha_to_hex(basename))
             delta_stack.append((prev_offset, base_type, delta))
 
         # Now grab the base object (mustn't be a delta) and apply the

@@ -26,7 +26,6 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "urllib3>=1.25",
-    'setuptools ; python_version >= "3.12"',
 ]
 dynamic = ["version"]
 

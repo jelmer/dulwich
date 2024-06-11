@@ -116,6 +116,7 @@ before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf
 skip = "*-musllinux_*"
 archs = ["auto", "aarch64"]
 
-[[tool.cibuildwheel.overrides]]
-select = "*-macosx_arm64"
-before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y && rustup target add x86_64-apple-darwin"
+[tool.cibuildwheel.macos]
+archs = ["auto", "universal2", "x86_64", "arm64"]
+before-all = "rustup target add x86_64-apple-darwin aarch64-apple-darwin"
+skip = "cp38-macosx_arm64 cp38-macosx_universal2 cp39-macosx_x86_64 cp39-macosx_universal2 cp310-macosx_x86_64 cp310-macosx_universal2 cp311-macosx_x86_64 cp311-macosx_universal2 cp311-macosx_universal2 cp312-macosx_x86_64 cp312-macosx_universal2"

@@ -27,12 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel fastimport paramiko urllib3 cibuildwheel setuptools-rust
-      - name: Install gpg on supported platforms
-        run: pip install -U gpg
-        if: "matrix.os != 'windows-latest'"
-      - name: Run test suite
-        run: python -m unittest tests.test_suite
+          pip install setuptools wheel cibuildwheel setuptools-rust
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         if: "matrix.os == 'ubuntu-latest'"

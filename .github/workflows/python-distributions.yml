@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        python-prefix: [pp, cp]
       fail-fast: true
 
     steps:
@@ -26,21 +27,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel fastimport paramiko urllib3 cibuildwheel setuptools-rust
-      - name: Install gpg on supported platforms
-        run: pip install -U gpg
-        if: "matrix.os != 'windows-latest'"
-      - name: Run test suite
-        run: python -m unittest tests.test_suite
+          pip install setuptools wheel cibuildwheel setuptools-rust
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         if: "matrix.os == 'ubuntu-latest'"
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BUILD: "${{ matrix.python-prefix }}*"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: artifact-${{ matrix.os }}
+          name: artifact-${{ matrix.os }}-${{ matrix.python-prefix }}
           path: ./wheelhouse/*.whl
 
   build-sdist:

@@ -33,6 +33,7 @@ import tempfile
 import threading
 from contextlib import suppress
 from io import BytesIO
+from unittest.mock import patch
 from urllib.parse import unquote
 
 from dulwich import client, file, index, objects, protocol, repo
@@ -422,6 +423,11 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         self.skipTest("skip flaky test; see #1015")
 
 
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichTCPClientTestGitProtov0(DulwichTCPClientTest):
+    pass
+
+
 class TestSSHVendor:
     @staticmethod
     def run_command(
@@ -472,6 +478,11 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         return self.gitroot + path
 
 
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichMockSSHClientTestGitProtov0(DulwichMockSSHClientTest):
+    pass
+
+
 class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self):
         CompatTestCase.setUp(self)
@@ -486,6 +497,11 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return self.gitroot + path
+
+
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichSubprocessClientTestGitProtov0(DulwichSubprocessClientTest):
+    pass
 
 
 class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -674,3 +690,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
 
     def test_archive(self):
         raise SkipTest("exporting archives not supported over http")
+
+
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichHttpClientTestGitProtov0(DulwichHttpClientTest):
+    pass

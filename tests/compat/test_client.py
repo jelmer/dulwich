@@ -570,6 +570,9 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         co = self.headers.get("cookie")
         if co:
             env["HTTP_COOKIE"] = co
+        proto = self.headers.get("Git-Protocol")
+        if proto:
+            env["GIT_PROTOCOL"] = proto
         # XXX Other HTTP_* headers
         # Since we're setting the env in the parent, provide empty
         # values to override previously set values

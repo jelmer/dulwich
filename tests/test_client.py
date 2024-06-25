@@ -58,7 +58,7 @@ from dulwich.client import (
 from dulwich.config import ConfigDict
 from dulwich.objects import Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
-from dulwich.protocol import TCP_GIT_PORT, Protocol
+from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
@@ -1539,8 +1539,13 @@ class SubprocessSSHVendorTests(TestCase):
             "2200",
             "-i",
             "/tmp/id_rsa",
-            "-o",
-            "SetEnv GIT_PROTOCOL=version=2",
+        ]
+        if DEFAULT_GIT_PROTOCOL_VERSION_FETCH:
+            expected += [
+                "-o",
+                f"SetEnv GIT_PROTOCOL=version={DEFAULT_GIT_PROTOCOL_VERSION_FETCH}",
+            ]
+        expected += [
             "user@host",
             "git-clone-url",
         ]
@@ -1564,8 +1569,13 @@ class SubprocessSSHVendorTests(TestCase):
             "-o",
             "Option=Value",
             "-x",
-            "-o",
-            "SetEnv GIT_PROTOCOL=version=2",
+        ]
+        if DEFAULT_GIT_PROTOCOL_VERSION_FETCH:
+            expected += [
+                "-o",
+                f"SetEnv GIT_PROTOCOL=version={DEFAULT_GIT_PROTOCOL_VERSION_FETCH}",
+            ]
+        expected += [
             "host",
             "git-clone-url",
         ]

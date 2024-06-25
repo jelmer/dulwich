@@ -435,8 +435,10 @@ class TestSSHVendor:
         cmd = cmd.split("-", 1)
         path = path.replace("'", "")
         env = dict(os.environ)
-        if protocol_version is None or protocol_version == 2:
-            env["GIT_PROTOCOL"] = "version=2"
+        if protocol_version is None:
+            protocol_version = protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH
+        if protocol_version > 0:
+            env["GIT_PROTOCOL"] = f"version={protocol_version}"
 
         p = subprocess.Popen(
             [*cmd, path],

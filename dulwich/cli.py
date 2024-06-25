@@ -276,6 +276,9 @@ class cmd_clone(Command):
             type=str,
             help="git-rev-list-style object filter",
         )
+        parser.add_option(
+            "--protocol", dest="protocol", type=int, help="Git protocol version to use"
+        )
         options, args = parser.parse_args(args)
 
         if args == []:
@@ -297,6 +300,7 @@ class cmd_clone(Command):
                 branch=options.branch,
                 refspec=options.refspec,
                 filter_spec=options.filter_spec,
+                protocol_version=options.protocol,
             )
         except GitProtocolError as e:
             print(f"{e}")
@@ -605,12 +609,14 @@ class cmd_pull(Command):
         parser.add_argument("from_location", type=str)
         parser.add_argument("refspec", type=str, nargs="*")
         parser.add_argument("--filter", type=str, nargs=1)
+        parser.add_argument("--protocol", type=int, nargs=1)
         args = parser.parse_args(args)
         porcelain.pull(
             ".",
             args.from_location or None,
             args.refspec or None,
             filter_spec=args.filter,
+            protocol_version=args.protocol_version or None,
         )
 
 

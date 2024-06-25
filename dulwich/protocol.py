@@ -64,6 +64,8 @@ CAPABILITY_AGENT = b"agent"
 CAPABILITY_SYMREF = b"symref"
 CAPABILITY_ALLOW_TIP_SHA1_IN_WANT = b"allow-tip-sha1-in-want"
 CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT = b"allow-reachable-sha1-in-want"
+CAPABILITY_FETCH = b"fetch"
+CAPABILITY_FILTER = b"filter"
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
@@ -90,6 +92,7 @@ KNOWN_UPLOAD_CAPABILITIES = set(
         CAPABILITY_DEEPEN_RELATIVE,
         CAPABILITY_ALLOW_TIP_SHA1_IN_WANT,
         CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
+        CAPABILITY_FETCH,
     ]
 )
 KNOWN_RECEIVE_CAPABILITIES = set(

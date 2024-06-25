@@ -101,6 +101,9 @@ from .protocol import (
     COMMAND_SHALLOW,
     COMMAND_UNSHALLOW,
     COMMAND_WANT,
+    DEFAULT_GIT_PROTOCOL_VERSION_FETCH,
+    DEFAULT_GIT_PROTOCOL_VERSION_SEND,
+    GIT_PROTOCOL_VERSIONS,
     KNOWN_RECEIVE_CAPABILITIES,
     KNOWN_UPLOAD_CAPABILITIES,
     SIDE_BAND_CHANNEL_DATA,
@@ -117,7 +120,6 @@ from .protocol import (
     extract_capability_names,
     parse_capability,
     pkt_line,
-    GIT_PROTOCOL_VERSIONS,
 )
 from .refs import PEELED_TAG_SUFFIX, _import_remote_refs, read_info_refs
 from .repo import Repo
@@ -564,7 +566,7 @@ def _handle_upload_pack_head(
     assert isinstance(wants, list) and isinstance(wants[0], bytes)
     wantcmd = COMMAND_WANT + b" " + wants[0]
     if protocol_version is None:
-        protocol_version = 0
+        protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
     if protocol_version != 2:
         wantcmd += b" " + b" ".join(sorted(capabilities))
     wantcmd += b"\n"
@@ -717,7 +719,7 @@ class GitClient:
             self._fetch_capabilities.remove(CAPABILITY_THIN_PACK)
         if include_tags:
             self._fetch_capabilities.add(CAPABILITY_INCLUDE_TAG)
-        self.protocol_version = 0  # our default Git protocol version
+        self.protocol_version = 0  # will be overridden later
 
     def get_url(self, path):
         """Retrieves full url to given path.
@@ -1190,7 +1192,7 @@ class TraditionalGitClient(GitClient):
           SendPackError: if server rejects the pack data
 
         """
-        self.protocol_version = 0
+        self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
         proto, unused_can_read, stderr = self._connect(b"receive-pack", path)
         with proto:
             try:
@@ -1546,11 +1548,11 @@ class TCPGitClient(TraditionalGitClient):
             path = path[1:]
         if cmd == b"upload-pack":
             if protocol_version is None:
-                self.protocol_version = 2
+                self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_FETCH
             else:
                 self.protocol_version = protocol_version
         else:
-            self.protocol_version = 0
+            self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
 
         if cmd == b"upload-pack" and self.protocol_version == 2:
             # Git protocol version advertisement is hidden behind two NUL bytes
@@ -2323,13 +2325,13 @@ class AbstractHttpGitClient(GitClient):
             # which lacks the "001f# service=git-receive-pack" marker.
             if service == b"git-upload-pack":
                 if protocol_version is None:
-                    self.protocol_version = 2
+                    self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_FETCH
                 else:
                     self.protocol_version = protocol_version
                 if self.protocol_version == 2:
                     headers["Git-Protocol"] = "version=2"
             else:
-                self.protocol_version = 0
+                self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
         url = urljoin(base_url, tail)
         resp, read = self._http_request(url, headers)
 
@@ -2411,7 +2413,7 @@ class AbstractHttpGitClient(GitClient):
                 ) = read_pkt_refs(proto.read_pkt_seq(), server_capabilities)
                 return refs, server_capabilities, base_url
             else:
-                self.protocol_version = 0
+                self.protocol_version = 0  # dumb servers only support protocol v0
                 return read_info_refs(resp), set(), base_url
         finally:
             resp.close()

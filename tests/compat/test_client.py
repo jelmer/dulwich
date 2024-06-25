@@ -434,7 +434,7 @@ class TestSSHVendor:
         cmd, path = command.split(" ")
         cmd = cmd.split("-", 1)
         path = path.replace("'", "")
-        env = copy.deepcopy(os.environ)
+        env = dict(os.environ)
         if protocol_version is None or protocol_version == 2:
             env["GIT_PROTOCOL"] = "version=2"
 

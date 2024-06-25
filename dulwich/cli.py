@@ -602,8 +602,8 @@ class cmd_pack_objects(Command):
 class cmd_pull(Command):
     def run(self, args):
         parser = argparse.ArgumentParser()
-        parser.add_argument("--from_location", type=str)
-        parser.add_argument("--refspec", type=str, nargs="*")
+        parser.add_argument("from_location", type=str)
+        parser.add_argument("refspec", type=str, nargs="*")
         parser.add_argument("--filter", type=str, nargs=1)
         args = parser.parse_args(args)
         porcelain.pull(

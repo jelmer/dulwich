@@ -288,6 +288,8 @@ class DulwichClientTestBase:
             self.assertDestEqualsSrc()
 
     def test_fetch_pack_no_side_band_64k(self):
+        if protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH >= 2:
+            raise SkipTest("side-band-64k cannot be disabled with git protocol v2")
         c = self._client()
         c._fetch_capabilities.remove(b"side-band-64k")
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:

@@ -411,7 +411,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
     def _build_path(self, path):
         return path
 
-    if sys.platform == "win32":
+    if sys.platform == "win32" and protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH < 2:
 
         @expectedFailure
         def test_fetch_pack_no_side_band_64k(self):

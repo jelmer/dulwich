@@ -43,6 +43,8 @@ TCP_GIT_PORT = 9418
 # As of 2024, Git only implements version 2 during 'git fetch' and still uses
 # version 0 during 'git push'.
 GIT_PROTOCOL_VERSIONS = [0, 1, 2]
+DEFAULT_GIT_PROTOCOL_VERSION_FETCH = 2
+DEFAULT_GIT_PROTOCOL_VERSION_SEND = 0
 
 ZERO_SHA = b"0" * 40
 

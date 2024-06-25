@@ -1923,8 +1923,10 @@ class SubprocessSSHVendor(SSHVendor):
         if key_filename:
             args.extend(["-i", str(key_filename)])
 
-        if protocol_version is None or protocol_version == 2:
-            args.extend(["-o", "SetEnv GIT_PROTOCOL=version=2"])
+        if protocol_version is None:
+            protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_FETCH
+        if protocol_version > 0:
+            args.extend(["-o", f"SetEnv GIT_PROTOCOL=version={protocol_version}"])
 
         if username:
             host = f"{username}@{host}"
@@ -1992,8 +1994,10 @@ class PLinkSSHVendor(SSHVendor):
         # does not work then the server should behave as if we had requested
         # protocol version 0.
         env = copy.deepcopy(os.environ)
-        if protocol_version is None or protocol_version == 2:
-            env["GIT_PROTOCOL"] = "version=2"
+        if protocol_version is None:
+            protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_FETCH
+        if protocol_version > 0:
+            env["GIT_PROTOCOL"] = f"version={protocol_version}"
 
         proc = subprocess.Popen(
             [*args, command],

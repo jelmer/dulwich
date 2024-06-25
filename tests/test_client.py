@@ -714,6 +714,7 @@ class TestSSHVendor:
         password=None,
         key_filename=None,
         ssh_command=None,
+        protocol_version=None,
     ):
         self.host = host
         self.command = command
@@ -722,6 +723,7 @@ class TestSSHVendor:
         self.password = password
         self.key_filename = key_filename
         self.ssh_command = ssh_command
+        self.protocol_version = protocol_version
 
         class Subprocess:
             pass
@@ -1537,6 +1539,8 @@ class SubprocessSSHVendorTests(TestCase):
             "2200",
             "-i",
             "/tmp/id_rsa",
+            "-o",
+            "SetEnv GIT_PROTOCOL=version=2",
             "user@host",
             "git-clone-url",
         ]
@@ -1560,6 +1564,8 @@ class SubprocessSSHVendorTests(TestCase):
             "-o",
             "Option=Value",
             "-x",
+            "-o",
+            "SetEnv GIT_PROTOCOL=version=2",
             "host",
             "git-clone-url",
         ]
@@ -1702,12 +1708,12 @@ class PLinkSSHVendorTests(TestCase):
     def test_run_with_ssh_command(self):
         expected = [
             "/path/to/plink",
-            "-x",
+            "-ssh",
             "host",
             "git-clone-url",
         ]
 
-        vendor = SubprocessSSHVendor()
+        vendor = PLinkSSHVendor()
         command = vendor.run_command(
             "host",
             "git-clone-url",

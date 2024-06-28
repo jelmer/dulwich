@@ -30,6 +30,22 @@ from .errors import GitProtocolError, HangupException
 
 TCP_GIT_PORT = 9418
 
+# Git protocol version 0 is the original Git protocol, which lacked a
+# version number until Git protocol version 1 was introduced by Brandon
+# Williams in 2017.
+#
+# Protocol version 1 is simply the original v0 protocol with the addition of
+# a single packet line, which precedes the ref advertisement, indicating the
+# protocol version being used. This was done in preparation for protocol v2.
+#
+# Git protocol version 2 was first introduced by Brandon Williams in 2018 and
+# adds many features. See the gitprotocol-v2(5) manual page for details.
+# As of 2024, Git only implements version 2 during 'git fetch' and still uses
+# version 0 during 'git push'.
+GIT_PROTOCOL_VERSIONS = [0, 1, 2]
+DEFAULT_GIT_PROTOCOL_VERSION_FETCH = 2
+DEFAULT_GIT_PROTOCOL_VERSION_SEND = 0
+
 ZERO_SHA = b"0" * 40
 
 SINGLE_ACK = 0
@@ -64,6 +80,8 @@ CAPABILITY_AGENT = b"agent"
 CAPABILITY_SYMREF = b"symref"
 CAPABILITY_ALLOW_TIP_SHA1_IN_WANT = b"allow-tip-sha1-in-want"
 CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT = b"allow-reachable-sha1-in-want"
+CAPABILITY_FETCH = b"fetch"
+CAPABILITY_FILTER = b"filter"
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
@@ -90,6 +108,7 @@ KNOWN_UPLOAD_CAPABILITIES = set(
         CAPABILITY_DEEPEN_RELATIVE,
         CAPABILITY_ALLOW_TIP_SHA1_IN_WANT,
         CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
+        CAPABILITY_FETCH,
     ]
 )
 KNOWN_RECEIVE_CAPABILITIES = set(

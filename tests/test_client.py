@@ -58,7 +58,7 @@ from dulwich.client import (
 from dulwich.config import ConfigDict
 from dulwich.objects import Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
-from dulwich.protocol import TCP_GIT_PORT, Protocol
+from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
@@ -72,7 +72,7 @@ class DummyClient(TraditionalGitClient):
         self.write = write
         TraditionalGitClient.__init__(self)
 
-    def _connect(self, service, path):
+    def _connect(self, service, path, protocol_version=None):
         return Protocol(self.read, self.write), self.can_read, None
 
 
@@ -714,6 +714,7 @@ class TestSSHVendor:
         password=None,
         key_filename=None,
         ssh_command=None,
+        protocol_version=None,
     ):
         self.host = host
         self.command = command
@@ -722,6 +723,7 @@ class TestSSHVendor:
         self.password = password
         self.key_filename = key_filename
         self.ssh_command = ssh_command
+        self.protocol_version = protocol_version
 
         class Subprocess:
             pass
@@ -1537,6 +1539,13 @@ class SubprocessSSHVendorTests(TestCase):
             "2200",
             "-i",
             "/tmp/id_rsa",
+        ]
+        if DEFAULT_GIT_PROTOCOL_VERSION_FETCH:
+            expected += [
+                "-o",
+                f"SetEnv GIT_PROTOCOL=version={DEFAULT_GIT_PROTOCOL_VERSION_FETCH}",
+            ]
+        expected += [
             "user@host",
             "git-clone-url",
         ]
@@ -1560,6 +1569,13 @@ class SubprocessSSHVendorTests(TestCase):
             "-o",
             "Option=Value",
             "-x",
+        ]
+        if DEFAULT_GIT_PROTOCOL_VERSION_FETCH:
+            expected += [
+                "-o",
+                f"SetEnv GIT_PROTOCOL=version={DEFAULT_GIT_PROTOCOL_VERSION_FETCH}",
+            ]
+        expected += [
             "host",
             "git-clone-url",
         ]
@@ -1702,12 +1718,12 @@ class PLinkSSHVendorTests(TestCase):
     def test_run_with_ssh_command(self):
         expected = [
             "/path/to/plink",
-            "-x",
+            "-ssh",
             "host",
             "git-clone-url",
         ]
 
-        vendor = SubprocessSSHVendor()
+        vendor = PLinkSSHVendor()
         command = vendor.run_command(
             "host",
             "git-clone-url",

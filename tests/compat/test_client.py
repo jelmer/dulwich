@@ -33,6 +33,7 @@ import tempfile
 import threading
 from contextlib import suppress
 from io import BytesIO
+from unittest.mock import patch
 from urllib.parse import unquote
 
 from dulwich import client, file, index, objects, protocol, repo
@@ -288,6 +289,8 @@ class DulwichClientTestBase:
             self.assertDestEqualsSrc()
 
     def test_fetch_pack_no_side_band_64k(self):
+        if protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH >= 2:
+            raise SkipTest("side-band-64k cannot be disabled with git protocol v2")
         c = self._client()
         c._fetch_capabilities.remove(b"side-band-64k")
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
@@ -408,7 +411,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
     def _build_path(self, path):
         return path
 
-    if sys.platform == "win32":
+    if sys.platform == "win32" and protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH < 2:
 
         @expectedFailure
         def test_fetch_pack_no_side_band_64k(self):
@@ -420,6 +423,11 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         self.skipTest("skip flaky test; see #1015")
 
 
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichTCPClientTestGitProtov0(DulwichTCPClientTest):
+    pass
+
+
 class TestSSHVendor:
     @staticmethod
     def run_command(
@@ -429,16 +437,24 @@ class TestSSHVendor:
         port=None,
         password=None,
         key_filename=None,
+        protocol_version=None,
     ):
         cmd, path = command.split(" ")
         cmd = cmd.split("-", 1)
         path = path.replace("'", "")
+        env = dict(os.environ)
+        if protocol_version is None:
+            protocol_version = protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH
+        if protocol_version > 0:
+            env["GIT_PROTOCOL"] = f"version={protocol_version}"
+
         p = subprocess.Popen(
             [*cmd, path],
             bufsize=0,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
         )
         return client.SubprocessWrapper(p)
 
@@ -462,6 +478,11 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         return self.gitroot + path
 
 
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichMockSSHClientTestGitProtov0(DulwichMockSSHClientTest):
+    pass
+
+
 class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self):
         CompatTestCase.setUp(self)
@@ -476,6 +497,11 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
 
     def _build_path(self, path):
         return self.gitroot + path
+
+
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichSubprocessClientTestGitProtov0(DulwichSubprocessClientTest):
+    pass
 
 
 class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -570,6 +596,9 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         co = self.headers.get("cookie")
         if co:
             env["HTTP_COOKIE"] = co
+        proto = self.headers.get("Git-Protocol")
+        if proto:
+            env["GIT_PROTOCOL"] = proto
         # XXX Other HTTP_* headers
         # Since we're setting the env in the parent, provide empty
         # values to override previously set values
@@ -661,3 +690,8 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
 
     def test_archive(self):
         raise SkipTest("exporting archives not supported over http")
+
+
+@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+class DulwichHttpClientTestGitProtov0(DulwichHttpClientTest):
+    pass

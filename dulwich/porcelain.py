@@ -486,6 +486,26 @@ def init(path=".", *, bare=False, symlinks: Optional[bool] = None):
         return Repo.init(path, symlinks=symlinks)
 
 
+def encode_refspecs(refspecs, refspec_encoding):
+    if refspecs is None:
+        return [b"HEAD"]
+
+    def encode_refspec(ref):
+        if isinstance(ref, bytes):
+            return ref
+        else:
+            return ref.encode(refspec_encoding)
+
+    encoded_refs = []
+    if isinstance(refspecs, bytes) or isinstance(refspecs, str):
+        encoded_refs.append(encode_refspec(refspecs))
+    else:
+        for ref in refspecs:
+            encoded_refs.append(encode_refspec(ref))
+
+    return encoded_refs
+
+
 def clone(
     source,
     target=None,
@@ -497,6 +517,10 @@ def clone(
     depth: Optional[int] = None,
     branch: Optional[Union[str, bytes]] = None,
     config: Optional[Config] = None,
+    refspecs=None,
+    refspec_encoding=DEFAULT_ENCODING,
+    filter_spec=None,
+    protocol_version: Optional[int] = None,
     **kwargs,
 ):
     """Clone a local or remote git repository.
@@ -513,6 +537,15 @@ def clone(
       branch: Optional branch or tag to be used as HEAD in the new repository
         instead of the cloned repository's HEAD.
       config: Configuration to use
+      refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
+        bytestring/string.
+      refspec_encoding: Character encoding of bytestrings provided in the refspecs parameter.
+        If not specified, the internal default encoding will be used.
+      filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
+        Only used if the server supports the Git protocol-v2 'filter'
+        feature, and ignored otherwise.
+      protocol_version: desired Git protocol version. By default the highest
+        mutually supported protocol version will be used.
     Returns: The new repository
     """
     if outstream is not None:
@@ -533,6 +566,8 @@ def clone(
     if checkout and bare:
         raise Error("checkout and bare are incompatible")
 
+    encoded_refs = encode_refspecs(refspecs, refspec_encoding)
+
     if target is None:
         target = source.split("/")[-1]
 
@@ -542,6 +577,9 @@ def clone(
     mkdir = not os.path.exists(target)
 
     (client, path) = get_transport_and_path(source, config=config, **kwargs)
+
+    if filter_spec:
+        filter_spec = filter_spec.encode("ascii")
 
     return client.clone(
         path,
@@ -553,6 +591,9 @@ def clone(
         branch=branch,
         progress=errstream.write,
         depth=depth,
+        ref_prefix=encoded_refs,
+        filter_spec=filter_spec,
+        protocol_version=protocol_version,
     )
 
 
@@ -1238,6 +1279,9 @@ def pull(
     errstream=default_bytes_err_stream,
     fast_forward=True,
     force=False,
+    refspec_encoding=DEFAULT_ENCODING,
+    filter_spec=None,
+    protocol_version=None,
     **kwargs,
 ):
     """Pull from remote via dulwich.client.
@@ -1245,21 +1289,28 @@ def pull(
     Args:
       repo: Path to repository
       remote_location: Location of the remote
-      refspecs: refspecs to fetch
+      refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
+        bytestring/string.
       outstream: A stream file to write to output
       errstream: A stream file to write to errors
+      refspec_encoding: Character encoding of bytestrings provided in the refspecs parameter.
+        If not specified, the internal default encoding will be used.
+      filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
+        Only used if the server supports the Git protocol-v2 'filter'
+        feature, and ignored otherwise.
+      protocol_version: desired Git protocol version. By default the highest
+        mutually supported protocol version will be used
     """
     # Open the repo
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
 
-        if refspecs is None:
-            refspecs = [b"HEAD"]
+        encoded_refs = encode_refspecs(refspecs, refspec_encoding)
         selected_refs = []
 
         def determine_wants(remote_refs, **kwargs):
             selected_refs.extend(
-                parse_reftuples(remote_refs, r.refs, refspecs, force=force)
+                parse_reftuples(remote_refs, r.refs, encoded_refs, force=force)
             )
             return [
                 remote_refs[lh]
@@ -1270,8 +1321,16 @@ def pull(
         client, path = get_transport_and_path(
             remote_location, config=r.get_config_stack(), **kwargs
         )
+        if filter_spec:
+            filter_spec = filter_spec.encode("ascii")
         fetch_result = client.fetch(
-            path, r, progress=errstream.write, determine_wants=determine_wants
+            path,
+            r,
+            progress=errstream.write,
+            determine_wants=determine_wants,
+            ref_prefix=refspecs,
+            filter_spec=filter_spec,
+            protocol_version=protocol_version,
         )
         for lh, rh, force_ref in selected_refs:
             if not force_ref and rh in r.refs:

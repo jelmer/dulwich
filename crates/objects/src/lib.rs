@@ -45,10 +45,11 @@ fn sha_to_pyhex(py: Python, sha: &[u8]) -> PyResult<PyObject> {
         hexsha.push(bytehex(c & 0x0F));
     }
 
-    Ok(PyBytes::new(py, hexsha.as_slice()).into())
+    Ok(PyBytes::new_bound(py, hexsha.as_slice()).into())
 }
 
 #[pyfunction]
+#[pyo3(signature = (text, strict=None))]
 fn parse_tree(
     py: Python,
     mut text: &[u8],
@@ -94,7 +95,7 @@ fn parse_tree(
         text = &text[namelen + 1..];
         let sha = &text[..20];
         entries.push((
-            PyBytes::new(py, name).to_object(py),
+            PyBytes::new_bound(py, name).to_object(py),
             mode,
             sha_to_pyhex(py, sha)?,
         ));
@@ -124,7 +125,7 @@ fn name_with_suffix(mode: u32, name: &[u8]) -> Cow<[u8]> {
 ///
 /// # Returns: Iterator over (name, mode, hexsha)
 #[pyfunction]
-fn sorted_tree_items(py: Python, entries: &PyDict, name_order: bool) -> PyResult<Vec<PyObject>> {
+fn sorted_tree_items(py: Python, entries: &Bound<PyDict>, name_order: bool) -> PyResult<Vec<PyObject>> {
     let mut qsort_entries = Vec::new();
     for (name, e) in entries.iter() {
         let (mode, sha): (u32, Vec<u8>) = match e.extract() {
@@ -142,16 +143,16 @@ fn sorted_tree_items(py: Python, entries: &PyDict, name_order: bool) -> PyResult
             name_with_suffix(a.1, a.0.as_slice()).cmp(&name_with_suffix(b.1, b.0.as_slice()))
         });
     }
-    let objectsm = py.import("dulwich.objects")?;
+    let objectsm = py.import_bound("dulwich.objects")?;
     let tree_entry_cls = objectsm.getattr("TreeEntry")?;
     qsort_entries
         .into_iter()
         .map(|(name, mode, hexsha)| -> PyResult<PyObject> {
             Ok(tree_entry_cls
                 .call1((
-                    PyBytes::new(py, name.as_slice()).to_object(py),
+                    PyBytes::new_bound(py, name.as_slice()).to_object(py),
                     mode,
-                    PyBytes::new(py, hexsha.as_slice()).to_object(py),
+                    PyBytes::new_bound(py, hexsha.as_slice()).to_object(py),
                 ))?
                 .to_object(py))
         })
@@ -159,7 +160,7 @@ fn sorted_tree_items(py: Python, entries: &PyDict, name_order: bool) -> PyResult
 }
 
 #[pymodule]
-fn _objects(_py: Python, m: &PyModule) -> PyResult<()> {
+fn _objects(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sorted_tree_items, m)?)?;
     m.add_function(wrap_pyfunction!(parse_tree, m)?)?;
     Ok(())

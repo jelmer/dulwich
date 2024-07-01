@@ -26,7 +26,7 @@ pyo3::import_exception!(dulwich.errors, ApplyDeltaError);
 
 fn py_is_sha(sha: &PyObject, py: Python) -> PyResult<bool> {
     // Check if the object is a bytes object
-    if sha.as_ref(py).is_instance_of::<PyBytes>() {
+    if sha.bind(py).is_instance_of::<PyBytes>() {
         // Check if the bytes object has a size of 20
         if sha.extract::<&[u8]>(py)?.len() == 20 {
             Ok(true)
@@ -100,7 +100,7 @@ fn get_delta_header_size(delta: &[u8], index: &mut usize, length: usize) -> usiz
 }
 
 fn py_chunked_as_string<'a>(py: Python<'a>, py_buf: &'a PyObject) -> PyResult<std::borrow::Cow<'a, [u8]>> {
-    if let Ok(py_list) = py_buf.extract::<&PyList>(py) {
+    if let Ok(py_list) = py_buf.extract::<Bound<PyList>>(py) {
         let mut buf = Vec::new();
         for chunk in py_list.iter() {
             if let Ok(chunk) = chunk.extract::<&[u8]>() {
@@ -112,7 +112,7 @@ fn py_chunked_as_string<'a>(py: Python<'a>, py_buf: &'a PyObject) -> PyResult<st
             }
         }
         Ok(buf.into())
-    } else if py_buf.extract::<&PyBytes>(py).is_ok() {
+    } else if py_buf.extract::<Bound<PyBytes>>(py).is_ok() {
         Ok(std::borrow::Cow::Borrowed(py_buf.extract::<&[u8]>(py)?))
     } else {
         Err(PyTypeError::new_err("buf is not a string or a list of chunks"))
@@ -203,11 +203,11 @@ fn apply_delta(py: Python, py_src_buf: PyObject, py_delta: PyObject) -> PyResult
         return Err(ApplyDeltaError::new_err("dest size incorrect"));
     }
 
-    Ok(vec![PyBytes::new(py, &out).into()])
+    Ok(vec![PyBytes::new_bound(py, &out).into()])
 }
 
 #[pymodule]
-fn _pack(_py: Python, m: &PyModule) -> PyResult<()> {
+fn _pack(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bisect_find_sha, m)?)?;
     m.add_function(wrap_pyfunction!(apply_delta, m)?)?;
     Ok(())

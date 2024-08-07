@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Operating System :: POSIX",
@@ -119,4 +120,11 @@ archs = ["auto", "aarch64"]
 [tool.cibuildwheel.macos]
 archs = ["auto", "universal2", "x86_64", "arm64"]
 before-all = "rustup target add x86_64-apple-darwin aarch64-apple-darwin"
-skip = "cp38-macosx_arm64 cp38-macosx_universal2 cp39-macosx_x86_64 cp39-macosx_universal2 cp310-macosx_x86_64 cp310-macosx_universal2 cp311-macosx_x86_64 cp311-macosx_universal2 cp311-macosx_universal2 cp312-macosx_x86_64 cp312-macosx_universal2"
+skip = """\
+    cp38-macosx_arm64 cp38-macosx_universal2 \
+    cp39-macosx_x86_64 cp39-macosx_universal2 \
+    cp310-macosx_x86_64 cp310-macosx_universal2 \
+    cp311-macosx_x86_64 cp311-macosx_universal2 \
+    cp312-macosx_x86_64 cp312-macosx_universal2 \
+    cp313-macosx_x86_64 cp313-macosx_universal2 \
+    """

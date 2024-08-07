@@ -890,7 +890,7 @@ class TreeTests(ShaFileCheckTests):
 
         # C/Python implementations may differ in specific error types, but
         # should all error on invalid inputs.
-        # For example, the C implementation has stricter type checks, so may
+        # For example, the Rust implementation has stricter type checks, so may
         # raise TypeError where the Python implementation raises
         # AttributeError.
         errors = (TypeError, ValueError, AttributeError)

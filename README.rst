@@ -16,7 +16,7 @@ in the particular Monty Python sketch.
 Installation
 ------------
 
-By default, Dulwich' setup.py will attempt to build and install the optional C
+By default, Dulwich' setup.py will attempt to build and install the optional Rust
 extensions. The reason for this is that they significantly improve the performance
 since some low-level operations that are executed often are much slower in CPython.
 

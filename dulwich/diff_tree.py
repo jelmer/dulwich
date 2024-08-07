@@ -644,7 +644,7 @@ _is_tree_py = _is_tree
 _merge_entries_py = _merge_entries
 _count_blocks_py = _count_blocks
 try:
-    # Try to import C versions
+    # Try to import Rust versions
     from dulwich._diff_tree import (  # type: ignore
         _count_blocks,
         _is_tree,

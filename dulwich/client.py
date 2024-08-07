@@ -1657,7 +1657,10 @@ class LocalGitClient(GitClient):
     """Git Client that just uses a local on-disk repository."""
 
     def __init__(
-        self, thin_packs=True, report_activity=None, config: Optional[Config] = None
+        self,
+        thin_packs: bool = True,
+        report_activity=None,
+        config: Optional[Config] = None,
     ) -> None:
         """Create a new LocalGitClient instance.
 

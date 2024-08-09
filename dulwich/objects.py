@@ -1020,7 +1020,7 @@ def sorted_tree_items(entries, name_order: bool):
         key_func = key_entry
     for name, entry in sorted(entries.items(), key=key_func):
         mode, hexsha = entry
-        # Stricter type checks than normal to mirror checks in the C version.
+        # Stricter type checks than normal to mirror checks in the Rust version.
         mode = int(mode)
         if not isinstance(hexsha, bytes):
             raise TypeError(f"Expected bytes for SHA, got {hexsha!r}")
@@ -1666,7 +1666,7 @@ for cls in OBJECT_CLASSES:
 _parse_tree_py = parse_tree
 _sorted_tree_items_py = sorted_tree_items
 try:
-    # Try to import C versions
+    # Try to import Rust versions
     from dulwich._objects import parse_tree, sorted_tree_items  # type: ignore
 except ImportError:
     pass

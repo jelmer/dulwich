@@ -1,7 +1,6 @@
-All functionality should be available in pure Python. Optional C
+All functionality should be available in pure Python. Optional Rust
 implementations may be written for performance reasons, but should never
-replace the Python implementation. The C implementations should follow the
-kernel/git coding style.
+replace the Python implementation.
 
 Where possible include updates to NEWS along with your improvements.
 

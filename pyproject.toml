@@ -42,7 +42,7 @@ https = ["urllib3>=1.24.1"]
 pgp = ["gpg"]
 paramiko = ["paramiko"]
 dev = [
-    "ruff==0.6.3"
+    "ruff==0.6.4"
 ]
 
 [project.scripts]

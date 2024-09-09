@@ -525,7 +525,10 @@ class BuildIndexTests(TestCase):
 
             tree = Tree()
             latin1_name = "À".encode("latin1")
-            latin1_path = os.path.join(repo_dir_bytes, latin1_name)
+            try:
+                latin1_path = os.path.join(repo_dir_bytes, latin1_name)
+            except UnicodeDecodeError:
+                self.skipTest("can not decode as latin1")
             utf8_name = "À".encode()
             utf8_path = os.path.join(repo_dir_bytes, utf8_name)
             tree[latin1_name] = (stat.S_IFREG | 0o644, file.id)

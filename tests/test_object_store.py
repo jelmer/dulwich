@@ -219,11 +219,14 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def test_add_alternate_path(self):
         store = DiskObjectStore(self.store_dir)
         self.assertEqual([], list(store._read_alternate_paths()))
-        store.add_alternate_path("/foo/path")
-        self.assertEqual(["/foo/path"], list(store._read_alternate_paths()))
+        store.add_alternate_path(os.path.abspath("/foo/path"))
+        self.assertEqual(
+            [os.path.abspath("/foo/path")], list(store._read_alternate_paths())
+        )
         store.add_alternate_path("/bar/path")
         self.assertEqual(
-            ["/foo/path", "/bar/path"], list(store._read_alternate_paths())
+            [os.path.abspath("/foo/path"), "/bar/path"],
+            list(store._read_alternate_paths()),
         )
 
     def test_rel_alternative_path(self):

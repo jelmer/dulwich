@@ -1,4 +1,4 @@
-0.22.2	UNRELEASED
+0.22.2	2024-10-09
 
  * Ship ``Cargo.lock``. (Jelmer Vernooĳ, #1287)
 
@@ -9,6 +9,10 @@
  * Drop Python 3.7 support. (Jelmer Vernooĳ)
 
  * Improve fuzzing coverage (David Lakin)
+
+ * Support Python 3.13. (Edgar Ramírez-Mondragón, #1352)
+
+ * Initial support for smart protocol v2. (Stefan Sperling)
 
 0.22.1	2024-04-23
 

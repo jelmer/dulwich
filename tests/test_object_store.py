@@ -223,11 +223,21 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual(
             [os.path.abspath("/foo/path")], list(store._read_alternate_paths())
         )
-        store.add_alternate_path("/bar/path")
-        self.assertEqual(
-            [os.path.abspath("/foo/path"), "/bar/path"],
-            list(store._read_alternate_paths()),
-        )
+        if sys.platform == "win32":
+            store.add_alternate_path("D:\\bar\\path")
+        else:
+            store.add_alternate_path("/bar/path")
+
+        if sys.platform == "win32":
+            self.assertEqual(
+                [os.path.abspath("/foo/path"), "D:\\bar\\path"],
+                list(store._read_alternate_paths()),
+            )
+        else:
+            self.assertEqual(
+                [os.path.abspath("/foo/path"), "/bar/path"],
+                list(store._read_alternate_paths()),
+            )
 
     def test_rel_alternative_path(self):
         alternate_dir = tempfile.mkdtemp()

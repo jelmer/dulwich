@@ -6,8 +6,6 @@ This is the Dulwich project.
 It aims to provide an interface to git repos (both local and remote) that
 doesn't call out to git directly but instead uses pure Python.
 
-**Main website**: <https://www.dulwich.io/>
-
 **License**: Apache License, version 2 or GNU General Public License, version 2 or later.
 
 The project is named after the part of London that Mr. and Mrs. Git live in

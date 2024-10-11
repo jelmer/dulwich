@@ -11,7 +11,7 @@ doesn't call out to git directly but instead uses pure Python.
 **License**: Apache License, version 2 or GNU General Public License, version 2 or later.
 
 The project is named after the part of London that Mr. and Mrs. Git live in
-in the particular Monty Python sketch.
+the particular Monty Python sketch.
 
 Installation
 ------------

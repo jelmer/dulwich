@@ -7,12 +7,56 @@ on:
     - cron: "0 6 * * *" # Daily 6AM UTC build
 
 jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.merged-identifiers.outputs.merged-identifiers }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+          cache: pip
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install cibuildwheel
+        run: pip install cibuildwheel
+      - name: Find build identifiers using cibuildwheel --print-build-identifiers
+        id: all-build-identifiers
+        run: |
+          echo "linux=$(cibuildwheel --platform linux --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          echo "macos=$(cibuildwheel --platform macos --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          echo "windows=$(cibuildwheel --platform windows --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
+      - name: Select build identifiers
+        id: select-build-identifiers
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "$GITHUB_REF" = "refs/heads/master" ] || [ "$GITHUB_REF" = "refs/tags/"* ]; then
+            echo 'linux=${{ steps.all-build-identifiers.outputs.linux }}' >> $GITHUB_OUTPUT
+            echo 'windows=${{ steps.all-build-identifiers.outputs.windows }}' >> $GITHUB_OUTPUT
+            echo 'macos=${{ steps.all-build-identifiers.outputs.macos }}' >> $GITHUB_OUTPUT
+          else
+            echo "linux=$(echo -n '${{ steps.all-build-identifiers.outputs.linux }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+            echo "macos=$(echo -n '${{ steps.all-build-identifiers.outputs.macos }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+            echo "windows=$(echo -n '${{ steps.all-build-identifiers.outputs.windows }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+          fi
+      - name: Output build identifiers
+        id: json-identifiers
+        run: |
+          echo "linux=$(echo -n '${{ steps.select-build-identifiers.outputs.linux }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "ubuntu-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+          echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "macos-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+          echo "windows=$(echo -n '${{ steps.select-build-identifiers.outputs.windows }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "windows-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+      - name: Merge build identifiers
+        id: merged-identifiers
+        run: |
+          echo merged-identifiers=$(echo -n '${{ steps.json-identifiers.outputs.linux }} ${{ steps.json-identifiers.outputs.macos }} ${{ steps.json-identifiers.outputs.windows }}' | jq -c -s 'add') >> $GITHUB_OUTPUT
+
   build-wheels:
     runs-on: ${{ matrix.os }}
+    needs: define-matrix
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-prefix: [pp, cp]
+        include: ${{ fromJSON(needs.define-matrix.outputs.matrix ) }}
       fail-fast: true
 
     steps:
@@ -30,7 +74,7 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_BUILD: "${{ matrix.python-prefix }}*"
+          CIBW_BUILD: "${{ matrix.build-identifier }}*"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:

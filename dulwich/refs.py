@@ -24,7 +24,7 @@
 import os
 import warnings
 from contextlib import suppress
-from typing import Any, Dict, Optional, Set, List, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists

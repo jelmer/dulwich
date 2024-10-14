@@ -24,7 +24,7 @@
 import os
 import warnings
 from contextlib import suppress
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists
@@ -53,7 +53,7 @@ class SymrefLoop(Exception):
         self.depth = depth
 
 
-def parse_symref_value(contents):
+def parse_symref_value(contents: bytes) -> bytes:
     """Parse a symref value.
 
     Args:
@@ -291,7 +291,7 @@ class RefsContainer:
         """
         raise NotImplementedError(self.read_loose_ref)
 
-    def follow(self, name):
+    def follow(self, name) -> Tuple[List[bytes], bytes]:
         """Follow a reference name.
 
         Returns: a tuple of (refnames, sha), wheres refnames are the names of
@@ -1188,7 +1188,7 @@ def _set_origin_head(refs, origin, origin_head):
 def _set_default_branch(
     refs: RefsContainer,
     origin: bytes,
-    origin_head: bytes,
+    origin_head: Optional[bytes],
     branch: bytes,
     ref_message: Optional[bytes],
 ) -> bytes:

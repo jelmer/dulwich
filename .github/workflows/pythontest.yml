@@ -43,7 +43,7 @@ jobs:
           python -m ruff format --check .
       - name: Typing checks
         run: |
-          pip install --upgrade mypy types-paramiko types-requests
+          pip install --upgrade types-paramiko types-requests
           python -m mypy dulwich
         if: "matrix.python-version != 'pypy3'"
       - name: Build

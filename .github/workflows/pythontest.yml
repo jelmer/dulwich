@@ -23,6 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
+          cache: pip
       - name: Install native dependencies (Ubuntu)
         run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
         if: "matrix.os == 'ubuntu-latest'"

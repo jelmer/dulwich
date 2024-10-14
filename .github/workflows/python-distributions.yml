@@ -18,6 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        with:
+          cache: pip
       - name: Install native dependencies (Ubuntu)
         run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
         if: "matrix.os == 'ubuntu-latest'"
@@ -46,6 +48,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        with:
+          cache: pip
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -64,6 +68,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
+        with:
+          cache: pip
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

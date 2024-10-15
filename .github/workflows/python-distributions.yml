@@ -3,6 +3,8 @@ name: Build Python distributions
 on:
   push:
     branches: [ main, master ]
+    tags:
+      - 'dulwich-*'
   pull_request:
   schedule:
     - cron: "0 6 * * *" # Daily 6AM UTC build
@@ -32,7 +34,7 @@ jobs:
       - name: Select build identifiers
         id: select-build-identifiers
         run: |
-          if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "$GITHUB_REF" = "refs/heads/master" ] || [ "$GITHUB_REF" = "refs/tags/"* ]; then
+          if [[ "$GITHUB_REF" = "refs/heads/main" ]] || [[ "$GITHUB_REF" = "refs/heads/master" ]] || [[ "$GITHUB_REF" = "refs/tags/"* ]]; then
             echo 'linux=${{ steps.all-build-identifiers.outputs.linux }}' >> $GITHUB_OUTPUT
             echo 'windows=${{ steps.all-build-identifiers.outputs.windows }}' >> $GITHUB_OUTPUT
             echo 'macos=${{ steps.all-build-identifiers.outputs.macos }}' >> $GITHUB_OUTPUT

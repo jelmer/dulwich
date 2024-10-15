@@ -1,3 +1,8 @@
+0.22.3	2024-10-15
+
+ * Improve wheel building in CI, so we can upload wheels for the next release.
+   (Jelmer Vernooĳ)
+
 0.22.2	2024-10-09
 
  * Ship ``Cargo.lock``. (Jelmer Vernooĳ, #1287)

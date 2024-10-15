@@ -3,6 +3,7 @@ name: API Docs
 
 on:
   push:
+    branches: [ main, master ]
   pull_request:
   schedule:
     - cron: "0 6 * * *" # Daily 6AM UTC build

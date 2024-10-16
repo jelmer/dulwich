@@ -30,6 +30,7 @@ import_exception!(dulwich.errors, ObjectFormatException);
 
 const S_IFDIR: u32 = 0o40000;
 
+#[inline]
 fn bytehex(byte: u8) -> u8 {
     match byte {
         0..=9 => byte + b'0',
@@ -58,36 +59,19 @@ fn parse_tree(
     let mut entries = Vec::new();
     let strict = strict.unwrap_or(false);
     while !text.is_empty() {
-        let mode_end = match memchr(b' ', text) {
-            Some(e) => e,
-            None => {
-                return Err(ObjectFormatException::new_err((
-                    "Missing terminator for mode",
-                )));
-            }
-        };
+        let mode_end = memchr(b' ', text)
+            .ok_or_else(|| ObjectFormatException::new_err(("Missing terminator for mode",)))?;
         let text_str = String::from_utf8_lossy(&text[..mode_end]).to_string();
-        let mode = match u32::from_str_radix(text_str.as_str(), 8) {
-            Ok(m) => m,
-            Err(e) => {
-                return Err(ObjectFormatException::new_err((format!(
-                    "invalid mode: {}",
-                    e
-                ),)));
-            }
-        };
+        let mode = u32::from_str_radix(text_str.as_str(), 8)
+            .map_err(|e| ObjectFormatException::new_err((format!("invalid mode: {}", e),)))?;
         if strict && text[0] == b'0' {
             return Err(ObjectFormatException::new_err((
                 "Illegal leading zero on mode",
             )));
         }
         text = &text[mode_end + 1..];
-        let namelen = match memchr(b'\0', text) {
-            Some(nl) => nl,
-            None => {
-                return Err(ObjectFormatException::new_err(("Missing trailing \\0",)));
-            }
-        };
+        let namelen = memchr(b'\0', text)
+            .ok_or_else(|| ObjectFormatException::new_err(("Missing trailing \\0",)))?;
         let name = &text[..namelen];
         if namelen + 20 >= text.len() {
             return Err(ObjectFormatException::new_err(("SHA truncated",)));
@@ -125,15 +109,16 @@ fn name_with_suffix(mode: u32, name: &[u8]) -> Cow<[u8]> {
 ///
 /// # Returns: Iterator over (name, mode, hexsha)
 #[pyfunction]
-fn sorted_tree_items(py: Python, entries: &Bound<PyDict>, name_order: bool) -> PyResult<Vec<PyObject>> {
+fn sorted_tree_items(
+    py: Python,
+    entries: &Bound<PyDict>,
+    name_order: bool,
+) -> PyResult<Vec<PyObject>> {
     let mut qsort_entries = Vec::new();
     for (name, e) in entries.iter() {
-        let (mode, sha): (u32, Vec<u8>) = match e.extract() {
-            Ok(o) => o,
-            Err(e) => {
-                return Err(PyTypeError::new_err((format!("invalid type: {}", e),)));
-            }
-        };
+        let (mode, sha): (u32, Vec<u8>) = e
+            .extract()
+            .map_err(|e| PyTypeError::new_err((format!("invalid type: {}", e),)))?;
         qsort_entries.push((name.extract::<Vec<u8>>().unwrap(), mode, sha));
     }
     if name_order {

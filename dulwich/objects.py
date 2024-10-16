@@ -1667,7 +1667,12 @@ _parse_tree_py = parse_tree
 _sorted_tree_items_py = sorted_tree_items
 try:
     # Try to import Rust versions
-    from dulwich._objects import parse_tree as _parse_tree_rs, sorted_tree_items as _sorted_tree_items_rs
+    from dulwich._objects import (
+        parse_tree as _parse_tree_rs,
+    )
+    from dulwich._objects import (
+        sorted_tree_items as _sorted_tree_items_rs,
+    )
 except ImportError:
     pass
 else:

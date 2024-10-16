@@ -51,6 +51,8 @@ jobs:
       - name: Build
         run: |
           python setup.py build_ext -i
+        env:
+          RUSTFLAGS: "-D warnings"
       - name: codespell
         run: |
           pip install --upgrade codespell

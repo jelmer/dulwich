@@ -18,9 +18,9 @@
  * License, Version 2.0.
  */
 
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyList,PyBytes};
-use pyo3::exceptions::{PyValueError, PyTypeError};
+use pyo3::types::{PyBytes, PyList};
 
 pyo3::import_exception!(dulwich.errors, ApplyDeltaError);
 
@@ -39,7 +39,13 @@ fn py_is_sha(sha: &PyObject, py: Python) -> PyResult<bool> {
 }
 
 #[pyfunction]
-fn bisect_find_sha(py: Python, start: i32, end: i32, sha: Py<PyBytes>, unpack_name: PyObject) -> PyResult<Option<i32>> {
+fn bisect_find_sha(
+    py: Python,
+    start: i32,
+    end: i32,
+    sha: Py<PyBytes>,
+    unpack_name: PyObject,
+) -> PyResult<Option<i32>> {
     // Convert sha_obj to a byte slice
     let sha = sha.as_bytes(py);
     let sha_len = sha.len();
@@ -99,7 +105,10 @@ fn get_delta_header_size(delta: &[u8], index: &mut usize, length: usize) -> usiz
     size
 }
 
-fn py_chunked_as_string<'a>(py: Python<'a>, py_buf: &'a PyObject) -> PyResult<std::borrow::Cow<'a, [u8]>> {
+fn py_chunked_as_string<'a>(
+    py: Python<'a>,
+    py_buf: &'a PyObject,
+) -> PyResult<std::borrow::Cow<'a, [u8]>> {
     if let Ok(py_list) = py_buf.extract::<Bound<PyList>>(py) {
         let mut buf = Vec::new();
         for chunk in py_list.iter() {
@@ -108,14 +117,19 @@ fn py_chunked_as_string<'a>(py: Python<'a>, py_buf: &'a PyObject) -> PyResult<st
             } else if let Ok(chunk) = chunk.extract::<Vec<u8>>() {
                 buf.extend(chunk);
             } else {
-                return Err(PyTypeError::new_err(format!("chunk is not a byte string, but a {:?}", chunk.get_type().name())));
+                return Err(PyTypeError::new_err(format!(
+                    "chunk is not a byte string, but a {:?}",
+                    chunk.get_type().name()
+                )));
             }
         }
         Ok(buf.into())
     } else if py_buf.extract::<Bound<PyBytes>>(py).is_ok() {
         Ok(std::borrow::Cow::Borrowed(py_buf.extract::<&[u8]>(py)?))
     } else {
-        Err(PyTypeError::new_err("buf is not a string or a list of chunks"))
+        Err(PyTypeError::new_err(
+            "buf is not a string or a list of chunks",
+        ))
     }
 }
 
@@ -168,10 +182,7 @@ fn apply_delta(py: Python, py_src_buf: PyObject, py_delta: PyObject) -> PyResult
                 cp_size = 0x10000;
             }
 
-            if cp_off + cp_size < cp_size
-                || cp_off + cp_size > src_size
-                || cp_size > dest_size
-            {
+            if cp_off + cp_size < cp_size || cp_off + cp_size > src_size || cp_size > dest_size {
                 break;
             }
 
@@ -187,7 +198,8 @@ fn apply_delta(py: Python, py_src_buf: PyObject, py_delta: PyObject) -> PyResult
                 return Err(ApplyDeltaError::new_err("Not enough space to copy"));
             }
 
-            out[outindex..outindex + cmd as usize].copy_from_slice(&delta[index..index + cmd as usize]);
+            out[outindex..outindex + cmd as usize]
+                .copy_from_slice(&delta[index..index + cmd as usize]);
             outindex += cmd as usize;
             index += cmd as usize;
         } else {

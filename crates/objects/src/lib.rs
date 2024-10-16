@@ -19,7 +19,6 @@
  */
 
 use memchr::memchr;
-use std::borrow::Cow;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::import_exception;
@@ -88,14 +87,20 @@ fn parse_tree(
     Ok(entries)
 }
 
-fn name_with_suffix(mode: u32, name: &[u8]) -> Cow<[u8]> {
-    if mode & S_IFDIR != 0 {
-        let mut v = name.to_vec();
-        v.push(b'/');
-        v.into()
-    } else {
-        name.into()
+fn cmp_with_suffix(a: (u32, &[u8]), b: (u32, &[u8])) -> std::cmp::Ordering {
+    let len = std::cmp::min(a.1.len(), b.1.len());
+    let cmp = a.1[..len].cmp(&b.1[..len]);
+    if cmp != std::cmp::Ordering::Equal {
+        return cmp;
     }
+
+    let c1 =
+        a.1.get(len)
+            .map_or_else(|| if a.0 & S_IFDIR != 0 { b'/' } else { 0 }, |&c| c);
+    let c2 =
+        b.1.get(len)
+            .map_or_else(|| if b.0 & S_IFDIR != 0 { b'/' } else { 0 }, |&c| c);
+    c1.cmp(&c2)
 }
 
 /// Iterate over a tree entries dictionary.
@@ -114,19 +119,19 @@ fn sorted_tree_items(
     entries: &Bound<PyDict>,
     name_order: bool,
 ) -> PyResult<Vec<PyObject>> {
-    let mut qsort_entries = Vec::new();
-    for (name, e) in entries.iter() {
-        let (mode, sha): (u32, Vec<u8>) = e
-            .extract()
-            .map_err(|e| PyTypeError::new_err((format!("invalid type: {}", e),)))?;
-        qsort_entries.push((name.extract::<Vec<u8>>().unwrap(), mode, sha));
-    }
+    let mut qsort_entries = entries
+        .iter()
+        .map(|(name, value)| -> PyResult<(Vec<u8>, u32, Vec<u8>)> {
+            let value = value
+                .extract::<(u32, Vec<u8>)>()
+                .map_err(|e| PyTypeError::new_err((format!("invalid type: {}", e),)))?;
+            Ok((name.extract::<Vec<u8>>().unwrap(), value.0, value.1))
+        })
+        .collect::<PyResult<Vec<(Vec<u8>, u32, Vec<u8>)>>>()?;
     if name_order {
         qsort_entries.sort_by(|a, b| a.0.cmp(&b.0));
     } else {
-        qsort_entries.sort_by(|a, b| {
-            name_with_suffix(a.1, a.0.as_slice()).cmp(&name_with_suffix(b.1, b.0.as_slice()))
-        });
+        qsort_entries.sort_by(|a, b| cmp_with_suffix((a.1, a.0.as_slice()), (b.1, b.0.as_slice())));
     }
     let objectsm = py.import_bound("dulwich.objects")?;
     let tree_entry_cls = objectsm.getattr("TreeEntry")?;

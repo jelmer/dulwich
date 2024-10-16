@@ -1299,18 +1299,20 @@ class DeltaChainIteratorTests(TestCase):
         fsize = f.tell()
         f.seek(0)
         packdata = PackData.from_file(f, fsize)
-        packdata.create_index(
-            "test.idx",
-            version=2,
-            resolve_ext_ref=self.get_raw_no_repeat,
-        )
-        packindex = load_pack_index("test.idx")
-        pack = Pack.from_objects(packdata, packindex)
-        try:
-            # Attempting to open this REF_DELTA object would loop forever
-            pack[b1.id]
-        except UnresolvedDeltas as e:
-            self.assertEqual((b1.id), e.shas)
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = os.path.join(tempdir, "test.idx")
+            packdata.create_index(
+                path,
+                version=2,
+                resolve_ext_ref=self.get_raw_no_repeat,
+            )
+            packindex = load_pack_index(path)
+            pack = Pack.from_objects(packdata, packindex)
+            try:
+                # Attempting to open this REF_DELTA object would loop forever
+                pack[b1.id]
+            except UnresolvedDeltas as e:
+                self.assertEqual((b1.id), e.shas)
 
 
 class DeltaEncodeSizeTests(TestCase):

@@ -115,7 +115,6 @@ environment = {PATH="$HOME/.cargo/bin:$PATH"}
 before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y && rustup show"
 
 [tool.cibuildwheel.linux]
-skip = "*-musllinux_*"
 archs = ["auto", "aarch64"]
 
 [tool.cibuildwheel.macos]

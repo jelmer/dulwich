@@ -834,14 +834,20 @@ _SORTED_TREE_ITEMS = [
 
 
 _TREE_ITEMS_BUG_1325 = {
-    b'dir': (stat.S_IFDIR | 0o644, b'5944b31ff85b415573d1a43eb942e2dea30ab8be'),
-    b'dira': (0o100644, b'cf7a729ca69bfabd0995fc9b083e86a18215bd91'),
+    b"dir": (stat.S_IFDIR | 0o644, b"5944b31ff85b415573d1a43eb942e2dea30ab8be"),
+    b"dira": (0o100644, b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"),
 }
 
 
 _SORTED_TREE_ITEMS_BUG_1325 = [
-    TreeEntry(path=b'dir', mode=stat.S_IFDIR | 0o644, sha=b'5944b31ff85b415573d1a43eb942e2dea30ab8be'),
-    TreeEntry(path=b'dira', mode=0o100644, sha=b'cf7a729ca69bfabd0995fc9b083e86a18215bd91'),
+    TreeEntry(
+        path=b"dir",
+        mode=stat.S_IFDIR | 0o644,
+        sha=b"5944b31ff85b415573d1a43eb942e2dea30ab8be",
+    ),
+    TreeEntry(
+        path=b"dira", mode=0o100644, sha=b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"
+    ),
 ]
 
 
@@ -898,7 +904,9 @@ class TreeTests(ShaFileCheckTests):
         )
 
     test_parse_tree = functest_builder(_do_test_parse_tree, _parse_tree_py)
-    test_parse_tree_extension = ext_functest_builder(_do_test_parse_tree, _parse_tree_rs)
+    test_parse_tree_extension = ext_functest_builder(
+        _do_test_parse_tree, _parse_tree_rs
+    )
 
     def _do_test_sorted_tree_items(self, sorted_tree_items):
         def do_sort(entries, name_order):
@@ -909,7 +917,10 @@ class TreeTests(ShaFileCheckTests):
         self.assertIsInstance(actual[0], TreeEntry)
 
         actual = do_sort(_TREE_ITEMS_BUG_1325, False)
-        self.assertEqual(key_entry((b"a", (0o40644, b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"))), b"a/")
+        self.assertEqual(
+            key_entry((b"a", (0o40644, b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"))),
+            b"a/",
+        )
         self.assertEqual(_SORTED_TREE_ITEMS_BUG_1325, actual)
         self.assertIsInstance(actual[0], TreeEntry)
 
@@ -920,7 +931,7 @@ class TreeTests(ShaFileCheckTests):
         # AttributeError.
         errors = (TypeError, ValueError, AttributeError)
         self.assertRaises(errors, do_sort, b"foo", False)
-        self.assertRaises(errors, do_sort, {b"foo": (1, 2, 3)},  False)
+        self.assertRaises(errors, do_sort, {b"foo": (1, 2, 3)}, False)
 
         myhexsha = b"d80c186a03f423a81b39df39dc87fd269736ca86"
         self.assertRaises(errors, do_sort, {b"foo": (b"xxx", myhexsha)}, False)
@@ -963,8 +974,6 @@ class TreeTests(ShaFileCheckTests):
                     0o100755,
                     b"d80c186a03f423a81b39df39dc87fd269736ca86",
                 ),
-
-
             ],
             list(sorted_tree_items(_TREE_ITEMS, True)),
         )

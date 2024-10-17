@@ -1027,19 +1027,19 @@ def sorted_tree_items(entries, name_order: bool):
         yield TreeEntry(name, mode, hexsha)
 
 
-def key_entry(entry) -> bytes:
+def key_entry(entry: Tuple[bytes, Tuple[int, ObjectID]]) -> bytes:
     """Sort key for tree entry.
 
     Args:
       entry: (name, value) tuple
     """
-    (name, value) = entry
-    if stat.S_ISDIR(value[0]):
+    (name, (mode, _sha)) = entry
+    if stat.S_ISDIR(mode):
         name += b"/"
     return name
 
 
-def key_entry_name_order(entry):
+def key_entry_name_order(entry: Tuple[bytes, Tuple[int, ObjectID]]) -> bytes:
     """Sort key for tree entry in name order."""
     return entry[0]
 
@@ -1667,6 +1667,14 @@ _parse_tree_py = parse_tree
 _sorted_tree_items_py = sorted_tree_items
 try:
     # Try to import Rust versions
-    from dulwich._objects import parse_tree, sorted_tree_items  # type: ignore
+    from dulwich._objects import (
+        parse_tree as _parse_tree_rs,
+    )
+    from dulwich._objects import (
+        sorted_tree_items as _sorted_tree_items_rs,
+    )
 except ImportError:
     pass
+else:
+    parse_tree = _parse_tree_rs
+    sorted_tree_items = _sorted_tree_items_rs

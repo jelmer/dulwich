@@ -133,7 +133,12 @@ fn entry_path_cmp(entry1: &Bound<PyAny>, entry2: &Bound<PyAny>) -> PyResult<Orde
 }
 
 #[pyfunction]
-fn _merge_entries(py: Python, path: &[u8], tree1: &Bound<PyAny>, tree2: &Bound<PyAny>) -> PyResult<PyObject> {
+fn _merge_entries(
+    py: Python,
+    path: &[u8],
+    tree1: &Bound<PyAny>,
+    tree2: &Bound<PyAny>,
+) -> PyResult<PyObject> {
     let entries1 = tree_entries(path, tree1, py)?;
     let entries2 = tree_entries(path, tree2, py)?;
 

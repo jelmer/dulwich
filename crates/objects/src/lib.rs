@@ -19,7 +19,6 @@
  */
 
 use memchr::memchr;
-use std::borrow::Cow;
 
 use pyo3::exceptions::PyTypeError;
 use pyo3::import_exception;
@@ -30,6 +29,7 @@ import_exception!(dulwich.errors, ObjectFormatException);
 
 const S_IFDIR: u32 = 0o40000;
 
+#[inline]
 fn bytehex(byte: u8) -> u8 {
     match byte {
         0..=9 => byte + b'0',
@@ -58,36 +58,19 @@ fn parse_tree(
     let mut entries = Vec::new();
     let strict = strict.unwrap_or(false);
     while !text.is_empty() {
-        let mode_end = match memchr(b' ', text) {
-            Some(e) => e,
-            None => {
-                return Err(ObjectFormatException::new_err((
-                    "Missing terminator for mode",
-                )));
-            }
-        };
+        let mode_end = memchr(b' ', text)
+            .ok_or_else(|| ObjectFormatException::new_err(("Missing terminator for mode",)))?;
         let text_str = String::from_utf8_lossy(&text[..mode_end]).to_string();
-        let mode = match u32::from_str_radix(text_str.as_str(), 8) {
-            Ok(m) => m,
-            Err(e) => {
-                return Err(ObjectFormatException::new_err((format!(
-                    "invalid mode: {}",
-                    e
-                ),)));
-            }
-        };
+        let mode = u32::from_str_radix(text_str.as_str(), 8)
+            .map_err(|e| ObjectFormatException::new_err((format!("invalid mode: {}", e),)))?;
         if strict && text[0] == b'0' {
             return Err(ObjectFormatException::new_err((
                 "Illegal leading zero on mode",
             )));
         }
         text = &text[mode_end + 1..];
-        let namelen = match memchr(b'\0', text) {
-            Some(nl) => nl,
-            None => {
-                return Err(ObjectFormatException::new_err(("Missing trailing \\0",)));
-            }
-        };
+        let namelen = memchr(b'\0', text)
+            .ok_or_else(|| ObjectFormatException::new_err(("Missing trailing \\0",)))?;
         let name = &text[..namelen];
         if namelen + 20 >= text.len() {
             return Err(ObjectFormatException::new_err(("SHA truncated",)));
@@ -104,14 +87,20 @@ fn parse_tree(
     Ok(entries)
 }
 
-fn name_with_suffix(mode: u32, name: &[u8]) -> Cow<[u8]> {
-    if mode & S_IFDIR != 0 {
-        let mut v = name.to_vec();
-        v.push(b'/');
-        v.into()
-    } else {
-        name.into()
+fn cmp_with_suffix(a: (u32, &[u8]), b: (u32, &[u8])) -> std::cmp::Ordering {
+    let len = std::cmp::min(a.1.len(), b.1.len());
+    let cmp = a.1[..len].cmp(&b.1[..len]);
+    if cmp != std::cmp::Ordering::Equal {
+        return cmp;
     }
+
+    let c1 =
+        a.1.get(len)
+            .map_or_else(|| if a.0 & S_IFDIR != 0 { b'/' } else { 0 }, |&c| c);
+    let c2 =
+        b.1.get(len)
+            .map_or_else(|| if b.0 & S_IFDIR != 0 { b'/' } else { 0 }, |&c| c);
+    c1.cmp(&c2)
 }
 
 /// Iterate over a tree entries dictionary.
@@ -125,23 +114,24 @@ fn name_with_suffix(mode: u32, name: &[u8]) -> Cow<[u8]> {
 ///
 /// # Returns: Iterator over (name, mode, hexsha)
 #[pyfunction]
-fn sorted_tree_items(py: Python, entries: &Bound<PyDict>, name_order: bool) -> PyResult<Vec<PyObject>> {
-    let mut qsort_entries = Vec::new();
-    for (name, e) in entries.iter() {
-        let (mode, sha): (u32, Vec<u8>) = match e.extract() {
-            Ok(o) => o,
-            Err(e) => {
-                return Err(PyTypeError::new_err((format!("invalid type: {}", e),)));
-            }
-        };
-        qsort_entries.push((name.extract::<Vec<u8>>().unwrap(), mode, sha));
-    }
+fn sorted_tree_items(
+    py: Python,
+    entries: &Bound<PyDict>,
+    name_order: bool,
+) -> PyResult<Vec<PyObject>> {
+    let mut qsort_entries = entries
+        .iter()
+        .map(|(name, value)| -> PyResult<(Vec<u8>, u32, Vec<u8>)> {
+            let value = value
+                .extract::<(u32, Vec<u8>)>()
+                .map_err(|e| PyTypeError::new_err((format!("invalid type: {}", e),)))?;
+            Ok((name.extract::<Vec<u8>>().unwrap(), value.0, value.1))
+        })
+        .collect::<PyResult<Vec<(Vec<u8>, u32, Vec<u8>)>>>()?;
     if name_order {
         qsort_entries.sort_by(|a, b| a.0.cmp(&b.0));
     } else {
-        qsort_entries.sort_by(|a, b| {
-            name_with_suffix(a.1, a.0.as_slice()).cmp(&name_with_suffix(b.1, b.0.as_slice()))
-        });
+        qsort_entries.sort_by(|a, b| cmp_with_suffix((a.1, a.0.as_slice()), (b.1, b.0.as_slice())));
     }
     let objectsm = py.import_bound("dulwich.objects")?;
     let tree_entry_cls = objectsm.getattr("TreeEntry")?;

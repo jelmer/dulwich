@@ -45,13 +45,17 @@ from dulwich.objects import (
     format_timezone,
     hex_to_filename,
     hex_to_sha,
+    key_entry,
     object_class,
     parse_timezone,
-    parse_tree,
     pretty_format_tree_entry,
     sha_to_hex,
-    sorted_tree_items,
 )
+
+try:
+    from dulwich.objects import _parse_tree_rs, _sorted_tree_items_rs
+except ImportError:
+    _sorted_tree_items_rs = _parse_tree_rs = None
 from dulwich.tests.utils import (
     ext_functest_builder,
     functest_builder,
@@ -813,15 +817,37 @@ nHxksHfeNln9RKseIDcy4b2ATjhDNIJZARHNfr6oy4u3XPW4svRqtBsLoMiIeuI=
 
 
 _TREE_ITEMS = {
+    b"a-c": (0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
     b"a.c": (0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
+    b"aoc": (0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
     b"a": (stat.S_IFDIR, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
     b"a/c": (stat.S_IFDIR, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
 }
 
 _SORTED_TREE_ITEMS = [
+    TreeEntry(b"a-c", 0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
     TreeEntry(b"a.c", 0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
     TreeEntry(b"a", stat.S_IFDIR, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
     TreeEntry(b"a/c", stat.S_IFDIR, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
+    TreeEntry(b"aoc", 0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
+]
+
+
+_TREE_ITEMS_BUG_1325 = {
+    b"dir": (stat.S_IFDIR | 0o644, b"5944b31ff85b415573d1a43eb942e2dea30ab8be"),
+    b"dira": (0o100644, b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"),
+}
+
+
+_SORTED_TREE_ITEMS_BUG_1325 = [
+    TreeEntry(
+        path=b"dir",
+        mode=stat.S_IFDIR | 0o644,
+        sha=b"5944b31ff85b415573d1a43eb942e2dea30ab8be",
+    ),
+    TreeEntry(
+        path=b"dira", mode=0o100644, sha=b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"
+    ),
 ]
 
 
@@ -878,14 +904,24 @@ class TreeTests(ShaFileCheckTests):
         )
 
     test_parse_tree = functest_builder(_do_test_parse_tree, _parse_tree_py)
-    test_parse_tree_extension = ext_functest_builder(_do_test_parse_tree, parse_tree)
+    test_parse_tree_extension = ext_functest_builder(
+        _do_test_parse_tree, _parse_tree_rs
+    )
 
     def _do_test_sorted_tree_items(self, sorted_tree_items):
-        def do_sort(entries):
-            return list(sorted_tree_items(entries, False))
+        def do_sort(entries, name_order):
+            return list(sorted_tree_items(entries, name_order))
 
-        actual = do_sort(_TREE_ITEMS)
+        actual = do_sort(_TREE_ITEMS, False)
         self.assertEqual(_SORTED_TREE_ITEMS, actual)
+        self.assertIsInstance(actual[0], TreeEntry)
+
+        actual = do_sort(_TREE_ITEMS_BUG_1325, False)
+        self.assertEqual(
+            key_entry((b"a", (0o40644, b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"))),
+            b"a/",
+        )
+        self.assertEqual(_SORTED_TREE_ITEMS_BUG_1325, actual)
         self.assertIsInstance(actual[0], TreeEntry)
 
         # C/Python implementations may differ in specific error types, but
@@ -894,19 +930,21 @@ class TreeTests(ShaFileCheckTests):
         # raise TypeError where the Python implementation raises
         # AttributeError.
         errors = (TypeError, ValueError, AttributeError)
-        self.assertRaises(errors, do_sort, b"foo")
-        self.assertRaises(errors, do_sort, {b"foo": (1, 2, 3)})
+        self.assertRaises(errors, do_sort, b"foo", False)
+        self.assertRaises(errors, do_sort, {b"foo": (1, 2, 3)}, False)
 
         myhexsha = b"d80c186a03f423a81b39df39dc87fd269736ca86"
-        self.assertRaises(errors, do_sort, {b"foo": (b"xxx", myhexsha)})
-        self.assertRaises(errors, do_sort, {b"foo": (0o100755, 12345)})
+        self.assertRaises(errors, do_sort, {b"foo": (b"xxx", myhexsha)}, False)
+        self.assertRaises(errors, do_sort, {b"foo": (0o100755, 12345)}, False)
 
     test_sorted_tree_items = functest_builder(
         _do_test_sorted_tree_items, _sorted_tree_items_py
     )
-    test_sorted_tree_items_extension = ext_functest_builder(
-        _do_test_sorted_tree_items, sorted_tree_items
-    )
+    if _sorted_tree_items_rs is not None:
+        assert _sorted_tree_items_rs != _sorted_tree_items_py
+        test_sorted_tree_items_extension = ext_functest_builder(
+            _do_test_sorted_tree_items, _sorted_tree_items_rs
+        )
 
     def _do_test_sorted_tree_items_name_order(self, sorted_tree_items):
         self.assertEqual(
@@ -914,6 +952,11 @@ class TreeTests(ShaFileCheckTests):
                 TreeEntry(
                     b"a",
                     stat.S_IFDIR,
+                    b"d80c186a03f423a81b39df39dc87fd269736ca86",
+                ),
+                TreeEntry(
+                    b"a-c",
+                    0o100755,
                     b"d80c186a03f423a81b39df39dc87fd269736ca86",
                 ),
                 TreeEntry(
@@ -926,6 +969,11 @@ class TreeTests(ShaFileCheckTests):
                     stat.S_IFDIR,
                     b"d80c186a03f423a81b39df39dc87fd269736ca86",
                 ),
+                TreeEntry(
+                    b"aoc",
+                    0o100755,
+                    b"d80c186a03f423a81b39df39dc87fd269736ca86",
+                ),
             ],
             list(sorted_tree_items(_TREE_ITEMS, True)),
         )
@@ -933,9 +981,10 @@ class TreeTests(ShaFileCheckTests):
     test_sorted_tree_items_name_order = functest_builder(
         _do_test_sorted_tree_items_name_order, _sorted_tree_items_py
     )
-    test_sorted_tree_items_name_order_extension = ext_functest_builder(
-        _do_test_sorted_tree_items_name_order, sorted_tree_items
-    )
+    if _sorted_tree_items_rs is not None:
+        test_sorted_tree_items_name_order_extension = ext_functest_builder(
+            _do_test_sorted_tree_items_name_order, _sorted_tree_items_rs
+        )
 
     def test_check(self):
         t = Tree

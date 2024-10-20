@@ -121,8 +121,20 @@ from .protocol import (
     parse_capability,
     pkt_line,
 )
-from .refs import PEELED_TAG_SUFFIX, _import_remote_refs, read_info_refs
+from .refs import (
+    PEELED_TAG_SUFFIX,
+    Ref,
+    _import_remote_refs,
+    _set_default_branch,
+    _set_head,
+    _set_origin_head,
+    read_info_refs,
+    split_peeled_refs,
+)
 from .repo import Repo
+
+ObjectID = bytes
+
 
 # url2pathname is lazily imported
 url2pathname = None
@@ -825,8 +837,6 @@ class GitClient:
         protocol_version: Optional[int] = None,
     ) -> Repo:
         """Clone a repository."""
-        from .refs import _set_default_branch, _set_head, _set_origin_head
-
         if mkdir:
             os.mkdir(target_path)
 
@@ -2343,7 +2353,11 @@ class AbstractHttpGitClient(GitClient):
         """
         raise NotImplementedError(self._http_request)
 
-    def _discover_references(self, service, base_url, protocol_version=None):
+    def _discover_references(
+        self, service, base_url, protocol_version=None
+    ) -> Tuple[
+        Dict[Ref, ObjectID], Set[bytes], str, Dict[Ref, Ref], Dict[Ref, ObjectID]
+    ]:
         if (
             protocol_version is not None
             and protocol_version not in GIT_PROTOCOL_VERSIONS
@@ -2413,11 +2427,10 @@ class AbstractHttpGitClient(GitClient):
                 self.protocol_version = server_protocol_version
                 if self.protocol_version == 2:
                     server_capabilities, resp, read, proto = begin_protocol_v2(proto)
-                    (refs, _symrefs, _peeled) = read_pkt_refs_v2(proto.read_pkt_seq())
-                    return refs, server_capabilities, base_url
+                    (refs, symrefs, peeled) = read_pkt_refs_v2(proto.read_pkt_seq())
+                    return refs, server_capabilities, base_url, symrefs, peeled
 
                 else:
-                    server_capabilities = None  # read_pkt_refs will find them
                     try:
                         [pkt] = list(proto.read_pkt_seq())
                     except ValueError as exc:
@@ -2446,14 +2459,21 @@ class AbstractHttpGitClient(GitClient):
                         server_capabilities, resp, read, proto = begin_protocol_v2(
                             proto
                         )
-                    (
-                        refs,
-                        server_capabilities,
-                    ) = read_pkt_refs_v1(proto.read_pkt_seq())
-                    return refs, server_capabilities, base_url
+                        (refs, symrefs, peeled) = read_pkt_refs_v2(proto.read_pkt_seq())
+                    else:
+                        (
+                            refs,
+                            server_capabilities,
+                        ) = read_pkt_refs_v1(proto.read_pkt_seq())
+                        (refs, peeled) = split_peeled_refs(refs)
+                        (symrefs, agent) = _extract_symrefs_and_agent(
+                            server_capabilities
+                        )
+                    return refs, server_capabilities, base_url, symrefs, peeled
             else:
                 self.protocol_version = 0  # dumb servers only support protocol v0
-                return read_info_refs(resp), set(), base_url
+                (refs, peeled) = split_peeled_refs(read_info_refs(resp))
+                return refs, set(), base_url, {}, peeled
         finally:
             resp.close()
 
@@ -2501,7 +2521,7 @@ class AbstractHttpGitClient(GitClient):
 
         """
         url = self._get_url(path)
-        old_refs, server_capabilities, url = self._discover_references(
+        old_refs, server_capabilities, url, symrefs, peeled = self._discover_references(
             b"git-receive-pack", url
         )
         (
@@ -2584,7 +2604,7 @@ class AbstractHttpGitClient(GitClient):
 
         """
         url = self._get_url(path)
-        refs, server_capabilities, url = self._discover_references(
+        refs, server_capabilities, url, symrefs, peeled = self._discover_references(
             b"git-upload-pack", url, protocol_version
         )
         (
@@ -2651,7 +2671,7 @@ class AbstractHttpGitClient(GitClient):
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
         url = self._get_url(path)
-        refs, _, _ = self._discover_references(b"git-upload-pack", url)
+        refs, _, _, _, _ = self._discover_references(b"git-upload-pack", url)
         return refs
 
     def get_url(self, path):

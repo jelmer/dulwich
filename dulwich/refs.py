@@ -585,17 +585,8 @@ class InfoRefsContainer(RefsContainer):
     def __init__(self, f) -> None:
         self._refs = {}
         self._peeled = {}
-        for line in f.readlines():
-            sha, name = line.rstrip(b"\n").split(b"\t")
-            if name.endswith(PEELED_TAG_SUFFIX):
-                name = name[:-3]
-                if not check_ref_format(name):
-                    raise ValueError(f"invalid ref name {name!r}")
-                self._peeled[name] = sha
-            else:
-                if not check_ref_format(name):
-                    raise ValueError(f"invalid ref name {name!r}")
-                self._refs[name] = sha
+        refs = read_info_refs(f)
+        (self._refs, self._peeled) = split_peeled_refs(refs)
 
     def allkeys(self):
         return self._refs.keys()
@@ -1173,6 +1164,18 @@ def strip_peeled_refs(refs):
     return {
         ref: sha for (ref, sha) in refs.items() if not ref.endswith(PEELED_TAG_SUFFIX)
     }
+
+
+def split_peeled_refs(refs):
+    """Split peeled refs from regular refs."""
+    peeled = {}
+    regular = {}
+    for ref, sha in refs.items():
+        if ref.endswith(PEELED_TAG_SUFFIX):
+            peeled[ref[: -len(PEELED_TAG_SUFFIX)]] = sha
+        else:
+            regular[ref] = sha
+    return regular, peeled
 
 
 def _set_origin_head(refs, origin, origin_head):

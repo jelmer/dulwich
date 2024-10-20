@@ -129,6 +129,7 @@ from .refs import (
     _set_head,
     _set_origin_head,
     read_info_refs,
+    split_peeled_refs,
 )
 from .repo import Repo
 
@@ -2471,7 +2472,8 @@ class AbstractHttpGitClient(GitClient):
                     return refs, server_capabilities, base_url, symrefs, peeled
             else:
                 self.protocol_version = 0  # dumb servers only support protocol v0
-                return read_info_refs(resp), set(), base_url, {}, {}
+                (refs, peeled) = split_peeled_refs(read_info_refs(resp))
+                return refs, set(), base_url, {}, peeled
         finally:
             resp.close()
 

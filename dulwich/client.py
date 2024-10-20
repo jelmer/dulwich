@@ -121,8 +121,19 @@ from .protocol import (
     parse_capability,
     pkt_line,
 )
-from .refs import PEELED_TAG_SUFFIX, _import_remote_refs, read_info_refs
+from .refs import (
+    PEELED_TAG_SUFFIX,
+    Ref,
+    _import_remote_refs,
+    _set_default_branch,
+    _set_head,
+    _set_origin_head,
+    read_info_refs,
+)
 from .repo import Repo
+
+ObjectID = bytes
+
 
 # url2pathname is lazily imported
 url2pathname = None
@@ -825,8 +836,6 @@ class GitClient:
         protocol_version: Optional[int] = None,
     ) -> Repo:
         """Clone a repository."""
-        from .refs import _set_default_branch, _set_head, _set_origin_head
-
         if mkdir:
             os.mkdir(target_path)
 
@@ -2343,7 +2352,9 @@ class AbstractHttpGitClient(GitClient):
         """
         raise NotImplementedError(self._http_request)
 
-    def _discover_references(self, service, base_url, protocol_version=None):
+    def _discover_references(
+        self, service, base_url, protocol_version=None
+    ) -> Tuple[Dict[Ref, ObjectID], Set[bytes], str]:
         if (
             protocol_version is not None
             and protocol_version not in GIT_PROTOCOL_VERSIONS

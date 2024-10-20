@@ -59,7 +59,7 @@ from ..pack import (
     write_pack_object,
 )
 from ..protocol import TCP_GIT_PORT
-from ..refs import InfoRefsContainer, read_info_refs, write_info_refs
+from ..refs import InfoRefsContainer, read_info_refs, split_peeled_refs, write_info_refs
 from ..repo import OBJECTDIR, BaseRepo
 from ..server import Backend, TCPGitServer
 
@@ -809,6 +809,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         if not f:
             return {}
         refs = read_info_refs(f)
+        (refs, peeled) = split_peeled_refs(refs)
         if old_ref is not None:
             if refs[name] != old_ref:
                 return False

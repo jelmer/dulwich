@@ -38,6 +38,7 @@ from dulwich.refs import (
     parse_symref_value,
     read_packed_refs,
     read_packed_refs_with_peeled,
+    split_peeled_refs,
     strip_peeled_refs,
     write_packed_refs,
 )
@@ -814,3 +815,14 @@ class StripPeeledRefsTests(TestCase):
     def test_strip_peeled_refs(self):
         # Simple check of two dicts
         self.assertEqual(strip_peeled_refs(self.all_refs), self.non_peeled_refs)
+
+    def test_split_peeled_refs(self):
+        (regular, peeled) = split_peeled_refs(self.all_refs)
+        self.assertEqual(regular, self.non_peeled_refs)
+        self.assertEqual(
+            peeled,
+            {
+                b"refs/tags/2.0.0": b"0749936d0956c661ac8f8d3483774509c165f89e",
+                b"refs/tags/1.0.0": b"a93db4b0360cc635a2b93675010bac8d101f73f0",
+            },
+        )

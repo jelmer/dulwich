@@ -2355,7 +2355,9 @@ class AbstractHttpGitClient(GitClient):
 
     def _discover_references(
         self, service, base_url, protocol_version=None
-    ) -> Tuple[Dict[Ref, ObjectID], Set[bytes], str]:
+    ) -> Tuple[
+        Dict[Ref, ObjectID], Set[bytes], str, Dict[Ref, Ref], Dict[Ref, ObjectID]
+    ]:
         if (
             protocol_version is not None
             and protocol_version not in GIT_PROTOCOL_VERSIONS
@@ -2457,18 +2459,16 @@ class AbstractHttpGitClient(GitClient):
                         server_capabilities, resp, read, proto = begin_protocol_v2(
                             proto
                         )
-                        (
-                            refs,
-                            symrefs,
-                            peeled
-                        ) = read_pkt_refs_v2(proto.read_pkt_seq())
+                        (refs, symrefs, peeled) = read_pkt_refs_v2(proto.read_pkt_seq())
                     else:
                         (
                             refs,
                             server_capabilities,
                         ) = read_pkt_refs_v1(proto.read_pkt_seq())
-                        peeled = {}
-                        (symrefs, agent) = _extract_symrefs_and_agent(server_capabilities)
+                        (refs, peeled) = split_peeled_refs(refs)
+                        (symrefs, agent) = _extract_symrefs_and_agent(
+                            server_capabilities
+                        )
                     return refs, server_capabilities, base_url, symrefs, peeled
             else:
                 self.protocol_version = 0  # dumb servers only support protocol v0

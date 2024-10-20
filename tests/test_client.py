@@ -1138,7 +1138,9 @@ class HttpGitClientTests(TestCase):
             # instantiate HttpGitClient with mocked pool manager
             c = HttpGitClient(base_url, pool_manager=pool_manager, config=None)
             # call method that detects url redirection
-            _, _, processed_url, _, _ = c._discover_references(b"git-upload-pack", base_url)
+            _, _, processed_url, _, _ = c._discover_references(
+                b"git-upload-pack", base_url
+            )
 
             # send the same request as the method above without redirection
             resp = c.pool_manager.request("GET", base_url + tail, redirect=False)

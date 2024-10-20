@@ -1175,6 +1175,18 @@ def strip_peeled_refs(refs):
     }
 
 
+def split_peeled_refs(refs):
+    """Split peeled refs from regular refs."""
+    peeled = {}
+    regular = {}
+    for (ref, sha) in refs.items():
+        if ref.endswith(PEELED_TAG_SUFFIX):
+            peeled[ref[:-len(PEELED_TAG_SUFFIX)]] = sha
+        else:
+            regular[ref] = sha
+    return regular, peeled
+
+
 def _set_origin_head(refs, origin, origin_head):
     # set refs/remotes/origin/HEAD
     origin_base = b"refs/remotes/" + origin + b"/"

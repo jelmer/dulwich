@@ -54,6 +54,7 @@ from dulwich.client import (
     get_transport_and_path,
     get_transport_and_path_from_url,
     parse_rsync_url,
+    _extract_symrefs_and_agent,
 )
 from dulwich.config import ConfigDict
 from dulwich.objects import Commit, Tree
@@ -1867,3 +1868,14 @@ And this line is just random noise, too.
                 ]
             ),
         )
+
+
+class TestExtractAgentAndSymrefs(TestCase):
+
+    def test_extract_agent_and_symrefs(self):
+        (agent, symrefs) = _extract_symrefs_and_agent(
+            [b"agent=git/2.31.1", b"symref=HEAD:refs/heads/master"
+             ])
+        self.assertEqual(agent, b"git/2.31.1")
+        self.assertEqual(symrefs, {b"HEAD": b"refs/heads/master"})
+

@@ -684,6 +684,26 @@ def _handle_upload_pack_tail(
             pack_data(data)
 
 
+def _extract_symrefs_and_agent(capabilities):
+    """Extract symrefs and agent from capabilities.
+
+    Args:
+     capabilities: List of capabilities
+    Returns:
+     (symrefs, agent) tuple
+    """
+    symrefs = {}
+    agent = None
+    for capability in capabilities:
+        k, v = parse_capability(capability)
+        if k == CAPABILITY_SYMREF:
+            (src, dst) = v.split(b":", 1)
+            symrefs[src] = dst
+        if k == CAPABILITY_AGENT:
+            agent = v
+    return (symrefs, agent)
+
+
 # TODO(durin42): this doesn't correctly degrade if the server doesn't
 # support some capabilities. This should work properly with servers
 # that don't support multi_ack.
@@ -1012,11 +1032,7 @@ class GitClient:
 
     def _negotiate_receive_pack_capabilities(self, server_capabilities):
         negotiated_capabilities = self._send_capabilities & server_capabilities
-        agent = None
-        for capability in server_capabilities:
-            k, v = parse_capability(capability)
-            if k == CAPABILITY_AGENT:
-                agent = v
+        (agent, _symrefs) = _extract_symrefs_and_agent(server_capabilities)
         (extract_capability_names(server_capabilities) - KNOWN_RECEIVE_CAPABILITIES)
         # TODO(jelmer): warn about unknown capabilities
         return negotiated_capabilities, agent
@@ -1069,23 +1085,16 @@ class GitClient:
     def _negotiate_upload_pack_capabilities(self, server_capabilities):
         (extract_capability_names(server_capabilities) - KNOWN_UPLOAD_CAPABILITIES)
         # TODO(jelmer): warn about unknown capabilities
-        symrefs = {}
-        agent = None
         fetch_capa = None
         for capability in server_capabilities:
             k, v = parse_capability(capability)
-            if k == CAPABILITY_SYMREF:
-                (src, dst) = v.split(b":", 1)
-                symrefs[src] = dst
-            if k == CAPABILITY_AGENT:
-                agent = v
             if self.protocol_version == 2 and k == CAPABILITY_FETCH:
                 fetch_capa = CAPABILITY_FETCH
                 fetch_features = []
-                v = v.strip()
-                if b"shallow" in v.split(b" "):
+                v = v.strip().split(b" ")
+                if b"shallow" in v:
                     fetch_features.append(CAPABILITY_SHALLOW)
-                if b"filter" in v.split(b" "):
+                if b"filter" in v:
                     fetch_features.append(CAPABILITY_FILTER)
                 for i in range(len(fetch_features)):
                     if i == 0:
@@ -1093,6 +1102,8 @@ class GitClient:
                     else:
                         fetch_capa += b" "
                     fetch_capa += fetch_features[i]
+
+        (symrefs, agent) = _extract_symrefs_and_agent(server_capabilities)
 
         negotiated_capabilities = self._fetch_capabilities & server_capabilities
         if fetch_capa:

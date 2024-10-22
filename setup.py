@@ -61,6 +61,9 @@ if "--pure" in sys.argv:
     sys.argv.remove("--pure")
     rust_extensions = []
 
+if "PURE" in os.environ:
+    rust_extensions = []
+
 
 setup(
     package_data={"": ["py.typed"]},

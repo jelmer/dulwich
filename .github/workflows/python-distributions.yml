@@ -84,6 +84,21 @@ jobs:
           name: artifact-${{ matrix.build-identifier }}
           path: ./wheelhouse/*.whl
 
+  build-pure-wheels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          cache: pip
+      - run: pip install build
+      - run: PURE=true python -m build --wheel
+      - name: Upload pure wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-pure
+          path: ./dist/*.whl
+
   build-sdist:
     runs-on: ubuntu-latest
     steps:
@@ -130,6 +145,7 @@ jobs:
     needs:
       - build-wheels
       - build-sdist
+      - build-pure-wheels
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/dulwich-')
     permissions:
       id-token: write

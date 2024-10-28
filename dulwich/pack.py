@@ -746,6 +746,28 @@ class FilePackIndex(PackIndex):
             raise KeyError(sha)
         return self._unpack_offset(i)
 
+    def iter_prefix(self, prefix: bytes) -> Iterator[bytes]:
+        """Iterate over all SHA1s with the given prefix."""
+        start = ord(prefix[:1])
+        if start == 0:
+            start = 0
+        else:
+            start = self._fan_out_table[start - 1]
+        end = ord(prefix[:1]) + 1
+        if end == 0x100:
+            end = len(self)
+        else:
+            end = self._fan_out_table[end]
+        assert start <= end
+        started = False
+        for i in range(start, end):
+            name = self._unpack_name(i)
+            if name.startswith(prefix):
+                yield name
+                started = True
+            elif started:
+                break
+
 
 class PackIndex1(FilePackIndex):
     """Version 1 Pack Index file."""

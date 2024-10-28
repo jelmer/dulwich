@@ -124,6 +124,16 @@ class PackIndexTests(PackTests):
         self.assertEqual(p.object_sha1(138), hex_to_sha(tree_sha))
         self.assertEqual(p.object_sha1(12), hex_to_sha(commit_sha))
 
+    def test_iter_prefix(self):
+        p = self.get_pack_index(pack1_sha)
+        self.assertEqual([p.object_sha1(178)], list(p.iter_prefix(hex_to_sha(a_sha))))
+        self.assertEqual(
+            [p.object_sha1(178)], list(p.iter_prefix(hex_to_sha(a_sha)[:5]))
+        )
+        self.assertEqual(
+            [p.object_sha1(178)], list(p.iter_prefix(hex_to_sha(a_sha)[:2]))
+        )
+
     def test_index_len(self):
         p = self.get_pack_index(pack1_sha)
         self.assertEqual(3, len(p))

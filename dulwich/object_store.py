@@ -22,6 +22,7 @@
 
 """Git object store interfaces and implementation."""
 
+import binascii
 import os
 import stat
 import sys
@@ -357,6 +358,17 @@ class BaseObjectStore:
     def close(self):
         """Close any files opened by this object store."""
         # Default implementation is a NO-OP
+
+    def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
+        """Iterate over all SHA1s that start with a given prefix.
+
+        The default implementation is a naive iteration over all objects.
+        However, subclasses may override this method with more efficient
+        implementations.
+        """
+        for sha in self:
+            if sha.startswith(prefix):
+                yield sha
 
 
 class PackBasedObjectStore(BaseObjectStore):
@@ -1026,6 +1038,37 @@ class DiskObjectStore(PackBasedObjectStore):
         os.mkdir(os.path.join(path, "info"))
         os.mkdir(os.path.join(path, PACKDIR))
         return cls(path)
+
+    def iter_prefix(self, prefix):
+        if len(prefix) < 2:
+            yield from super().iter_prefix(prefix)
+            return
+        seen = set()
+        dir = prefix[:2].decode()
+        rest = prefix[2:].decode()
+        for name in os.listdir(os.path.join(self.path, dir)):
+            if name.startswith(rest):
+                sha = os.fsencode(dir + name)
+                if sha not in seen:
+                    seen.add(sha)
+                    yield sha
+
+        for p in self.packs:
+            bin_prefix = (
+                binascii.unhexlify(prefix)
+                if len(prefix) % 2 == 0
+                else binascii.unhexlify(prefix[:-1])
+            )
+            for sha in p.index.iter_prefix(bin_prefix):
+                sha = sha_to_hex(sha)
+                if sha.startswith(prefix) and sha not in seen:
+                    seen.add(sha)
+                    yield sha
+        for alternate in self.alternates:
+            for sha in alternate.iter_prefix(prefix):
+                if sha not in seen:
+                    seen.add(sha)
+                    yield sha
 
 
 class MemoryObjectStore(BaseObjectStore):

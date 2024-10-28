@@ -43,7 +43,7 @@ pgp = ["gpg"]
 paramiko = ["paramiko"]
 dev = [
     "ruff==0.7.0",
-    "mypy==1.12.1"
+    "mypy==1.13.0"
 ]
 
 [project.scripts]

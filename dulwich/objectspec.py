@@ -22,8 +22,9 @@
 
 from typing import TYPE_CHECKING, Iterator, List, Optional, Tuple, Union
 
+from .objects import Commit, ShaFile, Tree
+
 if TYPE_CHECKING:
-    from .objects import Commit, ShaFile, Tree
     from .refs import Ref, RefsContainer
     from .repo import Repo
 
@@ -209,14 +210,13 @@ class AmbiguousShortId(Exception):
         self.options = options
 
 
-def scan_for_short_id(object_store, prefix):
+def scan_for_short_id(object_store, prefix, tp):
     """Scan an object store for a short id."""
-    # TODO(jelmer): This could short-circuit looking for objects
-    # starting with a certain prefix.
     ret = []
-    for object_id in object_store:
-        if object_id.startswith(prefix):
-            ret.append(object_store[object_id])
+    for object_id in object_store.iter_prefix(prefix):
+        o = object_store[object_id]
+        if isinstance(o, tp):
+            ret.append(o)
     if not ret:
         raise KeyError(prefix)
     if len(ret) == 1:
@@ -251,7 +251,7 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
             pass
         else:
             try:
-                return scan_for_short_id(repo.object_store, committish)
+                return scan_for_short_id(repo.object_store, committish, Commit)
             except KeyError:
                 pass
     raise KeyError(committish)

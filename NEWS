@@ -3,6 +3,8 @@
  * Fix handling of symrefs with protocol v2.
    (Jelmer Vernooĳ, #1389)
 
+ * Add ``ObjectStore.iter_prefix``.  (Jelmer Vernooĳ)
+
 0.22.3	2024-10-15
 
  * Improve wheel building in CI, so we can upload wheels for the next release.

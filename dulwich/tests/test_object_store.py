@@ -238,8 +238,14 @@ class ObjectStoreTests:
 
     def test_iter_prefix(self):
         self.store.add_object(testobject)
+        self.assertEqual([testobject.id], list(self.store.iter_prefix(testobject.id)))
+        self.assertEqual(
+            [testobject.id], list(self.store.iter_prefix(testobject.id[:10]))
+        )
+        self.assertEqual(
+            [testobject.id], list(self.store.iter_prefix(testobject.id[:4]))
+        )
         self.assertEqual([testobject.id], list(self.store.iter_prefix(b"")))
-        self.assertEqual([testobject.id], list(self.store.iter_prefix(testobject.id[:10])))
 
 
 class PackBasedObjectStoreTests(ObjectStoreTests):

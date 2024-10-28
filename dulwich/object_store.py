@@ -1041,7 +1041,8 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def iter_prefix(self, prefix):
         if len(prefix) < 2:
-            return super().iter_prefix(prefix)
+            yield from super().iter_prefix(prefix)
+            return
         seen = set()
         dir = prefix[:2].decode()
         rest = prefix[2:].decode()
@@ -1053,7 +1054,11 @@ class DiskObjectStore(PackBasedObjectStore):
                     yield sha
 
         for p in self.packs:
-            bin_prefix = binascii.unhexlify(prefix) if len(prefix) % 2 == 0 else binascii.unhexlify(prefix[:-1])
+            bin_prefix = (
+                binascii.unhexlify(prefix)
+                if len(prefix) % 2 == 0
+                else binascii.unhexlify(prefix[:-1])
+            )
             for sha in p.index.iter_prefix(bin_prefix):
                 sha = sha_to_hex(sha)
                 if sha.startswith(prefix) and sha not in seen:

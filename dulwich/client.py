@@ -832,7 +832,7 @@ class GitClient:
         branch=None,
         progress=None,
         depth=None,
-        ref_prefix=[],
+        ref_prefix=[b"HEAD", b"refs/"],
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ) -> Repo:
@@ -928,7 +928,7 @@ class GitClient:
         ] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[List[bytes]] = [],
+        ref_prefix: Optional[List[bytes]] = [b"HEAD", b"refs/"],
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -1009,7 +1009,7 @@ class GitClient:
         *,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix=[],
+        ref_prefix=[b"HEAD", b"refs/"],
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ):
@@ -1311,7 +1311,7 @@ class TraditionalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-        ref_prefix=[],
+        ref_prefix=[b"HEAD", b"refs/"],
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ):
@@ -1791,7 +1791,7 @@ class LocalGitClient(GitClient):
         determine_wants=None,
         progress=None,
         depth=None,
-        ref_prefix=[],
+        ref_prefix=[b"HEAD", b"refs/"],
         filter_spec=None,
         **kwargs,
     ):
@@ -1836,7 +1836,7 @@ class LocalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-        ref_prefix: Optional[List[bytes]] = [],
+        ref_prefix: Optional[List[bytes]] = [b"HEAD", b"refs/"],
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -2574,7 +2574,7 @@ class AbstractHttpGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-        ref_prefix=[],
+        ref_prefix=[b"HEAD", b"refs/"],
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ):

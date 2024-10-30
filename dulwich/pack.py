@@ -414,6 +414,8 @@ def load_pack_index_file(path, f):
         version = struct.unpack(b">L", contents[4:8])[0]
         if version == 2:
             return PackIndex2(path, file=f, contents=contents, size=size)
+        elif version == 3:
+            return PackIndex3(path, file=f, contents=contents, size=size)
         else:
             raise KeyError("Unknown pack index format %d" % version)
     else:
@@ -833,6 +835,43 @@ class PackIndex2(FilePackIndex):
 
     def _unpack_crc32_checksum(self, i):
         return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+
+
+class PackIndex3(FilePackIndex):
+    """Version 3 Pack Index file."""
+
+    def __init__(self, filename: str, file=None, contents=None, size=None):
+        super().__init__(filename, file, contents, size)
+        if self._contents[:4] != b"\377tOc":
+            raise AssertionError("Not a v2 pack index file")
+        offset = 4
+        (self.version, header_length, self.num_objects, self.num_formats) = unpack_from(b">LLLL", self._contents, offset)
+        if self.version != 3:
+            raise AssertionError("Version was %d" % self.version)
+        offset += 4 * 4
+        self.formats = []
+        for i in range(self.num_formats):
+            (identifier, shortened_length, format_offset) = unpack_from(
+                ">4sLL", self._contents, offset)
+            self.formats.append((identifier, shortened_length, format_offset))
+            offset += 3 * 4
+        trailer_offset = struct.unpack_from(">L", self._contents, offset)
+        offset += 4
+
+        # See https://git-scm.com/docs/hash-function-transition/#_pack_index
+
+    def _unpack_entry(self, i):
+        raise NotImplementedError
+        )
+
+    def _unpack_name(self, i):
+        raise NotImplementedError
+
+    def _unpack_offset(self, i):
+        raise NotImplementedError
+
+    def _unpack_crc32_checksum(self, i):
+        raise NotImplementedError
 
 
 def read_pack_header(read) -> Tuple[int, int]:

@@ -226,6 +226,25 @@ class DulwichClientTestBase:
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
             result = c.fetch(self._build_path("/server_new.export"), dest)
+            self.assertEqual(
+                {b"HEAD": b"refs/heads/master"},
+                result.symrefs,
+            )
+            for r in result.refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            self.assertDestEqualsSrc()
+
+    def test_fetch_pack_with_nondefault_symref(self):
+        c = self._client()
+        src = repo.Repo(os.path.join(self.gitroot, "server_new.export"))
+        src.refs.add_if_new(b"refs/heads/main", src.refs[b"refs/heads/master"])
+        src.refs.set_symbolic_ref(b"HEAD", b"refs/heads/main")
+        with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
+            result = c.fetch(self._build_path("/server_new.export"), dest)
+            self.assertEqual(
+                {b"HEAD": b"refs/heads/main"},
+                result.symrefs,
+            )
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()

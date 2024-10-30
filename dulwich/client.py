@@ -2609,9 +2609,11 @@ class AbstractHttpGitClient(GitClient):
         )
         (
             negotiated_capabilities,
-            symrefs,
+            capa_symrefs,
             agent,
         ) = self._negotiate_upload_pack_capabilities(server_capabilities)
+        if not symrefs and capa_symrefs:
+            symrefs = capa_symrefs
         if depth is not None:
             wants = determine_wants(refs, depth=depth)
         else:

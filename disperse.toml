@@ -1,0 +1,17 @@
+tag-name = "dulwich-$VERSION"
+news-file = "NEWS"
+verify-command = "make check"
+twine-upload = false
+tarball-location = []
+release-timeout = 5
+ci-timeout = 7200
+
+[[update_version]]
+path = "dulwich/__init__.py"
+match = "^__version__ = ((.*))$"
+new-line = "__version__ = $TUPLED_VERSION"
+
+[[update_version]]
+path = "Cargo.toml"
+match = '^version = "(.*)"$'
+new-line = 'version = "$VERSION"'

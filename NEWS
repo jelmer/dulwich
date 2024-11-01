@@ -1,5 +1,5 @@
 0.22.4	UNRELEASED
-
+0.22.4	2024-11-01
  * Fix handling of symrefs with protocol v2.
    (Jelmer Vernooĳ, #1389)
 

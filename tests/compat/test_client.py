@@ -37,6 +37,7 @@ from unittest.mock import patch
 from urllib.parse import unquote
 
 from dulwich import client, file, index, objects, protocol, repo
+from dulwich.porcelain import tag_create
 
 from .. import SkipTest, expectedFailure
 from .utils import (
@@ -248,6 +249,26 @@ class DulwichClientTestBase:
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
             self.assertDestEqualsSrc()
+
+    def test_get_refs_with_peeled_tag(self):
+        tag_create(
+            os.path.join(self.gitroot, "server_new.export"),
+            b"v1.0",
+            message="tagging".encode("ascii"),
+            annotated=True,
+        )
+        c = self._client()
+        refs = c.get_refs(self._build_path("/server_new.export"))
+        self.assertEqual(
+            [
+                b"HEAD",
+                b"refs/heads/branch",
+                b"refs/heads/master",
+                b"refs/tags/v1.0",
+                b"refs/tags/v1.0^{}",
+            ],
+            sorted(refs.keys()),
+        )
 
     def test_fetch_pack_depth(self):
         c = self._client()

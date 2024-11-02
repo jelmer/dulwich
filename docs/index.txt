@@ -15,7 +15,6 @@ Documentation
 .. toctree::
     :maxdepth: 2
 
-    performance
     protocol
 
     tutorial/index

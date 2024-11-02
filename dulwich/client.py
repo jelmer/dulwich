@@ -1378,6 +1378,7 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(b"command=ls-refs\n")
                 proto.write(b"0001")  # delim-pkt
                 proto.write_pkt_line(b"symrefs")
+                proto.write_pkt_line(b"peel")
                 for prefix in ref_prefix:
                     proto.write_pkt_line(b"ref-prefix " + prefix)
                 proto.write_pkt_line(None)
@@ -1458,13 +1459,16 @@ class TraditionalGitClient(GitClient):
             proto.write_pkt_line(b"command=ls-refs\n")
             proto.write(b"0001")  # delim-pkt
             proto.write_pkt_line(b"symrefs")
+            proto.write_pkt_line(b"peel")
             proto.write_pkt_line(None)
             with proto:
                 try:
-                    refs, _symrefs, _peeled = read_pkt_refs_v2(proto.read_pkt_seq())
+                    refs, _symrefs, peeled = read_pkt_refs_v2(proto.read_pkt_seq())
                 except HangupException as exc:
                     raise _remote_error_from_stderr(stderr) from exc
                 proto.write_pkt_line(None)
+                for refname, refvalue in peeled.items():
+                    refs[refname + PEELED_TAG_SUFFIX] = refvalue
                 return refs
         else:
             with proto:
@@ -2407,6 +2411,7 @@ class AbstractHttpGitClient(GitClient):
                         pkt_line(b"command=ls-refs\n")
                         + b"0001"
                         + pkt_line(b"symrefs")
+                        + pkt_line(b"peel")
                         + b"0000",
                     )
                     proto = Protocol(read, None)
@@ -2673,7 +2678,9 @@ class AbstractHttpGitClient(GitClient):
     def get_refs(self, path):
         """Retrieve the current refs from a git smart server."""
         url = self._get_url(path)
-        refs, _, _, _, _ = self._discover_references(b"git-upload-pack", url)
+        refs, _, _, _, peeled = self._discover_references(b"git-upload-pack", url)
+        for refname, refvalue in peeled.items():
+            refs[refname + PEELED_TAG_SUFFIX] = refvalue
         return refs
 
     def get_url(self, path):

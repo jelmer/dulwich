@@ -1,5 +1,7 @@
 0.22.5	UNRELEASED
 
+ * Drop support for Python 3.8. (Jelmer Vernooĳ)
+
 0.22.4	2024-11-01
 
  * Fix handling of symrefs with protocol v2.

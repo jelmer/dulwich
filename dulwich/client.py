@@ -128,6 +128,12 @@ from .refs import (
 )
 from .repo import Repo
 
+# Default ref prefix, used if none is specified.
+# GitHub defaults to just sending HEAD if no ref-prefix is
+# specified, so explicitly request all refs to match
+# behaviour with v1 when no ref-prefix is specified.
+DEFAULT_REF_PREFIX = [b"HEAD", b"refs/"]
+
 ObjectID = bytes
 
 
@@ -1375,10 +1381,7 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(b"symrefs")
                 proto.write_pkt_line(b"peel")
                 if ref_prefix is None:
-                    # GitHub defaults to just sending HEAD if no ref-prefix is
-                    # specified, so explicitly request all refs to match
-                    # behaviour with v1 when no ref-prefix is specified.
-                    ref_prefix = [b"HEAD", b"refs/"]
+                    ref_prefix = DEFAULT_REF_PREFIX
                 for prefix in ref_prefix:
                     proto.write_pkt_line(b"ref-prefix " + prefix)
                 proto.write_pkt_line(None)

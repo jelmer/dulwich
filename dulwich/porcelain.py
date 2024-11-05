@@ -486,7 +486,7 @@ def init(path=".", *, bare=False, symlinks: Optional[bool] = None):
         return Repo.init(path, symlinks=symlinks)
 
 
-def encode_refspecs(refspecs, refspec_encoding):
+def encode_refspecs(refspecs):
     if refspecs is None:
         return [b"HEAD"]
 
@@ -494,7 +494,7 @@ def encode_refspecs(refspecs, refspec_encoding):
         if isinstance(ref, bytes):
             return ref
         else:
-            return ref.encode(refspec_encoding)
+            return ref.encode(DEFAULT_ENCODING)
 
     encoded_refs = []
     if isinstance(refspecs, bytes) or isinstance(refspecs, str):
@@ -518,7 +518,6 @@ def clone(
     branch: Optional[Union[str, bytes]] = None,
     config: Optional[Config] = None,
     refspecs=None,
-    refspec_encoding=DEFAULT_ENCODING,
     filter_spec=None,
     protocol_version: Optional[int] = None,
     **kwargs,
@@ -539,8 +538,6 @@ def clone(
       config: Configuration to use
       refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
         bytestring/string.
-      refspec_encoding: Character encoding of bytestrings provided in the refspecs parameter.
-        If not specified, the internal default encoding will be used.
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
@@ -566,7 +563,7 @@ def clone(
     if checkout and bare:
         raise Error("checkout and bare are incompatible")
 
-    encoded_refs = encode_refspecs(refspecs, refspec_encoding)
+    encoded_refs = encode_refspecs(refspecs)
 
     if target is None:
         target = source.split("/")[-1]
@@ -1279,7 +1276,6 @@ def pull(
     errstream=default_bytes_err_stream,
     fast_forward=True,
     force=False,
-    refspec_encoding=DEFAULT_ENCODING,
     filter_spec=None,
     protocol_version=None,
     **kwargs,
@@ -1293,8 +1289,6 @@ def pull(
         bytestring/string.
       outstream: A stream file to write to output
       errstream: A stream file to write to errors
-      refspec_encoding: Character encoding of bytestrings provided in the refspecs parameter.
-        If not specified, the internal default encoding will be used.
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
@@ -1305,7 +1299,7 @@ def pull(
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
 
-        encoded_refs = encode_refspecs(refspecs, refspec_encoding)
+        encoded_refs = encode_refspecs(refspecs)
         selected_refs = []
 
         def determine_wants(remote_refs, **kwargs):

@@ -28,18 +28,13 @@ import stat
 import warnings
 import zlib
 from collections import namedtuple
+from collections.abc import Iterable, Iterator
 from hashlib import sha1
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
     BinaryIO,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Optional,
-    Tuple,
-    Type,
     Union,
 )
 
@@ -183,7 +178,7 @@ def serializable_property(name: str, docstring: Optional[str] = None):
     return property(get, set, doc=docstring)
 
 
-def object_class(type: Union[bytes, int]) -> Optional[Type["ShaFile"]]:
+def object_class(type: Union[bytes, int]) -> Optional[type["ShaFile"]]:
     """Get the object class corresponding to the given type.
 
     Args:
@@ -280,7 +275,7 @@ class ShaFile:
     _needs_serialization: bool
     type_name: bytes
     type_num: int
-    _chunked_text: Optional[List[bytes]]
+    _chunked_text: Optional[list[bytes]]
     _sha: Union[FixedSha, None, "HASH"]
 
     @staticmethod
@@ -335,7 +330,7 @@ class ShaFile:
             self.as_legacy_object_chunks(compression_level=compression_level)
         )
 
-    def as_raw_chunks(self) -> List[bytes]:
+    def as_raw_chunks(self) -> list[bytes]:
         """Return chunks with serialization of the object.
 
         Returns: List of strings, not necessarily one per line
@@ -372,7 +367,7 @@ class ShaFile:
         self.set_raw_chunks([text], sha)
 
     def set_raw_chunks(
-        self, chunks: List[bytes], sha: Optional[ObjectID] = None
+        self, chunks: list[bytes], sha: Optional[ObjectID] = None
     ) -> None:
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
@@ -431,10 +426,10 @@ class ShaFile:
         self._chunked_text = []
         self._needs_serialization = True
 
-    def _deserialize(self, chunks: List[bytes]) -> None:
+    def _deserialize(self, chunks: list[bytes]) -> None:
         raise NotImplementedError(self._deserialize)
 
-    def _serialize(self) -> List[bytes]:
+    def _serialize(self) -> list[bytes]:
         raise NotImplementedError(self._serialize)
 
     @classmethod
@@ -471,7 +466,7 @@ class ShaFile:
 
     @staticmethod
     def from_raw_chunks(
-        type_num: int, chunks: List[bytes], sha: Optional[ObjectID] = None
+        type_num: int, chunks: list[bytes], sha: Optional[ObjectID] = None
     ):
         """Creates an object of the indicated type from the raw chunks given.
 
@@ -591,7 +586,7 @@ class Blob(ShaFile):
     type_name = b"blob"
     type_num = 3
 
-    _chunked_text: List[bytes]
+    _chunked_text: list[bytes]
 
     def __init__(self) -> None:
         super().__init__()
@@ -611,7 +606,7 @@ class Blob(ShaFile):
     def _get_chunked(self):
         return self._chunked_text
 
-    def _set_chunked(self, chunks: List[bytes]):
+    def _set_chunked(self, chunks: list[bytes]):
         self._chunked_text = chunks
 
     def _serialize(self):
@@ -641,7 +636,7 @@ class Blob(ShaFile):
         """
         super().check()
 
-    def splitlines(self) -> List[bytes]:
+    def splitlines(self) -> list[bytes]:
         """Return list of lines in this blob.
 
         This preserves the original line endings.
@@ -671,7 +666,7 @@ class Blob(ShaFile):
 
 def _parse_message(
     chunks: Iterable[bytes],
-) -> Iterator[Union[Tuple[None, None], Tuple[Optional[bytes], bytes]]]:
+) -> Iterator[Union[tuple[None, None], tuple[Optional[bytes], bytes]]]:
     """Parse a message with a list of fields and a body.
 
     Args:
@@ -1027,7 +1022,7 @@ def sorted_tree_items(entries, name_order: bool):
         yield TreeEntry(name, mode, hexsha)
 
 
-def key_entry(entry: Tuple[bytes, Tuple[int, ObjectID]]) -> bytes:
+def key_entry(entry: tuple[bytes, tuple[int, ObjectID]]) -> bytes:
     """Sort key for tree entry.
 
     Args:
@@ -1039,7 +1034,7 @@ def key_entry(entry: Tuple[bytes, Tuple[int, ObjectID]]) -> bytes:
     return name
 
 
-def key_entry_name_order(entry: Tuple[bytes, Tuple[int, ObjectID]]) -> bytes:
+def key_entry_name_order(entry: tuple[bytes, tuple[int, ObjectID]]) -> bytes:
     """Sort key for tree entry in name order."""
     return entry[0]
 
@@ -1083,7 +1078,7 @@ class Tree(ShaFile):
 
     def __init__(self) -> None:
         super().__init__()
-        self._entries: Dict[bytes, Tuple[int, bytes]] = {}
+        self._entries: dict[bytes, tuple[int, bytes]] = {}
 
     @classmethod
     def from_path(cls, filename):
@@ -1201,7 +1196,7 @@ class Tree(ShaFile):
         return list(serialize_tree(self.iteritems()))
 
     def as_pretty_string(self) -> str:
-        text: List[str] = []
+        text: list[str] = []
         for name, mode, hexsha in self.iteritems():
             text.append(pretty_format_tree_entry(name, mode, hexsha))
         return "".join(text)
@@ -1387,11 +1382,11 @@ class Commit(ShaFile):
 
     def __init__(self) -> None:
         super().__init__()
-        self._parents: List[bytes] = []
+        self._parents: list[bytes] = []
         self._encoding = None
-        self._mergetag: List[Tag] = []
+        self._mergetag: list[Tag] = []
         self._gpgsig = None
-        self._extra: List[Tuple[bytes, bytes]] = []
+        self._extra: list[tuple[bytes, bytes]] = []
         self._author_timezone_neg_utc = False
         self._commit_timezone_neg_utc = False
 
@@ -1655,7 +1650,7 @@ OBJECT_CLASSES = (
     Tag,
 )
 
-_TYPE_MAP: Dict[Union[bytes, int], Type[ShaFile]] = {}
+_TYPE_MAP: dict[Union[bytes, int], type[ShaFile]] = {}
 
 for cls in OBJECT_CLASSES:
     _TYPE_MAP[cls.type_name] = cls

@@ -30,7 +30,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Tuple
 
 from dulwich.protocol import TCP_GIT_PORT
 from dulwich.repo import Repo
@@ -236,7 +235,7 @@ class CompatTestCase(TestCase):
     min_git_version.
     """
 
-    min_git_version: Tuple[int, ...] = (1, 5, 0)
+    min_git_version: tuple[int, ...] = (1, 5, 0)
 
     def setUp(self):
         super().setUp()

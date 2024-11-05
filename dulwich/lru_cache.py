@@ -21,7 +21,8 @@
 
 """A simple least-recently-used (LRU) cache."""
 
-from typing import Callable, Dict, Generic, Iterable, Iterator, Optional, TypeVar
+from collections.abc import Iterable, Iterator
+from typing import Callable, Generic, Optional, TypeVar
 
 _null_key = object()
 
@@ -74,7 +75,7 @@ class LRUCache(Generic[K, V]):
     def __init__(
         self, max_cache: int = 100, after_cleanup_count: Optional[int] = None
     ) -> None:
-        self._cache: Dict[K, _LRUNode[K, V]] = {}
+        self._cache: dict[K, _LRUNode[K, V]] = {}
         # The "HEAD" of the lru linked list
         self._most_recently_used = None
         # The "TAIL" of the lru linked list
@@ -209,7 +210,7 @@ class LRUCache(Generic[K, V]):
         """
         return self._cache.keys()
 
-    def items(self) -> Dict[K, V]:
+    def items(self) -> dict[K, V]:
         """Get the key:value pairs as a dict."""
         return {k: n.value for k, n in self._cache.items()}
 

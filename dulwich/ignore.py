@@ -24,8 +24,9 @@ For details for the matching rules, see https://git-scm.com/docs/gitignore
 
 import os.path
 import re
+from collections.abc import Iterable
 from contextlib import suppress
-from typing import TYPE_CHECKING, BinaryIO, Dict, Iterable, List, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 
 if TYPE_CHECKING:
     from .repo import Repo
@@ -193,7 +194,7 @@ class IgnoreFilter:
     def __init__(
         self, patterns: Iterable[bytes], ignorecase: bool = False, path=None
     ) -> None:
-        self._patterns: List[Pattern] = []
+        self._patterns: list[Pattern] = []
         self._ignorecase = ignorecase
         self._path = path
         for pattern in patterns:
@@ -290,10 +291,10 @@ class IgnoreFilterManager:
     def __init__(
         self,
         top_path: str,
-        global_filters: List[IgnoreFilter],
+        global_filters: list[IgnoreFilter],
         ignorecase: bool,
     ) -> None:
-        self._path_filters: Dict[str, Optional[IgnoreFilter]] = {}
+        self._path_filters: dict[str, Optional[IgnoreFilter]] = {}
         self._top_path = top_path
         self._global_filters = global_filters
         self._ignorecase = ignorecase

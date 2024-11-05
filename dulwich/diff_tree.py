@@ -24,7 +24,7 @@ import stat
 from collections import defaultdict, namedtuple
 from io import BytesIO
 from itertools import chain
-from typing import Dict, List, Optional
+from typing import Optional
 
 from .object_store import BaseObjectStore
 from .objects import S_ISGITLINK, ObjectID, ShaFile, Tree, TreeEntry
@@ -59,8 +59,8 @@ class TreeChange(namedtuple("TreeChange", ["type", "old", "new"])):
         return cls(CHANGE_DELETE, old, _NULL_ENTRY)
 
 
-def _tree_entries(path: str, tree: Tree) -> List[TreeEntry]:
-    result: List[TreeEntry] = []
+def _tree_entries(path: str, tree: Tree) -> list[TreeEntry]:
+    result: list[TreeEntry] = []
     if not tree:
         return result
     for entry in tree.iteritems(name_order=True):
@@ -241,7 +241,7 @@ def _all_same(seq, key):
 
 def tree_changes_for_merge(
     store: BaseObjectStore,
-    parent_tree_ids: List[ObjectID],
+    parent_tree_ids: list[ObjectID],
     tree_id: ObjectID,
     rename_detector=None,
 ):
@@ -270,7 +270,7 @@ def tree_changes_for_merge(
         for t in parent_tree_ids
     ]
     num_parents = len(parent_tree_ids)
-    changes_by_path: Dict[str, List[Optional[TreeChange]]] = defaultdict(
+    changes_by_path: dict[str, list[Optional[TreeChange]]] = defaultdict(
         lambda: [None] * num_parents
     )
 
@@ -308,7 +308,7 @@ def tree_changes_for_merge(
 _BLOCK_SIZE = 64
 
 
-def _count_blocks(obj: ShaFile) -> Dict[int, int]:
+def _count_blocks(obj: ShaFile) -> dict[int, int]:
     """Count the blocks in an object.
 
     Splits the data into blocks either on lines or <=64-byte chunks of lines.
@@ -319,7 +319,7 @@ def _count_blocks(obj: ShaFile) -> Dict[int, int]:
     Returns:
       A dict of block hashcode -> total bytes occurring.
     """
-    block_counts: Dict[int, int] = defaultdict(int)
+    block_counts: dict[int, int] = defaultdict(int)
     block = BytesIO()
     n = 0
 

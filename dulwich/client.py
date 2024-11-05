@@ -45,6 +45,7 @@ import select
 import socket
 import subprocess
 import sys
+from collections.abc import Iterable, Iterator
 from contextlib import closing
 from io import BufferedReader, BytesIO
 from typing import (
@@ -52,13 +53,7 @@ from typing import (
     TYPE_CHECKING,
     Callable,
     ClassVar,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Optional,
-    Set,
-    Tuple,
     Union,
 )
 from urllib.parse import quote as urlquote
@@ -210,7 +205,7 @@ class ReportStatusParser:
     def __init__(self) -> None:
         self._done = False
         self._pack_status = None
-        self._ref_statuses: List[bytes] = []
+        self._ref_statuses: list[bytes] = []
 
     def check(self):
         """Check if there were any errors and, if so, raise exceptions.
@@ -272,7 +267,7 @@ def read_server_capabilities(pkt_seq):
 
 def read_pkt_refs_v2(
     pkt_seq,
-) -> Tuple[Dict[bytes, bytes], Dict[bytes, bytes], Dict[bytes, bytes]]:
+) -> tuple[dict[bytes, bytes], dict[bytes, bytes], dict[bytes, bytes]]:
     refs = {}
     symrefs = {}
     peeled = {}
@@ -295,7 +290,7 @@ def read_pkt_refs_v2(
     return refs, symrefs, peeled
 
 
-def read_pkt_refs_v1(pkt_seq) -> Tuple[Dict[bytes, bytes], Set[bytes]]:
+def read_pkt_refs_v1(pkt_seq) -> tuple[dict[bytes, bytes], set[bytes]]:
     server_capabilities = None
     refs = {}
     # Receive refs from server
@@ -324,7 +319,7 @@ class FetchPackResult:
       agent: User agent string
     """
 
-    _FORWARDED_ATTRS: ClassVar[Set[str]] = {
+    _FORWARDED_ATTRS: ClassVar[set[str]] = {
         "clear",
         "copy",
         "fromkeys",
@@ -405,7 +400,7 @@ class SendPackResult:
         failed to update), or None if it was updated successfully
     """
 
-    _FORWARDED_ATTRS: ClassVar[Set[str]] = {
+    _FORWARDED_ATTRS: ClassVar[set[str]] = {
         "clear",
         "copy",
         "fromkeys",
@@ -489,8 +484,8 @@ def _read_shallow_updates(pkt_seq):
 
 class _v1ReceivePackHeader:
     def __init__(self, capabilities, old_refs, new_refs) -> None:
-        self.want: List[bytes] = []
-        self.have: List[bytes] = []
+        self.want: list[bytes] = []
+        self.have: list[bytes] = []
         self._it = self._handle_receive_pack_head(capabilities, old_refs, new_refs)
         self.sent_capabilities = False
 
@@ -546,7 +541,7 @@ class _v1ReceivePackHeader:
         yield None
 
 
-def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[Tuple[int, bytes]]:
+def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[tuple[int, bytes]]:
     """Read per-channel data.
 
     This requires the side-band-64k capability.
@@ -654,7 +649,7 @@ def _handle_upload_pack_head(
 
 def _handle_upload_pack_tail(
     proto,
-    capabilities: Set[bytes],
+    capabilities: set[bytes],
     graph_walker,
     pack_data: Callable[[bytes], None],
     progress: Optional[Callable[[bytes], None]] = None,
@@ -797,7 +792,7 @@ class GitClient:
         path,
         update_refs,
         generate_pack_data: Callable[
-            [Set[bytes], Set[bytes], bool], Tuple[int, Iterator[UnpackedObject]]
+            [set[bytes], set[bytes], bool], tuple[int, Iterator[UnpackedObject]]
         ],
         progress=None,
     ):
@@ -924,11 +919,11 @@ class GitClient:
         path: str,
         target: Repo,
         determine_wants: Optional[
-            Callable[[Dict[bytes, bytes], Optional[int]], List[bytes]]
+            Callable[[dict[bytes, bytes], Optional[int]], list[bytes]]
         ] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[List[bytes]] = [b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[bytes]] = [b"HEAD", b"refs/"],
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -1065,9 +1060,9 @@ class GitClient:
     def _handle_receive_pack_tail(
         self,
         proto: Protocol,
-        capabilities: Set[bytes],
+        capabilities: set[bytes],
         progress: Optional[Callable[[bytes], None]] = None,
-    ) -> Optional[Dict[bytes, Optional[str]]]:
+    ) -> Optional[dict[bytes, Optional[str]]]:
         """Handle the tail of a 'git-receive-pack' request.
 
         Args:
@@ -1641,7 +1636,7 @@ class SubprocessWrapper:
         self.proc.wait()
 
 
-def find_git_command() -> List[str]:
+def find_git_command() -> list[str]:
     """Find command to run for system Git (usually C Git)."""
     if sys.platform == "win32":  # support .exe, .bat and .cmd
         try:  # to avoid overhead
@@ -1840,7 +1835,7 @@ class LocalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-        ref_prefix: Optional[List[bytes]] = [b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[bytes]] = [b"HEAD", b"refs/"],
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -2094,7 +2089,7 @@ class SSHGitClient(TraditionalGitClient):
             "GIT_SSH_COMMAND", os.environ.get("GIT_SSH")
         )
         super().__init__(**kwargs)
-        self.alternative_paths: Dict[bytes, bytes] = {}
+        self.alternative_paths: dict[bytes, bytes] = {}
         if vendor is not None:
             self.ssh_vendor = vendor
         else:
@@ -2359,8 +2354,8 @@ class AbstractHttpGitClient(GitClient):
 
     def _discover_references(
         self, service, base_url, protocol_version=None
-    ) -> Tuple[
-        Dict[Ref, ObjectID], Set[bytes], str, Dict[Ref, Ref], Dict[Ref, ObjectID]
+    ) -> tuple[
+        dict[Ref, ObjectID], set[bytes], str, dict[Ref, Ref], dict[Ref, ObjectID]
     ]:
         if (
             protocol_version is not None
@@ -2831,7 +2826,7 @@ def _win32_url_to_path(parsed) -> str:
 
 def get_transport_and_path_from_url(
     url: str, config: Optional[Config] = None, operation: Optional[str] = None, **kwargs
-) -> Tuple[GitClient, str]:
+) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
     Args:
@@ -2876,7 +2871,7 @@ def _get_transport_and_path_from_url(url, config, operation, **kwargs):
     raise ValueError(f"unknown scheme '{parsed.scheme}'")
 
 
-def parse_rsync_url(location: str) -> Tuple[Optional[str], str, str]:
+def parse_rsync_url(location: str) -> tuple[Optional[str], str, str]:
     """Parse a rsync-style URL."""
     if ":" in location and "@" not in location:
         # SSH with no user@, zero or one leading slash.
@@ -2900,7 +2895,7 @@ def get_transport_and_path(
     config: Optional[Config] = None,
     operation: Optional[str] = None,
     **kwargs,
-) -> Tuple[GitClient, str]:
+) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
     Args:

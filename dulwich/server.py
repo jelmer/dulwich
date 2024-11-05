@@ -49,8 +49,9 @@ import socketserver
 import sys
 import time
 import zlib
+from collections.abc import Iterable
 from functools import partial
-from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Optional, cast
 from typing import Protocol as TypingProtocol
 
 from dulwich import log_utils
@@ -142,7 +143,7 @@ class BackendRepo(TypingProtocol):
     object_store: PackedObjectContainer
     refs: RefsContainer
 
-    def get_refs(self) -> Dict[bytes, bytes]:
+    def get_refs(self) -> dict[bytes, bytes]:
         """Get all the refs in the repository.
 
         Returns: dict of name -> sha
@@ -224,7 +225,7 @@ class PackHandler(Handler):
 
     def __init__(self, backend, proto, stateless_rpc=False) -> None:
         super().__init__(backend, proto, stateless_rpc)
-        self._client_capabilities: Optional[Set[bytes]] = None
+        self._client_capabilities: Optional[set[bytes]] = None
         # Flags needed for the no-done capability
         self._done_received = False
 
@@ -331,7 +332,7 @@ class UploadPackHandler(PackHandler):
         else:
             self.write_pack_data = self.proto.write
 
-    def get_tagged(self, refs=None, repo=None) -> Dict[ObjectID, ObjectID]:
+    def get_tagged(self, refs=None, repo=None) -> dict[ObjectID, ObjectID]:
         """Get a dict of peeled values of tags to their original tag shas.
 
         Args:
@@ -471,7 +472,7 @@ def _find_shallow(store: ObjectContainer, heads, depth):
         considered shallow and unshallow according to the arguments. Note that
         these sets may overlap if a commit is reachable along multiple paths.
     """
-    parents: Dict[bytes, List[bytes]] = {}
+    parents: dict[bytes, list[bytes]] = {}
 
     def get_parents(sha):
         result = parents.get(sha, None)
@@ -570,12 +571,12 @@ class _ProtocolGraphWalker:
         self.proto = handler.proto
         self.stateless_rpc = handler.stateless_rpc
         self.advertise_refs = handler.advertise_refs
-        self._wants: List[bytes] = []
-        self.shallow: Set[bytes] = set()
-        self.client_shallow: Set[bytes] = set()
-        self.unshallow: Set[bytes] = set()
+        self._wants: list[bytes] = []
+        self.shallow: set[bytes] = set()
+        self.client_shallow: set[bytes] = set()
+        self.unshallow: set[bytes] = set()
         self._cached = False
-        self._cache: List[bytes] = []
+        self._cache: list[bytes] = []
         self._cache_index = 0
         self._impl = None
 
@@ -770,7 +771,7 @@ class SingleAckGraphWalkerImpl:
 
     def __init__(self, walker) -> None:
         self.walker = walker
-        self._common: List[bytes] = []
+        self._common: list[bytes] = []
 
     def ack(self, have_ref):
         if not self._common:
@@ -815,7 +816,7 @@ class MultiAckGraphWalkerImpl:
     def __init__(self, walker) -> None:
         self.walker = walker
         self._found_base = False
-        self._common: List[bytes] = []
+        self._common: list[bytes] = []
 
     def ack(self, have_ref):
         self._common.append(have_ref)
@@ -873,7 +874,7 @@ class MultiAckDetailedGraphWalkerImpl:
 
     def __init__(self, walker) -> None:
         self.walker = walker
-        self._common: List[bytes] = []
+        self._common: list[bytes] = []
 
     def ack(self, have_ref):
         # Should only be called iff have_ref is common
@@ -955,8 +956,8 @@ class ReceivePackHandler(PackHandler):
         ]
 
     def _apply_pack(
-        self, refs: List[Tuple[bytes, bytes, bytes]]
-    ) -> List[Tuple[bytes, bytes]]:
+        self, refs: list[tuple[bytes, bytes, bytes]]
+    ) -> list[tuple[bytes, bytes]]:
         all_exceptions = (
             IOError,
             OSError,
@@ -1014,7 +1015,7 @@ class ReceivePackHandler(PackHandler):
 
         return status
 
-    def _report_status(self, status: List[Tuple[bytes, bytes]]) -> None:
+    def _report_status(self, status: list[tuple[bytes, bytes]]) -> None:
         if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             writer = BufferedPktLineWriter(
                 lambda d: self.proto.write_sideband(SIDE_BAND_CHANNEL_DATA, d)

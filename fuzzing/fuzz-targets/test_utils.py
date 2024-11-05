@@ -1,4 +1,3 @@
-
 import atheris  # pragma: no cover
 
 

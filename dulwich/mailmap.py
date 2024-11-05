@@ -20,7 +20,7 @@
 
 """Mailmap file reader."""
 
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 
 def parse_identity(text):
@@ -64,7 +64,7 @@ class Mailmap:
     """Class for accessing a mailmap file."""
 
     def __init__(self, map=None) -> None:
-        self._table: Dict[Tuple[Optional[str], str], Tuple[str, str]] = {}
+        self._table: dict[tuple[Optional[str], str], tuple[str, str]] = {}
         if map:
             for canonical_identity, from_identity in map:
                 self.add_entry(canonical_identity, from_identity)

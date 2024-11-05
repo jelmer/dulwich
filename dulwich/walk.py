@@ -23,7 +23,7 @@
 import collections
 import heapq
 from itertools import chain
-from typing import Deque, Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 from .diff_tree import (
     RENAME_CHANGE_TYPES,
@@ -51,7 +51,7 @@ class WalkEntry:
         self.commit = commit
         self._store = walker.store
         self._get_parents = walker.get_parents
-        self._changes: Dict[str, List[TreeChange]] = {}
+        self._changes: dict[str, list[TreeChange]] = {}
         self._rename_detector = walker.rename_detector
 
     def changes(self, path_prefix=None):
@@ -127,10 +127,10 @@ class _CommitTimeQueue:
         self._store = walker.store
         self._get_parents = walker.get_parents
         self._excluded = walker.excluded
-        self._pq: List[Tuple[int, Commit]] = []
-        self._pq_set: Set[ObjectID] = set()
-        self._seen: Set[ObjectID] = set()
-        self._done: Set[ObjectID] = set()
+        self._pq: list[tuple[int, Commit]] = []
+        self._pq_set: set[ObjectID] = set()
+        self._seen: set[ObjectID] = set()
+        self._done: set[ObjectID] = set()
         self._min_time = walker.since
         self._last = None
         self._extra_commits_left = _MAX_EXTRA_COMMITS
@@ -233,12 +233,12 @@ class Walker:
     def __init__(
         self,
         store,
-        include: List[bytes],
-        exclude: Optional[List[bytes]] = None,
+        include: list[bytes],
+        exclude: Optional[list[bytes]] = None,
         order: str = "date",
         reverse: bool = False,
         max_entries: Optional[int] = None,
-        paths: Optional[List[bytes]] = None,
+        paths: Optional[list[bytes]] = None,
         rename_detector: Optional[RenameDetector] = None,
         follow: bool = False,
         since: Optional[int] = None,
@@ -297,7 +297,7 @@ class Walker:
 
         self._num_entries = 0
         self._queue = queue_cls(self)
-        self._out_queue: Deque[WalkEntry] = collections.deque()
+        self._out_queue: collections.deque[WalkEntry] = collections.deque()
 
     def _path_matches(self, changed_path):
         if changed_path is None:

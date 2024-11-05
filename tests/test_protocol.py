@@ -35,9 +35,22 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
+    pkt_line,
+    pkt_seq,
 )
 
 from . import TestCase
+
+
+class PktLinetests:
+
+    def test_pkt_line(self):
+        self.assertEqual(b"0007bla", pkt_line(b"bla"))
+        self.assertEqual(b"0000", pkt_line(None))
+
+    def test_pkt_seq(self):
+        self.assertEqual(b"0007bla0003foo0000", pkt_seq([b"bla", b"foo"]))
+        self.assertEqual(b"0000", pkt_seq([]))
 
 
 class BaseProtocolTests:

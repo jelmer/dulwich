@@ -517,7 +517,6 @@ def clone(
     depth: Optional[int] = None,
     branch: Optional[Union[str, bytes]] = None,
     config: Optional[Config] = None,
-    refspecs=None,
     filter_spec=None,
     protocol_version: Optional[int] = None,
     **kwargs,
@@ -563,8 +562,6 @@ def clone(
     if checkout and bare:
         raise Error("checkout and bare are incompatible")
 
-    encoded_refs = encode_refspecs(refspecs)
-
     if target is None:
         target = source.split("/")[-1]
 
@@ -588,7 +585,6 @@ def clone(
         branch=branch,
         progress=errstream.write,
         depth=depth,
-        ref_prefix=encoded_refs,
         filter_spec=filter_spec,
         protocol_version=protocol_version,
     )

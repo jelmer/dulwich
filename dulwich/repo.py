@@ -1225,7 +1225,7 @@ class Repo(BaseRepo):
             pass
         if committer is None:
             config = self.get_config_stack()
-            committer = self._get_user_identity(config)
+            committer = get_user_identity(config)
         check_user_identity(committer)
         if timestamp is None:
             timestamp = int(time.time())

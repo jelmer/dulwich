@@ -1199,7 +1199,12 @@ class TraditionalGitClient(GitClient):
         self._remote_path_encoding = path_encoding
         super().__init__(**kwargs)
 
-    async def _connect(self, cmd, path, protocol_version: Optional[int] = None):
+    def _connect(
+        self,
+        cmd: bytes,
+        path: Union[str, bytes],
+        protocol_version: Optional[int] = None,
+    ) -> tuple[Protocol, Callable[[], bool], Optional[IO[bytes]]]:
         """Create a connection to the server.
 
         This method is abstract - concrete implementations should
@@ -1566,7 +1571,12 @@ class TCPGitClient(TraditionalGitClient):
             netloc += ":%d" % self._port
         return urlunsplit(("git", netloc, path, "", ""))
 
-    def _connect(self, cmd, path, protocol_version: Optional[int] = None):
+    def _connect(
+        self,
+        cmd: bytes,
+        path: Union[str, bytes],
+        protocol_version: Optional[int] = None,
+    ) -> tuple[Protocol, Callable[[], bool], Optional[IO[bytes]]]:
         if not isinstance(cmd, bytes):
             raise TypeError(cmd)
         if not isinstance(path, bytes):
@@ -1576,8 +1586,8 @@ class TCPGitClient(TraditionalGitClient):
         )
         s = None
         err = OSError(f"no address found for {self._host}")
-        for family, socktype, proto, canonname, sockaddr in sockaddrs:
-            s = socket.socket(family, socktype, proto)
+        for family, socktype, protof, canonname, sockaddr in sockaddrs:
+            s = socket.socket(family, socktype, protof)
             s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
                 s.connect(sockaddr)
@@ -1686,7 +1696,12 @@ class SubprocessGitClient(TraditionalGitClient):
 
     git_command = None
 
-    def _connect(self, service, path, protocol_version: Optional[int] = None):
+    def _connect(
+        self,
+        service: bytes,
+        path: Union[bytes, str],
+        protocol_version: Optional[int] = None,
+    ) -> tuple[Protocol, Callable[[], bool], Optional[IO[bytes]]]:
         if not isinstance(service, bytes):
             raise TypeError(service)
         if isinstance(path, bytes):
@@ -2150,7 +2165,12 @@ class SSHGitClient(TraditionalGitClient):
         assert isinstance(cmd, bytes)
         return cmd
 
-    def _connect(self, cmd, path, protocol_version: Optional[int] = None):
+    def _connect(
+        self,
+        cmd: bytes,
+        path: Union[str, bytes],
+        protocol_version: Optional[int] = None,
+    ) -> tuple[Protocol, Callable[[], bool], Optional[IO[bytes]]]:
         if not isinstance(cmd, bytes):
             raise TypeError(cmd)
         if isinstance(path, bytes):
@@ -2446,10 +2466,9 @@ class AbstractHttpGitClient(GitClient):
                     for prefix in ref_prefix:
                         pkts.append(b"ref-prefix " + prefix)
 
-                    body = b"".join([
-                        pkt_line(b"command=ls-refs\n"),
-                        b"0001",
-                        pkt_seq(*pkts)])
+                    body = b"".join(
+                        [pkt_line(b"command=ls-refs\n"), b"0001", pkt_seq(*pkts)]
+                    )
 
                     resp, read = self._smart_request(
                         service.decode("ascii"), base_url, body

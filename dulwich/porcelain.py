@@ -488,7 +488,7 @@ def init(path=".", *, bare=False, symlinks: Optional[bool] = None):
 
 def encode_refspecs(refspecs, refspec_encoding):
     if refspecs is None:
-        return [b"HEAD"]
+        return [b"HEAD", b"refs/"]
 
     def encode_refspec(ref):
         if isinstance(ref, bytes):

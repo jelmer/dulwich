@@ -1,11 +1,10 @@
-from typing import List  # pragma: no cover
 
 import atheris  # pragma: no cover
 
 
 @atheris.instrument_func
 def is_expected_exception(
-    error_message_list: List[str], exception: Exception
+    error_message_list: list[str], exception: Exception
 ):  # pragma: no cover
     """Checks if the message of a given exception matches any of the expected error messages.
 

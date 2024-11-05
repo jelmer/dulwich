@@ -37,7 +37,7 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
-from typing import ClassVar, List
+from typing import ClassVar
 from unittest import SkipTest, expectedFailure, skipIf
 from unittest import TestCase as _TestCase
 
@@ -67,7 +67,7 @@ class BlackboxTestCase(TestCase):
     """Blackbox testing."""
 
     # TODO(jelmer): Include more possible binary paths.
-    bin_directories: ClassVar[List[str]] = [
+    bin_directories: ClassVar[list[str]] = [
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin")),
         "/usr/bin",
         "/usr/local/bin",

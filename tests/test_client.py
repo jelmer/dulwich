@@ -25,7 +25,6 @@ import sys
 import tempfile
 import warnings
 from io import BytesIO
-from typing import Dict
 from unittest.mock import patch
 from urllib.parse import quote as urlquote
 from urllib.parse import urlparse
@@ -1094,7 +1093,7 @@ class HttpGitClientTests(TestCase):
         # otherwise without an active internet connection
         class PoolManagerMock:
             def __init__(self) -> None:
-                self.headers: Dict[str, str] = {}
+                self.headers: dict[str, str] = {}
 
             def request(
                 self,
@@ -1165,7 +1164,7 @@ class HttpGitClientTests(TestCase):
         # otherwise without an active internet connection
         class PoolManagerMock:
             def __init__(self) -> None:
-                self.headers: Dict[str, str] = {}
+                self.headers: dict[str, str] = {}
 
             def request(
                 self,
@@ -1200,7 +1199,7 @@ class HttpGitClientTests(TestCase):
         # otherwise without an active internet connection
         class PoolManagerMock:
             def __init__(self) -> None:
-                self.headers: Dict[str, str] = {}
+                self.headers: dict[str, str] = {}
 
             def request(
                 self,

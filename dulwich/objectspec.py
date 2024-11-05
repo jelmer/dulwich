@@ -20,7 +20,8 @@
 
 """Object specification."""
 
-from typing import TYPE_CHECKING, Iterator, List, Optional, Tuple, Union
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Optional, Union
 
 from .objects import Commit, ShaFile, Tree
 
@@ -102,7 +103,7 @@ def parse_reftuple(
     rh_container: Union["Repo", "RefsContainer"],
     refspec: Union[str, bytes],
     force: bool = False,
-) -> Tuple[Optional["Ref"], Optional["Ref"], bool]:
+) -> tuple[Optional["Ref"], Optional["Ref"], bool]:
     """Parse a reftuple spec.
 
     Args:
@@ -142,7 +143,7 @@ def parse_reftuple(
 def parse_reftuples(
     lh_container: Union["Repo", "RefsContainer"],
     rh_container: Union["Repo", "RefsContainer"],
-    refspecs: Union[bytes, List[bytes]],
+    refspecs: Union[bytes, list[bytes]],
     force: bool = False,
 ):
     """Parse a list of reftuple specs to a list of reftuples.

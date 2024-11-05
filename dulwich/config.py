@@ -28,18 +28,12 @@ Todo:
 
 import os
 import sys
+from collections.abc import Iterable, Iterator, KeysView, MutableMapping
 from contextlib import suppress
 from typing import (
     Any,
     BinaryIO,
-    Dict,
-    Iterable,
-    Iterator,
-    KeysView,
-    List,
-    MutableMapping,
     Optional,
-    Tuple,
     Union,
     overload,
 )
@@ -61,8 +55,8 @@ def lower_key(key):
 
 class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def __init__(self) -> None:
-        self._real: List[Any] = []
-        self._keyed: Dict[Any, Any] = {}
+        self._real: list[Any] = []
+        self._keyed: dict[Any, Any] = {}
 
     @classmethod
     def make(cls, dict_in=None):
@@ -85,7 +79,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
     def __len__(self) -> int:
         return len(self._keyed)
 
-    def keys(self) -> KeysView[Tuple[bytes, ...]]:
+    def keys(self) -> KeysView[tuple[bytes, ...]]:
         return self._keyed.keys()
 
     def items(self):
@@ -139,8 +133,8 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
 
 Name = bytes
 NameLike = Union[bytes, str]
-Section = Tuple[bytes, ...]
-SectionLike = Union[bytes, str, Tuple[Union[bytes, str], ...]]
+Section = tuple[bytes, ...]
+SectionLike = Union[bytes, str, tuple[Union[bytes, str], ...]]
 Value = bytes
 ValueLike = Union[bytes, str]
 
@@ -218,7 +212,7 @@ class Config:
         """
         raise NotImplementedError(self.set)
 
-    def items(self, section: SectionLike) -> Iterator[Tuple[Name, Value]]:
+    def items(self, section: SectionLike) -> Iterator[tuple[Name, Value]]:
         """Iterate over the configuration pairs for a specific section.
 
         Args:
@@ -293,7 +287,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
 
     def _check_section_and_name(
         self, section: SectionLike, name: NameLike
-    ) -> Tuple[Section, Name]:
+    ) -> tuple[Section, Name]:
         if not isinstance(section, tuple):
             section = (section,)
 
@@ -355,7 +349,7 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
 
     def items(  # type: ignore[override]
         self, section: Section
-    ) -> Iterator[Tuple[Name, Value]]:
+    ) -> Iterator[tuple[Name, Value]]:
         return self._values.get(section).items()
 
     def sections(self) -> Iterator[Section]:
@@ -469,7 +463,7 @@ def _strip_comments(line: bytes) -> bytes:
     return line
 
 
-def _parse_section_header_line(line: bytes) -> Tuple[Section, bytes]:
+def _parse_section_header_line(line: bytes) -> tuple[Section, bytes]:
     # Parse section header ("[bla]")
     line = _strip_comments(line).rstrip()
     in_quotes = False
@@ -667,7 +661,7 @@ class StackedConfig(Config):
     """Configuration which reads from multiple config files.."""
 
     def __init__(
-        self, backends: List[ConfigFile], writable: Optional[ConfigFile] = None
+        self, backends: list[ConfigFile], writable: Optional[ConfigFile] = None
     ) -> None:
         self.backends = backends
         self.writable = writable
@@ -680,7 +674,7 @@ class StackedConfig(Config):
         return cls(cls.default_backends())
 
     @classmethod
-    def default_backends(cls) -> List[ConfigFile]:
+    def default_backends(cls) -> list[ConfigFile]:
         """Retrieve the default configuration.
 
         See git-config(1) for details on the files searched.
@@ -738,13 +732,13 @@ class StackedConfig(Config):
                     yield section
 
 
-def read_submodules(path: str) -> Iterator[Tuple[bytes, bytes, bytes]]:
+def read_submodules(path: str) -> Iterator[tuple[bytes, bytes, bytes]]:
     """Read a .gitmodules file."""
     cfg = ConfigFile.from_path(path)
     return parse_submodules(cfg)
 
 
-def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]:
+def parse_submodules(config: ConfigFile) -> Iterator[tuple[bytes, bytes, bytes]]:
     """Parse a gitmodules GitConfig file, returning submodules.
 
     Args:
@@ -767,7 +761,7 @@ def parse_submodules(config: ConfigFile) -> Iterator[Tuple[bytes, bytes, bytes]]
                 pass
 
 
-def iter_instead_of(config: Config, push: bool = False) -> Iterable[Tuple[str, str]]:
+def iter_instead_of(config: Config, push: bool = False) -> Iterable[tuple[str, str]]:
     """Iterate over insteadOf / pushInsteadOf values."""
     for section in config.sections():
         if section[0] != b"url":

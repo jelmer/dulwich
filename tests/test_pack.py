@@ -28,7 +28,6 @@ import tempfile
 import zlib
 from hashlib import sha1
 from io import BytesIO
-from typing import Set
 
 from dulwich.errors import ApplyDeltaError, ChecksumMismatch
 from dulwich.file import GitFile
@@ -987,7 +986,7 @@ class TestPackIterator(DeltaChainIterator):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._unpacked_offsets: Set[int] = set()
+        self._unpacked_offsets: set[int] = set()
 
     def _result(self, unpacked):
         """Return entries in the same format as build_pack."""

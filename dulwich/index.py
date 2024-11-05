@@ -24,18 +24,14 @@ import os
 import stat
 import struct
 import sys
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
     BinaryIO,
     Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Optional,
-    Tuple,
     Union,
 )
 
@@ -82,8 +78,8 @@ class Stage(Enum):
 @dataclass
 class SerializedIndexEntry:
     name: bytes
-    ctime: Union[int, float, Tuple[int, int]]
-    mtime: Union[int, float, Tuple[int, int]]
+    ctime: Union[int, float, tuple[int, int]]
+    mtime: Union[int, float, tuple[int, int]]
     dev: int
     ino: int
     mode: int
@@ -100,8 +96,8 @@ class SerializedIndexEntry:
 
 @dataclass
 class IndexEntry:
-    ctime: Union[int, float, Tuple[int, int]]
-    mtime: Union[int, float, Tuple[int, int]]
+    ctime: Union[int, float, tuple[int, int]]
+    mtime: Union[int, float, tuple[int, int]]
     dev: int
     ino: int
     mode: int
@@ -163,7 +159,7 @@ class UnmergedEntries(Exception):
     """Unmerged entries exist in the index."""
 
 
-def pathsplit(path: bytes) -> Tuple[bytes, bytes]:
+def pathsplit(path: bytes) -> tuple[bytes, bytes]:
     """Split a /-delimited path into a directory part and a basename.
 
     Args:
@@ -314,14 +310,14 @@ def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
         yield read_cache_entry(f, version)
 
 
-def read_index_dict(f) -> Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
+def read_index_dict(f) -> dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
     """Read an index file and return it as a dictionary.
        Dict Key is tuple of path and stage number, as
             path alone is not unique
     Args:
       f: File object to read fromls.
     """
-    ret: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
+    ret: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
     for entry in read_index(f):
         stage = entry.stage()
         if stage == Stage.NORMAL:
@@ -340,7 +336,7 @@ def read_index_dict(f) -> Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
 
 
 def write_index(
-    f: BinaryIO, entries: List[SerializedIndexEntry], version: Optional[int] = None
+    f: BinaryIO, entries: list[SerializedIndexEntry], version: Optional[int] = None
 ):
     """Write an index file.
 
@@ -359,7 +355,7 @@ def write_index(
 
 def write_index_dict(
     f: BinaryIO,
-    entries: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]],
+    entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]],
     version: Optional[int] = None,
 ) -> None:
     """Write an index file based on the contents of a dictionary.
@@ -412,7 +408,7 @@ def cleanup_mode(mode: int) -> int:
 class Index:
     """A Git Index file."""
 
-    _byname: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
+    _byname: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
 
     def __init__(self, filename: Union[bytes, str], read=True) -> None:
         """Create an index object associated with the given filename.
@@ -491,7 +487,7 @@ class Index:
             raise UnmergedEntries
         return value.mode
 
-    def iterobjects(self) -> Iterable[Tuple[bytes, bytes, int]]:
+    def iterobjects(self) -> Iterable[tuple[bytes, bytes, int]]:
         """Iterate over path, sha, mode tuples for use with commit_tree."""
         for path in self:
             entry = self[path]
@@ -520,13 +516,13 @@ class Index:
 
     def iteritems(
         self,
-    ) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
+    ) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 
-    def items(self) -> Iterator[Tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
+    def items(self) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 
-    def update(self, entries: Dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]):
+    def update(self, entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]):
         for key, value in entries.items():
             self[key] = value
 
@@ -570,7 +566,7 @@ class Index:
 
 
 def commit_tree(
-    object_store: ObjectContainer, blobs: Iterable[Tuple[bytes, bytes, int]]
+    object_store: ObjectContainer, blobs: Iterable[tuple[bytes, bytes, int]]
 ) -> bytes:
     """Commit a new tree.
 
@@ -580,7 +576,7 @@ def commit_tree(
     Returns:
       SHA1 of the created tree.
     """
-    trees: Dict[bytes, Any] = {b"": {}}
+    trees: dict[bytes, Any] = {b"": {}}
 
     def add_tree(path):
         if path in trees:
@@ -627,15 +623,15 @@ def commit_index(object_store: ObjectContainer, index: Index) -> bytes:
 
 def changes_from_tree(
     names: Iterable[bytes],
-    lookup_entry: Callable[[bytes], Tuple[bytes, int]],
+    lookup_entry: Callable[[bytes], tuple[bytes, int]],
     object_store: ObjectContainer,
     tree: Optional[bytes],
     want_unchanged=False,
 ) -> Iterable[
-    Tuple[
-        Tuple[Optional[bytes], Optional[bytes]],
-        Tuple[Optional[int], Optional[int]],
-        Tuple[Optional[bytes], Optional[bytes]],
+    tuple[
+        tuple[Optional[bytes], Optional[bytes]],
+        tuple[Optional[int], Optional[int]],
+        tuple[Optional[bytes], Optional[bytes]],
     ]
 ]:
     """Find the differences between the contents of a tree and
@@ -1089,7 +1085,7 @@ def iter_fresh_entries(
     paths: Iterable[bytes],
     root_path: bytes,
     object_store: Optional[ObjectContainer] = None,
-) -> Iterator[Tuple[bytes, Optional[IndexEntry]]]:
+) -> Iterator[tuple[bytes, Optional[IndexEntry]]]:
     """Iterate over current versions of index entries on disk.
 
     Args:
@@ -1109,7 +1105,7 @@ def iter_fresh_entries(
 
 def iter_fresh_objects(
     paths: Iterable[bytes], root_path: bytes, include_deleted=False, object_store=None
-) -> Iterator[Tuple[bytes, Optional[bytes], Optional[int]]]:
+) -> Iterator[tuple[bytes, Optional[bytes], Optional[int]]]:
     """Iterate over versions of objects on disk referenced by index.
 
     Args:

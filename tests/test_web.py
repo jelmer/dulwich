@@ -24,7 +24,6 @@ import gzip
 import os
 import re
 from io import BytesIO
-from typing import Type
 
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob
@@ -96,7 +95,7 @@ class TestHTTPGitRequest(HTTPGitRequest):
 class WebTestCase(TestCase):
     """Base TestCase with useful instance vars and utility functions."""
 
-    _req_class: Type[HTTPGitRequest] = TestHTTPGitRequest
+    _req_class: type[HTTPGitRequest] = TestHTTPGitRequest
 
     def setUp(self):
         super().setUp()

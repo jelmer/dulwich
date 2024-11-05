@@ -75,7 +75,7 @@ from collections import namedtuple
 from contextlib import closing, contextmanager
 from io import BytesIO, RawIOBase
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Optional, Union
 
 from .archive import tar_stream
 from .client import get_transport_and_path
@@ -1167,7 +1167,7 @@ def reset(repo, mode, treeish="HEAD"):
 
 def get_remote_repo(
     repo: Repo, remote_location: Optional[Union[str, bytes]] = None
-) -> Tuple[Optional[str], str]:
+) -> tuple[Optional[str], str]:
     config = repo.get_config()
     if remote_location is None:
         remote_location = get_branch_remote(repo)
@@ -1763,7 +1763,7 @@ def fetch(
 def for_each_ref(
     repo: Union[Repo, str] = ".",
     pattern: Optional[Union[str, bytes]] = None,
-) -> List[Tuple[bytes, bytes, bytes]]:
+) -> list[tuple[bytes, bytes, bytes]]:
     """Iterate over all refs that match the (optional) pattern.
 
     Args:
@@ -1779,7 +1779,7 @@ def for_each_ref(
         refs = r.get_refs()
 
     if pattern:
-        matching_refs: Dict[bytes, bytes] = {}
+        matching_refs: dict[bytes, bytes] = {}
         pattern_parts = pattern.split(b"/")
         for ref, sha in refs.items():
             matches = False
@@ -1802,7 +1802,7 @@ def for_each_ref(
 
         refs = matching_refs
 
-    ret: List[Tuple[bytes, bytes, bytes]] = [
+    ret: list[tuple[bytes, bytes, bytes]] = [
         (sha, r.get_object(sha).type_name, ref)
         for ref, sha in sorted(
             refs.items(),

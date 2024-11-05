@@ -43,7 +43,6 @@ from . import TestCase
 
 
 class PktLinetests:
-
     def test_pkt_line(self):
         self.assertEqual(b"0007bla", pkt_line(b"bla"))
         self.assertEqual(b"0000", pkt_line(None))

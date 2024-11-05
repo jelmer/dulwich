@@ -22,7 +22,7 @@
 
 """Utility module for querying an ObjectStore with gevent."""
 
-from typing import FrozenSet, Optional, Set, Tuple
+from typing import Optional
 
 import gevent
 from gevent import pool
@@ -95,7 +95,7 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         want_commits, want_tags = _split_commits_and_tags(
             object_store, wants, ignore_unknown=False, pool=p
         )
-        all_ancestors: FrozenSet[ObjectID] = frozenset(
+        all_ancestors: frozenset[ObjectID] = frozenset(
             _collect_ancestors(object_store, have_commits)[0]
         )
         missing_commits, common_commits = _collect_ancestors(
@@ -109,8 +109,8 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
             self.sha_done.add(t)
         missing_tags = want_tags.difference(have_tags)
         wants = missing_commits.union(missing_tags)
-        self.objects_to_send: Set[
-            Tuple[ObjectID, Optional[bytes], Optional[int], bool]
+        self.objects_to_send: set[
+            tuple[ObjectID, Optional[bytes], Optional[int], bool]
         ] = {(w, None, 0, False) for w in wants}
         if progress is None:
             self.progress = lambda x: None

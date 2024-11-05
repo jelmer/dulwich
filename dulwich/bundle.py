@@ -20,7 +20,8 @@
 
 """Bundle format support."""
 
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Optional, Union
 
 from .pack import PackData, write_pack_data
 
@@ -28,9 +29,9 @@ from .pack import PackData, write_pack_data
 class Bundle:
     version: Optional[int]
 
-    capabilities: Dict[str, str]
-    prerequisites: List[Tuple[bytes, str]]
-    references: Dict[str, bytes]
+    capabilities: dict[str, str]
+    prerequisites: list[tuple[bytes, str]]
+    references: dict[str, bytes]
     pack_data: Union[PackData, Sequence[bytes]]
 
     def __repr__(self) -> str:

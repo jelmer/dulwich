@@ -587,6 +587,7 @@ def clone(
         depth=depth,
         filter_spec=filter_spec,
         protocol_version=protocol_version,
+        **kwargs,
     )
 
 

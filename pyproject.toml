@@ -12,7 +12,6 @@ keywords = ["vcs", "git"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -24,7 +23,7 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Topic :: Software Development :: Version Control",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "urllib3>=1.25",
 ]
@@ -122,7 +121,6 @@ archs = ["auto", "aarch64"]
 archs = ["auto", "universal2", "x86_64", "arm64"]
 before-all = "rustup target add x86_64-apple-darwin aarch64-apple-darwin"
 skip = """\
-    cp38-macosx_arm64 cp38-macosx_universal2 \
     cp39-macosx_x86_64 cp39-macosx_universal2 \
     cp310-macosx_x86_64 cp310-macosx_universal2 \
     cp311-macosx_x86_64 cp311-macosx_universal2 \

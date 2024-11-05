@@ -34,7 +34,7 @@
 
 import re
 import sys
-from typing import List, Optional, Tuple
+from typing import Optional
 
 # only needs to detect git style diffs as this is for
 # use with dulwich
@@ -56,8 +56,8 @@ _GIT_UNCHANGED_START = b" "
 
 
 def _parse_patch(
-    lines: List[bytes],
-) -> Tuple[List[bytes], List[bool], List[Tuple[int, int]]]:
+    lines: list[bytes],
+) -> tuple[list[bytes], list[bool], list[tuple[int, int]]]:
     """Parse a git style diff or patch to generate diff stats.
 
     Args:

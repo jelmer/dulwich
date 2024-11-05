@@ -33,19 +33,14 @@ import stat
 import sys
 import time
 import warnings
+from collections.abc import Iterable
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
     Callable,
-    Dict,
-    FrozenSet,
-    Iterable,
-    List,
     Optional,
-    Set,
-    Tuple,
     Union,
 )
 
@@ -149,7 +144,7 @@ class DefaultIdentityNotFound(Exception):
 
 
 # TODO(jelmer): Cache?
-def _get_default_identity() -> Tuple[str, str]:
+def _get_default_identity() -> tuple[str, str]:
     import socket
 
     for name in ("LOGNAME", "USER", "LNAME", "USERNAME"):
@@ -257,7 +252,7 @@ def check_user_identity(identity):
 
 def parse_graftpoints(
     graftpoints: Iterable[bytes],
-) -> Dict[bytes, List[bytes]]:
+) -> dict[bytes, list[bytes]]:
     """Convert a list of graftpoints into a dict.
 
     Args:
@@ -288,7 +283,7 @@ def parse_graftpoints(
     return grafts
 
 
-def serialize_graftpoints(graftpoints: Dict[bytes, List[bytes]]) -> bytes:
+def serialize_graftpoints(graftpoints: dict[bytes, list[bytes]]) -> bytes:
     """Convert a dictionary of grafts into string.
 
     The graft dictionary is:
@@ -376,8 +371,8 @@ class BaseRepo:
         self.object_store = object_store
         self.refs = refs
 
-        self._graftpoints: Dict[bytes, List[bytes]] = {}
-        self.hooks: Dict[str, Hook] = {}
+        self._graftpoints: dict[bytes, list[bytes]] = {}
+        self.hooks: dict[str, Hook] = {}
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
@@ -540,8 +535,8 @@ class BaseRepo:
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
-        shallows: FrozenSet[ObjectID] = getattr(graph_walker, "shallow", frozenset())
-        unshallows: FrozenSet[ObjectID] = getattr(
+        shallows: frozenset[ObjectID] = getattr(graph_walker, "shallow", frozenset())
+        unshallows: frozenset[ObjectID] = getattr(
             graph_walker, "unshallow", frozenset()
         )
 
@@ -594,8 +589,8 @@ class BaseRepo:
 
     def generate_pack_data(
         self,
-        have: List[ObjectID],
-        want: List[ObjectID],
+        have: list[ObjectID],
+        want: list[ObjectID],
         progress: Optional[Callable[[str], None]] = None,
         ofs_delta: Optional[bool] = None,
     ):
@@ -616,7 +611,7 @@ class BaseRepo:
         )
 
     def get_graph_walker(
-        self, heads: Optional[List[ObjectID]] = None
+        self, heads: Optional[list[ObjectID]] = None
     ) -> ObjectStoreGraphWalker:
         """Retrieve a graph walker.
 
@@ -638,7 +633,7 @@ class BaseRepo:
             heads, parents_provider.get_parents, shallow=self.get_shallow()
         )
 
-    def get_refs(self) -> Dict[bytes, bytes]:
+    def get_refs(self) -> dict[bytes, bytes]:
         """Get dictionary with all refs.
 
         Returns: A ``dict`` mapping ref names to SHA1s
@@ -683,7 +678,7 @@ class BaseRepo:
             shallows=self.get_shallow(),
         )
 
-    def get_parents(self, sha: bytes, commit: Optional[Commit] = None) -> List[bytes]:
+    def get_parents(self, sha: bytes, commit: Optional[Commit] = None) -> list[bytes]:
         """Retrieve the parents of a specific commit.
 
         If the specific commit is a graftpoint, the graft parents
@@ -735,14 +730,14 @@ class BaseRepo:
         from .config import ConfigFile, StackedConfig
 
         local_config = self.get_config()
-        backends: List[ConfigFile] = [local_config]
+        backends: list[ConfigFile] = [local_config]
         if local_config.get_boolean((b"extensions",), b"worktreeconfig", False):
             backends.append(self.get_worktree_config())
 
         backends += StackedConfig.default_backends()
         return StackedConfig(backends, writable=local_config)
 
-    def get_shallow(self) -> Set[ObjectID]:
+    def get_shallow(self) -> set[ObjectID]:
         """Get the set of shallow commits.
 
         Returns: Set of shallow commits.
@@ -784,7 +779,7 @@ class BaseRepo:
             return cached
         return peel_sha(self.object_store, self.refs[ref])[1].id
 
-    def get_walker(self, include: Optional[List[bytes]] = None, *args, **kwargs):
+    def get_walker(self, include: Optional[list[bytes]] = None, *args, **kwargs):
         """Obtain a walker for this repository.
 
         Args:
@@ -889,7 +884,7 @@ class BaseRepo:
         )
         return get_user_identity(config)
 
-    def _add_graftpoints(self, updated_graftpoints: Dict[bytes, List[bytes]]):
+    def _add_graftpoints(self, updated_graftpoints: dict[bytes, list[bytes]]):
         """Add or modify graftpoints.
 
         Args:
@@ -902,7 +897,7 @@ class BaseRepo:
 
         self._graftpoints.update(updated_graftpoints)
 
-    def _remove_graftpoints(self, to_remove: List[bytes] = []) -> None:
+    def _remove_graftpoints(self, to_remove: list[bytes] = []) -> None:
         """Remove graftpoints.
 
         Args:
@@ -930,7 +925,7 @@ class BaseRepo:
         tree: Optional[ObjectID] = None,
         encoding: Optional[bytes] = None,
         ref: Ref = b"HEAD",
-        merge_heads: Optional[List[ObjectID]] = None,
+        merge_heads: Optional[list[ObjectID]] = None,
         no_verify: bool = False,
         sign: bool = False,
     ):
@@ -1439,7 +1434,7 @@ class Repo(BaseRepo):
                     index[tree_path] = index_entry_from_stat(st, blob.id)
         index.write()
 
-    def unstage(self, fs_paths: List[str]):
+    def unstage(self, fs_paths: list[str]):
         """Unstage specific file in the index
         Args:
           fs_paths: a list of files to unstage,
@@ -1843,10 +1838,10 @@ class MemoryRepo(BaseRepo):
     def __init__(self) -> None:
         from .config import ConfigFile
 
-        self._reflog: List[Any] = []
+        self._reflog: list[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
         BaseRepo.__init__(self, MemoryObjectStore(), refs_container)  # type: ignore
-        self._named_files: Dict[str, bytes] = {}
+        self._named_files: dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()
         self._description = None

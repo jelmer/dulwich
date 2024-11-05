@@ -185,6 +185,15 @@ def pkt_line(data):
     return ("%04x" % (len(data) + 4)).encode("ascii") + data
 
 
+def pkt_seq(*seq):
+    """Wrap a sequence of data in pkt-lines.
+
+    Args:
+      seq: An iterable of strings to wrap.
+    """
+    return b"".join([pkt_line(s) for s in seq]) + pkt_line(None)
+
+
 class Protocol:
     """Class for interacting with a remote git process over the wire.
 

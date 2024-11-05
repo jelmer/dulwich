@@ -27,7 +27,6 @@ warning: these tests should be fairly stable, but when writing/debugging new
 
 import sys
 import threading
-from typing import Tuple
 from wsgiref import simple_server
 
 from dulwich.server import DictBackend, ReceivePackHandler, UploadPackHandler
@@ -78,7 +77,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     This server test case does not use side-band-64k in git-receive-pack.
     """
 
-    min_git_version: Tuple[int, ...] = (1, 6, 6)
+    min_git_version: tuple[int, ...] = (1, 6, 6)
 
     def _handlers(self):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}

@@ -24,7 +24,7 @@
 import os
 import warnings
 from contextlib import suppress
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists
@@ -149,7 +149,7 @@ class RefsContainer:
         """
         raise NotImplementedError(self.get_packed_refs)
 
-    def add_packed_refs(self, new_refs: Dict[Ref, Optional[ObjectID]]):
+    def add_packed_refs(self, new_refs: dict[Ref, Optional[ObjectID]]):
         """Add the given refs as packed refs.
 
         Args:
@@ -172,7 +172,7 @@ class RefsContainer:
     def import_refs(
         self,
         base: Ref,
-        other: Dict[Ref, ObjectID],
+        other: dict[Ref, ObjectID],
         committer: Optional[bytes] = None,
         timestamp: Optional[bytes] = None,
         timezone: Optional[bytes] = None,
@@ -291,7 +291,7 @@ class RefsContainer:
         """
         raise NotImplementedError(self.read_loose_ref)
 
-    def follow(self, name) -> Tuple[List[bytes], bytes]:
+    def follow(self, name) -> tuple[list[bytes], bytes]:
         """Follow a reference name.
 
         Returns: a tuple of (refnames, sha), wheres refnames are the names of
@@ -444,8 +444,8 @@ class DictRefsContainer(RefsContainer):
     def __init__(self, refs, logger=None) -> None:
         super().__init__(logger=logger)
         self._refs = refs
-        self._peeled: Dict[bytes, ObjectID] = {}
-        self._watchers: Set[Any] = set()
+        self._peeled: dict[bytes, ObjectID] = {}
+        self._watchers: set[Any] = set()
 
     def allkeys(self):
         return self._refs.keys()
@@ -702,7 +702,7 @@ class DiskRefsContainer(RefsContainer):
                         self._packed_refs[name] = sha
         return self._packed_refs
 
-    def add_packed_refs(self, new_refs: Dict[Ref, Optional[ObjectID]]):
+    def add_packed_refs(self, new_refs: dict[Ref, Optional[ObjectID]]):
         """Add the given refs as packed refs.
 
         Args:
@@ -1245,7 +1245,7 @@ def _set_head(refs, head_ref, ref_message):
 def _import_remote_refs(
     refs_container: RefsContainer,
     remote_name: str,
-    refs: Dict[str, str],
+    refs: dict[str, str],
     message: Optional[bytes] = None,
     prune: bool = False,
     prune_tags: bool = False,

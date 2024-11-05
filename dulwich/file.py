@@ -23,7 +23,7 @@
 import os
 import sys
 import warnings
-from typing import ClassVar, Set
+from typing import ClassVar
 
 
 def ensure_dir_exists(dirname):
@@ -115,7 +115,7 @@ class _GitFile:
         released. Typically this will happen in a finally block.
     """
 
-    PROXY_PROPERTIES: ClassVar[Set[str]] = {
+    PROXY_PROPERTIES: ClassVar[set[str]] = {
         "closed",
         "encoding",
         "errors",
@@ -124,7 +124,7 @@ class _GitFile:
         "newlines",
         "softspace",
     }
-    PROXY_METHODS: ClassVar[Set[str]] = {
+    PROXY_METHODS: ClassVar[set[str]] = {
         "__iter__",
         "flush",
         "fileno",

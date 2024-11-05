@@ -25,8 +25,9 @@ import os
 import re
 import sys
 import time
+from collections.abc import Iterator
 from io import BytesIO
-from typing import Callable, ClassVar, Dict, Iterator, List, Optional, Tuple
+from typing import Callable, ClassVar, Optional
 from urllib.parse import parse_qs
 from wsgiref.simple_server import (
     ServerHandler,
@@ -258,7 +259,7 @@ def _chunk_iter(f):
 class ChunkReader:
     def __init__(self, f) -> None:
         self._iter = _chunk_iter(f)
-        self._buffer: List[bytes] = []
+        self._buffer: list[bytes] = []
 
     def read(self, n):
         while sum(map(len, self._buffer)) < n:
@@ -334,8 +335,8 @@ class HTTPGitRequest:
         self.dumb = dumb
         self.handlers = handlers
         self._start_response = start_response
-        self._cache_headers: List[Tuple[str, str]] = []
-        self._headers: List[Tuple[str, str]] = []
+        self._cache_headers: list[tuple[str, str]] = []
+        self._headers: list[tuple[str, str]] = []
 
     def add_header(self, name, value):
         """Add a header to the response."""
@@ -345,7 +346,7 @@ class HTTPGitRequest:
         self,
         status: str = HTTP_OK,
         content_type: Optional[str] = None,
-        headers: Optional[List[Tuple[str, str]]] = None,
+        headers: Optional[list[tuple[str, str]]] = None,
     ):
         """Begin a response with the given status and other headers."""
         if headers:
@@ -394,8 +395,8 @@ class HTTPGitApplication:
     """
 
     services: ClassVar[
-        Dict[
-            Tuple[str, re.Pattern],
+        dict[
+            tuple[str, re.Pattern],
             Callable[[HTTPGitRequest, Backend, re.Match], Iterator[bytes]],
         ]
     ] = {

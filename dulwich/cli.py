@@ -33,7 +33,7 @@ import os
 import signal
 import sys
 from getopt import getopt
-from typing import ClassVar, Dict, Optional, Type
+from typing import ClassVar, Optional
 
 from dulwich import porcelain
 
@@ -644,8 +644,8 @@ class cmd_remote_add(Command):
 
 
 class SuperCommand(Command):
-    subcommands: ClassVar[Dict[str, Type[Command]]] = {}
-    default_command: ClassVar[Optional[Type[Command]]] = None
+    subcommands: ClassVar[dict[str, type[Command]]] = {}
+    default_command: ClassVar[Optional[type[Command]]] = None
 
     def run(self, args):
         if not args and not self.default_command:
@@ -663,7 +663,7 @@ class SuperCommand(Command):
 
 
 class cmd_remote(SuperCommand):
-    subcommands: ClassVar[Dict[str, Type[Command]]] = {
+    subcommands: ClassVar[dict[str, type[Command]]] = {
         "add": cmd_remote_add,
     }
 
@@ -684,7 +684,7 @@ class cmd_submodule_init(Command):
 
 
 class cmd_submodule(SuperCommand):
-    subcommands: ClassVar[Dict[str, Type[Command]]] = {
+    subcommands: ClassVar[dict[str, type[Command]]] = {
         "init": cmd_submodule_init,
     }
 
@@ -736,7 +736,7 @@ class cmd_stash_pop(Command):
 
 
 class cmd_stash(SuperCommand):
-    subcommands: ClassVar[Dict[str, Type[Command]]] = {
+    subcommands: ClassVar[dict[str, type[Command]]] = {
         "list": cmd_stash_list,
         "pop": cmd_stash_pop,
         "push": cmd_stash_push,

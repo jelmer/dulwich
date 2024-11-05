@@ -26,7 +26,8 @@ https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
 """
 
 import sys
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from typing import Optional
 from urllib.parse import ParseResult, urlparse
 
 from .config import ConfigDict, SectionLike

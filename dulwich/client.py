@@ -789,7 +789,7 @@ class GitClient:
 
     def send_pack(
         self,
-        path,
+        path: str,
         update_refs,
         generate_pack_data: Callable[
             [set[bytes], set[bytes], bool], tuple[int, Iterator[UnpackedObject]]
@@ -827,7 +827,7 @@ class GitClient:
         branch=None,
         progress=None,
         depth=None,
-        ref_prefix=[b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[Ref]] = None,
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ) -> Repo:
@@ -923,7 +923,7 @@ class GitClient:
         ] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[bytes]] = [b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -1004,7 +1004,7 @@ class GitClient:
         *,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix=[b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[Ref]] = None,
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ):
@@ -1306,7 +1306,7 @@ class TraditionalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-        ref_prefix=[b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[Ref]] = None,
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ):
@@ -1374,6 +1374,11 @@ class TraditionalGitClient(GitClient):
                 proto.write(b"0001")  # delim-pkt
                 proto.write_pkt_line(b"symrefs")
                 proto.write_pkt_line(b"peel")
+                if ref_prefix is None:
+                    # GitHub defaults to just sending HEAD if no ref-prefix is
+                    # specified, so explicitly request all refs to match
+                    # behaviour with v1 when no ref-prefix is specified.
+                    ref_prefix = [b"HEAD", b"refs/"]
                 for prefix in ref_prefix:
                     proto.write_pkt_line(b"ref-prefix " + prefix)
                 proto.write_pkt_line(None)
@@ -1785,13 +1790,16 @@ class LocalGitClient(GitClient):
 
     def fetch(
         self,
-        path,
-        target,
-        determine_wants=None,
-        progress=None,
-        depth=None,
-        ref_prefix=[b"HEAD", b"refs/"],
-        filter_spec=None,
+        path: str,
+        target: Repo,
+        determine_wants: Optional[
+            Callable[[dict[bytes, bytes], Optional[int]], list[bytes]]
+        ] = None,
+        progress: Optional[Callable[[bytes], None]] = None,
+        depth: Optional[int] = None,
+        ref_prefix: Optional[list[Ref]] = None,
+        filter_spec: Optional[bytes] = None,
+        protocol_version: Optional[int] = None,
         **kwargs,
     ):
         """Fetch into a target repository.
@@ -1835,7 +1843,7 @@ class LocalGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-        ref_prefix: Optional[list[bytes]] = [b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -2574,7 +2582,7 @@ class AbstractHttpGitClient(GitClient):
         pack_data,
         progress=None,
         depth=None,
-        ref_prefix=[b"HEAD", b"refs/"],
+        ref_prefix: Optional[list[Ref]] = None,
         filter_spec=None,
         protocol_version: Optional[int] = None,
     ):

@@ -194,6 +194,16 @@ def pkt_seq(*seq):
     return b"".join([pkt_line(s) for s in seq]) + pkt_line(None)
 
 
+def filter_ref_prefix(refs, prefixes):
+    """Filter refs to only include those with a given prefix.
+
+    Args:
+      refs: A list of refs.
+      prefix: The prefix to filter by.
+    """
+    return {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
+
+
 class Protocol:
     """Class for interacting with a remote git process over the wire.
 

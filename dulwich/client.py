@@ -113,6 +113,7 @@ from .protocol import (
     capability_agent,
     extract_capabilities,
     extract_capability_names,
+    filter_ref_prefix,
     parse_capability,
     pkt_line,
     pkt_seq,
@@ -944,12 +945,9 @@ class GitClient:
             list of shas to fetch. Defaults to all shas.
           progress: Optional progress function
           depth: Depth to fetch at
-          ref_prefix: Prefix of desired references, as a list of bytestrings.
-            The server will limit the list of references sent to this prefix,
-            provided this feature is supported and sufficient server-side
-            resources are available to match all references against the prefix.
-            Clients must be prepared to filter out any non-requested references
-            themselves. This feature is an entirely optional optimization.
+          ref_prefix: List of prefixes of desired references, as a list of
+            bytestrings. Filtering is done by the server if supported, and
+            client side otherwise.
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
@@ -1026,12 +1024,9 @@ class GitClient:
           pack_data: Callback called for each bit of data in the pack
           progress: Callback for progress reports (strings)
           depth: Shallow fetch depth
-          ref_prefix: Prefix of desired references, as a list of bytestrings.
-            The server will limit the list of references sent to this prefix,
-            provided this feature is supported and sufficient server-side
-            resources are available to match all references against the prefix.
-            Clients must be prepared to filter out any non-requested references
-            themselves. This feature is an entirely optional optimization.
+          ref_prefix: List of prefixes of desired references, as a list of
+            bytestrings. Filtering is done by the server if supported, and
+            client side otherwise.
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
@@ -1338,12 +1333,9 @@ class TraditionalGitClient(GitClient):
           pack_data: Callback called for each bit of data in the pack
           progress: Callback for progress reports (strings)
           depth: Shallow fetch depth
-          ref_prefix: Prefix of desired references, as a list of bytestrings.
-            The server will limit the list of references sent to this prefix,
-            provided this feature is supported and sufficient server-side
-            resources are available to match all references against the prefix.
-            Clients must be prepared to filter out any non-requested references
-            themselves. This feature is an entirely optional optimization.
+          ref_prefix: List of prefixes of desired references, as a list of
+            bytestrings. Filtering is done by the server if supported, and
+            client side otherwise.
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
@@ -1372,21 +1364,17 @@ class TraditionalGitClient(GitClient):
             )
         self.protocol_version = server_protocol_version
         with proto:
-            try:
-                if self.protocol_version == 2:
-                    server_capabilities = read_server_capabilities(proto.read_pkt_seq())
-                    refs = None
-                else:
-                    refs, server_capabilities = read_pkt_refs_v1(proto.read_pkt_seq())
-            except HangupException as exc:
-                raise _remote_error_from_stderr(stderr) from exc
-            (
-                negotiated_capabilities,
-                symrefs,
-                agent,
-            ) = self._negotiate_upload_pack_capabilities(server_capabilities)
-
             if self.protocol_version == 2:
+                try:
+                    server_capabilities = read_server_capabilities(proto.read_pkt_seq())
+                except HangupException as exc:
+                    raise _remote_error_from_stderr(stderr) from exc
+                (
+                    negotiated_capabilities,
+                    symrefs,
+                    agent,
+                ) = self._negotiate_upload_pack_capabilities(server_capabilities)
+
                 proto.write_pkt_line(b"command=ls-refs\n")
                 proto.write(b"0001")  # delim-pkt
                 proto.write_pkt_line(b"symrefs")
@@ -1397,6 +1385,19 @@ class TraditionalGitClient(GitClient):
                     proto.write_pkt_line(b"ref-prefix " + prefix)
                 proto.write_pkt_line(None)
                 refs, symrefs, _peeled = read_pkt_refs_v2(proto.read_pkt_seq())
+            else:
+                try:
+                    refs, server_capabilities = read_pkt_refs_v1(proto.read_pkt_seq())
+                except HangupException as exc:
+                    raise _remote_error_from_stderr(stderr) from exc
+                (
+                    negotiated_capabilities,
+                    symrefs,
+                    agent,
+                ) = self._negotiate_upload_pack_capabilities(server_capabilities)
+
+                if ref_prefix is not None:
+                    refs = filter_ref_prefix(refs, ref_prefix)
 
             if refs is None:
                 proto.write_pkt_line(None)
@@ -1501,6 +1502,8 @@ class TraditionalGitClient(GitClient):
                     raise _remote_error_from_stderr(stderr) from exc
                 proto.write_pkt_line(None)
                 (_symrefs, _agent) = _extract_symrefs_and_agent(server_capabilities)
+                if ref_prefix is not None:
+                    refs = filter_ref_prefix(refs, ref_prefix)
                 return refs
 
     def archive(
@@ -1845,12 +1848,9 @@ class LocalGitClient(GitClient):
             list of shas to fetch. Defaults to all shas.
           progress: Optional progress function
           depth: Shallow fetch depth
-          ref_prefix: Prefix of desired references, as a list of bytestrings.
-            The server will limit the list of references sent to this prefix,
-            provided this feature is supported and sufficient server-side
-            resources are available to match all references against the prefix.
-            Clients must be prepared to filter out any non-requested references
-            themselves. This feature is an entirely optional optimization.
+          ref_prefix: List of prefixes of desired references, as a list of
+            bytestrings. Filtering is done by the server if supported, and
+            client side otherwise.
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
@@ -1891,12 +1891,9 @@ class LocalGitClient(GitClient):
           pack_data: Callback called for each bit of data in the pack
           progress: Callback for progress reports (strings)
           depth: Shallow fetch depth
-          ref_prefix: Prefix of desired references, as a list of bytestrings.
-            The server will limit the list of references sent to this prefix,
-            provided this feature is supported and sufficient server-side
-            resources are available to match all references against the prefix.
-            Clients must be prepared to filter out any non-requested references
-            themselves. This feature is an entirely optional optimization.
+          ref_prefix: List of prefixes of desired references, as a list of
+            bytestrings. Filtering is done by the server if supported, and
+            client side otherwise.
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
@@ -2533,10 +2530,14 @@ class AbstractHttpGitClient(GitClient):
                         (symrefs, agent) = _extract_symrefs_and_agent(
                             server_capabilities
                         )
+                        if ref_prefix is not None:
+                            refs = filter_ref_prefix(refs, ref_prefix)
                     return refs, server_capabilities, base_url, symrefs, peeled
             else:
                 self.protocol_version = 0  # dumb servers only support protocol v0
                 (refs, peeled) = split_peeled_refs(read_info_refs(resp))
+                if ref_prefix is not None:
+                    refs = filter_ref_prefix(refs, ref_prefix)
                 return refs, set(), base_url, {}, peeled
         finally:
             resp.close()
@@ -2651,12 +2652,9 @@ class AbstractHttpGitClient(GitClient):
           pack_data: Callback called for each bit of data in the pack
           progress: Callback for progress reports (strings)
           depth: Depth for request
-          ref_prefix: Prefix of desired references, as a list of bytestrings.
-            The server will limit the list of references sent to this prefix,
-            provided this feature is supported and sufficient server-side
-            resources are available to match all references against the prefix.
-            Clients must be prepared to filter out any non-requested references
-            themselves. This feature is an entirely optional optimization.
+          ref_prefix: List of prefixes of desired references, as a list of
+            bytestrings. Filtering is done by the server if supported, and
+            client side otherwise.
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.

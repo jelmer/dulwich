@@ -35,6 +35,7 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
+    filter_ref_prefix,
     pkt_line,
     pkt_seq,
 )
@@ -42,14 +43,29 @@ from dulwich.protocol import (
 from . import TestCase
 
 
-class PktLinetests:
+class PktLineTests(TestCase):
     def test_pkt_line(self):
         self.assertEqual(b"0007bla", pkt_line(b"bla"))
         self.assertEqual(b"0000", pkt_line(None))
 
     def test_pkt_seq(self):
-        self.assertEqual(b"0007bla0003foo0000", pkt_seq([b"bla", b"foo"]))
-        self.assertEqual(b"0000", pkt_seq([]))
+        self.assertEqual(b"0007bla0007foo0000", pkt_seq(b"bla", b"foo"))
+        self.assertEqual(b"0000", pkt_seq())
+
+
+class FilterRefPrefixTests(TestCase):
+    def test_filter_ref_prefix(self):
+        self.assertEqual(
+            {b"refs/heads/foo": b"0123456789", b"refs/heads/bar": b"0123456789"},
+            filter_ref_prefix(
+                {
+                    b"refs/heads/foo": b"0123456789",
+                    b"refs/heads/bar": b"0123456789",
+                    b"refs/tags/bar": b"0123456789",
+                },
+                [b"refs/heads/"],
+            ),
+        )
 
 
 class BaseProtocolTests:

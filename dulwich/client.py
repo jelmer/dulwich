@@ -260,7 +260,7 @@ class ReportStatusParser:
 
 def negotiate_protocol_version(proto):
     pkt = proto.read_pkt_line()
-    if pkt == b"version 2\n":
+    if pkt is not None and pkt.strip() == b"version 2":
         return 2
     proto.unread_pkt_line(pkt)
     return 0

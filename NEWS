@@ -2,6 +2,29 @@
 
  * Drop support for Python 3.8. (Jelmer Vernooĳ)
 
+ * Fix refspec handling in porcelain.pull. (Jelmer Vernooĳ)
+
+ * Drop broken refspec support in porcelain.clone.
+   (Jelmer Vernooĳ)
+
+ * Provide ``ref_prefix`` functionality client-side
+   if the server does not support it. (Jelmer Vernooĳ)
+
+ * Consistently honor ``ref_prefix`` and ``protocol_version``
+   arguments in client. (Jelmer Vernooĳ)
+
+ * Strip pkt-line when negotiating protocol v2. Fixes
+   compatibility with gerrit. (Rémy Pecqueur, #1423)
+
+ * Don't pull in ``setuptools_rust`` when building pure
+   package. (Eli Schwartz)
+
+ * Return peeled refs from ``GitClient.get_refs`` if protocol-v2
+   is used. (Stefan Sperling, #1410)
+
+ * Drop outdated performance file. (Jelmer Vernooĳ, #1411)
+
+
 0.22.4	2024-11-01
 
  * Fix handling of symrefs with protocol v2.

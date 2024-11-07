@@ -486,26 +486,6 @@ def init(path=".", *, bare=False, symlinks: Optional[bool] = None):
         return Repo.init(path, symlinks=symlinks)
 
 
-def encode_refspecs(refspecs):
-    if refspecs is None:
-        return [b"HEAD"]
-
-    def encode_refspec(ref):
-        if isinstance(ref, bytes):
-            return ref
-        else:
-            return ref.encode(DEFAULT_ENCODING)
-
-    encoded_refs = []
-    if isinstance(refspecs, bytes) or isinstance(refspecs, str):
-        encoded_refs.append(encode_refspec(refspecs))
-    else:
-        for ref in refspecs:
-            encoded_refs.append(encode_refspec(ref))
-
-    return encoded_refs
-
-
 def clone(
     source,
     target=None,
@@ -587,7 +567,6 @@ def clone(
         depth=depth,
         filter_spec=filter_spec,
         protocol_version=protocol_version,
-        **kwargs,
     )
 
 
@@ -1296,12 +1275,14 @@ def pull(
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
 
-        encoded_refs = encode_refspecs(refspecs)
         selected_refs = []
+
+        if refspecs is None:
+            refspecs = [b"HEAD"]
 
         def determine_wants(remote_refs, **kwargs):
             selected_refs.extend(
-                parse_reftuples(remote_refs, r.refs, encoded_refs, force=force)
+                parse_reftuples(remote_refs, r.refs, refspecs, force=force)
             )
             return [
                 remote_refs[lh]
@@ -1319,7 +1300,6 @@ def pull(
             r,
             progress=errstream.write,
             determine_wants=determine_wants,
-            ref_prefix=refspecs,
             filter_spec=filter_spec,
             protocol_version=protocol_version,
         )

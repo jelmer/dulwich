@@ -270,6 +270,19 @@ class DulwichClientTestBase:
             sorted(refs.keys()),
         )
 
+    def test_get_refs_with_ref_prefix(self):
+        c = self._client()
+        refs = c.get_refs(
+            self._build_path("/server_new.export"), ref_prefix=[b"refs/heads"]
+        )
+        self.assertEqual(
+            [
+                b"refs/heads/branch",
+                b"refs/heads/master",
+            ],
+            sorted(refs.keys()),
+        )
+
     def test_fetch_pack_depth(self):
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:

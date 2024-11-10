@@ -233,7 +233,7 @@ class RefsContainer:
                 keys.add(refname[base_len:])
         return keys
 
-    def as_dict(self, base=None):
+    def as_dict(self, base=None) -> dict[Ref, ObjectID]:
         """Return the contents of this container as a dictionary."""
         ret = {}
         keys = self.keys(base)
@@ -316,7 +316,7 @@ class RefsContainer:
             return True
         return False
 
-    def __getitem__(self, name):
+    def __getitem__(self, name) -> ObjectID:
         """Get the SHA1 for a reference name.
 
         This method follows all symbolic references.

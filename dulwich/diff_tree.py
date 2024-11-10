@@ -59,7 +59,7 @@ class TreeChange(namedtuple("TreeChange", ["type", "old", "new"])):
         return cls(CHANGE_DELETE, old, _NULL_ENTRY)
 
 
-def _tree_entries(path: str, tree: Tree) -> list[TreeEntry]:
+def _tree_entries(path: bytes, tree: Tree) -> list[TreeEntry]:
     result: list[TreeEntry] = []
     if not tree:
         return result
@@ -68,7 +68,9 @@ def _tree_entries(path: str, tree: Tree) -> list[TreeEntry]:
     return result
 
 
-def _merge_entries(path, tree1, tree2):
+def _merge_entries(
+    path: bytes, tree1: Tree, tree2: Tree
+) -> list[tuple[TreeEntry, TreeEntry]]:
     """Merge the entries of two trees.
 
     Args:

@@ -1128,7 +1128,7 @@ class Tree(ShaFile):
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
 
-    def iteritems(self, name_order=False):
+    def iteritems(self, name_order=False) -> Iterator[TreeEntry]:
         """Iterate over entries.
 
         Args:
@@ -1138,7 +1138,7 @@ class Tree(ShaFile):
         """
         return sorted_tree_items(self._entries, name_order)
 
-    def items(self):
+    def items(self) -> list[TreeEntry]:
         """Return the sorted entries in this tree.
 
         Returns: List with (name, mode, sha) tuples

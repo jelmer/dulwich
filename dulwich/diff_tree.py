@@ -24,7 +24,7 @@ import stat
 from collections import defaultdict, namedtuple
 from io import BytesIO
 from itertools import chain
-from typing import Optional, Tuple
+from typing import Optional
 
 from .object_store import BaseObjectStore
 from .objects import S_ISGITLINK, ObjectID, ShaFile, Tree, TreeEntry
@@ -70,7 +70,7 @@ def _tree_entries(path: bytes, tree: Tree) -> list[TreeEntry]:
 
 def _merge_entries(
     path: bytes, tree1: Tree, tree2: Tree
-) -> list[Tuple[TreeEntry, TreeEntry]]:
+) -> list[tuple[TreeEntry, TreeEntry]]:
     """Merge the entries of two trees.
 
     Args:

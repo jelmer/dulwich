@@ -352,7 +352,7 @@ class ShaFile:
         """Return raw string serialization of this object."""
         return self.as_raw_string()
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """Return unique hash for this object."""
         return hash(self.id)
 
@@ -531,7 +531,7 @@ class ShaFile:
         """Returns the length of the raw string of this object."""
         return sum(map(len, self.as_raw_chunks()))
 
-    def sha(self):
+    def sha(self) -> "HASH":
         """The SHA1 object that is the name of this object."""
         if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha
@@ -557,21 +557,21 @@ class ShaFile:
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.id}>"
 
-    def __ne__(self, other):
+    def __ne__(self, other) -> bool:
         """Check whether this object does not match the other."""
         return not isinstance(other, ShaFile) or self.id != other.id
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """Return True if the SHAs of the two objects match."""
         return isinstance(other, ShaFile) and self.id == other.id
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         """Return whether SHA of this object is less than the other."""
         if not isinstance(other, ShaFile):
             raise TypeError
         return self.id < other.id
 
-    def __le__(self, other):
+    def __le__(self, other) -> bool:
         """Check whether SHA of this object is less than or equal to the other."""
         if not isinstance(other, ShaFile):
             raise TypeError
@@ -1128,7 +1128,7 @@ class Tree(ShaFile):
         self._entries[name] = mode, hexsha
         self._needs_serialization = True
 
-    def iteritems(self, name_order=False):
+    def iteritems(self, name_order=False) -> Iterator[TreeEntry]:
         """Iterate over entries.
 
         Args:
@@ -1138,7 +1138,7 @@ class Tree(ShaFile):
         """
         return sorted_tree_items(self._entries, name_order)
 
-    def items(self):
+    def items(self) -> list[TreeEntry]:
         """Return the sorted entries in this tree.
 
         Returns: List with (name, mode, sha) tuples

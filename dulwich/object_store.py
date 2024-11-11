@@ -1039,12 +1039,15 @@ class DiskObjectStore(PackBasedObjectStore):
         seen = set()
         dir = prefix[:2].decode()
         rest = prefix[2:].decode()
-        for name in os.listdir(os.path.join(self.path, dir)):
-            if name.startswith(rest):
-                sha = os.fsencode(dir + name)
-                if sha not in seen:
-                    seen.add(sha)
-                    yield sha
+        try:
+            for name in os.listdir(os.path.join(self.path, dir)):
+                if name.startswith(rest):
+                    sha = os.fsencode(dir + name)
+                    if sha not in seen:
+                        seen.add(sha)
+                        yield sha
+        except FileNotFoundError:
+            pass
 
         for p in self.packs:
             bin_prefix = (

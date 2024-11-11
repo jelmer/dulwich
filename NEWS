@@ -1,3 +1,8 @@
+0.22.6	UNRELEASED
+
+ * ``ObjectStore.iter_prefix``: fix handling of missing
+   loose object directories. (Jelmer Vernooĳ)
+
 0.22.5	2024-11-07
 
  * Drop support for Python 3.8. (Jelmer Vernooĳ)

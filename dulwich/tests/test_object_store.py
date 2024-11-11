@@ -247,6 +247,9 @@ class ObjectStoreTests:
         )
         self.assertEqual([testobject.id], list(self.store.iter_prefix(b"")))
 
+    def test_iter_prefix_not_found(self):
+        self.assertEqual([], list(self.store.iter_prefix(b"1" * 40)))
+
 
 class PackBasedObjectStoreTests(ObjectStoreTests):
     def tearDown(self):

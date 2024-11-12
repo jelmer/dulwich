@@ -28,7 +28,7 @@ import stat
 import warnings
 import zlib
 from collections import namedtuple
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from hashlib import sha1
 from io import BytesIO
 from typing import (
@@ -449,7 +449,9 @@ class ShaFile:
             raise ObjectFormatException("invalid object header") from exc
 
     @staticmethod
-    def from_raw_string(type_num, string, sha=None):
+    def from_raw_string(
+        type_num, string: bytes, sha: Optional[ObjectID] = None
+    ) -> "ShaFile":
         """Creates an object of the indicated type from the raw string given.
 
         Args:
@@ -542,7 +544,7 @@ class ShaFile:
             self._sha = new_sha
         return self._sha
 
-    def copy(self):
+    def copy(self) -> "ShaFile":
         """Create a new copy of this SHA1 object from its raw string."""
         obj_class = object_class(self.type_num)
         if obj_class is None:
@@ -1201,7 +1203,7 @@ class Tree(ShaFile):
             text.append(pretty_format_tree_entry(name, mode, hexsha))
         return "".join(text)
 
-    def lookup_path(self, lookup_obj, path):
+    def lookup_path(self, lookup_obj: Callable[[ObjectID], ShaFile], path: bytes):
         """Look up an object in a Git tree.
 
         Args:

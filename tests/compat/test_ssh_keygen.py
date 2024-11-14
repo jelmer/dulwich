@@ -1,6 +1,6 @@
-# __init__.py -- Compatibility tests for dulwich
-# Copyright (C) 2010 Jelmer Vernooij <jelmer@jelmer.uk>
-#
+# test_ssh_keygen.py -- ssh-keygen compatibility tests
+# (c) 2024 E. Castedo Ellerman <castedo@castedo.com>
+
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or
@@ -18,26 +18,23 @@
 # License, Version 2.0.
 #
 
-"""Compatibility tests for Dulwich."""
+import subprocess
+import sys
+import tempfile
 
-import unittest
+from .. import skipIf
+from ..test_sshsig import SshKeygenCheckNoValidate
 
 
-def test_suite():
-    names = [
-        "client",
-        "pack",
-        "patch",
-        "porcelain",
-        "repository",
-        "server",
-        "ssh_keygen",
-        "utils",
-        "web",
-    ]
-    module_names = ["tests.compat.test_" + name for name in names]
-    result = unittest.TestSuite()
-    loader = unittest.TestLoader()
-    suite = loader.loadTestsFromNames(module_names)
-    result.addTests(suite)
-    return result
+@skipIf(sys.platform == "win32", "Probably not going work on windows.")
+class CompatTestSshKeygenCheckNoValidate(SshKeygenCheckNoValidate):
+    def good_check_novalidate(
+        self, message: str, signature: str, namespace: str = "git"
+    ) -> bool:
+        cmdline = ["ssh-keygen", "-Y", "check-novalidate", "-n", namespace]
+        with tempfile.NamedTemporaryFile() as sig_file:
+            sig_file.write(signature.encode())
+            sig_file.flush()
+            cmdline += ["-s", sig_file.name]
+            result = subprocess.run(cmdline, input=message.encode())
+            return result.returncode == 0

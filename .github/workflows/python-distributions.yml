@@ -2,12 +2,12 @@ name: Build Python distributions
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
     tags:
-      - 'dulwich-*'
+    - 'dulwich-*'
   pull_request:
   schedule:
-    - cron: "0 6 * * *" # Daily 6AM UTC build
+  - cron: "0 6 * * *"   # Daily 6AM UTC build
 
 jobs:
   define-matrix:
@@ -16,43 +16,43 @@ jobs:
       matrix: ${{ steps.merged-identifiers.outputs.merged-identifiers }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-          cache: pip
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-      - name: Install cibuildwheel
-        run: pip install cibuildwheel
-      - name: Find build identifiers using cibuildwheel --print-build-identifiers
-        id: all-build-identifiers
-        run: |
-          echo "linux=$(cibuildwheel --platform linux --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
-          echo "macos=$(cibuildwheel --platform macos --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
-          echo "windows=$(cibuildwheel --platform windows --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
-      - name: Select build identifiers
-        id: select-build-identifiers
-        run: |
-          if [[ "$GITHUB_REF" = "refs/heads/main" ]] || [[ "$GITHUB_REF" = "refs/heads/master" ]] || [[ "$GITHUB_REF" = "refs/tags/"* ]]; then
-            echo 'linux=${{ steps.all-build-identifiers.outputs.linux }}' >> $GITHUB_OUTPUT
-            echo 'windows=${{ steps.all-build-identifiers.outputs.windows }}' >> $GITHUB_OUTPUT
-            echo 'macos=${{ steps.all-build-identifiers.outputs.macos }}' >> $GITHUB_OUTPUT
-          else
-            echo "linux=$(echo -n '${{ steps.all-build-identifiers.outputs.linux }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
-            echo "macos=$(echo -n '${{ steps.all-build-identifiers.outputs.macos }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
-            echo "windows=$(echo -n '${{ steps.all-build-identifiers.outputs.windows }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
-          fi
-      - name: Output build identifiers
-        id: json-identifiers
-        run: |
-          echo "linux=$(echo -n '${{ steps.select-build-identifiers.outputs.linux }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "ubuntu-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
-          echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "macos-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
-          echo "windows=$(echo -n '${{ steps.select-build-identifiers.outputs.windows }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "windows-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
-      - name: Merge build identifiers
-        id: merged-identifiers
-        run: |
-          echo merged-identifiers=$(echo -n '${{ steps.json-identifiers.outputs.linux }} ${{ steps.json-identifiers.outputs.macos }} ${{ steps.json-identifiers.outputs.windows }}' | jq -c -s 'add') >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: 3.x
+        cache: pip
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install -y jq
+    - name: Install cibuildwheel
+      run: pip install cibuildwheel
+    - name: Find build identifiers using cibuildwheel --print-build-identifiers
+      id: all-build-identifiers
+      run: |
+        echo "linux=$(cibuildwheel --platform linux --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
+        echo "macos=$(cibuildwheel --platform macos --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
+        echo "windows=$(cibuildwheel --platform windows --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
+    - name: Select build identifiers
+      id: select-build-identifiers
+      run: |
+        if [[ "$GITHUB_REF" = "refs/heads/main" ]] || [[ "$GITHUB_REF" = "refs/heads/master" ]] || [[ "$GITHUB_REF" = "refs/tags/"* ]]; then
+          echo 'linux=${{ steps.all-build-identifiers.outputs.linux }}' >> $GITHUB_OUTPUT
+          echo 'windows=${{ steps.all-build-identifiers.outputs.windows }}' >> $GITHUB_OUTPUT
+          echo 'macos=${{ steps.all-build-identifiers.outputs.macos }}' >> $GITHUB_OUTPUT
+        else
+          echo "linux=$(echo -n '${{ steps.all-build-identifiers.outputs.linux }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+          echo "macos=$(echo -n '${{ steps.all-build-identifiers.outputs.macos }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+          echo "windows=$(echo -n '${{ steps.all-build-identifiers.outputs.windows }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+        fi
+    - name: Output build identifiers
+      id: json-identifiers
+      run: |
+        echo "linux=$(echo -n '${{ steps.select-build-identifiers.outputs.linux }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "ubuntu-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+        echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "macos-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+        echo "windows=$(echo -n '${{ steps.select-build-identifiers.outputs.windows }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "windows-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+    - name: Merge build identifiers
+      id: merged-identifiers
+      run: |
+        echo merged-identifiers=$(echo -n '${{ steps.json-identifiers.outputs.linux }} ${{ steps.json-identifiers.outputs.macos }} ${{ steps.json-identifiers.outputs.windows }}' | jq -c -s 'add') >> $GITHUB_OUTPUT
 
   build-wheels:
     runs-on: ${{ matrix.os }}
@@ -63,89 +63,89 @@ jobs:
       fail-fast: true
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install setuptools wheel cibuildwheel setuptools-rust
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        if: "matrix.os == 'ubuntu-latest'"
-      - name: Build wheels
-        run: python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_BUILD: "${{ matrix.build-identifier }}*"
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifact-${{ matrix.build-identifier }}
-          path: ./wheelhouse/*.whl
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        cache: pip
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel cibuildwheel setuptools-rust
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      if: "matrix.os == 'ubuntu-latest'"
+    - name: Build wheels
+      run: python -m cibuildwheel --output-dir wheelhouse
+      env:
+        CIBW_BUILD: "${{ matrix.build-identifier }}*"
+    - name: Upload wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: artifact-${{ matrix.build-identifier }}
+        path: ./wheelhouse/*.whl
 
   build-pure-wheels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          cache: pip
-      - run: pip install build
-      - run: PURE=true python -m build --wheel
-      - name: Upload pure wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifact-pure
-          path: ./dist/*.whl
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        cache: pip
+    - run: pip install build
+    - run: PURE=true python -m build --wheel
+    - name: Upload pure wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: artifact-pure
+        path: ./dist/*.whl
 
   build-sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-      - name: Build sdist
-        run: python -m build --sdist
-      - name: Upload sdist
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifact-source
-          path: ./dist/*.tar.gz
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        cache: pip
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+    - name: Build sdist
+      run: python -m build --sdist
+    - name: Upload sdist
+      uses: actions/upload-artifact@v4
+      with:
+        name: artifact-source
+        path: ./dist/*.tar.gz
 
   test-sdist:
     needs:
-      - build-sdist
+    - build-sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
-        with:
-          cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install twine
-      - name: Download sdist
-        uses: actions/download-artifact@v4
-        with:
-          name: artifact-source
-          path: dist
-      - name: Test sdist
-        run: twine check dist/*
-      - name: Test installation from sdist
-        run: pip install dist/*.tar.gz
+    - uses: actions/setup-python@v5
+      with:
+        cache: pip
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install twine
+    - name: Download sdist
+      uses: actions/download-artifact@v4
+      with:
+        name: artifact-source
+        path: dist
+    - name: Test sdist
+      run: twine check dist/*
+    - name: Test installation from sdist
+      run: pip install dist/*.tar.gz
 
   publish:
     runs-on: ubuntu-latest
     needs:
-      - build-wheels
-      - build-sdist
-      - build-pure-wheels
+    - build-wheels
+    - build-sdist
+    - build-pure-wheels
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/dulwich-')
     permissions:
       id-token: write
@@ -153,11 +153,11 @@ jobs:
       name: pypi
       url: https://pypi.org/p/dulwich
     steps:
-      - name: Download distributions
-        uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-          pattern: artifact-*
-          path: dist
-      - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+    - name: Download distributions
+      uses: actions/download-artifact@v4
+      with:
+        merge-multiple: true
+        pattern: artifact-*
+        path: dist
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1

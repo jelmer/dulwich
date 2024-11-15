@@ -377,6 +377,8 @@ class RefsContainer:
           name: The refname to set.
           ref: The new sha the refname will refer to.
         """
+        if not (valid_hexsha(ref) or ref.startswith(SYMREF)):
+            raise ValueError(f"{ref!r} must be a valid sha (40 chars) or a symref")
         self.set_if_equals(name, None, ref)
 
     def remove_if_equals(

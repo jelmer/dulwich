@@ -210,11 +210,28 @@ class RefsContainerTests:
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
             self._refs[b"refs/some/ref"],
         )
+
+        # should accept symref
+        self._refs[b"refs/heads/symbolic"] = b"ref: refs/heads/master"
+        self.assertEqual(
+            b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+            self._refs[b"refs/heads/symbolic"],
+        )
+
+        # should not accept bad ref names
         self.assertRaises(
             errors.RefFormatError,
             self._refs.__setitem__,
             b"notrefs/foo",
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+        )
+
+        # should not accept short sha
+        self.assertRaises(
+            ValueError,
+            self._refs.__setitem__,
+            b"refs/some/ref",
+            b"42d06bd",
         )
 
     def test_set_if_equals(self):

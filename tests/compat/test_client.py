@@ -254,7 +254,7 @@ class DulwichClientTestBase:
         tag_create(
             os.path.join(self.gitroot, "server_new.export"),
             b"v1.0",
-            message="tagging".encode("ascii"),
+            message=b"tagging",
             annotated=True,
         )
         c = self._client()

@@ -1066,7 +1066,7 @@ class TagSerializeTests(TestCase):
                 b"type blob\n"
                 b"tag 0.1\n"
                 b"tagger Jelmer Vernooij <jelmer@samba.org> "
-                b"423423423 +0000\n"
+                b"423423423 +0000\n\n"
             ),
             x.as_raw_string(),
         )

@@ -215,7 +215,7 @@ fn apply_delta(py: Python, py_src_buf: PyObject, py_delta: PyObject) -> PyResult
         return Err(ApplyDeltaError::new_err("dest size incorrect"));
     }
 
-    Ok(vec![PyBytes::new_bound(py, &out).into()])
+    Ok(vec![PyBytes::new(py, &out).into()])
 }
 
 #[pymodule]

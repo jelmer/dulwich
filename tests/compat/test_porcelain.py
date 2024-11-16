@@ -126,9 +126,32 @@ class CommitCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
                 "commit",
                 "--allow-empty",
                 "-S" + PorcelainGpgTestCase.DEFAULT_KEY_ID,
-                "--allow-empty-message",
                 "-m",
                 "foo",
+            ],
+            env={
+                "GNUPGHOME": os.environ["GNUPGHOME"],
+                "GIT_COMMITTER_NAME": "Joe Example",
+                "GIT_COMMITTER_EMAIL": "joe@example.com",
+            },
+        )
+        commit = self.repo[b"HEAD"]
+        self.assertNotEqual(commit.gpgsig, None)
+        commit.verify()
+
+    def test_verify_with_empty_message(self):
+        # Test that CGit signatures can be verified by dulwich
+        self.import_default_key()
+
+        run_git_or_fail(
+            [
+                f"--git-dir={self.repo.controldir()}",
+                "commit",
+                "--allow-empty",
+                "-S" + PorcelainGpgTestCase.DEFAULT_KEY_ID,
+                "--allow-empty-message",
+                "-m",
+                "",
             ],
             env={
                 "GNUPGHOME": os.environ["GNUPGHOME"],

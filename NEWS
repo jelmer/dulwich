@@ -1,3 +1,8 @@
+0.22.7	UNRELEASED
+
+ * Fix serializing of commits with empty commit messages.
+   (Castedo Ellerman, #1429)
+
 0.22.6	2024-11-16
 
  * ``ObjectStore.iter_prefix``: fix handling of missing

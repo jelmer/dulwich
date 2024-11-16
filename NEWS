@@ -1,4 +1,4 @@
-0.22.6	UNRELEASED
+0.22.6	2024-11-16
 
  * ``ObjectStore.iter_prefix``: fix handling of missing
    loose object directories. (Jelmer Vernooĳ)

@@ -45,7 +45,7 @@ fn sha_to_pyhex(py: Python, sha: &[u8]) -> PyResult<PyObject> {
         hexsha.push(bytehex(c & 0x0F));
     }
 
-    Ok(PyBytes::new_bound(py, hexsha.as_slice()).into())
+    Ok(PyBytes::new(py, hexsha.as_slice()).into())
 }
 
 #[pyfunction]
@@ -78,7 +78,7 @@ fn parse_tree(
         text = &text[namelen + 1..];
         let sha = &text[..20];
         entries.push((
-            PyBytes::new_bound(py, name).to_object(py),
+            PyBytes::new(py, name).to_object(py),
             mode,
             sha_to_pyhex(py, sha)?,
         ));
@@ -133,16 +133,16 @@ fn sorted_tree_items(
     } else {
         qsort_entries.sort_by(|a, b| cmp_with_suffix((a.1, a.0.as_slice()), (b.1, b.0.as_slice())));
     }
-    let objectsm = py.import_bound("dulwich.objects")?;
+    let objectsm = py.import("dulwich.objects")?;
     let tree_entry_cls = objectsm.getattr("TreeEntry")?;
     qsort_entries
         .into_iter()
         .map(|(name, mode, hexsha)| -> PyResult<PyObject> {
             Ok(tree_entry_cls
                 .call1((
-                    PyBytes::new_bound(py, name.as_slice()).to_object(py),
+                    PyBytes::new(py, name.as_slice()).to_object(py),
                     mode,
-                    PyBytes::new_bound(py, hexsha.as_slice()).to_object(py),
+                    PyBytes::new(py, hexsha.as_slice()).to_object(py),
                 ))?
                 .to_object(py))
         })

@@ -31,7 +31,7 @@ const S_IFMT: u32 = 0o170000;
 const S_IFDIR: u32 = 0o040000;
 
 fn add_hash(get: &Bound<PyAny>, set: &Bound<PyAny>, string: &[u8], py: Python) -> PyResult<()> {
-    let str_obj = PyBytes::new_bound(py, string);
+    let str_obj = PyBytes::new(py, string);
     let hash_obj = str_obj.hash()?;
     let value = get.call1((hash_obj,))?;
     let n = string.len();
@@ -41,8 +41,8 @@ fn add_hash(get: &Bound<PyAny>, set: &Bound<PyAny>, string: &[u8], py: Python) -
 
 #[pyfunction]
 fn _count_blocks(py: Python, obj: &Bound<PyAny>) -> PyResult<PyObject> {
-    let default_dict_cls = PyModule::import_bound(py, "collections")?.getattr("defaultdict")?;
-    let int_cls = PyModule::import_bound(py, "builtins")?.getattr("int")?;
+    let default_dict_cls = PyModule::import(py, "collections")?.getattr("defaultdict")?;
+    let int_cls = PyModule::import(py, "builtins")?.getattr("int")?;
 
     let counts = default_dict_cls.call1((int_cls,))?;
     let get = counts.getattr("__getitem__")?;
@@ -56,7 +56,7 @@ fn _count_blocks(py: Python, obj: &Bound<PyAny>) -> PyResult<PyObject> {
     }
 
     let num_chunks = chunks.extract::<Vec<PyObject>>()?.len();
-    let pym = py.import_bound("dulwich.diff_tree")?;
+    let pym = py.import("dulwich.diff_tree")?;
     let block_size = pym.getattr("_BLOCK_SIZE")?.extract::<usize>()?;
     let mut block: Vec<u8> = Vec::with_capacity(block_size);
 
@@ -79,7 +79,7 @@ fn _count_blocks(py: Python, obj: &Bound<PyAny>) -> PyResult<PyObject> {
         add_hash(&get, &set, &block, py)?;
     }
 
-    Ok(counts.to_object(py))
+    Ok(counts.into_pyobject(py).unwrap().into())
 }
 
 #[pyfunction]
@@ -99,7 +99,7 @@ fn tree_entries(path: &[u8], tree: &Bound<PyAny>, py: Python) -> PyResult<Vec<Py
         return Ok(Vec::new());
     }
 
-    let dom = py.import_bound("dulwich.objects")?;
+    let dom = py.import("dulwich.objects")?;
     let tree_entry_cls = dom.getattr("TreeEntry")?;
 
     let items = tree
@@ -117,8 +117,8 @@ fn tree_entries(path: &[u8], tree: &Bound<PyAny>, py: Python) -> PyResult<Vec<Py
         }
         new_path.extend_from_slice(name.as_slice());
 
-        let tree_entry = tree_entry_cls.call1((PyBytes::new_bound(py, &new_path), mode, sha))?;
-        result.push(tree_entry.to_object(py));
+        let tree_entry = tree_entry_cls.call1((PyBytes::new(py, &new_path), mode, sha))?;
+        result.push(tree_entry.into_pyobject(py).unwrap().into());
     }
 
     Ok(result)
@@ -142,7 +142,7 @@ fn _merge_entries(
     let entries1 = tree_entries(path, tree1, py)?;
     let entries2 = tree_entries(path, tree2, py)?;
 
-    let pym = py.import_bound("dulwich.diff_tree")?;
+    let pym = py.import("dulwich.diff_tree")?;
     let null_entry = pym.getattr("_NULL_ENTRY")?.to_object(py);
 
     let mut result = Vec::new();
@@ -156,7 +156,7 @@ fn _merge_entries(
             Ordering::Less => (entries1[i1].clone_ref(py), null_entry.clone_ref(py)),
             Ordering::Greater => (null_entry.clone_ref(py), entries2[i2].clone_ref(py)),
         };
-        let pair = PyTuple::new_bound(py, &[e1, e2]);
+        let pair = PyTuple::new(py, &[e1, e2]).unwrap();
         result.push(pair);
         match cmp {
             Ordering::Equal => {
@@ -173,18 +173,20 @@ fn _merge_entries(
     }
 
     while i1 < entries1.len() {
-        let pair = PyTuple::new_bound(py, &[entries1[i1].clone_ref(py), null_entry.clone_ref(py)]);
+        let pair =
+            PyTuple::new(py, &[entries1[i1].clone_ref(py), null_entry.clone_ref(py)]).unwrap();
         result.push(pair);
         i1 += 1;
     }
 
     while i2 < entries2.len() {
-        let pair = PyTuple::new_bound(py, &[null_entry.clone_ref(py), entries2[i2].clone_ref(py)]);
+        let pair =
+            PyTuple::new(py, &[null_entry.clone_ref(py), entries2[i2].clone_ref(py)]).unwrap();
         result.push(pair);
         i2 += 1;
     }
 
-    Ok(PyList::new_bound(py, &result).to_object(py))
+    Ok(PyList::new(py, &result).unwrap().to_object(py))
 }
 
 #[pymodule]

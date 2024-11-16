@@ -21,8 +21,6 @@
 """Compatibility tests for dulwich.porcelain."""
 
 import os
-import platform
-import sys
 from unittest import skipIf
 
 from dulwich import porcelain
@@ -31,15 +29,17 @@ from dulwich.tests.utils import build_commit_graph
 from ..test_porcelain import PorcelainGpgTestCase
 from .utils import CompatTestCase, run_git_or_fail
 
+try:
+    import gpgme
+except ImportError:
+    gpgme = None
+
 
 @skipIf(
-    platform.python_implementation() == "PyPy" or sys.platform == "win32",
-    "gpgme not easily available or supported on Windows and PyPy",
+    gpgme is None,
+    "gpgme not available, skipping tests that require GPG signing",
 )
 class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
-    def setUp(self):
-        super().setUp()
-
     def test_sign(self):
         # Test that dulwich signatures can be verified by CGit
         c1, c2, c3 = build_commit_graph(

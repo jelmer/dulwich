@@ -728,8 +728,8 @@ def _format_message(headers, body):
         yield git_line(field, lines[0])
         for line in lines[1:]:
             yield b" " + line + b"\n"
+    yield b"\n"  # There must be a new line after the headers
     if body:
-        yield b"\n"  # There must be a new line after the headers
         yield body
 
 

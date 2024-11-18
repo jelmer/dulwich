@@ -821,7 +821,16 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         f.writelines(write_info_refs(refs, self.store))
         self.scon.put_object(self.filename, f)
 
-    def set_if_equals(self, name, old_ref, new_ref, committer=None, timestamp=None, timezone=None, message=None) -> bool:
+    def set_if_equals(
+        self,
+        name,
+        old_ref,
+        new_ref,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
+    ) -> bool:
         """Set a refname to new_ref only if it currently equals old_ref."""
         if name == "HEAD":
             return True
@@ -833,7 +842,9 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         self._refs[name] = new_ref
         return True
 
-    def remove_if_equals(self, name, old_ref, committer=None, timestamp=None, timezone=None, message=None) -> bool:
+    def remove_if_equals(
+        self, name, old_ref, committer=None, timestamp=None, timezone=None, message=None
+    ) -> bool:
         """Remove a refname only if it currently equals old_ref."""
         if name == "HEAD":
             return True

@@ -27,6 +27,7 @@ from .lru_cache import LRUCache
 
 T = TypeVar("T")
 
+
 # priority queue using builtin python minheap tools
 # why they do not have a builtin maxheap is simply ridiculous but
 # liveable with integer time stamps using negation

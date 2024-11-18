@@ -336,7 +336,7 @@ class RefsContainer:
         timestamp=None,
         timezone=None,
         message=None,
-        ) -> bool:
+    ) -> bool:
         """Set a refname to new_ref only if it currently equals old_ref.
 
         This method follows all symbolic references if applicable for the
@@ -355,7 +355,7 @@ class RefsContainer:
 
     def add_if_new(
         self, name, ref, committer=None, timestamp=None, timezone=None, message=None
-        ) -> bool:
+    ) -> bool:
         """Add a new reference only if it does not already exist.
 
         Args:

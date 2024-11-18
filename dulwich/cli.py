@@ -33,7 +33,7 @@ import os
 import signal
 import sys
 from getopt import getopt
-from typing import ClassVar, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from dulwich import porcelain
 
@@ -129,7 +129,7 @@ class cmd_fetch_pack(Command):
 class cmd_fetch(Command):
     def run(self, args) -> None:
         opts, args = getopt(args, "", [])
-        kwopts = dict(opts)
+        dict(opts)
         client, path = get_transport_and_path(args.pop(0))
         r = Repo(".")
         def progress(msg: bytes) -> None:
@@ -152,7 +152,7 @@ class cmd_for_each_ref(Command):
 class cmd_fsck(Command):
     def run(self, args) -> None:
         opts, args = getopt(args, "", [])
-        kwopts = dict(opts)
+        dict(opts)
         for obj, msg in porcelain.fsck("."):
             print(f"{obj}: {msg}")
 
@@ -404,7 +404,7 @@ class cmd_tag(Command):
 class cmd_repack(Command):
     def run(self, args) -> None:
         opts, args = getopt(args, "", [])
-        kwopts = dict(opts)
+        dict(opts)
         porcelain.repack(".")
 
 

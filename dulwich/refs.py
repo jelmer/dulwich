@@ -23,8 +23,9 @@
 
 import os
 import warnings
+from collections.abc import Iterator
 from contextlib import suppress
-from typing import Any, Optional, Iterator
+from typing import Any, Optional
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists

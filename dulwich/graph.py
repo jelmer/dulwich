@@ -19,8 +19,9 @@
 
 """Implementation of merge-base following the approach of git."""
 
+from collections.abc import Iterator
 from heapq import heappop, heappush
-from typing import Generic, Optional, Iterator, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from .lru_cache import LRUCache
 

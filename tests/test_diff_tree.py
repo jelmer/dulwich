@@ -629,8 +629,8 @@ class RenameDetectionTest(DiffTestCase):
 
     def assertBlockCountEqual(self, expected, got):
         self.assertEqual(
-            {(hash(l) & 0xFFFFFFFF): c for (l, c) in expected.items()},
-            {(h & 0xFFFFFFFF): c for (h, c) in got.items()},
+            {(hash(block) & 0xFFFFFFFF): count for (block, count) in expected.items()},
+            {(block & 0xFFFFFFFF): count for (block, count) in got.items()},
         )
 
     def _do_test_count_blocks_chunks(self, count_blocks):

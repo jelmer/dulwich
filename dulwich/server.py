@@ -548,7 +548,6 @@ def _all_wants_satisfied(store: ObjectContainer, haves, wants) -> bool:
 
 
 class AckGraphWalkerImpl:
-
     def __init__(self, graph_walker):
         raise NotImplementedError
 

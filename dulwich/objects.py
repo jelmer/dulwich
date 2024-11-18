@@ -868,7 +868,9 @@ class Tag(ShaFile):
                         self._message = value[:sig_idx]
                         self._signature = value[sig_idx:]
             else:
-                raise ObjectFormatException(f"Unknown field {field.decode('ascii', 'replace')}")
+                raise ObjectFormatException(
+                    f"Unknown field {field.decode('ascii', 'replace')}"
+                )
 
     def _get_object(self):
         """Get the object pointed to by this tag.

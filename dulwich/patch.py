@@ -35,7 +35,9 @@ from .pack import ObjectContainer
 FIRST_FEW_BYTES = 8000
 
 
-def write_commit_patch(f, commit, contents, progress, version=None, encoding=None) -> None:
+def write_commit_patch(
+    f, commit, contents, progress, version=None, encoding=None
+) -> None:
     """Write a individual file patch.
 
     Args:
@@ -188,7 +190,9 @@ def patch_filename(p, root):
         return root + b"/" + p
 
 
-def write_object_diff(f, store: ObjectContainer, old_file, new_file, diff_binary=False) -> None:
+def write_object_diff(
+    f, store: ObjectContainer, old_file, new_file, diff_binary=False
+) -> None:
     """Write the diff for an object.
 
     Args:

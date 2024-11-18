@@ -205,13 +205,13 @@ class FakeSwiftConnector:
             except KeyError:
                 return None
         else:
-            l, r = range.split("-")
+            left, right = range.split("-")
             try:
-                if not l:
-                    r = -int(r)
-                    return self.store[name][r:]
+                if not left:
+                    right = -int(right)
+                    return self.store[name][right:]
                 else:
-                    return self.store[name][int(l) : int(r)]
+                    return self.store[name][int(left) : int(right)]
             except KeyError:
                 return None
 

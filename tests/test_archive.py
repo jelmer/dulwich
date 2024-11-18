@@ -39,7 +39,7 @@ except ImportError:
 
 
 class ArchiveTests(TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         store = MemoryObjectStore()
         c1, c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
         tree = store[c3.tree]
@@ -59,13 +59,13 @@ class ArchiveTests(TestCase):
         stream = b"".join(tar_stream(store, t1, *tar_stream_args, **tar_stream_kwargs))
         return BytesIO(stream)
 
-    def test_simple(self):
+    def test_simple(self) -> None:
         stream = self._get_example_tar_stream(mtime=0)
         tf = tarfile.TarFile(fileobj=stream)
         self.addCleanup(tf.close)
         self.assertEqual(["somename"], tf.getnames())
 
-    def test_unicode(self):
+    def test_unicode(self) -> None:
         store = MemoryObjectStore()
         b1 = Blob.from_string(b"somedata")
         store.add_object(b1)
@@ -77,19 +77,19 @@ class ArchiveTests(TestCase):
         self.addCleanup(tf.close)
         self.assertEqual(["ő"], tf.getnames())
 
-    def test_prefix(self):
+    def test_prefix(self) -> None:
         stream = self._get_example_tar_stream(mtime=0, prefix=b"blah")
         tf = tarfile.TarFile(fileobj=stream)
         self.addCleanup(tf.close)
         self.assertEqual(["blah/somename"], tf.getnames())
 
-    def test_gzip_mtime(self):
+    def test_gzip_mtime(self) -> None:
         stream = self._get_example_tar_stream(mtime=1234, format="gz")
         expected_mtime = struct.pack("<L", 1234)
         self.assertEqual(stream.getvalue()[4:8], expected_mtime)
 
     @skipUnless(patch, "Required mock.patch")
-    def test_same_file(self):
+    def test_same_file(self) -> None:
         contents = [None, None]
         for format in ["", "gz", "bz2"]:
             for i in [0, 1]:

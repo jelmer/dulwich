@@ -103,7 +103,7 @@ def read_bundle(f):
     raise AssertionError(f"unsupported bundle format header: {firstline!r}")
 
 
-def write_bundle(f, bundle):
+def write_bundle(f, bundle) -> None:
     version = bundle.version
     if version is None:
         if bundle.capabilities:

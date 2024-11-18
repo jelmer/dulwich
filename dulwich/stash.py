@@ -55,7 +55,7 @@ class Stash:
         """Create a new stash from a Repo object."""
         return cls(repo)
 
-    def drop(self, index):
+    def drop(self, index) -> None:
         """Drop entry with specified index."""
         with open(self._reflog_path, "rb+") as f:
             drop_reflog_entry(f, index, rewrite=True)

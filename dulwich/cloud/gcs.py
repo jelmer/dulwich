@@ -39,7 +39,7 @@ class GcsObjectStore(BucketBasedObjectStore):
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.bucket!r}, subpath={self.subpath!r})"
 
-    def _remove_pack(self, name):
+    def _remove_pack(self, name) -> None:
         self.bucket.delete_blobs(
             [posixpath.join(self.subpath, name) + "." + ext for ext in ["pack", "idx"]]
         )
@@ -72,7 +72,7 @@ class GcsObjectStore(BucketBasedObjectStore):
             lambda: self._load_pack_data(name), lambda: self._load_pack_index(name)
         )
 
-    def _upload_pack(self, basename, pack_file, index_file):
+    def _upload_pack(self, basename, pack_file, index_file) -> None:
         idxblob = self.bucket.blob(posixpath.join(self.subpath, basename + ".idx"))
         datablob = self.bucket.blob(posixpath.join(self.subpath, basename + ".pack"))
         idxblob.upload_from_file(index_file)

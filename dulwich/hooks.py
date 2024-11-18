@@ -22,6 +22,7 @@
 
 import os
 import subprocess
+from typing import Any
 
 from .errors import HookError
 
@@ -29,7 +30,7 @@ from .errors import HookError
 class Hook:
     """Generic hook object."""
 
-    def execute(self, *args):
+    def execute(self, *args) -> Any:
         """Execute the hook with the given args.
 
         Args:

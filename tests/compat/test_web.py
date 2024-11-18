@@ -27,6 +27,7 @@ warning: these tests should be fairly stable, but when writing/debugging new
 
 import sys
 import threading
+from typing import NoReturn
 from wsgiref import simple_server
 
 from dulwich.server import DictBackend, ReceivePackHandler, UploadPackHandler
@@ -82,7 +83,7 @@ class SmartWebTestCase(WebTests, CompatTestCase):
     def _handlers(self):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
-    def _check_app(self, app):
+    def _check_app(self, app) -> None:
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
         self.assertNotIn(b"side-band-64k", caps)
@@ -119,20 +120,20 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
     # side-band-64k in git-receive-pack was introduced in git 1.7.0.2
     min_git_version = (1, 7, 0, 2)
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.o_uph_cap = patch_capabilities(UploadPackHandler, (b"no-done",))
         self.o_rph_cap = patch_capabilities(ReceivePackHandler, (b"no-done",))
         super().setUp()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         super().tearDown()
         UploadPackHandler.capabilities = self.o_uph_cap
         ReceivePackHandler.capabilities = self.o_rph_cap
 
-    def _handlers(self):
+    def _handlers(self) -> None:
         return None  # default handlers include side-band-64k
 
-    def _check_app(self, app):
+    def _check_app(self, app) -> None:
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
         self.assertIn(b"side-band-64k", caps)
@@ -147,10 +148,10 @@ class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
     # no-done was introduced in git 1.7.4
     min_git_version = (1, 7, 4)
 
-    def _handlers(self):
+    def _handlers(self) -> None:
         return None  # default handlers include side-band-64k
 
-    def _check_app(self, app):
+    def _check_app(self, app) -> None:
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
         self.assertIn(b"side-band-64k", caps)
@@ -164,33 +165,33 @@ class DumbWebTestCase(WebTests, CompatTestCase):
     def _make_app(self, backend):
         return make_wsgi_chain(backend, dumb=True)
 
-    def test_push_to_dulwich(self):
+    def test_push_to_dulwich(self) -> NoReturn:
         # Note: remove this if dulwich implements dumb web pushing.
         raise SkipTest("Dumb web pushing not supported.")
 
-    def test_push_to_dulwich_remove_branch(self):
+    def test_push_to_dulwich_remove_branch(self) -> NoReturn:
         # Note: remove this if dumb pushing is supported
         raise SkipTest("Dumb web pushing not supported.")
 
-    def test_new_shallow_clone_from_dulwich(self):
+    def test_new_shallow_clone_from_dulwich(self) -> NoReturn:
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
         raise SkipTest("Dumb web shallow cloning not supported.")
 
-    def test_shallow_clone_from_git_is_identical(self):
+    def test_shallow_clone_from_git_is_identical(self) -> NoReturn:
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
         raise SkipTest("Dumb web shallow cloning not supported.")
 
-    def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
+    def test_fetch_same_depth_into_shallow_clone_from_dulwich(self) -> NoReturn:
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
         raise SkipTest("Dumb web shallow cloning not supported.")
 
-    def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
+    def test_fetch_full_depth_into_shallow_clone_from_dulwich(self) -> NoReturn:
         # Note: remove this if C git and dulwich implement dumb web shallow
         # clones.
         raise SkipTest("Dumb web shallow cloning not supported.")
 
-    def test_push_to_dulwich_issue_88_standard(self):
+    def test_push_to_dulwich_issue_88_standard(self) -> NoReturn:
         raise SkipTest("Dumb web pushing not supported.")

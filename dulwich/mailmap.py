@@ -64,12 +64,12 @@ class Mailmap:
     """Class for accessing a mailmap file."""
 
     def __init__(self, map=None) -> None:
-        self._table: dict[tuple[Optional[str], str], tuple[str, str]] = {}
+        self._table: dict[tuple[Optional[str], Optional[str]], tuple[str, str]] = {}
         if map:
             for canonical_identity, from_identity in map:
                 self.add_entry(canonical_identity, from_identity)
 
-    def add_entry(self, canonical_identity, from_identity=None):
+    def add_entry(self, canonical_identity, from_identity=None) -> None:
         """Add an entry to the mail mail.
 
         Any of the fields can be None, but at least one of them needs to be

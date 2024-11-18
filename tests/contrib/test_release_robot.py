@@ -42,7 +42,7 @@ def gmtime_to_datetime(gmt):
 class TagPatternTests(unittest.TestCase):
     """test tag patterns."""
 
-    def test_tag_pattern(self):
+    def test_tag_pattern(self) -> None:
         """Test tag patterns."""
         test_cases = {
             "0.3": "0.3",
@@ -77,7 +77,7 @@ class GetRecentTagsTest(unittest.TestCase):
     }
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.projdir = tempfile.mkdtemp()  # temporary project directory
         cls.repo = Repo.init(cls.projdir)  # test repo
         obj_store = cls.repo.object_store  # test repo object store
@@ -113,11 +113,11 @@ class GetRecentTagsTest(unittest.TestCase):
         cls.repo[b"refs/tags/" + cls.t2.name] = cls.t2.id  # add annotated tag
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         cls.repo.close()
         shutil.rmtree(cls.projdir)
 
-    def test_get_recent_tags(self):
+    def test_get_recent_tags(self) -> None:
         """Test get recent tags."""
         tags = release_robot.get_recent_tags(self.projdir)  # get test tags
         for tag, metadata in tags:

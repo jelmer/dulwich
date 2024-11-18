@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+from typing import Optional
 
 import atheris
 
@@ -14,7 +15,7 @@ with atheris.instrument_imports():
     )
 
 
-def TestOneInput(data):
+def TestOneInput(data) -> Optional[int]:
     fdp = EnhancedFuzzedDataProvider(data)
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = Repo.init(temp_dir)
@@ -54,7 +55,7 @@ def TestOneInput(data):
                 raise e
 
 
-def main():
+def main() -> None:
     atheris.Setup(sys.argv, TestOneInput)
     atheris.Fuzz()
 

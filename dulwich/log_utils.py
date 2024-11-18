@@ -44,7 +44,7 @@ getLogger = logging.getLogger
 class _NullHandler(logging.Handler):
     """No-op logging handler to avoid unexpected logging warnings."""
 
-    def emit(self, record):
+    def emit(self, record) -> None:
         pass
 
 
@@ -53,7 +53,7 @@ _DULWICH_LOGGER = getLogger("dulwich")
 _DULWICH_LOGGER.addHandler(_NULL_HANDLER)
 
 
-def default_logging_config():
+def default_logging_config() -> None:
     """Set up the default Dulwich loggers."""
     remove_null_handler()
     logging.basicConfig(
@@ -63,7 +63,7 @@ def default_logging_config():
     )
 
 
-def remove_null_handler():
+def remove_null_handler() -> None:
     """Remove the null handler from the Dulwich loggers.
 
     If a caller wants to set up logging using something other than

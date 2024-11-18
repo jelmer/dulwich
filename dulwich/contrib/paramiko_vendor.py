@@ -66,7 +66,7 @@ class _ParamikoWrapper:
             return data + self.read(diff_len)
         return data
 
-    def close(self):
+    def close(self) -> None:
         self.channel.close()
 
 

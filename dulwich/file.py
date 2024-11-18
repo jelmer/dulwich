@@ -26,7 +26,7 @@ import warnings
 from typing import ClassVar
 
 
-def ensure_dir_exists(dirname):
+def ensure_dir_exists(dirname) -> None:
     """Ensure a directory exists, creating if necessary."""
     try:
         os.makedirs(dirname)
@@ -34,7 +34,7 @@ def ensure_dir_exists(dirname):
         pass
 
 
-def _fancy_rename(oldname, newname):
+def _fancy_rename(oldname, newname) -> None:
     """Rename file with temporary backup file to rollback if rename fails."""
     if not os.path.exists(newname):
         try:
@@ -159,7 +159,7 @@ class _GitFile:
         for method in self.PROXY_METHODS:
             setattr(self, method, getattr(self._file, method))
 
-    def abort(self):
+    def abort(self) -> None:
         """Close and discard the lockfile without overwriting the target.
 
         If the file is already closed, this is a no-op.
@@ -174,7 +174,7 @@ class _GitFile:
             # The file may have been removed already, which is ok.
             self._closed = True
 
-    def close(self):
+    def close(self) -> None:
         """Close this file, saving the lockfile over the original.
 
         Note: If this method fails, it will attempt to delete the lockfile.

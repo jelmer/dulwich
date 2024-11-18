@@ -31,7 +31,7 @@ from . import TestCase
 
 
 class BundleTests(TestCase):
-    def test_roundtrip_bundle(self):
+    def test_roundtrip_bundle(self) -> None:
         origbundle = Bundle()
         origbundle.version = 3
         origbundle.capabilities = {"foo": None}

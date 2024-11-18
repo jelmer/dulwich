@@ -25,7 +25,7 @@ from . import utils
 
 
 class GitVersionTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._orig_run_git = utils.run_git
         self._version_str = None  # tests can override to set stub version
@@ -36,36 +36,36 @@ class GitVersionTests(TestCase):
 
         utils.run_git = run_git
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         super().tearDown()
         utils.run_git = self._orig_run_git
 
-    def test_git_version_none(self):
+    def test_git_version_none(self) -> None:
         self._version_str = b"not a git version"
         self.assertEqual(None, utils.git_version())
 
-    def test_git_version_3(self):
+    def test_git_version_3(self) -> None:
         self._version_str = b"git version 1.6.6"
         self.assertEqual((1, 6, 6, 0), utils.git_version())
 
-    def test_git_version_4(self):
+    def test_git_version_4(self) -> None:
         self._version_str = b"git version 1.7.0.2"
         self.assertEqual((1, 7, 0, 2), utils.git_version())
 
-    def test_git_version_extra(self):
+    def test_git_version_extra(self) -> None:
         self._version_str = b"git version 1.7.0.3.295.gd8fa2"
         self.assertEqual((1, 7, 0, 3), utils.git_version())
 
-    def assertRequireSucceeds(self, required_version):
+    def assertRequireSucceeds(self, required_version) -> None:
         try:
             utils.require_git_version(required_version)
         except SkipTest:
             self.fail()
 
-    def assertRequireFails(self, required_version):
+    def assertRequireFails(self, required_version) -> None:
         self.assertRaises(SkipTest, utils.require_git_version, required_version)
 
-    def test_require_git_version(self):
+    def test_require_git_version(self) -> None:
         try:
             self._version_str = b"git version 1.6.6"
             self.assertRequireSucceeds((1, 6, 6))

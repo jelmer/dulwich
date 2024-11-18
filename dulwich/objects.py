@@ -120,7 +120,7 @@ def hex_to_sha(hex):
         raise ValueError(exc.args[0]) from exc
 
 
-def valid_hexsha(hex):
+def valid_hexsha(hex) -> bool:
     if len(hex) != 40:
         return False
     try:
@@ -168,7 +168,7 @@ def object_header(num_type: int, length: int) -> bytes:
 def serializable_property(name: str, docstring: Optional[str] = None):
     """A property that helps tracking whether serialization is necessary."""
 
-    def set(obj, value):
+    def set(obj, value) -> None:
         setattr(obj, "_" + name, value)
         obj._needs_serialization = True
 
@@ -189,7 +189,7 @@ def object_class(type: Union[bytes, int]) -> Optional[type["ShaFile"]]:
     return _TYPE_MAP.get(type, None)
 
 
-def check_hexsha(hex, error_msg):
+def check_hexsha(hex, error_msg) -> None:
     """Check if a string is a valid hex sha string.
 
     Args:
@@ -202,7 +202,7 @@ def check_hexsha(hex, error_msg):
         raise ObjectFormatException(f"{error_msg} {hex}")
 
 
-def check_identity(identity: bytes, error_msg: str) -> None:
+def check_identity(identity: Optional[bytes], error_msg: str) -> None:
     """Check if the specified identity is valid.
 
     This will raise an exception if the identity is not valid.
@@ -211,6 +211,8 @@ def check_identity(identity: bytes, error_msg: str) -> None:
       identity: Identity string
       error_msg: Error message to use in exception
     """
+    if identity is None:
+        raise ObjectFormatException(error_msg)
     email_start = identity.find(b"<")
     email_end = identity.find(b">")
     if not all(
@@ -226,7 +228,7 @@ def check_identity(identity: bytes, error_msg: str) -> None:
         raise ObjectFormatException(error_msg)
 
 
-def check_time(time_seconds):
+def check_time(time_seconds) -> None:
     """Check if the specified time is not prone to overflow error.
 
     This will raise an exception if the time is not valid.
@@ -491,7 +493,7 @@ class ShaFile:
         obj.set_raw_string(string)
         return obj
 
-    def _check_has_member(self, member, error_msg):
+    def _check_has_member(self, member, error_msg) -> None:
         """Check that the object has a given member variable.
 
         Args:
@@ -598,7 +600,7 @@ class Blob(ShaFile):
     def _get_data(self):
         return self.as_raw_string()
 
-    def _set_data(self, data):
+    def _set_data(self, data) -> None:
         self.set_raw_string(data)
 
     data = property(
@@ -608,13 +610,13 @@ class Blob(ShaFile):
     def _get_chunked(self):
         return self._chunked_text
 
-    def _set_chunked(self, chunks: list[bytes]):
+    def _set_chunked(self, chunks: list[bytes]) -> None:
         self._chunked_text = chunks
 
     def _serialize(self):
         return self._chunked_text
 
-    def _deserialize(self, chunks):
+    def _deserialize(self, chunks) -> None:
         self._chunked_text = chunks
 
     chunked = property(
@@ -630,7 +632,7 @@ class Blob(ShaFile):
             raise NotBlobError(path)
         return blob
 
-    def check(self):
+    def check(self) -> None:
         """Check this object for internal consistency.
 
         Raises:
@@ -759,7 +761,7 @@ class Tag(ShaFile):
         self._tag_time = None
         self._tag_timezone = None
         self._tag_timezone_neg_utc = False
-        self._signature = None
+        self._signature: Optional[bytes] = None
 
     @classmethod
     def from_path(cls, filename):
@@ -768,7 +770,7 @@ class Tag(ShaFile):
             raise NotTagError(filename)
         return tag
 
-    def check(self):
+    def check(self) -> None:
         """Check this object for internal consistency.
 
         Raises:
@@ -829,7 +831,7 @@ class Tag(ShaFile):
             body = (self.message or b"") + (self._signature or b"")
         return list(_format_message(headers, body))
 
-    def _deserialize(self, chunks):
+    def _deserialize(self, chunks) -> None:
         """Grab the metadata attached to the tag."""
         self._tagger = None
         self._tag_time = None
@@ -866,7 +868,7 @@ class Tag(ShaFile):
                         self._message = value[:sig_idx]
                         self._signature = value[sig_idx:]
             else:
-                raise ObjectFormatException(f"Unknown field {field}")
+                raise ObjectFormatException(f"Unknown field {field.decode('ascii', 'replace')}")
 
     def _get_object(self):
         """Get the object pointed to by this tag.
@@ -875,7 +877,7 @@ class Tag(ShaFile):
         """
         return (self._object_class, self._object_sha)
 
-    def _set_object(self, value):
+    def _set_object(self, value) -> None:
         (self._object_class, self._object_sha) = value
         self._needs_serialization = True
 
@@ -897,7 +899,7 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
-    def sign(self, keyid: Optional[str] = None):
+    def sign(self, keyid: Optional[str] = None) -> None:
         import gpg
 
         with gpg.Context(armor=True) as c:
@@ -1118,7 +1120,7 @@ class Tree(ShaFile):
     def __iter__(self):
         return iter(self._entries)
 
-    def add(self, name, mode, hexsha):
+    def add(self, name, mode, hexsha) -> None:
         """Add an entry to the tree.
 
         Args:
@@ -1147,7 +1149,7 @@ class Tree(ShaFile):
         """
         return list(self.iteritems())
 
-    def _deserialize(self, chunks):
+    def _deserialize(self, chunks) -> None:
         """Grab the entries in the tree."""
         try:
             parsed_entries = parse_tree(b"".join(chunks))
@@ -1158,7 +1160,7 @@ class Tree(ShaFile):
         # genexp.
         self._entries = {n: (m, s) for n, m, s in parsed_entries}
 
-    def check(self):
+    def check(self) -> None:
         """Check this object for internal consistency.
 
         Raises:
@@ -1385,12 +1387,12 @@ class Commit(ShaFile):
     def __init__(self) -> None:
         super().__init__()
         self._parents: list[bytes] = []
-        self._encoding = None
+        self._encoding: Optional[bytes] = None
         self._mergetag: list[Tag] = []
-        self._gpgsig = None
-        self._extra: list[tuple[bytes, bytes]] = []
-        self._author_timezone_neg_utc = False
-        self._commit_timezone_neg_utc = False
+        self._gpgsig: Optional[bytes] = None
+        self._extra: list[tuple[bytes, Optional[bytes]]] = []
+        self._author_timezone_neg_utc: Optional[bool] = False
+        self._commit_timezone_neg_utc: Optional[bool] = False
 
     @classmethod
     def from_path(cls, path):
@@ -1399,7 +1401,7 @@ class Commit(ShaFile):
             raise NotCommitError(path)
         return commit
 
-    def _deserialize(self, chunks):
+    def _deserialize(self, chunks) -> None:
         self._parents = []
         self._extra = []
         self._tree = None
@@ -1444,7 +1446,7 @@ class Commit(ShaFile):
             (self._commit_timezone, self._commit_timezone_neg_utc),
         ) = commit_info
 
-    def check(self):
+    def check(self) -> None:
         """Check this object for internal consistency.
 
         Raises:
@@ -1490,7 +1492,7 @@ class Commit(ShaFile):
 
         # TODO: optionally check for duplicate parents
 
-    def sign(self, keyid: Optional[str] = None):
+    def sign(self, keyid: Optional[str] = None) -> None:
         import gpg
 
         with gpg.Context(armor=True) as c:
@@ -1506,7 +1508,7 @@ class Commit(ShaFile):
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 
-    def verify(self, keyids: Optional[Iterable[str]] = None):
+    def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this commit (if it is signed).
 
         Args:
@@ -1583,7 +1585,7 @@ class Commit(ShaFile):
         """Return a list of parents of this commit."""
         return self._parents
 
-    def _set_parents(self, value):
+    def _set_parents(self, value) -> None:
         """Set a list of parents of this commit."""
         self._needs_serialization = True
         self._parents = value

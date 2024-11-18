@@ -4,7 +4,7 @@ import atheris  # pragma: no cover
 @atheris.instrument_func
 def is_expected_exception(
     error_message_list: list[str], exception: Exception
-):  # pragma: no cover
+) -> bool:  # pragma: no cover
     """Checks if the message of a given exception matches any of the expected error messages.
 
     Args:
@@ -23,7 +23,7 @@ def is_expected_exception(
 class EnhancedFuzzedDataProvider(atheris.FuzzedDataProvider):  # pragma: no cover
     """Extends atheris.FuzzedDataProvider to offer additional methods to make fuzz testing slightly more DRY."""
 
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         """Initializes the EnhancedFuzzedDataProvider with fuzzing data from the argument provided to TestOneInput.
 
         Args:

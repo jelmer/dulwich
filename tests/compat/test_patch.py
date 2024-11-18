@@ -32,7 +32,7 @@ from .utils import CompatTestCase, run_git_or_fail
 
 
 class CompatPatchTestCase(CompatTestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
@@ -40,7 +40,7 @@ class CompatPatchTestCase(CompatTestCase):
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
-    def test_patch_apply(self):
+    def test_patch_apply(self) -> None:
         # Prepare the repository
 
         # Create some files and commit them

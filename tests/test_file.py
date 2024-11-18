@@ -30,26 +30,26 @@ from . import SkipTest, TestCase
 
 
 class FancyRenameTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._tempdir = tempfile.mkdtemp()
         self.foo = self.path("foo")
         self.bar = self.path("bar")
         self.create(self.foo, b"foo contents")
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self._tempdir)
         super().tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
 
-    def create(self, path, contents):
+    def create(self, path, contents) -> None:
         f = open(path, "wb")
         f.write(contents)
         f.close()
 
-    def test_no_dest_exists(self):
+    def test_no_dest_exists(self) -> None:
         self.assertFalse(os.path.exists(self.bar))
         _fancy_rename(self.foo, self.bar)
         self.assertFalse(os.path.exists(self.foo))
@@ -58,7 +58,7 @@ class FancyRenameTests(TestCase):
         self.assertEqual(b"foo contents", new_f.read())
         new_f.close()
 
-    def test_dest_exists(self):
+    def test_dest_exists(self) -> None:
         self.create(self.bar, b"bar contents")
         _fancy_rename(self.foo, self.bar)
         self.assertFalse(os.path.exists(self.foo))
@@ -67,7 +67,7 @@ class FancyRenameTests(TestCase):
         self.assertEqual(b"foo contents", new_f.read())
         new_f.close()
 
-    def test_dest_opened(self):
+    def test_dest_opened(self) -> None:
         if sys.platform != "win32":
             raise SkipTest("platform allows overwriting open files")
         self.create(self.bar, b"bar contents")
@@ -86,21 +86,21 @@ class FancyRenameTests(TestCase):
 
 
 class GitFileTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._tempdir = tempfile.mkdtemp()
         f = open(self.path("foo"), "wb")
         f.write(b"foo contents")
         f.close()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self._tempdir)
         super().tearDown()
 
     def path(self, filename):
         return os.path.join(self._tempdir, filename)
 
-    def test_invalid(self):
+    def test_invalid(self) -> None:
         foo = self.path("foo")
         self.assertRaises(IOError, GitFile, foo, mode="r")
         self.assertRaises(IOError, GitFile, foo, mode="ab")
@@ -108,7 +108,7 @@ class GitFileTests(TestCase):
         self.assertRaises(IOError, GitFile, foo, mode="w+b")
         self.assertRaises(IOError, GitFile, foo, mode="a+bU")
 
-    def test_readonly(self):
+    def test_readonly(self) -> None:
         f = GitFile(self.path("foo"), "rb")
         self.assertIsInstance(f, io.IOBase)
         self.assertEqual(b"foo contents", f.read())
@@ -117,12 +117,12 @@ class GitFileTests(TestCase):
         self.assertEqual(b"contents", f.read())
         f.close()
 
-    def test_default_mode(self):
+    def test_default_mode(self) -> None:
         f = GitFile(self.path("foo"))
         self.assertEqual(b"foo contents", f.read())
         f.close()
 
-    def test_write(self):
+    def test_write(self) -> None:
         foo = self.path("foo")
         foo_lock = f"{foo}.lock"
 
@@ -146,7 +146,7 @@ class GitFileTests(TestCase):
         self.assertEqual(b"new contents", new_f.read())
         new_f.close()
 
-    def test_open_twice(self):
+    def test_open_twice(self) -> None:
         foo = self.path("foo")
         f1 = GitFile(foo, "wb")
         f1.write(b"new")
@@ -165,7 +165,7 @@ class GitFileTests(TestCase):
         self.assertEqual(b"new contents", f.read())
         f.close()
 
-    def test_abort(self):
+    def test_abort(self) -> None:
         foo = self.path("foo")
         foo_lock = f"{foo}.lock"
 
@@ -183,7 +183,7 @@ class GitFileTests(TestCase):
         self.assertEqual(new_orig_f.read(), b"foo contents")
         new_orig_f.close()
 
-    def test_abort_close(self):
+    def test_abort_close(self) -> None:
         foo = self.path("foo")
         f = GitFile(foo, "wb")
         f.abort()
@@ -199,7 +199,7 @@ class GitFileTests(TestCase):
         except OSError:
             self.fail()
 
-    def test_abort_close_removed(self):
+    def test_abort_close_removed(self) -> None:
         foo = self.path("foo")
         f = GitFile(foo, "wb")
 

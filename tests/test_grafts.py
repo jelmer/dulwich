@@ -35,22 +35,22 @@ def makesha(digit):
 
 
 class GraftParserTests(TestCase):
-    def assertParse(self, expected, graftpoints):
+    def assertParse(self, expected, graftpoints) -> None:
         self.assertEqual(expected, parse_graftpoints(iter(graftpoints)))
 
-    def test_no_grafts(self):
+    def test_no_grafts(self) -> None:
         self.assertParse({}, [])
 
-    def test_no_parents(self):
+    def test_no_parents(self) -> None:
         self.assertParse({makesha(0): []}, [makesha(0)])
 
-    def test_parents(self):
+    def test_parents(self) -> None:
         self.assertParse(
             {makesha(0): [makesha(1), makesha(2)]},
             [b" ".join([makesha(0), makesha(1), makesha(2)])],
         )
 
-    def test_multiple_hybrid(self):
+    def test_multiple_hybrid(self) -> None:
         self.assertParse(
             {
                 makesha(0): [],
@@ -66,22 +66,22 @@ class GraftParserTests(TestCase):
 
 
 class GraftSerializerTests(TestCase):
-    def assertSerialize(self, expected, graftpoints):
+    def assertSerialize(self, expected, graftpoints) -> None:
         self.assertEqual(sorted(expected), sorted(serialize_graftpoints(graftpoints)))
 
-    def test_no_grafts(self):
+    def test_no_grafts(self) -> None:
         self.assertSerialize(b"", {})
 
-    def test_no_parents(self):
+    def test_no_parents(self) -> None:
         self.assertSerialize(makesha(0), {makesha(0): []})
 
-    def test_parents(self):
+    def test_parents(self) -> None:
         self.assertSerialize(
             b" ".join([makesha(0), makesha(1), makesha(2)]),
             {makesha(0): [makesha(1), makesha(2)]},
         )
 
-    def test_multiple_hybrid(self):
+    def test_multiple_hybrid(self) -> None:
         self.assertSerialize(
             b"\n".join(
                 [
@@ -99,7 +99,7 @@ class GraftSerializerTests(TestCase):
 
 
 class GraftsInRepositoryBase:
-    def tearDown(self):
+    def tearDown(self) -> None:
         super().tearDown()
 
     def get_repo_with_grafts(self, grafts):
@@ -107,18 +107,18 @@ class GraftsInRepositoryBase:
         r._add_graftpoints(grafts)
         return r
 
-    def test_no_grafts(self):
+    def test_no_grafts(self) -> None:
         r = self.get_repo_with_grafts({})
 
         shas = [e.commit.id for e in r.get_walker()]
         self.assertEqual(shas, self._shas[::-1])
 
-    def test_no_parents_graft(self):
+    def test_no_parents_graft(self) -> None:
         r = self.get_repo_with_grafts({self._repo.head(): []})
 
         self.assertEqual([e.commit.id for e in r.get_walker()], [r.head()])
 
-    def test_existing_parent_graft(self):
+    def test_existing_parent_graft(self) -> None:
         r = self.get_repo_with_grafts({self._shas[-1]: [self._shas[0]]})
 
         self.assertEqual(
@@ -126,13 +126,13 @@ class GraftsInRepositoryBase:
             [self._shas[-1], self._shas[0]],
         )
 
-    def test_remove_graft(self):
+    def test_remove_graft(self) -> None:
         r = self.get_repo_with_grafts({self._repo.head(): []})
         r._remove_graftpoints([self._repo.head()])
 
         self.assertEqual([e.commit.id for e in r.get_walker()], self._shas[::-1])
 
-    def test_object_store_fail_invalid_parents(self):
+    def test_object_store_fail_invalid_parents(self) -> None:
         r = self._repo
 
         self.assertRaises(
@@ -141,7 +141,7 @@ class GraftsInRepositoryBase:
 
 
 class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._repo_dir = os.path.join(tempfile.mkdtemp())
         r = self._repo = Repo.init(self._repo_dir)
@@ -162,14 +162,14 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
         self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
 
-    def test_init_with_empty_info_grafts(self):
+    def test_init_with_empty_info_grafts(self) -> None:
         r = self._repo
         r._put_named_file(os.path.join("info", "grafts"), b"")
 
         r = Repo(self._repo_dir)
         self.assertEqual({}, r._graftpoints)
 
-    def test_init_with_info_grafts(self):
+    def test_init_with_info_grafts(self) -> None:
         r = self._repo
         r._put_named_file(
             os.path.join("info", "grafts"),
@@ -181,7 +181,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
 
 
 class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         r = self._repo = MemoryRepo()
 

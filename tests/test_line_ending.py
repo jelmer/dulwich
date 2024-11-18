@@ -35,59 +35,59 @@ from . import TestCase
 class LineEndingConversion(TestCase):
     """Test the line ending conversion functions in various cases."""
 
-    def test_convert_crlf_to_lf_no_op(self):
+    def test_convert_crlf_to_lf_no_op(self) -> None:
         self.assertEqual(convert_crlf_to_lf(b"foobar"), b"foobar")
 
-    def test_convert_crlf_to_lf(self):
+    def test_convert_crlf_to_lf(self) -> None:
         self.assertEqual(convert_crlf_to_lf(b"line1\r\nline2"), b"line1\nline2")
 
-    def test_convert_crlf_to_lf_mixed(self):
+    def test_convert_crlf_to_lf_mixed(self) -> None:
         self.assertEqual(convert_crlf_to_lf(b"line1\r\n\nline2"), b"line1\n\nline2")
 
-    def test_convert_lf_to_crlf_no_op(self):
+    def test_convert_lf_to_crlf_no_op(self) -> None:
         self.assertEqual(convert_lf_to_crlf(b"foobar"), b"foobar")
 
-    def test_convert_lf_to_crlf(self):
+    def test_convert_lf_to_crlf(self) -> None:
         self.assertEqual(convert_lf_to_crlf(b"line1\nline2"), b"line1\r\nline2")
 
-    def test_convert_lf_to_crlf_mixed(self):
+    def test_convert_lf_to_crlf_mixed(self) -> None:
         self.assertEqual(convert_lf_to_crlf(b"line1\r\n\nline2"), b"line1\r\n\r\nline2")
 
 
 class GetLineEndingAutocrlfFilters(TestCase):
-    def test_get_checkin_filter_autocrlf_default(self):
+    def test_get_checkin_filter_autocrlf_default(self) -> None:
         checkin_filter = get_checkin_filter_autocrlf(b"false")
 
         self.assertEqual(checkin_filter, None)
 
-    def test_get_checkin_filter_autocrlf_true(self):
+    def test_get_checkin_filter_autocrlf_true(self) -> None:
         checkin_filter = get_checkin_filter_autocrlf(b"true")
 
         self.assertEqual(checkin_filter, convert_crlf_to_lf)
 
-    def test_get_checkin_filter_autocrlf_input(self):
+    def test_get_checkin_filter_autocrlf_input(self) -> None:
         checkin_filter = get_checkin_filter_autocrlf(b"input")
 
         self.assertEqual(checkin_filter, convert_crlf_to_lf)
 
-    def test_get_checkout_filter_autocrlf_default(self):
+    def test_get_checkout_filter_autocrlf_default(self) -> None:
         checkout_filter = get_checkout_filter_autocrlf(b"false")
 
         self.assertEqual(checkout_filter, None)
 
-    def test_get_checkout_filter_autocrlf_true(self):
+    def test_get_checkout_filter_autocrlf_true(self) -> None:
         checkout_filter = get_checkout_filter_autocrlf(b"true")
 
         self.assertEqual(checkout_filter, convert_lf_to_crlf)
 
-    def test_get_checkout_filter_autocrlf_input(self):
+    def test_get_checkout_filter_autocrlf_input(self) -> None:
         checkout_filter = get_checkout_filter_autocrlf(b"input")
 
         self.assertEqual(checkout_filter, None)
 
 
 class NormalizeBlobTestCase(TestCase):
-    def test_normalize_to_lf_no_op(self):
+    def test_normalize_to_lf_no_op(self) -> None:
         base_content = b"line1\nline2"
         base_sha = "f8be7bb828880727816015d21abcbc37d033f233"
 
@@ -104,7 +104,7 @@ class NormalizeBlobTestCase(TestCase):
         self.assertEqual(filtered_blob.as_raw_chunks(), [base_content])
         self.assertEqual(filtered_blob.sha().hexdigest(), base_sha)
 
-    def test_normalize_to_lf(self):
+    def test_normalize_to_lf(self) -> None:
         base_content = b"line1\r\nline2"
         base_sha = "3a1bd7a52799fe5cf6411f1d35f4c10bacb1db96"
 
@@ -124,7 +124,7 @@ class NormalizeBlobTestCase(TestCase):
         self.assertEqual(filtered_blob.as_raw_chunks(), [normalized_content])
         self.assertEqual(filtered_blob.sha().hexdigest(), normalized_sha)
 
-    def test_normalize_to_lf_binary(self):
+    def test_normalize_to_lf_binary(self) -> None:
         base_content = b"line1\r\nline2\0"
         base_sha = "b44504193b765f7cd79673812de8afb55b372ab2"
 
@@ -141,7 +141,7 @@ class NormalizeBlobTestCase(TestCase):
         self.assertEqual(filtered_blob.as_raw_chunks(), [base_content])
         self.assertEqual(filtered_blob.sha().hexdigest(), base_sha)
 
-    def test_normalize_to_crlf_no_op(self):
+    def test_normalize_to_crlf_no_op(self) -> None:
         base_content = b"line1\r\nline2"
         base_sha = "3a1bd7a52799fe5cf6411f1d35f4c10bacb1db96"
 
@@ -158,7 +158,7 @@ class NormalizeBlobTestCase(TestCase):
         self.assertEqual(filtered_blob.as_raw_chunks(), [base_content])
         self.assertEqual(filtered_blob.sha().hexdigest(), base_sha)
 
-    def test_normalize_to_crlf(self):
+    def test_normalize_to_crlf(self) -> None:
         base_content = b"line1\nline2"
         base_sha = "f8be7bb828880727816015d21abcbc37d033f233"
 
@@ -178,7 +178,7 @@ class NormalizeBlobTestCase(TestCase):
         self.assertEqual(filtered_blob.as_raw_chunks(), [normalized_content])
         self.assertEqual(filtered_blob.sha().hexdigest(), normalized_sha)
 
-    def test_normalize_to_crlf_binary(self):
+    def test_normalize_to_crlf_binary(self) -> None:
         base_content = b"line1\r\nline2\0"
         base_sha = "b44504193b765f7cd79673812de8afb55b372ab2"
 

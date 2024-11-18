@@ -90,7 +90,7 @@ def read_reflog(f):
         yield parse_reflog_line(line)
 
 
-def drop_reflog_entry(f, index, rewrite=False):
+def drop_reflog_entry(f, index, rewrite=False) -> None:
     """Drop the specified reflog entry.
 
     Args:

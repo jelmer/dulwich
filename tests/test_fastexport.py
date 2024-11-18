@@ -32,7 +32,7 @@ from . import SkipTest, TestCase
 class GitFastExporterTests(TestCase):
     """Tests for the GitFastExporter tests."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = MemoryObjectStore()
         self.stream = BytesIO()
@@ -42,13 +42,13 @@ class GitFastExporterTests(TestCase):
             raise SkipTest("python-fastimport not available") from exc
         self.fastexporter = GitFastExporter(self.stream, self.store)
 
-    def test_emit_blob(self):
+    def test_emit_blob(self) -> None:
         b = Blob()
         b.data = b"fooBAR"
         self.fastexporter.emit_blob(b)
         self.assertEqual(b"blob\nmark :1\ndata 6\nfooBAR\n", self.stream.getvalue())
 
-    def test_emit_commit(self):
+    def test_emit_commit(self) -> None:
         b = Blob()
         b.data = b"FOO"
         t = Tree()
@@ -81,7 +81,7 @@ M 644 :1 foo
 class GitImportProcessorTests(TestCase):
     """Tests for the GitImportProcessor tests."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.repo = MemoryRepo()
         try:
@@ -90,7 +90,7 @@ class GitImportProcessorTests(TestCase):
             raise SkipTest("python-fastimport not available") from exc
         self.processor = GitImportProcessor(self.repo)
 
-    def test_reset_handler(self):
+    def test_reset_handler(self) -> None:
         from fastimport import commands
 
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
@@ -99,7 +99,7 @@ class GitImportProcessorTests(TestCase):
         self.assertEqual(c1.id, self.repo.get_refs()[b"refs/heads/foo"])
         self.assertEqual(c1.id, self.processor.last_commit)
 
-    def test_reset_handler_marker(self):
+    def test_reset_handler_marker(self) -> None:
         from fastimport import commands
 
         [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
@@ -108,7 +108,7 @@ class GitImportProcessorTests(TestCase):
         self.processor.reset_handler(cmd)
         self.assertEqual(c1.id, self.repo.get_refs()[b"refs/heads/foo"])
 
-    def test_reset_handler_default(self):
+    def test_reset_handler_default(self) -> None:
         from fastimport import commands
 
         [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
@@ -116,7 +116,7 @@ class GitImportProcessorTests(TestCase):
         self.processor.reset_handler(cmd)
         self.assertEqual(ZERO_SHA, self.repo.get_refs()[b"refs/heads/foo"])
 
-    def test_commit_handler(self):
+    def test_commit_handler(self) -> None:
         from fastimport import commands
 
         cmd = commands.CommitCommand(
@@ -141,7 +141,7 @@ class GitImportProcessorTests(TestCase):
         self.assertEqual(3600, commit.author_timezone)
         self.assertEqual(commit, self.repo[b"refs/heads/foo"])
 
-    def test_commit_handler_markers(self):
+    def test_commit_handler_markers(self) -> None:
         from fastimport import commands
 
         [c1, c2, c3] = build_commit_graph(self.repo.object_store, [[1], [2], [3]])
@@ -164,7 +164,7 @@ class GitImportProcessorTests(TestCase):
         self.assertEqual(c2.id, commit.parents[1])
         self.assertEqual(c3.id, commit.parents[2])
 
-    def test_import_stream(self):
+    def test_import_stream(self) -> None:
         markers = self.processor.import_stream(
             BytesIO(
                 b"""blob
@@ -186,7 +186,7 @@ M 100644 :1 a
         self.assertIsInstance(self.repo[markers[b"1"]], Blob)
         self.assertIsInstance(self.repo[markers[b"2"]], Commit)
 
-    def test_file_add(self):
+    def test_file_add(self) -> None:
         from fastimport import commands
 
         cmd = commands.BlobCommand(b"23", b"data")
@@ -249,7 +249,7 @@ M 100644 :1 a
         self.processor.commit_handler(cmd)
         return self.repo[self.processor.last_commit]
 
-    def test_file_copy(self):
+    def test_file_copy(self) -> None:
         from fastimport import commands
 
         self.simple_commit()
@@ -270,7 +270,7 @@ M 100644 :1 a
             self.repo[commit.tree].items(),
         )
 
-    def test_file_move(self):
+    def test_file_move(self) -> None:
         from fastimport import commands
 
         self.simple_commit()
@@ -288,14 +288,14 @@ M 100644 :1 a
             self.repo[commit.tree].items(),
         )
 
-    def test_file_delete(self):
+    def test_file_delete(self) -> None:
         from fastimport import commands
 
         self.simple_commit()
         commit = self.make_file_commit([commands.FileDeleteCommand(b"path")])
         self.assertEqual([], self.repo[commit.tree].items())
 
-    def test_file_deleteall(self):
+    def test_file_deleteall(self) -> None:
         from fastimport import commands
 
         self.simple_commit()

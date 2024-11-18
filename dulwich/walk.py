@@ -139,7 +139,7 @@ class _CommitTimeQueue:
         for commit_id in chain(walker.include, walker.excluded):
             self._push(commit_id)
 
-    def _push(self, object_id: bytes):
+    def _push(self, object_id: bytes) -> None:
         try:
             obj = self._store[object_id]
         except KeyError as exc:
@@ -154,7 +154,7 @@ class _CommitTimeQueue:
             self._pq_set.add(commit.id)
             self._seen.add(commit.id)
 
-    def _exclude_parents(self, commit):
+    def _exclude_parents(self, commit) -> None:
         excluded = self._excluded
         seen = self._seen
         todo = [commit]
@@ -299,7 +299,7 @@ class Walker:
         self._queue = queue_cls(self)
         self._out_queue: collections.deque[WalkEntry] = collections.deque()
 
-    def _path_matches(self, changed_path):
+    def _path_matches(self, changed_path) -> bool:
         if changed_path is None:
             return False
         if self.paths is None:
@@ -314,7 +314,8 @@ class Walker:
                 return True
         return False
 
-    def _change_matches(self, change):
+    def _change_matches(self, change) -> bool:
+        assert self.paths
         if not change:
             return False
 
@@ -329,7 +330,7 @@ class Walker:
             return True
         return False
 
-    def _should_return(self, entry):
+    def _should_return(self, entry) -> Optional[bool]:
         """Determine if a walk entry should be returned..
 
         Args:

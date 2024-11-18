@@ -99,7 +99,7 @@ PackHint = tuple[int, Optional[bytes]]
 class UnresolvedDeltas(Exception):
     """Delta objects could not be resolved."""
 
-    def __init__(self, shas):
+    def __init__(self, shas) -> None:
         self.shas = shas
 
 
@@ -525,7 +525,7 @@ class PackIndex:
         """Yield all the SHA1's of the objects in the index, sorted."""
         raise NotImplementedError(self._itersha)
 
-    def close(self):
+    def close(self) -> None:
         pass
 
     def check(self) -> None:
@@ -642,15 +642,15 @@ class FilePackIndex(PackIndex):
         """
         raise NotImplementedError(self._unpack_entry)
 
-    def _unpack_name(self, i):
+    def _unpack_name(self, i) -> bytes:
         """Unpack the i-th name from the index file."""
         raise NotImplementedError(self._unpack_name)
 
-    def _unpack_offset(self, i):
+    def _unpack_offset(self, i) -> int:
         """Unpack the i-th object offset from the index file."""
         raise NotImplementedError(self._unpack_offset)
 
-    def _unpack_crc32_checksum(self, i):
+    def _unpack_crc32_checksum(self, i) -> Optional[int]:
         """Unpack the crc32 checksum for the ith object from the index file."""
         raise NotImplementedError(self._unpack_crc32_checksum)
 
@@ -754,7 +754,7 @@ class FilePackIndex(PackIndex):
         assert start <= end
         started = False
         for i in range(start, end):
-            name = self._unpack_name(i)
+            name: bytes = self._unpack_name(i)
             if name.startswith(prefix):
                 yield name
                 started = True
@@ -782,7 +782,7 @@ class PackIndex1(FilePackIndex):
         offset = (0x100 * 4) + (i * 24)
         return unpack_from(">L", self._contents, offset)[0]
 
-    def _unpack_crc32_checksum(self, i):
+    def _unpack_crc32_checksum(self, i) -> None:
         # Not stored in v1 index files
         return None
 
@@ -1109,7 +1109,7 @@ class PackStreamCopier(PackStreamReader):
         self.outfile.write(data)
         return data
 
-    def verify(self, progress=None):
+    def verify(self, progress=None) -> None:
         """Verify a pack stream and write it to the output file.
 
         See PackStreamReader.iterobjects for a list of exceptions this may
@@ -1231,7 +1231,7 @@ class PackData:
     def from_path(cls, path):
         return cls(filename=path)
 
-    def close(self):
+    def close(self) -> None:
         self._file.close()
 
     def __enter__(self):
@@ -1370,7 +1370,7 @@ class PackData:
         self._file.seek(-20, SEEK_END)
         return self._file.read(20)
 
-    def check(self):
+    def check(self) -> None:
         """Check the consistency of this pack."""
         actual = self.calculate_checksum()
         stored = self.get_stored_checksum()
@@ -1611,7 +1611,7 @@ class SHA1Reader:
         self.sha1.update(data)
         return data
 
-    def check_sha(self):
+    def check_sha(self) -> None:
         stored = self.f.read(20)
         if stored != self.sha1.digest():
             raise ChecksumMismatch(self.sha1.hexdigest(), sha_to_hex(stored))
@@ -1631,7 +1631,7 @@ class SHA1Writer:
         self.length = 0
         self.sha1 = sha1(b"")
 
-    def write(self, data):
+    def write(self, data) -> None:
         self.sha1.update(data)
         self.f.write(data)
         self.length += len(data)
@@ -1766,7 +1766,7 @@ def pack_header_chunks(num_objects):
     yield struct.pack(b">L", num_objects)  # Number of objects in pack
 
 
-def write_pack_header(write, num_objects):
+def write_pack_header(write, num_objects) -> None:
     """Write a pack header for the given number of objects."""
     if hasattr(write, "write"):
         write = write.write
@@ -2470,7 +2470,7 @@ class Pack:
             self._idx = self._idx_load()
         return self._idx
 
-    def close(self):
+    def close(self) -> None:
         if self._data is not None:
             self._data.close()
         if self._idx is not None:

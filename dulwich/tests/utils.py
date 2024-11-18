@@ -71,7 +71,7 @@ def open_repo(name, temp_dir=None):
     return Repo(temp_repo_dir)
 
 
-def tear_down_repo(repo):
+def tear_down_repo(repo) -> None:
     """Tear down a test repository."""
     repo.close()
     temp_dir = os.path.dirname(repo.path.rstrip(os.sep))
@@ -160,7 +160,7 @@ def make_tag(target, **attrs):
 def functest_builder(method, func):
     """Generate a test method that tests the given function."""
 
-    def do_test(self):
+    def do_test(self) -> None:
         method(self, func)
 
     return do_test
@@ -188,7 +188,7 @@ def ext_functest_builder(method, func):
       func: The function implementation to pass to method.
     """
 
-    def do_test(self):
+    def do_test(self) -> None:
         if not isinstance(func, types.BuiltinFunctionType):
             raise SkipTest(f"{func} extension not found")
         method(self, func)
@@ -354,12 +354,12 @@ def setup_warning_catcher():
     caught_warnings = []
     original_showwarning = warnings.showwarning
 
-    def custom_showwarning(*args, **kwargs):
+    def custom_showwarning(*args, **kwargs) -> None:
         caught_warnings.append(args[0])
 
     warnings.showwarning = custom_showwarning
 
-    def restore_showwarning():
+    def restore_showwarning() -> None:
         warnings.showwarning = original_showwarning
 
     return caught_warnings, restore_showwarning

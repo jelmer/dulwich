@@ -1529,6 +1529,7 @@ class Commit(ShaFile):
 
         with gpg.Context() as ctx:
             self_without_gpgsig = self.copy()
+            assert isinstance(self_without_gpgsig, Commit)
             self_without_gpgsig._gpgsig = None
             self_without_gpgsig.gpgsig = None
             data, result = ctx.verify(

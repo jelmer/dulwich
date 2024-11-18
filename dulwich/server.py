@@ -49,9 +49,10 @@ import socketserver
 import sys
 import time
 import zlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from functools import partial
-from typing import Optional, cast, Iterator, Protocol as TypingProtocol, Type
+from typing import Optional, cast
+from typing import Protocol as TypingProtocol
 
 from dulwich import log_utils
 
@@ -112,7 +113,7 @@ from .protocol import (
     symref_capabilities,
 )
 from .refs import PEELED_TAG_SUFFIX, RefsContainer, write_info_refs
-from .repo import BaseRepo, Repo
+from .repo import Repo
 
 logger = log_utils.getLogger(__name__)
 
@@ -120,7 +121,7 @@ logger = log_utils.getLogger(__name__)
 class Backend:
     """A backend for the Git smart server implementation."""
 
-    def open_repository(self, path) -> BackendRepo:
+    def open_repository(self, path) -> "BackendRepo":
         """Open the repository at a path.
 
         Args:
@@ -763,7 +764,7 @@ class _ProtocolGraphWalker:
         return _all_wants_satisfied(self.store, haves, self._wants)
 
     def set_ack_type(self, ack_type) -> None:
-        impl_classes: dict[int, Type[AckGraphWalkerImpl]] = {
+        impl_classes: dict[int, type[AckGraphWalkerImpl]] = {
             MULTI_ACK: MultiAckGraphWalkerImpl,
             MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
             SINGLE_ACK: SingleAckGraphWalkerImpl,

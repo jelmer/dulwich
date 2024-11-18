@@ -35,7 +35,7 @@ from .pack import ObjectContainer
 FIRST_FEW_BYTES = 8000
 
 
-def write_commit_patch(f, commit, contents, progress, version=None, encoding=None):
+def write_commit_patch(f, commit, contents, progress, version=None, encoding=None) -> None:
     """Write a individual file patch.
 
     Args:
@@ -101,7 +101,7 @@ def get_summary(commit):
 
 
 #  Unified Diff
-def _format_range_unified(start, stop):
+def _format_range_unified(start, stop) -> str:
     """Convert range to the "ed" format."""
     # Per the diff spec at http://www.unix.org/single_unix_specification/
     beginning = start + 1  # lines start numbering with one
@@ -188,7 +188,7 @@ def patch_filename(p, root):
         return root + b"/" + p
 
 
-def write_object_diff(f, store: ObjectContainer, old_file, new_file, diff_binary=False):
+def write_object_diff(f, store: ObjectContainer, old_file, new_file, diff_binary=False) -> None:
     """Write the diff for an object.
 
     Args:
@@ -279,7 +279,7 @@ def gen_diff_header(paths, modes, shas):
 
 
 # TODO(jelmer): Support writing unicode, rather than bytes.
-def write_blob_diff(f, old_file, new_file):
+def write_blob_diff(f, old_file, new_file) -> None:
     """Write blob diff.
 
     Args:
@@ -314,7 +314,7 @@ def write_blob_diff(f, old_file, new_file):
     )
 
 
-def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False):
+def write_tree_diff(f, store, old_tree, new_tree, diff_binary=False) -> None:
     """Write tree diff.
 
     Args:

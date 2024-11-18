@@ -239,7 +239,7 @@ class ReportStatusParser:
             else:
                 raise GitProtocolError(f"invalid ref status {status!r}")
 
-    def handle_packet(self, pkt):
+    def handle_packet(self, pkt) -> None:
         """Handle a packet.
 
         Raises:
@@ -258,7 +258,7 @@ class ReportStatusParser:
             self._ref_statuses.append(ref_status)
 
 
-def negotiate_protocol_version(proto):
+def negotiate_protocol_version(proto) -> int:
     pkt = proto.read_pkt_line()
     if pkt is not None and pkt.strip() == b"version 2":
         return 2
@@ -353,7 +353,7 @@ class FetchPackResult:
         self.new_shallow = new_shallow
         self.new_unshallow = new_unshallow
 
-    def _warn_deprecated(self):
+    def _warn_deprecated(self) -> None:
         import warnings
 
         warnings.warn(
@@ -430,7 +430,7 @@ class SendPackResult:
         self.agent = agent
         self.ref_status = ref_status
 
-    def _warn_deprecated(self):
+    def _warn_deprecated(self) -> None:
         import warnings
 
         warnings.warn(
@@ -663,7 +663,7 @@ def _handle_upload_pack_tail(
     progress: Optional[Callable[[bytes], None]] = None,
     rbufsize=_RBUFSIZE,
     protocol_version=0,
-):
+) -> None:
     """Handle the tail of a 'git-upload-pack' request.
 
     Args:
@@ -696,7 +696,7 @@ def _handle_upload_pack_tail(
         if progress is None:
             # Just ignore progress data
 
-            def progress(x):
+            def progress(x) -> None:
                 pass
 
         for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
@@ -771,7 +771,7 @@ class GitClient:
             self._fetch_capabilities.add(CAPABILITY_INCLUDE_TAG)
         self.protocol_version = 0  # will be overridden later
 
-    def get_url(self, path):
+    def get_url(self, path) -> str:
         """Retrieves full url to given path.
 
         Args:
@@ -784,7 +784,7 @@ class GitClient:
         raise NotImplementedError(self.get_url)
 
     @classmethod
-    def from_parsedurl(cls, parsedurl, **kwargs):
+    def from_parsedurl(cls, parsedurl, **kwargs) -> "GitClient":
         """Create an instance of this client from a urlparse.parsed object.
 
         Args:
@@ -803,7 +803,7 @@ class GitClient:
             [set[bytes], set[bytes], bool], tuple[int, Iterator[UnpackedObject]]
         ],
         progress=None,
-    ):
+        ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
         Args:
@@ -969,13 +969,13 @@ class GitClient:
                 dir=getattr(target.object_store, "path", None),
             )
 
-            def commit():
+            def commit() -> None:
                 if f.tell():
                     f.seek(0)
-                    target.object_store.add_thin_pack(f.read, None, progress=progress)
+                    target.object_store.add_thin_pack(f.read, None, progress=progress)  # type: ignore
                 f.close()
 
-            def abort():
+            def abort() -> None:
                 f.close()
 
         else:
@@ -1012,7 +1012,7 @@ class GitClient:
         ref_prefix: Optional[list[Ref]] = None,
         filter_spec=None,
         protocol_version: Optional[int] = None,
-    ):
+        ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
         Args:
@@ -1044,7 +1044,7 @@ class GitClient:
         path,
         protocol_version: Optional[int] = None,
         ref_prefix: Optional[list[Ref]] = None,
-    ):
+    ) -> dict[Ref, ObjectID]:
         """Retrieve the current refs from a git smart server.
 
         Args:
@@ -1085,7 +1085,7 @@ class GitClient:
         if CAPABILITY_SIDE_BAND_64K in capabilities or self.protocol_version == 2:
             if progress is None:
 
-                def progress(x):
+                def progress(x) -> None:
                     pass
 
             if CAPABILITY_REPORT_STATUS in capabilities:
@@ -1147,12 +1147,12 @@ class GitClient:
         format=None,
         subdirs=None,
         prefix=None,
-    ):
+        ) -> None:
         """Retrieve an archive of the specified tree."""
         raise NotImplementedError(self.archive)
 
     @staticmethod
-    def _warn_filter_objects():
+    def _warn_filter_objects() -> None:
         import warnings
 
         warnings.warn(
@@ -1161,7 +1161,7 @@ class GitClient:
         )
 
 
-def check_wants(wants, refs):
+def check_wants(wants, refs) -> None:
     """Check that a set of wants is valid.
 
     Args:
@@ -1516,7 +1516,7 @@ class TraditionalGitClient(GitClient):
         format=None,
         subdirs=None,
         prefix=None,
-    ):
+    ) -> None:
         proto, can_read, stderr = self._connect(b"upload-archive", path)
         with proto:
             if format is not None:
@@ -1607,7 +1607,7 @@ class TCPGitClient(TraditionalGitClient):
         # 0 means unbuffered
         wfile = s.makefile("wb", 0)
 
-        def close():
+        def close() -> None:
             rfile.close()
             wfile.close()
             s.close()
@@ -1664,7 +1664,7 @@ class SubprocessWrapper:
         else:
             return _fileno_can_read(self.proc.stdout.fileno())
 
-    def close(self):
+    def close(self) -> None:
         self.proc.stdin.close()
         self.proc.stdout.close()
         if self.proc.stderr:
@@ -1784,7 +1784,7 @@ class LocalGitClient(GitClient):
         """
         if not progress:
 
-            def progress(x):
+            def progress(x) -> None:
                 pass
 
         with self._open_repo(path) as target:
@@ -1948,7 +1948,7 @@ class SSHVendor:
         key_filename=None,
         ssh_command=None,
         protocol_version: Optional[int] = None,
-    ):
+        ):
         """Connect to an SSH server.
 
         Run a command remotely and return a file-like object for interaction
@@ -2313,7 +2313,7 @@ def default_urllib3_manager(
     return manager
 
 
-def check_for_proxy_bypass(base_url):
+def check_for_proxy_bypass(base_url) -> bool:
     # Check if a proxy bypass is defined with the no_proxy environment variable
     if base_url:  # only check if base_url is provided
         no_proxy_str = os.environ.get("no_proxy")

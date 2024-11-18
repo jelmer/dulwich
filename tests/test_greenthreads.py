@@ -66,13 +66,13 @@ def init_store(store, count=1):
 
 @skipIf(not gevent_support, skipmsg)
 class TestGreenThreadsMissingObjectFinder(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = MemoryObjectStore()
         self.cmt_amount = 10
         self.objs = init_store(self.store, self.cmt_amount)
 
-    def test_finder(self):
+    def test_finder(self) -> None:
         wants = [sha.id for sha in self.objs if isinstance(sha, Commit)]
         finder = GreenThreadsMissingObjectFinder(self.store, (), wants)
         self.assertEqual(len(finder.sha_done), 0)

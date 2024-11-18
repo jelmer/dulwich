@@ -46,13 +46,13 @@ class ConfigFileTests(TestCase):
     def from_file(self, text):
         return ConfigFile.from_file(BytesIO(text))
 
-    def test_empty(self):
+    def test_empty(self) -> None:
         ConfigFile()
 
-    def test_eq(self):
+    def test_eq(self) -> None:
         self.assertEqual(ConfigFile(), ConfigFile())
 
-    def test_default_config(self):
+    def test_default_config(self) -> None:
         cf = self.from_file(
             b"""[core]
 \trepositoryformatversion = 0
@@ -75,127 +75,127 @@ class ConfigFileTests(TestCase):
             cf,
         )
 
-    def test_from_file_empty(self):
+    def test_from_file_empty(self) -> None:
         cf = self.from_file(b"")
         self.assertEqual(ConfigFile(), cf)
 
-    def test_empty_line_before_section(self):
+    def test_empty_line_before_section(self) -> None:
         cf = self.from_file(b"\n[section]\n")
         self.assertEqual(ConfigFile({(b"section",): {}}), cf)
 
-    def test_comment_before_section(self):
+    def test_comment_before_section(self) -> None:
         cf = self.from_file(b"# foo\n[section]\n")
         self.assertEqual(ConfigFile({(b"section",): {}}), cf)
 
-    def test_comment_after_section(self):
+    def test_comment_after_section(self) -> None:
         cf = self.from_file(b"[section] # foo\n")
         self.assertEqual(ConfigFile({(b"section",): {}}), cf)
 
-    def test_comment_after_variable(self):
+    def test_comment_after_variable(self) -> None:
         cf = self.from_file(b"[section]\nbar= foo # a comment\n")
         self.assertEqual(ConfigFile({(b"section",): {b"bar": b"foo"}}), cf)
 
-    def test_comment_character_within_value_string(self):
+    def test_comment_character_within_value_string(self) -> None:
         cf = self.from_file(b'[section]\nbar= "foo#bar"\n')
         self.assertEqual(ConfigFile({(b"section",): {b"bar": b"foo#bar"}}), cf)
 
-    def test_comment_character_within_section_string(self):
+    def test_comment_character_within_section_string(self) -> None:
         cf = self.from_file(b'[branch "foo#bar"] # a comment\nbar= foo\n')
         self.assertEqual(ConfigFile({(b"branch", b"foo#bar"): {b"bar": b"foo"}}), cf)
 
-    def test_closing_bracket_within_section_string(self):
+    def test_closing_bracket_within_section_string(self) -> None:
         cf = self.from_file(b'[branch "foo]bar"] # a comment\nbar= foo\n')
         self.assertEqual(ConfigFile({(b"branch", b"foo]bar"): {b"bar": b"foo"}}), cf)
 
-    def test_from_file_section(self):
+    def test_from_file_section(self) -> None:
         cf = self.from_file(b"[core]\nfoo = bar\n")
         self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
-    def test_from_file_multiple(self):
+    def test_from_file_multiple(self) -> None:
         cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
         self.assertEqual([b"bar", b"blah"], list(cf.get_multivar((b"core",), b"foo")))
         self.assertEqual([], list(cf.get_multivar((b"core",), b"blah")))
 
-    def test_from_file_utf8_bom(self):
+    def test_from_file_utf8_bom(self) -> None:
         text = "[core]\nfoo = b\u00e4r\n".encode("utf-8-sig")
         cf = self.from_file(text)
         self.assertEqual(b"b\xc3\xa4r", cf.get((b"core",), b"foo"))
 
-    def test_from_file_section_case_insensitive_lower(self):
+    def test_from_file_section_case_insensitive_lower(self) -> None:
         cf = self.from_file(b"[cOre]\nfOo = bar\n")
         self.assertEqual(b"bar", cf.get((b"core",), b"foo"))
         self.assertEqual(b"bar", cf.get((b"core", b"foo"), b"foo"))
 
-    def test_from_file_section_case_insensitive_mixed(self):
+    def test_from_file_section_case_insensitive_mixed(self) -> None:
         cf = self.from_file(b"[cOre]\nfOo = bar\n")
         self.assertEqual(b"bar", cf.get((b"core",), b"fOo"))
         self.assertEqual(b"bar", cf.get((b"cOre", b"fOo"), b"fOo"))
 
-    def test_from_file_with_mixed_quoted(self):
+    def test_from_file_with_mixed_quoted(self) -> None:
         cf = self.from_file(b'[core]\nfoo = "bar"la\n')
         self.assertEqual(b"barla", cf.get((b"core",), b"foo"))
 
-    def test_from_file_section_with_open_brackets(self):
+    def test_from_file_section_with_open_brackets(self) -> None:
         self.assertRaises(ValueError, self.from_file, b"[core\nfoo = bar\n")
 
-    def test_from_file_value_with_open_quoted(self):
+    def test_from_file_value_with_open_quoted(self) -> None:
         self.assertRaises(ValueError, self.from_file, b'[core]\nfoo = "bar\n')
 
-    def test_from_file_with_quotes(self):
+    def test_from_file_with_quotes(self) -> None:
         cf = self.from_file(b"[core]\n" b'foo = " bar"\n')
         self.assertEqual(b" bar", cf.get((b"core",), b"foo"))
 
-    def test_from_file_with_interrupted_line(self):
+    def test_from_file_with_interrupted_line(self) -> None:
         cf = self.from_file(b"[core]\n" b"foo = bar\\\n" b" la\n")
         self.assertEqual(b"barla", cf.get((b"core",), b"foo"))
 
-    def test_from_file_with_boolean_setting(self):
+    def test_from_file_with_boolean_setting(self) -> None:
         cf = self.from_file(b"[core]\n" b"foo\n")
         self.assertEqual(b"true", cf.get((b"core",), b"foo"))
 
-    def test_from_file_subsection(self):
+    def test_from_file_subsection(self) -> None:
         cf = self.from_file(b'[branch "foo"]\nfoo = bar\n')
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
-    def test_from_file_subsection_invalid(self):
+    def test_from_file_subsection_invalid(self) -> None:
         self.assertRaises(ValueError, self.from_file, b'[branch "foo]\nfoo = bar\n')
 
-    def test_from_file_subsection_not_quoted(self):
+    def test_from_file_subsection_not_quoted(self) -> None:
         cf = self.from_file(b"[branch.foo]\nfoo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
-    def test_write_preserve_multivar(self):
+    def test_write_preserve_multivar(self) -> None:
         cf = self.from_file(b"[core]\nfoo = bar\nfoo = blah\n")
         f = BytesIO()
         cf.write_to_file(f)
         self.assertEqual(b"[core]\n\tfoo = bar\n\tfoo = blah\n", f.getvalue())
 
-    def test_write_to_file_empty(self):
+    def test_write_to_file_empty(self) -> None:
         c = ConfigFile()
         f = BytesIO()
         c.write_to_file(f)
         self.assertEqual(b"", f.getvalue())
 
-    def test_write_to_file_section(self):
+    def test_write_to_file_section(self) -> None:
         c = ConfigFile()
         c.set((b"core",), b"foo", b"bar")
         f = BytesIO()
         c.write_to_file(f)
         self.assertEqual(b"[core]\n\tfoo = bar\n", f.getvalue())
 
-    def test_write_to_file_subsection(self):
+    def test_write_to_file_subsection(self) -> None:
         c = ConfigFile()
         c.set((b"branch", b"blie"), b"foo", b"bar")
         f = BytesIO()
         c.write_to_file(f)
         self.assertEqual(b'[branch "blie"]\n\tfoo = bar\n', f.getvalue())
 
-    def test_same_line(self):
+    def test_same_line(self) -> None:
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
 
-    def test_quoted_newlines_windows(self):
+    def test_quoted_newlines_windows(self) -> None:
         cf = self.from_file(
             b"[alias]\r\n"
             b"c = '!f() { \\\r\n"
@@ -209,7 +209,7 @@ class ConfigFileTests(TestCase):
             cf.get((b"alias",), b"c"),
         )
 
-    def test_quoted(self):
+    def test_quoted(self) -> None:
         cf = self.from_file(
             b"""[gui]
 \tfontdiff = -family \\\"Ubuntu Mono\\\" -size 11 -overstrike 0
@@ -226,7 +226,7 @@ class ConfigFileTests(TestCase):
             cf,
         )
 
-    def test_quoted_multiline(self):
+    def test_quoted_multiline(self) -> None:
         cf = self.from_file(
             b"""[alias]
 who = \"!who() {\\
@@ -249,7 +249,7 @@ who\"
             cf,
         )
 
-    def test_set_hash_gets_quoted(self):
+    def test_set_hash_gets_quoted(self) -> None:
         c = ConfigFile()
         c.set(b"xandikos", b"color", b"#665544")
         f = BytesIO()
@@ -258,7 +258,7 @@ who\"
 
 
 class ConfigDictTests(TestCase):
-    def test_get_set(self):
+    def test_get_set(self) -> None:
         cd = ConfigDict()
         self.assertRaises(KeyError, cd.get, b"foo", b"core")
         cd.set((b"core",), b"foo", b"bla")
@@ -266,7 +266,7 @@ class ConfigDictTests(TestCase):
         cd.set((b"core",), b"foo", b"bloe")
         self.assertEqual(b"bloe", cd.get((b"core",), b"foo"))
 
-    def test_get_boolean(self):
+    def test_get_boolean(self) -> None:
         cd = ConfigDict()
         cd.set((b"core",), b"foo", b"true")
         self.assertTrue(cd.get_boolean((b"core",), b"foo"))
@@ -275,7 +275,7 @@ class ConfigDictTests(TestCase):
         cd.set((b"core",), b"foo", b"invalid")
         self.assertRaises(ValueError, cd.get_boolean, (b"core",), b"foo")
 
-    def test_dict(self):
+    def test_dict(self) -> None:
         cd = ConfigDict()
         cd.set((b"core",), b"foo", b"bla")
         cd.set((b"core2",), b"foo", b"bloe")
@@ -286,20 +286,20 @@ class ConfigDictTests(TestCase):
         cd[b"a"] = b"b"
         self.assertEqual(cd[b"a"], b"b")
 
-    def test_items(self):
+    def test_items(self) -> None:
         cd = ConfigDict()
         cd.set((b"core",), b"foo", b"bla")
         cd.set((b"core2",), b"foo", b"bloe")
 
         self.assertEqual([(b"foo", b"bla")], list(cd.items((b"core",))))
 
-    def test_items_nonexistant(self):
+    def test_items_nonexistant(self) -> None:
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
         self.assertEqual([], list(cd.items((b"core",))))
 
-    def test_sections(self):
+    def test_sections(self) -> None:
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 
@@ -307,11 +307,11 @@ class ConfigDictTests(TestCase):
 
 
 class StackedConfigTests(TestCase):
-    def test_default_backends(self):
+    def test_default_backends(self) -> None:
         StackedConfig.default_backends()
 
     @skipIf(sys.platform != "win32", "Windows specific config location.")
-    def test_windows_config_from_path(self):
+    def test_windows_config_from_path(self) -> None:
         from dulwich.config import get_win_system_paths
 
         install_dir = os.path.join("C:", "foo", "Git")
@@ -327,7 +327,7 @@ class StackedConfigTests(TestCase):
         )
 
     @skipIf(sys.platform != "win32", "Windows specific config location.")
-    def test_windows_config_from_reg(self):
+    def test_windows_config_from_reg(self) -> None:
         import winreg
 
         from dulwich.config import get_win_system_paths
@@ -350,66 +350,66 @@ class StackedConfigTests(TestCase):
 
 
 class EscapeValueTests(TestCase):
-    def test_nothing(self):
+    def test_nothing(self) -> None:
         self.assertEqual(b"foo", _escape_value(b"foo"))
 
-    def test_backslash(self):
+    def test_backslash(self) -> None:
         self.assertEqual(b"foo\\\\", _escape_value(b"foo\\"))
 
-    def test_newline(self):
+    def test_newline(self) -> None:
         self.assertEqual(b"foo\\n", _escape_value(b"foo\n"))
 
 
 class FormatStringTests(TestCase):
-    def test_quoted(self):
+    def test_quoted(self) -> None:
         self.assertEqual(b'" foo"', _format_string(b" foo"))
         self.assertEqual(b'"\\tfoo"', _format_string(b"\tfoo"))
 
-    def test_not_quoted(self):
+    def test_not_quoted(self) -> None:
         self.assertEqual(b"foo", _format_string(b"foo"))
         self.assertEqual(b"foo bar", _format_string(b"foo bar"))
 
 
 class ParseStringTests(TestCase):
-    def test_quoted(self):
+    def test_quoted(self) -> None:
         self.assertEqual(b" foo", _parse_string(b'" foo"'))
         self.assertEqual(b"\tfoo", _parse_string(b'"\\tfoo"'))
 
-    def test_not_quoted(self):
+    def test_not_quoted(self) -> None:
         self.assertEqual(b"foo", _parse_string(b"foo"))
         self.assertEqual(b"foo bar", _parse_string(b"foo bar"))
 
-    def test_nothing(self):
+    def test_nothing(self) -> None:
         self.assertEqual(b"", _parse_string(b""))
 
-    def test_tab(self):
+    def test_tab(self) -> None:
         self.assertEqual(b"\tbar\t", _parse_string(b"\\tbar\\t"))
 
-    def test_newline(self):
+    def test_newline(self) -> None:
         self.assertEqual(b"\nbar\t", _parse_string(b"\\nbar\\t\t"))
 
-    def test_quote(self):
+    def test_quote(self) -> None:
         self.assertEqual(b'"foo"', _parse_string(b'\\"foo\\"'))
 
 
 class CheckVariableNameTests(TestCase):
-    def test_invalid(self):
+    def test_invalid(self) -> None:
         self.assertFalse(_check_variable_name(b"foo "))
         self.assertFalse(_check_variable_name(b"bar,bar"))
         self.assertFalse(_check_variable_name(b"bar.bar"))
 
-    def test_valid(self):
+    def test_valid(self) -> None:
         self.assertTrue(_check_variable_name(b"FOO"))
         self.assertTrue(_check_variable_name(b"foo"))
         self.assertTrue(_check_variable_name(b"foo-bar"))
 
 
 class CheckSectionNameTests(TestCase):
-    def test_invalid(self):
+    def test_invalid(self) -> None:
         self.assertFalse(_check_section_name(b"foo "))
         self.assertFalse(_check_section_name(b"bar,bar"))
 
-    def test_valid(self):
+    def test_valid(self) -> None:
         self.assertTrue(_check_section_name(b"FOO"))
         self.assertTrue(_check_section_name(b"foo"))
         self.assertTrue(_check_section_name(b"foo-bar"))
@@ -417,7 +417,7 @@ class CheckSectionNameTests(TestCase):
 
 
 class SubmodulesTests(TestCase):
-    def testSubmodules(self):
+    def testSubmodules(self) -> None:
         cf = ConfigFile.from_file(
             BytesIO(
                 b"""\
@@ -439,7 +439,7 @@ class SubmodulesTests(TestCase):
             got,
         )
 
-    def testMalformedSubmodules(self):
+    def testMalformedSubmodules(self) -> None:
         cf = ConfigFile.from_file(
             BytesIO(
                 b"""\
@@ -466,20 +466,20 @@ class SubmodulesTests(TestCase):
 
 
 class ApplyInsteadOfTests(TestCase):
-    def test_none(self):
+    def test_none(self) -> None:
         config = ConfigDict()
         self.assertEqual(
             "https://example.com/", apply_instead_of(config, "https://example.com/")
         )
 
-    def test_apply(self):
+    def test_apply(self) -> None:
         config = ConfigDict()
         config.set(("url", "https://samba.org/"), "insteadOf", "https://example.com/")
         self.assertEqual(
             "https://samba.org/", apply_instead_of(config, "https://example.com/")
         )
 
-    def test_apply_multiple(self):
+    def test_apply_multiple(self) -> None:
         config = ConfigDict()
         config.set(("url", "https://samba.org/"), "insteadOf", "https://blah.com/")
         config.set(("url", "https://samba.org/"), "insteadOf", "https://example.com/")

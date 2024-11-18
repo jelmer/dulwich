@@ -26,14 +26,21 @@ from dulwich.index import commit_tree
 from dulwich.object_store import (
     iter_tree_contents,
     peel_sha,
+    PackBasedObjectStore,
 )
 from dulwich.objects import (
     Blob,
     TreeEntry,
+    Tree,
 )
 from dulwich.protocol import DEPTH_INFINITE
 
 from .utils import make_object, make_tag
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dulwich.object_store import BaseObjectStore
 
 try:
     from unittest.mock import patch
@@ -45,19 +52,36 @@ testobject = make_object(Blob, data=b"yummy data")
 
 
 class ObjectStoreTests:
-    def test_determine_wants_all(self):
+    store: "BaseObjectStore"
+
+    def assertEqual(self, a, b) -> None:
+        raise NotImplementedError
+
+    def assertRaises(self, exc, func) -> None:
+        raise NotImplementedError
+
+    def assertNotIn(self, a, b) -> None:
+        raise NotImplementedError
+
+    def assertNotEqual(self, a, b) -> None:
+        raise NotImplementedError
+
+    def assertIn(self, a, b) -> None:
+        raise NotImplementedError
+
+    def test_determine_wants_all(self) -> None:
         self.assertEqual(
             [b"1" * 40],
             self.store.determine_wants_all({b"refs/heads/foo": b"1" * 40}),
         )
 
-    def test_determine_wants_all_zero(self):
+    def test_determine_wants_all_zero(self) -> None:
         self.assertEqual(
             [], self.store.determine_wants_all({b"refs/heads/foo": b"0" * 40})
         )
 
     @skipUnless(patch, "Required mock.patch")
-    def test_determine_wants_all_depth(self):
+    def test_determine_wants_all_depth(self) -> None:
         self.store.add_object(testobject)
         refs = {b"refs/heads/foo": testobject.id}
         with patch.object(self.store, "_get_depth", return_value=1) as m:
@@ -74,7 +98,7 @@ class ObjectStoreTests:
                 [testobject.id], self.store.determine_wants_all(refs, depth=2)
             )
 
-    def test_get_depth(self):
+    def test_get_depth(self) -> None:
         self.assertEqual(0, self.store._get_depth(testobject.id))
 
         self.store.add_object(testobject)
@@ -92,24 +116,24 @@ class ObjectStoreTests:
             ),
         )
 
-    def test_iter(self):
+    def test_iter(self) -> None:
         self.assertEqual([], list(self.store))
 
-    def test_get_nonexistant(self):
+    def test_get_nonexistant(self) -> None:
         self.assertRaises(KeyError, lambda: self.store[b"a" * 40])
 
-    def test_contains_nonexistant(self):
+    def test_contains_nonexistant(self) -> None:
         self.assertNotIn(b"a" * 40, self.store)
 
-    def test_add_objects_empty(self):
+    def test_add_objects_empty(self) -> None:
         self.store.add_objects([])
 
-    def test_add_commit(self):
+    def test_add_commit(self) -> None:
         # TODO: Argh, no way to construct Git commit objects without
         # access to a serialized form.
         self.store.add_objects([])
 
-    def test_store_resilience(self):
+    def test_store_resilience(self) -> None:
         """Test if updating an existing stored object doesn't erase the
         object from the store.
         """
@@ -123,14 +147,14 @@ class ObjectStoreTests:
         self.assertNotEqual(test_object.id, stored_test_object.id)
         self.assertEqual(stored_test_object.id, test_object_id)
 
-    def test_add_object(self):
+    def test_add_object(self) -> None:
         self.store.add_object(testobject)
         self.assertEqual({testobject.id}, set(self.store))
         self.assertIn(testobject.id, self.store)
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
 
-    def test_add_objects(self):
+    def test_add_objects(self) -> None:
         data = [(testobject, "mypath")]
         self.store.add_objects(data)
         self.assertEqual({testobject.id}, set(self.store))
@@ -138,7 +162,7 @@ class ObjectStoreTests:
         r = self.store[testobject.id]
         self.assertEqual(r, testobject)
 
-    def test_tree_changes(self):
+    def test_tree_changes(self) -> None:
         blob_a1 = make_object(Blob, data=b"a1")
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b = make_object(Blob, data=b"b")
@@ -163,7 +187,7 @@ class ObjectStoreTests:
             list(self.store.tree_changes(tree1_id, tree2_id, want_unchanged=True)),
         )
 
-    def test_iter_tree_contents(self):
+    def test_iter_tree_contents(self) -> None:
         blob_a = make_object(Blob, data=b"a")
         blob_b = make_object(Blob, data=b"b")
         blob_c = make_object(Blob, data=b"c")
@@ -184,7 +208,7 @@ class ObjectStoreTests:
         )
         self.assertEqual([], list(iter_tree_contents(self.store, None)))
 
-    def test_iter_tree_contents_include_trees(self):
+    def test_iter_tree_contents_include_trees(self) -> None:
         blob_a = make_object(Blob, data=b"a")
         blob_b = make_object(Blob, data=b"b")
         blob_c = make_object(Blob, data=b"c")
@@ -198,7 +222,9 @@ class ObjectStoreTests:
         ]
         tree_id = commit_tree(self.store, blobs)
         tree = self.store[tree_id]
+        assert isinstance(tree, Tree)
         tree_ad = self.store[tree[b"ad"][1]]
+        assert isinstance(tree_ad, Tree)
         tree_bd = self.store[tree_ad[b"bd"][1]]
 
         expected = [
@@ -217,7 +243,7 @@ class ObjectStoreTests:
         self.store.add_object(tag)
         return tag
 
-    def test_peel_sha(self):
+    def test_peel_sha(self) -> None:
         self.store.add_object(testobject)
         tag1 = self.make_tag(b"1", testobject)
         tag2 = self.make_tag(b"2", testobject)
@@ -225,18 +251,18 @@ class ObjectStoreTests:
         for obj in [testobject, tag1, tag2, tag3]:
             self.assertEqual((obj, testobject), peel_sha(self.store, obj.id))
 
-    def test_get_raw(self):
+    def test_get_raw(self) -> None:
         self.store.add_object(testobject)
         self.assertEqual(
             (Blob.type_num, b"yummy data"), self.store.get_raw(testobject.id)
         )
 
-    def test_close(self):
+    def test_close(self) -> None:
         # For now, just check that close doesn't barf.
         self.store.add_object(testobject)
         self.store.close()
 
-    def test_iter_prefix(self):
+    def test_iter_prefix(self) -> None:
         self.store.add_object(testobject)
         self.assertEqual([testobject.id], list(self.store.iter_prefix(testobject.id)))
         self.assertEqual(
@@ -247,19 +273,21 @@ class ObjectStoreTests:
         )
         self.assertEqual([testobject.id], list(self.store.iter_prefix(b"")))
 
-    def test_iter_prefix_not_found(self):
+    def test_iter_prefix_not_found(self) -> None:
         self.assertEqual([], list(self.store.iter_prefix(b"1" * 40)))
 
 
 class PackBasedObjectStoreTests(ObjectStoreTests):
-    def tearDown(self):
+    store: PackBasedObjectStore
+
+    def tearDown(self) -> None:
         for pack in self.store.packs:
             pack.close()
 
-    def test_empty_packs(self):
+    def test_empty_packs(self) -> None:
         self.assertEqual([], list(self.store.packs))
 
-    def test_pack_loose_objects(self):
+    def test_pack_loose_objects(self) -> None:
         b1 = make_object(Blob, data=b"yummy data")
         self.store.add_object(b1)
         b2 = make_object(Blob, data=b"more yummy data")
@@ -273,7 +301,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.assertNotEqual([], list(self.store.packs))
         self.assertEqual(0, self.store.pack_loose_objects())
 
-    def test_repack(self):
+    def test_repack(self) -> None:
         b1 = make_object(Blob, data=b"yummy data")
         self.store.add_object(b1)
         b2 = make_object(Blob, data=b"more yummy data")
@@ -290,7 +318,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.assertEqual(1, len(self.store.packs))
         self.assertEqual(0, self.store.pack_loose_objects())
 
-    def test_repack_existing(self):
+    def test_repack_existing(self) -> None:
         b1 = make_object(Blob, data=b"yummy data")
         self.store.add_object(b1)
         b2 = make_object(Blob, data=b"more yummy data")

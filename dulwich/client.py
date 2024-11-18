@@ -803,7 +803,7 @@ class GitClient:
             [set[bytes], set[bytes], bool], tuple[int, Iterator[UnpackedObject]]
         ],
         progress=None,
-        ) -> SendPackResult:
+    ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
         Args:
@@ -1012,7 +1012,7 @@ class GitClient:
         ref_prefix: Optional[list[Ref]] = None,
         filter_spec=None,
         protocol_version: Optional[int] = None,
-        ) -> FetchPackResult:
+    ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
         Args:
@@ -1147,7 +1147,7 @@ class GitClient:
         format=None,
         subdirs=None,
         prefix=None,
-        ) -> None:
+    ) -> None:
         """Retrieve an archive of the specified tree."""
         raise NotImplementedError(self.archive)
 
@@ -1948,7 +1948,7 @@ class SSHVendor:
         key_filename=None,
         ssh_command=None,
         protocol_version: Optional[int] = None,
-        ):
+    ):
         """Connect to an SSH server.
 
         Run a command remotely and return a file-like object for interaction

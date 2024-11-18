@@ -522,7 +522,9 @@ class Index:
     def items(self) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 
-    def update(self, entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]) -> None:
+    def update(
+        self, entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
+    ) -> None:
         for key, value in entries.items():
             self[key] = value
 

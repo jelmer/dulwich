@@ -20,24 +20,23 @@
 
 """Tests for the object store interface."""
 
+from typing import TYPE_CHECKING
 from unittest import skipUnless
 
 from dulwich.index import commit_tree
 from dulwich.object_store import (
+    PackBasedObjectStore,
     iter_tree_contents,
     peel_sha,
-    PackBasedObjectStore,
 )
 from dulwich.objects import (
     Blob,
-    TreeEntry,
     Tree,
+    TreeEntry,
 )
 from dulwich.protocol import DEPTH_INFINITE
 
 from .utils import make_object, make_tag
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dulwich.object_store import BaseObjectStore

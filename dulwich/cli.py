@@ -120,8 +120,10 @@ class cmd_fetch_pack(Command):
             determine_wants = r.object_store.determine_wants_all
         else:
 
-            def determine_wants(refs: dict[Ref, ObjectID], depth: Optional[int] = None) -> list[ObjectID]:
-                return [y.encode('utf-8') for y in args.refs if y not in r.object_store]
+            def determine_wants(
+                refs: dict[Ref, ObjectID], depth: Optional[int] = None
+            ) -> list[ObjectID]:
+                return [y.encode("utf-8") for y in args.refs if y not in r.object_store]
 
         client.fetch(path, r, determine_wants)
 
@@ -132,8 +134,10 @@ class cmd_fetch(Command):
         dict(opts)
         client, path = get_transport_and_path(args.pop(0))
         r = Repo(".")
+
         def progress(msg: bytes) -> None:
             sys.stdout.buffer.write(msg)
+
         refs = client.fetch(path, r, progress=progress)
         print("Remote refs:")
         for item in refs.items():

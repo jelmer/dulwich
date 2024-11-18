@@ -546,9 +546,12 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
             return
 
         handler = ServerHandlerLogger(
-            self.rfile, self.wfile, self.get_stderr(), self.get_environ()
+            self.rfile,
+            self.wfile,  # type: ignore
+            self.get_stderr(),
+            self.get_environ(),
         )
-        handler.request_handler = self   # type: ignore  # backpointer for logging
+        handler.request_handler = self  # type: ignore  # backpointer for logging
         handler.run(self.server.get_app())  # type: ignore
 
 

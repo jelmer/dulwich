@@ -407,7 +407,9 @@ class TreeChangesTest(DiffTestCase):
             want_unchanged=True,
         )
 
-    def assertChangesForMergeEqual(self, expected, parent_trees, merge_tree, **kwargs) -> None:
+    def assertChangesForMergeEqual(
+        self, expected, parent_trees, merge_tree, **kwargs
+    ) -> None:
         parent_tree_ids = [t.id for t in parent_trees]
         actual = list(
             tree_changes_for_merge(self.store, parent_tree_ids, merge_tree.id, **kwargs)

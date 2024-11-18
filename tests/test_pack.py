@@ -1295,6 +1295,8 @@ class DeltaChainIteratorTests(TestCase):
             self.assertEqual((sorted([b2.id, b3.id]),), (sorted(e.shas),))
 
     def test_ext_ref_deltified_object_based_on_itself(self) -> None:
+        td = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, td)
         b1_content = b"foo"
         (b1,) = self.store_blobs([b1_content])
         f = BytesIO()
@@ -1310,11 +1312,11 @@ class DeltaChainIteratorTests(TestCase):
         f.seek(0)
         packdata = PackData.from_file(f, fsize)
         packdata.create_index(
-            "test.idx",
+            td.join("test.idx"),
             version=2,
             resolve_ext_ref=self.get_raw_no_repeat,
         )
-        packindex = load_pack_index("test.idx")
+        packindex = load_pack_index(td.join("test.idx"))
         pack = Pack.from_objects(packdata, packindex)
         try:
             # Attempting to open this REF_DELTA object would loop forever

@@ -104,6 +104,7 @@ ignore = [
     "D417",
     "E501",  # line too long
     "E741",  # ambiguous variable name
+    "UP007", # Use `X | Y` for type annotations
 ]
 
 [tool.ruff.lint.pydocstyle]

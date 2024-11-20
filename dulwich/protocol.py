@@ -23,6 +23,7 @@
 
 from io import BytesIO
 from os import SEEK_END
+from typing import Optional
 
 import dulwich
 
@@ -221,9 +222,9 @@ class Protocol:
         self.write = write
         self._close = close
         self.report_activity = report_activity
-        self._readahead = None
+        self._readahead: Optional[BytesIO] = None
 
-    def close(self):
+    def close(self) -> None:
         if self._close:
             self._close()
 
@@ -270,7 +271,7 @@ class Protocol:
                 )
             return pkt_contents
 
-    def eof(self):
+    def eof(self) -> bool:
         """Test whether the protocol stream has reached EOF.
 
         Note that this refers to the actual stream EOF and not just a
@@ -285,7 +286,7 @@ class Protocol:
         self.unread_pkt_line(next_line)
         return False
 
-    def unread_pkt_line(self, data):
+    def unread_pkt_line(self, data) -> None:
         """Unread a single line of data into the readahead buffer.
 
         This method can be used to unread a single pkt-line into a fixed
@@ -312,7 +313,7 @@ class Protocol:
             yield pkt
             pkt = self.read_pkt_line()
 
-    def write_pkt_line(self, line):
+    def write_pkt_line(self, line) -> None:
         """Sends a pkt-line to the remote git process.
 
         Args:
@@ -327,7 +328,7 @@ class Protocol:
         except OSError as exc:
             raise GitProtocolError(str(exc)) from exc
 
-    def write_sideband(self, channel, blob):
+    def write_sideband(self, channel, blob) -> None:
         """Write multiplexed data to the sideband.
 
         Args:
@@ -341,7 +342,7 @@ class Protocol:
             self.write_pkt_line(bytes(bytearray([channel])) + blob[:65515])
             blob = blob[65515:]
 
-    def send_cmd(self, cmd, *args):
+    def send_cmd(self, cmd, *args) -> None:
         """Send a command and some arguments to a git server.
 
         Only used for the TCP git protocol (git://).
@@ -531,7 +532,7 @@ class BufferedPktLineWriter:
         self._wbuf = BytesIO()
         self._buflen = 0
 
-    def write(self, data):
+    def write(self, data) -> None:
         """Write data, wrapping it in a pkt-line."""
         line = pkt_line(data)
         line_len = len(line)
@@ -546,7 +547,7 @@ class BufferedPktLineWriter:
         self._wbuf.write(saved)
         self._buflen += len(saved)
 
-    def flush(self):
+    def flush(self) -> None:
         """Flush all data from the buffer."""
         data = self._wbuf.getvalue()
         if data:
@@ -562,7 +563,7 @@ class PktLineParser:
         self.handle_pkt = handle_pkt
         self._readahead = BytesIO()
 
-    def parse(self, data):
+    def parse(self, data) -> None:
         """Parse a fragment of data and call back for any completed packets."""
         self._readahead.write(data)
         buf = self._readahead.getvalue()

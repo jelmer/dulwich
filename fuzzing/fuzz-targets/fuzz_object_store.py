@@ -1,6 +1,7 @@
 import stat
 import sys
 from io import BytesIO
+from typing import Optional
 
 import atheris
 
@@ -17,7 +18,7 @@ with atheris.instrument_imports():
     )
 
 
-def TestOneInput(data):
+def TestOneInput(data) -> Optional[int]:
     fdp = EnhancedFuzzedDataProvider(data)
     repo = MemoryRepo()
     blob = Blob.from_string(fdp.ConsumeRandomBytes())
@@ -85,7 +86,7 @@ def TestOneInput(data):
             raise e
 
 
-def main():
+def main() -> None:
     atheris.Setup(sys.argv, TestOneInput)
     atheris.Fuzz()
 

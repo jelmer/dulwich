@@ -32,7 +32,7 @@ from . import TestCase
 
 
 class TestCredentialHelpersUtils(TestCase):
-    def test_match_urls(self):
+    def test_match_urls(self) -> None:
         url = urlparse("https://github.com/jelmer/dulwich/")
         url_1 = urlparse("https://github.com/jelmer/dulwich")
         url_2 = urlparse("https://github.com/jelmer")
@@ -44,7 +44,7 @@ class TestCredentialHelpersUtils(TestCase):
         non_matching = urlparse("https://git.sr.ht/")
         self.assertFalse(match_urls(url, non_matching))
 
-    def test_match_partial_url(self):
+    def test_match_partial_url(self) -> None:
         url = urlparse("https://github.com/jelmer/dulwich/")
         self.assertTrue(match_partial_url(url, "github.com"))
         self.assertFalse(match_partial_url(url, "github.com/jelmer/"))
@@ -52,7 +52,7 @@ class TestCredentialHelpersUtils(TestCase):
         self.assertFalse(match_partial_url(url, "github.com/jel"))
         self.assertFalse(match_partial_url(url, "github.com/jel/"))
 
-    def test_urlmatch_credential_sections(self):
+    def test_urlmatch_credential_sections(self) -> None:
         config = ConfigDict()
         config.set((b"credential", "https://github.com"), b"helper", "foo")
         config.set((b"credential", "git.sr.ht"), b"helper", "foo")

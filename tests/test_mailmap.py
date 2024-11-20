@@ -27,7 +27,7 @@ from dulwich.mailmap import Mailmap, read_mailmap
 
 
 class ReadMailmapTests(TestCase):
-    def test_read(self):
+    def test_read(self) -> None:
         b = BytesIO(
             b"""\
 Jane Doe         <jane@desktop.(none)>
@@ -67,7 +67,7 @@ Santa Claus <santa.claus@northpole.xx> <me@company.xx>
 
 
 class MailmapTests(TestCase):
-    def test_lookup(self):
+    def test_lookup(self) -> None:
         m = Mailmap()
         m.add_entry((b"Jane Doe", b"jane@desktop.(none)"), (None, None))
         m.add_entry((b"Joe R. Developer", b"joe@example.com"), None)

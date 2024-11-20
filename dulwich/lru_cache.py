@@ -214,7 +214,7 @@ class LRUCache(Generic[K, V]):
         """Get the key:value pairs as a dict."""
         return {k: n.value for k, n in self._cache.items()}
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clear the cache until it shrinks to the requested size.
 
         This does not completely wipe the cache, just makes sure it is under
@@ -291,7 +291,7 @@ class LRUCache(Generic[K, V]):
         """Change the number of entries that will be cached."""
         self._update_max_cache(max_cache, after_cleanup_count=after_cleanup_count)
 
-    def _update_max_cache(self, max_cache, after_cleanup_count=None):
+    def _update_max_cache(self, max_cache, after_cleanup_count=None) -> None:
         self._max_cache = max_cache
         if after_cleanup_count is None:
             self._after_cleanup_count = self._max_cache * 8 / 10

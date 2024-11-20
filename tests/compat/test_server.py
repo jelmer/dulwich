@@ -48,7 +48,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
     def _handlers(self):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
-    def _check_server(self, dul_server):
+    def _check_server(self, dul_server) -> None:
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
         self.assertNotIn(b"side-band-64k", caps)
@@ -72,7 +72,7 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
     # side-band-64k in git-receive-pack was introduced in git 1.7.0.2
     min_git_version = (1, 7, 0, 2)
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         # side-band-64k is broken in the windows client.
         # https://github.com/msysgit/git/issues/101
@@ -80,10 +80,10 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         if os.name == "nt":
             require_git_version((1, 9, 3))
 
-    def _handlers(self):
+    def _handlers(self) -> None:
         return None  # default handlers include side-band-64k
 
-    def _check_server(self, server):
+    def _check_server(self, server) -> None:
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
         caps = receive_pack_handler_cls.capabilities()
         self.assertIn(b"side-band-64k", caps)

@@ -188,7 +188,7 @@ def diffstat(lines, max_width=80):
     return output
 
 
-def main():
+def main() -> int:
     argv = sys.argv
     # allow diffstat.py to also be used from the command line
     if len(sys.argv) > 1:

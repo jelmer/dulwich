@@ -32,13 +32,13 @@ from . import TestCase
 
 
 class ShellHookTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         if os.name != "posix":
             self.skipTest("shell hook tests requires POSIX shell")
         self.assertTrue(os.path.exists("/bin/sh"))
 
-    def test_hook_pre_commit(self):
+    def test_hook_pre_commit(self) -> None:
         repo_dir = os.path.join(tempfile.mkdtemp())
         os.mkdir(os.path.join(repo_dir, "hooks"))
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -89,7 +89,7 @@ exit 0
 
         hook.execute()
 
-    def test_hook_commit_msg(self):
+    def test_hook_commit_msg(self) -> None:
         repo_dir = os.path.join(tempfile.mkdtemp())
         os.mkdir(os.path.join(repo_dir, "hooks"))
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -133,7 +133,7 @@ if [ "$(pwd)" = '"""
 
         hook.execute(b"empty commit")
 
-    def test_hook_post_commit(self):
+    def test_hook_post_commit(self) -> None:
         (fd, path) = tempfile.mkstemp()
         os.close(fd)
 

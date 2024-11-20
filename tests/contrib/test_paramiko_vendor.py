@@ -22,6 +22,7 @@
 import socket
 import threading
 from io import StringIO
+from typing import Optional
 from unittest import skipIf
 
 from .. import TestCase
@@ -41,7 +42,7 @@ else:
             super().__init__(*args, **kwargs)
             self.commands = commands
 
-        def check_channel_exec_request(self, channel, command):
+        def check_channel_exec_request(self, channel, command) -> bool:
             self.commands.append(command)
             return True
 
@@ -61,7 +62,7 @@ else:
                 return paramiko.OPEN_SUCCEEDED
             return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
-        def get_allowed_auths(self, username):
+        def get_allowed_auths(self, username) -> str:
             return "password,publickey"
 
 
@@ -127,7 +128,7 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 
 @skipIf(not has_paramiko, "paramiko is not installed")
 class ParamikoSSHVendorTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         import paramiko.transport
 
         # re-enable server functionality for tests
@@ -145,10 +146,10 @@ class ParamikoSSHVendorTests(TestCase):
         self.thread = threading.Thread(target=self._run)
         self.thread.start()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.thread.join()
 
-    def _run(self):
+    def _run(self) -> Optional[bool]:
         try:
             conn, addr = self.socket.accept()
         except OSError:
@@ -160,7 +161,7 @@ class ParamikoSSHVendorTests(TestCase):
         server = Server(self.commands)
         self.transport.start_server(server=server)
 
-    def test_run_command_password(self):
+    def test_run_command_password(self) -> None:
         vendor = ParamikoSSHVendor(
             allow_agent=False,
             look_for_keys=False,
@@ -175,7 +176,7 @@ class ParamikoSSHVendorTests(TestCase):
 
         self.assertIn(b"test_run_command_password", self.commands)
 
-    def test_run_command_with_privkey(self):
+    def test_run_command_with_privkey(self) -> None:
         key = paramiko.RSAKey.from_private_key(StringIO(CLIENT_KEY))
 
         vendor = ParamikoSSHVendor(
@@ -192,7 +193,7 @@ class ParamikoSSHVendorTests(TestCase):
 
         self.assertIn(b"test_run_command_with_privkey", self.commands)
 
-    def test_run_command_data_transfer(self):
+    def test_run_command_data_transfer(self) -> None:
         vendor = ParamikoSSHVendor(
             allow_agent=False,
             look_for_keys=False,

@@ -49,7 +49,7 @@ import socketserver
 import sys
 import time
 import zlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from functools import partial
 from typing import Optional, cast
 from typing import Protocol as TypingProtocol
@@ -113,7 +113,7 @@ from .protocol import (
     symref_capabilities,
 )
 from .refs import PEELED_TAG_SUFFIX, RefsContainer, write_info_refs
-from .repo import BaseRepo, Repo
+from .repo import Repo
 
 logger = log_utils.getLogger(__name__)
 
@@ -121,7 +121,7 @@ logger = log_utils.getLogger(__name__)
 class Backend:
     """A backend for the Git smart server implementation."""
 
-    def open_repository(self, path):
+    def open_repository(self, path) -> "BackendRepo":
         """Open the repository at a path.
 
         Args:
@@ -164,7 +164,7 @@ class BackendRepo(TypingProtocol):
 
     def find_missing_objects(
         self, determine_wants, graph_walker, progress, get_tagged=None
-    ):
+    ) -> Iterator[ObjectID]:
         """Yield the objects required for a list of commits.
 
         Args:
@@ -181,7 +181,7 @@ class DictBackend(Backend):
     def __init__(self, repos) -> None:
         self.repos = repos
 
-    def open_repository(self, path: str) -> BaseRepo:
+    def open_repository(self, path: str) -> BackendRepo:
         logger.debug("Opening repository at %s", path)
         try:
             return self.repos[path]
@@ -314,15 +314,15 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_OFS_DELTA,
         )
 
-    def progress(self, message: bytes):
+    def progress(self, message: bytes) -> None:
         pass
 
-    def _start_pack_send_phase(self):
+    def _start_pack_send_phase(self) -> None:
         if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             # The provided haves are processed, and it is safe to send side-
             # band data now.
             if not self.has_capability(CAPABILITY_NO_PROGRESS):
-                self.progress = partial(
+                self.progress = partial(  # type: ignore
                     self.proto.write_sideband, SIDE_BAND_CHANNEL_PROGRESS
                 )
 
@@ -364,7 +364,7 @@ class UploadPackHandler(PackHandler):
                 tagged[peeled_sha] = sha
         return tagged
 
-    def handle(self):
+    def handle(self) -> None:
         # Note the fact that client is only processing responses related
         # to the have lines it sent, and any other data (including side-
         # band) will be be considered a fatal error.
@@ -501,7 +501,7 @@ def _find_shallow(store: ObjectContainer, heads, depth):
     return shallow, not_shallow
 
 
-def _want_satisfied(store: ObjectContainer, haves, want, earliest):
+def _want_satisfied(store: ObjectContainer, haves, want, earliest) -> bool:
     o = store[want]
     pending = collections.deque([o])
     known = {want}
@@ -524,7 +524,7 @@ def _want_satisfied(store: ObjectContainer, haves, want, earliest):
     return False
 
 
-def _all_wants_satisfied(store: ObjectContainer, haves, wants):
+def _all_wants_satisfied(store: ObjectContainer, haves, wants) -> bool:
     """Check whether all the current wants are satisfied by a set of haves.
 
     Args:
@@ -545,6 +545,14 @@ def _all_wants_satisfied(store: ObjectContainer, haves, wants):
             return False
 
     return True
+
+
+class AckGraphWalkerImpl:
+    def __init__(self, graph_walker):
+        raise NotImplementedError
+
+    def ack(self, have_ref: ObjectID) -> None:
+        raise NotImplementedError
 
 
 class _ProtocolGraphWalker:
@@ -578,7 +586,7 @@ class _ProtocolGraphWalker:
         self._cached = False
         self._cache: list[bytes] = []
         self._cache_index = 0
-        self._impl = None
+        self._impl: Optional[AckGraphWalkerImpl] = None
 
     def determine_wants(self, heads, depth=None):
         """Determine the wants for a set of heads.
@@ -662,12 +670,12 @@ class _ProtocolGraphWalker:
 
         return want_revs
 
-    def unread_proto_line(self, command, value):
+    def unread_proto_line(self, command, value) -> None:
         if isinstance(value, int):
             value = str(value).encode("ascii")
         self.proto.unread_pkt_line(command + b" " + value)
 
-    def nak(self):
+    def nak(self) -> None:
         pass
 
     def ack(self, have_ref):
@@ -675,7 +683,7 @@ class _ProtocolGraphWalker:
             raise ValueError(f"invalid sha {have_ref!r}")
         return self._impl.ack(have_ref)
 
-    def reset(self):
+    def reset(self) -> None:
         self._cached = True
         self._cache_index = 0
 
@@ -703,7 +711,7 @@ class _ProtocolGraphWalker:
         """
         return _split_proto_line(self.proto.read_pkt_line(), allowed)
 
-    def _handle_shallow_request(self, wants):
+    def _handle_shallow_request(self, wants) -> None:
         while True:
             command, val = self.read_proto_line((COMMAND_DEEPEN, COMMAND_SHALLOW))
             if command == COMMAND_DEEPEN:
@@ -727,21 +735,21 @@ class _ProtocolGraphWalker:
 
         self.proto.write_pkt_line(None)
 
-    def notify_done(self):
+    def notify_done(self) -> None:
         # relay the message down to the handler.
         self.handler.notify_done()
 
-    def send_ack(self, sha, ack_type=b""):
+    def send_ack(self, sha, ack_type=b"") -> None:
         self.proto.write_pkt_line(format_ack_line(sha, ack_type))
 
-    def send_nak(self):
+    def send_nak(self) -> None:
         self.proto.write_pkt_line(NAK_LINE)
 
     def handle_done(self, done_required, done_received):
         # Delegate this to the implementation.
         return self._impl.handle_done(done_required, done_received)
 
-    def set_wants(self, wants):
+    def set_wants(self, wants) -> None:
         self._wants = wants
 
     def all_wants_satisfied(self, haves):
@@ -754,8 +762,8 @@ class _ProtocolGraphWalker:
         """
         return _all_wants_satisfied(self.store, haves, self._wants)
 
-    def set_ack_type(self, ack_type):
-        impl_classes = {
+    def set_ack_type(self, ack_type) -> None:
+        impl_classes: dict[int, type[AckGraphWalkerImpl]] = {
             MULTI_ACK: MultiAckGraphWalkerImpl,
             MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
             SINGLE_ACK: SingleAckGraphWalkerImpl,
@@ -766,14 +774,14 @@ class _ProtocolGraphWalker:
 _GRAPH_WALKER_COMMANDS = (COMMAND_HAVE, COMMAND_DONE, None)
 
 
-class SingleAckGraphWalkerImpl:
+class SingleAckGraphWalkerImpl(AckGraphWalkerImpl):
     """Graph walker implementation that speaks the single-ack protocol."""
 
     def __init__(self, walker) -> None:
         self.walker = walker
         self._common: list[bytes] = []
 
-    def ack(self, have_ref):
+    def ack(self, have_ref) -> None:
         if not self._common:
             self.walker.send_ack(have_ref)
             self._common.append(have_ref)
@@ -789,7 +797,7 @@ class SingleAckGraphWalkerImpl:
 
     __next__ = next
 
-    def handle_done(self, done_required, done_received):
+    def handle_done(self, done_required, done_received) -> bool:
         if not self._common:
             self.walker.send_nak()
 
@@ -810,7 +818,7 @@ class SingleAckGraphWalkerImpl:
         return True
 
 
-class MultiAckGraphWalkerImpl:
+class MultiAckGraphWalkerImpl(AckGraphWalkerImpl):
     """Graph walker implementation that speaks the multi-ack protocol."""
 
     def __init__(self, walker) -> None:
@@ -818,7 +826,7 @@ class MultiAckGraphWalkerImpl:
         self._found_base = False
         self._common: list[bytes] = []
 
-    def ack(self, have_ref):
+    def ack(self, have_ref) -> None:
         self._common.append(have_ref)
         if not self._found_base:
             self.walker.send_ack(have_ref, b"continue")
@@ -845,7 +853,7 @@ class MultiAckGraphWalkerImpl:
 
     __next__ = next
 
-    def handle_done(self, done_required, done_received):
+    def handle_done(self, done_required, done_received) -> bool:
         if done_required and not done_received:
             # we are not done, especially when done is required; skip
             # the pack for this request and especially do not handle
@@ -869,14 +877,14 @@ class MultiAckGraphWalkerImpl:
         return True
 
 
-class MultiAckDetailedGraphWalkerImpl:
+class MultiAckDetailedGraphWalkerImpl(AckGraphWalkerImpl):
     """Graph walker implementation speaking the multi-ack-detailed protocol."""
 
     def __init__(self, walker) -> None:
         self.walker = walker
         self._common: list[bytes] = []
 
-    def ack(self, have_ref):
+    def ack(self, have_ref) -> None:
         # Should only be called iff have_ref is common
         self._common.append(have_ref)
         self.walker.send_ack(have_ref, b"common")
@@ -910,7 +918,7 @@ class MultiAckDetailedGraphWalkerImpl:
 
     __next__ = next
 
-    def handle_done(self, done_required, done_received):
+    def handle_done(self, done_required, done_received) -> bool:
         if done_required and not done_received:
             # we are not done, especially when done is required; skip
             # the pack for this request and especially do not handle
@@ -1022,14 +1030,14 @@ class ReceivePackHandler(PackHandler):
             )
             write = writer.write
 
-            def flush():
+            def flush() -> None:
                 writer.flush()
                 self.proto.write_pkt_line(None)
 
         else:
             write = self.proto.write_pkt_line
 
-            def flush():
+            def flush() -> None:
                 pass
 
         for name, msg in status:
@@ -1042,7 +1050,7 @@ class ReceivePackHandler(PackHandler):
         write(None)
         flush()
 
-    def _on_post_receive(self, client_refs):
+    def _on_post_receive(self, client_refs) -> None:
         hook = self.repo.hooks.get("post-receive", None)
         if not hook:
             return
@@ -1155,7 +1163,7 @@ class TCPGitRequestHandler(socketserver.StreamRequestHandler):
         self.handlers = handlers
         socketserver.StreamRequestHandler.__init__(self, *args, **kwargs)
 
-    def handle(self):
+    def handle(self) -> None:
         proto = ReceivableProtocol(self.connection.recv, self.wfile.write)
         command, args = proto.read_cmd()
         logger.info("Handling %s request, args=%s", command, args)
@@ -1163,7 +1171,7 @@ class TCPGitRequestHandler(socketserver.StreamRequestHandler):
         cls = self.handlers.get(command, None)
         if not callable(cls):
             raise GitProtocolError(f"Invalid service {command}")
-        h = cls(self.server.backend, args, proto)
+        h = cls(self.server.backend, args, proto)  # type: ignore
         h.handle()
 
 
@@ -1182,18 +1190,18 @@ class TCPGitServer(socketserver.TCPServer):
         logger.info("Listening for TCP connections on %s:%d", listen_addr, port)
         socketserver.TCPServer.__init__(self, (listen_addr, port), self._make_handler)
 
-    def verify_request(self, request, client_address):
+    def verify_request(self, request, client_address) -> bool:
         logger.info("Handling request from %s", client_address)
         return True
 
-    def handle_error(self, request, client_address):
+    def handle_error(self, request, client_address) -> None:
         logger.exception(
             "Exception happened during processing of request " "from %s",
             client_address,
         )
 
 
-def main(argv=sys.argv):
+def main(argv=sys.argv) -> None:
     """Entry point for starting a TCP git server."""
     import optparse
 
@@ -1228,7 +1236,7 @@ def main(argv=sys.argv):
 
 def serve_command(
     handler_cls, argv=sys.argv, backend=None, inf=sys.stdin, outf=sys.stdout
-):
+) -> int:
     """Serve a single command.
 
     This is mostly useful for the implementation of commands used by e.g.
@@ -1245,7 +1253,7 @@ def serve_command(
     if backend is None:
         backend = FileSystemBackend()
 
-    def send_fn(data):
+    def send_fn(data) -> None:
         outf.write(data)
         outf.flush()
 
@@ -1268,7 +1276,7 @@ def generate_objects_info_packs(repo):
         yield (b"P " + os.fsencode(pack.data.filename) + b"\n")
 
 
-def update_server_info(repo):
+def update_server_info(repo) -> None:
     """Generate server info for dumb file access.
 
     This generates info/refs and objects/info/packs,

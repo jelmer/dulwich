@@ -58,18 +58,18 @@ testobject = make_object(Blob, data=b"yummy data")
 
 
 class OverlayObjectStoreTests(ObjectStoreTests, TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         TestCase.setUp(self)
         self.bases = [MemoryObjectStore(), MemoryObjectStore()]
         self.store = OverlayObjectStore(self.bases, self.bases[0])
 
 
 class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         TestCase.setUp(self)
         self.store = MemoryObjectStore()
 
-    def test_add_pack(self):
+    def test_add_pack(self) -> None:
         o = MemoryObjectStore()
         f, commit, abort = o.add_pack()
         try:
@@ -81,12 +81,12 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         else:
             commit()
 
-    def test_add_pack_emtpy(self):
+    def test_add_pack_emtpy(self) -> None:
         o = MemoryObjectStore()
         f, commit, abort = o.add_pack()
         commit()
 
-    def test_add_thin_pack(self):
+    def test_add_thin_pack(self) -> None:
         o = MemoryObjectStore()
         blob = make_object(Blob, data=b"yummy data")
         o.add_object(blob)
@@ -105,7 +105,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
             (Blob.type_num, b"more yummy data"), o.get_raw(packed_blob_sha)
         )
 
-    def test_add_thin_pack_empty(self):
+    def test_add_thin_pack_empty(self) -> None:
         o = MemoryObjectStore()
 
         f = BytesIO()
@@ -115,24 +115,24 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
 
 class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         TestCase.setUp(self)
         self.store_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.store_dir)
         self.store = DiskObjectStore.init(self.store_dir)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         TestCase.tearDown(self)
         PackBasedObjectStoreTests.tearDown(self)
 
-    def test_loose_compression_level(self):
+    def test_loose_compression_level(self) -> None:
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir, loose_compression_level=6)
         b2 = make_object(Blob, data=b"yummy data")
         alternate_store.add_object(b2)
 
-    def test_alternates(self):
+    def test_alternates(self) -> None:
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir)
@@ -144,7 +144,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
 
-    def test_read_alternate_paths(self):
+    def test_read_alternate_paths(self) -> None:
         store = DiskObjectStore(self.store_dir)
 
         abs_path = os.path.abspath(os.path.normpath("/abspath"))
@@ -164,7 +164,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         for alt_path in store._read_alternate_paths():
             self.assertNotIn("#", alt_path)
 
-    def test_file_modes(self):
+    def test_file_modes(self) -> None:
         self.store.add_object(testobject)
         path = self.store._get_shafile_path(testobject.id)
         mode = os.stat(path).st_mode
@@ -172,7 +172,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         packmode = "0o100444" if sys.platform != "win32" else "0o100666"
         self.assertEqual(oct(mode), packmode)
 
-    def test_corrupted_object_raise_exception(self):
+    def test_corrupted_object_raise_exception(self) -> None:
         """Corrupted sha1 disk file should raise specific exception."""
         self.store.add_object(testobject)
         self.assertEqual(
@@ -202,7 +202,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # this does not change iteration on loose objects though
         self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
-    def test_tempfile_in_loose_store(self):
+    def test_tempfile_in_loose_store(self) -> None:
         self.store.add_object(testobject)
         self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
@@ -216,7 +216,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
         self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
-    def test_add_alternate_path(self):
+    def test_add_alternate_path(self) -> None:
         store = DiskObjectStore(self.store_dir)
         self.assertEqual([], list(store._read_alternate_paths()))
         store.add_alternate_path(os.path.abspath("/foo/path"))
@@ -239,7 +239,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
                 list(store._read_alternate_paths()),
             )
 
-    def test_rel_alternative_path(self):
+    def test_rel_alternative_path(self) -> None:
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir)
@@ -252,11 +252,11 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
 
-    def test_pack_dir(self):
+    def test_pack_dir(self) -> None:
         o = DiskObjectStore(self.store_dir)
         self.assertEqual(os.path.join(self.store_dir, "pack"), o.pack_dir)
 
-    def test_add_pack(self):
+    def test_add_pack(self) -> None:
         o = DiskObjectStore(self.store_dir)
         self.addCleanup(o.close)
         f, commit, abort = o.add_pack()
@@ -269,7 +269,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         else:
             commit()
 
-    def test_add_thin_pack(self):
+    def test_add_thin_pack(self) -> None:
         o = DiskObjectStore(self.store_dir)
         try:
             blob = make_object(Blob, data=b"yummy data")
@@ -297,7 +297,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         finally:
             o.close()
 
-    def test_add_thin_pack_empty(self):
+    def test_add_thin_pack_empty(self) -> None:
         with closing(DiskObjectStore(self.store_dir)) as o:
             f = BytesIO()
             entries = build_pack(f, [], store=o)
@@ -306,7 +306,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
 
 class TreeLookupPathTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         TestCase.setUp(self)
         self.store = MemoryObjectStore()
         blob_a = make_object(Blob, data=b"a")
@@ -328,11 +328,11 @@ class TreeLookupPathTests(TestCase):
     def get_object(self, sha):
         return self.store[sha]
 
-    def test_lookup_blob(self):
+    def test_lookup_blob(self) -> None:
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"a")[1]
         self.assertIsInstance(self.store[o_id], Blob)
 
-    def test_lookup_tree(self):
+    def test_lookup_tree(self) -> None:
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad")[1]
         self.assertIsInstance(self.store[o_id], Tree)
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad/bd")[1]
@@ -340,7 +340,7 @@ class TreeLookupPathTests(TestCase):
         o_id = tree_lookup_path(self.get_object, self.tree_id, b"ad/bd/")[1]
         self.assertIsInstance(self.store[o_id], Tree)
 
-    def test_lookup_submodule(self):
+    def test_lookup_submodule(self) -> None:
         tree_lookup_path(self.get_object, self.tree_id, b"d")[1]
         self.assertRaises(
             SubmoduleEncountered,
@@ -350,12 +350,12 @@ class TreeLookupPathTests(TestCase):
             b"d/a",
         )
 
-    def test_lookup_nonexistent(self):
+    def test_lookup_nonexistent(self) -> None:
         self.assertRaises(
             KeyError, tree_lookup_path, self.get_object, self.tree_id, b"j"
         )
 
-    def test_lookup_not_tree(self):
+    def test_lookup_not_tree(self) -> None:
         self.assertRaises(
             NotTreeError,
             tree_lookup_path,
@@ -374,40 +374,40 @@ class ObjectStoreGraphWalkerTests(TestCase):
             [x * 40 for x in heads], new_parent_map.__getitem__
         )
 
-    def test_ack_invalid_value(self):
+    def test_ack_invalid_value(self) -> None:
         gw = self.get_walker([], {})
         self.assertRaises(ValueError, gw.ack, "tooshort")
 
-    def test_empty(self):
+    def test_empty(self) -> None:
         gw = self.get_walker([], {})
         self.assertIs(None, next(gw))
         gw.ack(b"a" * 40)
         self.assertIs(None, next(gw))
 
-    def test_descends(self):
+    def test_descends(self) -> None:
         gw = self.get_walker([b"a"], {b"a": [b"b"], b"b": []})
         self.assertEqual(b"a" * 40, next(gw))
         self.assertEqual(b"b" * 40, next(gw))
 
-    def test_present(self):
+    def test_present(self) -> None:
         gw = self.get_walker([b"a"], {b"a": [b"b"], b"b": []})
         gw.ack(b"a" * 40)
         self.assertIs(None, next(gw))
 
-    def test_parent_present(self):
+    def test_parent_present(self) -> None:
         gw = self.get_walker([b"a"], {b"a": [b"b"], b"b": []})
         self.assertEqual(b"a" * 40, next(gw))
         gw.ack(b"a" * 40)
         self.assertIs(None, next(gw))
 
-    def test_child_ack_later(self):
+    def test_child_ack_later(self) -> None:
         gw = self.get_walker([b"a"], {b"a": [b"b"], b"b": [b"c"], b"c": []})
         self.assertEqual(b"a" * 40, next(gw))
         self.assertEqual(b"b" * 40, next(gw))
         gw.ack(b"a" * 40)
         self.assertIs(None, next(gw))
 
-    def test_only_once(self):
+    def test_only_once(self) -> None:
         # a  b
         # |  |
         # c  d
@@ -447,7 +447,7 @@ class ObjectStoreGraphWalkerTests(TestCase):
 
 
 class CommitTreeChangesTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = MemoryObjectStore()
         self.blob_a = make_object(Blob, data=b"a")
@@ -465,13 +465,13 @@ class CommitTreeChangesTests(TestCase):
         ]
         self.tree_id = commit_tree(self.store, blobs)
 
-    def test_no_changes(self):
+    def test_no_changes(self) -> None:
         self.assertEqual(
             self.store[self.tree_id],
             commit_tree_changes(self.store, self.store[self.tree_id], []),
         )
 
-    def test_add_blob(self):
+    def test_add_blob(self) -> None:
         blob_d = make_object(Blob, data=b"d")
         new_tree = commit_tree_changes(
             self.store, self.store[self.tree_id], [(b"d", 0o100644, blob_d.id)]
@@ -481,7 +481,7 @@ class CommitTreeChangesTests(TestCase):
             (33188, b"c59d9b6344f1af00e504ba698129f07a34bbed8d"),
         )
 
-    def test_add_blob_in_dir(self):
+    def test_add_blob_in_dir(self) -> None:
         blob_d = make_object(Blob, data=b"d")
         new_tree = commit_tree_changes(
             self.store,
@@ -522,7 +522,7 @@ class CommitTreeChangesTests(TestCase):
             [TreeEntry(path=b"d", mode=stat.S_IFREG | 0o100644, sha=blob_d.id)],
         )
 
-    def test_delete_blob(self):
+    def test_delete_blob(self) -> None:
         new_tree = commit_tree_changes(
             self.store, self.store[self.tree_id], [(b"ad/bd/c", None, None)]
         )
@@ -532,7 +532,7 @@ class CommitTreeChangesTests(TestCase):
 
 
 class TestReadPacksFile(TestCase):
-    def test_read_packs(self):
+    def test_read_packs(self) -> None:
         self.assertEqual(
             ["pack-1.pack"],
             list(

@@ -54,11 +54,11 @@ class DulwichServer:
         self.port = port
         self.backend = backend
 
-    def run(self):
+    def run(self) -> None:
         self.server = server.TCPGitServer(self.backend, "localhost", port=self.port)
         self.job = gevent.spawn(self.server.serve_forever)
 
-    def stop(self):
+    def stop(self) -> None:
         self.server.shutdown()
         gevent.joinall((self.job,))
 
@@ -70,7 +70,7 @@ class SwiftSystemBackend(server.Backend):
 
 class SwiftRepoSmokeTest(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.backend = SwiftSystemBackend()
         cls.port = 9148
         cls.server_address = "localhost"
@@ -80,10 +80,10 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         cls.conf = swift.load_conf()
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         cls.th_server.stop()
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.scon = swift.SwiftConnector(self.fakerepo, self.conf)
         if self.scon.test_root_exists():
             try:
@@ -94,7 +94,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         if os.path.isdir(self.temp_d):
             shutil.rmtree(self.temp_d)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         if self.scon.test_root_exists():
             try:
                 self.scon.del_root()
@@ -103,7 +103,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         if os.path.isdir(self.temp_d):
             shutil.rmtree(self.temp_d)
 
-    def test_init_bare(self):
+    def test_init_bare(self) -> None:
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         self.assertTrue(self.scon.test_root_exists())
         obj = self.scon.get_container_objects()
@@ -112,7 +112,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         ]
         self.assertEqual(len(filtered), 2)
 
-    def test_clone_bare(self):
+    def test_clone_bare(self) -> None:
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)
@@ -120,7 +120,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         # The remote repo is empty (no refs retrieved)
         self.assertEqual(remote_refs, None)
 
-    def test_push_commit(self):
+    def test_push_commit(self) -> None:
         def determine_wants(*args, **kwargs):
             return {"refs/heads/master": local_repo.refs["HEAD"]}
 
@@ -137,7 +137,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         remote_sha = swift_repo.refs.read_loose_ref("refs/heads/master")
         self.assertEqual(sha, remote_sha)
 
-    def test_push_branch(self):
+    def test_push_branch(self) -> None:
         def determine_wants(*args, **kwargs):
             return {"refs/heads/mybranch": local_repo.refs["refs/heads/mybranch"]}
 
@@ -154,7 +154,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         remote_sha = swift_repo.refs.read_loose_ref("refs/heads/mybranch")
         self.assertEqual(sha, remote_sha)
 
-    def test_push_multiple_branch(self):
+    def test_push_multiple_branch(self) -> None:
         def determine_wants(*args, **kwargs):
             return {
                 "refs/heads/mybranch": local_repo.refs["refs/heads/mybranch"],
@@ -182,7 +182,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
             remote_shas[branch] = swift_repo.refs.read_loose_ref(f"refs/heads/{branch}")
         self.assertDictEqual(local_shas, remote_shas)
 
-    def test_push_data_branch(self):
+    def test_push_data_branch(self) -> None:
         def determine_wants(*args, **kwargs):
             return {"refs/heads/master": local_repo.refs["HEAD"]}
 
@@ -216,7 +216,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         # Tree
         self.assertEqual(objs_[0][0], 2)
 
-    def test_clone_then_push_data(self):
+    def test_clone_then_push_data(self) -> None:
         self.test_push_data_branch()
         shutil.rmtree(self.temp_d)
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
@@ -250,7 +250,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
             "/fakerepo", determine_wants, local_repo.generate_pack_data
         )
 
-    def test_push_remove_branch(self):
+    def test_push_remove_branch(self) -> None:
         def determine_wants(*args, **kwargs):
             return {
                 "refs/heads/pullr-108": objects.ZERO_SHA,
@@ -267,7 +267,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         swift_repo = swift.SwiftRepo("fakerepo", self.conf)
         self.assertNotIn("refs/heads/pullr-108", swift_repo.refs.allkeys())
 
-    def test_push_annotated_tag(self):
+    def test_push_annotated_tag(self) -> None:
         def determine_wants(*args, **kwargs):
             return {
                 "refs/heads/master": local_repo.refs["HEAD"],

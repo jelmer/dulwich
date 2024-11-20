@@ -19,30 +19,34 @@
 
 """Implementation of merge-base following the approach of git."""
 
+from collections.abc import Iterator
 from heapq import heappop, heappush
+from typing import Generic, Optional, TypeVar
 
 from .lru_cache import LRUCache
+
+T = TypeVar("T")
 
 
 # priority queue using builtin python minheap tools
 # why they do not have a builtin maxheap is simply ridiculous but
 # liveable with integer time stamps using negation
-class WorkList:
-    def __init__(self):
-        self.pq = []
+class WorkList(Generic[T]):
+    def __init__(self) -> None:
+        self.pq: list[tuple[int, T]] = []
 
-    def add(self, item):
+    def add(self, item: tuple[int, T]) -> None:
         dt, cmt = item
         heappush(self.pq, (-dt, cmt))
 
-    def get(self):
+    def get(self) -> Optional[tuple[int, T]]:
         item = heappop(self.pq)
         if item:
             pr, cmt = item
             return -pr, cmt
         return None
 
-    def iter(self):
+    def iter(self) -> Iterator[tuple[int, T]]:
         for pr, cmt in self.pq:
             yield (-pr, cmt)
 
@@ -57,7 +61,7 @@ def _find_lcas(lookup_parents, c1, c2s, lookup_stamp, min_stamp=0):
     _DNC = 4  # Do Not Consider
     _LCA = 8  # potential LCA (Lowest Common Ancestor)
 
-    def _has_candidates(wlst, cstates):
+    def _has_candidates(wlst, cstates) -> bool:
         for dt, cmt in wlst.iter():
             if cmt in cstates:
                 if not ((cstates[cmt] & _DNC) == _DNC):

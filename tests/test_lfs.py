@@ -29,16 +29,16 @@ from . import TestCase
 
 
 class LFSTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.lfs = LFSStore.create(self.test_dir)
 
-    def test_create(self):
+    def test_create(self) -> None:
         sha = self.lfs.write_object([b"a", b"b"])
         with self.lfs.open_object(sha) as f:
             self.assertEqual(b"ab", f.read())
 
-    def test_missing(self):
+    def test_missing(self) -> None:
         self.assertRaises(KeyError, self.lfs.open_object, "abcdeabcdeabcdeabcde")

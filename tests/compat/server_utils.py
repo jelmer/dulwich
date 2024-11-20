@@ -43,7 +43,7 @@ class _StubRepo:
         self.path = os.path.join(temp_dir, name)
         os.mkdir(self.path)
 
-    def close(self):
+    def close(self) -> None:
         pass
 
 
@@ -74,11 +74,11 @@ class ServerTests:
         10,
     )
 
-    def import_repos(self):
+    def import_repos(self) -> None:
         self._old_repo = self.import_repo("server_old.export")
         self._new_repo = self.import_repo("server_new.export")
 
-    def url(self, port):
+    def url(self, port) -> str:
         return f"{self.protocol}://localhost:{port}/"
 
     def branch_args(self, branches=None):
@@ -86,7 +86,7 @@ class ServerTests:
             branches = ["master", "branch"]
         return [f"{b}:{b}" for b in branches]
 
-    def test_push_to_dulwich(self):
+    def test_push_to_dulwich(self) -> None:
         self.import_repos()
         self.assertReposNotEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._old_repo)
@@ -97,7 +97,7 @@ class ServerTests:
         )
         self.assertReposEqual(self._old_repo, self._new_repo)
 
-    def test_push_to_dulwich_no_op(self):
+    def test_push_to_dulwich_no_op(self) -> None:
         self._old_repo = self.import_repo("server_old.export")
         self._new_repo = self.import_repo("server_old.export")
         self.assertReposEqual(self._old_repo, self._new_repo)
@@ -109,7 +109,7 @@ class ServerTests:
         )
         self.assertReposEqual(self._old_repo, self._new_repo)
 
-    def test_push_to_dulwich_remove_branch(self):
+    def test_push_to_dulwich_remove_branch(self) -> None:
         self._old_repo = self.import_repo("server_old.export")
         self._new_repo = self.import_repo("server_old.export")
         self.assertReposEqual(self._old_repo, self._new_repo)
@@ -119,7 +119,7 @@ class ServerTests:
 
         self.assertEqual(list(self._old_repo.get_refs().keys()), [b"refs/heads/branch"])
 
-    def test_fetch_from_dulwich(self):
+    def test_fetch_from_dulwich(self) -> None:
         self.import_repos()
         self.assertReposNotEqual(self._old_repo, self._new_repo)
         port = self._start_server(self._new_repo)
@@ -132,7 +132,7 @@ class ServerTests:
         self._old_repo.object_store._pack_cache_time = 0
         self.assertReposEqual(self._old_repo, self._new_repo)
 
-    def test_fetch_from_dulwich_no_op(self):
+    def test_fetch_from_dulwich_no_op(self) -> None:
         self._old_repo = self.import_repo("server_old.export")
         self._new_repo = self.import_repo("server_old.export")
         self.assertReposEqual(self._old_repo, self._new_repo)
@@ -146,7 +146,7 @@ class ServerTests:
         self._old_repo.object_store._pack_cache_time = 0
         self.assertReposEqual(self._old_repo, self._new_repo)
 
-    def test_clone_from_dulwich_empty(self):
+    def test_clone_from_dulwich_empty(self) -> None:
         old_repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, old_repo_dir)
         self._old_repo = Repo.init_bare(old_repo_dir)
@@ -159,13 +159,13 @@ class ServerTests:
         new_repo = Repo(new_repo_dir)
         self.assertReposEqual(self._old_repo, new_repo)
 
-    def test_lsremote_from_dulwich(self):
+    def test_lsremote_from_dulwich(self) -> None:
         self._repo = self.import_repo("server_old.export")
         port = self._start_server(self._repo)
         o = run_git_or_fail(["ls-remote", self.url(port)])
         self.assertEqual(len(o.split(b"\n")), 4)
 
-    def test_new_shallow_clone_from_dulwich(self):
+    def test_new_shallow_clone_from_dulwich(self) -> None:
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo("server_new.export")
         self._stub_repo = _StubRepo("shallow")
@@ -191,7 +191,7 @@ class ServerTests:
         self.assertEqual(expected_shallow, _get_shallow(clone))
         self.assertReposNotEqual(clone, self._source_repo)
 
-    def test_shallow_clone_from_git_is_identical(self):
+    def test_shallow_clone_from_git_is_identical(self) -> None:
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo("server_new.export")
         self._stub_repo_git = _StubRepo("shallow-git")
@@ -228,7 +228,7 @@ class ServerTests:
             Repo(self._stub_repo_git.path), Repo(self._stub_repo_dw.path)
         )
 
-    def test_fetch_same_depth_into_shallow_clone_from_dulwich(self):
+    def test_fetch_same_depth_into_shallow_clone_from_dulwich(self) -> None:
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo("server_new.export")
         self._stub_repo = _StubRepo("shallow")
@@ -260,7 +260,7 @@ class ServerTests:
         self.assertEqual(expected_shallow, _get_shallow(clone))
         self.assertReposNotEqual(clone, self._source_repo)
 
-    def test_fetch_full_depth_into_shallow_clone_from_dulwich(self):
+    def test_fetch_full_depth_into_shallow_clone_from_dulwich(self) -> None:
         require_git_version(self.min_single_branch_version)
         self._source_repo = self.import_repo("server_new.export")
         self._stub_repo = _StubRepo("shallow")
@@ -294,7 +294,7 @@ class ServerTests:
         self.assertEqual([], _get_shallow(clone))
         self.assertReposEqual(clone, self._source_repo)
 
-    def test_fetch_from_dulwich_issue_88_standard(self):
+    def test_fetch_from_dulwich_issue_88_standard(self) -> None:
         # Basically an integration test to see that the ACK/NAK
         # generation works on repos with common head.
         self._source_repo = self.import_repo("issue88_expect_ack_nak_server.export")
@@ -306,7 +306,7 @@ class ServerTests:
             self._source_repo.object_store, self._client_repo.object_store
         )
 
-    def test_fetch_from_dulwich_issue_88_alternative(self):
+    def test_fetch_from_dulwich_issue_88_alternative(self) -> None:
         # likewise, but the case where the two repos have no common parent
         self._source_repo = self.import_repo("issue88_expect_ack_nak_other.export")
         self._client_repo = self.import_repo("issue88_expect_ack_nak_client.export")
@@ -325,7 +325,7 @@ class ServerTests:
             ).type_name,
         )
 
-    def test_push_to_dulwich_issue_88_standard(self):
+    def test_push_to_dulwich_issue_88_standard(self) -> None:
         # Same thing, but we reverse the role of the server/client
         # and do a push instead.
         self._source_repo = self.import_repo("issue88_expect_ack_nak_client.export")

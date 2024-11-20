@@ -29,7 +29,7 @@ from . import TestCase
 class StashTests(TestCase):
     """Tests for stash."""
 
-    def test_obtain(self):
+    def test_obtain(self) -> None:
         repo = MemoryRepo()
         stash = Stash.from_repo(repo)
         self.assertIsInstance(stash, Stash)

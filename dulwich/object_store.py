@@ -114,7 +114,7 @@ class BaseObjectStore:
             and not sha == ZERO_SHA
         ]
 
-    def contains_loose(self, sha):
+    def contains_loose(self, sha) -> bool:
         """Check if a particular object is present by SHA1 and is loose."""
         raise NotImplementedError(self.contains_loose)
 
@@ -130,7 +130,7 @@ class BaseObjectStore:
         """Iterable of pack objects."""
         raise NotImplementedError
 
-    def get_raw(self, name):
+    def get_raw(self, name) -> tuple[int, bytes]:
         """Obtain the raw text for an object.
 
         Args:
@@ -148,11 +148,11 @@ class BaseObjectStore:
         """Iterate over the SHAs that are present in this store."""
         raise NotImplementedError(self.__iter__)
 
-    def add_object(self, obj):
+    def add_object(self, obj) -> None:
         """Add a single object to this object store."""
         raise NotImplementedError(self.add_object)
 
-    def add_objects(self, objects, progress=None):
+    def add_objects(self, objects, progress=None) -> None:
         """Add a set of objects to this object store.
 
         Args:
@@ -348,7 +348,7 @@ class BaseObjectStore:
             )
         return current_depth
 
-    def close(self):
+    def close(self) -> None:
         """Close any files opened by this object store."""
         # Default implementation is a NO-OP
 
@@ -404,7 +404,7 @@ class PackBasedObjectStore(BaseObjectStore):
     def alternates(self):
         return []
 
-    def contains_packed(self, sha):
+    def contains_packed(self, sha) -> bool:
         """Check if a particular object is present by SHA1 and is packed.
 
         This does not check alternates.
@@ -429,7 +429,7 @@ class PackBasedObjectStore(BaseObjectStore):
                 return True
         return False
 
-    def _add_cached_pack(self, base_name, pack):
+    def _add_cached_pack(self, base_name, pack) -> None:
         """Add a newly appeared pack to the cache by path."""
         prev_pack = self._pack_cache.get(base_name)
         if prev_pack is not pack:
@@ -462,7 +462,7 @@ class PackBasedObjectStore(BaseObjectStore):
             other_haves=remote_has,
         )
 
-    def _clear_cached_packs(self):
+    def _clear_cached_packs(self) -> None:
         pack_cache = self._pack_cache
         self._pack_cache = {}
         while pack_cache:
@@ -472,10 +472,10 @@ class PackBasedObjectStore(BaseObjectStore):
     def _iter_cached_packs(self):
         return self._pack_cache.values()
 
-    def _update_pack_cache(self):
+    def _update_pack_cache(self) -> list[Pack]:
         raise NotImplementedError(self._update_pack_cache)
 
-    def close(self):
+    def close(self) -> None:
         self._clear_cached_packs()
 
     @property
@@ -492,13 +492,13 @@ class PackBasedObjectStore(BaseObjectStore):
         """Iterate over the SHAs of all loose objects."""
         raise NotImplementedError(self._iter_loose_objects)
 
-    def _get_loose_object(self, sha):
+    def _get_loose_object(self, sha) -> Optional[ShaFile]:
         raise NotImplementedError(self._get_loose_object)
 
-    def _remove_loose_object(self, sha):
+    def _remove_loose_object(self, sha) -> None:
         raise NotImplementedError(self._remove_loose_object)
 
-    def _remove_pack(self, name):
+    def _remove_pack(self, name) -> None:
         raise NotImplementedError(self._remove_pack)
 
     def pack_loose_objects(self):
@@ -793,7 +793,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 else:
                     yield os.fsdecode(os.path.join(os.fsencode(self.path), line))
 
-    def add_alternate_path(self, path):
+    def add_alternate_path(self, path) -> None:
         """Add an alternate path to this object store."""
         try:
             os.mkdir(os.path.join(self.path, INFODIR))
@@ -864,10 +864,10 @@ class DiskObjectStore(PackBasedObjectStore):
         except FileNotFoundError:
             return None
 
-    def _remove_loose_object(self, sha):
+    def _remove_loose_object(self, sha) -> None:
         os.remove(self._get_shafile_path(sha))
 
-    def _remove_pack(self, pack):
+    def _remove_pack(self, pack) -> None:
         try:
             del self._pack_cache[os.path.basename(pack._basename)]
         except KeyError:
@@ -997,13 +997,13 @@ class DiskObjectStore(PackBasedObjectStore):
                 os.remove(path)
                 return None
 
-        def abort():
+        def abort() -> None:
             f.close()
             os.remove(path)
 
         return f, commit, abort
 
-    def add_object(self, obj):
+    def add_object(self, obj) -> None:
         """Add a single object to this object store.
 
         Args:
@@ -1087,7 +1087,7 @@ class MemoryObjectStore(BaseObjectStore):
         """Check if a particular object is present by SHA1 and is loose."""
         return self._to_hexsha(sha) in self._data
 
-    def contains_packed(self, sha):
+    def contains_packed(self, sha) -> bool:
         """Check if a particular object is present by SHA1 and is packed."""
         return False
 
@@ -1117,11 +1117,11 @@ class MemoryObjectStore(BaseObjectStore):
         """Delete an object from this store, for testing only."""
         del self._data[self._to_hexsha(name)]
 
-    def add_object(self, obj):
+    def add_object(self, obj) -> None:
         """Add a single object to this object store."""
         self._data[obj.id] = obj.copy()
 
-    def add_objects(self, objects, progress=None):
+    def add_objects(self, objects, progress=None) -> None:
         """Add a set of objects to this object store.
 
         Args:
@@ -1143,7 +1143,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         f = SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix="incoming-")
 
-        def commit():
+        def commit() -> None:
             size = f.tell()
             if size > 0:
                 f.seek(0)
@@ -1154,7 +1154,7 @@ class MemoryObjectStore(BaseObjectStore):
             else:
                 f.close()
 
-        def abort():
+        def abort() -> None:
             f.close()
 
         return f, commit, abort
@@ -1171,7 +1171,7 @@ class MemoryObjectStore(BaseObjectStore):
         for unpacked_object in unpacked_objects:
             self.add_object(unpacked_object.sha_file())
 
-    def add_thin_pack(self, read_all, read_some, progress=None):
+    def add_thin_pack(self, read_all, read_some, progress=None) -> None:
         """Add a new thin pack to this object store.
 
         Thin packs are packs that contain deltas with parents that exist
@@ -1372,7 +1372,7 @@ class MissingObjectFinder:
 
     def add_todo(
         self, entries: Iterable[tuple[ObjectID, Optional[bytes], Optional[int], bool]]
-    ):
+    ) -> None:
         self.objects_to_send.update([e for e in entries if e[0] not in self.sha_done])
 
     def __next__(self) -> tuple[bytes, Optional[PackHint]]:
@@ -1445,10 +1445,10 @@ class ObjectStoreGraphWalker:
             shallow = set()
         self.shallow = shallow
 
-    def nak(self):
+    def nak(self) -> None:
         """Nothing in common was found."""
 
-    def ack(self, sha):
+    def ack(self, sha) -> None:
         """Ack that a revision and its ancestors are present in the source."""
         if len(sha) != 40:
             raise ValueError(f"unexpected sha {sha!r} received")
@@ -1610,13 +1610,13 @@ class OverlayObjectStore(BaseObjectStore):
                 pass
         raise KeyError(sha_id)
 
-    def contains_packed(self, sha):
+    def contains_packed(self, sha) -> bool:
         for b in self.bases:
             if b.contains_packed(sha):
                 return True
         return False
 
-    def contains_loose(self, sha):
+    def contains_loose(self, sha) -> bool:
         for b in self.bases:
             if b.contains_loose(sha):
                 return True
@@ -1641,20 +1641,20 @@ class BucketBasedObjectStore(PackBasedObjectStore):
         """Iterate over the SHAs of all loose objects."""
         return iter([])
 
-    def _get_loose_object(self, sha):
+    def _get_loose_object(self, sha) -> None:
         return None
 
-    def _remove_loose_object(self, sha):
+    def _remove_loose_object(self, sha) -> None:
         # Doesn't exist..
         pass
 
-    def _remove_pack(self, name):
+    def _remove_pack(self, name) -> None:
         raise NotImplementedError(self._remove_pack)
 
-    def _iter_pack_names(self):
+    def _iter_pack_names(self) -> Iterator[str]:
         raise NotImplementedError(self._iter_pack_names)
 
-    def _get_pack(self, name):
+    def _get_pack(self, name) -> Pack:
         raise NotImplementedError(self._get_pack)
 
     def _update_pack_cache(self):
@@ -1672,7 +1672,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
             self._pack_cache.pop(f).close()
         return new_packs
 
-    def _upload_pack(self, basename, pack_file, index_file):
+    def _upload_pack(self, basename, pack_file, index_file) -> None:
         raise NotImplementedError
 
     def add_pack(self):

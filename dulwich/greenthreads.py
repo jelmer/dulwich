@@ -44,7 +44,7 @@ def _split_commits_and_tags(obj_store, lst, *, ignore_unknown=False, pool=None):
     commits = set()
     tags = set()
 
-    def find_commit_type(sha):
+    def find_commit_type(sha) -> None:
         try:
             o = obj_store[sha]
         except KeyError:
@@ -81,7 +81,7 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         concurrency=1,
         get_parents=None,
     ) -> None:
-        def collect_tree_sha(sha):
+        def collect_tree_sha(sha) -> None:
             self.sha_done.add(sha)
             cmt = object_store[sha]
             _collect_filetree_revs(object_store, cmt.tree, self.sha_done)

@@ -103,7 +103,6 @@ ignore = [
     "D205",
     "D417",
     "E501",  # line too long
-    "E741",  # ambiguous variable name
 ]
 
 [tool.ruff.lint.pydocstyle]

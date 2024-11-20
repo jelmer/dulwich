@@ -45,7 +45,7 @@ check-contrib:: clean
 check-all: check check-pypy check-noextensions
 
 typing:
-	mypy dulwich
+	$(PYTHON) -m mypy dulwich
 
 clean::
 	$(SETUP) clean --all

@@ -230,7 +230,7 @@ def tree_changes(
         yield TreeChange(change_type, entry1, entry2)
 
 
-def _all_eq(seq, key, value):
+def _all_eq(seq, key, value) -> bool:
     for e in seq:
         if key(e) != value:
             return False
@@ -411,6 +411,11 @@ def _tree_change_key(entry):
 class RenameDetector:
     """Object for handling rename detection between two trees."""
 
+    _adds: list[TreeChange]
+    _deletes: list[TreeChange]
+    _changes: list[TreeChange]
+    _candidates: list[tuple[int, TreeChange]]
+
     def __init__(
         self,
         store,
@@ -443,7 +448,7 @@ class RenameDetector:
         self._find_copies_harder = find_copies_harder
         self._want_unchanged = False
 
-    def _reset(self):
+    def _reset(self) -> None:
         self._adds = []
         self._deletes = []
         self._changes = []
@@ -459,7 +464,7 @@ class RenameDetector:
         new_obj = self._store[change.new.sha]
         return _similarity_score(old_obj, new_obj) < self._rewrite_threshold
 
-    def _add_change(self, change):
+    def _add_change(self, change) -> None:
         if change.type == CHANGE_ADD:
             self._adds.append(change)
         elif change.type == CHANGE_DELETE:
@@ -478,7 +483,7 @@ class RenameDetector:
         else:
             self._changes.append(change)
 
-    def _collect_changes(self, tree1_id, tree2_id):
+    def _collect_changes(self, tree1_id, tree2_id) -> None:
         want_unchanged = self._find_copies_harder or self._want_unchanged
         for change in tree_changes(
             self._store,
@@ -489,11 +494,11 @@ class RenameDetector:
         ):
             self._add_change(change)
 
-    def _prune(self, add_paths, delete_paths):
+    def _prune(self, add_paths, delete_paths) -> None:
         self._adds = [a for a in self._adds if a.new.path not in add_paths]
         self._deletes = [d for d in self._deletes if d.old.path not in delete_paths]
 
-    def _find_exact_renames(self):
+    def _find_exact_renames(self) -> None:
         add_map = defaultdict(list)
         for add in self._adds:
             add_map[add.new.sha].append(add.new)
@@ -541,7 +546,7 @@ class RenameDetector:
             return CHANGE_COPY
         return CHANGE_RENAME
 
-    def _find_content_rename_candidates(self):
+    def _find_content_rename_candidates(self) -> None:
         candidates = self._candidates = []
         # TODO: Optimizations:
         #  - Compare object sizes before counting blocks.
@@ -570,7 +575,7 @@ class RenameDetector:
                     rename = TreeChange(new_type, delete.old, add.new)
                     candidates.append((-score, rename))
 
-    def _choose_content_renames(self):
+    def _choose_content_renames(self) -> None:
         # Sort scores from highest to lowest, but keep names in ascending
         # order.
         self._candidates.sort()
@@ -594,7 +599,7 @@ class RenameDetector:
             self._changes.append(change)
         self._prune(add_paths, delete_paths)
 
-    def _join_modifies(self):
+    def _join_modifies(self) -> None:
         if self._rewrite_threshold is None:
             return
 
@@ -620,7 +625,7 @@ class RenameDetector:
         result.sort(key=_tree_change_key)
         return result
 
-    def _prune_unchanged(self):
+    def _prune_unchanged(self) -> None:
         if self._want_unchanged:
             return
         self._deletes = [d for d in self._deletes if d.type != CHANGE_UNCHANGED]

@@ -50,7 +50,7 @@ class TestWalkEntry:
 
 
 class WalkerTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = MemoryObjectStore()
 
@@ -70,7 +70,7 @@ class WalkerTest(TestCase):
             commit_spec.append(c)
         return self.make_commits(commit_spec, **kwargs)
 
-    def assertWalkYields(self, expected, *args, **kwargs):
+    def assertWalkYields(self, expected, *args, **kwargs) -> None:
         walker = Walker(self.store, *args, **kwargs)
         expected = list(expected)
         for i, entry in enumerate(expected):
@@ -79,13 +79,13 @@ class WalkerTest(TestCase):
         actual = list(walker)
         self.assertEqual(expected, actual)
 
-    def test_tag(self):
+    def test_tag(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         t2 = make_tag(target=c2)
         self.store.add_object(t2)
         self.assertWalkYields([c2, c1], [t2.id])
 
-    def test_linear(self):
+    def test_linear(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([c1], [c1.id])
         self.assertWalkYields([c2, c1], [c2.id])
@@ -95,7 +95,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c3, c2], [c3.id, c1.id], exclude=[c1.id])
         self.assertWalkYields([c3], [c3.id, c1.id], exclude=[c2.id])
 
-    def test_missing(self):
+    def test_missing(self) -> None:
         cs = list(reversed(self.make_linear_commits(20)))
         self.assertWalkYields(cs, [cs[0].id])
 
@@ -107,7 +107,7 @@ class WalkerTest(TestCase):
             self.assertWalkYields(cs[:i], [cs[0].id], max_entries=i)
         self.assertRaises(MissingCommitError, Walker, self.store, [cs[-1].id])
 
-    def test_branch(self):
+    def test_branch(self) -> None:
         c1, x2, x3, y4 = self.make_commits([[1], [2, 1], [3, 2], [4, 1]])
         self.assertWalkYields([x3, x2, c1], [x3.id])
         self.assertWalkYields([y4, c1], [y4.id])
@@ -117,7 +117,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([y4], [y4.id], exclude=[x3.id])
         self.assertWalkYields([x3, x2], [x3.id], exclude=[y4.id])
 
-    def test_merge(self):
+    def test_merge(self) -> None:
         c1, c2, c3, c4 = self.make_commits([[1], [2, 1], [3, 1], [4, 2, 3]])
         self.assertWalkYields([c4, c3, c2, c1], [c4.id])
         self.assertWalkYields([c3, c1], [c3.id])
@@ -125,7 +125,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c4, c3], [c4.id], exclude=[c2.id])
         self.assertWalkYields([c4, c2], [c4.id], exclude=[c3.id])
 
-    def test_merge_of_new_branch_from_old_base(self):
+    def test_merge_of_new_branch_from_old_base(self) -> None:
         # The commit on the branch was made at a time after any of the
         # commits on master, but the branch was from an older commit.
         # See also test_merge_of_old_branch
@@ -139,7 +139,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2, c1], [c2.id])
 
     @expectedFailure
-    def test_merge_of_old_branch(self):
+    def test_merge_of_old_branch(self) -> None:
         # The commit on the branch was made at a time before any of
         # the commits on master, but it was merged into master after
         # those commits.
@@ -153,23 +153,23 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c3, c2, c1], [c3.id])
         self.assertWalkYields([c2, c1], [c2.id])
 
-    def test_reverse(self):
+    def test_reverse(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([c1, c2, c3], [c3.id], reverse=True)
 
-    def test_max_entries(self):
+    def test_max_entries(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([c3, c2, c1], [c3.id], max_entries=3)
         self.assertWalkYields([c3, c2], [c3.id], max_entries=2)
         self.assertWalkYields([c3], [c3.id], max_entries=1)
 
-    def test_reverse_after_max_entries(self):
+    def test_reverse_after_max_entries(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([c1, c2, c3], [c3.id], max_entries=3, reverse=True)
         self.assertWalkYields([c2, c3], [c3.id], max_entries=2, reverse=True)
         self.assertWalkYields([c3], [c3.id], max_entries=1, reverse=True)
 
-    def test_changes_one_parent(self):
+    def test_changes_one_parent(self) -> None:
         blob_a1 = make_object(Blob, data=b"a1")
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b2 = make_object(Blob, data=b"b2")
@@ -190,7 +190,7 @@ class WalkerTest(TestCase):
         )
         self.assertWalkYields([e2, e1], [c2.id])
 
-    def test_changes_multiple_parents(self):
+    def test_changes_multiple_parents(self) -> None:
         blob_a1 = make_object(Blob, data=b"a1")
         blob_b2 = make_object(Blob, data=b"b2")
         blob_a3 = make_object(Blob, data=b"a3")
@@ -213,7 +213,7 @@ class WalkerTest(TestCase):
             [TestWalkEntry(c3, changes)], [c3.id], exclude=[c1.id, c2.id]
         )
 
-    def test_path_matches(self):
+    def test_path_matches(self) -> None:
         walker = Walker(None, [], paths=[b"foo", b"bar", b"baz/quux"])
         self.assertTrue(walker._path_matches(b"foo"))
         self.assertTrue(walker._path_matches(b"foo/a"))
@@ -228,7 +228,7 @@ class WalkerTest(TestCase):
         self.assertFalse(walker._path_matches(b"baz"))
         self.assertFalse(walker._path_matches(b"baz/quu"))
 
-    def test_paths(self):
+    def test_paths(self) -> None:
         blob_a1 = make_object(Blob, data=b"a1")
         blob_b2 = make_object(Blob, data=b"b2")
         blob_a3 = make_object(Blob, data=b"a3")
@@ -255,7 +255,7 @@ class WalkerTest(TestCase):
             [TestWalkEntry(c3, changes)], [c3.id], max_entries=1, paths=[b"a"]
         )
 
-    def test_paths_subtree(self):
+    def test_paths_subtree(self) -> None:
         blob_a = make_object(Blob, data=b"a")
         blob_b = make_object(Blob, data=b"b")
         c1, c2, c3 = self.make_linear_commits(
@@ -269,7 +269,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2], [c3.id], paths=[b"b"])
         self.assertWalkYields([c3, c1], [c3.id], paths=[b"x"])
 
-    def test_paths_max_entries(self):
+    def test_paths_max_entries(self) -> None:
         blob_a = make_object(Blob, data=b"a")
         blob_b = make_object(Blob, data=b"b")
         c1, c2 = self.make_linear_commits(
@@ -278,7 +278,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c2], [c2.id], paths=[b"b"], max_entries=1)
         self.assertWalkYields([c1], [c1.id], paths=[b"a"], max_entries=1)
 
-    def test_paths_merge(self):
+    def test_paths_merge(self) -> None:
         blob_a1 = make_object(Blob, data=b"a1")
         blob_a2 = make_object(Blob, data=b"a2")
         blob_a3 = make_object(Blob, data=b"a3")
@@ -294,7 +294,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([m3, y2, x1], [m3.id], paths=[b"a"])
         self.assertWalkYields([y2, x1], [m4.id], paths=[b"a"])
 
-    def test_changes_with_renames(self):
+    def test_changes_with_renames(self) -> None:
         blob = make_object(Blob, data=b"blob")
         c1, c2 = self.make_linear_commits(
             2, trees={1: [(b"a", blob)], 2: [(b"b", blob)]}
@@ -319,7 +319,7 @@ class WalkerTest(TestCase):
             rename_detector=detector,
         )
 
-    def test_follow_rename(self):
+    def test_follow_rename(self) -> None:
         blob = make_object(Blob, data=b"blob")
         names = [b"a", b"a", b"b", b"b", b"c", b"c"]
 
@@ -341,7 +341,7 @@ class WalkerTest(TestCase):
             follow=True,
         )
 
-    def test_follow_rename_remove_path(self):
+    def test_follow_rename_remove_path(self) -> None:
         blob = make_object(Blob, data=b"blob")
         _, _, _, c4, c5, c6 = self.make_linear_commits(
             6,
@@ -370,7 +370,7 @@ class WalkerTest(TestCase):
             follow=True,
         )
 
-    def test_since(self):
+    def test_since(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([c3, c2, c1], [c3.id], since=-1)
         self.assertWalkYields([c3, c2, c1], [c3.id], since=0)
@@ -383,7 +383,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([], [c3.id], since=201)
         self.assertWalkYields([], [c3.id], since=300)
 
-    def test_until(self):
+    def test_until(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([], [c3.id], until=-1)
         self.assertWalkYields([c1], [c3.id], until=0)
@@ -396,14 +396,14 @@ class WalkerTest(TestCase):
         self.assertWalkYields([c3, c2, c1], [c3.id], until=201)
         self.assertWalkYields([c3, c2, c1], [c3.id], until=300)
 
-    def test_since_until(self):
+    def test_since_until(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([], [c3.id], since=100, until=99)
         self.assertWalkYields([c3, c2, c1], [c3.id], since=-1, until=201)
         self.assertWalkYields([c2], [c3.id], since=100, until=100)
         self.assertWalkYields([c2], [c3.id], since=50, until=150)
 
-    def test_since_over_scan(self):
+    def test_since_over_scan(self) -> None:
         commits = self.make_linear_commits(11, times=[9, 0, 1, 2, 3, 4, 5, 8, 6, 7, 9])
         c8, _, c10, c11 = commits[-4:]
         del self.store[commits[0].id]
@@ -413,18 +413,18 @@ class WalkerTest(TestCase):
         # even with over-scanning.
         self.assertWalkYields([c11, c10, c8], [c11.id], since=7)
 
-    def assertTopoOrderEqual(self, expected_commits, commits):
+    def assertTopoOrderEqual(self, expected_commits, commits) -> None:
         entries = [TestWalkEntry(c, None) for c in commits]
         actual_ids = [e.commit.id for e in list(_topo_reorder(entries))]
         self.assertEqual([c.id for c in expected_commits], actual_ids)
 
-    def test_topo_reorder_linear(self):
+    def test_topo_reorder_linear(self) -> None:
         commits = self.make_linear_commits(5)
         commits.reverse()
         for perm in permutations(commits):
             self.assertTopoOrderEqual(commits, perm)
 
-    def test_topo_reorder_multiple_parents(self):
+    def test_topo_reorder_multiple_parents(self) -> None:
         c1, c2, c3 = self.make_commits([[1], [2], [3, 1, 2]])
         # Already sorted, so totally FIFO.
         self.assertTopoOrderEqual([c3, c2, c1], [c3, c2, c1])
@@ -438,7 +438,7 @@ class WalkerTest(TestCase):
         self.assertTopoOrderEqual([c3, c2, c1], [c1, c2, c3])
         self.assertTopoOrderEqual([c3, c2, c1], [c2, c1, c3])
 
-    def test_topo_reorder_multiple_children(self):
+    def test_topo_reorder_multiple_children(self) -> None:
         c1, c2, c3 = self.make_commits([[1], [2, 1], [3, 1]])
 
         # c2 and c3 are FIFO but c1 moves to the end.
@@ -450,14 +450,14 @@ class WalkerTest(TestCase):
         self.assertTopoOrderEqual([c2, c3, c1], [c2, c1, c3])
         self.assertTopoOrderEqual([c2, c3, c1], [c1, c2, c3])
 
-    def test_out_of_order_children(self):
+    def test_out_of_order_children(self) -> None:
         c1, c2, c3, c4, c5 = self.make_commits(
             [[1], [2, 1], [3, 2], [4, 1], [5, 3, 4]], times=[2, 1, 3, 4, 5]
         )
         self.assertWalkYields([c5, c4, c3, c1, c2], [c5.id])
         self.assertWalkYields([c5, c4, c3, c2, c1], [c5.id], order=ORDER_TOPO)
 
-    def test_out_of_order_with_exclude(self):
+    def test_out_of_order_with_exclude(self) -> None:
         # Create the following graph:
         # c1-------x2---m6
         #   \          /
@@ -472,13 +472,13 @@ class WalkerTest(TestCase):
         # priority queue long before y5.
         self.assertWalkYields([m6, x2], [m6.id], exclude=[y5.id])
 
-    def test_empty_walk(self):
+    def test_empty_walk(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([], [c3.id], exclude=[c3.id])
 
 
 class WalkEntryTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = MemoryObjectStore()
 
@@ -498,7 +498,7 @@ class WalkEntryTest(TestCase):
             commit_spec.append(c)
         return self.make_commits(commit_spec, **kwargs)
 
-    def test_all_changes(self):
+    def test_all_changes(self) -> None:
         # Construct a commit with 2 files in different subdirectories.
         blob_a = make_object(Blob, data=b"a")
         blob_b = make_object(Blob, data=b"b")
@@ -520,7 +520,7 @@ class WalkEntryTest(TestCase):
             changes,
         )
 
-    def test_all_with_merge(self):
+    def test_all_with_merge(self) -> None:
         blob_a = make_object(Blob, data=b"a")
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b = make_object(Blob, data=b"b")
@@ -560,7 +560,7 @@ class WalkEntryTest(TestCase):
             changes,
         )
 
-    def test_filter_changes(self):
+    def test_filter_changes(self) -> None:
         # Construct a commit with 2 files in different subdirectories.
         blob_a = make_object(Blob, data=b"a")
         blob_b = make_object(Blob, data=b"b")
@@ -581,7 +581,7 @@ class WalkEntryTest(TestCase):
             changes,
         )
 
-    def test_filter_with_merge(self):
+    def test_filter_with_merge(self) -> None:
         blob_a = make_object(Blob, data=b"a")
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b = make_object(Blob, data=b"b")

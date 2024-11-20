@@ -232,7 +232,7 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
     return user + b" <" + email + b">"
 
 
-def check_user_identity(identity):
+def check_user_identity(identity) -> None:
     """Verify that a user identity is formatted correctly.
 
     Args:
@@ -304,7 +304,7 @@ def serialize_graftpoints(graftpoints: dict[bytes, list[bytes]]) -> bytes:
     return b"\n".join(graft_lines)
 
 
-def _set_filesystem_hidden(path):
+def _set_filesystem_hidden(path) -> None:
     """Mark path as to be hidden if supported by platform and filesystem.
 
     On win32 uses SetFileAttributesW api:
@@ -427,7 +427,7 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_named_file)
 
-    def _put_named_file(self, path: str, contents: bytes):
+    def _put_named_file(self, path: str, contents: bytes) -> None:
         """Write a file to the control dir with the given name and contents.
 
         Args:
@@ -436,7 +436,7 @@ class BaseRepo:
         """
         raise NotImplementedError(self._put_named_file)
 
-    def _del_named_file(self, path: str):
+    def _del_named_file(self, path: str) -> None:
         """Delete a file in the control directory with the given name."""
         raise NotImplementedError(self._del_named_file)
 
@@ -549,7 +549,7 @@ class BaseRepo:
                 return None
 
             class DummyMissingObjectFinder:
-                def get_remote_has(self):
+                def get_remote_has(self) -> None:
                     return None
 
                 def __len__(self) -> int:
@@ -702,7 +702,7 @@ class BaseRepo:
         """Retrieve the worktree config object."""
         raise NotImplementedError(self.get_worktree_config)
 
-    def get_description(self):
+    def get_description(self) -> Optional[str]:
         """Retrieve the description for this repository.
 
         Returns: String with the description of the repository
@@ -710,7 +710,7 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_description)
 
-    def set_description(self, description):
+    def set_description(self, description) -> None:
         """Set the description for this repository.
 
         Args:
@@ -748,7 +748,7 @@ class BaseRepo:
         with f:
             return {line.strip() for line in f}
 
-    def update_shallow(self, new_shallow, new_unshallow):
+    def update_shallow(self, new_shallow, new_unshallow) -> None:
         """Update the list of shallow objects.
 
         Args:
@@ -884,7 +884,7 @@ class BaseRepo:
         )
         return get_user_identity(config)
 
-    def _add_graftpoints(self, updated_graftpoints: dict[bytes, list[bytes]]):
+    def _add_graftpoints(self, updated_graftpoints: dict[bytes, list[bytes]]) -> None:
         """Add or modify graftpoints.
 
         Args:
@@ -1215,7 +1215,7 @@ class Repo(BaseRepo):
 
     def _write_reflog(
         self, ref, old_sha, new_sha, committer, timestamp, timezone, message
-    ):
+    ) -> None:
         from .reflog import format_reflog_line
 
         path = os.path.join(self.controldir(), "logs", os.fsdecode(ref))
@@ -1305,7 +1305,7 @@ class Repo(BaseRepo):
         # TODO(jelmer): Actually probe disk / look at filesystem
         return sys.platform != "win32"
 
-    def _put_named_file(self, path, contents):
+    def _put_named_file(self, path, contents) -> None:
         """Write a file to the control dir with the given name and contents.
 
         Args:
@@ -1316,7 +1316,7 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), "wb") as f:
             f.write(contents)
 
-    def _del_named_file(self, path):
+    def _del_named_file(self, path) -> None:
         try:
             os.unlink(os.path.join(self.controldir(), path))
         except FileNotFoundError:
@@ -1362,7 +1362,7 @@ class Repo(BaseRepo):
             raise NoIndexPresent
         return Index(self.index_path())
 
-    def has_index(self):
+    def has_index(self) -> bool:
         """Check if an index is present."""
         # Bare repos must never have index files; non-bare repos may have a
         # missing index file, which is treated as empty.
@@ -1434,7 +1434,7 @@ class Repo(BaseRepo):
                     index[tree_path] = index_entry_from_stat(st, blob.id)
         index.write()
 
-    def unstage(self, fs_paths: list[str]):
+    def unstage(self, fs_paths: list[str]) -> None:
         """Unstage specific file in the index
         Args:
           fs_paths: a list of files to unstage,
@@ -1613,7 +1613,7 @@ class Repo(BaseRepo):
             symlink_fn = symlink
         else:
 
-            def symlink_fn(source, target):  # type: ignore
+            def symlink_fn(source, target) -> None:  # type: ignore
                 with open(
                     target, "w" + ("b" if isinstance(source, bytes) else "")
                 ) as f:
@@ -1670,7 +1670,7 @@ class Repo(BaseRepo):
     def __repr__(self) -> str:
         return f"<Repo at {self.path!r}>"
 
-    def set_description(self, description):
+    def set_description(self, description) -> None:
         """Set the description for this repository.
 
         Args:
@@ -1801,7 +1801,7 @@ class Repo(BaseRepo):
 
     create = init_bare
 
-    def close(self):
+    def close(self) -> None:
         """Close any files opened by this repository."""
         self.object_store.close()
 
@@ -1846,10 +1846,10 @@ class MemoryRepo(BaseRepo):
         self._config = ConfigFile()
         self._description = None
 
-    def _append_reflog(self, *args):
+    def _append_reflog(self, *args) -> None:
         self._reflog.append(args)
 
-    def set_description(self, description):
+    def set_description(self, description) -> None:
         self._description = description
 
     def get_description(self):
@@ -1869,7 +1869,7 @@ class MemoryRepo(BaseRepo):
         """
         return sys.platform != "win32"
 
-    def _put_named_file(self, path, contents):
+    def _put_named_file(self, path, contents) -> None:
         """Write a file to the control dir with the given name and contents.
 
         Args:
@@ -1878,7 +1878,7 @@ class MemoryRepo(BaseRepo):
         """
         self._named_files[path] = contents
 
-    def _del_named_file(self, path):
+    def _del_named_file(self, path) -> None:
         try:
             del self._named_files[path]
         except KeyError:
@@ -1900,7 +1900,7 @@ class MemoryRepo(BaseRepo):
             return None
         return BytesIO(contents)
 
-    def open_index(self):
+    def open_index(self) -> "Index":
         """Fail to open index for this repo, since it is bare.
 
         Raises:

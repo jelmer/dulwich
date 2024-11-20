@@ -32,7 +32,7 @@ class FindMergeBaseTests(TestCase):
         def lookup_parents(commit_id):
             return dag[commit_id]
 
-        def lookup_stamp(commit_id):
+        def lookup_stamp(commit_id) -> int:
             # any constant timestamp value here will work to force
             # this test to test the same behaviour as done previously
             return 100
@@ -41,7 +41,7 @@ class FindMergeBaseTests(TestCase):
         c2s = inputs[1:]
         return set(_find_lcas(lookup_parents, c1, c2s, lookup_stamp))
 
-    def test_multiple_lca(self):
+    def test_multiple_lca(self) -> None:
         # two lowest common ancestors
         graph = {
             "5": ["1", "2"],
@@ -53,7 +53,7 @@ class FindMergeBaseTests(TestCase):
         }
         self.assertEqual(self.run_test(graph, ["4", "5"]), {"1", "2"})
 
-    def test_no_common_ancestor(self):
+    def test_no_common_ancestor(self) -> None:
         # no common ancestor
         graph = {
             "4": ["2"],
@@ -64,7 +64,7 @@ class FindMergeBaseTests(TestCase):
         }
         self.assertEqual(self.run_test(graph, ["4", "3"]), set())
 
-    def test_ancestor(self):
+    def test_ancestor(self) -> None:
         # ancestor
         graph = {
             "G": ["D", "F"],
@@ -77,7 +77,7 @@ class FindMergeBaseTests(TestCase):
         }
         self.assertEqual(self.run_test(graph, ["D", "C"]), {"C"})
 
-    def test_direct_parent(self):
+    def test_direct_parent(self) -> None:
         # parent
         graph = {
             "G": ["D", "F"],
@@ -90,7 +90,7 @@ class FindMergeBaseTests(TestCase):
         }
         self.assertEqual(self.run_test(graph, ["G", "D"]), {"D"})
 
-    def test_another_crossover(self):
+    def test_another_crossover(self) -> None:
         # Another cross over
         graph = {
             "G": ["D", "F"],
@@ -103,7 +103,7 @@ class FindMergeBaseTests(TestCase):
         }
         self.assertEqual(self.run_test(graph, ["D", "F"]), {"E", "C"})
 
-    def test_three_way_merge_lca(self):
+    def test_three_way_merge_lca(self) -> None:
         # three way merge commit straight from git docs
         graph = {
             "C": ["C1"],
@@ -126,7 +126,7 @@ class FindMergeBaseTests(TestCase):
         # which actually means find the first LCA from either of B OR C with A
         self.assertEqual(self.run_test(graph, ["A", "B", "C"]), {"1"})
 
-    def test_octopus(self):
+    def test_octopus(self) -> None:
         # octopus algorithm test
         # test straight from git docs of A, B, and C
         # but this time use octopus to find lcas of A, B, and C simultaneously
@@ -151,7 +151,7 @@ class FindMergeBaseTests(TestCase):
         def lookup_parents(cid):
             return graph[cid]
 
-        def lookup_stamp(commit_id):
+        def lookup_stamp(commit_id) -> int:
             # any constant timestamp value here will work to force
             # this test to test the same behaviour as done previously
             return 100
@@ -168,7 +168,7 @@ class FindMergeBaseTests(TestCase):
 
 
 class CanFastForwardTests(TestCase):
-    def test_ff(self):
+    def test_ff(self) -> None:
         r = MemoryRepo()
         base = make_commit()
         c1 = make_commit(parents=[base.id])
@@ -179,7 +179,7 @@ class CanFastForwardTests(TestCase):
         self.assertTrue(can_fast_forward(r, c1.id, c2.id))
         self.assertFalse(can_fast_forward(r, c2.id, c1.id))
 
-    def test_diverged(self):
+    def test_diverged(self) -> None:
         r = MemoryRepo()
         base = make_commit()
         c1 = make_commit(parents=[base.id])
@@ -193,7 +193,7 @@ class CanFastForwardTests(TestCase):
 
 
 class WorkListTest(TestCase):
-    def test_WorkList(self):
+    def test_WorkList(self) -> None:
         # tuples of (timestamp, value) are stored in a Priority MaxQueue
         # repeated use of get should return them in maxheap timestamp
         # order: largest time value (most recent in time) first then earlier/older

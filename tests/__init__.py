@@ -43,13 +43,13 @@ from unittest import TestCase as _TestCase
 
 
 class TestCase(_TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.overrideEnv("HOME", "/nonexistent")
         self.overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 
-    def overrideEnv(self, name, value):
-        def restore():
+    def overrideEnv(self, name, value) -> None:
+        def restore() -> None:
             if oldval is not None:
                 os.environ[name] = oldval
             else:
@@ -168,7 +168,7 @@ def tutorial_test_suite():
 
     to_restore = []
 
-    def overrideEnv(name, value):
+    def overrideEnv(name, value) -> None:
         oldval = os.environ.get(name)
         if value is not None:
             os.environ[name] = value
@@ -176,7 +176,7 @@ def tutorial_test_suite():
             del os.environ[name]
         to_restore.append((name, oldval))
 
-    def setup(test):
+    def setup(test) -> None:
         test.__old_cwd = os.getcwd()
         test.tempdir = tempfile.mkdtemp()
         test.globs.update({"tempdir": test.tempdir})
@@ -184,7 +184,7 @@ def tutorial_test_suite():
         overrideEnv("HOME", "/nonexistent")
         overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 
-    def teardown(test):
+    def teardown(test) -> None:
         os.chdir(test.__old_cwd)
         shutil.rmtree(test.tempdir)
         for name, oldval in to_restore:

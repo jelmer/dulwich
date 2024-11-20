@@ -34,7 +34,7 @@ from .utils import CompatTestCase, require_git_version, rmtree_ro, run_git_or_fa
 class ObjectStoreTestCase(CompatTestCase):
     """Tests for git repository compatibility."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._repo = self.import_repo("server_new.export")
 
@@ -55,17 +55,17 @@ class ObjectStoreTestCase(CompatTestCase):
     def _parse_objects(self, output):
         return {s.rstrip(b"\n").split(b" ")[0] for s in BytesIO(output)}
 
-    def test_bare(self):
+    def test_bare(self) -> None:
         self.assertTrue(self._repo.bare)
         self.assertFalse(os.path.exists(os.path.join(self._repo.path, ".git")))
 
-    def test_head(self):
+    def test_head(self) -> None:
         output = self._run_git(["rev-parse", "HEAD"])
         head_sha = output.rstrip(b"\n")
         hex_to_sha(head_sha)
         self.assertEqual(head_sha, self._repo.refs[b"HEAD"])
 
-    def test_refs(self):
+    def test_refs(self) -> None:
         output = self._run_git(
             ["for-each-ref", "--format=%(refname) %(objecttype) %(objectname)"]
         )
@@ -90,7 +90,7 @@ class ObjectStoreTestCase(CompatTestCase):
         output = self._run_git(["rev-list", "--all", "--objects"])
         return self._parse_objects(output)
 
-    def assertShasMatch(self, expected_shas, actual_shas_iter):
+    def assertShasMatch(self, expected_shas, actual_shas_iter) -> None:
         actual_shas = set()
         for sha in actual_shas_iter:
             obj = self._repo[sha]
@@ -98,7 +98,7 @@ class ObjectStoreTestCase(CompatTestCase):
             actual_shas.add(sha)
         self.assertEqual(expected_shas, actual_shas)
 
-    def test_loose_objects(self):
+    def test_loose_objects(self) -> None:
         # TODO(dborowitz): This is currently not very useful since
         # fast-imported repos only contained packed objects.
         expected_shas = self._get_loose_shas()
@@ -106,13 +106,13 @@ class ObjectStoreTestCase(CompatTestCase):
             expected_shas, self._repo.object_store._iter_loose_objects()
         )
 
-    def test_packed_objects(self):
+    def test_packed_objects(self) -> None:
         expected_shas = self._get_all_shas() - self._get_loose_shas()
         self.assertShasMatch(
             expected_shas, chain.from_iterable(self._repo.object_store.packs)
         )
 
-    def test_all_objects(self):
+    def test_all_objects(self) -> None:
         expected_shas = self._get_all_shas()
         self.assertShasMatch(expected_shas, iter(self._repo.object_store))
 
@@ -136,7 +136,7 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self.addCleanup(rmtree_ro, temp_dir)
         return temp_dir
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._worktree_path = self.create_new_worktree(self._repo.path, "branch")
         self._worktree_repo = Repo(self._worktree_path)
@@ -145,18 +145,18 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self._number_of_working_tree = 2
         self._repo = self._worktree_repo
 
-    def test_refs(self):
+    def test_refs(self) -> None:
         super().test_refs()
         self.assertEqual(
             self._mainworktree_repo.refs.allkeys(), self._repo.refs.allkeys()
         )
 
-    def test_head_equality(self):
+    def test_head_equality(self) -> None:
         self.assertNotEqual(
             self._repo.refs[b"HEAD"], self._mainworktree_repo.refs[b"HEAD"]
         )
 
-    def test_bare(self):
+    def test_bare(self) -> None:
         self.assertFalse(self._repo.bare)
         self.assertTrue(os.path.isfile(os.path.join(self._repo.path, ".git")))
 
@@ -167,7 +167,7 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
             worktrees.append(tuple(f.decode() for f in fields))
         return worktrees
 
-    def test_git_worktree_list(self):
+    def test_git_worktree_list(self) -> None:
         # 'git worktree list' was introduced in 2.7.0
         require_git_version((2, 7, 0))
         output = run_git_or_fail(["worktree", "list"], cwd=self._repo.path)
@@ -182,7 +182,7 @@ class WorkingTreeTestCase(ObjectStoreTestCase):
         self.assertEqual(worktrees[0][1], "(bare)")
         self.assertTrue(os.path.samefile(worktrees[0][0], self._mainworktree_repo.path))
 
-    def test_git_worktree_config(self):
+    def test_git_worktree_config(self) -> None:
         """Test that git worktree config parsing matches the git CLI's behavior."""
         # Set some config value in the main repo using the git CLI
         require_git_version((2, 7, 0))
@@ -222,7 +222,7 @@ class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
 
     min_git_version = (2, 5, 0)
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self._other_worktree = self._repo
         worktree_repo_path = tempfile.mkdtemp()
@@ -233,11 +233,11 @@ class InitNewWorkingDirectoryTestCase(WorkingTreeTestCase):
         self.addCleanup(self._repo.close)
         self._number_of_working_tree = 3
 
-    def test_head_equality(self):
+    def test_head_equality(self) -> None:
         self.assertEqual(
             self._repo.refs[b"HEAD"], self._mainworktree_repo.refs[b"HEAD"]
         )
 
-    def test_bare(self):
+    def test_bare(self) -> None:
         self.assertFalse(self._repo.bare)
         self.assertTrue(os.path.isfile(os.path.join(self._repo.path, ".git")))

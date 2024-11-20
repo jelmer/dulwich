@@ -25,6 +25,7 @@ import os
 import re
 import shutil
 import tempfile
+from typing import NoReturn
 
 from dulwich.objects import Blob
 from dulwich.pack import write_pack
@@ -51,13 +52,13 @@ def _git_verify_pack_object_list(output):
 class TestPack(PackTests):
     """Compatibility tests for reading and writing pack files."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         require_git_version((1, 5, 0))
         super().setUp()
         self._tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self._tempdir)
 
-    def test_copy(self):
+    def test_copy(self) -> None:
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             pack_path = os.path.join(self._tempdir, "Elch")
@@ -66,7 +67,7 @@ class TestPack(PackTests):
             orig_shas = {o.id for o in origpack.iterobjects()}
             self.assertEqual(orig_shas, _git_verify_pack_object_list(output))
 
-    def test_deltas_work(self):
+    def test_deltas_work(self) -> None:
         with self.get_pack(pack1_sha) as orig_pack:
             orig_blob = orig_pack[a_sha]
             new_blob = Blob()
@@ -91,7 +92,7 @@ class TestPack(PackTests):
             "Expected 3 non-delta objects, got %d" % got_non_delta,
         )
 
-    def test_delta_medium_object(self):
+    def test_delta_medium_object(self) -> None:
         # This tests an object set that will have a copy operation
         # 2**20 in size.
         with self.get_pack(pack1_sha) as orig_pack:
@@ -130,7 +131,7 @@ class TestPack(PackTests):
     # on the input size. It's impractical to produce deltas for
     # objects this large, but it's still worth doing the right thing
     # when it happens.
-    def test_delta_large_object(self):
+    def test_delta_large_object(self) -> NoReturn:
         # This tests an object set that will have a copy operation
         # 2**25 in size. This is a copy large enough that it requires
         # two copy operations in git's binary delta format.

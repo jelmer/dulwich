@@ -192,7 +192,7 @@ def read_cache_time(f):
     return struct.unpack(">LL", f.read(8))
 
 
-def write_cache_time(f, t):
+def write_cache_time(f, t) -> None:
     """Write a cache time.
 
     Args:
@@ -337,7 +337,7 @@ def read_index_dict(f) -> dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
 
 def write_index(
     f: BinaryIO, entries: list[SerializedIndexEntry], version: Optional[int] = None
-):
+) -> None:
     """Write an index file.
 
     Args:
@@ -440,7 +440,7 @@ class Index:
         finally:
             f.close()
 
-    def read(self):
+    def read(self) -> None:
         """Read current contents of index from disk."""
         if not os.path.exists(self._filename):
             return
@@ -470,7 +470,7 @@ class Index:
         """Iterate over the paths and stages in this index."""
         return iter(self._byname)
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return key in self._byname
 
     def get_sha1(self, path: bytes) -> bytes:
@@ -501,7 +501,7 @@ class Index:
                 return True
         return False
 
-    def clear(self):
+    def clear(self) -> None:
         """Remove all contents from this index."""
         self._byname = {}
 
@@ -522,7 +522,9 @@ class Index:
     def items(self) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
         return iter(self._byname.items())
 
-    def update(self, entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]):
+    def update(
+        self, entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
+    ) -> None:
         for key, value in entries.items():
             self[key] = value
 
@@ -808,7 +810,7 @@ def build_index_from_tree(
     honor_filemode: bool = True,
     validate_path_element=validate_path_element_default,
     symlink_fn=None,
-):
+) -> None:
     """Generate and materialize index from a tree.
 
     Args:
@@ -935,7 +937,7 @@ def read_submodule_head(path: Union[str, bytes]) -> Optional[bytes]:
         return None
 
 
-def _has_directory_changed(tree_path: bytes, entry):
+def _has_directory_changed(tree_path: bytes, entry) -> bool:
     """Check if a directory has changed after getting an error.
 
     When handling an error trying to create a blob from a path, call this
@@ -1123,7 +1125,7 @@ def iter_fresh_objects(
             yield path, entry.sha, cleanup_mode(entry.mode)
 
 
-def refresh_index(index: Index, root_path: bytes):
+def refresh_index(index: Index, root_path: bytes) -> None:
     """Refresh the contents of an index.
 
     This is the equivalent to running 'git commit -a'.

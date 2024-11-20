@@ -21,6 +21,7 @@
 """Tests for patch.py."""
 
 from io import BytesIO, StringIO
+from typing import NoReturn
 
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
@@ -37,7 +38,7 @@ from . import SkipTest, TestCase
 
 
 class WriteCommitPatchTests(TestCase):
-    def test_simple_bytesio(self):
+    def test_simple_bytesio(self) -> None:
         f = BytesIO()
         c = Commit()
         c.committer = c.author = b"Jelmer <jelmer@samba.org>"
@@ -70,7 +71,7 @@ class WriteCommitPatchTests(TestCase):
 
 
 class ReadGitAmPatch(TestCase):
-    def test_extract_string(self):
+    def test_extract_string(self) -> None:
         text = b"""\
 From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
@@ -102,7 +103,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
         )
         self.assertEqual(b"1.7.0.4", version)
 
-    def test_extract_bytes(self):
+    def test_extract_bytes(self) -> None:
         text = b"""\
 From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
@@ -134,7 +135,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
         )
         self.assertEqual(b"1.7.0.4", version)
 
-    def test_extract_spaces(self):
+    def test_extract_spaces(self) -> None:
         text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
@@ -164,7 +165,7 @@ Added unit tests for dulwich.object_store.tree_lookup_path.
             c.message,
         )
 
-    def test_extract_pseudo_from_header(self):
+    def test_extract_pseudo_from_header(self) -> None:
         text = b"""From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
 Date: Thu, 15 Apr 2010 15:40:28 +0200
@@ -197,7 +198,7 @@ Added unit tests for dulwich.object_store.tree_lookup_path.
             c.message,
         )
 
-    def test_extract_no_version_tail(self):
+    def test_extract_no_version_tail(self) -> None:
         text = b"""\
 From ff643aae102d8870cac88e8f007e70f58f3a7363 Mon Sep 17 00:00:00 2001
 From: Jelmer Vernooij <jelmer@samba.org>
@@ -216,7 +217,7 @@ From: Jelmer Vernooij <jelmer@debian.org>
         c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(None, version)
 
-    def test_extract_mercurial(self):
+    def test_extract_mercurial(self) -> NoReturn:
         raise SkipTest(
             "git_am_patch_split doesn't handle Mercurial patches " "properly yet"
         )
@@ -262,7 +263,7 @@ More help   : https://help.launchpad.net/ListHelp
 class DiffTests(TestCase):
     """Tests for write_blob_diff and write_tree_diff."""
 
-    def test_blob_diff(self):
+    def test_blob_diff(self) -> None:
         f = BytesIO()
         write_blob_diff(
             f,
@@ -283,7 +284,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_blob_add(self):
+    def test_blob_add(self) -> None:
         f = BytesIO()
         write_blob_diff(
             f,
@@ -304,7 +305,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_blob_remove(self):
+    def test_blob_remove(self) -> None:
         f = BytesIO()
         write_blob_diff(
             f,
@@ -325,7 +326,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_tree_diff(self):
+    def test_tree_diff(self) -> None:
         f = BytesIO()
         store = MemoryObjectStore()
         added = Blob.from_string(b"add\n")
@@ -384,7 +385,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_tree_diff_submodule(self):
+    def test_tree_diff_submodule(self) -> None:
         f = BytesIO()
         store = MemoryObjectStore()
         tree1 = Tree()
@@ -414,7 +415,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_blob(self):
+    def test_object_diff_blob(self) -> None:
         f = BytesIO()
         b1 = Blob.from_string(b"old\nsame\n")
         b2 = Blob.from_string(b"new\nsame\n")
@@ -437,7 +438,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_add_blob(self):
+    def test_object_diff_add_blob(self) -> None:
         f = BytesIO()
         store = MemoryObjectStore()
         b2 = Blob.from_string(b"new\nsame\n")
@@ -457,7 +458,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_remove_blob(self):
+    def test_object_diff_remove_blob(self) -> None:
         f = BytesIO()
         b1 = Blob.from_string(b"new\nsame\n")
         store = MemoryObjectStore()
@@ -477,7 +478,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_bin_blob_force(self):
+    def test_object_diff_bin_blob_force(self) -> None:
         f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
@@ -521,7 +522,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_bin_blob(self):
+    def test_object_diff_bin_blob(self) -> None:
         f = BytesIO()
         # Prepare two slightly different PNG headers
         b1 = Blob.from_string(
@@ -550,7 +551,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_add_bin_blob(self):
+    def test_object_diff_add_bin_blob(self) -> None:
         f = BytesIO()
         b2 = Blob.from_string(
             b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
@@ -571,7 +572,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_remove_bin_blob(self):
+    def test_object_diff_remove_bin_blob(self) -> None:
         f = BytesIO()
         b1 = Blob.from_string(
             b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
@@ -592,7 +593,7 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
-    def test_object_diff_kind_change(self):
+    def test_object_diff_kind_change(self) -> None:
         f = BytesIO()
         b1 = Blob.from_string(b"new\nsame\n")
         store = MemoryObjectStore()
@@ -625,7 +626,7 @@ class DiffTests(TestCase):
 
 
 class GetSummaryTests(TestCase):
-    def test_simple(self):
+    def test_simple(self) -> None:
         c = Commit()
         c.committer = c.author = b"Jelmer <jelmer@samba.org>"
         c.commit_time = c.author_time = 1271350201

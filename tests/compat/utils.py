@@ -73,7 +73,7 @@ def git_version(git_path=_DEFAULT_GIT):
     return tuple(nums[:_VERSION_LEN])
 
 
-def require_git_version(required_version, git_path=_DEFAULT_GIT):
+def require_git_version(required_version, git_path=_DEFAULT_GIT) -> None:
     """Require git version >= version, or skip the calling test.
 
     Args:
@@ -196,7 +196,7 @@ def import_repo_to_dir(name):
     return temp_repo_dir
 
 
-def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT):
+def check_for_daemon(limit=10, delay=0.1, timeout=0.1, port=TCP_GIT_PORT) -> bool:
     """Check for a running TCP daemon.
 
     Defaults to checking 10 times with a delay of 0.1 sec between tries.
@@ -237,18 +237,18 @@ class CompatTestCase(TestCase):
 
     min_git_version: tuple[int, ...] = (1, 5, 0)
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         require_git_version(self.min_git_version)
 
-    def assertObjectStoreEqual(self, store1, store2):
+    def assertObjectStoreEqual(self, store1, store2) -> None:
         self.assertEqual(sorted(set(store1)), sorted(set(store2)))
 
-    def assertReposEqual(self, repo1, repo2):
+    def assertReposEqual(self, repo1, repo2) -> None:
         self.assertEqual(repo1.get_refs(), repo2.get_refs())
         self.assertObjectStoreEqual(repo1.object_store, repo2.object_store)
 
-    def assertReposNotEqual(self, repo1, repo2):
+    def assertReposNotEqual(self, repo1, repo2) -> None:
         refs1 = repo1.get_refs()
         objs1 = set(repo1.object_store)
         refs2 = repo2.get_refs()
@@ -267,7 +267,7 @@ class CompatTestCase(TestCase):
         path = import_repo_to_dir(name)
         repo = Repo(path)
 
-        def cleanup():
+        def cleanup() -> None:
             repo.close()
             rmtree_ro(os.path.dirname(path.rstrip(os.sep)))
 
@@ -277,7 +277,7 @@ class CompatTestCase(TestCase):
 
 if sys.platform == "win32":
 
-    def remove_ro(action, name, exc):
+    def remove_ro(action, name, exc) -> None:
         os.chmod(name, stat.S_IWRITE)
         os.remove(name)
 

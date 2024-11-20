@@ -1510,6 +1510,17 @@ class Commit(ShaFile):
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 
+    def raw_without_sig(self) -> bytes:
+        """Return raw string serialization without the GPG/SSH signature.
+
+        self.gpgsig is a signature for the returned raw byte string serialization.
+        """
+        tmp = self.copy()
+        assert isinstance(tmp, Commit)
+        tmp._gpgsig = None
+        tmp.gpgsig = None
+        return tmp.as_raw_string()
+
     def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this commit (if it is signed).
 
@@ -1530,12 +1541,8 @@ class Commit(ShaFile):
         import gpg
 
         with gpg.Context() as ctx:
-            self_without_gpgsig = self.copy()
-            assert isinstance(self_without_gpgsig, Commit)
-            self_without_gpgsig._gpgsig = None
-            self_without_gpgsig.gpgsig = None
             data, result = ctx.verify(
-                self_without_gpgsig.as_raw_string(),
+                self.raw_without_sig(),
                 signature=self._gpgsig,
             )
             if keyids:

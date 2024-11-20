@@ -383,8 +383,7 @@ class CommitSerializationTests(TestCase):
         self.assertEqual(c, d)
 
     def test_serialize_gpgsig(self) -> None:
-        commit = self.make_commit(
-            gpgsig=b"""-----BEGIN PGP SIGNATURE-----
+        gpgsig = b"""-----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1
 
 iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
@@ -401,15 +400,14 @@ ND189UFuRuubxb42vZhpcXRbqJVWnbECTKVUPsGZqat3enQUB63uM4i6/RdONDZA
 fDeF1m4qYs+cUXKNUZ03
 =X6RT
 -----END PGP SIGNATURE-----"""
-        )
-        self.maxDiff = None
-        self.assertEqual(
-            b"""\
+        pre_sig = b"""\
 tree d80c186a03f423a81b39df39dc87fd269736ca86
 parent ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd
 parent 4cffe90e0a41ad3f5190079d7c8f036bde29cbe6
 author James Westby <jw+debian@jameswestby.net> 1174773719 +0000
 committer James Westby <jw+debian@jameswestby.net> 1174773719 +0000
+"""
+        git_sig = b"""\
 gpgsig -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1
  
@@ -427,11 +425,17 @@ gpgsig -----BEGIN PGP SIGNATURE-----
  fDeF1m4qYs+cUXKNUZ03
  =X6RT
  -----END PGP SIGNATURE-----
+"""
+        post_sig = b"""\
 
 Merge ../b
-""",
-            commit.as_raw_string(),
-        )
+"""
+        commit = self.make_commit(gpgsig=gpgsig)
+        self.maxDiff = None
+        self.assertEqual(pre_sig + git_sig + post_sig, commit.as_raw_string())
+        self.assertEqual(pre_sig + post_sig, commit.raw_without_sig())
+        self.assertEqual(gpgsig, commit.gpgsig)
+        self.assertEqual(b"Merge ../b\n", commit.message)
 
     def test_serialize_mergetag(self) -> None:
         tag = make_object(
@@ -729,10 +733,11 @@ class CommitParseTests(ShaFileCheckTests):
             commit.check()
 
     def test_parse_gpgsig(self) -> None:
-        c = Commit.from_string(
-            b"""tree aaff74984cccd156a469afa7d9ab10e4777beb24
+        pre_sig = b"""tree aaff74984cccd156a469afa7d9ab10e4777beb24
 author Jelmer Vernooij <jelmer@samba.org> 1412179807 +0200
 committer Jelmer Vernooij <jelmer@samba.org> 1412179807 +0200
+"""
+        git_sig = b"""\
 gpgsig -----BEGIN PGP SIGNATURE-----
  Version: GnuPG v1
  
@@ -750,10 +755,14 @@ gpgsig -----BEGIN PGP SIGNATURE-----
  fDeF1m4qYs+cUXKNUZ03
  =X6RT
  -----END PGP SIGNATURE-----
+"""
+        post_sig = b"""\
 
 foo
 """
-        )
+        c = Commit.from_string(pre_sig + git_sig + post_sig)
+        self.assertEqual(pre_sig + post_sig, c.raw_without_sig())
+        self.assertEqual(pre_sig + git_sig + post_sig, bytes(c))
         self.assertEqual(b"foo\n", c.message)
         self.assertEqual([], c._extra)
         self.assertEqual(
@@ -778,12 +787,13 @@ fDeF1m4qYs+cUXKNUZ03
         )
 
     def test_parse_header_trailing_newline(self) -> None:
-        c = Commit.from_string(
-            b"""\
+        pre_sig = b"""\
 tree a7d6277f78d3ecd0230a1a5df6db00b1d9c521ac
 parent c09b6dec7a73760fbdb478383a3c926b18db8bbe
 author Neil Matatall <oreoshake@github.com> 1461964057 -1000
 committer Neil Matatall <oreoshake@github.com> 1461964057 -1000
+"""
+        git_sig = b"""\
 gpgsig -----BEGIN PGP SIGNATURE-----
  
  wsBcBAABCAAQBQJXI80ZCRA6pcNDcVZ70gAAarcIABs72xRX3FWeox349nh6ucJK
@@ -795,13 +805,12 @@ gpgsig -----BEGIN PGP SIGNATURE-----
  =ms6q
  -----END PGP SIGNATURE-----
  
+"""
+        post_sig = b"""\
 
 3.3.0 version bump and docs
 """
-        )
-        self.assertEqual([], c._extra)
-        self.assertEqual(
-            b"""\
+        gpgsig = b"""\
 -----BEGIN PGP SIGNATURE-----
 
 wsBcBAABCAAQBQJXI80ZCRA6pcNDcVZ70gAAarcIABs72xRX3FWeox349nh6ucJK
@@ -811,9 +820,14 @@ hHsDXnCaotphLkbgKKRdGZo7tDqM84wuEDlh4MwNe7qlFC7bYLDyysc81ZX5lpMm
 gl3REp9+A+qBEpNQI7z94Pg5Bc5xenwuDh3SJgHvJV6zBWupWcdB3fAkVd4TPnEZ
 nHxksHfeNln9RKseIDcy4b2ATjhDNIJZARHNfr6oy4u3XPW4svRqtBsLoMiIeuI=
 =ms6q
------END PGP SIGNATURE-----\n""",
-            c.gpgsig,
-        )
+-----END PGP SIGNATURE-----\n"""
+
+        c = Commit.from_string(pre_sig + git_sig + post_sig)
+        self.assertEqual([], c._extra)
+        self.assertEqual(pre_sig + git_sig + post_sig, c.as_raw_string())
+        self.assertEqual(pre_sig + post_sig, c.raw_without_sig())
+        self.assertEqual(gpgsig, c.gpgsig)
+        self.assertEqual(b"3.3.0 version bump and docs\n", c.message)
 
 
 _TREE_ITEMS = {

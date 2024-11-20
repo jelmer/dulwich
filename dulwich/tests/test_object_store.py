@@ -20,7 +20,7 @@
 
 """Tests for the object store interface."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable
 from unittest import skipUnless
 
 from dulwich.index import commit_tree
@@ -53,20 +53,11 @@ testobject = make_object(Blob, data=b"yummy data")
 class ObjectStoreTests:
     store: "BaseObjectStore"
 
-    def assertEqual(self, a, b) -> None:
-        raise NotImplementedError
-
-    def assertRaises(self, exc, func) -> None:
-        raise NotImplementedError
-
-    def assertNotIn(self, a, b) -> None:
-        raise NotImplementedError
-
-    def assertNotEqual(self, a, b) -> None:
-        raise NotImplementedError
-
-    def assertIn(self, a, b) -> None:
-        raise NotImplementedError
+    assertEqual: Callable[[object, object], None]
+    assertRaises: Callable[[type[Exception], Callable[[], Any]], None]
+    assertNotIn: Callable[[object, object], None]
+    assertNotEqual: Callable[[object, object], None]
+    assertIn: Callable[[object, object], None]
 
     def test_determine_wants_all(self) -> None:
         self.assertEqual(

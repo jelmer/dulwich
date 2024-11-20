@@ -26,7 +26,7 @@ from . import TestCase
 
 
 class MissingObjectFinderTest(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.store = MemoryObjectStore()
         self.commits = []
@@ -34,7 +34,7 @@ class MissingObjectFinderTest(TestCase):
     def cmt(self, n):
         return self.commits[n - 1]
 
-    def assertMissingMatch(self, haves, wants, expected):
+    def assertMissingMatch(self, haves, wants, expected) -> None:
         for sha, path in MissingObjectFinder(self.store, haves, wants, shallow=set()):
             self.assertIn(
                 sha, expected, f"({sha},{path}) erroneously reported as missing"
@@ -49,7 +49,7 @@ class MissingObjectFinderTest(TestCase):
 
 
 class MOFLinearRepoTest(MissingObjectFinderTest):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         # present in 1, removed in 3
         f1_1 = make_object(Blob, data=b"f1")
@@ -84,23 +84,23 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
             f2_3.id,
         ]
 
-    def test_1_to_2(self):
+    def test_1_to_2(self) -> None:
         self.assertMissingMatch([self.cmt(1).id], [self.cmt(2).id], self.missing_1_2)
 
-    def test_2_to_3(self):
+    def test_2_to_3(self) -> None:
         self.assertMissingMatch([self.cmt(2).id], [self.cmt(3).id], self.missing_2_3)
 
-    def test_1_to_3(self):
+    def test_1_to_3(self) -> None:
         self.assertMissingMatch([self.cmt(1).id], [self.cmt(3).id], self.missing_1_3)
 
-    def test_bogus_haves(self):
+    def test_bogus_haves(self) -> None:
         """Ensure non-existent SHA in haves are tolerated."""
         bogus_sha = self.cmt(2).id[::-1]
         haves = [self.cmt(1).id, bogus_sha]
         wants = [self.cmt(3).id]
         self.assertMissingMatch(haves, wants, self.missing_1_3)
 
-    def test_bogus_wants_failure(self):
+    def test_bogus_wants_failure(self) -> None:
         """Ensure non-existent SHA in wants are not tolerated."""
         bogus_sha = self.cmt(2).id[::-1]
         haves = [self.cmt(1).id]
@@ -109,7 +109,7 @@ class MOFLinearRepoTest(MissingObjectFinderTest):
             KeyError, MissingObjectFinder, self.store, haves, wants, shallow=set()
         )
 
-    def test_no_changes(self):
+    def test_no_changes(self) -> None:
         self.assertMissingMatch([self.cmt(3).id], [self.cmt(3).id], [])
 
 
@@ -120,7 +120,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
     #            \
     #             5
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         f1_1 = make_object(Blob, data=b"f1")
         f1_2 = make_object(Blob, data=b"f1-2")
@@ -153,7 +153,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
 
         self.assertEqual(f1_2.id, f1_7.id, "[sanity]")
 
-    def test_have6_want7(self):
+    def test_have6_want7(self) -> None:
         # have 6, want 7. Ideally, shall not report f1_7 as it's the same as
         # f1_2, however, to do so, MissingObjectFinder shall not record trees
         # of common commits only, but also all parent trees and tree items,
@@ -166,7 +166,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
             [self.cmt(7).id, self.cmt(7).tree, self.f1_7_id],
         )
 
-    def test_have4_want7(self):
+    def test_have4_want7(self) -> None:
         # have 4, want 7. Shall not include rev5 as it is not in the tree
         # between 4 and 7 (well, it is, but its SHA's are irrelevant for 4..7
         # commit hierarchy)
@@ -185,7 +185,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
             ],
         )
 
-    def test_have1_want6(self):
+    def test_have1_want6(self) -> None:
         # have 1, want 6. Shall not include rev5
         self.assertMissingMatch(
             [self.cmt(1).id],
@@ -206,7 +206,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
             ],
         )
 
-    def test_have3_want6(self):
+    def test_have3_want6(self) -> None:
         # have 3, want 7. Shall not report rev2 and its tree, because
         # haves(3) means has parents, i.e. rev2, too
         # BUT shall report any changes descending rev2 (excluding rev3)
@@ -225,7 +225,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
             ],
         )
 
-    def test_have5_want7(self):
+    def test_have5_want7(self) -> None:
         # have 5, want 7. Common parent is rev2, hence children of rev2 from
         # a descent line other than rev5 shall be reported
         # expects f1_4 from rev6. f3_5 is known in rev5;
@@ -246,7 +246,7 @@ class MOFMergeForkRepoTest(MissingObjectFinderTest):
 
 
 class MOFTagsTest(MissingObjectFinderTest):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         f1_1 = make_object(Blob, data=b"f1")
         commit_spec = [[1]]
@@ -270,7 +270,7 @@ class MOFTagsTest(MissingObjectFinderTest):
 
         self.f1_1_id = f1_1.id
 
-    def test_tagged_commit(self):
+    def test_tagged_commit(self) -> None:
         # The user already has the tagged commit, all they want is the tag,
         # so send them only the tag object.
         self.assertMissingMatch(
@@ -278,7 +278,7 @@ class MOFTagsTest(MissingObjectFinderTest):
         )
 
     # The remaining cases are unusual, but do happen in the wild.
-    def test_tagged_tag(self):
+    def test_tagged_tag(self) -> None:
         # User already has tagged tag, send only tag of tag
         self.assertMissingMatch(
             [self._normal_tag.id], [self._tag_of_tag.id], [self._tag_of_tag.id]
@@ -290,19 +290,19 @@ class MOFTagsTest(MissingObjectFinderTest):
             [self._normal_tag.id, self._tag_of_tag.id],
         )
 
-    def test_tagged_tree(self):
+    def test_tagged_tree(self) -> None:
         self.assertMissingMatch(
             [],
             [self._tag_of_tree.id],
             [self._tag_of_tree.id, self.cmt(1).tree, self.f1_1_id],
         )
 
-    def test_tagged_blob(self):
+    def test_tagged_blob(self) -> None:
         self.assertMissingMatch(
             [], [self._tag_of_blob.id], [self._tag_of_blob.id, self.f1_1_id]
         )
 
-    def test_tagged_tagged_blob(self):
+    def test_tagged_tagged_blob(self) -> None:
         self.assertMissingMatch(
             [],
             [self._tag_of_tag_of_blob.id],

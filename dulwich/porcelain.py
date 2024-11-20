@@ -140,16 +140,16 @@ GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
 class NoneStream(RawIOBase):
     """Fallback if stdout or stderr are unavailable, does nothing."""
 
-    def read(self, size=-1):
+    def read(self, size=-1) -> None:
         return None
 
-    def readall(self):
+    def readall(self) -> bytes:
+        return b""
+
+    def readinto(self, b) -> None:
         return None
 
-    def readinto(self, b):
-        return None
-
-    def write(self, b):
+    def write(self, b) -> None:
         return None
 
 
@@ -325,7 +325,7 @@ class DivergedBranches(Error):
         self.new_sha = new_sha
 
 
-def check_diverged(repo, current_sha, new_sha):
+def check_diverged(repo, current_sha, new_sha) -> None:
     """Check if updating to a sha can be done with fast forwarding.
 
     Args:
@@ -346,7 +346,7 @@ def archive(
     committish=None,
     outstream=default_bytes_out_stream,
     errstream=default_bytes_err_stream,
-):
+) -> None:
     """Create an archive.
 
     Args:
@@ -365,7 +365,7 @@ def archive(
             outstream.write(chunk)
 
 
-def update_server_info(repo="."):
+def update_server_info(repo=".") -> None:
     """Update server info files for a repository.
 
     Args:
@@ -375,7 +375,7 @@ def update_server_info(repo="."):
         server_update_server_info(r)
 
 
-def symbolic_ref(repo, ref_name, force=False):
+def symbolic_ref(repo, ref_name, force=False) -> None:
     """Set git symbolic ref into HEAD.
 
     Args:
@@ -390,7 +390,7 @@ def symbolic_ref(repo, ref_name, force=False):
         repo_obj.refs.set_symbolic_ref(b"HEAD", ref_path)
 
 
-def pack_refs(repo, all=False):
+def pack_refs(repo, all=False) -> None:
     with open_repo_closing(repo) as repo_obj:
         refs = repo_obj.refs
         packed_refs = {
@@ -623,7 +623,7 @@ def _is_subdir(subdir, parentdir):
 
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
-def clean(repo=".", target_dir=None):
+def clean(repo=".", target_dir=None) -> None:
     """Remove any untracked files from the target directory recursively.
 
     Equivalent to running ``git clean -fd`` in target_dir.
@@ -669,7 +669,7 @@ def clean(repo=".", target_dir=None):
                     os.remove(ap)
 
 
-def remove(repo=".", paths=None, cached=False):
+def remove(repo=".", paths=None, cached=False) -> None:
     """Remove files from the staging area.
 
     Args:
@@ -736,7 +736,7 @@ def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
     return contents.encode(encoding)
 
 
-def print_commit(commit, decode, outstream=sys.stdout):
+def print_commit(commit, decode, outstream=sys.stdout) -> None:
     """Write a human-readable commit log entry.
 
     Args:
@@ -764,7 +764,7 @@ def print_commit(commit, decode, outstream=sys.stdout):
     outstream.write("\n")
 
 
-def print_tag(tag, decode, outstream=sys.stdout):
+def print_tag(tag, decode, outstream=sys.stdout) -> None:
     """Write a human-readable tag.
 
     Args:
@@ -782,7 +782,7 @@ def print_tag(tag, decode, outstream=sys.stdout):
     outstream.write("\n")
 
 
-def show_blob(repo, blob, decode, outstream=sys.stdout):
+def show_blob(repo, blob, decode, outstream=sys.stdout) -> None:
     """Write a blob to a stream.
 
     Args:
@@ -794,7 +794,7 @@ def show_blob(repo, blob, decode, outstream=sys.stdout):
     outstream.write(decode(blob.data))
 
 
-def show_commit(repo, commit, decode, outstream=sys.stdout):
+def show_commit(repo, commit, decode, outstream=sys.stdout) -> None:
     """Show a commit to a stream.
 
     Args:
@@ -815,7 +815,7 @@ def show_commit(repo, commit, decode, outstream=sys.stdout):
     outstream.write(commit_decode(commit, diffstream.getvalue()))
 
 
-def show_tree(repo, tree, decode, outstream=sys.stdout):
+def show_tree(repo, tree, decode, outstream=sys.stdout) -> None:
     """Print a tree to a stream.
 
     Args:
@@ -828,7 +828,7 @@ def show_tree(repo, tree, decode, outstream=sys.stdout):
         outstream.write(decode(n) + "\n")
 
 
-def show_tag(repo, tag, decode, outstream=sys.stdout):
+def show_tag(repo, tag, decode, outstream=sys.stdout) -> None:
     """Print a tag to a stream.
 
     Args:
@@ -886,7 +886,7 @@ def log(
     max_entries=None,
     reverse=False,
     name_status=False,
-):
+) -> None:
     """Write commit logs.
 
     Args:
@@ -917,7 +917,7 @@ def show(
     objects=None,
     outstream=sys.stdout,
     default_encoding=DEFAULT_ENCODING,
-):
+) -> None:
     """Print the changes in a commit.
 
     Args:
@@ -947,7 +947,7 @@ def show(
             show_object(r, o, decode, outstream)
 
 
-def diff_tree(repo, old_tree, new_tree, outstream=default_bytes_out_stream):
+def diff_tree(repo, old_tree, new_tree, outstream=default_bytes_out_stream) -> None:
     """Compares the content and mode of blobs found via two tree objects.
 
     Args:
@@ -960,7 +960,7 @@ def diff_tree(repo, old_tree, new_tree, outstream=default_bytes_out_stream):
         write_tree_diff(outstream, r.object_store, old_tree, new_tree)
 
 
-def rev_list(repo, commits, outstream=sys.stdout):
+def rev_list(repo, commits, outstream=sys.stdout) -> None:
     """Lists commit objects in reverse chronological order.
 
     Args:
@@ -980,7 +980,7 @@ def _canonical_part(url: str) -> str:
     return name
 
 
-def submodule_add(repo, url, path=None, name=None):
+def submodule_add(repo, url, path=None, name=None) -> None:
     """Add a new submodule.
 
     Args:
@@ -1006,7 +1006,7 @@ def submodule_add(repo, url, path=None, name=None):
         config.write_to_path()
 
 
-def submodule_init(repo):
+def submodule_init(repo) -> None:
     """Initialize submodules.
 
     Args:
@@ -1045,7 +1045,7 @@ def tag_create(
     tag_timezone=None,
     sign=False,
     encoding=DEFAULT_ENCODING,
-):
+) -> None:
     """Creates a tag in git via dulwich calls.
 
     Args:
@@ -1104,7 +1104,7 @@ def tag_list(repo, outstream=sys.stdout):
         return tags
 
 
-def tag_delete(repo, name):
+def tag_delete(repo, name) -> None:
     """Remove a tag.
 
     Args:
@@ -1122,7 +1122,7 @@ def tag_delete(repo, name):
             del r.refs[_make_tag_ref(name)]
 
 
-def reset(repo, mode, treeish="HEAD"):
+def reset(repo, mode, treeish="HEAD") -> None:
     """Reset current HEAD to the specified state.
 
     Args:
@@ -1170,7 +1170,7 @@ def push(
     errstream=default_bytes_err_stream,
     force=False,
     **kwargs,
-):
+) -> None:
     """Remote push with dulwich via dulwich.client.
 
     Args:
@@ -1255,7 +1255,7 @@ def pull(
     filter_spec=None,
     protocol_version=None,
     **kwargs,
-):
+) -> None:
     """Pull from remote via dulwich.client.
 
     Args:
@@ -1280,7 +1280,7 @@ def pull(
         if refspecs is None:
             refspecs = [b"HEAD"]
 
-        def determine_wants(remote_refs, **kwargs):
+        def determine_wants(remote_refs, *args, **kwargs):
             selected_refs.extend(
                 parse_reftuples(remote_refs, r.refs, refspecs, force=force)
             )
@@ -1494,7 +1494,7 @@ def get_tree_changes(repo):
         return tracked_changes
 
 
-def daemon(path=".", address=None, port=None):
+def daemon(path=".", address=None, port=None) -> None:
     """Run a daemon serving Git requests over TCP/IP.
 
     Args:
@@ -1508,7 +1508,7 @@ def daemon(path=".", address=None, port=None):
     server.serve_forever()
 
 
-def web_daemon(path=".", address=None, port=None):
+def web_daemon(path=".", address=None, port=None) -> None:
     """Run a daemon serving Git requests over HTTP.
 
     Args:
@@ -1535,7 +1535,7 @@ def web_daemon(path=".", address=None, port=None):
     server.serve_forever()
 
 
-def upload_pack(path=".", inf=None, outf=None):
+def upload_pack(path=".", inf=None, outf=None) -> int:
     """Upload a pack file after negotiating its contents using smart protocol.
 
     Args:
@@ -1550,7 +1550,7 @@ def upload_pack(path=".", inf=None, outf=None):
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
 
-    def send_fn(data):
+    def send_fn(data) -> None:
         outf.write(data)
         outf.flush()
 
@@ -1561,7 +1561,7 @@ def upload_pack(path=".", inf=None, outf=None):
     return 0
 
 
-def receive_pack(path=".", inf=None, outf=None):
+def receive_pack(path=".", inf=None, outf=None) -> int:
     """Receive a pack file after negotiating its contents using smart protocol.
 
     Args:
@@ -1576,7 +1576,7 @@ def receive_pack(path=".", inf=None, outf=None):
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
 
-    def send_fn(data):
+    def send_fn(data) -> None:
         outf.write(data)
         outf.flush()
 
@@ -1599,7 +1599,7 @@ def _make_tag_ref(name):
     return LOCAL_TAG_PREFIX + name
 
 
-def branch_delete(repo, name):
+def branch_delete(repo, name) -> None:
     """Delete a branch.
 
     Args:
@@ -1615,7 +1615,7 @@ def branch_delete(repo, name):
             del r.refs[_make_branch_ref(name)]
 
 
-def branch_create(repo, name, objectish=None, force=False):
+def branch_create(repo, name, objectish=None, force=False) -> None:
     """Create a branch.
 
     Args:
@@ -1800,7 +1800,7 @@ def ls_remote(remote, config: Optional[Config] = None, **kwargs):
     return client.get_refs(host_path)
 
 
-def repack(repo):
+def repack(repo) -> None:
     """Repack loose files in a repository.
 
     Currently this only packs loose objects.
@@ -1820,7 +1820,7 @@ def pack_objects(
     delta_window_size=None,
     deltify=None,
     reuse_deltas=True,
-):
+) -> None:
     """Pack objects into a file.
 
     Args:
@@ -1853,7 +1853,7 @@ def ls_tree(
     outstream=sys.stdout,
     recursive=False,
     name_only=False,
-):
+) -> None:
     """List contents of a tree.
 
     Args:
@@ -1864,7 +1864,7 @@ def ls_tree(
       name_only: Only print item name
     """
 
-    def list_tree(store, treeid, base):
+    def list_tree(store, treeid, base) -> None:
         for name, mode, sha in store[treeid].iteritems():
             if base:
                 name = posixpath.join(base, name)
@@ -1880,7 +1880,7 @@ def ls_tree(
         list_tree(r.object_store, tree.id, "")
 
 
-def remote_add(repo: Repo, name: Union[bytes, str], url: Union[bytes, str]):
+def remote_add(repo, name: Union[bytes, str], url: Union[bytes, str]) -> None:
     """Add a remote.
 
     Args:
@@ -1901,7 +1901,7 @@ def remote_add(repo: Repo, name: Union[bytes, str], url: Union[bytes, str]):
         c.write_to_path()
 
 
-def remote_remove(repo: Repo, name: Union[bytes, str]):
+def remote_remove(repo: Repo, name: Union[bytes, str]) -> None:
     """Remove a remote.
 
     Args:
@@ -1938,7 +1938,7 @@ def check_ignore(repo, paths, no_index=False):
                 yield path
 
 
-def update_head(repo, target, detached=False, new_branch=None):
+def update_head(repo, target, detached=False, new_branch=None) -> None:
     """Update HEAD to point at a new branch/commit.
 
     Note that this does not actually update the working tree.
@@ -1966,7 +1966,7 @@ def update_head(repo, target, detached=False, new_branch=None):
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
-def reset_file(repo, file_path: str, target: bytes = b"HEAD", symlink_fn=None):
+def reset_file(repo, file_path: str, target: bytes = b"HEAD", symlink_fn=None) -> None:
     """Reset the file to specific commit or branch.
 
     Args:
@@ -2010,7 +2010,7 @@ def _update_head_during_checkout_branch(repo, target):
     return checkout_target
 
 
-def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
+def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> None:
     """Switch branches or restore working tree files.
 
     The implementation of this function will probably not scale well
@@ -2143,7 +2143,7 @@ def stash_list(repo):
         return enumerate(list(stash.stashes()))
 
 
-def stash_push(repo):
+def stash_push(repo) -> None:
     """Push a new stash onto the stack."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -2152,16 +2152,16 @@ def stash_push(repo):
         stash.push()
 
 
-def stash_pop(repo, index):
+def stash_pop(repo) -> None:
     """Pop a stash from the stack."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
 
         stash = Stash.from_repo(r)
-        stash.pop(index)
+        stash.pop()
 
 
-def stash_drop(repo, index):
+def stash_drop(repo, index) -> None:
     """Drop a stash from the stack."""
     with open_repo_closing(repo) as r:
         from .stash import Stash

@@ -36,6 +36,7 @@ import urllib.parse as urlparse
 import zlib
 from configparser import ConfigParser
 from io import BytesIO
+from typing import Optional
 
 from geventhttpclient import HTTPClient
 
@@ -302,7 +303,7 @@ class SwiftConnector:
         )
         return endpoint[self.endpoint_type], token
 
-    def test_root_exists(self):
+    def test_root_exists(self) -> Optional[bool]:
         """Check that Swift container exist.
 
         Returns: True if exist or None it not
@@ -316,7 +317,7 @@ class SwiftConnector:
             )
         return True
 
-    def create_root(self):
+    def create_root(self) -> None:
         """Create the Swift container.
 
         Raises:
@@ -368,7 +369,7 @@ class SwiftConnector:
             resp_headers[header.lower()] = value
         return resp_headers
 
-    def put_object(self, name, content):
+    def put_object(self, name, content) -> None:
         """Put an object.
 
         Args:
@@ -425,7 +426,7 @@ class SwiftConnector:
             return content
         return BytesIO(content)
 
-    def del_object(self, name):
+    def del_object(self, name) -> None:
         """Delete an object.
 
         Args:
@@ -440,7 +441,7 @@ class SwiftConnector:
                 f"DELETE request failed with error code {ret.status_code}"
             )
 
-    def del_root(self):
+    def del_root(self) -> None:
         """Delete the root container by removing container content.
 
         Raises:
@@ -481,7 +482,7 @@ class SwiftPackReader:
         self.buff = b""
         self.buff_length = self.scon.chunk_length
 
-    def _read(self, more=False):
+    def _read(self, more=False) -> None:
         if more:
             self.buff_length = self.buff_length * 2
         offset = self.base_offset
@@ -510,7 +511,7 @@ class SwiftPackReader:
         self.offset = end
         return data
 
-    def seek(self, offset):
+    def seek(self, offset) -> None:
         """Seek to a specified offset.
 
         Args:
@@ -568,7 +569,7 @@ class SwiftPackData(PackData):
         pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
         return pack_reader.read_checksum()
 
-    def close(self):
+    def close(self) -> None:
         pass
 
 
@@ -695,22 +696,22 @@ class SwiftObjectStore(PackBasedObjectStore):
             else:
                 return None
 
-        def abort():
+        def abort() -> None:
             pass
 
         return f, commit, abort
 
-    def add_object(self, obj):
+    def add_object(self, obj) -> None:
         self.add_objects(
             [
                 (obj, None),
             ]
         )
 
-    def _pack_cache_stale(self):
+    def _pack_cache_stale(self) -> bool:
         return False
 
-    def _get_loose_object(self, sha):
+    def _get_loose_object(self, sha) -> None:
         return None
 
     def add_thin_pack(self, read_all, read_some):
@@ -815,12 +816,21 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
                 return False
         return refs
 
-    def _write_refs(self, refs):
+    def _write_refs(self, refs) -> None:
         f = BytesIO()
         f.writelines(write_info_refs(refs, self.store))
         self.scon.put_object(self.filename, f)
 
-    def set_if_equals(self, name, old_ref, new_ref):
+    def set_if_equals(
+        self,
+        name,
+        old_ref,
+        new_ref,
+        committer=None,
+        timestamp=None,
+        timezone=None,
+        message=None,
+    ) -> bool:
         """Set a refname to new_ref only if it currently equals old_ref."""
         if name == "HEAD":
             return True
@@ -832,7 +842,9 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         self._refs[name] = new_ref
         return True
 
-    def remove_if_equals(self, name, old_ref):
+    def remove_if_equals(
+        self, name, old_ref, committer=None, timestamp=None, timezone=None, message=None
+    ) -> bool:
         """Remove a refname only if it currently equals old_ref."""
         if name == "HEAD":
             return True
@@ -879,14 +891,14 @@ class SwiftRepo(BaseRepo):
         refs = SwiftInfoRefsContainer(self.scon, object_store)
         BaseRepo.__init__(self, object_store, refs)
 
-    def _determine_file_mode(self):
+    def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
 
         Returns: True if permissions can be trusted, False otherwise.
         """
         return False
 
-    def _put_named_file(self, filename, contents):
+    def _put_named_file(self, filename, contents) -> None:
         """Put an object in a Swift container.
 
         Args:
@@ -928,7 +940,7 @@ class SwiftSystemBackend(Backend):
         return SwiftRepo(path, self.conf)
 
 
-def cmd_daemon(args):
+def cmd_daemon(args) -> None:
     """Entry point for starting a TCP git server."""
     import optparse
 
@@ -980,7 +992,7 @@ def cmd_daemon(args):
     server.serve_forever()
 
 
-def cmd_init(args):
+def cmd_init(args) -> None:
     import optparse
 
     parser = optparse.OptionParser()
@@ -1001,7 +1013,7 @@ def cmd_init(args):
     SwiftRepo.init_bare(scon, conf)
 
 
-def main(argv=sys.argv):
+def main(argv=sys.argv) -> None:
     commands = {
         "init": cmd_init,
         "daemon": cmd_daemon,

@@ -45,7 +45,7 @@ class GitFastExporter:
         self.markers: dict[bytes, bytes] = {}
         self._marker_idx = 0
 
-    def print_cmd(self, cmd):
+    def print_cmd(self, cmd) -> None:
         self.outf.write(getattr(cmd, "__bytes__", cmd.__repr__)() + b"\n")
 
     def _allocate_marker(self):
@@ -138,17 +138,17 @@ class GitImportProcessor(processor.ImportProcessor):
         self.process(p.iter_commands)
         return self.markers
 
-    def blob_handler(self, cmd):
+    def blob_handler(self, cmd) -> None:
         """Process a BlobCommand."""
         blob = Blob.from_string(cmd.data)
         self.repo.object_store.add_object(blob)
         if cmd.mark:
             self.markers[cmd.mark] = blob.id
 
-    def checkpoint_handler(self, cmd):
+    def checkpoint_handler(self, cmd) -> None:
         """Process a CheckpointCommand."""
 
-    def commit_handler(self, cmd):
+    def commit_handler(self, cmd) -> None:
         """Process a CommitCommand."""
         commit = Commit()
         if cmd.author is not None:
@@ -207,10 +207,10 @@ class GitImportProcessor(processor.ImportProcessor):
         if cmd.mark:
             self.markers[cmd.mark] = commit.id
 
-    def progress_handler(self, cmd):
+    def progress_handler(self, cmd) -> None:
         """Process a ProgressCommand."""
 
-    def _reset_base(self, commit_id):
+    def _reset_base(self, commit_id) -> None:
         if self.last_commit == commit_id:
             return
         self._contents = {}
@@ -224,7 +224,7 @@ class GitImportProcessor(processor.ImportProcessor):
             ) in iter_tree_contents(self.repo.object_store, tree_id):
                 self._contents[path] = (mode, hexsha)
 
-    def reset_handler(self, cmd):
+    def reset_handler(self, cmd) -> None:
         """Process a ResetCommand."""
         if cmd.from_ is None:
             from_ = ZERO_SHA
@@ -233,7 +233,7 @@ class GitImportProcessor(processor.ImportProcessor):
         self._reset_base(from_)
         self.repo.refs[cmd.ref] = from_
 
-    def tag_handler(self, cmd):
+    def tag_handler(self, cmd) -> None:
         """Process a TagCommand."""
         tag = Tag()
         tag.tagger = cmd.tagger

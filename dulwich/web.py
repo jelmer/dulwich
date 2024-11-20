@@ -338,7 +338,7 @@ class HTTPGitRequest:
         self._cache_headers: list[tuple[str, str]] = []
         self._headers: list[tuple[str, str]] = []
 
-    def add_header(self, name, value):
+    def add_header(self, name, value) -> None:
         """Add a header to the response."""
         self._headers.append((name, value))
 
@@ -511,56 +511,59 @@ def make_wsgi_chain(*args, **kwargs):
 class ServerHandlerLogger(ServerHandler):
     """ServerHandler that uses dulwich's logger for logging exceptions."""
 
-    def log_exception(self, exc_info):
+    def log_exception(self, exc_info) -> None:
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
-    def log_message(self, format, *args):
+    def log_message(self, format, *args) -> None:
         logger.info(format, *args)
 
-    def log_error(self, *args):
+    def log_error(self, *args) -> None:
         logger.error(*args)
 
 
 class WSGIRequestHandlerLogger(WSGIRequestHandler):
     """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
 
-    def log_exception(self, exc_info):
+    def log_exception(self, exc_info) -> None:
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
-    def log_message(self, format, *args):
+    def log_message(self, format, *args) -> None:
         logger.info(format, *args)
 
-    def log_error(self, *args):
+    def log_error(self, *args) -> None:
         logger.error(*args)
 
-    def handle(self):
+    def handle(self) -> None:
         """Handle a single HTTP request."""
         self.raw_requestline = self.rfile.readline()
         if not self.parse_request():  # An error code has been sent, just exit
             return
 
         handler = ServerHandlerLogger(
-            self.rfile, self.wfile, self.get_stderr(), self.get_environ()
+            self.rfile,
+            self.wfile,  # type: ignore
+            self.get_stderr(),
+            self.get_environ(),
         )
-        handler.request_handler = self  # backpointer for logging
-        handler.run(self.server.get_app())
+        handler.request_handler = self  # type: ignore  # backpointer for logging
+        handler.run(self.server.get_app())  # type: ignore
 
 
 class WSGIServerLogger(WSGIServer):
-    def handle_error(self, request, client_address):
+    def handle_error(self, request, client_address) -> None:
         """Handle an error."""
         logger.exception(
             f"Exception happened during processing of request from {client_address!s}"
         )
 
 
-def main(argv=sys.argv):
+def main(argv=sys.argv) -> None:
     """Entry point for starting an HTTP git server."""
     import optparse
 

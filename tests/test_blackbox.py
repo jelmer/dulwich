@@ -31,19 +31,19 @@ from . import BlackboxTestCase
 class GitReceivePackTests(BlackboxTestCase):
     """Blackbox tests for dul-receive-pack."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
 
-    def test_basic(self):
+    def test_basic(self) -> None:
         process = self.run_command("dul-receive-pack", [self.path])
         (stdout, stderr) = process.communicate(b"0000")
         self.assertEqual(b"0000", stdout[-4:])
         self.assertEqual(0, process.returncode)
 
-    def test_missing_arg(self):
+    def test_missing_arg(self) -> None:
         process = self.run_command("dul-receive-pack", [])
         (stdout, stderr) = process.communicate()
         self.assertEqual(
@@ -56,13 +56,13 @@ class GitReceivePackTests(BlackboxTestCase):
 class GitUploadPackTests(BlackboxTestCase):
     """Blackbox tests for dul-upload-pack."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.path)
         self.repo = Repo.init(self.path)
 
-    def test_missing_arg(self):
+    def test_missing_arg(self) -> None:
         process = self.run_command("dul-upload-pack", [])
         (stdout, stderr) = process.communicate()
         self.assertEqual(

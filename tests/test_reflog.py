@@ -34,7 +34,7 @@ from . import TestCase
 
 
 class ReflogLineTests(TestCase):
-    def test_format(self):
+    def test_format(self) -> None:
         self.assertEqual(
             b"0000000000000000000000000000000000000000 "
             b"49030649db3dfec5a9bc03e5dde4255a14499f16 Jelmer Vernooij "
@@ -65,7 +65,7 @@ class ReflogLineTests(TestCase):
             ),
         )
 
-    def test_parse(self):
+    def test_parse(self) -> None:
         reflog_line = (
             b"0000000000000000000000000000000000000000 "
             b"49030649db3dfec5a9bc03e5dde4255a14499f16 Jelmer Vernooij "
@@ -102,7 +102,7 @@ _TEST_REFLOG = (
 
 
 class ReflogDropTests(TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         TestCase.setUp(self)
         self.f = BytesIO(_TEST_REFLOG)
         self.original_log = list(read_reflog(self.f))
@@ -112,10 +112,10 @@ class ReflogDropTests(TestCase):
         self.f.seek(0)
         return list(read_reflog(self.f))
 
-    def test_invalid(self):
+    def test_invalid(self) -> None:
         self.assertRaises(ValueError, drop_reflog_entry, self.f, -1)
 
-    def test_drop_entry(self):
+    def test_drop_entry(self) -> None:
         drop_reflog_entry(self.f, 0)
         log = self._read_log()
         self.assertEqual(len(log), 2)
@@ -127,7 +127,7 @@ class ReflogDropTests(TestCase):
         self.assertEqual(len(log), 1)
         self.assertEqual(self.original_log[1], log[0])
 
-    def test_drop_entry_with_rewrite(self):
+    def test_drop_entry_with_rewrite(self) -> None:
         drop_reflog_entry(self.f, 1, True)
         log = self._read_log()
         self.assertEqual(len(log), 2)

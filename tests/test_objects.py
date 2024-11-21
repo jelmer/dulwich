@@ -218,6 +218,7 @@ class BlobReadTests(TestCase):
             b"=ql7y\n"
             b"-----END PGP SIGNATURE-----\n",
         )
+        self.assertEqual(t.raw_without_sig() + t.signature, bytes(t))
 
     def test_read_commit_from_file(self) -> None:
         sha = b"60dacdc733de308bb77bb76ce0fb0f9b44c9769e"
@@ -1237,6 +1238,23 @@ class TagParseTests(ShaFileCheckTests):
 
         self.assertNotIn(shas[0], shas[1:])
         self.assertEqual(shas[1], shas[2])
+
+    def test_tag_withough_sig(self) -> None:
+        x = Tag()
+        x.set_raw_string(self.make_tag_text())
+        self.assertEqual(bytes(x), x.raw_without_sig() + x.signature)
+        self.assertEqual(
+            b"""\
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.7 (GNU/Linux)
+
+iD8DBQBGiAaAF3YsRnbiHLsRAitMAKCiLboJkQECM/jpYsY3WPfvUgLXkACgg3ql
+OK2XeQOiEeXtT76rV4t2WR4=
+=ivrA
+-----END PGP SIGNATURE-----
+""",
+            x.signature,
+        )
 
 
 class CheckTests(TestCase):

@@ -917,6 +917,16 @@ class Tag(ShaFile):
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 
+    def raw_without_sig(self) -> bytes:
+        """Return raw string serialization without the GPG/SSH signature.
+
+        self.signature is a signature for the returned raw byte string serialization.
+        """
+        ret = self.as_raw_string()
+        if self._signature:
+            ret = ret[: -len(self._signature)]
+        return ret
+
     def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this tag (if it is signed).
 
@@ -938,7 +948,7 @@ class Tag(ShaFile):
 
         with gpg.Context() as ctx:
             data, result = ctx.verify(
-                self.as_raw_string()[: -len(self._signature)],
+                self.raw_without_sig(),
                 signature=self._signature,
             )
             if keyids:

@@ -85,6 +85,19 @@ class EmptyFileException(FileFormatException):
     """An unexpectedly empty file was encountered."""
 
 
+class InvalidSignature(Exception):
+    """A signature was rejected by a signature criterion."""
+
+
+class SignatureCriterion:
+    def check(self, crypto_msg: bytes, signature: bytes, verify_time: int) -> None:
+        """Check/verify signature for a cryptographic message.
+
+        Raises:
+            InvalidSignature
+        """
+
+
 def S_ISGITLINK(m):
     """Check if a mode indicates a submodule.
 
@@ -927,6 +940,10 @@ class Tag(ShaFile):
             ret = ret[: -len(self._signature)]
         return ret
 
+    def check_signature(self, criterion: SignatureCriterion) -> None:
+        if self.signature:
+            criterion.check(self.raw_without_sig(), self.signature, self.tag_time)
+
     def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this tag (if it is signed).
 
@@ -941,24 +958,10 @@ class Tag(ShaFile):
           gpg.errors.MissingSignatures: if tag was not signed by a key
             specified in keyids
         """
-        if self._signature is None:
-            return
-
-        import gpg
-
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._signature,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in keys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
+        try:
+            self.check_signature(GpgSignatureCriterion(keyids))
+        except InvalidSignature as ex:
+            raise ex.__cause__ from None  # type: ignore[misc]
 
 
 class TreeEntry(namedtuple("TreeEntry", ["path", "mode", "sha"])):
@@ -1531,6 +1534,10 @@ class Commit(ShaFile):
         tmp.gpgsig = None
         return tmp.as_raw_string()
 
+    def check_signature(self, criterion: SignatureCriterion) -> None:
+        if self.gpgsig:
+            criterion.check(self.raw_without_sig(), self.gpgsig, self.commit_time)
+
     def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this commit (if it is signed).
 
@@ -1545,24 +1552,10 @@ class Commit(ShaFile):
           gpg.errors.MissingSignatures: if commit was not signed by a key
             specified in keyids
         """
-        if self._gpgsig is None:
-            return
-
-        import gpg
-
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._gpgsig,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in keys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
+        try:
+            self.check_signature(GpgSignatureCriterion(keyids))
+        except InvalidSignature as ex:
+            raise ex.__cause__ from None  # type: ignore[misc]
 
     def _serialize(self):
         headers = []
@@ -1679,6 +1672,30 @@ _TYPE_MAP: dict[Union[bytes, int], type[ShaFile]] = {}
 for cls in OBJECT_CLASSES:
     _TYPE_MAP[cls.type_name] = cls
     _TYPE_MAP[cls.type_num] = cls
+
+
+class GpgSignatureCriterion(SignatureCriterion):
+    """Verifies GPG signature."""
+
+    def __init__(self, keyids: Optional[Iterable[str]] = None):
+        self.keyids = keyids
+
+    def check(self, crypto_msg: bytes, signature: bytes, verify_time: int) -> None:
+        import gpg
+
+        with gpg.Context() as ctx:
+            try:
+                data, result = ctx.verify(crypto_msg, signature=signature)
+            except gpg.errors.BadSignatures as ex:
+                raise InvalidSignature from ex
+            if self.keyids is not None:
+                keys = [ctx.get_key(keyid) for keyid in self.keyids]
+                for key in keys:
+                    for sig in result.signatures:
+                        if key.can_sign and key.fpr == sig.fpr:
+                            return
+                ex2 = gpg.errors.MissingSignatures(result, keys, results=(data, result))
+                raise InvalidSignature from ex2
 
 
 # Hold on to the pure-python implementations for testing

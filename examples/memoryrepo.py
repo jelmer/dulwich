@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+
 # This script creates a clone of a remote repository in local memory,
 # then adds a single file and pushes the result back.
 #

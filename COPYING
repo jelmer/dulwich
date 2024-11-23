@@ -2,6 +2,8 @@ Dulwich may be used under the conditions of either of two licenses,
 the Apache License (version 2.0 or later) or the GNU General Public License,
 version 2.0 or later.
 
+SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/

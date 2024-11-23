@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+
 # Example printing the last author of a specified file
 
 import sys

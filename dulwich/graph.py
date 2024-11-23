@@ -1,6 +1,7 @@
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
 # Copyright (c) 2020 Kevin B. Hendricks, Stratford Ontario Canada
 #
+# SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as public by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or

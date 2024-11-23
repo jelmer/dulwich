@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # Setup file for dulwich
 # Copyright (C) 2008-2022 Jelmer Vernooĳ <jelmer@jelmer.uk>
+# SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 
 import os
 import sys

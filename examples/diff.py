@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+
 # This trivial script demonstrates how to extract the unified diff for a single
 # commit in a local repository.
 #

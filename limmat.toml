@@ -1,0 +1,25 @@
+# Check that the formatting is correct
+[[tests]]
+name = "fmt"
+command = "cargo fmt --check"
+
+[[tests]]
+name = "typing"
+command = "mypy dulwich"
+
+[[tests]]
+name = "ruff-check"
+command = "ruff check ."
+
+[[tests]]
+name = "ruff-format"
+command = "ruff format --check ."
+
+[[tests]]
+name = "codespell"
+command = "codespell --config=.codespellrc ."
+
+# Validate disperse config
+[[tests]]
+name = "disperse"
+command = "disperse validate"

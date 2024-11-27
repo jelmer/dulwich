@@ -112,7 +112,7 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
             if sha in self._tagged:
                 self.add_todo([(self._tagged[sha], None, True)])
         self.sha_done.add(sha)
-        self.progress("counting objects: %d\r" % len(self.sha_done))
+        self.progress(f"counting objects: {len(self.sha_done)}\r")
         return (sha, name)
 
 

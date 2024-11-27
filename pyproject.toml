@@ -85,8 +85,6 @@ ignore = [
     "ANN001",
     "ANN002",
     "ANN003",
-    "ANN101",  # missing-type-self
-    "ANN102",
     "ANN201",
     "ANN202",
     "ANN204",

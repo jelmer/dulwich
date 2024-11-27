@@ -393,12 +393,11 @@ def _parse_string(value: bytes) -> bytes:
                 v = _ESCAPE_TABLE[value[i]]
             except IndexError as exc:
                 raise ValueError(
-                    "escape character in %r at %d before end of string" % (value, i)
+                    f"escape character in {value!r} at {i} before end of string"
                 ) from exc
             except KeyError as exc:
                 raise ValueError(
-                    "escape character followed by unknown character "
-                    "%s at %d in %r" % (value[i], i, value)
+                    f"escape character followed by unknown character {value[i]!r} at {i} in {value!r}"
                 ) from exc
             if whitespace:
                 ret.extend(whitespace)

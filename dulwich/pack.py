@@ -190,16 +190,16 @@ class UnpackedObject:
     """
 
     __slots__ = [
-        "offset",  # Offset in its pack.
         "_sha",  # Cached binary SHA.
-        "obj_type_num",  # Type of this object.
-        "obj_chunks",  # Decompressed and delta-resolved chunks.
-        "pack_type_num",  # Type of this object in the pack (may be a delta).
-        "delta_base",  # Delta base offset or SHA.
         "comp_chunks",  # Compressed object chunks.
+        "crc32",  # CRC32.
         "decomp_chunks",  # Decompressed object chunks.
         "decomp_len",  # Decompressed length of this object.
-        "crc32",  # CRC32.
+        "delta_base",  # Delta base offset or SHA.
+        "obj_chunks",  # Decompressed and delta-resolved chunks.
+        "obj_type_num",  # Type of this object.
+        "offset",  # Offset in its pack.
+        "pack_type_num",  # Type of this object in the pack (may be a delta).
     ]
 
     obj_type_num: Optional[int]
@@ -409,7 +409,7 @@ def load_pack_index_file(path, f):
         if version == 2:
             return PackIndex2(path, file=f, contents=contents, size=size)
         else:
-            raise KeyError("Unknown pack index format %d" % version)
+            raise KeyError(f"Unknown pack index format {version}")
     else:
         return PackIndex1(path, file=f, contents=contents, size=size)
 
@@ -797,7 +797,7 @@ class PackIndex2(FilePackIndex):
             raise AssertionError("Not a v2 pack index file")
         (self.version,) = unpack_from(b">L", self._contents, 4)
         if self.version != 2:
-            raise AssertionError("Version was %d" % self.version)
+            raise AssertionError(f"Version was {self.version}")
         self._fan_out_table = self._read_fan_out_table(8)
         self._name_table_offset = 8 + 0x100 * 4
         self._crc32_table_offset = self._name_table_offset + 20 * len(self)
@@ -844,7 +844,7 @@ def read_pack_header(read) -> tuple[int, int]:
         raise AssertionError(f"Invalid pack header {header!r}")
     (version,) = unpack_from(b">L", header, 4)
     if version not in (2, 3):
-        raise AssertionError("Version was %d" % version)
+        raise AssertionError(f"Version was {version}")
     (num_objects,) = unpack_from(b">L", header, 8)
     return (version, num_objects)
 
@@ -1122,10 +1122,10 @@ class PackStreamCopier(PackStreamReader):
                 self._delta_iter.record(unpacked)
             if progress is not None:
                 progress(
-                    ("copying pack entries: %d/%d\r" % (i, len(self))).encode("ascii")
+                    f"copying pack entries: {i}/{len(self)}\r".encode("ascii")
                 )
         if progress is not None:
-            progress(("copied %d pack entries\n" % i).encode("ascii"))
+            progress(f"copied {i} pack entries\n".encode("ascii"))
 
 
 def obj_sha(type, chunks):
@@ -1156,8 +1156,7 @@ def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1 << 16):
     length = f.tell()
     if (end_ofs < 0 and length + end_ofs < start_ofs) or end_ofs > length:
         raise AssertionError(
-            "Attempt to read beyond file length. "
-            "start_ofs: %d, end_ofs: %d, file length: %d" % (start_ofs, end_ofs, length)
+            f"Attempt to read beyond file length. start_ofs: {start_ofs}, end_ofs: {end_ofs}, file length: {length}"
         )
     todo = length + end_ofs - start_ofs
     f.seek(start_ofs)
@@ -1251,11 +1250,7 @@ class PackData:
             return self._size
         self._size = os.path.getsize(self._filename)
         if self._size < self._header_size:
-            errmsg = "%s is too small for a packfile (%d < %d)" % (
-                self._filename,
-                self._size,
-                self._header_size,
-            )
+            errmsg = f"{self._filename} is too small for a packfile ({self._size} < {self._header_size})"
             raise AssertionError(errmsg)
         return self._size
 
@@ -1364,7 +1359,7 @@ class PackData:
                 filename, progress, resolve_ext_ref=resolve_ext_ref
             )
         else:
-            raise ValueError("unknown index format %d" % version)
+            raise ValueError(f"unknown index format {version}")
 
     def get_stored_checksum(self):
         """Return the expected checksum stored in this pack."""
@@ -1797,9 +1792,7 @@ def find_reusable_deltas(
     ):
         if progress is not None and i % 1000 == 0:
             progress(
-                ("checking for reusable deltas: %d/%d\r" % (i, len(object_ids))).encode(
-                    "utf-8"
-                )
+                f"checking for reusable deltas: {i}/{len(object_ids)}\r".encode()
             )
         if unpacked.pack_type_num == REF_DELTA:
             hexsha = sha_to_hex(unpacked.delta_base)
@@ -1807,7 +1800,7 @@ def find_reusable_deltas(
                 yield unpacked
                 reused += 1
     if progress is not None:
-        progress(("found %d deltas to reuse\n" % (reused,)).encode("utf-8"))
+        progress((f"found {reused} deltas to reuse\n").encode())
 
 
 def deltify_pack_objects(
@@ -1870,7 +1863,7 @@ def deltas_from_sorted_objects(
     possible_bases: deque[tuple[bytes, int, list[bytes]]] = deque()
     for i, o in enumerate(objects):
         if progress is not None and i % 1000 == 0:
-            progress(("generating deltas: %d\r" % (i,)).encode("utf-8"))
+            progress((f"generating deltas: {i}\r").encode())
         raw = o.as_raw_chunks()
         winner = raw
         winner_len = sum(map(len, winner))
@@ -2118,7 +2111,7 @@ class PackChunkGenerator:
             type_num = unpacked.pack_type_num
             if progress is not None and i % 1000 == 0:
                 progress(
-                    ("writing pack data: %d/%d\r" % (i, num_records)).encode("ascii")
+                    (f"writing pack data: {i}/{num_records}\r").encode("ascii")
                 )
             raw: Union[list[bytes], tuple[int, list[bytes]], tuple[bytes, list[bytes]]]
             if unpacked.delta_base is not None:
@@ -2151,8 +2144,7 @@ class PackChunkGenerator:
             offset += object_size
         if actual_num_records != num_records:
             raise AssertionError(
-                "actual records written differs: %d != %d"
-                % (actual_num_records, num_records)
+                f"actual records written differs: {actual_num_records} != {num_records}"
             )
 
         yield self.cs.digest()
@@ -2320,7 +2312,7 @@ def apply_delta(src_buf, delta):
 
     src_size, index = get_delta_header_size(delta, index)
     dest_size, index = get_delta_header_size(delta, index)
-    assert src_size == len(src_buf), "%d vs %d" % (src_size, len(src_buf))
+    assert src_size == len(src_buf), f"{src_size} vs {len(src_buf)}"
     while index < delta_length:
         cmd = ord(delta[index : index + 1])
         index += 1
@@ -2771,7 +2763,7 @@ def extend_pack(
     for i, object_id in enumerate(object_ids):
         if progress is not None:
             progress(
-                ("writing extra base objects: %d/%d\r" % (i, len(object_ids))).encode(
+                (f"writing extra base objects: {i}/{len(object_ids)}\r").encode(
                     "ascii"
                 )
             )

@@ -408,7 +408,7 @@ class UploadPackHandler(PackHandler):
 
         self._start_pack_send_phase()
         self.progress(
-            ("counting objects: %d, done.\n" % len(object_ids)).encode("ascii")
+            (f"counting objects: {len(object_ids)}, done.\n").encode("ascii")
         )
 
         write_pack_from_container(

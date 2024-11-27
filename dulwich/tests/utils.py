@@ -319,7 +319,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
             parent_ids = [nums[pn] for pn in commit[1:]]
         except KeyError as exc:
             (missing_parent,) = exc.args
-            raise ValueError("Unknown parent %i" % missing_parent) from exc
+            raise ValueError(f"Unknown parent {missing_parent}") from exc
 
         blobs = []
         for entry in trees.get(commit_num, []):
@@ -332,7 +332,7 @@ def build_commit_graph(object_store, commit_spec, trees=None, attrs=None):
         tree_id = commit_tree(object_store, blobs)
 
         commit_attrs = {
-            "message": ("Commit %i" % commit_num).encode("ascii"),
+            "message": (f"Commit {commit_num}").encode("ascii"),
             "parents": parent_ids,
             "tree": tree_id,
             "commit_time": commit_time,

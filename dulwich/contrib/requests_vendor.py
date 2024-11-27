@@ -81,7 +81,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
             raise HTTPProxyUnauthorized(resp.headers.get("Proxy-Authenticate"), url)
         if resp.status_code != 200:
             raise GitProtocolError(
-                "unexpected http resp %d for %s" % (resp.status_code, url)
+                f"unexpected http resp {resp.status_code} for {url}"
             )
 
         # Add required fields as stated in AbstractHttpGitClient._http_request

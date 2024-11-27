@@ -102,7 +102,7 @@ def date_time_string(timestamp: Optional[float] = None) -> str:
     if timestamp is None:
         timestamp = time.time()
     year, month, day, hh, mm, ss, wd = time.gmtime(timestamp)[:7]
-    return "%s, %02d %3s %4d %02d:%02d:%02d GMD" % (
+    return "%s, %02d %3s %4d %02d:%02d:%02d GMD" % (  # noqa: UP031
         weekdays[wd],
         day,
         months[month],

@@ -22,11 +22,11 @@
 """Tests for Dulwich."""
 
 __all__ = [
+    "BlackboxTestCase",
     "SkipTest",
     "TestCase",
-    "BlackboxTestCase",
-    "skipIf",
     "expectedFailure",
+    "skipIf",
 ]
 
 import doctest

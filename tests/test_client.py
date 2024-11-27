@@ -103,7 +103,9 @@ class GitClientTests(TestCase):
         self.client = DummyClient(lambda x: True, self.rin.read, self.rout.write)
 
     def test_caps(self) -> None:
-        agent_cap = "agent=dulwich/{}.{}.{}".format(*dulwich.__version__).encode("ascii")
+        agent_cap = "agent=dulwich/{}.{}.{}".format(*dulwich.__version__).encode(
+            "ascii"
+        )
         self.assertEqual(
             {
                 b"multi_ack",

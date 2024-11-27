@@ -2846,9 +2846,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         if resp.status == 407:
             raise HTTPProxyUnauthorized(resp.headers.get("Proxy-Authenticate"), url)
         if resp.status != 200:
-            raise GitProtocolError(
-                f"unexpected http resp {resp.status} for {url}"
-            )
+            raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
 
         resp.content_type = resp.headers.get("Content-Type")
         # Check if geturl() is available (urllib3 version >= 1.23)

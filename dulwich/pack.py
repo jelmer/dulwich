@@ -1121,9 +1121,7 @@ class PackStreamCopier(PackStreamReader):
             if self._delta_iter:
                 self._delta_iter.record(unpacked)
             if progress is not None:
-                progress(
-                    f"copying pack entries: {i}/{len(self)}\r".encode("ascii")
-                )
+                progress(f"copying pack entries: {i}/{len(self)}\r".encode("ascii"))
         if progress is not None:
             progress(f"copied {i} pack entries\n".encode("ascii"))
 
@@ -1791,9 +1789,7 @@ def find_reusable_deltas(
         )
     ):
         if progress is not None and i % 1000 == 0:
-            progress(
-                f"checking for reusable deltas: {i}/{len(object_ids)}\r".encode()
-            )
+            progress(f"checking for reusable deltas: {i}/{len(object_ids)}\r".encode())
         if unpacked.pack_type_num == REF_DELTA:
             hexsha = sha_to_hex(unpacked.delta_base)
             if hexsha in object_ids or hexsha in other_haves:
@@ -2110,9 +2106,7 @@ class PackChunkGenerator:
         for i, unpacked in enumerate(records):
             type_num = unpacked.pack_type_num
             if progress is not None and i % 1000 == 0:
-                progress(
-                    (f"writing pack data: {i}/{num_records}\r").encode("ascii")
-                )
+                progress((f"writing pack data: {i}/{num_records}\r").encode("ascii"))
             raw: Union[list[bytes], tuple[int, list[bytes]], tuple[bytes, list[bytes]]]
             if unpacked.delta_base is not None:
                 try:
@@ -2763,9 +2757,7 @@ def extend_pack(
     for i, object_id in enumerate(object_ids):
         if progress is not None:
             progress(
-                (f"writing extra base objects: {i}/{len(object_ids)}\r").encode(
-                    "ascii"
-                )
+                (f"writing extra base objects: {i}/{len(object_ids)}\r").encode("ascii")
             )
         assert len(object_id) == 20
         type_num, data = get_raw(object_id)

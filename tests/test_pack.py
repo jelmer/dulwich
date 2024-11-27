@@ -1001,9 +1001,9 @@ class TestPackIterator(DeltaChainIterator):
         )
 
     def _resolve_object(self, offset, pack_type_num, base_chunks):
-        assert offset not in self._unpacked_offsets, (
-            f"Attempted to re-inflate offset {offset}"
-        )
+        assert (
+            offset not in self._unpacked_offsets
+        ), f"Attempted to re-inflate offset {offset}"
         self._unpacked_offsets.add(offset)
         return super()._resolve_object(offset, pack_type_num, base_chunks)
 

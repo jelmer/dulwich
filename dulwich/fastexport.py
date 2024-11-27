@@ -51,7 +51,7 @@ class GitFastExporter:
 
     def _allocate_marker(self):
         self._marker_idx += 1
-        return ("%d" % (self._marker_idx,)).encode("ascii")
+        return str(self._marker_idx).encode("ascii")
 
     def _export_blob(self, blob):
         marker = self._allocate_marker()

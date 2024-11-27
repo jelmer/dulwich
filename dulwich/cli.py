@@ -217,7 +217,7 @@ class cmd_dump_pack(Command):
         print(f"Object names checksum: {x.name()}")
         print(f"Checksum: {sha_to_hex(x.get_stored_checksum())}")
         x.check()
-        print("Length: %d" % len(x))
+        print(f"Length: {len(x)}")
         for name in x:
             try:
                 print(f"\t{x[name]}")
@@ -729,7 +729,7 @@ class cmd_stash_list(Command):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         for i, entry in porcelain.stash_list("."):
-            print("stash@{%d}: %s" % (i, entry.message.rstrip("\n")))
+            print(f"stash@{{{i}}}: {entry.message.rstrip('\n')}")
 
 
 class cmd_stash_push(Command):

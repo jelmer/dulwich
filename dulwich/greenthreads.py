@@ -117,4 +117,4 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
             self.progress = lambda x: None
         else:
             self.progress = progress
-        self._tagged = get_tagged and get_tagged() or {}
+        self._tagged = (get_tagged and get_tagged()) or {}

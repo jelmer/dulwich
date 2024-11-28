@@ -729,7 +729,7 @@ class cmd_stash_list(Command):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         for i, entry in porcelain.stash_list("."):
-            print(f"stash@{{{i}}}: {entry.message.rstrip('\n')}")
+            print("stash@{{{}}}: {}".format(i, entry.message.rstrip("\n")))
 
 
 class cmd_stash_push(Command):

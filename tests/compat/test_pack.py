@@ -90,7 +90,7 @@ class TestPack(PackTests):
         self.assertEqual(
             3,
             got_non_delta,
-            "Expected 3 non-delta objects, got %d" % got_non_delta,
+            f"Expected 3 non-delta objects, got {got_non_delta}",
         )
 
     def test_delta_medium_object(self) -> None:
@@ -121,7 +121,7 @@ class TestPack(PackTests):
         self.assertEqual(
             3,
             got_non_delta,
-            "Expected 3 non-delta objects, got %d" % got_non_delta,
+            f"Expected 3 non-delta objects, got {got_non_delta}",
         )
         # We expect one object to have a delta chain length of two
         # (new_blob_2), so let's verify that actually happens:
@@ -161,5 +161,5 @@ class TestPack(PackTests):
         self.assertEqual(
             4,
             got_non_delta,
-            "Expected 4 non-delta objects, got %d" % got_non_delta,
+            f"Expected 4 non-delta objects, got {got_non_delta}",
         )

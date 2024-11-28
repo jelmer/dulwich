@@ -877,7 +877,7 @@ def print_name_status(changes):
                 kind = "R"
             elif change.type == CHANGE_COPY:
                 kind = "C"
-        yield "%-8s%-20s%-20s" % (kind, path1, path2)
+        yield "%-8s%-20s%-20s" % (kind, path1, path2)  # noqa: UP031
 
 
 def log(

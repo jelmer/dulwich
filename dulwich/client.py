@@ -706,7 +706,7 @@ def _handle_upload_pack_tail(
             elif chan == SIDE_BAND_CHANNEL_PROGRESS:
                 progress(data)
             else:
-                raise AssertionError("Invalid sideband channel %d" % chan)
+                raise AssertionError(f"Invalid sideband channel {chan}")
     else:
         while True:
             data = proto.read(rbufsize)
@@ -1099,7 +1099,7 @@ class GitClient:
                 elif chan == SIDE_BAND_CHANNEL_PROGRESS:
                     progress(data)
                 else:
-                    raise AssertionError("Invalid sideband channel %d" % chan)
+                    raise AssertionError(f"Invalid sideband channel {chan}")
         else:
             if CAPABILITY_REPORT_STATUS in capabilities:
                 assert self._report_status_parser
@@ -1351,17 +1351,16 @@ class TraditionalGitClient(GitClient):
             protocol_version is not None
             and protocol_version not in GIT_PROTOCOL_VERSIONS
         ):
-            raise ValueError("unknown Git protocol version %d" % protocol_version)
+            raise ValueError(f"unknown Git protocol version {protocol_version}")
         proto, can_read, stderr = self._connect(b"upload-pack", path, protocol_version)
         server_protocol_version = negotiate_protocol_version(proto)
         if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
             raise ValueError(
-                "unknown Git protocol version %d used by server"
-                % server_protocol_version
+                f"unknown Git protocol version {server_protocol_version} used by server"
             )
         if protocol_version and server_protocol_version > protocol_version:
             raise ValueError(
-                "bad Git protocol version %d used by server" % server_protocol_version
+                f"bad Git protocol version {server_protocol_version} used by server"
             )
         self.protocol_version = server_protocol_version
         with proto:
@@ -1462,17 +1461,16 @@ class TraditionalGitClient(GitClient):
             protocol_version is not None
             and protocol_version not in GIT_PROTOCOL_VERSIONS
         ):
-            raise ValueError("unknown Git protocol version %d" % protocol_version)
+            raise ValueError(f"unknown Git protocol version {protocol_version}")
         proto, _, stderr = self._connect(b"upload-pack", path, protocol_version)
         server_protocol_version = negotiate_protocol_version(proto)
         if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
             raise ValueError(
-                "unknown Git protocol version %d used by server"
-                % server_protocol_version
+                f"unknown Git protocol version {server_protocol_version} used by server"
             )
         if protocol_version and server_protocol_version > protocol_version:
             raise ValueError(
-                "bad Git protocol version %d used by server" % server_protocol_version
+                f"bad Git protocol version {server_protocol_version} used by server"
             )
         self.protocol_version = server_protocol_version
         if self.protocol_version == 2:
@@ -1552,7 +1550,7 @@ class TraditionalGitClient(GitClient):
                 elif chan == SIDE_BAND_CHANNEL_FATAL:
                     write_error(data)
                 else:
-                    raise AssertionError("Invalid sideband channel %d" % chan)
+                    raise AssertionError(f"Invalid sideband channel {chan}")
 
 
 class TCPGitClient(TraditionalGitClient):
@@ -1572,7 +1570,7 @@ class TCPGitClient(TraditionalGitClient):
     def get_url(self, path):
         netloc = self._host
         if self._port is not None and self._port != TCP_GIT_PORT:
-            netloc += ":%d" % self._port
+            netloc += f":{self._port}"
         return urlunsplit(("git", netloc, path, "", ""))
 
     def _connect(
@@ -2142,7 +2140,7 @@ class SSHGitClient(TraditionalGitClient):
     def get_url(self, path):
         netloc = self.host
         if self.port is not None:
-            netloc += ":%d" % self.port
+            netloc += f":{self.port}"
 
         if self.username is not None:
             netloc = urlquote(self.username, "@/:") + "@" + netloc
@@ -2414,7 +2412,7 @@ class AbstractHttpGitClient(GitClient):
             protocol_version is not None
             and protocol_version not in GIT_PROTOCOL_VERSIONS
         ):
-            raise ValueError("unknown Git protocol version %d" % protocol_version)
+            raise ValueError(f"unknown Git protocol version {protocol_version}")
         assert base_url[-1] == "/"
         tail = "info/refs"
         headers = {"Accept": "*/*"}
@@ -2478,13 +2476,11 @@ class AbstractHttpGitClient(GitClient):
                 server_protocol_version = negotiate_protocol_version(proto)
                 if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
                     raise ValueError(
-                        "unknown Git protocol version %d used by server"
-                        % server_protocol_version
+                        f"unknown Git protocol version {server_protocol_version} used by server"
                     )
                 if protocol_version and server_protocol_version > protocol_version:
                     raise ValueError(
-                        "bad Git protocol version %d used by server"
-                        % server_protocol_version
+                        f"bad Git protocol version {server_protocol_version} used by server"
                     )
                 self.protocol_version = server_protocol_version
                 if self.protocol_version == 2:
@@ -2508,13 +2504,11 @@ class AbstractHttpGitClient(GitClient):
                     server_protocol_version = negotiate_protocol_version(proto)
                     if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
                         raise ValueError(
-                            "unknown Git protocol version %d used by server"
-                            % server_protocol_version
+                            f"unknown Git protocol version {server_protocol_version} used by server"
                         )
                     if protocol_version and server_protocol_version > protocol_version:
                         raise ValueError(
-                            "bad Git protocol version %d used by server"
-                            % server_protocol_version
+                            f"bad Git protocol version {server_protocol_version} used by server"
                         )
                     self.protocol_version = server_protocol_version
                     if self.protocol_version == 2:
@@ -2852,9 +2846,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         if resp.status == 407:
             raise HTTPProxyUnauthorized(resp.headers.get("Proxy-Authenticate"), url)
         if resp.status != 200:
-            raise GitProtocolError(
-                "unexpected http resp %d for %s" % (resp.status, url)
-            )
+            raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
 
         resp.content_type = resp.headers.get("Content-Type")
         # Check if geturl() is available (urllib3 version >= 1.23)

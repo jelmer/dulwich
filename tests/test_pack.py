@@ -1001,9 +1001,9 @@ class TestPackIterator(DeltaChainIterator):
         )
 
     def _resolve_object(self, offset, pack_type_num, base_chunks):
-        assert offset not in self._unpacked_offsets, (
-            "Attempted to re-inflate offset %i" % offset
-        )
+        assert (
+            offset not in self._unpacked_offsets
+        ), f"Attempted to re-inflate offset {offset}"
         self._unpacked_offsets.add(offset)
         return super()._resolve_object(offset, pack_type_num, base_chunks)
 
@@ -1034,14 +1034,14 @@ class DeltaChainIteratorTests(TestCase):
     def make_pack_iter(self, f, thin=None):
         if thin is None:
             thin = bool(list(self.store))
-        resolve_ext_ref = thin and self.get_raw_no_repeat or None
+        resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
         data = PackData("test.pack", file=f)
         return TestPackIterator.for_pack_data(data, resolve_ext_ref=resolve_ext_ref)
 
     def make_pack_iter_subset(self, f, subset, thin=None):
         if thin is None:
             thin = bool(list(self.store))
-        resolve_ext_ref = thin and self.get_raw_no_repeat or None
+        resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
         data = PackData("test.pack", file=f)
         assert data
         index = MemoryPackIndex.for_pack(data)

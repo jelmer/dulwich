@@ -441,7 +441,7 @@ class ReceivableProtocol(Protocol):
                 buf.write(data)
                 del data  # explicit free
                 break
-            assert n <= left, "_recv(%d) returned %d bytes" % (left, n)
+            assert n <= left, f"_recv({left}) returned {n} bytes"
             buf.write(data)
             buf_len += n
             del data  # explicit free

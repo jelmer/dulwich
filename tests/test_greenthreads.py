@@ -58,7 +58,7 @@ def create_commit(marker=None):
 def init_store(store, count=1):
     ret = []
     for i in range(count):
-        objs = create_commit(marker=("%d" % i).encode("ascii"))
+        objs = create_commit(marker=str(i).encode("ascii"))
         for obj in objs:
             ret.append(obj)
             store.add_object(obj)

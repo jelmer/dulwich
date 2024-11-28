@@ -287,7 +287,7 @@ class Walker:
         self.order = order
         self.reverse = reverse
         self.max_entries = max_entries
-        self.paths = paths and set(paths) or None
+        self.paths = (paths and set(paths)) or None
         if follow and not rename_detector:
             rename_detector = RenameDetector(store)
         self.rename_detector = rename_detector

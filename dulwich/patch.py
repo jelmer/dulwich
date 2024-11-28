@@ -64,9 +64,7 @@ def write_commit_patch(
         b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n"
     )
     f.write(
-        ("Subject: [PATCH %d/%d] " % (num, total)).encode(encoding)
-        + commit.message
-        + b"\n"
+        (f"Subject: [PATCH {num}/{total}] ").encode(encoding) + commit.message + b"\n"
     )
     f.write(b"\n")
     f.write(b"---\n")

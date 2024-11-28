@@ -897,9 +897,7 @@ class DiskObjectStore(PackBasedObjectStore):
         entries = []
         for i, entry in enumerate(indexer):
             if progress is not None:
-                progress(
-                    ("generating index: %d/%d\r" % (i, num_objects)).encode("ascii")
-                )
+                progress(f"generating index: {i}/{num_objects}\r".encode("ascii"))
             entries.append(entry)
 
         pack_sha, extra_entries = extend_pack(
@@ -1366,7 +1364,7 @@ class MissingObjectFinder:
             self.progress = lambda x: None
         else:
             self.progress = progress
-        self._tagged = get_tagged and get_tagged() or {}
+        self._tagged = (get_tagged and get_tagged()) or {}
 
     def get_remote_has(self):
         return self.remote_has
@@ -1380,9 +1378,7 @@ class MissingObjectFinder:
         while True:
             if not self.objects_to_send:
                 self.progress(
-                    ("counting objects: %d, done.\n" % len(self.sha_done)).encode(
-                        "ascii"
-                    )
+                    f"counting objects: {len(self.sha_done)}, done.\n".encode("ascii")
                 )
                 raise StopIteration
             (sha, name, type_num, leaf) = self.objects_to_send.pop()
@@ -1411,9 +1407,7 @@ class MissingObjectFinder:
             self.add_todo([(self._tagged[sha], None, None, True)])
         self.sha_done.add(sha)
         if len(self.sha_done) % 1000 == 0:
-            self.progress(
-                ("counting objects: %d\r" % len(self.sha_done)).encode("ascii")
-            )
+            self.progress(f"counting objects: {len(self.sha_done)}\r".encode("ascii"))
         if type_num is None:
             pack_hint = None
         else:

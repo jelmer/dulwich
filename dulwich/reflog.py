@@ -101,7 +101,7 @@ def drop_reflog_entry(f, index, rewrite=False) -> None:
             old SHA to the new SHA of the entry that now precedes it
     """
     if index < 0:
-        raise ValueError("Invalid reflog index %d" % index)
+        raise ValueError(f"Invalid reflog index {index}")
 
     log = []
     offset = f.tell()

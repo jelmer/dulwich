@@ -139,8 +139,8 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
     """
     # This could be fairly easily generalized to >2 trees if we find a use
     # case.
-    mode1 = tree1_id and stat.S_IFDIR or None
-    mode2 = tree2_id and stat.S_IFDIR or None
+    mode1 = (tree1_id and stat.S_IFDIR) or None
+    mode2 = (tree2_id and stat.S_IFDIR) or None
     todo = [(TreeEntry(b"", mode1, tree1_id), TreeEntry(b"", mode2, tree2_id))]
     while todo:
         entry1, entry2 = todo.pop()
@@ -149,8 +149,8 @@ def walk_trees(store, tree1_id, tree2_id, prune_identical=False):
         if prune_identical and is_tree1 and is_tree2 and entry1 == entry2:
             continue
 
-        tree1 = is_tree1 and store[entry1.sha] or None
-        tree2 = is_tree2 and store[entry2.sha] or None
+        tree1 = (is_tree1 and store[entry1.sha]) or None
+        tree2 = (is_tree2 and store[entry2.sha]) or None
         path = entry1.path or entry2.path
         todo.extend(reversed(_merge_entries(path, tree1, tree2)))
         yield entry1, entry2
@@ -520,7 +520,7 @@ class RenameDetector:
                 if is_delete:
                     delete_paths.add(old.path)
                 add_paths.add(new.path)
-                new_type = is_delete and CHANGE_RENAME or CHANGE_COPY
+                new_type = (is_delete and CHANGE_RENAME) or CHANGE_COPY
                 self._changes.append(TreeChange(new_type, old, new))
 
             num_extra_adds = len(sha_adds) - len(sha_deletes)

@@ -116,7 +116,7 @@ def write_bundle(f, bundle) -> None:
     elif version == 3:
         f.write(b"# v3 git bundle\n")
     else:
-        raise AssertionError("unknown version %d" % version)
+        raise AssertionError(f"unknown version {version}")
     if version == 3:
         for key, value in bundle.capabilities.items():
             f.write(b"@" + key.encode("utf-8"))

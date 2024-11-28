@@ -35,7 +35,7 @@ V = TypeVar("V")
 class _LRUNode(Generic[K, V]):
     """This maintains the linked-list which is the lru internals."""
 
-    __slots__ = ("prev", "next_key", "key", "value", "cleanup", "size")
+    __slots__ = ("cleanup", "key", "next_key", "prev", "size", "value")
 
     prev: Optional["_LRUNode[K, V]"]
     next_key: K

@@ -162,7 +162,7 @@ def object_header(num_type: int, length: int) -> bytes:
     """Return an object header for the given numeric type and text length."""
     cls = object_class(num_type)
     if cls is None:
-        raise AssertionError("unsupported class type num: %d" % num_type)
+        raise AssertionError(f"unsupported class type num: {num_type}")
     return cls.type_name + b" " + str(length).encode("ascii") + b"\0"
 
 
@@ -273,7 +273,7 @@ class FixedSha:
 class ShaFile:
     """A git SHA file."""
 
-    __slots__ = ("_chunked_text", "_sha", "_needs_serialization")
+    __slots__ = ("_chunked_text", "_needs_serialization", "_sha")
 
     _needs_serialization: bool
     type_name: bytes
@@ -387,7 +387,7 @@ class ShaFile:
         num_type = (ord(magic[0:1]) >> 4) & 7
         obj_class = object_class(num_type)
         if not obj_class:
-            raise ObjectFormatException("Not a known type %d" % num_type)
+            raise ObjectFormatException(f"Not a known type {num_type}")
         return obj_class()
 
     def _parse_object(self, map) -> None:
@@ -464,7 +464,7 @@ class ShaFile:
         """
         cls = object_class(type_num)
         if cls is None:
-            raise AssertionError("unsupported class type num: %d" % type_num)
+            raise AssertionError(f"unsupported class type num: {type_num}")
         obj = cls()
         obj.set_raw_string(string, sha)
         return obj
@@ -482,7 +482,7 @@ class ShaFile:
         """
         cls = object_class(type_num)
         if cls is None:
-            raise AssertionError("unsupported class type num: %d" % type_num)
+            raise AssertionError(f"unsupported class type num: {type_num}")
         obj = cls()
         obj.set_raw_chunks(chunks, sha)
         return obj
@@ -551,7 +551,7 @@ class ShaFile:
         """Create a new copy of this SHA1 object from its raw string."""
         obj_class = object_class(self.type_num)
         if obj_class is None:
-            raise AssertionError("invalid type num %d" % self.type_num)
+            raise AssertionError(f"invalid type num {self.type_num}")
         return obj_class.from_raw_string(self.type_num, self.as_raw_string(), self.id)
 
     @property
@@ -743,15 +743,15 @@ class Tag(ShaFile):
     type_num = 4
 
     __slots__ = (
-        "_tag_timezone_neg_utc",
+        "_message",
         "_name",
-        "_object_sha",
         "_object_class",
+        "_object_sha",
+        "_signature",
         "_tag_time",
         "_tag_timezone",
+        "_tag_timezone_neg_utc",
         "_tagger",
-        "_message",
-        "_signature",
     )
 
     _tagger: Optional[bytes]
@@ -1260,7 +1260,7 @@ def parse_timezone(text):
     if sign == b"-":
         offset = -offset
     unnecessary_negative_timezone = offset >= 0 and sign == b"-"
-    signum = (offset < 0) and -1 or 1
+    signum = ((offset < 0) and -1) or 1
     offset = abs(offset)
     hours = int(offset / 100)
     minutes = offset % 100
@@ -1285,7 +1285,7 @@ def format_timezone(offset, unnecessary_negative_timezone=False):
         offset = -offset
     else:
         sign = "+"
-    return ("%c%02d%02d" % (sign, offset / 3600, (offset / 60) % 60)).encode("ascii")
+    return ("%c%02d%02d" % (sign, offset / 3600, (offset / 60) % 60)).encode("ascii")  # noqa: UP031
 
 
 def parse_time_entry(value):
@@ -1380,21 +1380,21 @@ class Commit(ShaFile):
     type_num = 1
 
     __slots__ = (
-        "_parents",
-        "_encoding",
-        "_extra",
-        "_author_timezone_neg_utc",
-        "_commit_timezone_neg_utc",
-        "_commit_time",
+        "_author",
         "_author_time",
         "_author_timezone",
+        "_author_timezone_neg_utc",
+        "_commit_time",
         "_commit_timezone",
-        "_author",
+        "_commit_timezone_neg_utc",
         "_committer",
-        "_tree",
-        "_message",
-        "_mergetag",
+        "_encoding",
+        "_extra",
         "_gpgsig",
+        "_mergetag",
+        "_message",
+        "_parents",
+        "_tree",
     )
 
     def __init__(self) -> None:

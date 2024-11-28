@@ -93,8 +93,7 @@ def require_git_version(required_version, git_path=_DEFAULT_GIT) -> None:
 
     if len(required_version) > _VERSION_LEN:
         raise ValueError(
-            "Invalid version tuple %s, expected %i parts"
-            % (required_version, _VERSION_LEN)
+            f"Invalid version tuple {required_version}, expected {_VERSION_LEN} parts"
         )
 
     required_version = list(required_version)
@@ -170,8 +169,7 @@ def run_git_or_fail(args, git_path=_DEFAULT_GIT, input=None, **popen_kwargs):
     )
     if returncode != 0:
         raise AssertionError(
-            "git with args %r failed with %d: stdout=%r stderr=%r"
-            % (args, returncode, stdout, stderr)
+            f"git with args {args!r} failed with {returncode}: stdout={stdout!r} stderr={stderr!r}"
         )
     return stdout
 

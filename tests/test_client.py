@@ -689,7 +689,9 @@ class TestGetTransportAndPathFromUrl(TestCase):
             ]:
                 c, path = get_transport_and_path(file_url)
                 self.assertIsInstance(c, LocalGitClient)
-                self.assertEqual(path, expected)
+                self.assertEqual(
+                    path, expected, f"Failed for {file_url}: {path} != {expected}"
+                )
 
             for remote_url in [
                 "file://host.example.com/C:/foo.bar/baz"

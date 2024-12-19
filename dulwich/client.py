@@ -140,10 +140,6 @@ DEFAULT_REF_PREFIX = [b"HEAD", b"refs/"]
 ObjectID = bytes
 
 
-# url2pathname is lazily imported
-url2pathname = None
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -2868,7 +2864,6 @@ def _win32_url_to_path(parsed) -> str:
 
     https://datatracker.ietf.org/doc/html/rfc8089
     """
-    assert sys.platform == "win32" or os.name == "nt"
     assert parsed.scheme == "file"
 
     _, netloc, path, _, _, _ = parsed
@@ -2886,10 +2881,9 @@ def _win32_url_to_path(parsed) -> str:
     else:
         raise NotImplementedError("Non-local file URLs are not supported")
 
-    global url2pathname
-    if url2pathname is None:
-        from urllib.request import url2pathname  # type: ignore
-    return url2pathname(netloc + path)  # type: ignore
+    from nturl2path import url2pathname
+
+    return url2pathname(netloc + path)
 
 
 def get_transport_and_path_from_url(

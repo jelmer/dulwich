@@ -1,4 +1,4 @@
-0.22.7	UNRELEASED
+0.22.7	2024-12-19
 
  * Fix serializing of commits with empty commit messages.
    (Castedo Ellerman, #1429)

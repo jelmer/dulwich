@@ -536,7 +536,7 @@ class ShaFile:
         """Returns the length of the raw string of this object."""
         return sum(map(len, self.as_raw_chunks()))
 
-    def sha(self) -> "HASH":
+    def sha(self) -> Union[FixedSha, "HASH"]:
         """The SHA1 object that is the name of this object."""
         if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha

@@ -81,9 +81,6 @@ script-files = [
 ]
 license-files = ["COPYING"]
 
-[tool.setuptools.package-data]
-"" = ["py.typed"]
-
 [tool.setuptools.dynamic]
 version = {attr = "dulwich.__version__"}
 

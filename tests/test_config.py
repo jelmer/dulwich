@@ -144,15 +144,15 @@ class ConfigFileTests(TestCase):
         self.assertRaises(ValueError, self.from_file, b'[core]\nfoo = "bar\n')
 
     def test_from_file_with_quotes(self) -> None:
-        cf = self.from_file(b"[core]\n" b'foo = " bar"\n')
+        cf = self.from_file(b'[core]\nfoo = " bar"\n')
         self.assertEqual(b" bar", cf.get((b"core",), b"foo"))
 
     def test_from_file_with_interrupted_line(self) -> None:
-        cf = self.from_file(b"[core]\n" b"foo = bar\\\n" b" la\n")
+        cf = self.from_file(b"[core]\nfoo = bar\\\n la\n")
         self.assertEqual(b"barla", cf.get((b"core",), b"foo"))
 
     def test_from_file_with_boolean_setting(self) -> None:
-        cf = self.from_file(b"[core]\n" b"foo\n")
+        cf = self.from_file(b"[core]\nfoo\n")
         self.assertEqual(b"true", cf.get((b"core",), b"foo"))
 
     def test_from_file_subsection(self) -> None:
@@ -206,7 +206,7 @@ class ConfigFileTests(TestCase):
         )
         self.assertEqual(list(cf.sections()), [(b"alias",)])
         self.assertEqual(
-            b"'!f() { printf '[git commit -m \"%s\"]\n' " b'"$*" && git commit -m "$*"',
+            b'\'!f() { printf \'[git commit -m "%s"]\n\' "$*" && git commit -m "$*"',
             cf.get((b"alias",), b"c"),
         )
 

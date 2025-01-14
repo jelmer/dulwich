@@ -1089,7 +1089,7 @@ class TagSerializeTests(TestCase):
 
 
 default_tagger = (
-    b"Linus Torvalds <torvalds@woody.linux-foundation.org> " b"1183319674 -0700"
+    b"Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 -0700"
 )
 default_message = b"""Linux 2.6.22-rc7
 -----BEGIN PGP SIGNATURE-----
@@ -1194,8 +1194,7 @@ class TagParseTests(ShaFileCheckTests):
             Tag,
             self.make_tag_text(
                 tagger=(
-                    b"Linus Torvalds <torvalds@woody.linux-foundation.org> "
-                    b"423423+0000"
+                    b"Linus Torvalds <torvalds@woody.linux-foundation.org> 423423+0000"
                 )
             ),
         )

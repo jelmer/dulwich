@@ -91,7 +91,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
         self.assertEqual(
-            b"Remove executable bit from prey.ico " b"(triggers a warning).\n",
+            b"Remove executable bit from prey.ico (triggers a warning).\n",
             c.message,
         )
         self.assertEqual(
@@ -123,7 +123,7 @@ Subject: [PATCH 1/2] Remove executable bit from prey.ico (triggers a warning).
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.committer)
         self.assertEqual(b"Jelmer Vernooij <jelmer@samba.org>", c.author)
         self.assertEqual(
-            b"Remove executable bit from prey.ico " b"(triggers a warning).\n",
+            b"Remove executable bit from prey.ico (triggers a warning).\n",
             c.message,
         )
         self.assertEqual(
@@ -220,7 +220,7 @@ From: Jelmer Vernooij <jelmer@debian.org>
 
     def test_extract_mercurial(self) -> NoReturn:
         raise SkipTest(
-            "git_am_patch_split doesn't handle Mercurial patches " "properly yet"
+            "git_am_patch_split doesn't handle Mercurial patches properly yet"
         )
         expected_diff = """\
 diff --git a/dulwich/tests/test_patch.py b/dulwich/tests/test_patch.py

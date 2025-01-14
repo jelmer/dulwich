@@ -631,7 +631,7 @@ def _find_git_in_win_reg():
             "CurrentVersion\\Uninstall\\Git_is1"
         )
     else:
-        subkey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\" "Uninstall\\Git_is1"
+        subkey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Git_is1"
 
     for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore
         with suppress(OSError):

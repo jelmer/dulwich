@@ -468,7 +468,7 @@ class TestSwiftConnector(TestCase):
             lambda *args: None,
         ):
             with patch(
-                "dulwich.contrib.swift.SwiftConnector." "get_container_objects",
+                "dulwich.contrib.swift.SwiftConnector.get_container_objects",
                 lambda *args: ({"name": "a"}, {"name": "b"}),
             ):
                 with patch(

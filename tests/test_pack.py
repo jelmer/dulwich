@@ -249,7 +249,7 @@ class TestPackDeltas(TestCase):
             b"parent 20a103cc90135494162e819f98d0edfc1f1fba6b",
             b"\nauthor Victor Stinner <victor.stinner@gmail.com> 14213",
             b"10738",
-            b" +0100\ncommitter Victor Stinner <victor.stinner@gmail.com> " b"14213",
+            b" +0100\ncommitter Victor Stinner <victor.stinner@gmail.com> 14213",
             b"10738 +0100",
             b"\n\nStreamWriter: close() now clears the reference to the "
             b"transport\n\n"
@@ -1001,9 +1001,9 @@ class TestPackIterator(DeltaChainIterator):
         )
 
     def _resolve_object(self, offset, pack_type_num, base_chunks):
-        assert (
-            offset not in self._unpacked_offsets
-        ), f"Attempted to re-inflate offset {offset}"
+        assert offset not in self._unpacked_offsets, (
+            f"Attempted to re-inflate offset {offset}"
+        )
         self._unpacked_offsets.add(offset)
         return super()._resolve_object(offset, pack_type_num, base_chunks)
 

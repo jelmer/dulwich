@@ -712,8 +712,7 @@ if sys.platform == "win32":
         def __init__(self, errno, msg, filename) -> None:
             super(PermissionError, self).__init__(
                 errno,
-                "Unable to create symlink; "
-                f"do you have developer mode enabled? {msg}",
+                f"Unable to create symlink; do you have developer mode enabled? {msg}",
                 filename,
             )
 

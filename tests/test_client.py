@@ -131,7 +131,7 @@ class GitClientTests(TestCase):
         )
 
     def test_archive_ack(self) -> None:
-        self.rin.write(b"0009NACK\n" b"0000")
+        self.rin.write(b"0009NACK\n0000")
         self.rin.seek(0)
         self.client.archive(b"bla", b"HEAD", None, None)
         self.assertEqual(self.rout.getvalue(), b"0011argument HEAD0000")
@@ -1636,8 +1636,7 @@ class PLinkSSHVendorTests(TestCase):
         )
 
         expected_warning = UserWarning(
-            "Invoking PLink with a password exposes the password in the "
-            "process list."
+            "Invoking PLink with a password exposes the password in the process list."
         )
 
         for w in warnings_list:
@@ -1682,8 +1681,7 @@ class PLinkSSHVendorTests(TestCase):
         command = vendor.run_command("host", "git-clone-url", password="12345")
 
         expected_warning = UserWarning(
-            "Invoking PLink with a password exposes the password in the "
-            "process list."
+            "Invoking PLink with a password exposes the password in the process list."
         )
 
         for w in warnings_list:

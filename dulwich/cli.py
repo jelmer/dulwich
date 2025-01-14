@@ -272,7 +272,7 @@ class cmd_clone(Command):
             "--branch",
             dest="branch",
             type=str,
-            help=("Check out branch instead of branch pointed to by remote " "HEAD"),
+            help=("Check out branch instead of branch pointed to by remote HEAD"),
         )
         parser.add_option(
             "--refspec",

@@ -2485,9 +2485,9 @@ class Pack:
 
     def check_length_and_checksum(self) -> None:
         """Sanity check the length and checksum of the pack index and data."""
-        assert len(self.index) == len(
-            self.data
-        ), f"Length mismatch: {len(self.index)} (index) != {len(self.data)} (data)"
+        assert len(self.index) == len(self.data), (
+            f"Length mismatch: {len(self.index)} (index) != {len(self.data)} (data)"
+        )
         idx_stored_checksum = self.index.get_pack_checksum()
         data_stored_checksum = self.data.get_stored_checksum()
         if idx_stored_checksum != data_stored_checksum:

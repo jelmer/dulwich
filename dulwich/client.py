@@ -604,11 +604,11 @@ def _handle_upload_pack_head(
         if protocol_version == 2:
             if not find_capability(capabilities, CAPABILITY_FETCH, CAPABILITY_SHALLOW):
                 raise GitProtocolError(
-                    "server does not support shallow capability required for " "depth"
+                    "server does not support shallow capability required for depth"
                 )
         elif CAPABILITY_SHALLOW not in capabilities:
             raise GitProtocolError(
-                "server does not support shallow capability required for " "depth"
+                "server does not support shallow capability required for depth"
             )
         for sha in graph_walker.shallow:
             proto.write_pkt_line(COMMAND_SHALLOW + b" " + sha + b"\n")

@@ -257,12 +257,12 @@ class PackHandler(Handler):
                 continue
             if cap not in allowable_caps:
                 raise GitProtocolError(
-                    f"Client asked for capability {cap!r} that " "was not advertised."
+                    f"Client asked for capability {cap!r} that was not advertised."
                 )
         for cap in self.required_capabilities():
             if cap not in caps:
                 raise GitProtocolError(
-                    "Client does not support required " f"capability {cap!r}."
+                    f"Client does not support required capability {cap!r}."
                 )
         self._client_capabilities = set(caps)
         logger.info("Client capabilities: %s", caps)
@@ -270,7 +270,7 @@ class PackHandler(Handler):
     def has_capability(self, cap: bytes) -> bool:
         if self._client_capabilities is None:
             raise GitProtocolError(
-                f"Server attempted to access capability {cap!r} " "before asking client"
+                f"Server attempted to access capability {cap!r} before asking client"
             )
         return cap in self._client_capabilities
 
@@ -1004,8 +1004,7 @@ class ReceivePackHandler(PackHandler):
                 if sha == ZERO_SHA:
                     if CAPABILITY_DELETE_REFS not in self.capabilities():
                         raise GitProtocolError(
-                            "Attempted to delete refs without delete-refs "
-                            "capability."
+                            "Attempted to delete refs without delete-refs capability."
                         )
                     try:
                         self.repo.refs.remove_if_equals(ref, oldsha)
@@ -1195,7 +1194,7 @@ class TCPGitServer(socketserver.TCPServer):
 
     def handle_error(self, request, client_address) -> None:
         logger.exception(
-            "Exception happened during processing of request " "from %s",
+            "Exception happened during processing of request from %s",
             client_address,
         )
 

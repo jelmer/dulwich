@@ -892,8 +892,7 @@ class Tag(ShaFile):
     )
     tag_time = serializable_property(
         "tag_time",
-        "The creation timestamp of the tag.  As the number of seconds "
-        "since the epoch",
+        "The creation timestamp of the tag.  As the number of seconds since the epoch",
     )
     tag_timezone = serializable_property(
         "tag_timezone", "The timezone that tag_time is in."
@@ -1644,7 +1643,7 @@ class Commit(ShaFile):
 
     commit_time = serializable_property(
         "commit_time",
-        "The timestamp of the commit. As the number of seconds since the " "epoch.",
+        "The timestamp of the commit. As the number of seconds since the epoch.",
     )
 
     commit_timezone = serializable_property(

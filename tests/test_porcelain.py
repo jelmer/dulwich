@@ -3512,14 +3512,26 @@ class ActiveBranchTests(PorcelainTestCase):
 
 
 class FindUniqueAbbrevTests(PorcelainTestCase):
-    def test_simple(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+    def setUp(self) -> None:
+        super().setUp()
+        self.graph = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
+
+    def test_simple(self) -> None:
+        c1, c2, c3 = self.graph
         self.repo.refs[b"HEAD"] = c3.id
         self.assertEqual(
             c1.id.decode("ascii")[:7],
             porcelain.find_unique_abbrev(self.repo.object_store, c1.id),
+        )
+
+    def test_commit_full(self) -> None:
+        c1, c2, c3 = self.graph
+        self.repo.refs[b"HEAD"] = c3.id
+        self.assertEqual(
+            c1.id.decode("ascii"),
+            porcelain.find_unique_abbrev(self.repo.object_store, c1.id, abbrev=40),
         )
 
 

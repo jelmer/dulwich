@@ -26,7 +26,7 @@ jobs:
           allow-prereleases: true
           cache: pip
       - name: Install native dependencies (Ubuntu)
-        run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
+        run: sudo apt-get update && sudo apt-get install -y python3-gpg
         if: "matrix.os == 'ubuntu-latest'"
       - name: Install native dependencies (MacOS)
         run: brew install swig gpgme

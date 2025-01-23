@@ -116,7 +116,7 @@ from .objectspec import (
     parse_tree,
     to_bytes,
 )
-from .pack import ObjectContainer, write_pack_from_container, write_pack_index
+from .pack import write_pack_from_container, write_pack_index
 from .patch import write_tree_diff
 from .protocol import ZERO_SHA, Protocol
 from .refs import (
@@ -2177,14 +2177,14 @@ def ls_files(repo):
         return sorted(r.open_index())
 
 
-def find_unique_abbrev(object_store: ObjectContainer, object_id: str, abbrev: int | None = 7) -> str:
+def find_unique_abbrev(object_store, object_id):
     """For now, just return 7 characters."""
     # TODO(jelmer): Add some logic here to return a number of characters that
     # scales relative with the size of the repository
-    return object_id.decode("ascii")[:abbrev]
+    return object_id.decode("ascii")[:7]
 
 
-def describe(repo, abbrev=7):
+def describe(repo, abbrev=None):
     """Describe the repository version.
 
     Args:
@@ -2222,7 +2222,10 @@ def describe(repo, abbrev=7):
 
         # If there are no tags, return the current commit
         if len(sorted_tags) == 0:
-            return f"g{find_unique_abbrev(r.object_store, r[r.head()].id, abbrev=abbrev)}"
+            object_id = r[r.head()].id
+            if abbrev is not None:
+                return object_id[:abbrev].decode("ascii")
+            return f"g{find_unique_abbrev(r.object_store, object_id)}"
 
         # We're now 0 commits from the top
         commit_count = 0
@@ -2245,13 +2248,13 @@ def describe(repo, abbrev=7):
                         return "{}-{}-g{}".format(
                             tag_name,
                             commit_count,
-                            latest_commit.id.decode("ascii")[:abbrev],
+                            latest_commit.id.decode("ascii")[:abbrev or 7],
                         )
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return "g{}".format(latest_commit.id.decode("ascii")[:abbrev])
+        return "g{}".format(latest_commit.id.decode("ascii")[:abbrev or 7])
 
 
 def get_object_by_path(repo, path, committish=None):

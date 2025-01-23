@@ -3403,6 +3403,16 @@ class DescribeTests(PorcelainTestCase):
             porcelain.describe(self.repo.path, abbrev=40),
         )
 
+    def test_untagged_commit_abbreviation(self) -> None:
+        _, _, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        self.assertEqual(
+            c3.id.decode("ascii"),
+            porcelain.describe(self.repo, abbrev=40),
+        )
+
 
 class PathToTreeTests(PorcelainTestCase):
     def setUp(self) -> None:
@@ -3512,26 +3522,14 @@ class ActiveBranchTests(PorcelainTestCase):
 
 
 class FindUniqueAbbrevTests(PorcelainTestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        self.graph = build_commit_graph(
+    def test_simple(self) -> None:
+        c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
-
-    def test_simple(self) -> None:
-        c1, c2, c3 = self.graph
         self.repo.refs[b"HEAD"] = c3.id
         self.assertEqual(
             c1.id.decode("ascii")[:7],
             porcelain.find_unique_abbrev(self.repo.object_store, c1.id),
-        )
-
-    def test_commit_full(self) -> None:
-        c1, c2, c3 = self.graph
-        self.repo.refs[b"HEAD"] = c3.id
-        self.assertEqual(
-            c1.id.decode("ascii"),
-            porcelain.find_unique_abbrev(self.repo.object_store, c1.id, abbrev=40),
         )
 
 

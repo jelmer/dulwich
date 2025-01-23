@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install --upgrade ".[fastimport,paramiko,https]"  setuptools-rust
       - name: Install gpg on supported platforms
-        run: pip install --upgrade ".[pgp]"
+        run: pip install ".[pgp]"
         if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
       - name: Style checks
         run: |

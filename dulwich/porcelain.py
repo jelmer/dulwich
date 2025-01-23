@@ -2194,6 +2194,7 @@ def describe(repo, abbrev=None):
 
     Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".
     """
+    abbrev_slice = slice(0, abbrev if abbrev is not None else 7)
     # Get the repository
     with open_repo_closing(repo) as r:
         # Get a list of all tags
@@ -2224,7 +2225,7 @@ def describe(repo, abbrev=None):
         if len(sorted_tags) == 0:
             object_id = r[r.head()].id
             if abbrev is not None:
-                return object_id[:abbrev].decode("ascii")
+                return object_id[abbrev_slice].decode("ascii")
             return f"g{find_unique_abbrev(r.object_store, object_id)}"
 
         # We're now 0 commits from the top
@@ -2248,13 +2249,13 @@ def describe(repo, abbrev=None):
                         return "{}-{}-g{}".format(
                             tag_name,
                             commit_count,
-                            latest_commit.id.decode("ascii")[:abbrev or 7],
+                            latest_commit.id.decode("ascii")[abbrev_slice],
                         )
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return "g{}".format(latest_commit.id.decode("ascii")[:abbrev or 7])
+        return "g{}".format(latest_commit.id.decode("ascii")[abbrev_slice])
 
 
 def get_object_by_path(repo, path, committish=None):

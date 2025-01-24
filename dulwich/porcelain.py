@@ -2225,7 +2225,7 @@ def describe(repo, abbrev=None):
         if len(sorted_tags) == 0:
             object_id = r[r.head()].id
             if abbrev is not None:
-                return object_id[abbrev_slice].decode("ascii")
+                return object_id.decode("ascii")[abbrev_slice]
             return f"g{find_unique_abbrev(r.object_store, object_id)}"
 
         # We're now 0 commits from the top

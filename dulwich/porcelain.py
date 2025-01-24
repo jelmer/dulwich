@@ -2221,18 +2221,17 @@ def describe(repo, abbrev=None):
 
         sorted_tags = sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
 
-        # If there are no tags, return the current commit
+        # Get the latest commit
+        latest_commit = r[r.head()]
+
+        # If there are no tags, return the latest commit
         if len(sorted_tags) == 0:
-            object_id = r[r.head()].id
             if abbrev is not None:
-                return object_id.decode("ascii")[abbrev_slice]
-            return f"g{find_unique_abbrev(r.object_store, object_id)}"
+                return latest_commit.id.decode("ascii")[abbrev_slice]
+            return f"g{find_unique_abbrev(r.object_store, latest_commit.id)}"
 
         # We're now 0 commits from the top
         commit_count = 0
-
-        # Get the latest commit
-        latest_commit = r[r.head()]
 
         # Walk through all commits
         walker = r.get_walker()

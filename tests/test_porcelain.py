@@ -3409,7 +3409,7 @@ class DescribeTests(PorcelainTestCase):
         )
         self.repo.refs[b"HEAD"] = c3.id
         self.assertEqual(
-            c3.id.decode("ascii"),
+            "g{}".format(c3.id.decode("ascii")),
             porcelain.describe(self.repo, abbrev=40),
         )
 

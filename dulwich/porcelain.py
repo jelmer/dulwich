@@ -2227,7 +2227,7 @@ def describe(repo, abbrev=None):
         # If there are no tags, return the latest commit
         if len(sorted_tags) == 0:
             if abbrev is not None:
-                return latest_commit.id.decode("ascii")[abbrev_slice]
+                return "g{}".format(latest_commit.id.decode("ascii")[abbrev_slice])
             return f"g{find_unique_abbrev(r.object_store, latest_commit.id)}"
 
         # We're now 0 commits from the top

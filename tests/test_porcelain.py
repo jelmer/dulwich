@@ -3404,17 +3404,13 @@ class DescribeTests(PorcelainTestCase):
         )
 
     def test_untagged_commit_abbreviation(self) -> None:
-        _, _, c3 = build_commit_graph(
-            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
-        )
+        _, _, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1, 2]])
         self.repo.refs[b"HEAD"] = c3.id
         brief_description, complete_description = (
             porcelain.describe(self.repo),
             porcelain.describe(self.repo, abbrev=40),
         )
-        self.assertTrue(
-            complete_description.startswith(brief_description)
-        )
+        self.assertTrue(complete_description.startswith(brief_description))
         self.assertEqual(
             "g{}".format(c3.id.decode("ascii")),
             complete_description,

@@ -745,7 +745,7 @@ class cmd_stash_pop(Command):
         parser = optparse.OptionParser()
         options, args = parser.parse_args(args)
         porcelain.stash_pop(".")
-        print("Restrored working directory and index state")
+        print("Restored working directory and index state")
 
 
 class cmd_stash(SuperCommand):

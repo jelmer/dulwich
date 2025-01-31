@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.2"]
+requires = ["setuptools>=61.2", "setuptools-rust"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -34,6 +34,21 @@ Homepage = "https://www.dulwich.io/"
 Repository = "https://www.dulwich.io/code/"
 GitHub = "https://github.com/dulwich/dulwich"
 "Bug Tracker" = "https://github.com/dulwich/dulwich/issues"
+
+[[tool.setuptools-rust.ext-modules]]
+target = "dulwich._objects"
+path = "crates/objects/Cargo.toml"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "dulwich._pack"
+path = "crates/pack/Cargo.toml"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "dulwich._diff_tree"
+path = "crates/diff-tree/Cargo.toml"
+optional = true
 
 [project.optional-dependencies]
 fastimport = ["fastimport"]

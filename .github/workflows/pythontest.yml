@@ -28,6 +28,13 @@ jobs:
       - name: Install native dependencies (Ubuntu)
         run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
         if: "matrix.os == 'ubuntu-latest'"
+      - name: Provide gpgme-config and gpg-error-config
+        if: "matrix.os == 'ubuntu-latest'"
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cp .github/gpgme-config "$HOME/.local/bin/gpgme-config"
+          cp .github/gpg-error-config "$HOME/.local/bin/gpg-error-config"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Install native dependencies (MacOS)
         run: brew install swig gpgme
         if: "matrix.os == 'macos-latest'"

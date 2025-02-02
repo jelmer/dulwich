@@ -451,7 +451,7 @@ class Index:
             self.update(read_index_dict(f))
             # FIXME: Additional data?
             f.read(os.path.getsize(self._filename) - f.tell() - 20)
-            f.check_sha()
+            f.check_sha(allow_empty=True)
         finally:
             f.close()
 

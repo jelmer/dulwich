@@ -50,6 +50,7 @@ from dulwich.client import (
     TraditionalGitClient,
     _extract_symrefs_and_agent,
     _remote_error_from_stderr,
+    _win32_url_to_path,
     check_wants,
     default_urllib3_manager,
     get_credentials_from_store,
@@ -130,7 +131,7 @@ class GitClientTests(TestCase):
         )
 
     def test_archive_ack(self) -> None:
-        self.rin.write(b"0009NACK\n" b"0000")
+        self.rin.write(b"0009NACK\n0000")
         self.rin.seek(0)
         self.client.archive(b"bla", b"HEAD", None, None)
         self.assertEqual(self.rout.getvalue(), b"0011argument HEAD0000")
@@ -671,33 +672,37 @@ class TestGetTransportAndPathFromUrl(TestCase):
         self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("/home/jelmer/foo", path)
 
+    def test_win32_url_to_path(self):
+        def check(url, expected):
+            parsed = urlparse(url)
+            self.assertEqual(_win32_url_to_path(parsed), expected)
+
+        check("file:C:/foo.bar/baz", "C:\\foo.bar\\baz")
+        check("file:/C:/foo.bar/baz", "C:\\foo.bar\\baz")
+        check("file://C:/foo.bar/baz", "C:\\foo.bar\\baz")
+        check("file:///C:/foo.bar/baz", "C:\\foo.bar\\baz")
+
     @patch("os.name", "nt")
     @patch("sys.platform", "win32")
     def test_file_win(self) -> None:
-        # `_win32_url_to_path` uses urllib.request.url2pathname, which is set to
-        # `ntutl2path.url2pathname`  when `os.name==nt`
-        from nturl2path import url2pathname
+        expected = "C:\\foo.bar\\baz"
+        for file_url in [
+            "file:C:/foo.bar/baz",
+            "file:/C:/foo.bar/baz",
+            "file://C:/foo.bar/baz",
+            "file:///C:/foo.bar/baz",
+        ]:
+            c, path = get_transport_and_path(file_url)
+            self.assertIsInstance(c, LocalGitClient)
+            self.assertEqual(path, expected)
 
-        with patch("dulwich.client.url2pathname", url2pathname):
-            expected = "C:\\foo.bar\\baz"
-            for file_url in [
-                "file:C:/foo.bar/baz",
-                "file:/C:/foo.bar/baz",
-                "file://C:/foo.bar/baz",
-                "file://C://foo.bar//baz",
-                "file:///C:/foo.bar/baz",
-            ]:
-                c, path = get_transport_and_path(file_url)
-                self.assertIsInstance(c, LocalGitClient)
-                self.assertEqual(path, expected)
-
-            for remote_url in [
-                "file://host.example.com/C:/foo.bar/baz"
-                "file://host.example.com/C:/foo.bar/baz"
-                "file:////host.example/foo.bar/baz",
-            ]:
-                with self.assertRaises(NotImplementedError):
-                    c, path = get_transport_and_path(remote_url)
+        for remote_url in [
+            "file://host.example.com/C:/foo.bar/baz"
+            "file://host.example.com/C:/foo.bar/baz"
+            "file:////host.example/foo.bar/baz",
+        ]:
+            with self.assertRaises(NotImplementedError):
+                c, path = get_transport_and_path(remote_url)
 
 
 class TestSSHVendor:
@@ -1631,8 +1636,7 @@ class PLinkSSHVendorTests(TestCase):
         )
 
         expected_warning = UserWarning(
-            "Invoking PLink with a password exposes the password in the "
-            "process list."
+            "Invoking PLink with a password exposes the password in the process list."
         )
 
         for w in warnings_list:
@@ -1677,8 +1681,7 @@ class PLinkSSHVendorTests(TestCase):
         command = vendor.run_command("host", "git-clone-url", password="12345")
 
         expected_warning = UserWarning(
-            "Invoking PLink with a password exposes the password in the "
-            "process list."
+            "Invoking PLink with a password exposes the password in the process list."
         )
 
         for w in warnings_list:

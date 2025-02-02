@@ -2184,7 +2184,7 @@ def find_unique_abbrev(object_store, object_id):
     return object_id.decode("ascii")[:7]
 
 
-def describe(repo, abbrev=7):
+def describe(repo, abbrev=None):
     """Describe the repository version.
 
     Args:
@@ -2194,6 +2194,7 @@ def describe(repo, abbrev=7):
 
     Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".
     """
+    abbrev_slice = slice(0, abbrev if abbrev is not None else 7)
     # Get the repository
     with open_repo_closing(repo) as r:
         # Get a list of all tags
@@ -2220,15 +2221,17 @@ def describe(repo, abbrev=7):
 
         sorted_tags = sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
 
-        # If there are no tags, return the current commit
+        # Get the latest commit
+        latest_commit = r[r.head()]
+
+        # If there are no tags, return the latest commit
         if len(sorted_tags) == 0:
-            return f"g{find_unique_abbrev(r.object_store, r[r.head()].id)}"
+            if abbrev is not None:
+                return "g{}".format(latest_commit.id.decode("ascii")[abbrev_slice])
+            return f"g{find_unique_abbrev(r.object_store, latest_commit.id)}"
 
         # We're now 0 commits from the top
         commit_count = 0
-
-        # Get the latest commit
-        latest_commit = r[r.head()]
 
         # Walk through all commits
         walker = r.get_walker()
@@ -2245,13 +2248,13 @@ def describe(repo, abbrev=7):
                         return "{}-{}-g{}".format(
                             tag_name,
                             commit_count,
-                            latest_commit.id.decode("ascii")[:abbrev],
+                            latest_commit.id.decode("ascii")[abbrev_slice],
                         )
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return "g{}".format(latest_commit.id.decode("ascii")[:abbrev])
+        return "g{}".format(latest_commit.id.decode("ascii")[abbrev_slice])
 
 
 def get_object_by_path(repo, path, committish=None):

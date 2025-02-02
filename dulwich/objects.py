@@ -536,7 +536,7 @@ class ShaFile:
         """Returns the length of the raw string of this object."""
         return sum(map(len, self.as_raw_chunks()))
 
-    def sha(self) -> "HASH":
+    def sha(self) -> Union[FixedSha, "HASH"]:
         """The SHA1 object that is the name of this object."""
         if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha
@@ -892,8 +892,7 @@ class Tag(ShaFile):
     )
     tag_time = serializable_property(
         "tag_time",
-        "The creation timestamp of the tag.  As the number of seconds "
-        "since the epoch",
+        "The creation timestamp of the tag.  As the number of seconds since the epoch",
     )
     tag_timezone = serializable_property(
         "tag_timezone", "The timezone that tag_time is in."
@@ -1644,7 +1643,7 @@ class Commit(ShaFile):
 
     commit_time = serializable_property(
         "commit_time",
-        "The timestamp of the commit. As the number of seconds since the " "epoch.",
+        "The timestamp of the commit. As the number of seconds since the epoch.",
     )
 
     commit_timezone = serializable_property(

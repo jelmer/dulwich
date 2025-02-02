@@ -16,6 +16,9 @@ for arg in "$@"; do
 	  ;;
 	--thread=pthread)
 	  ;;
+	--prefix)
+	  flags="$flags --variable=prefix"
+	  ;;
 	*)
 	  echo "Unknown flag: $arg" >&2
 	  exit 1

@@ -1608,7 +1608,10 @@ class SHA1Reader:
     def check_sha(self, allow_empty: bool = False) -> None:
         stored = self.f.read(20)
         # If git option index.skipHash is set the index will be empty
-        if stored != self.sha1.digest() and (not allow_empty or sha_to_hex(stored) != b'0000000000000000000000000000000000000000'):
+        if stored != self.sha1.digest() and (
+            not allow_empty
+            or sha_to_hex(stored) != b"0000000000000000000000000000000000000000"
+        ):
             raise ChecksumMismatch(self.sha1.hexdigest(), sha_to_hex(stored))
 
     def close(self):
@@ -2486,9 +2489,9 @@ class Pack:
 
     def check_length_and_checksum(self) -> None:
         """Sanity check the length and checksum of the pack index and data."""
-        assert len(self.index) == len(self.data), (
-            f"Length mismatch: {len(self.index)} (index) != {len(self.data)} (data)"
-        )
+        assert len(self.index) == len(
+            self.data
+        ), f"Length mismatch: {len(self.index)} (index) != {len(self.data)} (data)"
         idx_stored_checksum = self.index.get_pack_checksum()
         data_stored_checksum = self.data.get_stored_checksum()
         if idx_stored_checksum != data_stored_checksum:

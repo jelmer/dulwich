@@ -1135,6 +1135,14 @@ class Repo(BaseRepo):
         object_store: Optional[PackBasedObjectStore] = None,
         bare: Optional[bool] = None,
     ) -> None:
+        """Open a repository on disk.
+
+        Args:
+          root: Path to the repository's root.
+          object_store: ObjectStore to use; if omitted, we use the
+            repository's default object store
+          bare: True if this is a bare repository.
+        """
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
             if os.path.isfile(hidden_path) or os.path.isdir(
@@ -1837,6 +1845,9 @@ class MemoryRepo(BaseRepo):
     """
 
     def __init__(self) -> None:
+        """
+        Create a new repository in memory.
+        """
         from .config import ConfigFile
 
         self._reflog: list[Any] = []

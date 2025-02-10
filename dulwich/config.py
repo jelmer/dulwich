@@ -553,6 +553,7 @@ class ConfigFile(ConfigDict):
                     ret._values[section][setting] = value
                     setting = None
             else:  # continuation line
+                assert continuation is not None
                 if line.endswith(b"\\\n"):
                     continuation += line[:-2]
                 elif line.endswith(b"\\\r\n"):

@@ -1845,9 +1845,7 @@ class MemoryRepo(BaseRepo):
     """
 
     def __init__(self) -> None:
-        """
-        Create a new repository in memory.
-        """
+        "Create a new repository in memory."
         from .config import ConfigFile
 
         self._reflog: list[Any] = []

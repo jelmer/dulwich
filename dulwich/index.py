@@ -106,6 +106,8 @@ class IndexEntry:
     gid: int
     size: int
     sha: bytes
+    flags: int
+    extended_flags: int
 
     @classmethod
     def from_serialized(cls, serialized: SerializedIndexEntry) -> "IndexEntry":
@@ -119,9 +121,14 @@ class IndexEntry:
             gid=serialized.gid,
             size=serialized.size,
             sha=serialized.sha,
+            flags=serialized.flags,
+            extended_flags=serialized.extended_flags,
         )
 
     def serialize(self, name: bytes, stage: Stage) -> SerializedIndexEntry:
+        # Clear out any existing stage bits, then set them from the Stage.
+        new_flags = self.flags & ~FLAG_STAGEMASK
+        new_flags |= stage.value << FLAG_STAGESHIFT
         return SerializedIndexEntry(
             name=name,
             ctime=self.ctime,
@@ -133,9 +140,29 @@ class IndexEntry:
             gid=self.gid,
             size=self.size,
             sha=self.sha,
-            flags=stage.value << FLAG_STAGESHIFT,
-            extended_flags=0,
+            flags=new_flags,
+            extended_flags=self.extended_flags,
         )
+
+    def stage(self) -> Stage:
+        return Stage((self.flags & FLAG_STAGEMASK) >> FLAG_STAGESHIFT)
+
+    def set_skip_worktree(self, skip: bool = True) -> None:
+        """
+        Helper method to set or clear the skip-worktree bit in extended_flags.
+        Also sets FLAG_EXTENDED in self.flags if needed.
+        """
+        if skip:
+            # Turn on the skip-worktree bit
+            self.extended_flags |= EXTENDED_FLAG_SKIP_WORKTREE
+            # Also ensure the main 'extended' bit is set in flags
+            self.flags |= FLAG_EXTENDED
+        else:
+            # Turn off the skip-worktree bit
+            self.extended_flags &= ~EXTENDED_FLAG_SKIP_WORKTREE
+            # Optionally unset the main extended bit if no extended flags remain
+            if self.extended_flags == 0:
+                self.flags &= ~FLAG_EXTENDED
 
 
 class ConflictedIndexEntry:

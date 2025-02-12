@@ -153,8 +153,7 @@ class IndexEntry:
         return bool(self.extended_flags & EXTENDED_FLAG_SKIP_WORKTREE)
 
     def set_skip_worktree(self, skip: bool = True) -> None:
-        """
-        Helper method to set or clear the skip-worktree bit in extended_flags.
+        """Helper method to set or clear the skip-worktree bit in extended_flags.
         Also sets FLAG_EXTENDED in self.flags if needed.
         """
         if skip:

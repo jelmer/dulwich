@@ -2103,8 +2103,7 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
 
 
 def sparse_checkout(repo, patterns=None, force=False):
-    """
-    Perform a sparse checkout by updating the index and working tree
+    """Perform a sparse checkout by updating the index and working tree
     based on inclusion/exclusion patterns, using skip-worktree bits in
     the index's extended_flags field (as supported by patched Dulwich).
 
@@ -2132,7 +2131,7 @@ def sparse_checkout(repo, patterns=None, force=False):
     else:
         if not os.path.exists(sparse_file):
             raise Error("No sparse checkout patterns provided and no file found.")
-        with open(sparse_file, "r", encoding="utf-8") as f:
+        with open(sparse_file, encoding="utf-8") as f:
             patterns = [line.strip() for line in f if line.strip()]
 
     # 2) Preprocess patterns: "docs/" -> "docs/*", unify path separators

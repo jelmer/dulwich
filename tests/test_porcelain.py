@@ -34,7 +34,7 @@ import tempfile
 import threading
 import time
 from io import BytesIO, StringIO
-from unittest import skip, skipIf
+from unittest import skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
@@ -3699,8 +3699,7 @@ class SparseCheckoutTests(PorcelainTestCase):
     # Utility/Placeholder
     #
     def sparse_checkout(self, repo, patterns, force=False):
-        """
-        Wrapper around the actual porcelain.sparse_checkout function
+        """Wrapper around the actual porcelain.sparse_checkout function
         to handle any test-specific setup or logging.
         """
         return porcelain.sparse_checkout(repo, patterns, force=force)
@@ -3720,8 +3719,7 @@ class SparseCheckoutTests(PorcelainTestCase):
         commit(self.repo_path, message=b"Added " + rel_path.encode("utf-8"))
 
     def _list_wtree_files(self):
-        """
-        Return a set of all files (not dirs) present
+        """Return a set of all files (not dirs) present
         in the working tree, ignoring .git/.
         """
         found_files = set()
@@ -3739,10 +3737,9 @@ class SparseCheckoutTests(PorcelainTestCase):
     # -- Test Cases --
     #
     def test_TC_SC_001_only_included_paths_appear_in_wtree(self):
-        """
-        TC-SC-001:
-          Verify that only included paths (per Sparse_Checkout_File)
-          remain in the working tree, while excluded paths do not.
+        """TC-SC-001:
+        Verify that only included paths (per Sparse_Checkout_File)
+        remain in the working tree, while excluded paths do not.
         """
         self._commit_file("keep_me.txt", "I'll stay\n")
         self._commit_file("exclude_me.txt", "I'll be excluded\n")
@@ -3759,11 +3756,10 @@ class SparseCheckoutTests(PorcelainTestCase):
         )
 
     def test_TC_SC_002_previously_included_paths_become_excluded(self):
-        """
-        TC-SC-002:
-          Confirm that previously included (checked out) files
-          become excluded (skip-worktree bit set)
-          after patterns change to remove them.
+        """TC-SC-002:
+        Confirm that previously included (checked out) files
+        become excluded (skip-worktree bit set)
+        after patterns change to remove them.
         """
         self._commit_file("data/included_1.txt", "some content\n")
         self._commit_file("data/included_2.txt", "other content\n")
@@ -3784,11 +3780,10 @@ class SparseCheckoutTests(PorcelainTestCase):
         self.assertTrue(entry.skip_worktree)
 
     def test_TC_SC_003_force_removes_local_changes_for_excluded_paths(self):
-        """
-        TC-SC-003:
-          Verify that forced enablement of sparse checkout
-          removes local modifications for newly excluded paths
-          only when 'force=True'.
+        """TC-SC-003:
+        Verify that forced enablement of sparse checkout
+        removes local modifications for newly excluded paths
+        only when 'force=True'.
         """
         self._commit_file("file1.txt", "original content\n")
 
@@ -3807,10 +3802,9 @@ class SparseCheckoutTests(PorcelainTestCase):
         )
 
     def test_TC_SC_004_destructive_refuse_uncommitted_changes_without_force(self):
-        """
-        TC-SC-004:
-          Destructive operation should fail if uncommitted changes
-          exist for newly excluded paths and we do NOT pass force=True.
+        """TC-SC-004:
+        Destructive operation should fail if uncommitted changes
+        exist for newly excluded paths and we do NOT pass force=True.
         """
         self._commit_file("config.yaml", "initial\n")
         cfg_path = os.path.join(self.repo_path, "config.yaml")
@@ -3822,10 +3816,9 @@ class SparseCheckoutTests(PorcelainTestCase):
             self.sparse_checkout(self.repo, exclude_patterns, force=False)
 
     def test_TC_SC_005_fnmatch_gitignore_pattern_expansion(self):
-        """
-        TC-SC-005:
-          Confirm that reading/writing of patterns aligns
-          with gitignore-style or fnmatch expansions (*, ?, etc.).
+        """TC-SC-005:
+        Confirm that reading/writing of patterns aligns
+        with gitignore-style or fnmatch expansions (*, ?, etc.).
         """
         self._commit_file("src/foo.py", "print('hello')\n")
         self._commit_file("src/foo_test.py", "print('test')\n")
@@ -3845,6 +3838,6 @@ class SparseCheckoutTests(PorcelainTestCase):
 
         sc_file = os.path.join(self.repo_path, ".git", "info", "sparse-checkout")
         self.assertTrue(os.path.isfile(sc_file))
-        with open(sc_file, "r") as f:
+        with open(sc_file) as f:
             lines = f.read().strip().split()
             self.assertIn("src/foo*.py", lines)

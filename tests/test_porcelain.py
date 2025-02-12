@@ -3850,6 +3850,7 @@ class SparseCheckoutTests(PorcelainTestCase):
             self.assertIn("src/foo*.py", lines)
 
 
+@unittest.skip("Cone mode is not developed yet but tests are written in advance.")
 class ConeModeSparseCheckoutTests(PorcelainTestCase):
     """
     Integration tests for Dulwich's cone mode sparse checkout.

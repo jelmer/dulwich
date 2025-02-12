@@ -2107,19 +2107,25 @@ SKIP_WORKTREE_BIT = 0x4000
 def local_modifications_exist(full_path, index_entry):
     """
     Check whether the file at full_path has local modifications relative
-    to what is recorded in the index entry.
-
-    This placeholder implementation simply returns False. In a real-world
-    scenario, you might compare file contents or check the stat information
-    against the recorded metadata.
+    to the blob recorded in the index entry.
     """
     try:
-        os.stat(full_path)
-    except OSError:
-        return False
-    # For example, you might check file size, mtime, or compute a hash.
-    # Here we assume no modifications.
-    return False
+        with open(full_path, "rb") as f:
+            disk_data = f.read()
+    except Exception:
+        # If we can’t read the file, assume there are modifications.
+        return True
+    try:
+        blob = repo.object_store[index_entry.sha]
+    except KeyError:
+        # If we cannot find the blob, assume modifications exist.
+        return True
+    # Compare the blob data to the disk contents.
+    return disk_data != blob.data
+
+
+# The skip-worktree bit value; adjust if Dulwich uses a different value.
+SKIP_WORKTREE_BIT = 0x4000
 
 
 def sparse_checkout(repo, patterns=None, force=False):
@@ -2209,7 +2215,7 @@ def sparse_checkout(repo, patterns=None, force=False):
                         f"Local modifications in {path_str} would be overwritten by sparse checkout."
                     )
                 try:
-                    os.remove(full_path)
+                    os.unlink(full_path)
                 except OSError as e:
                     raise Error(f"Failed to remove excluded file {path_str}: {e}")
         else:
@@ -2226,7 +2232,6 @@ def sparse_checkout(repo, patterns=None, force=False):
                 with open(full_path, "wb") as f:
                     f.write(blob.data)
 
-    # Optionally, you might want to print or log that the operation succeeded.
     return
 
 

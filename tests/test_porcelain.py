@@ -34,7 +34,7 @@ import tempfile
 import threading
 import time
 from io import BytesIO, StringIO
-from unittest import skipIf
+from unittest import skip, skipIf
 
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
@@ -3850,7 +3850,7 @@ class SparseCheckoutTests(PorcelainTestCase):
             self.assertIn("src/foo*.py", lines)
 
 
-@unittest.skip("Cone mode is not developed yet but tests are written in advance.")
+@skip("Cone mode is not developed yet but tests are written in advance.")
 class ConeModeSparseCheckoutTests(PorcelainTestCase):
     """
     Integration tests for Dulwich's cone mode sparse checkout.

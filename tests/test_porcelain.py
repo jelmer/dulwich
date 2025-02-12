@@ -40,7 +40,11 @@ from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError
 from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
-from dulwich.porcelain import CheckoutError
+from dulwich.porcelain import (
+    CheckoutError,  # Hypothetical or real error class
+    add,
+    commit,
+)
 from dulwich.repo import NoIndexPresent, Repo
 from dulwich.server import DictBackend
 from dulwich.tests.utils import build_commit_graph, make_commit, make_object
@@ -3682,127 +3686,168 @@ class ForEachTests(PorcelainTestCase):
 
 
 class SparseCheckoutTests(PorcelainTestCase):
-    """Integration tests for sparse checkout functionality."""
+    """Integration tests for Dulwich's sparse checkout feature."""
 
-    def sparse_checkout_placeholder(self, repo, patterns):
+    # NOTE: We do NOT override `setUp()` here because the parent class
+    #       (PorcelainTestCase) already:
+    #         1) Creates self.test_dir = a unique temp dir
+    #         2) Creates a subdir named "repo"
+    #         3) Calls Repo.init() on that path
+    #       Re-initializing again caused FileExistsError.
+
+    #
+    # Utility/Placeholder
+    #
+    def sparse_checkout(self, repo, patterns, force=False):
         """
-        Placeholder function for sparse checkout logic.
-        Currently a no-op (simulating a normal/unchanged checkout).
-        Later, this will be replaced with actual sparse checkout logic
-        that sets skip-worktree bits for excluded paths.
+        Placeholder method:
+        Should enable or update sparse checkout patterns
+        and manipulate skip-worktree bits in the index.
+        For now, it is unimplemented (or minimal) to ensure tests fail.
         """
-        # Does nothing right now, so these tests will fail.
+        # Currently no-op or minimal. We'll refine once we implement it.
         pass
 
-    def _write_and_commit_file(self, filename, content=None):
-        """
-        Helper: Write 'filename' in self.repo.path with optional 'content',
-        stage it, and commit. Returns the path to the file.
-        """
-        if content is None:
-            content = "dummy content"
-        fullpath = os.path.join(self.repo.path, filename)
-        os.makedirs(os.path.dirname(fullpath), exist_ok=True)
-        with open(fullpath, "w") as f:
+    def _write_file(self, rel_path, content):
+        """Helper to write a file in the repository working tree."""
+        abs_path = os.path.join(self.repo_path, rel_path)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "w") as f:
             f.write(content)
-        porcelain.add(self.repo, paths=[fullpath])
-        porcelain.commit(
-            self.repo,
-            message=b"Add " + filename.encode("ascii"),
-            author=b"test <test@example.com>",
-            committer=b"test <test@example.com>",
-        )
-        return fullpath
+        return abs_path
 
-    # TC-SC-001
-    def test_sparse_checkout_includes_only_specified_files(self):
+    def _commit_file(self, rel_path, content):
+        """Helper to write, add, and commit a file."""
+        abs_path = self._write_file(rel_path, content)
+        add(self.repo_path, paths=[abs_path])
+        commit(self.repo_path, message=b"Added " + rel_path.encode("utf-8"))
+
+    def _list_wtree_files(self):
         """
-        Test that sparse checkout includes only the paths specified in the patterns
-        list, excluding others from the working tree.
+        Return a set of all files (not dirs) present
+        in the working tree, ignoring .git/.
         """
-        # Create and commit two files in the repo
-        included = self._write_and_commit_file("included.txt", "This is included.\n")
-        excluded = self._write_and_commit_file("excluded.txt", "This is excluded.\n")
+        found_files = set()
+        for root, dirs, files in os.walk(self.repo_path):
+            # Skip .git in the walk
+            if ".git" in dirs:
+                dirs.remove(".git")
 
-        # Patterns for sparse checkout: only "included.txt"
-        patterns = ["included.txt"]
+            for filename in files:
+                file_rel = os.path.relpath(os.path.join(root, filename), self.repo_path)
+                found_files.add(file_rel)
+        return found_files
 
-        # Call the placeholder sparse checkout
-        self.sparse_checkout_placeholder(self.repo, patterns)
+    #
+    # -- Test Cases --
+    #
+    def test_TC_SC_001_only_included_paths_appear_in_wtree(self):
+        """
+        TC-SC-001:
+          Verify that only included paths (per Sparse_Checkout_File)
+          remain in the working tree, while excluded paths do not.
+        """
+        self._commit_file("keep_me.txt", "I'll stay\n")
+        self._commit_file("exclude_me.txt", "I'll be excluded\n")
 
-        # Now we expect that 'excluded.txt' no longer exists in the working tree,
-        # while 'included.txt' remains. Because our placeholder does nothing,
-        # the test should fail.
-        actual_paths = set(
-            p
-            for p in os.listdir(self.repo.path)
-            if p not in (".git", os.path.basename(self.repo.controldir()))
-        )
+        patterns = ["keep_me.txt"]
+        self.sparse_checkout(self.repo, patterns)
 
-        expected_paths = {"included.txt"}
-
+        actual_files = self._list_wtree_files()
+        expected_files = {"keep_me.txt"}
         self.assertEqual(
-            expected_paths,
-            actual_paths,
-            "Expected only 'included.txt' to remain, but sparse checkout placeholder didn't exclude 'excluded.txt'.",
+            expected_files,
+            actual_files,
+            f"Expected only {expected_files}, but found {actual_files}",
         )
 
-    # TC-SC-002
-    def test_sparse_checkout_excludes_subdir_files(self):
+    def test_TC_SC_002_previously_included_paths_become_excluded(self):
         """
-        Test that patterns exclude entire subdirectories that do not match.
+        TC-SC-002:
+          Confirm that previously included (checked out) files
+          become excluded (skip-worktree bit set)
+          after patterns change to remove them.
         """
-        # Create a nested subdir with two files
-        self._write_and_commit_file("src/main.py", "print('main')\n")
-        self._write_and_commit_file("src/helper.py", "print('helper')\n")
-        # Create a top-level doc file to keep
-        self._write_and_commit_file("README.md", "# Some documentation\n")
+        self._commit_file("data/included_1.txt", "some content\n")
+        self._commit_file("data/included_2.txt", "other content\n")
 
-        # Patterns only match "README.md" in the root
-        patterns = ["README.md"]
+        initial_patterns = ["data/"]
+        self.sparse_checkout(self.repo, initial_patterns)
 
-        # Call placeholder
-        self.sparse_checkout_placeholder(self.repo, patterns)
+        updated_patterns = ["data/included_1.txt"]
+        self.sparse_checkout(self.repo, updated_patterns)
 
-        # We want subdir 'src/' not to be present in the working tree.
-        actual_paths = set(
-            p
-            for p in os.listdir(self.repo.path)
-            if p not in (".git", os.path.basename(self.repo.controldir()))
-        )
+        actual_files = self._list_wtree_files()
+        expected_files = {"data/included_1.txt"}
+        self.assertEqual(expected_files, actual_files)
 
-        expected_paths = {"README.md"}
+        idx = self.repo.open_index()
+        self.assertIn(b"data/included_2.txt", idx)
+        entry = idx[b"data/included_2.txt"]
+        self.assertTrue(entry.skip_worktree)
 
+    def test_TC_SC_003_force_removes_local_changes_for_excluded_paths(self):
+        """
+        TC-SC-003:
+          Verify that forced enablement of sparse checkout
+          removes local modifications for newly excluded paths
+          only when 'force=True'.
+        """
+        self._commit_file("file1.txt", "original content\n")
+
+        file1_path = os.path.join(self.repo_path, "file1.txt")
+        with open(file1_path, "a") as f:
+            f.write("local changes!\n")
+
+        new_patterns = ["some_other_file.txt"]
+        self.sparse_checkout(self.repo, new_patterns, force=True)
+
+        actual_files = self._list_wtree_files()
         self.assertEqual(
-            expected_paths,
-            actual_paths,
-            "Expected only 'README.md' in the root. 'src/' directory should be excluded.",
+            set(),
+            actual_files,
+            "Force-sparse-checkout did not remove file with local changes.",
         )
 
-    # TC-SC-003
-    def test_sparse_checkout_does_not_delete_modified_excluded_paths_without_force(
-        self,
-    ):
+    def test_TC_SC_004_destructive_refuse_uncommitted_changes_without_force(self):
         """
-        If excluded paths have local modifications, a normal sparse checkout should fail
-        (raise CheckoutError) rather than silently removing or overwriting them.
+        TC-SC-004:
+          Destructive operation should fail if uncommitted changes
+          exist for newly excluded paths and we do NOT pass force=True.
         """
-        # 1. Create and commit a file that will eventually be excluded
-        exclude = self._write_and_commit_file("ditch_me.txt", "I'll be excluded.\n")
+        self._commit_file("config.yaml", "initial\n")
+        cfg_path = os.path.join(self.repo_path, "config.yaml")
+        with open(cfg_path, "a") as f:
+            f.write("local modifications\n")
 
-        # 2. Modify the file locally without committing
-        with open(exclude, "a") as f:
-            f.write("Some local changes.\n")
-
-        # 3. Patterns that exclude "ditch_me.txt"
-        patterns = ["some_other_file.txt"]  # doesn't include 'ditch_me.txt'
-
-        # 4. We now EXPECT an error if our logic sees local changes in a path
-        #    that is being excluded. Because our placeholder does nothing,
-        #    we won't see that error -> test fails as desired.
+        exclude_patterns = ["docs/"]
         with self.assertRaises(CheckoutError):
-            self.sparse_checkout_placeholder(self.repo, patterns)
+            self.sparse_checkout(self.repo, exclude_patterns, force=False)
 
-        # Because the placeholder is currently a no-op, no exception is raised,
-        # so the test will FAIL — exactly what we want in TDD until
-        # real logic is implemented.
+    def test_TC_SC_005_fnmatch_gitignore_pattern_expansion(self):
+        """
+        TC-SC-005:
+          Confirm that reading/writing of patterns aligns
+          with gitignore-style or fnmatch expansions (*, ?, etc.).
+        """
+        self._commit_file("src/foo.py", "print('hello')\n")
+        self._commit_file("src/foo_test.py", "print('test')\n")
+        self._commit_file("docs/readme.md", "# docs\n")
+        self._commit_file("src/foo_helper.py", "print('helper')\n")
+
+        patterns = ["src/foo*.py"]
+        self.sparse_checkout(self.repo, patterns)
+
+        actual_files = self._list_wtree_files()
+        expected_files = {"src/foo.py", "src/foo_test.py", "src/foo_helper.py"}
+        self.assertEqual(
+            expected_files,
+            actual_files,
+            "Wildcard pattern not matched as expected. Either too strict or too broad.",
+        )
+
+        sc_file = os.path.join(self.repo_path, ".git", "info", "sparse-checkout")
+        self.assertTrue(os.path.isfile(sc_file))
+        with open(sc_file, "r") as f:
+            lines = f.read().strip().split()
+            self.assertIn("src/foo*.py", lines)

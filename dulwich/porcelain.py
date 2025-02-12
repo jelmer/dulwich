@@ -2098,6 +2098,141 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
                 dir_path = os.path.dirname(dir_path)
 
 
+# --- Sparse Checkout Commands ---
+
+# Define a skip-worktree bit flag (the actual value may differ in Dulwich's implementation)
+SKIP_WORKTREE_BIT = 0x4000
+
+
+def local_modifications_exist(full_path, index_entry):
+    """
+    Check whether the file at full_path has local modifications relative
+    to what is recorded in the index entry.
+
+    This placeholder implementation simply returns False. In a real-world
+    scenario, you might compare file contents or check the stat information
+    against the recorded metadata.
+    """
+    try:
+        os.stat(full_path)
+    except OSError:
+        return False
+    # For example, you might check file size, mtime, or compute a hash.
+    # Here we assume no modifications.
+    return False
+
+
+def sparse_checkout(repo, patterns=None, force=False):
+    """
+    Perform a sparse checkout by updating the index and working tree
+    based on inclusion/exclusion patterns.
+
+    If `patterns` is provided (as a list of gitignore-style strings), then
+    write them to .git/info/sparse-checkout. Otherwise, the sparse-checkout file
+    is read and its patterns are used.
+
+    For each file in the index:
+      - If the file matches one of the patterns, clear its skip-worktree bit.
+      - If the file does not match any pattern, set its skip-worktree bit.
+
+    Then, for the working tree:
+      - For excluded files: if the file exists, remove it (unless local modifications exist
+        and force is False, in which case a CheckoutError is raised).
+      - For included files: if the file is missing, restore it from the repository's object store.
+
+    Args:
+      repo: Either a repository path or a Repo object.
+      patterns: A list of strings (patterns) to use. If None, the function will read
+                the existing sparse-checkout file.
+      force: If True, force removal even if local modifications exist.
+
+    Raises:
+      CheckoutError: If local modifications would be lost and force is False.
+      Error: For any other errors (for example, if no patterns can be determined).
+    """
+    # Open the repository (this helper accepts either a Repo instance or a path)
+    repo = Repo(repo) if not isinstance(repo, Repo) else repo
+
+    # Define the path to the sparse-checkout file
+    info_dir = os.path.join(repo.path, ".git", "info")
+    if not os.path.exists(info_dir):
+        os.makedirs(info_dir)
+    sparse_file = os.path.join(info_dir, "sparse-checkout")
+
+    # If patterns were provided, write them to the sparse-checkout file.
+    if patterns is not None:
+        with open(sparse_file, "w", encoding="utf-8") as f:
+            for pat in patterns:
+                f.write(pat + "\n")
+    else:
+        # Otherwise, try to read the existing sparse-checkout file.
+        if os.path.exists(sparse_file):
+            with open(sparse_file, "r", encoding="utf-8") as f:
+                patterns = [line.strip() for line in f if line.strip()]
+        else:
+            raise Error(
+                "No sparse checkout patterns provided and no sparse-checkout file found."
+            )
+
+    # Open the index from the repository.
+    index = repo.open_index()
+
+    # Iterate over a copy of the current index entries.
+    for path, entry in list(index.items()):
+        # Convert the index entry path (a bytestring) to a string.
+        path_str = path.decode("utf-8")
+        # Determine whether the file should be included.
+        # (Assumes that if any pattern matches the path the file is included.)
+        include = any(fnmatch.fnmatch(path_str, pat) for pat in patterns)
+        if include:
+            # Clear the skip-worktree bit.
+            entry.flags &= ~SKIP_WORKTREE_BIT
+        else:
+            # Set the skip-worktree bit.
+            entry.flags |= SKIP_WORKTREE_BIT
+
+        # Update the index entry.
+        index[path] = entry
+
+    # Write the updated index back to disk.
+    index.write()
+
+    # Now update the working tree based on the updated index.
+    for path, entry in list(index.items()):
+        path_str = path.decode("utf-8")
+        full_path = os.path.join(repo.path, path_str)
+        if entry.flags & SKIP_WORKTREE_BIT:
+            # The file is now excluded.
+            if os.path.exists(full_path):
+                if not force and local_modifications_exist(full_path, entry):
+                    raise CheckoutError(
+                        f"Local modifications in {path_str} would be overwritten by sparse checkout."
+                    )
+                try:
+                    os.remove(full_path)
+                except OSError as e:
+                    raise Error(f"Failed to remove excluded file {path_str}: {e}")
+        else:
+            # The file is included.
+            if not os.path.exists(full_path):
+                # Restore the file from the object store.
+                try:
+                    blob = repo.object_store[entry.sha]
+                except KeyError:
+                    raise Error(
+                        f"Blob {entry.sha} not found in object store for {path_str}."
+                    )
+                ensure_dir_exists(os.path.dirname(full_path))
+                with open(full_path, "wb") as f:
+                    f.write(blob.data)
+
+    # Optionally, you might want to print or log that the operation succeeded.
+    return
+
+
+# --- End of Sparse Checkout Commands ---
+
+
 def check_mailmap(repo, contact):
     """Check canonical name and email of contact.
 

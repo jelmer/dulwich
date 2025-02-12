@@ -3700,13 +3700,10 @@ class SparseCheckoutTests(PorcelainTestCase):
     #
     def sparse_checkout(self, repo, patterns, force=False):
         """
-        Placeholder method:
-        Should enable or update sparse checkout patterns
-        and manipulate skip-worktree bits in the index.
-        For now, it is unimplemented (or minimal) to ensure tests fail.
+        Wrapper around the actual porcelain.sparse_checkout function
+        to handle any test-specific setup or logging.
         """
-        # Currently no-op or minimal. We'll refine once we implement it.
-        pass
+        return porcelain.sparse_checkout(repo, patterns, force=force)
 
     def _write_file(self, rel_path, content):
         """Helper to write a file in the repository working tree."""

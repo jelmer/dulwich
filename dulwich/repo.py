@@ -1493,6 +1493,8 @@ class Repo(BaseRepo):
                 gid=st.st_gid if st else 0,
                 size=len(self[tree_entry[1]].data),
                 sha=tree_entry[1],
+                flags=0,
+                extended_flags=0,
             )
 
             index[tree_path] = index_entry

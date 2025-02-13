@@ -3733,13 +3733,14 @@ class SparseCheckoutTests(PorcelainTestCase):
                 found_files.add(file_rel)
         return found_files
 
-    #
-    # -- Test Cases --
-    #
-    def test_TC_SC_001_only_included_paths_appear_in_wtree(self):
-        """TC-SC-001:
-        Verify that only included paths (per Sparse_Checkout_File)
-        remain in the working tree, while excluded paths do not.
+    def test_only_included_paths_appear_in_wtree(self):
+        """Only included paths remain in the working tree, excluded paths are removed.
+
+        Commits two files, "keep_me.txt" and "exclude_me.txt". Then applies a
+        sparse‐checkout pattern containing only "keep_me.txt". Ensures that
+        the latter remains in the working tree, while "exclude_me.txt" is
+        removed. This verifies correct application of sparse‐checkout patterns
+        to remove files not listed.
         """
         self._commit_file("keep_me.txt", "I'll stay\n")
         self._commit_file("exclude_me.txt", "I'll be excluded\n")
@@ -3755,11 +3756,15 @@ class SparseCheckoutTests(PorcelainTestCase):
             f"Expected only {expected_files}, but found {actual_files}",
         )
 
-    def test_TC_SC_002_previously_included_paths_become_excluded(self):
-        """TC-SC-002:
-        Confirm that previously included (checked out) files
-        become excluded (skip-worktree bit set)
-        after patterns change to remove them.
+    def test_previously_included_paths_become_excluded(self):
+        """Previously included files become excluded after pattern changes.
+
+        Verifies that files initially brought into the working tree (e.g.,
+        by including `data/`) can later be excluded by narrowing the
+        sparse‐checkout pattern to just `data/included_1.txt`. Confirms that
+        the file `data/included_2.txt` remains in the index with
+        skip-worktree set (rather than being removed entirely), ensuring
+        data is not lost and Dulwich correctly updates the index flags.
         """
         self._commit_file("data/included_1.txt", "some content\n")
         self._commit_file("data/included_2.txt", "other content\n")
@@ -3779,11 +3784,14 @@ class SparseCheckoutTests(PorcelainTestCase):
         entry = idx[b"data/included_2.txt"]
         self.assertTrue(entry.skip_worktree)
 
-    def test_TC_SC_003_force_removes_local_changes_for_excluded_paths(self):
-        """TC-SC-003:
-        Verify that forced enablement of sparse checkout
-        removes local modifications for newly excluded paths
-        only when 'force=True'.
+    def test_force_removes_local_changes_for_excluded_paths(self):
+        """Forced sparse checkout removes local modifications for newly excluded paths.
+
+        Verifies that specifying force=True allows destructive operations
+        which discard uncommitted changes. First, we commit "file1.txt" and
+        then modify it. Next, we apply a pattern that excludes the file,
+        using force=True. The local modifications (and the file) should
+        be removed, leaving the working tree empty.
         """
         self._commit_file("file1.txt", "original content\n")
 
@@ -3801,10 +3809,14 @@ class SparseCheckoutTests(PorcelainTestCase):
             "Force-sparse-checkout did not remove file with local changes.",
         )
 
-    def test_TC_SC_004_destructive_refuse_uncommitted_changes_without_force(self):
-        """TC-SC-004:
-        Destructive operation should fail if uncommitted changes
-        exist for newly excluded paths and we do NOT pass force=True.
+    def test_destructive_refuse_uncommitted_changes_without_force(self):
+        """Fail on uncommitted changes for newly excluded paths without force.
+
+        Ensures that a sparse checkout is blocked if it would remove local
+        modifications from the working tree. We commit 'config.yaml', then
+        modify it, and finally attempt to exclude it via new patterns without
+        using force=True. This should raise a CheckoutError rather than
+        discarding the local changes.
         """
         self._commit_file("config.yaml", "initial\n")
         cfg_path = os.path.join(self.repo_path, "config.yaml")
@@ -3815,10 +3827,19 @@ class SparseCheckoutTests(PorcelainTestCase):
         with self.assertRaises(CheckoutError):
             self.sparse_checkout(self.repo, exclude_patterns, force=False)
 
-    def test_TC_SC_005_fnmatch_gitignore_pattern_expansion(self):
-        """TC-SC-005:
-        Confirm that reading/writing of patterns aligns
-        with gitignore-style or fnmatch expansions (*, ?, etc.).
+    def test_fnmatch_gitignore_pattern_expansion(self):
+        """Reading/writing patterns align with gitignore/fnmatch expansions.
+
+        Ensures that `sparse_checkout` interprets wildcard patterns (like `*.py`)
+        in the same way Git’s sparse‐checkout would. Multiple files are committed
+        to `src/` (e.g. `foo.py`, `foo_test.py`, `foo_helper.py`) and to `docs/`.
+        Then the pattern `src/foo*.py` is applied, confirming that only the
+        matching Python files remain in the working tree while the Markdown file
+        under `docs/` is excluded.
+
+        Finally, verifies that the `.git/info/sparse-checkout` file contains the
+        specified wildcard pattern (`src/foo*.py`), ensuring correct round-trip
+        of user-supplied patterns.
         """
         self._commit_file("src/foo.py", "print('hello')\n")
         self._commit_file("src/foo_test.py", "print('test')\n")

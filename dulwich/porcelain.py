@@ -45,6 +45,7 @@ Currently implemented:
  * remote{_add}
  * receive-pack
  * reset
+ * sparse_checkout
  * submodule_add
  * submodule_init
  * submodule_list

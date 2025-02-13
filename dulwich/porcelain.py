@@ -2099,9 +2099,6 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
                 dir_path = os.path.dirname(dir_path)
 
 
-# --- Sparse Checkout Commands ---
-
-
 def sparse_checkout(repo, patterns=None, force=False):
     """Perform a sparse checkout by updating the index and working tree
     based on inclusion/exclusion patterns, using skip-worktree bits in
@@ -2211,9 +2208,6 @@ def sparse_checkout(repo, patterns=None, force=False):
                 with open(full_path, "wb") as f:
                     f.write(blob.data)
     return
-
-
-# --- End of Sparse Checkout Commands ---
 
 
 def check_mailmap(repo, contact):

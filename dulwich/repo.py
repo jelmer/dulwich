@@ -1838,6 +1838,39 @@ class Repo(BaseRepo):
         except KeyError:
             return BlobNormalizer(config_stack, git_attributes)
 
+    def _sparse_checkout_file_path(self) -> str:
+        """Return the path of the sparse-checkout file in this repo's control dir."""
+        return os.path.join(self.controldir(), "info", "sparse-checkout")
+
+    def get_sparse_checkout_patterns(self) -> list[str]:
+        """Return a list of sparse-checkout patterns from info/sparse-checkout.
+
+        Returns:
+            A list of patterns. Returns an empty list if the file is missing.
+        """
+        path = self._sparse_checkout_file_path()
+        try:
+            with open(path, encoding="utf-8") as f:
+                return [line.strip() for line in f if line.strip()]
+        except FileNotFoundError:
+            return []
+
+    def set_sparse_checkout_patterns(self, patterns: list[str]) -> None:
+        """Write the given sparse-checkout patterns into info/sparse-checkout.
+
+        Creates the info/ directory if it does not exist.
+
+        Args:
+            patterns: A list of gitignore-style patterns to store.
+        """
+        info_dir = os.path.join(self.controldir(), "info")
+        os.makedirs(info_dir, exist_ok=True)
+
+        path = self._sparse_checkout_file_path()
+        with open(path, "w", encoding="utf-8") as f:
+            for pat in patterns:
+                f.write(pat + "\n")
+
 
 class MemoryRepo(BaseRepo):
     """Repo that stores refs, objects, and named files in memory.

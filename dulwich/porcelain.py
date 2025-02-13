@@ -2122,21 +2122,13 @@ def sparse_checkout(repo, patterns=None, force=False):
     """
     repo = Repo(repo) if not isinstance(repo, Repo) else repo
 
-    info_dir = os.path.join(repo.path, ".git", "info")
-    if not os.path.exists(info_dir):
-        os.makedirs(info_dir)
-    sparse_file = os.path.join(info_dir, "sparse-checkout")
-
     # 1) Read or write the sparse-checkout file
     if patterns is not None:
-        with open(sparse_file, "w", encoding="utf-8") as f:
-            for pat in patterns:
-                f.write(pat + "\n")
+        repo.set_sparse_checkout_patterns(patterns)
     else:
-        if not os.path.exists(sparse_file):
+        patterns = repo.get_sparse_checkout_patterns()
+        if patterns is None:
             raise Error("No sparse checkout patterns provided and no file found.")
-        with open(sparse_file, encoding="utf-8") as f:
-            patterns = [line.strip() for line in f if line.strip()]
 
     # 2) Preprocess patterns: "docs/" -> "docs/*", unify path separators
     processed_pats = []

@@ -2101,18 +2101,24 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
 
 
 def sparse_checkout(repo, patterns=None, force=False):
-    """Perform a sparse checkout by updating the index and working tree
-    based on inclusion/exclusion patterns, using skip-worktree bits in
-    the index's extended_flags field (as supported by patched Dulwich).
+    """Perform a sparse checkout by excluding certain paths via skip-worktree bits.
+
+    Mark any paths not matching the given patterns with skip-worktree in the index and
+    remove them from the working tree.  If `force=False` and a file has local
+    modifications, a `CheckoutError` is raised to prevent accidental data loss.
+
+    By default, patterns are stored in or read from `.git/info/sparse-checkout`, and
+    follow standard Gitignore/fnmatch rules.
 
     Args:
-      repo: A path to a repository or a Repo instance
-      patterns: A list of gitignore-style patterns
-      force: If True, destructive operations proceed even if local changes exist
+      repo: A path to a repository or a Repo instance.
+      patterns: A list of Gitignore-style patterns to include.
+      force: Whether to allow destructive removals of uncommitted changes
+             in newly excluded paths.
 
     Raises:
-      CheckoutError: If local modifications would be lost (force=False)
-      Error: If no patterns can be determined or an I/O error occurs
+      CheckoutError: If local modifications would be discarded without force=True.
+      Error: If no patterns are given or an I/O failure occurs.
     """
     repo = Repo(repo) if not isinstance(repo, Repo) else repo
 

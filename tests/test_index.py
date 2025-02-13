@@ -102,6 +102,8 @@ class SimpleIndexTestCase(IndexTestCase):
                 1000,
                 0,
                 b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+                0,
+                0,
             ),
             self.get_simple_index("index")[b"bla"],
         )
@@ -177,6 +179,8 @@ class ReadIndexDictTests(IndexTestCase):
                 1000,
                 0,
                 b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+                0,
+                0,
             )
         }
         filename = os.path.join(self.tempdir, "test-simple-write-index")
@@ -287,6 +291,8 @@ class IndexEntryFromStatTests(TestCase):
                 1000,
                 12288,
                 b"2222222222222222222222222222222222222222",
+                0,
+                0,
             ),
         )
 
@@ -318,6 +324,8 @@ class IndexEntryFromStatTests(TestCase):
                 1000,
                 12288,
                 b"2222222222222222222222222222222222222222",
+                0,
+                0,
             ),
         )
 

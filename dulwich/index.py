@@ -106,6 +106,8 @@ class IndexEntry:
     gid: int
     size: int
     sha: bytes
+    flags: int
+    extended_flags: int
 
     @classmethod
     def from_serialized(cls, serialized: SerializedIndexEntry) -> "IndexEntry":
@@ -119,9 +121,14 @@ class IndexEntry:
             gid=serialized.gid,
             size=serialized.size,
             sha=serialized.sha,
+            flags=serialized.flags,
+            extended_flags=serialized.extended_flags,
         )
 
     def serialize(self, name: bytes, stage: Stage) -> SerializedIndexEntry:
+        # Clear out any existing stage bits, then set them from the Stage.
+        new_flags = self.flags & ~FLAG_STAGEMASK
+        new_flags |= stage.value << FLAG_STAGESHIFT
         return SerializedIndexEntry(
             name=name,
             ctime=self.ctime,
@@ -133,9 +140,33 @@ class IndexEntry:
             gid=self.gid,
             size=self.size,
             sha=self.sha,
-            flags=stage.value << FLAG_STAGESHIFT,
-            extended_flags=0,
+            flags=new_flags,
+            extended_flags=self.extended_flags,
         )
+
+    def stage(self) -> Stage:
+        return Stage((self.flags & FLAG_STAGEMASK) >> FLAG_STAGESHIFT)
+
+    @property
+    def skip_worktree(self) -> bool:
+        """Return True if the skip-worktree bit is set in extended_flags."""
+        return bool(self.extended_flags & EXTENDED_FLAG_SKIP_WORKTREE)
+
+    def set_skip_worktree(self, skip: bool = True) -> None:
+        """Helper method to set or clear the skip-worktree bit in extended_flags.
+        Also sets FLAG_EXTENDED in self.flags if needed.
+        """
+        if skip:
+            # Turn on the skip-worktree bit
+            self.extended_flags |= EXTENDED_FLAG_SKIP_WORKTREE
+            # Also ensure the main 'extended' bit is set in flags
+            self.flags |= FLAG_EXTENDED
+        else:
+            # Turn off the skip-worktree bit
+            self.extended_flags &= ~EXTENDED_FLAG_SKIP_WORKTREE
+            # Optionally unset the main extended bit if no extended flags remain
+            if self.extended_flags == 0:
+                self.flags &= ~FLAG_EXTENDED
 
 
 class ConflictedIndexEntry:
@@ -348,10 +379,22 @@ def write_index(
     """
     if version is None:
         version = DEFAULT_VERSION
+    # STEP 1: check if any extended_flags are set
+    uses_extended_flags = any(e.extended_flags != 0 for e in entries)
+    if uses_extended_flags and version < 3:
+        # Force or bump the version to 3
+        version = 3
+    # The rest is unchanged, but you might insert a final check:
+    if version < 3:
+        # Double-check no extended flags appear
+        for e in entries:
+            if e.extended_flags != 0:
+                raise AssertionError("Attempt to use extended flags in index < v3")
+    # Proceed with the existing code to write the header and entries.
     f.write(b"DIRC")
     f.write(struct.pack(b">LL", version, len(entries)))
     for entry in entries:
-        write_cache_entry(f, entry, version)
+        write_cache_entry(f, entry, version=version)
 
 
 def write_index_dict(
@@ -689,15 +732,17 @@ def index_entry_from_stat(
         mode = cleanup_mode(stat_val.st_mode)
 
     return IndexEntry(
-        stat_val.st_ctime,
-        stat_val.st_mtime,
-        stat_val.st_dev,
-        stat_val.st_ino,
-        mode,
-        stat_val.st_uid,
-        stat_val.st_gid,
-        stat_val.st_size,
-        hex_sha,
+        ctime=stat_val.st_ctime,
+        mtime=stat_val.st_mtime,
+        dev=stat_val.st_dev,
+        ino=stat_val.st_ino,
+        mode=mode,
+        uid=stat_val.st_uid,
+        gid=stat_val.st_gid,
+        size=stat_val.st_size,
+        sha=hex_sha,
+        flags=0,
+        extended_flags=0,
     )
 
 

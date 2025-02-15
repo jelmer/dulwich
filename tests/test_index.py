@@ -84,6 +84,9 @@ class SimpleIndexTestCase(IndexTestCase):
     def test_iter(self) -> None:
         self.assertEqual([b"bla"], list(self.get_simple_index("index")))
 
+    def test_iter_skip_hash(self) -> None:
+        self.assertEqual([b"bla"], list(self.get_simple_index("index_skip_hash")))
+
     def test_iterobjects(self) -> None:
         self.assertEqual(
             [(b"bla", b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", 33188)],

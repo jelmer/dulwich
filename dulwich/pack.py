@@ -1605,9 +1605,13 @@ class SHA1Reader:
         self.sha1.update(data)
         return data
 
-    def check_sha(self) -> None:
+    def check_sha(self, allow_empty: bool = False) -> None:
         stored = self.f.read(20)
-        if stored != self.sha1.digest():
+        # If git option index.skipHash is set the index will be empty
+        if stored != self.sha1.digest() and (
+            not allow_empty
+            or sha_to_hex(stored) != b"0000000000000000000000000000000000000000"
+        ):
             raise ChecksumMismatch(self.sha1.hexdigest(), sha_to_hex(stored))
 
     def close(self):

@@ -3776,7 +3776,7 @@ class SparseCheckoutTests(PorcelainTestCase):
         self.sparse_checkout(self.repo, updated_patterns)
 
         actual_files = self._list_wtree_files()
-        expected_files = {"data/included_1.txt"}
+        expected_files = {os.path.join("data", "included_1.txt")}
         self.assertEqual(expected_files, actual_files)
 
         idx = self.repo.open_index()
@@ -3850,7 +3850,11 @@ class SparseCheckoutTests(PorcelainTestCase):
         self.sparse_checkout(self.repo, patterns)
 
         actual_files = self._list_wtree_files()
-        expected_files = {"src/foo.py", "src/foo_test.py", "src/foo_helper.py"}
+        expected_files = {
+            os.path.join("src", "foo.py"),
+            os.path.join("src", "foo_test.py"),
+            os.path.join("src", "foo_helper.py"),
+        }
         self.assertEqual(
             expected_files,
             actual_files,

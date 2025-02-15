@@ -3737,9 +3737,9 @@ class SparseCheckoutTests(PorcelainTestCase):
         """Only included paths remain in the working tree, excluded paths are removed.
 
         Commits two files, "keep_me.txt" and "exclude_me.txt". Then applies a
-        sparse‐checkout pattern containing only "keep_me.txt". Ensures that
+        sparse-checkout pattern containing only "keep_me.txt". Ensures that
         the latter remains in the working tree, while "exclude_me.txt" is
-        removed. This verifies correct application of sparse‐checkout patterns
+        removed. This verifies correct application of sparse-checkout patterns
         to remove files not listed.
         """
         self._commit_file("keep_me.txt", "I'll stay\n")
@@ -3761,7 +3761,7 @@ class SparseCheckoutTests(PorcelainTestCase):
 
         Verifies that files initially brought into the working tree (e.g.,
         by including `data/`) can later be excluded by narrowing the
-        sparse‐checkout pattern to just `data/included_1.txt`. Confirms that
+        sparse-checkout pattern to just `data/included_1.txt`. Confirms that
         the file `data/included_2.txt` remains in the index with
         skip-worktree set (rather than being removed entirely), ensuring
         data is not lost and Dulwich correctly updates the index flags.
@@ -3831,7 +3831,7 @@ class SparseCheckoutTests(PorcelainTestCase):
         """Reading/writing patterns align with gitignore/fnmatch expansions.
 
         Ensures that `sparse_checkout` interprets wildcard patterns (like `*.py`)
-        in the same way Git’s sparse‐checkout would. Multiple files are committed
+        in the same way Git's sparse-checkout would. Multiple files are committed
         to `src/` (e.g. `foo.py`, `foo_test.py`, `foo_helper.py`) and to `docs/`.
         Then the pattern `src/foo*.py` is applied, confirming that only the
         matching Python files remain in the working tree while the Markdown file

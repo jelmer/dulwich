@@ -45,6 +45,7 @@ Currently implemented:
  * remote{_add}
  * receive-pack
  * reset
+ * sparse_checkout
  * submodule_add
  * submodule_init
  * submodule_list
@@ -94,6 +95,7 @@ from .file import ensure_dir_exists
 from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
 from .index import (
+    EXTENDED_FLAG_SKIP_WORKTREE,
     _fs_to_tree_path,
     blob_from_path_and_stat,
     build_file_from_blob,
@@ -2096,6 +2098,115 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
                 if is_empty:
                     os.rmdir(dir_path)
                 dir_path = os.path.dirname(dir_path)
+
+
+def sparse_checkout(repo, patterns=None, force=False):
+    """Perform a sparse checkout by excluding certain paths via skip-worktree bits.
+
+    Mark any paths not matching the given patterns with skip-worktree in the index and
+    remove them from the working tree.  If `force=False` and a file has local
+    modifications, a `CheckoutError` is raised to prevent accidental data loss.
+
+    By default, patterns are stored in or read from `.git/info/sparse-checkout`, and
+    follow standard Gitignore/fnmatch rules.
+
+    Args:
+      repo: A path to a repository or a Repo instance.
+      patterns: A list of Gitignore-style patterns to include.
+      force: Whether to allow destructive removals of uncommitted changes
+             in newly excluded paths.
+
+    Raises:
+      CheckoutError: If local modifications would be discarded without force=True.
+      Error: If no patterns are given or an I/O failure occurs.
+    """
+    repo = Repo(repo) if not isinstance(repo, Repo) else repo
+
+    # 1) Read or write the sparse-checkout file
+    if patterns is not None:
+        repo.set_sparse_checkout_patterns(patterns)
+    else:
+        patterns = repo.get_sparse_checkout_patterns()
+        if patterns is None:
+            raise Error("No sparse checkout patterns provided and no file found.")
+
+    # 2) Preprocess patterns: "docs/" -> "docs/*", unify path separators
+    processed_pats = []
+    for pat in patterns:
+        if pat.endswith("/"):
+            pat += "*"
+        processed_pats.append(pat)
+    patterns = processed_pats
+
+    def matches_any_pattern(index_path):
+        forward_path = index_path.replace("\\", "/")
+        for pat in patterns:
+            if fnmatch.fnmatch(forward_path, pat):
+                return True
+        return False
+
+    # 3) Helper to detect local modifications
+    normalizer = repo.get_blob_normalizer()
+
+    def local_modifications_exist(full_path, index_entry):
+        if not os.path.exists(full_path):
+            return False
+        try:
+            with open(full_path, "rb") as f:
+                disk_data = f.read()
+        except OSError:
+            return True
+        try:
+            blob = repo.object_store[index_entry.sha]
+        except KeyError:
+            return True
+        norm_data = normalizer.checkin_normalize(disk_data, full_path)
+        return norm_data != blob.data
+
+    # 4) Update skip-worktree bits in the index
+    index = repo.open_index()
+    for path, entry in list(index.items()):
+        path_str = path.decode("utf-8")
+        # If the file matches any pattern => included => clear skip-worktree
+        if matches_any_pattern(path_str):
+            entry.set_skip_worktree(False)
+        else:
+            entry.set_skip_worktree(True)
+        index[path] = entry
+    index.write()
+
+    # 5) Update the working tree to reflect skip-worktree bits
+    for path, entry in list(index.items()):
+        path_str = path.decode("utf-8")
+        full_path = os.path.join(repo.path, path_str)
+        skip_bit_set = bool(entry.extended_flags & EXTENDED_FLAG_SKIP_WORKTREE)
+
+        if skip_bit_set:
+            # The file is excluded
+            if os.path.exists(full_path):
+                # If force is False and local modifications exist, fail
+                if not force and local_modifications_exist(full_path, entry):
+                    raise CheckoutError(
+                        f"Local modifications in {path_str} would be overwritten "
+                        f"by sparse checkout. Use force=True to override."
+                    )
+                try:
+                    os.remove(full_path)
+                except OSError as e:
+                    raise Error(f"Failed to remove excluded file {path_str}: {e}")
+        else:
+            # The file is included
+            if not os.path.exists(full_path):
+                try:
+                    blob = repo.object_store[entry.sha]
+                except KeyError:
+                    raise Error(
+                        f"Blob {entry.sha} not found in object store for {path_str}."
+                    )
+                ensure_dir_exists(os.path.dirname(full_path))
+                with open(full_path, "wb") as f:
+                    f.write(blob.data)
+    return
 
 
 def check_mailmap(repo, contact):

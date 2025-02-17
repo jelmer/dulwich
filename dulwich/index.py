@@ -106,8 +106,8 @@ class IndexEntry:
     gid: int
     size: int
     sha: bytes
-    flags: int
-    extended_flags: int
+    flags: int = 0
+    extended_flags: int = 0
 
     @classmethod
     def from_serialized(cls, serialized: SerializedIndexEntry) -> "IndexEntry":

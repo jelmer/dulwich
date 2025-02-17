@@ -96,7 +96,6 @@ from .file import ensure_dir_exists
 from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
 from .index import (
-    EXTENDED_FLAG_SKIP_WORKTREE,
     _fs_to_tree_path,
     blob_from_path_and_stat,
     build_file_from_blob,
@@ -2101,36 +2100,8 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
                 dir_path = os.path.dirname(dir_path)
 
 
-def parse_sparse_patterns(lines):
-    """Utility to parse a list of lines into a list of ParsedPattern objects."""
-    out = []
-    for ln in lines:
-        pat = parse_gitignore_line(ln)
-        if pat:
-            out.append(pat)
-    return out
-
-
-import os
-
-from dulwich.repo import Repo
-
-
-class Error(Exception):
-    pass
-
-
-class CheckoutError(Error):
-    pass
-
-
-def ensure_dir_exists(path):
-    os.makedirs(path, exist_ok=True)
-
-
 def sparse_checkout(repo, patterns=None, force=False, cone=None):
-    """
-    Perform sparse checkout in either 'cone' (directory-based) mode or
+    """Perform sparse checkout in either 'cone' (directory-based) mode or
     'full pattern' (.gitignore) mode, depending on the 'cone' parameter.
 
     If cone=None, we'll infer from 'core.sparseCheckoutCone' in the repo config.
@@ -2142,7 +2113,6 @@ def sparse_checkout(repo, patterns=None, force=False, cone=None):
     3) Update skip-worktree bits and add/remove files in the working tree.
     4) If force=False, refuse to remove files that have local modifications.
     """
-
     if not isinstance(repo, Repo):
         repo = Repo(repo)
 
@@ -2178,8 +2148,7 @@ def sparse_checkout(repo, patterns=None, force=False, cone=None):
 
 
 def determine_included_paths(repo, lines, cone):
-    """
-    Dispatches to either a full-pattern match or a cone-mode approach,
+    """Dispatches to either a full-pattern match or a cone-mode approach,
     returning a set of paths (strings) that should be included.
     """
     if cone:
@@ -2189,8 +2158,7 @@ def determine_included_paths(repo, lines, cone):
 
 
 def compute_included_paths_full(repo, lines):
-    """
-    Uses the existing .gitignore-style parsing and matching.
+    """Uses the existing .gitignore-style parsing and matching.
     Every path in the index is tested against these patterns,
     and included if it matches a final 'positive' pattern.
     """
@@ -2206,8 +2174,7 @@ def compute_included_paths_full(repo, lines):
 
 
 def compute_included_paths_cone(repo, lines):
-    """
-    A simplified "cone" approach:
+    """A simplified "cone" approach:
       - '/*' => include top-level files
       - '!/*/' => exclude all subdirectories by default
       - '!/some/dir/' => re-include directory "some/dir" (and everything under it)
@@ -2256,13 +2223,8 @@ def compute_included_paths_cone(repo, lines):
     return included
 
 
-from pysnooper import snoop
-
-
-@snoop(depth=2)
 def apply_included_paths(repo, included_paths, force=False):
-    """
-    Given a set of included paths, update skip-worktree bits in the index
+    """Given a set of included paths, update skip-worktree bits in the index
     and apply the changes to the working tree. If force=False, do not remove
     locally modified files from excluded sets.
     """
@@ -2389,52 +2351,8 @@ def fnmatch_to_regex(pat):
     return "^" + "".join(res) + "$"
 
 
-# def match_sparse_patterns(path_str, patterns):
-#     """Decide if `path_str` is included by a Git-like sparse-checkout pattern list.
-#     Patterns are applied top-to-bottom; the last pattern that matches this path
-#     determines whether we end up included (for a positive pattern) or excluded
-#     (for a negative pattern).
-#
-#     - Positive pattern: "docs/*.md" => include files matching "docs/*.md"
-#     - Negative pattern: "!docs/secret.md" => exclude that file if it was previously included
-#     - Leading slash indicates anchor at repo root (we do a simplified check).
-#     - We do not fully implement double-asterisk or advanced anchoring, but enough
-#       to demonstrate the logic.
-#
-#     Returns: True if included, False if excluded.
-#     """
-#     included = False
-#     # We'll interpret patterns in order; each can flip the 'included' state.
-#     for pat in patterns:
-#         is_neg = pat.startswith("!")
-#         raw_pat = pat[1:] if is_neg else pat
-#
-#         # (Optional) Handle leading slash => anchored at root
-#         anchored = raw_pat.startswith("/")
-#         if anchored:
-#             raw_pat = raw_pat.lstrip("/")  # remove the leading slash
-#             # We'll interpret this as: path_str must not have subdirs preceding raw_pat.
-#             # For simplicity, we assume path_str is relative, e.g. "docs/readme.md".
-#             # If you want true anchoring, ensure path_str never includes extra subdirs in front.
-#
-#         # Attempt to match with fnmatch
-#         if fnmatch.fnmatch(path_str, raw_pat):
-#             # This pattern matches
-#             if is_neg:
-#                 # Negative => exclude
-#                 if included:
-#                     included = False
-#                 # If not already included, negative has no effect (Git's rule).
-#             else:
-#                 # Positive => included
-#                 included = True
-#
-#     return included
-
-
 def parse_sparse_patterns(lines):
-    """
-    Parse the lines from .git/info/sparse-checkout (or a .gitignore-like file)
+    """Parse the lines from .git/info/sparse-checkout (or a .gitignore-like file)
     into a structure we can use for match_gitignore_patterns.
 
     This simplified parser:
@@ -2475,75 +2393,8 @@ def parse_sparse_patterns(lines):
     return results
 
 
-# def match_gitignore_patterns(path_str, patterns, path_is_dir=False):
-#     """Evaluate `path_str` against a list of ParsedPattern objects in order.
-#
-#     Implementing full .gitignore-like behavior:
-#       - top-to-bottom
-#       - last match wins
-#       - if the path is never matched by a positive pattern, it's excluded
-#         unless a negative pattern tries to exclude it (which does nothing if it wasn't included).
-#       - if pattern is anchored => we only match if the pattern's regex matches from the root
-#         (i.e. we treat path as if it has no leading slash, but we'll enforce '^' in the pattern).
-#       - if pattern is is_dir_only => we only consider it a match if path_is_dir=True
-#
-#     Return: True if included, False if excluded.
-#     """
-#     included = False
-#     # Git docs: "by default, everything is excluded until included"? Actually in
-#     # sparse-checkout, a path is "excluded" if no pattern matches it as included.
-#     # We'll interpret "start as excluded" => included=False
-#
-#     # For best results, let's unify path representation. In Git, a path might not have
-#     # a leading slash. We'll just store as "dir/sub/file.ext" and rely on anchored patterns
-#     # having '^' in their regex.
-#     # We'll also handle boundary matching if pattern.anchored is False => we do partial?
-#
-#     # Let's define a helper to do the actual check of a single pattern:
-#     def does_pattern_match(pat: ParsedPattern, path_str):
-#         # If is_dir_only and the path is not a directory, skip
-#         if pat.is_dir_only and not path_is_dir:
-#             return False
-#
-#         # If anchored => must match entire path from root
-#         # We already compiled the regex to have ^...$, so if anchored is True,
-#         # we require the path_str to match from start to end. If anchored is False,
-#         # Git normally allows a match starting anywhere after a slash boundary.
-#         # For full fidelity, we might do repeated segment checks if not anchored,
-#         # but let's do a simpler approach: we handle that by 'find' approach.
-#
-#         if pat.anchored:
-#             # the regex is '^stuff$', so we just do a direct full match
-#             return pat.regex.match(path_str) is not None
-#         else:
-#             # For non-anchored, we attempt to see if any subpath segment matches.
-#             # e.g. "abc/def/ghi" => we try "abc/def/ghi", "def/ghi", "ghi"?
-#             # Because .gitignore: "abc" could match if it appears in some directory component
-#             # We'll do a quick approach: we split by '/', then rejoin from each segment to the end
-#             # and test the regex. If any sub-slice matches, we say True.
-#             segments = path_str.split("/")
-#             for i in range(len(segments)):
-#                 candidate = "/".join(segments[i:])
-#                 if pat.regex.match(candidate):
-#                     return True
-#             return False
-#
-#     for pat in patterns:
-#         if does_pattern_match(pat, path_str):
-#             if pat.is_neg:
-#                 # only exclude if included
-#                 if included:
-#                     included = False
-#             else:
-#                 # positive => include
-#                 included = True
-#
-#     return included
-
-
 def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
-    """
-    Determine whether path_str is "included" based on .gitignore-style logic.
+    """Determine whether path_str is "included" based on .gitignore-style logic.
     This is a simplified approach that:
       1. Iterates over patterns in order.
       2. If a pattern matches, we set the "include" state depending on negation.

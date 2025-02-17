@@ -36,8 +36,6 @@ import time
 from io import BytesIO, StringIO
 from unittest import skipIf
 
-from pysnooper import snoop
-
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError

@@ -26,12 +26,19 @@ import os
 import re
 
 from .file import ensure_dir_exists
-from .repo import Repo
 
 
 def determine_included_paths(repo, lines, cone):
-    """Dispatches to either a full-pattern match or a cone-mode approach,
-    returning a set of paths (strings) that should be included.
+    """Determine which paths in the index should be included based on either
+    a full-pattern match or a cone-mode approach.
+
+    Args:
+      repo: A path to the repository or a Repo object.
+      lines: A list of pattern lines (strings) from sparse-checkout config.
+      cone: A bool indicating cone mode.
+
+    Returns:
+      A set of included path strings.
     """
     if cone:
         return compute_included_paths_cone(repo, lines)
@@ -40,9 +47,17 @@ def determine_included_paths(repo, lines, cone):
 
 
 def compute_included_paths_full(repo, lines):
-    """Uses the existing .gitignore-style parsing and matching.
-    Every path in the index is tested against these patterns,
-    and included if it matches a final 'positive' pattern.
+    """Use .gitignore-style parsing and matching to determine included paths.
+
+    Each file path in the index is tested against the parsed sparse patterns.
+    If it matches the final (most recently applied) positive pattern, it is included.
+
+    Args:
+      repo: A path to the repository or a Repo object.
+      lines: A list of pattern lines (strings) from sparse-checkout config.
+
+    Returns:
+      A set of included path strings.
     """
     parsed = parse_sparse_patterns(lines)
     index = repo.open_index()
@@ -56,13 +71,19 @@ def compute_included_paths_full(repo, lines):
 
 
 def compute_included_paths_cone(repo, lines):
-    """A simplified "cone" approach:
-      - '/*' => include top-level files
-      - '!/*/' => exclude all subdirectories by default
-      - '!/some/dir/' => re-include directory "some/dir" (and everything under it)
-    We look for these special lines and then decide which index paths are included.
-    Real Git uses more sophisticated logic pairing "recursive" vs. "parent" patterns,
-    but this demonstrates the basic concept.
+    """Implement a simplified 'cone' approach for sparse-checkout.
+
+    By default, this can include top-level files, exclude all subdirectories,
+    and re-include specified directories. The logic is less comprehensive than
+    Git's built-in cone mode (recursive vs parent) but retains the core concept.
+
+    Args:
+      repo: A path to the repository or a Repo object.
+      lines: A list of pattern lines (strings), typically including entries like
+        "/*", "!/*/", or "!/mydir/".
+
+    Returns:
+      A set of included path strings.
     """
     include_top_level = False
     exclude_subdirs = False
@@ -106,9 +127,20 @@ def compute_included_paths_cone(repo, lines):
 
 
 def apply_included_paths(repo, included_paths, force=False):
-    """Given a set of included paths, update skip-worktree bits in the index
-    and apply the changes to the working tree. If force=False, do not remove
-    locally modified files from excluded sets.
+    """Apply the sparse-checkout inclusion set to the index and working tree.
+
+    This function updates skip-worktree bits in the index based on whether each
+    path is included or not. It then adds or removes files in the working tree
+    accordingly. If `force=False`, files that have local modifications
+    will cause an error instead of being removed.
+
+    Args:
+      repo: A path to the repository or a Repo object.
+      included_paths: A set of paths (strings) that should remain included.
+      force: Whether to forcibly remove locally modified files (default False).
+
+    Returns:
+      None
     """
     index = repo.open_index()
     normalizer = repo.get_blob_normalizer()
@@ -234,12 +266,15 @@ def fnmatch_to_regex(pat):
 
 
 def parse_sparse_patterns(lines):
-    """Parse the lines from .git/info/sparse-checkout (or a .gitignore-like file)
-    into a structure we can use for match_gitignore_patterns.
+    """Parse pattern lines from a sparse-checkout file (.git/info/sparse-checkout).
 
     This simplified parser:
       1. Strips comments (#...) and empty lines.
       2. Returns a list of (pattern, is_negation, is_dir_only, anchored) tuples.
+
+    These lines are similar to .gitignore patterns but are used for sparse-checkout
+    logic. This function strips comments and blank lines, identifies negation,
+    anchoring, and directory-only markers, and returns data suitable for matching.
 
     Example:
       line = "/*.txt"
@@ -248,6 +283,13 @@ def parse_sparse_patterns(lines):
         -> ("/docs/", True, True, True)
       line = "mydir/"
         -> ("mydir/", False, True, False)  # not anchored since no leading "/"
+
+    Args:
+      lines: A list of raw lines (strings) from the sparse-checkout file.
+
+    Returns:
+      A list of tuples (pattern, negation, dir_only, anchored), representing
+      the essential details needed to perform matching.
     """
     results = []
     for raw_line in lines:
@@ -276,7 +318,8 @@ def parse_sparse_patterns(lines):
 
 
 def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
-    """Determine whether path_str is "included" based on .gitignore-style logic.
+    """Check whether a path is included based on .gitignore-style patterns.
+
     This is a simplified approach that:
       1. Iterates over patterns in order.
       2. If a pattern matches, we set the "include" state depending on negation.
@@ -291,17 +334,21 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
     We'll interpret "include" as returning True, "exclude" as returning False.
 
     Because real Git uses more specialized code in cone mode, this is primarily used
-    in full-pattern (non-cone) mode. If you want to replicate Git exactly, you'll need
+    in full-pattern (non-cone) mode. To replicate Git exactly, this approach would need
     to handle anchored patterns, wildcards, directory restrictions, etc. precisely.
 
-    Arguments:
-      - path_str: "docs/readme.md"
-      - parsed_patterns: list of (pattern, negation, dir_only, anchored)
-      - path_is_dir: if True, treat path_str as a directory (only relevant if we handle "dir_only")
+    Each pattern can include negation (!), directory-only markers, or be anchored
+    to the start of the path. The last matching pattern determines whether the
+    path is ultimately included or excluded.
+
+    Args:
+      path_str: The path (string) to test.
+      parsed_patterns: A list of (pattern, negation, dir_only, anchored) tuples
+        as returned by parse_sparse_patterns.
+      path_is_dir: Whether to treat the path as a directory (default False).
 
     Returns:
-      True if the final pattern that matches path_str indicates it is included.
-      False otherwise.
+      True if the path is included by the last matching pattern, False otherwise.
     """
     # Start by assuming "excluded" (like a .gitignore starts by including everything
     # until matched, but for sparse-checkout we often treat unmatched as "excluded").
@@ -350,13 +397,18 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
 
 
 def parse_gitignore_line(line):
-    """Parse a single line from a .gitignore/.git/info/sparse-checkout file
-    into a ParsedPattern that handles:
-      - ! negation
-      - / anchor
-      - trailing / for directory-only
-      - wildcard expansion (*, ?, **)
-    Returns: ParsedPattern or None if line is blank/comment.
+    """Parse a single line from a .gitignore-like file into a ParsedPattern.
+
+    Handles negation ('!'), anchoring ('/'), trailing slash for directories,
+    and wildcard expansion ('*', '**', '?'). Lines that are empty or start with
+    '#' are treated as comments.
+
+    Args:
+      line: A single raw line (string) from the file.
+
+    Returns:
+      A ParsedPattern object if the line is valid, or None if the line is a
+      comment or empty.
     """
     line = line.strip()
     if not line or line.startswith("#"):
@@ -395,13 +447,13 @@ def parse_gitignore_line(line):
     # slash boundary. We'll implement a simplified approach:
     #    anchored => pattern must match from start
     #    non-anchored => we allow '.*' or '(^|/)somepattern($|/)'
-    # Git is more subtle, but let's approximate:
+    # Git is more subtle, but this is a good approximate.
 
     # We'll embed this in a bigger pattern that tries to find a match on a path
     # boundary. For directory-only, we might require a match that extends to end or slash.
     # We'll refine in the matching function instead.
 
-    # We'll store the raw transformed pattern but actual anchoring logic is handled
+    # Store the raw transformed pattern. Actual anchoring logic is handled
     # in the final matching step.
 
     pat = ParsedPattern(

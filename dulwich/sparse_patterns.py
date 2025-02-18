@@ -131,7 +131,7 @@ def apply_included_paths(repo, included_paths, force=False):
 
     This function updates skip-worktree bits in the index based on whether each
     path is included or not. It then adds or removes files in the working tree
-    accordingly. If `force=False`, files that have local modifications
+    accordingly. If ``force=False``, files that have local modifications
     will cause an error instead of being removed.
 
     Args:

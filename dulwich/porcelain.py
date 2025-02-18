@@ -2101,18 +2101,34 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
                 dir_path = os.path.dirname(dir_path)
 
 
-def sparse_checkout(repo, patterns=None, force=False, cone=None):
-    """Perform sparse checkout in either 'cone' (directory-based) mode or
-    'full pattern' (.gitignore) mode, depending on the 'cone' parameter.
+def sparse_checkout(
+    repo, patterns=None, force: bool = False, cone: Union[bool, None] = None
+):
+    """Perform a sparse checkout in the repository (either 'full' or 'cone mode').
 
-    If cone=None, we'll infer from 'core.sparseCheckoutCone' in the repo config.
+    Perform sparse checkout in either 'cone' (directory-based) mode or
+    'full pattern' (.gitignore) mode, depending on the ``cone`` parameter.
 
-    1) If patterns are provided, write them to .git/info/sparse-checkout.
-    2) Determine which paths in the index are included vs. excluded.
-       - If cone=True, handle "cone-compatible" directory-based logic.
-       - If cone=False, handle full .gitignore-style logic.
-    3) Update skip-worktree bits and add/remove files in the working tree.
-    4) If force=False, refuse to remove files that have local modifications.
+    If ``cone`` is ``None``, the mode is inferred from the repository's
+    ``core.sparseCheckoutCone`` config setting.
+
+    Steps:
+      1) If ``patterns`` is provided, write them to ``.git/info/sparse-checkout``.
+      2) Determine which paths in the index are included vs. excluded.
+         - If ``cone=True``, use "cone-compatible" directory-based logic.
+         - If ``cone=False``, use standard .gitignore-style matching.
+      3) Update the index's skip-worktree bits and add/remove files in
+         the working tree accordingly.
+      4) If ``force=False``, refuse to remove files that have local modifications.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      patterns: Optional list of sparse-checkout patterns to write.
+      force: Whether to force removal of locally modified files (default False).
+      cone: Boolean indicating cone mode (True/False). If None, read from config.
+
+    Returns:
+      None
     """
     if not isinstance(repo, Repo):
         repo = Repo(repo)
@@ -2149,14 +2165,21 @@ def sparse_checkout(repo, patterns=None, force=False, cone=None):
 
 
 def cone_mode_init(repo):
-    """Minimal re-implementation for a 'cone mode' initialization.
+    """Initialize a repository to use sparse checkout in 'cone' mode.
 
-    - Sets config
-    - Writes /*, !/*/ => top-level only
-    - Calls above sparse_checkout
+    Sets ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` in the config.
+    Writes an initial ``.git/info/sparse-checkout`` file that includes only
+    top-level files (and excludes all subdirectories), e.g. ``["/*", "!/*/"]``.
+    Then performs a sparse checkout to update the working tree accordingly.
 
-    If no directories are specified, then the files in the top level dir are included
-    (https://git-scm.com/docs/git-sparse-checkout#_internalscone_mode_handling).
+    If no directories are specified, then only top-level files are included:
+    https://git-scm.com/docs/git-sparse-checkout#_internalscone_mode_handling
+
+    Args:
+      repo: Path to the repository or a Repo object.
+
+    Returns:
+      None
     """
     if not isinstance(repo, Repo):
         repo = Repo(repo)
@@ -2171,7 +2194,20 @@ def cone_mode_init(repo):
 
 
 def cone_mode_set(repo, dirs, force=False):
-    """Overwrite the existing pattern set with only the specified directories fully included."""
+    """Overwrite the existing 'cone-mode' sparse patterns with a new set of directories.
+
+    Ensures ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` are enabled.
+    Writes new patterns so that only the specified directories (and top-level files)
+    remain in the working tree, and applies the sparse checkout update.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      dirs: List of directory names to include.
+      force: Whether to forcibly discard local modifications (default False).
+
+    Returns:
+      None
+    """
     if not isinstance(repo, Repo):
         repo = Repo(repo)
 
@@ -2195,7 +2231,20 @@ def cone_mode_set(repo, dirs, force=False):
 
 
 def cone_mode_add(repo, dirs, force=False):
-    """Merges new directories with existing pattern lines, similar to Git's 'git sparse-checkout add'."""
+    """Add new directories to the existing 'cone-mode' sparse-checkout patterns.
+
+    Reads the current patterns from ``.git/info/sparse-checkout``, adds pattern
+    lines to include the specified directories, and then performs a sparse
+    checkout to update the working tree accordingly.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      dirs: List of directory names to add to the sparse-checkout.
+      force: Whether to forcibly discard local modifications (default False).
+
+    Returns:
+      None
+    """
     if not isinstance(repo, Repo):
         repo = Repo(repo)
 

@@ -277,12 +277,9 @@ def parse_sparse_patterns(lines):
     anchoring, and directory-only markers, and returns data suitable for matching.
 
     Example:
-      line = "/*.txt"
-        -> ("/.txt", False, False, True)
-      line = "!/docs/"
-        -> ("/docs/", True, True, True)
-      line = "mydir/"
-        -> ("mydir/", False, True, False)  # not anchored since no leading "/"
+      ``line = "/*.txt" -> ("/.txt", False, False, True)``
+      ``line = "!/docs/" -> ("/docs/", True, True, True)``
+      ``line = "mydir/" -> ("mydir/", False, True, False)`` not anchored, no leading "/"
 
     Args:
       lines: A list of raw lines (strings) from the sparse-checkout file.

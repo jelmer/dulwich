@@ -1,4 +1,4 @@
-# porcelain.py -- Porcelain-like layer on top of Dulwich
+# sparse_patterns.py -- Sparse checkout pattern handling.
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later

@@ -28,6 +28,12 @@ import re
 from .file import ensure_dir_exists
 
 
+class SparseCheckoutConflictError(Exception):
+    """Raised when local modifications would be overwritten by a sparse checkout operation."""
+
+    pass
+
+
 def determine_included_paths(repo, lines, cone):
     """Determine which paths in the index should be included based on either
     a full-pattern match or a cone-mode approach.
@@ -178,7 +184,7 @@ def apply_included_paths(repo, included_paths, force=False):
             # Excluded => remove if safe
             if os.path.exists(full_path):
                 if not force and local_modifications_exist(full_path, entry):
-                    raise CheckoutError(
+                    raise SparseCheckoutConflictError(
                         f"Local modifications in {full_path} would be overwritten "
                         "by sparse checkout. Use force=True to override."
                     )

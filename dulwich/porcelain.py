@@ -135,7 +135,11 @@ from .server import (
     UploadPackHandler,
 )
 from .server import update_server_info as server_update_server_info
-from .sparse_patterns import apply_included_paths, determine_included_paths
+from .sparse_patterns import (
+    SparseCheckoutConflictError,
+    apply_included_paths,
+    determine_included_paths,
+)
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -2159,7 +2163,10 @@ def sparse_checkout(
         included_paths = determine_included_paths(repo, lines, cone)
 
         # --- 3) Apply those results to the index & working tree ---
-        apply_included_paths(repo, included_paths, force=force)
+        try:
+            apply_included_paths(repo, included_paths, force=force)
+        except SparseCheckoutConflictError as exc:
+            raise CheckoutError(*exc.args) from exc
 
 
 def cone_mode_init(repo):

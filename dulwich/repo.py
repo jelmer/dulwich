@@ -1842,6 +1842,13 @@ class Repo(BaseRepo):
         """Return the path of the sparse-checkout file in this repo's control dir."""
         return os.path.join(self.controldir(), "info", "sparse-checkout")
 
+    def configure_for_cone_mode(self) -> None:
+        """Ensure the repository is configured for cone-mode sparse-checkout."""
+        config = self.get_config()
+        config.set((b"core",), b"sparseCheckout", b"true")
+        config.set((b"core",), b"sparseCheckoutCone", b"true")
+        config.write_to_path()
+
     def get_sparse_checkout_patterns(self) -> list[str]:
         """Return a list of sparse-checkout patterns from info/sparse-checkout.
 

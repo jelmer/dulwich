@@ -2182,11 +2182,7 @@ def cone_mode_init(repo):
       None
     """
     with open_repo_closing(repo) as repo_obj:
-        config = repo_obj.get_config()
-        config.set((b"core",), b"sparseCheckout", b"true")
-        config.set((b"core",), b"sparseCheckoutCone", b"true")
-        config.write_to_path()
-
+        repo_obj.configure_for_cone_mode()
         patterns = ["/*", "!/*/"]  # root-level files only
         sparse_checkout(repo_obj, patterns, force=True, cone=True)
 

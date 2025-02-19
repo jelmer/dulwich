@@ -2198,17 +2198,8 @@ def cone_mode_set(repo, dirs, force=False):
     """
     with open_repo_closing(repo) as repo_obj:
         repo_obj.configure_for_cone_mode()
-        # Initial lines: include top-level files, then exclude all subdirectories
-        new_patterns = ["/*", "!/*/"]
-
-        # For each directory to include, add an exclusion-style line that "undoes"
-        # the prior 'exclude' and re-includes that directory (and everything under it).
-        for d in dirs:
-            d = d.strip("/")
-            line = f"/{d}/"
-            if d:
-                new_patterns.append(line)
-
+        repo_obj.set_cone_mode_patterns(dirs=dirs)
+        new_patterns = repo_obj.get_sparse_checkout_patterns()
         # Finally, apply the patterns and update the working tree
         sparse_checkout(repo_obj, new_patterns, force=force, cone=True)
 

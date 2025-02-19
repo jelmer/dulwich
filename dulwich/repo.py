@@ -1888,6 +1888,21 @@ class Repo(BaseRepo):
             for pat in patterns:
                 f.write(pat + "\n")
 
+    def set_cone_mode_patterns(self, dirs: Union[list[str], None] = None) -> None:
+        """Write the given cone-mode directory patterns into info/sparse-checkout.
+
+        For each directory to include, add an inclusion line that "undoes" the prior
+        ``!/*/`` 'exclude' that re-includes that directory and everything under it.
+        """
+        patterns = ["/*", "!/*/"]
+        if dirs:
+            for d in dirs:
+                d = d.strip("/")
+                line = f"/{d}/"
+                if d:
+                    patterns.append(line)
+        self.set_sparse_checkout_patterns(patterns)
+
 
 class MemoryRepo(BaseRepo):
     """Repo that stores refs, objects, and named files in memory.

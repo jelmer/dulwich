@@ -2152,11 +2152,6 @@ def sparse_checkout(
                 raise Error("No sparse checkout patterns found.")
         else:
             lines = patterns
-            sp_path = os.path.join(repo_obj.path, ".git", "info", "sparse-checkout")
-            ensure_dir_exists(os.path.dirname(sp_path))
-            with open(sp_path, "w") as f:
-                for p in patterns:
-                    f.write(p + "\n")
             repo_obj.set_sparse_checkout_patterns(patterns)
 
         # --- 2) Determine the set of included paths ---

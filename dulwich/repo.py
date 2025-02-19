@@ -1849,6 +1849,16 @@ class Repo(BaseRepo):
         config.set((b"core",), b"sparseCheckoutCone", b"true")
         config.write_to_path()
 
+    def infer_cone_mode(self) -> bool:
+        """Return True if 'core.sparseCheckoutCone' is set to 'true' in config, else False."""
+        config = repo_obj.get_config()
+        try:
+            sc_cone = config.get((b"core",), b"sparseCheckoutCone")
+            return sc_cone == b"true"
+        except KeyError:
+            # If core.sparseCheckoutCone is not set, default to False
+            return False
+
     def get_sparse_checkout_patterns(self) -> list[str]:
         """Return a list of sparse-checkout patterns from info/sparse-checkout.
 

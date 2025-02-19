@@ -2137,13 +2137,7 @@ def sparse_checkout(
     with open_repo_closing(repo) as repo_obj:
         # --- 0) Possibly infer 'cone' from config ---
         if cone is None:
-            config = repo_obj.get_config()
-            try:
-                sc_cone = config.get((b"core",), b"sparseCheckoutCone")
-                cone = sc_cone == b"true"
-            except KeyError:
-                # If core.sparseCheckoutCone is not set, default to False
-                cone = False
+            cone = repo_obj.infer_cone_mode()
 
         # --- 1) Read or write patterns ---
         if patterns is None:

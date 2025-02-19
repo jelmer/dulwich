@@ -2197,11 +2197,7 @@ def cone_mode_set(repo, dirs, force=False):
       None
     """
     with open_repo_closing(repo) as repo_obj:
-        config = repo_obj.get_config()
-        config.set((b"core",), b"sparseCheckout", b"true")
-        config.set((b"core",), b"sparseCheckoutCone", b"true")
-        config.write_to_path()
-
+        repo_obj.configure_for_cone_mode()
         # Initial lines: include top-level files, then exclude all subdirectories
         new_patterns = ["/*", "!/*/"]
 

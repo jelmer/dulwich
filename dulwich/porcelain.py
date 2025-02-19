@@ -2130,38 +2130,36 @@ def sparse_checkout(
     Returns:
       None
     """
-    if not isinstance(repo, Repo):
-        repo = Repo(repo)
+    with open_repo_closing(repo) as r:
+        # --- 0) Possibly infer 'cone' from config ---
+        if cone is None:
+            config = repo.get_config()
+            try:
+                sc_cone = config.get((b"core",), b"sparseCheckoutCone")
+                cone = sc_cone == b"true"
+            except KeyError:
+                # If core.sparseCheckoutCone is not set, default to False
+                cone = False
 
-    # --- 0) Possibly infer 'cone' from config ---
-    if cone is None:
-        config = repo.get_config()
-        try:
-            sc_cone = config.get((b"core",), b"sparseCheckoutCone")
-            cone = sc_cone == b"true"
-        except KeyError:
-            # If core.sparseCheckoutCone is not set, default to False
-            cone = False
+        # --- 1) Read or write patterns ---
+        if patterns is None:
+            lines = repo.get_sparse_checkout_patterns()
+            if lines is None:
+                raise Error("No sparse checkout patterns found.")
+        else:
+            lines = patterns
+            sp_path = os.path.join(repo.path, ".git", "info", "sparse-checkout")
+            ensure_dir_exists(os.path.dirname(sp_path))
+            with open(sp_path, "w") as f:
+                for p in patterns:
+                    f.write(p + "\n")
+            repo.set_sparse_checkout_patterns(patterns)
 
-    # --- 1) Read or write patterns ---
-    if patterns is None:
-        lines = repo.get_sparse_checkout_patterns()
-        if lines is None:
-            raise Error("No sparse checkout patterns found.")
-    else:
-        lines = patterns
-        sp_path = os.path.join(repo.path, ".git", "info", "sparse-checkout")
-        ensure_dir_exists(os.path.dirname(sp_path))
-        with open(sp_path, "w") as f:
-            for p in patterns:
-                f.write(p + "\n")
-        repo.set_sparse_checkout_patterns(patterns)
+        # --- 2) Determine the set of included paths ---
+        included_paths = determine_included_paths(repo, lines, cone)
 
-    # --- 2) Determine the set of included paths ---
-    included_paths = determine_included_paths(repo, lines, cone)
-
-    # --- 3) Apply those results to the index & working tree ---
-    apply_included_paths(repo, included_paths, force=force)
+        # --- 3) Apply those results to the index & working tree ---
+        apply_included_paths(repo, included_paths, force=force)
 
 
 def cone_mode_init(repo):
@@ -2181,16 +2179,14 @@ def cone_mode_init(repo):
     Returns:
       None
     """
-    if not isinstance(repo, Repo):
-        repo = Repo(repo)
+    with open_repo_closing(repo) as r:
+        config = repo.get_config()
+        config.set((b"core",), b"sparseCheckout", b"true")
+        config.set((b"core",), b"sparseCheckoutCone", b"true")
+        config.write_to_path()
 
-    config = repo.get_config()
-    config.set((b"core",), b"sparseCheckout", b"true")
-    config.set((b"core",), b"sparseCheckoutCone", b"true")
-    config.write_to_path()
-
-    patterns = ["/*", "!/*/"]  # root-level files only
-    sparse_checkout(repo, patterns, force=True, cone=True)
+        patterns = ["/*", "!/*/"]  # root-level files only
+        sparse_checkout(repo, patterns, force=True, cone=True)
 
 
 def cone_mode_set(repo, dirs, force=False):
@@ -2208,26 +2204,24 @@ def cone_mode_set(repo, dirs, force=False):
     Returns:
       None
     """
-    if not isinstance(repo, Repo):
-        repo = Repo(repo)
+    with open_repo_closing(repo) as r:
+        config = repo.get_config()
+        config.set((b"core",), b"sparseCheckout", b"true")
+        config.set((b"core",), b"sparseCheckoutCone", b"true")
+        config.write_to_path()
 
-    config = repo.get_config()
-    config.set((b"core",), b"sparseCheckout", b"true")
-    config.set((b"core",), b"sparseCheckoutCone", b"true")
-    config.write_to_path()
+        # Initial lines: include top-level files, then exclude all subdirectories
+        new_patterns = ["/*", "!/*/"]
 
-    # Initial lines: include top-level files, then exclude all subdirectories
-    new_patterns = ["/*", "!/*/"]
+        # For each directory to include, add an exclusion-style line that "undoes"
+        # the prior 'exclude' and re-includes that directory (and everything under it).
+        for d in dirs:
+            d = d.strip("/")
+            if d:
+                new_patterns.append(f"!/{d}/")
 
-    # For each directory to include, add an exclusion-style line that "undoes"
-    # the prior 'exclude' and re-includes that directory (and everything under it).
-    for d in dirs:
-        d = d.strip("/")
-        if d:
-            new_patterns.append(f"!/{d}/")
-
-    # Finally, apply the patterns and update the working tree
-    sparse_checkout(repo, new_patterns, force=force, cone=True)
+        # Finally, apply the patterns and update the working tree
+        sparse_checkout(repo, new_patterns, force=force, cone=True)
 
 
 def cone_mode_add(repo, dirs, force=False):
@@ -2245,23 +2239,21 @@ def cone_mode_add(repo, dirs, force=False):
     Returns:
       None
     """
-    if not isinstance(repo, Repo):
-        repo = Repo(repo)
+    with open_repo_closing(repo) as r:
+        sp_path = os.path.join(repo.path, ".git", "info", "sparse-checkout")
+        if not os.path.exists(sp_path):
+            cone_mode_init(repo)
 
-    sp_path = os.path.join(repo.path, ".git", "info", "sparse-checkout")
-    if not os.path.exists(sp_path):
-        cone_mode_init(repo)
+        with open(sp_path) as f:
+            existing = [ln.strip("\n") for ln in f if ln.strip()]
 
-    with open(sp_path) as f:
-        existing = [ln.strip("\n") for ln in f if ln.strip()]
+        for d in dirs:
+            d = d.strip("/")
+            line = f"!/{d}/"
+            if line not in existing:
+                existing.append(line)
 
-    for d in dirs:
-        d = d.strip("/")
-        line = f"!/{d}/"
-        if line not in existing:
-            existing.append(line)
-
-    sparse_checkout(repo, existing, force=force, cone=True)
+        sparse_checkout(repo, existing, force=force, cone=True)
 
 
 def check_mailmap(repo, contact):

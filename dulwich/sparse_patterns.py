@@ -87,7 +87,7 @@ def compute_included_paths_cone(repo, lines):
     Args:
       repo: A path to the repository or a Repo object.
       lines: A list of pattern lines (strings), typically including entries like
-        "/*", "!/*/", or "!/mydir/".
+        "/*", "!/*/", or "/mydir/".
 
     Returns:
       A set of included path strings.
@@ -101,9 +101,9 @@ def compute_included_paths_cone(repo, lines):
             include_top_level = True
         elif pat == "!/*/":
             exclude_subdirs = True
-        elif pat.startswith("!/"):
-            # strip leading '!/' and trailing '/'
-            d = pat[2:].rstrip("/")
+        elif pat.startswith("/"):
+            # strip leading '/' and trailing '/'
+            d = pat.strip("/")
             if d:
                 reinclude_dirs.add(d)
 

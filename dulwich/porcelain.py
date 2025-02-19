@@ -2134,10 +2134,10 @@ def sparse_checkout(
     Returns:
       None
     """
-    with open_repo_closing(repo) as r:
+    with open_repo_closing(repo) as repo_obj:
         # --- 0) Possibly infer 'cone' from config ---
         if cone is None:
-            config = repo.get_config()
+            config = repo_obj.get_config()
             try:
                 sc_cone = config.get((b"core",), b"sparseCheckoutCone")
                 cone = sc_cone == b"true"
@@ -2147,24 +2147,24 @@ def sparse_checkout(
 
         # --- 1) Read or write patterns ---
         if patterns is None:
-            lines = repo.get_sparse_checkout_patterns()
+            lines = repo_obj.get_sparse_checkout_patterns()
             if lines is None:
                 raise Error("No sparse checkout patterns found.")
         else:
             lines = patterns
-            sp_path = os.path.join(repo.path, ".git", "info", "sparse-checkout")
+            sp_path = os.path.join(repo_obj.path, ".git", "info", "sparse-checkout")
             ensure_dir_exists(os.path.dirname(sp_path))
             with open(sp_path, "w") as f:
                 for p in patterns:
                     f.write(p + "\n")
-            repo.set_sparse_checkout_patterns(patterns)
+            repo_obj.set_sparse_checkout_patterns(patterns)
 
         # --- 2) Determine the set of included paths ---
-        included_paths = determine_included_paths(repo, lines, cone)
+        included_paths = determine_included_paths(repo_obj, lines, cone)
 
         # --- 3) Apply those results to the index & working tree ---
         try:
-            apply_included_paths(repo, included_paths, force=force)
+            apply_included_paths(repo_obj, included_paths, force=force)
         except SparseCheckoutConflictError as exc:
             raise CheckoutError(*exc.args) from exc
 
@@ -2186,14 +2186,14 @@ def cone_mode_init(repo):
     Returns:
       None
     """
-    with open_repo_closing(repo) as r:
-        config = repo.get_config()
+    with open_repo_closing(repo) as repo_obj:
+        config = repo_obj.get_config()
         config.set((b"core",), b"sparseCheckout", b"true")
         config.set((b"core",), b"sparseCheckoutCone", b"true")
         config.write_to_path()
 
         patterns = ["/*", "!/*/"]  # root-level files only
-        sparse_checkout(repo, patterns, force=True, cone=True)
+        sparse_checkout(repo_obj, patterns, force=True, cone=True)
 
 
 def cone_mode_set(repo, dirs, force=False):
@@ -2211,8 +2211,8 @@ def cone_mode_set(repo, dirs, force=False):
     Returns:
       None
     """
-    with open_repo_closing(repo) as r:
-        config = repo.get_config()
+    with open_repo_closing(repo) as repo_obj:
+        config = repo_obj.get_config()
         config.set((b"core",), b"sparseCheckout", b"true")
         config.set((b"core",), b"sparseCheckoutCone", b"true")
         config.write_to_path()
@@ -2228,7 +2228,7 @@ def cone_mode_set(repo, dirs, force=False):
                 new_patterns.append(f"!/{d}/")
 
         # Finally, apply the patterns and update the working tree
-        sparse_checkout(repo, new_patterns, force=force, cone=True)
+        sparse_checkout(repo_obj, new_patterns, force=force, cone=True)
 
 
 def cone_mode_add(repo, dirs, force=False):
@@ -2246,10 +2246,10 @@ def cone_mode_add(repo, dirs, force=False):
     Returns:
       None
     """
-    with open_repo_closing(repo) as r:
-        sp_path = os.path.join(repo.path, ".git", "info", "sparse-checkout")
+    with open_repo_closing(repo) as repo_obj:
+        sp_path = os.path.join(repo_obj.path, ".git", "info", "sparse-checkout")
         if not os.path.exists(sp_path):
-            cone_mode_init(repo)
+            cone_mode_init(repo_obj)
 
         with open(sp_path) as f:
             existing = [ln.strip("\n") for ln in f if ln.strip()]
@@ -2260,7 +2260,7 @@ def cone_mode_add(repo, dirs, force=False):
             if line not in existing:
                 existing.append(line)
 
-        sparse_checkout(repo, existing, force=force, cone=True)
+        sparse_checkout(repo_obj, existing, force=force, cone=True)
 
 
 def check_mailmap(repo, contact):

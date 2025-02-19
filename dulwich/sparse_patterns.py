@@ -23,7 +23,6 @@
 
 import fnmatch
 import os
-import re
 
 from .file import ensure_dir_exists
 
@@ -31,7 +30,9 @@ from .file import ensure_dir_exists
 class SparseCheckoutConflictError(Exception):
     """Raised when local modifications would be overwritten by a sparse checkout operation."""
 
-    pass
+
+class BlobNotFoundError(Exception):
+    """Raised when a requested blob is not found in the repository's object store."""
 
 
 def determine_included_paths(repo, lines, cone):
@@ -200,7 +201,9 @@ def apply_included_paths(repo, included_paths, force=False):
                 try:
                     blob = repo.object_store[entry.sha]
                 except KeyError:
-                    raise Error(f"Blob {entry.sha} not found for {path_bytes}.")
+                    raise BlobNotFoundError(
+                        f"Blob {entry.sha} not found for {path_bytes}."
+                    )
                 ensure_dir_exists(os.path.dirname(full_path))
                 with open(full_path, "wb") as f:
                     f.write(blob.data)

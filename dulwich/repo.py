@@ -1851,7 +1851,7 @@ class Repo(BaseRepo):
 
     def infer_cone_mode(self) -> bool:
         """Return True if 'core.sparseCheckoutCone' is set to 'true' in config, else False."""
-        config = repo_obj.get_config()
+        config = self.get_config()
         try:
             sc_cone = config.get((b"core",), b"sparseCheckoutCone")
             return sc_cone == b"true"

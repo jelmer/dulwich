@@ -2220,20 +2220,18 @@ def cone_mode_add(repo, dirs, force=False):
       None
     """
     with open_repo_closing(repo) as repo_obj:
-        sp_path = repo_obj._sparse_checkout_file_path()
-        if not os.path.exists(sp_path):
-            cone_mode_init(repo_obj)
-
-        with open(sp_path) as f:
-            existing = [ln.strip("\n") for ln in f if ln.strip()]
-
-        for d in dirs:
-            d = d.strip("/")
-            line = f"/{d}/"
-            if d and line not in existing:
-                existing.append(line)
-
-        sparse_checkout(repo_obj, existing, force=force, cone=True)
+        repo_obj.configure_for_cone_mode()
+        # Do not pass base patterns as dirs
+        base_patterns = ["/*", "!/*/"]
+        existing_dirs = [
+            pat.strip("/")
+            for pat in repo_obj.get_sparse_checkout_patterns()
+            if pat not in base_patterns
+        ]
+        added_dirs = existing_dirs + (dirs or [])
+        repo_obj.set_cone_mode_patterns(dirs=added_dirs)
+        new_patterns = repo_obj.get_sparse_checkout_patterns()
+        sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
 
 
 def check_mailmap(repo, contact):

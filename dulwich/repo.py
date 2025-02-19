@@ -1893,13 +1893,14 @@ class Repo(BaseRepo):
 
         For each directory to include, add an inclusion line that "undoes" the prior
         ``!/*/`` 'exclude' that re-includes that directory and everything under it.
+        Never add the same line twice.
         """
         patterns = ["/*", "!/*/"]
         if dirs:
             for d in dirs:
                 d = d.strip("/")
                 line = f"/{d}/"
-                if d:
+                if d and line not in patterns:
                     patterns.append(line)
         self.set_sparse_checkout_patterns(patterns)
 

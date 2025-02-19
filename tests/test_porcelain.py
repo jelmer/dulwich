@@ -3986,9 +3986,9 @@ class ConeModeTests(PorcelainTestCase):
         # Instead of the wildcard-based lines the old test used.
         self.assertIn("/*", lines)
         self.assertIn("!/*/", lines)
-        self.assertIn("!/docs/", lines)
-        self.assertIn("!/src/", lines)
-        self.assertNotIn("!/tests/", lines)
+        self.assertIn("/docs/", lines)
+        self.assertIn("/src/", lines)
+        self.assertNotIn("/tests/", lines)
 
     def test_set_overwrites_old_dirs(self):
         """Ensure that calling cone_mode_set again overwrites old includes.
@@ -4075,6 +4075,6 @@ class ConeModeTests(PorcelainTestCase):
         # "!/docs/", "!/src/", "!/tests/" -> re-include the directories we added
         self.assertIn("/*", lines)
         self.assertIn("!/*/", lines)
-        self.assertIn("!/docs/", lines)
-        self.assertIn("!/src/", lines)
-        self.assertIn("!/tests/", lines)
+        self.assertIn("/docs/", lines)
+        self.assertIn("/src/", lines)
+        self.assertIn("/tests/", lines)

@@ -2219,8 +2219,9 @@ def cone_mode_set(repo, dirs, force=False):
         # the prior 'exclude' and re-includes that directory (and everything under it).
         for d in dirs:
             d = d.strip("/")
+            line = f"/{d}/"
             if d:
-                new_patterns.append(f"!/{d}/")
+                new_patterns.append(line)
 
         # Finally, apply the patterns and update the working tree
         sparse_checkout(repo_obj, new_patterns, force=force, cone=True)
@@ -2242,7 +2243,7 @@ def cone_mode_add(repo, dirs, force=False):
       None
     """
     with open_repo_closing(repo) as repo_obj:
-        sp_path = os.path.join(repo_obj.path, ".git", "info", "sparse-checkout")
+        sp_path = repo_obj._sparse_checkout_file_path()
         if not os.path.exists(sp_path):
             cone_mode_init(repo_obj)
 
@@ -2251,8 +2252,8 @@ def cone_mode_add(repo, dirs, force=False):
 
         for d in dirs:
             d = d.strip("/")
-            line = f"!/{d}/"
-            if line not in existing:
+            line = f"/{d}/"
+            if d and line not in existing:
                 existing.append(line)
 
         sparse_checkout(repo_obj, existing, force=force, cone=True)

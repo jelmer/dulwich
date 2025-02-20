@@ -82,7 +82,8 @@ def compute_included_paths_cone(repo, lines):
 
     By default, this can include top-level files, exclude all subdirectories,
     and re-include specified directories. The logic is less comprehensive than
-    Git's built-in cone mode (recursive vs parent) but retains the core concept.
+    Git's built-in cone mode (recursive vs parent) and is essentially an implementation
+    of the recursive cone mode.
 
     Args:
       repo: A path to the repository or a Repo object.

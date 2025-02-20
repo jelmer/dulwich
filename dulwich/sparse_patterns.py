@@ -21,8 +21,8 @@
 
 """Sparse checkout pattern handling."""
 
-import fnmatch
 import os
+from fnmatch import fnmatch
 
 from .file import ensure_dir_exists
 
@@ -325,7 +325,7 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
         else:
             # Not anchored: we can do a simple wildcard match or a substring match.
             # For simplicity, let's use Python's fnmatch:
-            matched = fnmatch.fnmatch(path_str, pattern)
+            matched = fnmatch(path_str, pattern) or fnmatch(path_str, f"*/{pattern}")
 
         if matched:
             # If negation is True, that means 'exclude'. If negation is False, 'include'.

@@ -297,16 +297,17 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
     is_included = False
 
     for pattern, negation, dir_only, anchored in parsed_patterns:
+        matched = path_str == pattern
         # If dir_only is True and path_is_dir is False, we skip matching
-        # real Git might treat "docs/" pattern as matching "docs/readme.md" indirectly,
-        # but let's keep it strictly directory-only for demonstration.
-        if dir_only and not path_is_dir:
-            # e.g. "docs/" won't match "docs/readme.md" in this naive approach
-            continue
+        if dir_only and not matched:
+            if path_str.startswith(pattern + "/"):
+                matched = True  # anchored or unanchored
+            else:
+                matched = fnmatch(path_str, f"*/{pattern}/*")  # unanchored subpath
 
         # If anchored is True, pattern should match from the start of path_str.
         # If not anchored, we can match anywhere.
-        if anchored:
+        if anchored and not matched:
             # We match from the beginning. For example, pattern = "docs"
             # path_str = "docs/readme.md" -> start is "docs"
             # We'll just do a prefix check or prefix + slash check
@@ -322,7 +323,7 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
                 matched = True
             else:
                 matched = False
-        else:
+        elif not matched:
             # Not anchored: we can do a simple wildcard match or a substring match.
             # For simplicity, let's use Python's fnmatch:
             matched = fnmatch(path_str, pattern) or fnmatch(path_str, f"*/{pattern}")

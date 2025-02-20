@@ -274,10 +274,6 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
 
     We'll interpret "include" as returning True, "exclude" as returning False.
 
-    Because real Git uses more specialized code in cone mode, this is primarily used
-    in full-pattern (non-cone) mode. To replicate Git exactly, this approach would need
-    to handle anchored patterns, wildcards, directory restrictions, etc. precisely.
-
     Each pattern can include negation (!), directory-only markers, or be anchored
     to the start of the path. The last matching pattern determines whether the
     path is ultimately included or excluded.
@@ -339,8 +335,6 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
 
         if matched:
             # If negation is True, that means 'exclude'. If negation is False, 'include'.
-            # But note that in real .gitignore, negation is "unignore." For sparse-checkout,
-            # it can be reversed. We'll keep it direct for demonstration:
             is_included = not negation
             # The last matching pattern overrides, so we continue checking until the end.
 

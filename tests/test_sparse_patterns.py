@@ -89,7 +89,7 @@ class ParseSparsePatternsTests(TestCase):
 
 
 class MatchGitignorePatternsTests(TestCase):
-    """Test the match_gitignore_patterns function using its simplified logic."""
+    """Test the match_gitignore_patterns function."""
 
     def test_no_patterns_returns_excluded(self):
         """If no patterns are provided, by default we treat the path as excluded."""

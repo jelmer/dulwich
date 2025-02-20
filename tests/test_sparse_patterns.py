@@ -108,10 +108,10 @@ class MatchGitignorePatternsTests(TestCase):
         self.assertFalse(match_gitignore_patterns("foo.py", parsed))
 
     def test_dir_only(self):
-        """A pattern with a trailing slash should only match directories in this naive approach."""
+        """A pattern with a trailing slash should only match directories and subdirectories."""
         parsed = parse_sparse_patterns(["docs/"])
         # Because we set path_is_dir=False, it won't match
-        self.assertFalse(
+        self.assertTrue(
             match_gitignore_patterns("docs/readme.md", parsed, path_is_dir=False)
         )
         self.assertTrue(match_gitignore_patterns("docs", parsed, path_is_dir=True))

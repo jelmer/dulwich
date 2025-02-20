@@ -297,12 +297,21 @@ def match_gitignore_patterns(path_str, parsed_patterns, path_is_dir=False):
     is_included = False
 
     for pattern, negation, dir_only, anchored in parsed_patterns:
-        matched = path_str == pattern
+        forbidden_path = dir_only and not path_is_dir
+        if path_str == pattern:
+            if forbidden_path:
+                continue
+            else:
+                matched = True
+        else:
+            matched = False
         # If dir_only is True and path_is_dir is False, we skip matching
         if dir_only and not matched:
-            if path_str.startswith(pattern + "/"):
-                matched = True  # anchored or unanchored
-            else:
+            if path_str == pattern + "/":
+                matched = not forbidden_path
+            elif fnmatch(path_str, f"{pattern}/*"):
+                matched = True  # root subpath (anchored or unanchored)
+            elif not anchored:
                 matched = fnmatch(path_str, f"*/{pattern}/*")  # unanchored subpath
 
         # If anchored is True, pattern should match from the start of path_str.

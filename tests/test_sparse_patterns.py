@@ -180,11 +180,12 @@ class ComputeIncludedPathsConeTests(TestCase):
         self.repo.stage([relpath])
 
     def test_cone_mode_patterns(self):
-        """
+        """Simpler pattern handling in cone mode.
+
         Lines in 'cone' style typically look like:
-          /*     -> include top-level
-          !/*/   -> exclude all subdirs
-          /docs/ -> reinclude 'docs' directory
+          - /*     -> include top-level
+          - !/*/   -> exclude all subdirs
+          - /docs/ -> reinclude 'docs' directory
         """
         self._add_file_to_index("topfile", b"hi")
         self._add_file_to_index("docs/readme.md", b"stuff")
@@ -349,7 +350,7 @@ class ApplyIncludedPathsTests(TestCase):
         )
         e.set_skip_worktree(False)
         e.sha = fake_sha
-        idx[("missing_file".encode("utf-8"))] = e
+        idx[(b"missing_file")] = e
         idx.write()
 
         with self.assertRaises(BlobNotFoundError):

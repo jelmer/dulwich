@@ -28,6 +28,7 @@ Currently implemented:
  * check-ignore
  * checkout_branch
  * clone
+ * cone mode{_init, _set, _add}
  * commit
  * commit-tree
  * daemon
@@ -95,7 +96,6 @@ from .file import ensure_dir_exists
 from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
 from .index import (
-    EXTENDED_FLAG_SKIP_WORKTREE,
     _fs_to_tree_path,
     blob_from_path_and_stat,
     build_file_from_blob,
@@ -136,6 +136,11 @@ from .server import (
     UploadPackHandler,
 )
 from .server import update_server_info as server_update_server_info
+from .sparse_patterns import (
+    SparseCheckoutConflictError,
+    apply_included_paths,
+    determine_included_paths,
+)
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -2114,113 +2119,133 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
                 dir_path = os.path.dirname(dir_path)
 
 
-def sparse_checkout(repo, patterns=None, force=False):
-    """Perform a sparse checkout by excluding certain paths via skip-worktree bits.
+def sparse_checkout(
+    repo, patterns=None, force: bool = False, cone: Union[bool, None] = None
+):
+    """Perform a sparse checkout in the repository (either 'full' or 'cone mode').
 
-    Mark any paths not matching the given patterns with skip-worktree in the index and
-    remove them from the working tree.  If `force=False` and a file has local
-    modifications, a `CheckoutError` is raised to prevent accidental data loss.
+    Perform sparse checkout in either 'cone' (directory-based) mode or
+    'full pattern' (.gitignore) mode, depending on the ``cone`` parameter.
 
-    By default, patterns are stored in or read from `.git/info/sparse-checkout`, and
-    follow standard Gitignore/fnmatch rules.
+    If ``cone`` is ``None``, the mode is inferred from the repository's
+    ``core.sparseCheckoutCone`` config setting.
+
+    Steps:
+      1) If ``patterns`` is provided, write them to ``.git/info/sparse-checkout``.
+      2) Determine which paths in the index are included vs. excluded.
+         - If ``cone=True``, use "cone-compatible" directory-based logic.
+         - If ``cone=False``, use standard .gitignore-style matching.
+      3) Update the index's skip-worktree bits and add/remove files in
+         the working tree accordingly.
+      4) If ``force=False``, refuse to remove files that have local modifications.
 
     Args:
-      repo: A path to a repository or a Repo instance.
-      patterns: A list of Gitignore-style patterns to include.
-      force: Whether to allow destructive removals of uncommitted changes
-             in newly excluded paths.
+      repo: Path to the repository or a Repo object.
+      patterns: Optional list of sparse-checkout patterns to write.
+      force: Whether to force removal of locally modified files (default False).
+      cone: Boolean indicating cone mode (True/False). If None, read from config.
 
-    Raises:
-      CheckoutError: If local modifications would be discarded without force=True.
-      Error: If no patterns are given or an I/O failure occurs.
+    Returns:
+      None
     """
-    repo = Repo(repo) if not isinstance(repo, Repo) else repo
+    with open_repo_closing(repo) as repo_obj:
+        # --- 0) Possibly infer 'cone' from config ---
+        if cone is None:
+            cone = repo_obj.infer_cone_mode()
 
-    # 1) Read or write the sparse-checkout file
-    if patterns is not None:
-        repo.set_sparse_checkout_patterns(patterns)
-    else:
-        patterns = repo.get_sparse_checkout_patterns()
+        # --- 1) Read or write patterns ---
         if patterns is None:
-            raise Error("No sparse checkout patterns provided and no file found.")
-
-    # 2) Preprocess patterns: "docs/" -> "docs/*", unify path separators
-    processed_pats = []
-    for pat in patterns:
-        if pat.endswith("/"):
-            pat += "*"
-        processed_pats.append(pat)
-    patterns = processed_pats
-
-    def matches_any_pattern(index_path):
-        forward_path = index_path.replace("\\", "/")
-        for pat in patterns:
-            if fnmatch.fnmatch(forward_path, pat):
-                return True
-        return False
-
-    # 3) Helper to detect local modifications
-    normalizer = repo.get_blob_normalizer()
-
-    def local_modifications_exist(full_path, index_entry):
-        if not os.path.exists(full_path):
-            return False
-        try:
-            with open(full_path, "rb") as f:
-                disk_data = f.read()
-        except OSError:
-            return True
-        try:
-            blob = repo.object_store[index_entry.sha]
-        except KeyError:
-            return True
-        norm_data = normalizer.checkin_normalize(disk_data, full_path)
-        return norm_data != blob.data
-
-    # 4) Update skip-worktree bits in the index
-    index = repo.open_index()
-    for path, entry in list(index.items()):
-        path_str = path.decode("utf-8")
-        # If the file matches any pattern => included => clear skip-worktree
-        if matches_any_pattern(path_str):
-            entry.set_skip_worktree(False)
+            lines = repo_obj.get_sparse_checkout_patterns()
+            if lines is None:
+                raise Error("No sparse checkout patterns found.")
         else:
-            entry.set_skip_worktree(True)
-        index[path] = entry
-    index.write()
+            lines = patterns
+            repo_obj.set_sparse_checkout_patterns(patterns)
 
-    # 5) Update the working tree to reflect skip-worktree bits
-    for path, entry in list(index.items()):
-        path_str = path.decode("utf-8")
-        full_path = os.path.join(repo.path, path_str)
-        skip_bit_set = bool(entry.extended_flags & EXTENDED_FLAG_SKIP_WORKTREE)
+        # --- 2) Determine the set of included paths ---
+        included_paths = determine_included_paths(repo_obj, lines, cone)
 
-        if skip_bit_set:
-            # The file is excluded
-            if os.path.exists(full_path):
-                # If force is False and local modifications exist, fail
-                if not force and local_modifications_exist(full_path, entry):
-                    raise CheckoutError(
-                        f"Local modifications in {path_str} would be overwritten "
-                        f"by sparse checkout. Use force=True to override."
-                    )
-                try:
-                    os.remove(full_path)
-                except OSError as e:
-                    raise Error(f"Failed to remove excluded file {path_str}: {e}")
-        else:
-            # The file is included
-            if not os.path.exists(full_path):
-                try:
-                    blob = repo.object_store[entry.sha]
-                except KeyError:
-                    raise Error(
-                        f"Blob {entry.sha} not found in object store for {path_str}."
-                    )
-                ensure_dir_exists(os.path.dirname(full_path))
-                with open(full_path, "wb") as f:
-                    f.write(blob.data)
-    return
+        # --- 3) Apply those results to the index & working tree ---
+        try:
+            apply_included_paths(repo_obj, included_paths, force=force)
+        except SparseCheckoutConflictError as exc:
+            raise CheckoutError(*exc.args) from exc
+
+
+def cone_mode_init(repo):
+    """Initialize a repository to use sparse checkout in 'cone' mode.
+
+    Sets ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` in the config.
+    Writes an initial ``.git/info/sparse-checkout`` file that includes only
+    top-level files (and excludes all subdirectories), e.g. ``["/*", "!/*/"]``.
+    Then performs a sparse checkout to update the working tree accordingly.
+
+    If no directories are specified, then only top-level files are included:
+    https://git-scm.com/docs/git-sparse-checkout#_internalscone_mode_handling
+
+    Args:
+      repo: Path to the repository or a Repo object.
+
+    Returns:
+      None
+    """
+    with open_repo_closing(repo) as repo_obj:
+        repo_obj.configure_for_cone_mode()
+        patterns = ["/*", "!/*/"]  # root-level files only
+        sparse_checkout(repo_obj, patterns, force=True, cone=True)
+
+
+def cone_mode_set(repo, dirs, force=False):
+    """Overwrite the existing 'cone-mode' sparse patterns with a new set of directories.
+
+    Ensures ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` are enabled.
+    Writes new patterns so that only the specified directories (and top-level files)
+    remain in the working tree, and applies the sparse checkout update.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      dirs: List of directory names to include.
+      force: Whether to forcibly discard local modifications (default False).
+
+    Returns:
+      None
+    """
+    with open_repo_closing(repo) as repo_obj:
+        repo_obj.configure_for_cone_mode()
+        repo_obj.set_cone_mode_patterns(dirs=dirs)
+        new_patterns = repo_obj.get_sparse_checkout_patterns()
+        # Finally, apply the patterns and update the working tree
+        sparse_checkout(repo_obj, new_patterns, force=force, cone=True)
+
+
+def cone_mode_add(repo, dirs, force=False):
+    """Add new directories to the existing 'cone-mode' sparse-checkout patterns.
+
+    Reads the current patterns from ``.git/info/sparse-checkout``, adds pattern
+    lines to include the specified directories, and then performs a sparse
+    checkout to update the working tree accordingly.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      dirs: List of directory names to add to the sparse-checkout.
+      force: Whether to forcibly discard local modifications (default False).
+
+    Returns:
+      None
+    """
+    with open_repo_closing(repo) as repo_obj:
+        repo_obj.configure_for_cone_mode()
+        # Do not pass base patterns as dirs
+        base_patterns = ["/*", "!/*/"]
+        existing_dirs = [
+            pat.strip("/")
+            for pat in repo_obj.get_sparse_checkout_patterns()
+            if pat not in base_patterns
+        ]
+        added_dirs = existing_dirs + (dirs or [])
+        repo_obj.set_cone_mode_patterns(dirs=added_dirs)
+        new_patterns = repo_obj.get_sparse_checkout_patterns()
+        sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
 
 
 def check_mailmap(repo, contact):

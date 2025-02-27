@@ -3967,7 +3967,10 @@ class ConeModeTests(PorcelainTestCase):
         porcelain.cone_mode_set(self.repo, dirs=["docs", "src"])
 
         actual_files = self._list_wtree_files()
-        expected_files = {"docs/readme.md", "src/main.py"}
+        expected_files = {
+            os.path.join("docs", "readme.md"),
+            os.path.join("src", "main.py"),
+        }
         self.assertEqual(
             expected_files,
             actual_files,
@@ -4003,13 +4006,16 @@ class ConeModeTests(PorcelainTestCase):
         self._commit_file("tests/test_bar.py")
 
         porcelain.cone_mode_set(self.repo, dirs=["docs", "src"])
-        self.assertEqual({"docs/readme.md", "src/main.py"}, self._list_wtree_files())
+        self.assertEqual(
+            {os.path.join("docs", "readme.md"), os.path.join("src", "main.py")},
+            self._list_wtree_files(),
+        )
 
         # Overwrite includes, now only 'tests'
         porcelain.cone_mode_set(self.repo, dirs=["tests"], force=True)
 
         actual_files = self._list_wtree_files()
-        expected_files = {"tests/test_bar.py"}
+        expected_files = {os.path.join("tests", "test_bar.py")}
         self.assertEqual(expected_files, actual_files)
 
     def test_force_removal_of_local_mods(self):
@@ -4033,7 +4039,7 @@ class ConeModeTests(PorcelainTestCase):
         porcelain.cone_mode_set(self.repo, dirs=["docs"], force=True)
 
         actual_files = self._list_wtree_files()
-        expected_files = {"docs/readme.md"}
+        expected_files = {os.path.join("docs", "readme.md")}
         self.assertEqual(expected_files, actual_files)
 
     def test_add_and_merge_dirs(self):
@@ -4051,17 +4057,24 @@ class ConeModeTests(PorcelainTestCase):
 
         # Include "docs" only
         porcelain.cone_mode_set(self.repo, dirs=["docs"])
-        self.assertEqual({"docs/readme.md"}, self._list_wtree_files())
+        self.assertEqual({os.path.join("docs", "readme.md")}, self._list_wtree_files())
 
         # Add "src"
         porcelain.cone_mode_add(self.repo, dirs=["src"])
         actual_files = self._list_wtree_files()
-        self.assertEqual({"docs/readme.md", "src/main.py"}, actual_files)
+        self.assertEqual(
+            {os.path.join("docs", "readme.md"), os.path.join("src", "main.py")},
+            actual_files,
+        )
 
         # Add "tests" as well
         porcelain.cone_mode_add(self.repo, dirs=["tests"])
         actual_files = self._list_wtree_files()
-        expected_files = {"docs/readme.md", "src/main.py", "tests/test_bar.py"}
+        expected_files = {
+            os.path.join("docs", "readme.md"),
+            os.path.join("src", "main.py"),
+            os.path.join("tests", "test_bar.py"),
+        }
         self.assertEqual(expected_files, actual_files)
 
         # Check .git/info/sparse-checkout

@@ -1041,7 +1041,7 @@ def submodule_list(repo):
 def tag_create(
     repo,
     tag: Union[str, bytes],
-    author: Optional[str] = None,
+    author: Optional[Union[str, bytes]] = None,
     message: Optional[Union[str, bytes]] = None,
     annotated=False,
     objectish: Union[str, bytes] = "HEAD",
@@ -1076,11 +1076,17 @@ def tag_create(
             tag_obj = Tag()
             if author is None:
                 author = get_user_identity(r.get_config_stack())
-            if isinstance(author, str):
+            elif isinstance(author, str):
                 author = author.encode(encoding)
+            else:
+                assert isinstance(author, bytes)
             tag_obj.tagger = author
             if isinstance(message, str):
                 message = message.encode(encoding)
+            elif isinstance(message, bytes):
+                pass
+            else:
+                message = b""
             tag_obj.message = message + "\n".encode(encoding)
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
@@ -1599,13 +1605,13 @@ def receive_pack(path=".", inf=None, outf=None) -> int:
 
 
 def _make_branch_ref(name: Union[str, bytes]) -> Ref:
-    if getattr(name, "encode", None):
+    if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return LOCAL_BRANCH_PREFIX + name
 
 
 def _make_tag_ref(name: Union[str, bytes]) -> Ref:
-    if getattr(name, "encode", None):
+    if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return LOCAL_TAG_PREFIX + name
 

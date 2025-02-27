@@ -125,6 +125,7 @@ from .refs import (
     LOCAL_BRANCH_PREFIX,
     LOCAL_REMOTE_PREFIX,
     LOCAL_TAG_PREFIX,
+    Ref,
     _import_remote_refs,
 )
 from .repo import BaseRepo, Repo, get_user_identity
@@ -1039,15 +1040,15 @@ def submodule_list(repo):
 
 def tag_create(
     repo,
-    tag,
-    author=None,
-    message=None,
+    tag: Union[str, bytes],
+    author: Optional[Union[str, bytes]] = None,
+    message: Optional[Union[str, bytes]] = None,
     annotated=False,
-    objectish="HEAD",
+    objectish: Union[str, bytes] = "HEAD",
     tag_time=None,
     tag_timezone=None,
-    sign=False,
-    encoding=DEFAULT_ENCODING,
+    sign: bool = False,
+    encoding: str = DEFAULT_ENCODING,
 ) -> None:
     """Creates a tag in git via dulwich calls.
 
@@ -1067,12 +1068,25 @@ def tag_create(
     with open_repo_closing(repo) as r:
         object = parse_object(r, objectish)
 
+        if isinstance(tag, str):
+            tag = tag.encode(encoding)
+
         if annotated:
             # Create the tag object
             tag_obj = Tag()
             if author is None:
                 author = get_user_identity(r.get_config_stack())
+            elif isinstance(author, str):
+                author = author.encode(encoding)
+            else:
+                assert isinstance(author, bytes)
             tag_obj.tagger = author
+            if isinstance(message, str):
+                message = message.encode(encoding)
+            elif isinstance(message, bytes):
+                pass
+            else:
+                message = b""
             tag_obj.message = message + "\n".encode(encoding)
             tag_obj.name = tag
             tag_obj.object = (type(object), object.id)
@@ -1590,14 +1604,14 @@ def receive_pack(path=".", inf=None, outf=None) -> int:
     return 0
 
 
-def _make_branch_ref(name):
-    if getattr(name, "encode", None):
+def _make_branch_ref(name: Union[str, bytes]) -> Ref:
+    if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return LOCAL_BRANCH_PREFIX + name
 
 
-def _make_tag_ref(name):
-    if getattr(name, "encode", None):
+def _make_tag_ref(name: Union[str, bytes]) -> Ref:
+    if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return LOCAL_TAG_PREFIX + name
 

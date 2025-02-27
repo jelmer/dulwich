@@ -1,5 +1,8 @@
 0.22.8	UNRELEASED
 
+ * Allow passing in plain strings to ``dulwich.porcelain.tag_create``
+   (Jelmer Vernooĳ, #1499)
+
 0.22.7	2024-12-19
 
  * Fix serializing of commits with empty commit messages.

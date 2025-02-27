@@ -1842,6 +1842,23 @@ class Repo(BaseRepo):
         """Return the path of the sparse-checkout file in this repo's control dir."""
         return os.path.join(self.controldir(), "info", "sparse-checkout")
 
+    def configure_for_cone_mode(self) -> None:
+        """Ensure the repository is configured for cone-mode sparse-checkout."""
+        config = self.get_config()
+        config.set((b"core",), b"sparseCheckout", b"true")
+        config.set((b"core",), b"sparseCheckoutCone", b"true")
+        config.write_to_path()
+
+    def infer_cone_mode(self) -> bool:
+        """Return True if 'core.sparseCheckoutCone' is set to 'true' in config, else False."""
+        config = self.get_config()
+        try:
+            sc_cone = config.get((b"core",), b"sparseCheckoutCone")
+            return sc_cone == b"true"
+        except KeyError:
+            # If core.sparseCheckoutCone is not set, default to False
+            return False
+
     def get_sparse_checkout_patterns(self) -> list[str]:
         """Return a list of sparse-checkout patterns from info/sparse-checkout.
 
@@ -1870,6 +1887,22 @@ class Repo(BaseRepo):
         with open(path, "w", encoding="utf-8") as f:
             for pat in patterns:
                 f.write(pat + "\n")
+
+    def set_cone_mode_patterns(self, dirs: Union[list[str], None] = None) -> None:
+        """Write the given cone-mode directory patterns into info/sparse-checkout.
+
+        For each directory to include, add an inclusion line that "undoes" the prior
+        ``!/*/`` 'exclude' that re-includes that directory and everything under it.
+        Never add the same line twice.
+        """
+        patterns = ["/*", "!/*/"]
+        if dirs:
+            for d in dirs:
+                d = d.strip("/")
+                line = f"/{d}/"
+                if d and line not in patterns:
+                    patterns.append(line)
+        self.set_sparse_checkout_patterns(patterns)
 
 
 class MemoryRepo(BaseRepo):

@@ -1196,6 +1196,51 @@ index 0000000..ea5c7bf
 """,
         )
 
+    def test_tag_unicode(self) -> None:
+        a = Blob.from_string(b"The Foo\n")
+        ta = Tree()
+        ta.add(b"somename", 0o100644, a.id)
+        ca = make_commit(tree=ta.id)
+        self.repo.object_store.add_objects([(a, None), (ta, None), (ca, None)])
+        porcelain.tag_create(
+            self.repo.path,
+            "tryme",
+            "foo <foo@bar.com>",
+            "bar",
+            annotated=True,
+            objectish=ca.id,
+            tag_time=1552854211,
+            tag_timezone=0,
+        )
+        outstream = StringIO()
+        porcelain.show(self.repo, objects=[b"refs/tags/tryme"], outstream=outstream)
+        self.maxDiff = None
+        self.assertMultiLineEqual(
+            outstream.getvalue(),
+            """\
+Tagger: foo <foo@bar.com>
+Date:   Sun Mar 17 2019 20:23:31 +0000
+
+bar
+
+--------------------------------------------------
+commit: 344da06c1bb85901270b3e8875c988a027ec087d
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+
+Test message.
+
+diff --git a/somename b/somename
+new file mode 100644
+index 0000000..ea5c7bf
+--- /dev/null
++++ b/somename
+@@ -0,0 +1 @@
++The Foo
+""",
+        )
+
     def test_commit_with_change(self) -> None:
         a = Blob.from_string(b"The Foo\n")
         ta = Tree()

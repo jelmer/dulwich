@@ -3,6 +3,16 @@
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``
    (Jelmer Vernooĳ, #1499)
 
+ * Bump PyO3 to 0.23.5. (Jelmer Vernooĳ)
+
+ * Add sparse checkout cone mode support (Louis Maddox, #1497)
+
+ * Add skip-worktree support. (Louis Maddox)
+
+ * Add "index.skipHash" option support. (Jan Rűegg)
+
+ * Repo docstring improvements. (Marnanel Thurman)
+
 0.22.7	2024-12-19
 
  * Fix serializing of commits with empty commit messages.

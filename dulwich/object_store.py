@@ -1429,7 +1429,12 @@ class ObjectStoreGraphWalker:
 
     shallow: set[ObjectID]
 
-    def __init__(self, local_heads: Iterable[ObjectID], get_parents, shallow: Optional[set[ObjectID]] = None) -> None:
+    def __init__(
+        self,
+        local_heads: Iterable[ObjectID],
+        get_parents,
+        shallow: Optional[set[ObjectID]] = None,
+    ) -> None:
         """Create a new instance.
 
         Args:

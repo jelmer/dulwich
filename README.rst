@@ -15,6 +15,20 @@ SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 The project is named after the part of London that Mr. and Mrs. Git live in
 the particular Monty Python sketch.
 
+Differences with other Python Git libraries
+-------------------------------------------
+
+Unlike other Python Git libraries, Dulwich is available as a standalone
+package that doesn't depend on git (like GitPython) being installed or any
+native code (like pygit2).
+
+This comes at the cost of speed, but makes it easier to deploy in environments
+where git isn't available or where it's important to have a pure Python
+implementation.
+
+To improve performance, Dulwich includes optional Rust bindings that can be
+used to speed up low-level operations.
+
 Installation
 ------------
 

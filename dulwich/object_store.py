@@ -1419,14 +1419,22 @@ class MissingObjectFinder:
 
 
 class ObjectStoreGraphWalker:
-    """Graph walker that finds what commits are missing from an object store.
+    """Graph walker that finds what commits are missing from an object store."""
 
-    Attributes:
-      heads: Revisions without descendants in the local repo
-      get_parents: Function to retrieve parents in the local repo
-    """
+    heads: set[ObjectID]
+    """Revisions without descendants in the local repo."""
 
-    def __init__(self, local_heads, get_parents, shallow=None) -> None:
+    get_parents: Callable[[ObjectID], ObjectID]
+    """Function to retrieve parents in the local repo."""
+
+    shallow: set[ObjectID]
+
+    def __init__(
+        self,
+        local_heads: Iterable[ObjectID],
+        get_parents,
+        shallow: Optional[set[ObjectID]] = None,
+    ) -> None:
         """Create a new instance.
 
         Args:
@@ -1443,7 +1451,7 @@ class ObjectStoreGraphWalker:
     def nak(self) -> None:
         """Nothing in common was found."""
 
-    def ack(self, sha) -> None:
+    def ack(self, sha: ObjectID) -> None:
         """Ack that a revision and its ancestors are present in the source."""
         if len(sha) != 40:
             raise ValueError(f"unexpected sha {sha!r} received")

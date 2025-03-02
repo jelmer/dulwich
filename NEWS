@@ -1,4 +1,4 @@
-0.22.8	UNRELEASED
+0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``
    (Jelmer Vernooĳ, #1499)

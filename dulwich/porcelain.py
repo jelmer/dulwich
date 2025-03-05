@@ -768,9 +768,10 @@ def print_commit(commit, decode, outstream=sys.stdout) -> None:
     time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
     timezone_str = format_timezone(commit.author_timezone).decode("ascii")
     outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
-    outstream.write("\n")
-    outstream.write(decode(commit.message) + "\n")
-    outstream.write("\n")
+    if commit.message is not None:
+        outstream.write("\n")
+        outstream.write(decode(commit.message) + "\n")
+        outstream.write("\n")
 
 
 def print_tag(tag, decode, outstream=sys.stdout) -> None:

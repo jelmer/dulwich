@@ -321,14 +321,14 @@ class cmd_clone(Command):
 
 class cmd_commit(Command):
     def run(self, args) -> None:
-        opts, args = getopt(args, "", ["message"])
+        opts, args = getopt(args, "", ["message="])
         kwopts = dict(opts)
         porcelain.commit(".", message=kwopts["--message"])
 
 
 class cmd_commit_tree(Command):
     def run(self, args) -> None:
-        opts, args = getopt(args, "", ["message"])
+        opts, args = getopt(args, "", ["message="])
         if args == []:
             print("usage: dulwich commit-tree tree")
             sys.exit(1)

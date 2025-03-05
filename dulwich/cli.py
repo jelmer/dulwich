@@ -34,6 +34,7 @@ import os
 import signal
 import sys
 from getopt import getopt
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Optional
 
 from dulwich import porcelain
@@ -95,17 +96,19 @@ class cmd_archive(Command):
 class cmd_add(Command):
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
+        parser.add_argument("path", type=Path, nargs="+")
         args = parser.parse_args(argv)
 
-        porcelain.add(".", paths=args)
+        porcelain.add(".", paths=args.path)
 
 
 class cmd_rm(Command):
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
+        parser.add_argument("path", type=Path, nargs="+")
         args = parser.parse_args(argv)
 
-        porcelain.rm(".", paths=args)
+        porcelain.rm(".", paths=args.path)
 
 
 class cmd_fetch_pack(Command):

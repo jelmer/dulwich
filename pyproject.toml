@@ -113,6 +113,7 @@ before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf
 [tool.cibuildwheel.linux]
 skip = "*-musllinux_*"
 archs = ["auto", "aarch64"]
+before-build = "pip install -U setuptools-rust && yum -y install libatomic && curl https://sh.rustup.rs -sSf | sh -s -- --profile=minimal -y && rustup show"
 
 [tool.cibuildwheel.macos]
 archs = ["auto", "universal2", "x86_64", "arm64"]

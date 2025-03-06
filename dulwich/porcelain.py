@@ -768,7 +768,7 @@ def print_commit(commit, decode, outstream=sys.stdout) -> None:
     time_str = time.strftime("%a %b %d %Y %H:%M:%S", time_tuple)
     timezone_str = format_timezone(commit.author_timezone).decode("ascii")
     outstream.write("Date:   " + time_str + " " + timezone_str + "\n")
-    if commit.message is not None:
+    if commit.message:
         outstream.write("\n")
         outstream.write(decode(commit.message) + "\n")
         outstream.write("\n")
@@ -908,7 +908,13 @@ def log(
       max_entries: Optional maximum number of entries to display
     """
     with open_repo_closing(repo) as r:
-        walker = r.get_walker(max_entries=max_entries, paths=paths, reverse=reverse)
+        try:
+            include = [r.head()]
+        except KeyError:
+            include = []
+        walker = r.get_walker(
+            include=include, max_entries=max_entries, paths=paths, reverse=reverse
+        )
         for entry in walker:
 
             def decode(x):

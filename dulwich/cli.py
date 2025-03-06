@@ -111,6 +111,23 @@ class cmd_rm(Command):
         porcelain.rm(".", paths=args.path)
 
 
+class cmd_rm_branch(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "branch",
+            type=str,
+            help="Name of the branch to remove",
+        )
+        args = parser.parse_args(args)
+        if not args.branch:
+            print("Usage: dulwich rm-branch BRANCH_NAME")
+            sys.exit(1)
+            
+        r = Repo(".")
+        porcelain.branch_delete(r, name=args.branch)
+
+
 class cmd_fetch_pack(Command):
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
@@ -429,7 +446,11 @@ class cmd_reset(Command):
             mode = "soft"
         elif "--mixed" in kwopts:
             mode = "mixed"
-        porcelain.reset(".", mode=mode)
+        try:
+            treeish = args.pop(0)
+        except IndexError:
+            treeish = None
+        porcelain.reset(".", mode=mode, treeish=treeish)
 
 
 class cmd_daemon(Command):
@@ -729,6 +750,52 @@ class cmd_check_mailmap(Command):
             print(canonical_identity)
 
 
+class cmd_create_branch(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "branch",
+            type=str,
+            help="Name of the branch to create",
+        )
+        args = parser.parse_args(args)
+        if not args.branch:
+            print("Usage: dulwich create-branch BRANCH_NAME")
+            sys.exit(1)
+            
+        r = Repo(".")
+        try:
+            porcelain.branch_create(r, name=args.branch)
+        except porcelain.Error as e:
+            print(f"{e}")
+
+
+class cmd_checkout_branch(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "branch",
+            type=str,
+            help="Name of the branch to checkout",
+        )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force checkout",
+        )
+        args = parser.parse_args(args)
+        if not args.branch:
+            print("Usage: dulwich checkout-branch BRANCH_NAME [--force]")
+            sys.exit(1)
+            
+        r = Repo(".")
+        try:
+            porcelain.checkout_branch(r, target=args.branch, force=args.force)
+        except porcelain.CheckoutError as e:
+            print(f"{e}")
+
+
 class cmd_stash_list(Command):
     def run(self, args) -> None:
         parser = optparse.OptionParser()
@@ -808,6 +875,8 @@ commands = {
     "archive": cmd_archive,
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
+    "checkout-branch": cmd_checkout_branch,
+    "create-branch": cmd_create_branch,
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
@@ -837,6 +906,7 @@ commands = {
     "reset": cmd_reset,
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
+    "rm-branch": cmd_rm_branch,
     "show": cmd_show,
     "stash": cmd_stash,
     "status": cmd_status,

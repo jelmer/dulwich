@@ -1082,9 +1082,39 @@ class LogTests(PorcelainTestCase):
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
+        self.maxDiff = None
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream)
-        self.assertEqual(3, outstream.getvalue().count("-" * 50))
+        self.assertEqual(
+            outstream.getvalue(),
+            """\
+--------------------------------------------------
+commit: 4a3b887baa9ecb2d054d2469b628aef84e2d74f0
+merge: 7508036b1cfec5aa9cef0d5a7f04abcecfe09112
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+
+Commit 3
+
+--------------------------------------------------
+commit: 7508036b1cfec5aa9cef0d5a7f04abcecfe09112
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+
+Commit 2
+
+--------------------------------------------------
+commit: 11d3cf672a19366435c1983c7340b008ec6b8bf3
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+
+Commit 1
+
+""",
+        )
 
     def test_max_entries(self) -> None:
         c1, c2, c3 = build_commit_graph(
@@ -1094,6 +1124,28 @@ class LogTests(PorcelainTestCase):
         outstream = StringIO()
         porcelain.log(self.repo.path, outstream=outstream, max_entries=1)
         self.assertEqual(1, outstream.getvalue().count("-" * 50))
+
+    def test_no_revisions(self) -> None:
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream)
+        self.assertEqual("", outstream.getvalue())
+
+    def test_empty_message(self) -> None:
+        c1 = make_commit(message="")
+        self.repo.object_store.add_object(c1)
+        self.repo.refs[b"HEAD"] = c1.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream)
+        self.assertEqual(
+            outstream.getvalue(),
+            """\
+--------------------------------------------------
+commit: 4a7ad5552fad70647a81fb9a4a923ccefcca4b76
+Author: Test Author <test@nodomain.com>
+Committer: Test Committer <test@nodomain.com>
+Date:   Fri Jan 01 2010 00:00:00 +0000
+""",
+        )
 
 
 class ShowTests(PorcelainTestCase):

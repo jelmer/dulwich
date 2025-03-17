@@ -1376,17 +1376,17 @@ class TimezoneTests(TestCase):
         self.assertEqual((-4 * 60 * 60, False), parse_timezone(b"-0400"))
 
     def test_format_timezone_pdt_half(self) -> None:
-        self.assertEqual(b"-0440", format_timezone(int(((-4 * 60) - 40) * 60)))
+        self.assertEqual(b"-0440", format_timezone(((-4 * 60) - 40) * 60))
 
     def test_format_timezone_double_negative(self) -> None:
-        self.assertEqual(b"--700", format_timezone(int((7 * 60) * 60), True))
+        self.assertEqual(b"--700", format_timezone(((7 * 60) * 60), True))
 
     def test_parse_timezone_pdt_half(self) -> None:
         self.assertEqual((((-4 * 60) - 40) * 60, False), parse_timezone(b"-0440"))
 
     def test_parse_timezone_double_negative(self) -> None:
-        self.assertEqual((int((7 * 60) * 60), False), parse_timezone(b"+700"))
-        self.assertEqual((int((7 * 60) * 60), True), parse_timezone(b"--700"))
+        self.assertEqual((((7 * 60) * 60), False), parse_timezone(b"+700"))
+        self.assertEqual((((7 * 60) * 60), True), parse_timezone(b"--700"))
 
 
 class ShaFileCopyTests(TestCase):

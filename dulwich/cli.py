@@ -111,23 +111,6 @@ class cmd_rm(Command):
         porcelain.rm(".", paths=args.path)
 
 
-class cmd_rm_branch(Command):
-    def run(self, args) -> None:
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "branch",
-            type=str,
-            help="Name of the branch to remove",
-        )
-        args = parser.parse_args(args)
-        if not args.branch:
-            print("Usage: dulwich rm-branch BRANCH_NAME")
-            sys.exit(1)
-
-        r = Repo(".")
-        porcelain.branch_delete(r, name=args.branch)
-
-
 class cmd_fetch_pack(Command):
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
@@ -750,7 +733,7 @@ class cmd_check_mailmap(Command):
             print(canonical_identity)
 
 
-class cmd_create_branch(Command):
+class cmd_branch(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -758,19 +741,28 @@ class cmd_create_branch(Command):
             type=str,
             help="Name of the branch to create",
         )
+        parser.add_argument(
+            "-d",
+            "--delete",
+            action="store_true",
+            help="Delete branch",
+        )
         args = parser.parse_args(args)
         if not args.branch:
-            print("Usage: dulwich create-branch BRANCH_NAME")
+            print("Usage: dulwich branch [-d] BRANCH_NAME")
             sys.exit(1)
 
         r = Repo(".")
-        try:
-            porcelain.branch_create(r, name=args.branch)
-        except porcelain.Error as e:
-            print(f"{e}")
+        if args.delete:
+            porcelain.branch_delete(r, name=args.branch)
+        else:
+            try:
+                porcelain.branch_create(r, name=args.branch)
+            except porcelain.Error as e:
+                print(f"{e}")
 
 
-class cmd_checkout_branch(Command):
+class cmd_checkout(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -786,7 +778,7 @@ class cmd_checkout_branch(Command):
         )
         args = parser.parse_args(args)
         if not args.branch:
-            print("Usage: dulwich checkout-branch BRANCH_NAME [--force]")
+            print("Usage: dulwich checkout BRANCH_NAME [--force]")
             sys.exit(1)
 
         r = Repo(".")
@@ -873,10 +865,10 @@ For a list of supported commands, see 'dulwich help -a'.
 commands = {
     "add": cmd_add,
     "archive": cmd_archive,
+    "branch": cmd_branch,
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
-    "checkout-branch": cmd_checkout_branch,
-    "create-branch": cmd_create_branch,
+    "checkout": cmd_checkout,
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
@@ -906,7 +898,6 @@ commands = {
     "reset": cmd_reset,
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
-    "rm-branch": cmd_rm_branch,
     "show": cmd_show,
     "stash": cmd_stash,
     "status": cmd_status,

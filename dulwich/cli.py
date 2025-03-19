@@ -123,7 +123,7 @@ class cmd_rm_branch(Command):
         if not args.branch:
             print("Usage: dulwich rm-branch BRANCH_NAME")
             sys.exit(1)
-            
+
         r = Repo(".")
         porcelain.branch_delete(r, name=args.branch)
 
@@ -762,7 +762,7 @@ class cmd_create_branch(Command):
         if not args.branch:
             print("Usage: dulwich create-branch BRANCH_NAME")
             sys.exit(1)
-            
+
         r = Repo(".")
         try:
             porcelain.branch_create(r, name=args.branch)
@@ -788,7 +788,7 @@ class cmd_checkout_branch(Command):
         if not args.branch:
             print("Usage: dulwich checkout-branch BRANCH_NAME [--force]")
             sys.exit(1)
-            
+
         r = Repo(".")
         try:
             porcelain.checkout_branch(r, target=args.branch, force=args.force)

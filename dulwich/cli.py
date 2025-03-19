@@ -758,7 +758,8 @@ class cmd_branch(Command):
             try:
                 porcelain.branch_create(".", name=args.branch)
             except porcelain.Error as e:
-                print(f"{e}")
+                sys.stderr.write(f"{e}")
+                sys.exit(1)
 
 
 class cmd_checkout(Command):
@@ -783,7 +784,8 @@ class cmd_checkout(Command):
         try:
             porcelain.checkout_branch(".", target=args.branch, force=args.force)
         except porcelain.CheckoutError as e:
-            print(f"{e}")
+            sys.stderr.write(f"{e}\n")
+            sys.exit(1)
 
 
 class cmd_stash_list(Command):

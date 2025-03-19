@@ -429,7 +429,11 @@ class cmd_reset(Command):
             mode = "soft"
         elif "--mixed" in kwopts:
             mode = "mixed"
-        porcelain.reset(".", mode=mode)
+        try:
+            treeish = args.pop(0)
+        except IndexError:
+            treeish = None
+        porcelain.reset(".", mode=mode, treeish=treeish)
 
 
 class cmd_daemon(Command):
@@ -729,6 +733,61 @@ class cmd_check_mailmap(Command):
             print(canonical_identity)
 
 
+class cmd_branch(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "branch",
+            type=str,
+            help="Name of the branch",
+        )
+        parser.add_argument(
+            "-d",
+            "--delete",
+            action="store_true",
+            help="Delete branch",
+        )
+        args = parser.parse_args(args)
+        if not args.branch:
+            print("Usage: dulwich branch [-d] BRANCH_NAME")
+            sys.exit(1)
+
+        if args.delete:
+            porcelain.branch_delete(".", name=args.branch)
+        else:
+            try:
+                porcelain.branch_create(".", name=args.branch)
+            except porcelain.Error as e:
+                sys.stderr.write(f"{e}")
+                sys.exit(1)
+
+
+class cmd_checkout(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "branch",
+            type=str,
+            help="Name of the branch",
+        )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force checkout",
+        )
+        args = parser.parse_args(args)
+        if not args.branch:
+            print("Usage: dulwich checkout BRANCH_NAME [--force]")
+            sys.exit(1)
+
+        try:
+            porcelain.checkout_branch(".", target=args.branch, force=args.force)
+        except porcelain.CheckoutError as e:
+            sys.stderr.write(f"{e}\n")
+            sys.exit(1)
+
+
 class cmd_stash_list(Command):
     def run(self, args) -> None:
         parser = optparse.OptionParser()
@@ -806,8 +865,10 @@ For a list of supported commands, see 'dulwich help -a'.
 commands = {
     "add": cmd_add,
     "archive": cmd_archive,
+    "branch": cmd_branch,
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
+    "checkout": cmd_checkout,
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,

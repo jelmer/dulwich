@@ -739,7 +739,7 @@ class cmd_branch(Command):
         parser.add_argument(
             "branch",
             type=str,
-            help="Name of the branch to create",
+            help="Name of the branch",
         )
         parser.add_argument(
             "-d",
@@ -768,7 +768,7 @@ class cmd_checkout(Command):
         parser.add_argument(
             "branch",
             type=str,
-            help="Name of the branch to checkout",
+            help="Name of the branch",
         )
         parser.add_argument(
             "-f",

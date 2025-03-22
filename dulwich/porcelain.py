@@ -25,37 +25,37 @@ Currently implemented:
  * archive
  * add
  * branch{_create,_delete,_list}
- * check-ignore
+ * check_ignore
  * checkout_branch
  * clone
  * cone mode{_init, _set, _add}
  * commit
- * commit-tree
+ * commit_tree
  * daemon
  * describe
- * diff-tree
+ * diff_tree
  * fetch
- * for-each-ref
+ * for_each_ref
  * init
- * ls-files
- * ls-remote
- * ls-tree
+ * ls_files
+ * ls_remote
+ * ls_tree
  * pull
  * push
  * rm
  * remote{_add}
- * receive-pack
+ * receive_pack
  * reset
  * sparse_checkout
  * submodule_add
  * submodule_init
  * submodule_list
- * rev-list
+ * rev_list
  * tag{_create,_delete,_list}
- * upload-pack
- * update-server-info
+ * upload_pack
+ * update_server_info
  * status
- * symbolic-ref
+ * symbolic_ref
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.

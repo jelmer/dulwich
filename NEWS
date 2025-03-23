@@ -1,5 +1,12 @@
 0.22.9	UNRELEASED
 
+ * In dulwich.porcelain docstring, list functions by their Python identifiers.
+   (Marnanel Thurman)
+
+ * cli: add basic branch management commands (James Addison, #1514)
+
+ * Fix wheels workflow. (Jelmer Vernooĳ)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

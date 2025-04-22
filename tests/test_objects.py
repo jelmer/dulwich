@@ -617,11 +617,17 @@ class CommitParseTests(ShaFileCheckTests):
         )
         expected_time = datetime.datetime(2007, 3, 24, 22, 1, 59)
         self.assertEqual(
-            expected_time, datetime.datetime.utcfromtimestamp(c.commit_time)
+            expected_time,
+            datetime.datetime.fromtimestamp(
+                c.commit_time, datetime.timezone.utc
+            ).replace(tzinfo=None),
         )
         self.assertEqual(0, c.commit_timezone)
         self.assertEqual(
-            expected_time, datetime.datetime.utcfromtimestamp(c.author_time)
+            expected_time,
+            datetime.datetime.fromtimestamp(
+                c.author_time, datetime.timezone.utc
+            ).replace(tzinfo=None),
         )
         self.assertEqual(0, c.author_timezone)
         self.assertEqual(None, c.encoding)
@@ -1139,7 +1145,9 @@ class TagParseTests(ShaFileCheckTests):
         self.assertEqual(b"a38d6181ff27824c79fc7df825164a212eff6a3f", object_sha)
         self.assertEqual(Commit, object_type)
         self.assertEqual(
-            datetime.datetime.utcfromtimestamp(x.tag_time),
+            datetime.datetime.fromtimestamp(x.tag_time, datetime.timezone.utc).replace(
+                tzinfo=None
+            ),
             datetime.datetime(2007, 7, 1, 19, 54, 34),
         )
         self.assertEqual(-25200, x.tag_timezone)
@@ -1159,7 +1167,9 @@ class TagParseTests(ShaFileCheckTests):
             b"Linus Torvalds <torvalds@woody.linux-foundation.org>", x.tagger
         )
         self.assertEqual(
-            datetime.datetime.utcfromtimestamp(x.tag_time),
+            datetime.datetime.fromtimestamp(x.tag_time, datetime.timezone.utc).replace(
+                tzinfo=None
+            ),
             datetime.datetime(2007, 7, 1, 19, 54, 34),
         )
         self.assertEqual(-25200, x.tag_timezone)

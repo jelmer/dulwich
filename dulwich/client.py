@@ -1415,6 +1415,8 @@ class TraditionalGitClient(GitClient):
             if self.protocol_version == 2:
                 proto.write_pkt_line(b"command=fetch\n")
                 proto.write(b"0001")  # delim-pkt
+                if CAPABILITY_THIN_PACK in self._fetch_capabilities:
+                    proto.write(pkt_line(b"thin-pack\n"))
                 if (
                     find_capability(
                         negotiated_capabilities, CAPABILITY_FETCH, CAPABILITY_FILTER
@@ -2693,6 +2695,8 @@ class AbstractHttpGitClient(GitClient):
         )
         if self.protocol_version == 2:
             data = pkt_line(b"command=fetch\n") + b"0001"
+            if CAPABILITY_THIN_PACK in self._fetch_capabilities:
+                data += pkt_line(b"thin-pack\n")
             if (
                 find_capability(
                     negotiated_capabilities, CAPABILITY_FETCH, CAPABILITY_FILTER

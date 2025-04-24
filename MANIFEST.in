@@ -1,12 +1,11 @@
 include NEWS
 include AUTHORS
 include README.rst
-include README.swift.rst
 include Makefile
 include COPYING
 include CONTRIBUTING.rst
 include TODO
-include setup.cfg
+include dulwich/contrib/README.swift.rst
 include dulwich/stdint.h
 include dulwich/py.typed
 recursive-include docs conf.py *.txt Makefile make.bat

@@ -75,5 +75,4 @@ setup(
     package_data={"": ["py.typed"]},
     rust_extensions=rust_extensions,
     setup_requires=setup_requires,
-    tests_require=tests_require,
 )

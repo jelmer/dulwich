@@ -208,7 +208,7 @@ def nocompat_test_suite():
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
     result.addTests(tutorial_test_suite())
-    from dulwich.contrib import test_suite as contrib_test_suite
+    from .contrib import test_suite as contrib_test_suite
 
     result.addTests(contrib_test_suite())
     return result

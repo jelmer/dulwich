@@ -20,7 +20,13 @@
 
 """Tests for dulwich.graph."""
 
-from dulwich.graph import WorkList, _find_lcas, can_fast_forward
+from dulwich.graph import (
+    WorkList,
+    _find_lcas,
+    can_fast_forward,
+    find_merge_base,
+    find_octopus_base,
+)
 from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import make_commit
 
@@ -168,6 +174,84 @@ class FindMergeBaseTests(TestCase):
         self.assertEqual(set(lcas), {"2"})
 
 
+class FindMergeBaseFunctionTests(TestCase):
+    def test_find_merge_base_empty(self) -> None:
+        r = MemoryRepo()
+        # Empty list of commits
+        self.assertEqual([], find_merge_base(r, []))
+
+    def test_find_merge_base_single(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        r.object_store.add_objects([(base, None)])
+        # Single commit returns itself
+        self.assertEqual([base.id], find_merge_base(r, [base.id]))
+
+    def test_find_merge_base_identical(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        r.object_store.add_objects([(base, None)])
+        # When the same commit is in both positions
+        self.assertEqual([base.id], find_merge_base(r, [base.id, base.id]))
+
+    def test_find_merge_base_linear(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        c1 = make_commit(parents=[base.id])
+        c2 = make_commit(parents=[c1.id])
+        r.object_store.add_objects([(base, None), (c1, None), (c2, None)])
+        # Base of c1 and c2 is c1
+        self.assertEqual([c1.id], find_merge_base(r, [c1.id, c2.id]))
+        # Base of c2 and c1 is c1
+        self.assertEqual([c1.id], find_merge_base(r, [c2.id, c1.id]))
+
+    def test_find_merge_base_diverged(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        c1 = make_commit(parents=[base.id])
+        c2a = make_commit(parents=[c1.id], message=b"2a")
+        c2b = make_commit(parents=[c1.id], message=b"2b")
+        r.object_store.add_objects([(base, None), (c1, None), (c2a, None), (c2b, None)])
+        # Merge base of two diverged commits is their common parent
+        self.assertEqual([c1.id], find_merge_base(r, [c2a.id, c2b.id]))
+
+
+class FindOctopusBaseTests(TestCase):
+    def test_find_octopus_base_empty(self) -> None:
+        r = MemoryRepo()
+        # Empty list of commits
+        self.assertEqual([], find_octopus_base(r, []))
+
+    def test_find_octopus_base_single(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        r.object_store.add_objects([(base, None)])
+        # Single commit returns itself
+        self.assertEqual([base.id], find_octopus_base(r, [base.id]))
+
+    def test_find_octopus_base_two_commits(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        c1 = make_commit(parents=[base.id])
+        c2 = make_commit(parents=[c1.id])
+        r.object_store.add_objects([(base, None), (c1, None), (c2, None)])
+        # With two commits it should call find_merge_base
+        self.assertEqual([c1.id], find_octopus_base(r, [c1.id, c2.id]))
+
+    def test_find_octopus_base_multiple(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        c1 = make_commit(parents=[base.id])
+        c2a = make_commit(parents=[c1.id], message=b"2a")
+        c2b = make_commit(parents=[c1.id], message=b"2b")
+        c2c = make_commit(parents=[c1.id], message=b"2c")
+        r.object_store.add_objects(
+            [(base, None), (c1, None), (c2a, None), (c2b, None), (c2c, None)]
+        )
+        # Common ancestor of all three branches
+        self.assertEqual([c1.id], find_octopus_base(r, [c2a.id, c2b.id, c2c.id]))
+
+
 class CanFastForwardTests(TestCase):
     def test_ff(self) -> None:
         r = MemoryRepo()
@@ -207,3 +291,33 @@ class WorkListTest(TestCase):
         wlst.add((150, "Test Value 4"))
         self.assertEqual(wlst.get(), (150, "Test Value 4"))
         self.assertEqual(wlst.get(), (50, "Test Value 2"))
+
+    def test_WorkList_iter(self) -> None:
+        # Test the iter method of WorkList
+        wlst = WorkList()
+        wlst.add((100, "Value 1"))
+        wlst.add((200, "Value 2"))
+        wlst.add((50, "Value 3"))
+
+        # Collect all items from iter
+        items = list(wlst.iter())
+
+        # Items should be in their original order, not sorted
+        self.assertEqual(len(items), 3)
+
+        # Check the values are present with correct timestamps
+        timestamps = [dt for dt, _ in items]
+        values = [val for _, val in items]
+
+        self.assertIn(100, timestamps)
+        self.assertIn(200, timestamps)
+        self.assertIn(50, timestamps)
+        self.assertIn("Value 1", values)
+        self.assertIn("Value 2", values)
+        self.assertIn("Value 3", values)
+
+    def test_WorkList_empty_get(self) -> None:
+        # Test getting from an empty WorkList
+        wlst = WorkList()
+        with self.assertRaises(IndexError):
+            wlst.get()

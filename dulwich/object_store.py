@@ -1577,12 +1577,20 @@ class OverlayObjectStore(BaseObjectStore):
         self, shas: Iterable[bytes], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         todo = set(shas)
+        found: set[bytes] = set()
+
         for b in self.bases:
-            for o in b.iterobjects_subset(todo, allow_missing=True):
+            # Create a copy of todo for each base to avoid modifying
+            # the set while iterating through it
+            current_todo = todo - found
+            for o in b.iterobjects_subset(current_todo, allow_missing=True):
                 yield o
-                todo.remove(o.id)
-        if todo and not allow_missing:
-            raise KeyError(o.id)
+                found.add(o.id)
+
+        # Check for any remaining objects not found
+        missing = todo - found
+        if missing and not allow_missing:
+            raise KeyError(next(iter(missing)))
 
     def iter_unpacked_subset(
         self,

@@ -43,3 +43,46 @@ class LFSTests(TestCase):
 
     def test_missing(self) -> None:
         self.assertRaises(KeyError, self.lfs.open_object, "abcdeabcdeabcdeabcde")
+
+    def test_write_object_empty(self) -> None:
+        """Test writing an empty object."""
+        sha = self.lfs.write_object([])
+        with self.lfs.open_object(sha) as f:
+            self.assertEqual(b"", f.read())
+
+    def test_write_object_multiple_chunks(self) -> None:
+        """Test writing an object with multiple chunks."""
+        chunks = [b"chunk1", b"chunk2", b"chunk3"]
+        sha = self.lfs.write_object(chunks)
+        with self.lfs.open_object(sha) as f:
+            self.assertEqual(b"".join(chunks), f.read())
+
+    def test_sha_path_calculation(self) -> None:
+        """Test the internal sha path calculation."""
+        # The implementation splits the sha into parts for directory structure
+        # Write and verify we can read it back
+        sha = self.lfs.write_object([b"test data"])
+        self.assertEqual(len(sha), 64)  # SHA-256 is 64 hex chars
+
+        # Open should succeed, which verifies the path calculation works
+        with self.lfs.open_object(sha) as f:
+            self.assertEqual(b"test data", f.read())
+
+    def test_create_lfs_dir(self) -> None:
+        """Test creating an LFS directory when it doesn't exist."""
+        import os
+
+        # Create a temporary directory for the test
+        lfs_parent_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, lfs_parent_dir)
+
+        # Create a path for the LFS directory
+        lfs_dir = os.path.join(lfs_parent_dir, "lfs")
+
+        # Create the LFS store
+        LFSStore.create(lfs_dir)
+
+        # Verify the directories were created
+        self.assertTrue(os.path.isdir(lfs_dir))
+        self.assertTrue(os.path.isdir(os.path.join(lfs_dir, "tmp")))
+        self.assertTrue(os.path.isdir(os.path.join(lfs_dir, "objects")))

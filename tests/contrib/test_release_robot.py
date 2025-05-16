@@ -30,7 +30,7 @@ import tempfile
 import time
 import unittest
 from typing import ClassVar, Optional
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from dulwich.contrib import release_robot
 from dulwich.repo import Repo
@@ -64,6 +64,19 @@ class TagPatternTests(unittest.TestCase):
         for testcase, version in test_cases.items():
             matches = re.match(release_robot.PATTERN, testcase)
             self.assertEqual(matches.group(1), version)
+
+    def test_pattern_no_match(self) -> None:
+        """Test tags that don't match the pattern."""
+        test_cases = [
+            "master",
+            "HEAD",
+            "feature-branch",
+            "no-numbers",
+            "_",
+        ]
+        for testcase in test_cases:
+            matches = re.match(release_robot.PATTERN, testcase)
+            self.assertIsNone(matches)
 
 
 class GetRecentTagsTest(unittest.TestCase):
@@ -140,6 +153,33 @@ class GetRecentTagsTest(unittest.TestCase):
             self.assertEqual(metadata[3][1].encode("utf-8"), tag_obj[1])
             self.assertEqual(metadata[3][2].encode("utf-8"), tag)
 
+    def test_get_recent_tags_sorting(self) -> None:
+        """Test that tags are sorted by commit time from newest to oldest."""
+        tags = release_robot.get_recent_tags(self.projdir)
+        # v0.1 should be first as it's newer
+        self.assertEqual(tags[0][0], "v0.1")
+        # v0.1a should be second as it's older
+        self.assertEqual(tags[1][0], "v0.1a")
+
+    def test_get_recent_tags_non_tag_refs(self) -> None:
+        """Test that non-tag refs are ignored."""
+        # Create a commit on a branch to test that it's not included
+        branch_commit = make_commit(
+            message=b"branch commit",
+            author=self.committer,
+            commit_time=int(time.time()),
+        )
+        self.repo.object_store.add_object(branch_commit)
+        self.repo[b"refs/heads/test-branch"] = branch_commit.id
+
+        # Get tags and ensure only the actual tags are returned
+        tags = release_robot.get_recent_tags(self.projdir)
+        self.assertEqual(len(tags), 2)  # Still only 2 tags
+        tag_names = [tag[0] for tag in tags]
+        self.assertIn("v0.1", tag_names)
+        self.assertIn("v0.1a", tag_names)
+        self.assertNotIn("test-branch", tag_names)
+
 
 class GetCurrentVersionTests(unittest.TestCase):
     """Test get_current_version function."""
@@ -212,6 +252,46 @@ class GetCurrentVersionTests(unittest.TestCase):
         custom_pattern = r"CUSTOM-([\d\.]+)"
         result = release_robot.get_current_version(self.projdir, pattern=custom_pattern)
         self.assertEqual("99.88.77", result)
+
+    def test_with_logger_debug_call(self):
+        """Test that the logger.debug method is actually called."""
+        # Create a test commit and tag that won't match the pattern
+        c = make_commit(message=b"Test commit")
+        self.repo.object_store.add_object(c)
+        self.repo[b"refs/tags/no-version-tag"] = c.id
+        self.repo[b"HEAD"] = c.id
+
+        # Create a mock logger
+        mock_logger = MagicMock()
+
+        # Test with the mock logger
+        result = release_robot.get_current_version(self.projdir, logger=mock_logger)
+
+        # Verify logger.debug was called
+        mock_logger.debug.assert_called_once()
+        # Check the tag name is in the debug message
+        self.assertIn("no-version-tag", mock_logger.debug.call_args[0][2])
+
+        # The result should still be the full tag
+        self.assertEqual("no-version-tag", result)
+
+    def test_multiple_tags(self):
+        """Test behavior with multiple tags to ensure we get the most recent."""
+        # Create multiple commits and tags with different timestamps
+        c1 = make_commit(message=b"First commit", commit_time=1000)
+        c2 = make_commit(message=b"Second commit", commit_time=2000, parents=[c1.id])
+
+        self.repo.object_store.add_object(c1)
+        self.repo.object_store.add_object(c2)
+
+        # Add tags with older commit first
+        self.repo[b"refs/tags/v0.9.0"] = c1.id
+        self.repo[b"refs/tags/v1.0.0"] = c2.id
+        self.repo[b"HEAD"] = c2.id
+
+        # Get the current version - should be from the most recent commit
+        result = release_robot.get_current_version(self.projdir)
+        self.assertEqual("1.0.0", result)
 
 
 class MainFunctionTests(unittest.TestCase):

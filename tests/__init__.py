@@ -119,6 +119,7 @@ def self_test_suite():
         "blackbox",
         "bundle",
         "client",
+        "cloud_gcs",
         "config",
         "credentials",
         "diff_tree",

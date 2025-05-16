@@ -21,13 +21,16 @@
 """Tests for release_robot."""
 
 import datetime
+import logging
 import os
 import re
 import shutil
+import sys
 import tempfile
 import time
 import unittest
 from typing import ClassVar, Optional
+from unittest.mock import patch
 
 from dulwich.contrib import release_robot
 from dulwich.repo import Repo
@@ -136,3 +139,146 @@ class GetRecentTagsTest(unittest.TestCase):
             self.assertEqual(metadata[3][0], gmtime_to_datetime(tag_obj[0]))
             self.assertEqual(metadata[3][1].encode("utf-8"), tag_obj[1])
             self.assertEqual(metadata[3][2].encode("utf-8"), tag)
+
+
+class GetCurrentVersionTests(unittest.TestCase):
+    """Test get_current_version function."""
+
+    def setUp(self):
+        """Set up a test repository for each test."""
+        self.projdir = tempfile.mkdtemp()
+        self.repo = Repo.init(self.projdir)
+        self.addCleanup(self.cleanup)
+
+    def cleanup(self):
+        """Clean up after test."""
+        self.repo.close()
+        shutil.rmtree(self.projdir)
+
+    def test_no_tags(self):
+        """Test behavior when repo has no tags."""
+        # Create a repo with no tags
+        result = release_robot.get_current_version(self.projdir)
+        self.assertIsNone(result)
+
+    def test_tag_with_pattern_match(self):
+        """Test with a tag that matches the pattern."""
+        # Create a test commit and tag
+        c = make_commit(message=b"Test commit")
+        self.repo.object_store.add_object(c)
+        self.repo[b"refs/tags/v1.2.3"] = c.id
+        self.repo[b"HEAD"] = c.id
+
+        # Test that the version is extracted correctly
+        result = release_robot.get_current_version(self.projdir)
+        self.assertEqual("1.2.3", result)
+
+    def test_tag_no_pattern_match(self):
+        """Test with a tag that doesn't match the pattern."""
+        # Create a test commit and tag that won't match the default pattern
+        c = make_commit(message=b"Test commit")
+        self.repo.object_store.add_object(c)
+        self.repo[b"refs/tags/no-version-tag"] = c.id
+        self.repo[b"HEAD"] = c.id
+
+        # Test that the full tag is returned when no match
+        result = release_robot.get_current_version(self.projdir)
+        self.assertEqual("no-version-tag", result)
+
+    def test_with_logger(self):
+        """Test with a logger when regex match fails."""
+        # Create a test commit and tag that won't match the pattern
+        c = make_commit(message=b"Test commit")
+        self.repo.object_store.add_object(c)
+        self.repo[b"refs/tags/no-version-tag"] = c.id
+        self.repo[b"HEAD"] = c.id
+
+        # Create a logger
+        logger = logging.getLogger("test_logger")
+
+        # Test with the logger
+        result = release_robot.get_current_version(self.projdir, logger=logger)
+        self.assertEqual("no-version-tag", result)
+
+    def test_custom_pattern(self):
+        """Test with a custom regex pattern."""
+        # Create a test commit and tag
+        c = make_commit(message=b"Test commit")
+        self.repo.object_store.add_object(c)
+        self.repo[b"refs/tags/CUSTOM-99.88.77"] = c.id
+        self.repo[b"HEAD"] = c.id
+
+        # Test with a custom pattern
+        custom_pattern = r"CUSTOM-([\d\.]+)"
+        result = release_robot.get_current_version(self.projdir, pattern=custom_pattern)
+        self.assertEqual("99.88.77", result)
+
+
+class MainFunctionTests(unittest.TestCase):
+    """Test the __main__ block."""
+
+    def setUp(self):
+        """Set up a test repository."""
+        self.projdir = tempfile.mkdtemp()
+        self.repo = Repo.init(self.projdir)
+        # Create a test commit and tag
+        c = make_commit(message=b"Test commit")
+        self.repo.object_store.add_object(c)
+        self.repo[b"refs/tags/v3.2.1"] = c.id
+        self.repo[b"HEAD"] = c.id
+        self.addCleanup(self.cleanup)
+
+    def cleanup(self):
+        """Clean up after test."""
+        self.repo.close()
+        shutil.rmtree(self.projdir)
+
+    @patch.object(sys, "argv", ["release_robot.py"])
+    @patch("builtins.print")
+    def test_main_default_dir(self, mock_print):
+        """Test main function with default directory."""
+        # Run the __main__ block code with mocked environment
+        module_globals = {
+            "__name__": "__main__",
+            "sys": sys,
+            "get_current_version": lambda projdir: "3.2.1",
+            "PROJDIR": ".",
+        }
+        exec(
+            compile(
+                "if __name__ == '__main__':\n    if len(sys.argv) > 1:\n        _PROJDIR = sys.argv[1]\n    else:\n        _PROJDIR = PROJDIR\n    print(get_current_version(projdir=_PROJDIR))",
+                "<string>",
+                "exec",
+            ),
+            module_globals,
+        )
+
+        # Check that print was called with the version
+        mock_print.assert_called_once_with("3.2.1")
+
+    @patch.object(sys, "argv", ["release_robot.py", "/custom/path"])
+    @patch("builtins.print")
+    @patch("dulwich.contrib.release_robot.get_current_version")
+    def test_main_custom_dir(self, mock_get_version, mock_print):
+        """Test main function with custom directory from command line."""
+        mock_get_version.return_value = "4.5.6"
+
+        # Run the __main__ block code with mocked environment
+        module_globals = {
+            "__name__": "__main__",
+            "sys": sys,
+            "get_current_version": mock_get_version,
+            "PROJDIR": ".",
+        }
+        exec(
+            compile(
+                "if __name__ == '__main__':\n    if len(sys.argv) > 1:\n        _PROJDIR = sys.argv[1]\n    else:\n        _PROJDIR = PROJDIR\n    print(get_current_version(projdir=_PROJDIR))",
+                "<string>",
+                "exec",
+            ),
+            module_globals,
+        )
+
+        # Check that get_current_version was called with the right arg
+        mock_get_version.assert_called_once_with(projdir="/custom/path")
+        mock_print.assert_called_once_with("4.5.6")

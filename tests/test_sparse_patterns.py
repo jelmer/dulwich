@@ -130,6 +130,54 @@ class MatchGitignorePatternsTests(TestCase):
         self.assertTrue(match_gitignore_patterns("some/foo", parsed))
         self.assertFalse(match_gitignore_patterns("some/bar", parsed))
 
+    def test_anchored_empty_pattern(self):
+        """Test handling of empty pattern with anchoring (e.g., '/')."""
+        parsed = parse_sparse_patterns(["/"])
+        # Check the structure of the parsed empty pattern first
+        self.assertEqual(parsed, [("", False, False, True)])
+        # When the pattern is empty with anchoring, it's continued (skipped) in match_gitignore_patterns
+        # for non-empty paths but for empty string it might match due to empty string comparisons
+        self.assertFalse(match_gitignore_patterns("foo", parsed))
+        # An empty string with empty pattern will match (implementation detail)
+        self.assertTrue(match_gitignore_patterns("", parsed))
+
+    def test_anchored_dir_only_exact_match(self):
+        """Test anchored directory-only patterns with exact matching."""
+        parsed = parse_sparse_patterns(["/docs/"])
+        # Test with exact match "docs" and path_is_dir=True
+        self.assertTrue(match_gitignore_patterns("docs", parsed, path_is_dir=True))
+        # Test with "docs/" (exact match + trailing slash)
+        self.assertTrue(match_gitignore_patterns("docs/", parsed, path_is_dir=True))
+
+    def test_complex_anchored_patterns(self):
+        """Test more complex anchored pattern matching."""
+        parsed = parse_sparse_patterns(["/dir/subdir"])
+        # Test exact match
+        self.assertTrue(match_gitignore_patterns("dir/subdir", parsed))
+        # Test subdirectory path
+        self.assertTrue(match_gitignore_patterns("dir/subdir/file.txt", parsed))
+        # Test non-matching path
+        self.assertFalse(match_gitignore_patterns("otherdir/subdir", parsed))
+
+    def test_pattern_matching_edge_cases(self):
+        """Test various edge cases in pattern matching."""
+        # Test exact equality with an anchored pattern
+        parsed = parse_sparse_patterns(["/foo"])
+        self.assertTrue(match_gitignore_patterns("foo", parsed))
+
+        # Test with path_is_dir=True
+        self.assertTrue(match_gitignore_patterns("foo", parsed, path_is_dir=True))
+
+        # Test exact match with pattern with dir_only=True
+        parsed = parse_sparse_patterns(["/bar/"])
+        self.assertTrue(match_gitignore_patterns("bar", parsed, path_is_dir=True))
+
+        # Test startswith match for anchored pattern
+        parsed = parse_sparse_patterns(["/prefix"])
+        self.assertTrue(
+            match_gitignore_patterns("prefix/subdirectory/file.txt", parsed)
+        )
+
 
 class ComputeIncludedPathsFullTests(TestCase):
     """Test compute_included_paths_full using a real ephemeral repo index."""
@@ -161,6 +209,16 @@ class ComputeIncludedPathsFullTests(TestCase):
         ]
         included = compute_included_paths_full(self.repo, lines)
         self.assertEqual(included, {"foo.py", "docs/readme"})
+
+    def test_full_with_utf8_paths(self):
+        """Test that UTF-8 encoded paths are handled correctly."""
+        self._add_file_to_index("unicode/文件.txt", b"unicode content")
+        self._add_file_to_index("unicode/другой.md", b"more unicode")
+
+        # Include all text files
+        lines = ["*.txt"]
+        included = compute_included_paths_full(self.repo, lines)
+        self.assertEqual(included, {"unicode/文件.txt"})
 
 
 class ComputeIncludedPathsConeTests(TestCase):
@@ -201,6 +259,21 @@ class ComputeIncludedPathsConeTests(TestCase):
         # subdirs => excluded, except docs/
         self.assertEqual(included, {"topfile", "docs/readme.md"})
 
+    def test_cone_mode_with_empty_pattern(self):
+        """Test cone mode with an empty reinclude directory."""
+        self._add_file_to_index("topfile", b"hi")
+        self._add_file_to_index("docs/readme.md", b"stuff")
+
+        # Include an empty pattern that should be skipped
+        lines = [
+            "/*",
+            "!/*/",
+            "/",  # This empty pattern should be skipped
+        ]
+        included = compute_included_paths_cone(self.repo, lines)
+        # Only topfile should be included since the empty pattern is skipped
+        self.assertEqual(included, {"topfile"})
+
     def test_no_exclude_subdirs(self):
         """If lines never specify '!/*/', we include everything by default."""
         self._add_file_to_index("topfile", b"hi")
@@ -217,6 +290,30 @@ class ComputeIncludedPathsConeTests(TestCase):
             included,
             {"topfile", "docs/readme.md", "lib/code.py"},
         )
+
+    def test_only_reinclude_dirs(self):
+        """Test cone mode when only reinclude directories are specified."""
+        self._add_file_to_index("topfile", b"hi")
+        self._add_file_to_index("docs/readme.md", b"stuff")
+        self._add_file_to_index("lib/code.py", b"stuff")
+
+        # Only specify reinclude_dirs, need to explicitly exclude subdirs
+        lines = ["!/*/", "/docs/"]
+        included = compute_included_paths_cone(self.repo, lines)
+        # Only docs/* should be included, not topfile or lib/*
+        self.assertEqual(included, {"docs/readme.md"})
+
+    def test_exclude_subdirs_no_toplevel(self):
+        """Test with exclude_subdirs but without toplevel files."""
+        self._add_file_to_index("topfile", b"hi")
+        self._add_file_to_index("docs/readme.md", b"stuff")
+        self._add_file_to_index("lib/code.py", b"stuff")
+
+        # Only exclude subdirs and reinclude docs
+        lines = ["!/*/", "/docs/"]
+        included = compute_included_paths_cone(self.repo, lines)
+        # Only docs/* should be included since we didn't include top level
+        self.assertEqual(included, {"docs/readme.md"})
 
 
 class DetermineIncludedPathsTests(TestCase):
@@ -357,3 +454,77 @@ class ApplyIncludedPathsTests(TestCase):
             apply_included_paths(
                 self.repo, included_paths={"missing_file"}, force=False
             )
+
+    def test_directory_removal(self):
+        """Test handling of directories when removing excluded files."""
+        # Create a directory with a file
+        dir_path = os.path.join(self.temp_dir, "dir")
+        os.makedirs(dir_path, exist_ok=True)
+        self._commit_blob("dir/file.txt", b"content")
+
+        # Make sure it exists before we proceed
+        self.assertTrue(os.path.exists(os.path.join(dir_path, "file.txt")))
+
+        # Exclude everything
+        apply_included_paths(self.repo, included_paths=set(), force=True)
+
+        # The file should be removed, but the directory might remain
+        self.assertFalse(os.path.exists(os.path.join(dir_path, "file.txt")))
+
+        # Test when file is actually a directory - should hit the IsADirectoryError case
+        another_dir_path = os.path.join(self.temp_dir, "another_dir")
+        os.makedirs(another_dir_path, exist_ok=True)
+        self._commit_blob("another_dir/subfile.txt", b"content")
+
+        # Create a path with the same name as the file but make it a dir to trigger IsADirectoryError
+        subfile_dir_path = os.path.join(another_dir_path, "subfile.txt")
+        if os.path.exists(subfile_dir_path):
+            # Remove any existing file first
+            os.remove(subfile_dir_path)
+        os.makedirs(subfile_dir_path, exist_ok=True)
+
+        # Attempt to apply sparse checkout, should trigger IsADirectoryError but not fail
+        apply_included_paths(self.repo, included_paths=set(), force=True)
+
+    def test_handling_removed_files(self):
+        """Test that files already removed from disk are handled correctly during exclusion."""
+        self._commit_blob("test_file.txt", b"test content")
+        # Remove the file manually
+        os.remove(os.path.join(self.temp_dir, "test_file.txt"))
+
+        # Should not raise any errors when excluding this file
+        apply_included_paths(self.repo, included_paths=set(), force=True)
+
+        # Verify skip-worktree bit is set in index
+        idx = self.repo.open_index()
+        self.assertTrue(idx[b"test_file.txt"].skip_worktree)
+
+    def test_local_modifications_ioerror(self):
+        """Test handling of IOError when checking for local modifications."""
+        self._commit_blob("special_file.txt", b"content")
+        file_path = os.path.join(self.temp_dir, "special_file.txt")
+
+        # Make the file unreadable
+        os.chmod(file_path, 0)
+
+        # Add a cleanup that checks if file exists first
+        def safe_chmod_cleanup():
+            if os.path.exists(file_path):
+                try:
+                    os.chmod(file_path, 0o644)
+                except (FileNotFoundError, PermissionError):
+                    pass
+
+        self.addCleanup(safe_chmod_cleanup)
+
+        # Should raise conflict error with unreadable file and force=False
+        with self.assertRaises(SparseCheckoutConflictError):
+            apply_included_paths(self.repo, included_paths=set(), force=False)
+
+        # With force=True, should remove the file anyway
+        apply_included_paths(self.repo, included_paths=set(), force=True)
+
+        # Verify file is gone and skip-worktree bit is set
+        self.assertFalse(os.path.exists(file_path))
+        idx = self.repo.open_index()
+        self.assertTrue(idx[b"special_file.txt"].skip_worktree)

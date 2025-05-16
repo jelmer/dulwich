@@ -24,6 +24,7 @@ def test_suite():
     import unittest
 
     names = [
+        "diffstat",
         "paramiko_vendor",
         "release_robot",
         "swift",

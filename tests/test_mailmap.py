@@ -99,3 +99,70 @@ class MailmapTests(TestCase):
             b"Some Dude <some@dude.xx>", m.lookup(b"nick1 <bugs@company.xx>")
         )
         self.assertEqual(b"CTO <cto@company.xx>", m.lookup(b"CTO <cto@coompany.xx>"))
+
+    def test_lookup_with_identity_tuple(self) -> None:
+        """Test lookup using an identity tuple instead of a string."""
+        m = Mailmap()
+        m.add_entry(
+            (b"Real Name", b"real@example.com"), (b"Alias", b"alias@example.com")
+        )
+
+        # Test lookup with a tuple
+        self.assertEqual(
+            (b"Real Name", b"real@example.com"),
+            m.lookup((b"Alias", b"alias@example.com")),
+        )
+
+        # Test lookup with another tuple that doesn't match anything
+        self.assertEqual(
+            (b"Unknown", b"unknown@example.com"),
+            m.lookup((b"Unknown", b"unknown@example.com")),
+        )
+
+    def test_lookup_with_no_match(self) -> None:
+        """Test lookup when no match is found."""
+        m = Mailmap()
+        m.add_entry(
+            (b"Real Name", b"real@example.com"), (b"Alias", b"alias@example.com")
+        )
+
+        # No match should return the original identity
+        original = b"Unknown <unknown@example.com>"
+        self.assertEqual(original, m.lookup(original))
+
+    def test_lookup_partial_matches(self) -> None:
+        """Test lookup with partial matches (name or email only)."""
+        m = Mailmap()
+        # Add entry with only name
+        m.add_entry((b"Real Name", None), (b"Any Name", None))
+        # Add entry with only email
+        m.add_entry((None, b"real@example.com"), (None, b"other@example.com"))
+
+        # Match by name
+        self.assertEqual(
+            b"Real Name <any@example.com>", m.lookup(b"Any Name <any@example.com>")
+        )
+
+        # Match by email
+        self.assertEqual(
+            b"Any Name <real@example.com>", m.lookup(b"Any Name <other@example.com>")
+        )
+
+    def test_add_entry_name_or_email_only(self) -> None:
+        """Test adding entries with only name or only email."""
+        m = Mailmap()
+
+        # Entry with only canonical name
+        m.add_entry((b"Real Name", None), (b"Alias", b"alias@example.com"))
+
+        # Entry with only canonical email
+        m.add_entry((None, b"real@example.com"), (b"Other", b"other@example.com"))
+
+        # Lookup should properly combine the identity parts
+        self.assertEqual(
+            b"Real Name <alias@example.com>", m.lookup(b"Alias <alias@example.com>")
+        )
+
+        self.assertEqual(
+            b"Other <real@example.com>", m.lookup(b"Other <other@example.com>")
+        )

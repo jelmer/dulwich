@@ -135,7 +135,7 @@ def get_current_version(projdir=PROJDIR, pattern=PATTERN, logger=None):
         current_version = matches.group(1)
     except (IndexError, AttributeError) as err:
         if logger:
-            logger.exception(err)
+            logger.debug("Pattern %r didn't match tag %r: %s", pattern, tag, err)
         return tag
     return current_version
 

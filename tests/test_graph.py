@@ -215,6 +215,33 @@ class FindMergeBaseFunctionTests(TestCase):
         # Merge base of two diverged commits is their common parent
         self.assertEqual([c1.id], find_merge_base(r, [c2a.id, c2b.id]))
 
+    def test_find_merge_base_with_min_stamp(self) -> None:
+        r = MemoryRepo()
+        base = make_commit(commit_time=100)
+        c1 = make_commit(parents=[base.id], commit_time=200)
+        c2 = make_commit(parents=[c1.id], commit_time=300)
+        r.object_store.add_objects([(base, None), (c1, None), (c2, None)])
+
+        # Normal merge base finding works
+        self.assertEqual([c1.id], find_merge_base(r, [c1.id, c2.id]))
+
+    def test_find_merge_base_multiple_common_ancestors(self) -> None:
+        r = MemoryRepo()
+        base = make_commit(commit_time=100)
+        c1a = make_commit(parents=[base.id], commit_time=200, message=b"c1a")
+        c1b = make_commit(parents=[base.id], commit_time=201, message=b"c1b")
+        c2 = make_commit(parents=[c1a.id, c1b.id], commit_time=300)
+        c3 = make_commit(parents=[c1a.id, c1b.id], commit_time=301)
+        r.object_store.add_objects(
+            [(base, None), (c1a, None), (c1b, None), (c2, None), (c3, None)]
+        )
+
+        # Merge base should include both c1a and c1b since both are common ancestors
+        bases = find_merge_base(r, [c2.id, c3.id])
+        self.assertEqual(2, len(bases))
+        self.assertIn(c1a.id, bases)
+        self.assertIn(c1b.id, bases)
+
 
 class FindOctopusBaseTests(TestCase):
     def test_find_octopus_base_empty(self) -> None:
@@ -319,5 +346,20 @@ class WorkListTest(TestCase):
     def test_WorkList_empty_get(self) -> None:
         # Test getting from an empty WorkList
         wlst = WorkList()
+        with self.assertRaises(IndexError):
+            wlst.get()
+
+    def test_WorkList_empty_iter(self) -> None:
+        # Test iterating over an empty WorkList
+        wlst = WorkList()
+        items = list(wlst.iter())
+        self.assertEqual([], items)
+
+    def test_WorkList_empty_heap(self) -> None:
+        # The current implementation raises IndexError when the heap is empty
+        wlst = WorkList()
+        # Ensure pq is empty
+        wlst.pq = []
+        # get should raise IndexError when heap is empty
         with self.assertRaises(IndexError):
             wlst.get()

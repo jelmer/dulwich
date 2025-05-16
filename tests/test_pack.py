@@ -220,6 +220,35 @@ class TestPackDeltas(TestCase):
             ApplyDeltaError, apply_delta, b"", b"\x00\x80\x02\xb0\x11\x11"
         )
 
+    def test_apply_delta_invalid_opcode(self) -> None:
+        """Test apply_delta with an invalid opcode."""
+        # Create a delta with an invalid opcode (0xff is not valid)
+        invalid_delta = [b"\xff\x01\x02"]
+        base = b"test base"
+
+        # Should raise ApplyDeltaError
+        self.assertRaises(ApplyDeltaError, apply_delta, base, invalid_delta)
+
+    def test_create_delta_insert_only(self) -> None:
+        """Test create_delta when only insertions are required."""
+        base = b""
+        target = b"brand new content"
+        delta = list(create_delta(base, target))
+
+        # Apply the delta to verify it works correctly
+        result = apply_delta(base, delta)
+        self.assertEqual(target, b"".join(result))
+
+    def test_create_delta_copy_only(self) -> None:
+        """Test create_delta when only copy operations are required."""
+        base = b"content to be copied"
+        target = b"content to be copied"  # Identical to base
+        delta = list(create_delta(base, target))
+
+        # Apply the delta to verify
+        result = apply_delta(base, delta)
+        self.assertEqual(target, b"".join(result))
+
     def test_pypy_issue(self) -> None:
         # Test for https://github.com/jelmer/dulwich/issues/509 /
         # https://bitbucket.org/pypy/pypy/issues/2499/cpyext-pystring_asstring-doesnt-work
@@ -280,6 +309,23 @@ class TestPackData(PackTests):
     def test_index_check(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
             self.assertSucceeds(p.check)
+
+    def test_get_stored_checksum(self) -> None:
+        """Test getting the stored checksum of the pack data."""
+        with self.get_pack_data(pack1_sha) as p:
+            checksum = p.get_stored_checksum()
+            self.assertEqual(20, len(checksum))
+            # Verify it's a valid SHA1 hash (20 bytes)
+            self.assertIsInstance(checksum, bytes)
+
+    # Removed test_check_pack_data_size as it was accessing private attributes
+
+    def test_close_twice(self) -> None:
+        """Test that calling close multiple times is safe."""
+        p = self.get_pack_data(pack1_sha)
+        p.close()
+        # Second close should not raise an exception
+        p.close()
 
     def test_iter_unpacked(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
@@ -422,6 +468,8 @@ class TestPack(PackTests):
             self.assertEqual(expected, set(list(tuples)))
             self.assertEqual(3, len(tuples))
 
+    # Removed test_pack_tuples_with_progress as it was using parameters not supported by the API
+
     def test_get_object_at(self) -> None:
         """Tests random access for non-delta objects."""
         with self.get_pack(pack1_sha) as p:
@@ -541,6 +589,32 @@ class TestPack(PackTests):
             objs = {o.id: o for o in p.iterobjects_subset([commit_sha])}
             self.assertEqual(1, len(objs))
             self.assertIsInstance(objs[commit_sha], Commit)
+
+    def test_iterobjects_subset_empty(self) -> None:
+        """Test iterobjects_subset with an empty subset."""
+        with self.get_pack(pack1_sha) as p:
+            objs = list(p.iterobjects_subset([]))
+            self.assertEqual(0, len(objs))
+
+    def test_iterobjects_subset_nonexistent(self) -> None:
+        """Test iterobjects_subset with non-existent object IDs."""
+        with self.get_pack(pack1_sha) as p:
+            # Create a fake SHA that doesn't exist in the pack
+            fake_sha = b"1" * 40
+
+            # KeyError is expected when trying to access a non-existent object
+            # We'll use a try-except block to test the behavior
+            try:
+                list(p.iterobjects_subset([fake_sha]))
+                self.fail("Expected KeyError when accessing non-existent object")
+            except KeyError:
+                pass  # This is the expected behavior
+
+    def test_check_length_and_checksum(self) -> None:
+        """Test that check_length_and_checksum works correctly."""
+        with self.get_pack(pack1_sha) as p:
+            # This should not raise an exception
+            p.check_length_and_checksum()
 
 
 class TestThinPack(PackTests):
@@ -802,6 +876,32 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
     def tearDown(self) -> None:
         TestCase.tearDown(self)
         BaseTestFilePackIndexWriting.tearDown(self)
+
+
+class MockFileWithoutFileno:
+    """Mock file-like object without fileno method."""
+
+    def __init__(self, content):
+        self.content = content
+        self.position = 0
+
+    def read(self, size=None):
+        if size is None:
+            result = self.content[self.position :]
+            self.position = len(self.content)
+        else:
+            result = self.content[self.position : self.position + size]
+            self.position += size
+        return result
+
+    def seek(self, position):
+        self.position = position
+
+    def tell(self):
+        return self.position
+
+
+# Removed the PackWithoutMmapTests class since it was using private methods
 
 
 class ReadZlibTests(TestCase):

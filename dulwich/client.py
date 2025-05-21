@@ -1662,11 +1662,15 @@ class SubprocessWrapper:
             return _fileno_can_read(self.proc.stdout.fileno())
 
     def close(self) -> None:
-        self.proc.stdin.close()
-        self.proc.stdout.close()
-        if self.proc.stderr:
-            self.proc.stderr.close()
-        self.proc.wait()
+        # communicate() is used (instead of wait()) to avoid some deadlocks.
+        # We won't avoid all of them, since Protocol uses stdin, stdout, and
+        # stderr directly. But there's no way to structure what Protocol does
+        # around one call to communicate(), so this is better than nothing.
+        try:
+            self.proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.communicate()
 
 
 def find_git_command() -> list[str]:

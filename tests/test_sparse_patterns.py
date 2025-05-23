@@ -85,9 +85,13 @@ class ParseSparsePatternsTests(TestCase):
 class MatchSparsePatternsTests(TestCase):
     """Test the match_sparse_patterns function."""
 
+    # def match_sparse_patterns(path_str, parsed_patterns, path_is_dir=False):
     def test_no_patterns_returns_excluded(self):
         """If no patterns are provided, by default we treat the path as excluded."""
-        self.assertFalse(match_sparse_patterns("anyfile.py", []))
+        self.assertFalse(match_sparse_patterns("foo.py", [], path_is_dir=False))
+        self.assertFalse(match_sparse_patterns("A/", [], path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("A/B/", [], path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("A/B/bar.md", [], path_is_dir=False))
 
     def test_last_match_wins(self):
         """Checks that the last pattern to match determines included vs excluded."""
@@ -100,75 +104,96 @@ class MatchSparsePatternsTests(TestCase):
         # "foo.py" matches first pattern => included
         # then matches second pattern => excluded
         self.assertFalse(match_sparse_patterns("foo.py", parsed))
+        self.assertFalse(match_sparse_patterns("A/foo.py", parsed))
+        self.assertFalse(match_sparse_patterns("A/B/foo.py", parsed))
+        self.assertTrue(match_sparse_patterns("bar.py", parsed))
+        self.assertTrue(match_sparse_patterns("A/bar.py", parsed))
+        self.assertTrue(match_sparse_patterns("A/B/bar.py", parsed))
+        self.assertFalse(match_sparse_patterns("bar.md", parsed))
+        self.assertFalse(match_sparse_patterns("A/bar.md", parsed))
+        self.assertFalse(match_sparse_patterns("A/B", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("A/B", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns(".cache", parsed, path_is_dir=True))
 
     def test_dir_only(self):
         """A pattern with a trailing slash should only match directories and subdirectories."""
         parsed = parse_sparse_patterns(["docs/"])
-        # Because we set path_is_dir=False, it won't match
-        self.assertTrue(
-            match_sparse_patterns("docs/readme.md", parsed, path_is_dir=False)
-        )
+        # The directory pattern is not rooted, so can be at any level
         self.assertTrue(match_sparse_patterns("docs", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("A/docs", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("A/B/docs", parsed, path_is_dir=True))
         # Even if the path name is "docs", if it's a file, won't match:
         self.assertFalse(match_sparse_patterns("docs", parsed, path_is_dir=False))
+        # TODO: fix
+        # self.assertFalse(match_sparse_patterns("A/docs", parsed, path_is_dir=False)) #
+        # self.assertFalse(match_sparse_patterns("A/B/docs", parsed, path_is_dir=False))
+        # Subfiles and subdirs of the included dir should match
+        self.assertTrue(match_sparse_patterns("docs/x.md", parsed))
+        self.assertTrue(match_sparse_patterns("docs/A/x.md", parsed))
+        self.assertTrue(match_sparse_patterns("docs/A/B/x.md", parsed))
+        self.assertTrue(match_sparse_patterns("docs/A", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("docs/A/B", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("docs", parsed, path_is_dir=True))
 
     def test_anchored(self):
         """Anchored patterns match from the start of the path only."""
-        parsed = parse_sparse_patterns(["/foo"])
+        parsed = parse_sparse_patterns(["/foo"])  # Can be file or dir, must be at root
         self.assertTrue(match_sparse_patterns("foo", parsed))
+        self.assertTrue(match_sparse_patterns("foo", parsed, path_is_dir=True))
         # But "some/foo" doesn't match because anchored requires start
-        self.assertFalse(match_sparse_patterns("some/foo", parsed))
+        self.assertFalse(match_sparse_patterns("A/foo", parsed))
+        self.assertFalse(match_sparse_patterns("A/foo", parsed, path_is_dir=True))
 
-    def test_unanchored_uses_fnmatch(self):
+    def test_unanchored(self):
         parsed = parse_sparse_patterns(["foo"])
-        self.assertTrue(match_sparse_patterns("some/foo", parsed))
-        self.assertFalse(match_sparse_patterns("some/bar", parsed))
+        self.assertTrue(match_sparse_patterns("foo", parsed))
+        self.assertTrue(match_sparse_patterns("foo", parsed, path_is_dir=True))
+        # But "some/foo" doesn't match because anchored requires start
+        self.assertTrue(match_sparse_patterns("A/foo", parsed))
+        self.assertTrue(match_sparse_patterns("A/foo", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("bar", parsed))
+        self.assertFalse(match_sparse_patterns("A/bar", parsed))
 
     def test_anchored_empty_pattern(self):
         """Test handling of empty pattern with anchoring (e.g., '/')."""
+        # TODO: this is wrong: `/` should be recursive match of all files
         parsed = parse_sparse_patterns(["/"])
-        # Check the structure of the parsed empty pattern first
-        self.assertEqual(parsed, [("", False, False, True)])
-        # When the pattern is empty with anchoring, it's continued (skipped) in match_sparse_patterns
-        # for non-empty paths but for empty string it might match due to empty string comparisons
-        self.assertFalse(match_sparse_patterns("foo", parsed))
-        # An empty string with empty pattern will match (implementation detail)
-        self.assertTrue(match_sparse_patterns("", parsed))
+        self.assertEqual(parsed, [("", False, False, True)])  # anchored
+        self.assertTrue(match_sparse_patterns("", parsed, path_is_dir=True))
+        # TODO: fix
+        # self.assertTrue(match_sparse_patterns("A", parsed, path_is_dir=True))
+        # self.assertTrue(match_sparse_patterns("A/B", parsed, path_is_dir=True))
+        # self.assertTrue(match_sparse_patterns("foo", parsed))
+        # self.assertTrue(match_sparse_patterns("A/foo", parsed))
+        # self.assertTrue(match_sparse_patterns("A/B/foo", parsed))
 
-    def test_anchored_dir_only_exact_match(self):
-        """Test anchored directory-only patterns with exact matching."""
+    def test_anchored_dir_only(self):
+        """Test anchored directory-only patterns."""
         parsed = parse_sparse_patterns(["/docs/"])
-        # Test with exact match "docs" and path_is_dir=True
         self.assertTrue(match_sparse_patterns("docs", parsed, path_is_dir=True))
-        # Test with "docs/" (exact match + trailing slash)
-        self.assertTrue(match_sparse_patterns("docs/", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("docs", parsed))  # file named docs
+        self.assertFalse(match_sparse_patterns("A", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("A/B", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("A/docs", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("A/docs", parsed))
+        self.assertFalse(match_sparse_patterns("A/B/docs", parsed))
+        self.assertFalse(match_sparse_patterns("A/B/docs", parsed, path_is_dir=True))
 
-    def test_complex_anchored_patterns(self):
-        """Test more complex anchored pattern matching."""
-        parsed = parse_sparse_patterns(["/dir/subdir"])
-        # Test exact match
-        self.assertTrue(match_sparse_patterns("dir/subdir", parsed))
-        # Test subdirectory path
-        self.assertTrue(match_sparse_patterns("dir/subdir/file.txt", parsed))
+    def test_anchored_subpath(self):
+        """Test anchored subpath pattern matching."""
+        parsed = parse_sparse_patterns(["/A/B"])
+        # TODO: should this also match the dir "A" (positively?)
+        # self.assertTrue(match_sparse_patterns("A", parsed, path_is_dir=True))
+        # self.assertFalse(match_sparse_patterns("A", parsed, path_is_dir=False))
+        # Test exact match (both as file and dir, not dir-only pattern)
+        self.assertTrue(match_sparse_patterns("A/B", parsed))
+        self.assertTrue(match_sparse_patterns("A/B", parsed, path_is_dir=True))
+        # Test subdirectory path (file and dir)
+        self.assertTrue(match_sparse_patterns("A/B/file.txt", parsed))
+        self.assertTrue(match_sparse_patterns("A/B/C", parsed, path_is_dir=True))
         # Test non-matching path
-        self.assertFalse(match_sparse_patterns("otherdir/subdir", parsed))
-
-    def test_pattern_matching_edge_cases(self):
-        """Test various edge cases in pattern matching."""
-        # Test exact equality with an anchored pattern
-        parsed = parse_sparse_patterns(["/foo"])
-        self.assertTrue(match_sparse_patterns("foo", parsed))
-
-        # Test with path_is_dir=True
-        self.assertTrue(match_sparse_patterns("foo", parsed, path_is_dir=True))
-
-        # Test exact match with pattern with dir_only=True
-        parsed = parse_sparse_patterns(["/bar/"])
-        self.assertTrue(match_sparse_patterns("bar", parsed, path_is_dir=True))
-
-        # Test startswith match for anchored pattern
-        parsed = parse_sparse_patterns(["/prefix"])
-        self.assertTrue(match_sparse_patterns("prefix/subdirectory/file.txt", parsed))
+        self.assertFalse(match_sparse_patterns("X", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("X/Y", parsed, path_is_dir=True))
 
 
 class ComputeIncludedPathsFullTests(TestCase):

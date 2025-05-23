@@ -86,8 +86,8 @@ def compute_included_paths_full(index: Index, lines: Sequence[str]) -> set[str]:
     included = set()
     for path_bytes, entry in index.items():
         path_str = path_bytes.decode("utf-8")
-        # For .gitignore logic, match_gitignore_patterns returns True if 'included'
-        if match_gitignore_patterns(path_str, parsed, path_is_dir=False):
+        # For .gitignore logic, match_sparse_patterns returns True if 'included'
+        if match_sparse_patterns(path_str, parsed, path_is_dir=False):
             included.add(path_str)
     return included
 
@@ -287,7 +287,7 @@ def parse_sparse_patterns(lines: Sequence[str]) -> list[tuple[str, bool, bool, b
     return results
 
 
-def match_gitignore_patterns(
+def match_sparse_patterns(
     path_str: str,
     parsed_patterns: Sequence[tuple[str, bool, bool, bool]],
     path_is_dir: bool = False,
@@ -299,16 +299,22 @@ def match_gitignore_patterns(
       2. If a pattern matches, we set the "include" state depending on negation.
       3. Later matches override earlier ones.
 
-    In a .gitignore sense, lines that do not start with '!' are "ignore" patterns,
-    lines that start with '!' are "unignore" (re-include). But in sparse checkout,
-    it's effectively reversed: a non-negation line is "include," negation is "exclude."
-    However, many flows still rely on the same final logic: the last matching pattern
+    In a sparse checkout, lines that do not start with '!' are positive patterns,
+    indicating files/directories to check out (include in the index), and those that
+    start with '!' are negative ('negated'), meaning they indicate files not to check
+    out (not included in the index). This is fairly straightforward.
+
+    In a .gitignore, it's the same syntax but with a reverse effect: positive means
+    "ignore" (exclude from the index) and negative means "unignore" (re-include in the
+    index).
+
+    Many routines still rely on the same final logic: the last matching pattern
     decides "excluded" vs. "included."
 
     We'll interpret "include" as returning True, "exclude" as returning False.
 
-    Each pattern can include negation (!), directory-only markers, or be anchored
-    to the start of the path. The last matching pattern determines whether the
+    Each pattern can include negation ('!'), directory-only markers ('/' as suffix), or
+    be anchored ('/' as prefix). The last matching pattern determines whether the
     path is ultimately included or excluded.
 
     Args:
@@ -320,9 +326,8 @@ def match_gitignore_patterns(
     Returns:
       True if the path is included by the last matching pattern, False otherwise.
     """
-    # Start by assuming "excluded" (like a .gitignore starts by including everything
-    # until matched, but for sparse-checkout we often treat unmatched as "excluded").
-    # We will flip if we match an "include" pattern.
+    # Start by assuming "excluded". Like how .gitignore initially includes everything
+    # until matched, but reversed: sparse-checkout initially excludes everything.
     is_included = False
 
     for pattern, negation, dir_only, anchored in parsed_patterns:

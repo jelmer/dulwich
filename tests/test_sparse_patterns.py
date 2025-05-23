@@ -57,36 +57,29 @@ class ParseSparsePatternsTests(TestCase):
         parsed = parse_sparse_patterns(lines)
         self.assertEqual(parsed, [])
 
-    def test_simple_patterns(self):
+    def test_sparse_pattern_combos(self):
         lines = [
-            "*.py",
-            "!*.md",
-            "/docs/",
-            "!/docs/images/",
+            "*.py",  # Python files anywhere
+            "!*.md",  # markdown files anywhere
+            "/docs/",  # root docs dir
+            "!/docs/images/",  # no root docs/images subdir
+            "src/",  # src dir anywhere
+            "/*.toml",  # root TOML files
+            "!/*.bak",  # no root backup files
+            "!data/",  # no data dirs anywhere
         ]
         parsed = parse_sparse_patterns(lines)
-        self.assertEqual(len(parsed), 4)
+        self.assertEqual(len(parsed), 6)
 
-        self.assertEqual(parsed[0], ("*.py", False, False, False))  # include *.py
-        self.assertEqual(parsed[1], ("*.md", True, False, False))  # exclude *.md
-        self.assertEqual(parsed[2], ("docs", False, True, True))  # anchored, dir_only
-        self.assertEqual(parsed[3], ("docs/images", True, True, True))
-
-    def test_trailing_slash_dir(self):
-        lines = [
-            "src/",
-        ]
-        parsed = parse_sparse_patterns(lines)
-        # "src/" => (pattern="src", negation=False, dir_only=True, anchored=False)
-        self.assertEqual(parsed, [("src", False, True, False)])
-
-    def test_negation_anchor(self):
-        lines = [
-            "!/foo.txt",
-        ]
-        parsed = parse_sparse_patterns(lines)
-        # => (pattern="foo.txt", negation=True, dir_only=False, anchored=True)
-        self.assertEqual(parsed, [("foo.txt", True, False, True)])
+        # Returns a 4-tuple of: (pattern, negation, dir_only, anchored)
+        self.assertEqual(parsed[0], ("*.py", False, False, False))  # _,_,_
+        self.assertEqual(parsed[1], ("*.md", True, False, False))  # N,_,_
+        self.assertEqual(parsed[2], ("docs", False, True, True))  # _,D,A
+        self.assertEqual(parsed[3], ("docs/images", True, True, True))  # N,D,A
+        self.assertEqual(parsed[4], [("src", False, True, False)])  # _,D,_
+        self.assertEqual(parsed[5], [("*.toml", False, False, True)])  # _,_,A
+        self.assertEqual(parsed[6], [("*.bak", True, False, True)])  # N,_,A
+        self.assertEqual(parsed[7], [("data", True, True, False)])  # N,D,_
 
 
 class MatchGitignorePatternsTests(TestCase):

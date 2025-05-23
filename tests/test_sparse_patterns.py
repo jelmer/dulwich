@@ -37,7 +37,7 @@ from dulwich.sparse_patterns import (
     compute_included_paths_cone,
     compute_included_paths_full,
     determine_included_paths,
-    match_gitignore_patterns,
+    match_sparse_patterns,
     parse_sparse_patterns,
 )
 
@@ -69,25 +69,25 @@ class ParseSparsePatternsTests(TestCase):
             "!data/",  # no data dirs anywhere
         ]
         parsed = parse_sparse_patterns(lines)
-        self.assertEqual(len(parsed), 6)
+        self.assertEqual(len(parsed), 8)
 
         # Returns a 4-tuple of: (pattern, negation, dir_only, anchored)
         self.assertEqual(parsed[0], ("*.py", False, False, False))  # _,_,_
         self.assertEqual(parsed[1], ("*.md", True, False, False))  # N,_,_
         self.assertEqual(parsed[2], ("docs", False, True, True))  # _,D,A
         self.assertEqual(parsed[3], ("docs/images", True, True, True))  # N,D,A
-        self.assertEqual(parsed[4], [("src", False, True, False)])  # _,D,_
-        self.assertEqual(parsed[5], [("*.toml", False, False, True)])  # _,_,A
-        self.assertEqual(parsed[6], [("*.bak", True, False, True)])  # N,_,A
-        self.assertEqual(parsed[7], [("data", True, True, False)])  # N,D,_
+        self.assertEqual(parsed[4], ("src", False, True, False))  # _,D,_
+        self.assertEqual(parsed[5], ("*.toml", False, False, True))  # _,_,A
+        self.assertEqual(parsed[6], ("*.bak", True, False, True))  # N,_,A
+        self.assertEqual(parsed[7], ("data", True, True, False))  # N,D,_
 
 
-class MatchGitignorePatternsTests(TestCase):
-    """Test the match_gitignore_patterns function."""
+class MatchSparsePatternsTests(TestCase):
+    """Test the match_sparse_patterns function."""
 
     def test_no_patterns_returns_excluded(self):
         """If no patterns are provided, by default we treat the path as excluded."""
-        self.assertFalse(match_gitignore_patterns("anyfile.py", []))
+        self.assertFalse(match_sparse_patterns("anyfile.py", []))
 
     def test_last_match_wins(self):
         """Checks that the last pattern to match determines included vs excluded."""
@@ -99,78 +99,76 @@ class MatchGitignorePatternsTests(TestCase):
         )
         # "foo.py" matches first pattern => included
         # then matches second pattern => excluded
-        self.assertFalse(match_gitignore_patterns("foo.py", parsed))
+        self.assertFalse(match_sparse_patterns("foo.py", parsed))
 
     def test_dir_only(self):
         """A pattern with a trailing slash should only match directories and subdirectories."""
         parsed = parse_sparse_patterns(["docs/"])
         # Because we set path_is_dir=False, it won't match
         self.assertTrue(
-            match_gitignore_patterns("docs/readme.md", parsed, path_is_dir=False)
+            match_sparse_patterns("docs/readme.md", parsed, path_is_dir=False)
         )
-        self.assertTrue(match_gitignore_patterns("docs", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("docs", parsed, path_is_dir=True))
         # Even if the path name is "docs", if it's a file, won't match:
-        self.assertFalse(match_gitignore_patterns("docs", parsed, path_is_dir=False))
+        self.assertFalse(match_sparse_patterns("docs", parsed, path_is_dir=False))
 
     def test_anchored(self):
         """Anchored patterns match from the start of the path only."""
         parsed = parse_sparse_patterns(["/foo"])
-        self.assertTrue(match_gitignore_patterns("foo", parsed))
+        self.assertTrue(match_sparse_patterns("foo", parsed))
         # But "some/foo" doesn't match because anchored requires start
-        self.assertFalse(match_gitignore_patterns("some/foo", parsed))
+        self.assertFalse(match_sparse_patterns("some/foo", parsed))
 
     def test_unanchored_uses_fnmatch(self):
         parsed = parse_sparse_patterns(["foo"])
-        self.assertTrue(match_gitignore_patterns("some/foo", parsed))
-        self.assertFalse(match_gitignore_patterns("some/bar", parsed))
+        self.assertTrue(match_sparse_patterns("some/foo", parsed))
+        self.assertFalse(match_sparse_patterns("some/bar", parsed))
 
     def test_anchored_empty_pattern(self):
         """Test handling of empty pattern with anchoring (e.g., '/')."""
         parsed = parse_sparse_patterns(["/"])
         # Check the structure of the parsed empty pattern first
         self.assertEqual(parsed, [("", False, False, True)])
-        # When the pattern is empty with anchoring, it's continued (skipped) in match_gitignore_patterns
+        # When the pattern is empty with anchoring, it's continued (skipped) in match_sparse_patterns
         # for non-empty paths but for empty string it might match due to empty string comparisons
-        self.assertFalse(match_gitignore_patterns("foo", parsed))
+        self.assertFalse(match_sparse_patterns("foo", parsed))
         # An empty string with empty pattern will match (implementation detail)
-        self.assertTrue(match_gitignore_patterns("", parsed))
+        self.assertTrue(match_sparse_patterns("", parsed))
 
     def test_anchored_dir_only_exact_match(self):
         """Test anchored directory-only patterns with exact matching."""
         parsed = parse_sparse_patterns(["/docs/"])
         # Test with exact match "docs" and path_is_dir=True
-        self.assertTrue(match_gitignore_patterns("docs", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("docs", parsed, path_is_dir=True))
         # Test with "docs/" (exact match + trailing slash)
-        self.assertTrue(match_gitignore_patterns("docs/", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("docs/", parsed, path_is_dir=True))
 
     def test_complex_anchored_patterns(self):
         """Test more complex anchored pattern matching."""
         parsed = parse_sparse_patterns(["/dir/subdir"])
         # Test exact match
-        self.assertTrue(match_gitignore_patterns("dir/subdir", parsed))
+        self.assertTrue(match_sparse_patterns("dir/subdir", parsed))
         # Test subdirectory path
-        self.assertTrue(match_gitignore_patterns("dir/subdir/file.txt", parsed))
+        self.assertTrue(match_sparse_patterns("dir/subdir/file.txt", parsed))
         # Test non-matching path
-        self.assertFalse(match_gitignore_patterns("otherdir/subdir", parsed))
+        self.assertFalse(match_sparse_patterns("otherdir/subdir", parsed))
 
     def test_pattern_matching_edge_cases(self):
         """Test various edge cases in pattern matching."""
         # Test exact equality with an anchored pattern
         parsed = parse_sparse_patterns(["/foo"])
-        self.assertTrue(match_gitignore_patterns("foo", parsed))
+        self.assertTrue(match_sparse_patterns("foo", parsed))
 
         # Test with path_is_dir=True
-        self.assertTrue(match_gitignore_patterns("foo", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("foo", parsed, path_is_dir=True))
 
         # Test exact match with pattern with dir_only=True
         parsed = parse_sparse_patterns(["/bar/"])
-        self.assertTrue(match_gitignore_patterns("bar", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("bar", parsed, path_is_dir=True))
 
         # Test startswith match for anchored pattern
         parsed = parse_sparse_patterns(["/prefix"])
-        self.assertTrue(
-            match_gitignore_patterns("prefix/subdirectory/file.txt", parsed)
-        )
+        self.assertTrue(match_sparse_patterns("prefix/subdirectory/file.txt", parsed))
 
 
 class ComputeIncludedPathsFullTests(TestCase):

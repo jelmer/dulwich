@@ -252,9 +252,10 @@ def parse_sparse_patterns(lines: Sequence[str]) -> list[tuple[str, bool, bool, b
     anchoring, and directory-only markers, and returns data suitable for matching.
 
     Example:
-      ``line = "/*.txt" -> ("/.txt", False, False, True)``
-      ``line = "!/docs/" -> ("/docs/", True, True, True)``
-      ``line = "mydir/" -> ("mydir/", False, True, False)`` not anchored, no leading "/"
+      ``line = "*.txt" -> ("*.txt", False, False, False)`` not negated/dir/anchored
+      ``line = "/*.txt" -> ("*.txt", False, False, True)`` anchored, not negated/dir
+      ``line = "!/*.txt" -> ("*.txt", False, False, True)`` anchored/negated, not dir
+      ``line = "!/mydir/" -> ("mydir", True, True, True)`` anchored/negated/dir
 
     Args:
       lines: A list of raw lines (strings) from the sparse-checkout file.
@@ -277,12 +278,9 @@ def parse_sparse_patterns(lines: Sequence[str]) -> list[tuple[str, bool, bool, b
         if anchored:
             line = line[1:]  # remove leading '/'
 
-        # If pattern ends with '/', we consider it directory-only
-        # (like "docs/"). Real Git might treat it slightly differently,
-        # but we'll simplify and mark it as "dir_only" if it ends in "/".
-        dir_only = False
-        if line.endswith("/"):
-            dir_only = True
+        # If pattern ends with '/', we consider it directory-only (like "docs/").
+        dir_only = line.endswith("/")
+        if dir_only:
             line = line[:-1]
 
         results.append((line, negation, dir_only, anchored))

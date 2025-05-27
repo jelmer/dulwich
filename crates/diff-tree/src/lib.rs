@@ -143,7 +143,7 @@ fn _merge_entries(
     let entries2 = tree_entries(path, tree2, py)?;
 
     let pym = py.import("dulwich.diff_tree")?;
-    let null_entry = pym.getattr("_NULL_ENTRY")?.to_object(py);
+    let null_entry = pym.getattr("_NULL_ENTRY")?.unbind();
 
     let mut result = Vec::new();
 
@@ -186,7 +186,7 @@ fn _merge_entries(
         i2 += 1;
     }
 
-    Ok(PyList::new(py, &result).unwrap().to_object(py))
+    Ok(PyList::new(py, &result).unwrap().unbind().into())
 }
 
 #[pymodule]

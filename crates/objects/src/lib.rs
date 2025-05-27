@@ -78,7 +78,7 @@ fn parse_tree(
         text = &text[namelen + 1..];
         let sha = &text[..20];
         entries.push((
-            PyBytes::new(py, name).to_object(py),
+            PyBytes::new(py, name).into_pyobject(py)?.unbind().into(),
             mode,
             sha_to_pyhex(py, sha)?,
         ));
@@ -140,11 +140,18 @@ fn sorted_tree_items(
         .map(|(name, mode, hexsha)| -> PyResult<PyObject> {
             Ok(tree_entry_cls
                 .call1((
-                    PyBytes::new(py, name.as_slice()).to_object(py),
+                    PyBytes::new(py, name.as_slice())
+                        .into_pyobject(py)?
+                        .unbind()
+                        .into_any(),
                     mode,
-                    PyBytes::new(py, hexsha.as_slice()).to_object(py),
+                    PyBytes::new(py, hexsha.as_slice())
+                        .into_pyobject(py)?
+                        .unbind()
+                        .into_any(),
                 ))?
-                .to_object(py))
+                .unbind()
+                .into())
         })
         .collect::<PyResult<Vec<PyObject>>>()
 }

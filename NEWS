@@ -7,6 +7,8 @@
 
  * Fix wheels workflow. (Jelmer Vernooĳ)
 
+ * Bump PyO3 to 0.25. (Jelmer Vernooĳ)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

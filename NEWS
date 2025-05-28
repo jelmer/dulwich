@@ -15,6 +15,10 @@
 
  * Bump PyO3 to 0.25. (Jelmer Vernooĳ)
 
+ * In ``SubprocessClient`` time out after 60 seconds
+   when the subprocess hasn't terminated when closing
+   the channel. (Jelmer Vernooĳ)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

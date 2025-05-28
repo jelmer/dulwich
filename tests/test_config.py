@@ -28,6 +28,7 @@ from unittest import skipIf
 from unittest.mock import patch
 
 from dulwich.config import (
+    CaseInsensitiveOrderedMultiDict,
     ConfigDict,
     ConfigFile,
     StackedConfig,
@@ -184,6 +185,14 @@ class ConfigFileTests(TestCase):
         f = BytesIO()
         c.write_to_file(f)
         self.assertEqual(b"[core]\n\tfoo = bar\n", f.getvalue())
+
+    def test_write_to_file_section_multiple(self) -> None:
+        c = ConfigFile()
+        c.set((b"core",), b"foo", b"old")
+        c.set((b"core",), b"foo", b"new")
+        f = BytesIO()
+        c.write_to_file(f)
+        self.assertEqual(b"[core]\n\tfoo = new\n", f.getvalue())
 
     def test_write_to_file_subsection(self) -> None:
         c = ConfigFile()
@@ -491,3 +500,121 @@ class ApplyInsteadOfTests(TestCase):
         self.assertEqual(
             "https://samba.org/", apply_instead_of(config, "https://example.com/")
         )
+
+
+class CaseInsensitiveConfigTests(TestCase):
+    def test_case_insensitive(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("core",)] = "value"
+        self.assertEqual("value", config[("CORE",)])
+        self.assertEqual("value", config[("CoRe",)])
+        self.assertEqual([("core",)], list(config.keys()))
+
+    def test_multiple_set(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("core",)] = "value1"
+        config[("core",)] = "value2"
+        # The second set overwrites the first one
+        self.assertEqual("value2", config[("core",)])
+        self.assertEqual("value2", config[("CORE",)])
+
+    def test_get_all(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("core",)] = "value1"
+        config[("CORE",)] = "value2"
+        config[("CoRe",)] = "value3"
+        self.assertEqual(
+            ["value1", "value2", "value3"], list(config.get_all(("core",)))
+        )
+        self.assertEqual(
+            ["value1", "value2", "value3"], list(config.get_all(("CORE",)))
+        )
+
+    def test_delitem(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("core",)] = "value1"
+        config[("CORE",)] = "value2"
+        config[("other",)] = "value3"
+        del config[("core",)]
+        self.assertNotIn(("core",), config)
+        self.assertNotIn(("CORE",), config)
+        self.assertEqual("value3", config[("other",)])
+        self.assertEqual(1, len(config))
+
+    def test_len(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        self.assertEqual(0, len(config))
+        config[("core",)] = "value1"
+        self.assertEqual(1, len(config))
+        config[("CORE",)] = "value2"
+        self.assertEqual(1, len(config))  # Same key, case insensitive
+        config[("other",)] = "value3"
+        self.assertEqual(2, len(config))
+
+    def test_make_from_dict(self) -> None:
+        original = {("core",): "value1", ("other",): "value2"}
+        config = CaseInsensitiveOrderedMultiDict.make(original)
+        self.assertEqual("value1", config[("core",)])
+        self.assertEqual("value1", config[("CORE",)])
+        self.assertEqual("value2", config[("other",)])
+
+    def test_make_from_self(self) -> None:
+        config1 = CaseInsensitiveOrderedMultiDict()
+        config1[("core",)] = "value"
+        config2 = CaseInsensitiveOrderedMultiDict.make(config1)
+        self.assertIs(config1, config2)
+
+    def test_make_invalid_type(self) -> None:
+        self.assertRaises(TypeError, CaseInsensitiveOrderedMultiDict.make, "invalid")
+
+    def test_get_with_default(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("core",)] = "value"
+        self.assertEqual("value", config.get(("core",)))
+        self.assertEqual("value", config.get(("CORE",)))
+        self.assertEqual("default", config.get(("missing",), "default"))
+        # Test SENTINEL behavior
+        result = config.get(("missing",))
+        self.assertIsInstance(result, CaseInsensitiveOrderedMultiDict)
+        self.assertEqual(0, len(result))
+
+    def test_setdefault(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        # Set new value
+        result1 = config.setdefault(("core",), "value1")
+        self.assertEqual("value1", result1)
+        self.assertEqual("value1", config[("core",)])
+        # Try to set again with different case - should return existing
+        result2 = config.setdefault(("CORE",), "value2")
+        self.assertEqual("value1", result2)
+        self.assertEqual("value1", config[("core",)])
+
+    def test_values(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("core",)] = "value1"
+        config[("other",)] = "value2"
+        config[("CORE",)] = "value3"  # Overwrites previous core value
+        self.assertEqual({"value3", "value2"}, set(config.values()))
+
+    def test_items_iteration(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("core",)] = "value1"
+        config[("other",)] = "value2"
+        config[("CORE",)] = "value3"
+        items = list(config.items())
+        self.assertEqual(3, len(items))
+        self.assertEqual((("core",), "value1"), items[0])
+        self.assertEqual((("other",), "value2"), items[1])
+        self.assertEqual((("CORE",), "value3"), items[2])
+
+    def test_str_keys(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config["core"] = "value"
+        self.assertEqual("value", config["CORE"])
+        self.assertEqual("value", config["CoRe"])
+
+    def test_nested_tuple_keys(self) -> None:
+        config = CaseInsensitiveOrderedMultiDict()
+        config[("branch", "master")] = "value"
+        self.assertEqual("value", config[("BRANCH", "MASTER")])
+        self.assertEqual("value", config[("Branch", "Master")])

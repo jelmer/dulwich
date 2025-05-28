@@ -26,6 +26,7 @@ Currently implemented:
  * add
  * branch{_create,_delete,_list}
  * check_ignore
+ * checkout
  * checkout_branch
  * clone
  * cone mode{_init, _set, _add}
@@ -93,7 +94,6 @@ from .diff_tree import (
     RENAME_CHANGE_TYPES,
 )
 from .errors import SendPackError
-from .file import ensure_dir_exists
 from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
 from .index import (
@@ -101,10 +101,9 @@ from .index import (
     blob_from_path_and_stat,
     build_file_from_blob,
     get_unstaged_changes,
-    index_entry_from_stat,
     update_working_tree,
 )
-from .object_store import iter_tree_contents, tree_lookup_path
+from .object_store import tree_lookup_path
 from .objects import (
     Commit,
     Tag,
@@ -118,14 +117,12 @@ from .objectspec import (
     parse_ref,
     parse_reftuples,
     parse_tree,
-    to_bytes,
 )
 from .pack import write_pack_from_container, write_pack_index
 from .patch import write_tree_diff
 from .protocol import ZERO_SHA, Protocol
 from .refs import (
     LOCAL_BRANCH_PREFIX,
-    LOCAL_REMOTE_PREFIX,
     LOCAL_TAG_PREFIX,
     Ref,
     _import_remote_refs,
@@ -1186,10 +1183,10 @@ def reset(repo, mode, treeish="HEAD") -> None:
         else:
             validate_path_element = validate_path_element_default
 
-        # Import symlink function
-        from .index import symlink
-
         if config.get_boolean(b"core", b"symlinks", True):
+            # Import symlink function
+            from .index import symlink
+
             symlink_fn = symlink
         else:
 
@@ -2065,6 +2062,135 @@ def update_head(repo, target, detached=False, new_branch=None) -> None:
             r.refs.set_symbolic_ref(b"HEAD", to_set)
 
 
+def checkout(
+    repo,
+    target: Union[bytes, str],
+    force: bool = False,
+    new_branch: Optional[Union[bytes, str]] = None,
+) -> None:
+    """Switch to a branch or commit, updating both HEAD and the working tree.
+
+    This is similar to 'git checkout', allowing you to switch to a branch,
+    tag, or specific commit. Unlike update_head, this function also updates
+    the working tree to match the target.
+
+    Args:
+      repo: Path to repository or repository object
+      target: Branch name, tag, or commit SHA to checkout
+      force: Force checkout even if there are local changes
+      new_branch: Create a new branch at target (like git checkout -b)
+
+    Raises:
+      CheckoutError: If checkout cannot be performed due to conflicts
+      KeyError: If the target reference cannot be found
+    """
+    with open_repo_closing(repo) as r:
+        if isinstance(target, str):
+            target = target.encode(DEFAULT_ENCODING)
+        if isinstance(new_branch, str):
+            new_branch = new_branch.encode(DEFAULT_ENCODING)
+
+        # Parse the target to get the commit
+        target_commit = parse_commit(r, target)
+        target_tree_id = target_commit.tree
+
+        # Get current HEAD tree for comparison
+        try:
+            current_head = r.refs[b"HEAD"]
+            current_tree_id = r[current_head].tree
+        except KeyError:
+            # No HEAD yet (empty repo)
+            current_tree_id = None
+
+        # Check for uncommitted changes if not forcing
+        if not force and current_tree_id is not None:
+            status_report = status(r)
+            changes = []
+            # staged is a dict with 'add', 'delete', 'modify' keys
+            if isinstance(status_report.staged, dict):
+                changes.extend(status_report.staged.get("add", []))
+                changes.extend(status_report.staged.get("delete", []))
+                changes.extend(status_report.staged.get("modify", []))
+            # unstaged is a list
+            changes.extend(status_report.unstaged)
+            if changes:
+                # Check if any changes would conflict with checkout
+                target_tree = r[target_tree_id]
+                for change in changes:
+                    if isinstance(change, str):
+                        change = change.encode(DEFAULT_ENCODING)
+
+                    try:
+                        target_tree.lookup_path(r.object_store.__getitem__, change)
+                        # File exists in target tree - would overwrite local changes
+                        raise CheckoutError(
+                            f"Your local changes to '{change.decode()}' would be "
+                            "overwritten by checkout. Please commit or stash before switching."
+                        )
+                    except KeyError:
+                        # File doesn't exist in target tree - change can be preserved
+                        pass
+
+        # Get configuration for working directory update
+        config = r.get_config()
+        honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
+
+        # Import validation functions
+        from .index import validate_path_element_default, validate_path_element_ntfs
+
+        if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
+            validate_path_element = validate_path_element_ntfs
+        else:
+            validate_path_element = validate_path_element_default
+
+        if config.get_boolean(b"core", b"symlinks", True):
+            # Import symlink function
+            from .index import symlink
+
+            symlink_fn = symlink
+        else:
+
+            def symlink_fn(source, target) -> None:  # type: ignore
+                mode = "w" + ("b" if isinstance(source, bytes) else "")
+                with open(target, mode) as f:
+                    f.write(source)
+
+        # Update working tree
+        update_working_tree(
+            r,
+            current_tree_id,
+            target_tree_id,
+            honor_filemode=honor_filemode,
+            validate_path_element=validate_path_element,
+            symlink_fn=symlink_fn,
+            force_remove_untracked=force,
+        )
+
+        # Update HEAD
+        if new_branch:
+            # Create new branch and switch to it
+            branch_create(r, new_branch, objectish=target_commit.id.decode("ascii"))
+            update_head(r, new_branch)
+        else:
+            # Check if target is a branch name (with or without refs/heads/ prefix)
+            branch_ref = None
+            if target in r.refs.keys():
+                if target.startswith(LOCAL_BRANCH_PREFIX):
+                    branch_ref = target
+            else:
+                # Try adding refs/heads/ prefix
+                potential_branch = _make_branch_ref(target)
+                if potential_branch in r.refs.keys():
+                    branch_ref = potential_branch
+
+            if branch_ref:
+                # It's a branch - update HEAD symbolically
+                update_head(r, branch_ref)
+            else:
+                # It's a tag, other ref, or commit SHA - detached HEAD
+                update_head(r, target_commit.id.decode("ascii"), detached=True)
+
+
 def reset_file(repo, file_path: str, target: bytes = b"HEAD", symlink_fn=None) -> None:
     """Reset the file to specific commit or branch.
 
@@ -2083,117 +2209,26 @@ def reset_file(repo, file_path: str, target: bytes = b"HEAD", symlink_fn=None) -
     build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)
 
 
-def _update_head_during_checkout_branch(repo, target):
-    checkout_target = None
-    if target == b"HEAD":  # Do not update head while trying to checkout to HEAD.
-        pass
-    elif target in repo.refs.keys(base=LOCAL_BRANCH_PREFIX):
-        update_head(repo, target)
-    else:
-        # If checking out a remote branch, create a local one without the remote name prefix.
-        config = repo.get_config()
-        name = target.split(b"/")[0]
-        section = (b"remote", name)
-        if config.has_section(section):
-            checkout_target = target.replace(name + b"/", b"")
-            try:
-                branch_create(
-                    repo, checkout_target, (LOCAL_REMOTE_PREFIX + target).decode()
-                )
-            except Error:
-                pass
-            update_head(repo, LOCAL_BRANCH_PREFIX + checkout_target)
-        else:
-            update_head(repo, target, detached=True)
-
-    return checkout_target
-
-
 def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> None:
     """Switch branches or restore working tree files.
 
-    The implementation of this function will probably not scale well
-    for branches with lots of local changes.
-    This is due to the analysis of a diff between branches before any
-    changes are applied.
+    This is now a wrapper around the general checkout() function.
+    Preserved for backward compatibility.
 
     Args:
       repo: dulwich Repo object
       target: branch name or commit sha to checkout
       force: true or not to force checkout
     """
-    target = to_bytes(target)
+    import warnings
 
-    current_tree = parse_tree(repo, repo.head())
-    target_tree = parse_tree(repo, target)
-
-    if force:
-        repo.reset_index(target_tree.id)
-        _update_head_during_checkout_branch(repo, target)
-    else:
-        status_report = status(repo)
-        changes = list(
-            set(
-                status_report[0]["add"]
-                + status_report[0]["delete"]
-                + status_report[0]["modify"]
-                + status_report[1]
-            )
-        )
-        index = 0
-        while index < len(changes):
-            change = changes[index]
-            try:
-                current_tree.lookup_path(repo.object_store.__getitem__, change)
-                try:
-                    target_tree.lookup_path(repo.object_store.__getitem__, change)
-                    index += 1
-                except KeyError:
-                    raise CheckoutError(
-                        "Your local changes to the following files would be overwritten by checkout: "
-                        + change.decode()
-                    )
-            except KeyError:
-                changes.pop(index)
-
-        # Update head.
-        checkout_target = _update_head_during_checkout_branch(repo, target)
-        if checkout_target is not None:
-            target_tree = parse_tree(repo, checkout_target)
-
-        dealt_with = set()
-        repo_index = repo.open_index()
-        for entry in iter_tree_contents(repo.object_store, target_tree.id):
-            dealt_with.add(entry.path)
-            if entry.path in changes:
-                continue
-            full_path = os.path.join(os.fsencode(repo.path), entry.path)
-            blob = repo.object_store[entry.sha]
-            ensure_dir_exists(os.path.dirname(full_path))
-            st = build_file_from_blob(blob, entry.mode, full_path)
-            repo_index[entry.path] = index_entry_from_stat(st, entry.sha)
-
-        repo_index.write()
-
-        for entry in iter_tree_contents(repo.object_store, current_tree.id):
-            if entry.path not in dealt_with:
-                repo.unstage([entry.path])
-
-    # Remove the untracked files which are in the current_file_set.
-    repo_index = repo.open_index()
-    for change in repo_index.changes_from_tree(repo.object_store, current_tree.id):
-        path_change = change[0]
-        if path_change[1] is None:
-            file_name = path_change[0]
-            full_path = os.path.join(repo.path, file_name.decode())
-            if os.path.isfile(full_path):
-                os.remove(full_path)
-            dir_path = os.path.dirname(full_path)
-            while dir_path != repo.path:
-                is_empty = len(os.listdir(dir_path)) == 0
-                if is_empty:
-                    os.rmdir(dir_path)
-                dir_path = os.path.dirname(dir_path)
+    warnings.warn(
+        "checkout_branch is deprecated, use checkout instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    # Simply delegate to the new checkout function
+    checkout(repo, target, force=force)
 
 
 def sparse_checkout(

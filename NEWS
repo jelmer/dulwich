@@ -24,6 +24,11 @@
 
  * Add basic merge command. (Jelmer Vernooĳ)
 
+ * Update working tree in pull. (Jelmer Vernooĳ, #452)
+
+ * Support switching branch in a way that updates
+   working tree. (Jelmer Vernooĳ, #576)
+
  * Fix typing for ``dulwich.client`` methods that take repositories.
    (Jelmer Vernooĳ, #1521)
 

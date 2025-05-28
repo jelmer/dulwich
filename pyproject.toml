@@ -44,6 +44,7 @@ dev = [
     "ruff==0.11.11",
     "mypy==1.15.0"
 ]
+merge = ["merge3"]
 
 [project.scripts]
 dulwich = "dulwich.cli:main"

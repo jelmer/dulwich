@@ -24,8 +24,11 @@
 
  * Add basic merge command. (Jelmer Vernooĳ)
 
-* Fix typing for ``dulwich.client`` methods that take repositories.
+ * Fix typing for ``dulwich.client`` methods that take repositories.
    (Jelmer Vernooĳ, #1521)
+
+ * Fix handling of casing of subsection names in config.
+   (Jelmer Vernooĳ, #1183)
 
 0.22.8	2025-03-02
 

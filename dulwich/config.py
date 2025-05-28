@@ -96,6 +96,13 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping):
         self._real.append((key, value))
         self._keyed[lower_key(key)] = value
 
+    def set(self, key, value) -> None:
+        # This method replaces all existing values for the key
+        lower = lower_key(key)
+        self._real = [(k, v) for k, v in self._real if lower_key(k) != lower]
+        self._real.append((key, value))
+        self._keyed[lower] = value
+
     def __delitem__(self, key) -> None:
         key = lower_key(key)
         del self._keyed[key]
@@ -338,6 +345,27 @@ class ConfigDict(Config, MutableMapping[Section, MutableMapping[Name, Value]]):
         name: NameLike,
         value: Union[ValueLike, bool],
     ) -> None:
+        section, name = self._check_section_and_name(section, name)
+
+        if isinstance(value, bool):
+            value = b"true" if value else b"false"
+
+        if not isinstance(value, bytes):
+            value = value.encode(self.encoding)
+
+        section_dict = self._values.setdefault(section)
+        if hasattr(section_dict, "set"):
+            section_dict.set(name, value)
+        else:
+            section_dict[name] = value
+
+    def add(
+        self,
+        section: SectionLike,
+        name: NameLike,
+        value: Union[ValueLike, bool],
+    ) -> None:
+        """Add a value to a configuration setting, creating a multivar if needed."""
         section, name = self._check_section_and_name(section, name)
 
         if isinstance(value, bool):

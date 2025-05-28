@@ -15,7 +15,11 @@
 
  * Bump PyO3 to 0.25. (Jelmer Vernooĳ)
 
- * Fix typing for ``dulwich.client`` methods that take repositories.
+ * In ``SubprocessClient`` time out after 60 seconds
+   when the subprocess hasn't terminated when closing
+   the channel. (Jelmer Vernooĳ)
+
+* Fix typing for ``dulwich.client`` methods that take repositories.
    (Jelmer Vernooĳ, #1521)
 
 0.22.8	2025-03-02

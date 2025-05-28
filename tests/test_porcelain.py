@@ -2476,9 +2476,8 @@ class PullTests(PorcelainTestCase):
         with Repo(self.target_path) as r:
             self.assertEqual(r[b"refs/heads/master"].id, c3a)
 
-        self.assertRaises(
-            NotImplementedError,
-            porcelain.pull,
+        # Pull with merge should now work
+        porcelain.pull(
             self.target_path,
             self.repo.path,
             b"refs/heads/master",
@@ -2487,9 +2486,16 @@ class PullTests(PorcelainTestCase):
             fast_forward=False,
         )
 
-        # Check the target repo for pushed changes
+        # Check the target repo for merged changes
         with Repo(self.target_path) as r:
-            self.assertEqual(r[b"refs/heads/master"].id, c3a)
+            # HEAD should now be a merge commit
+            head = r[b"HEAD"]
+            # It should have two parents
+            self.assertEqual(len(head.parents), 2)
+            # One parent should be the previous HEAD (c3a)
+            self.assertIn(c3a, head.parents)
+            # The other parent should be from the source repo
+            self.assertIn(self.repo[b"HEAD"].id, head.parents)
 
     def test_no_refspec(self) -> None:
         outstream = BytesIO()
@@ -2520,6 +2526,46 @@ class PullTests(PorcelainTestCase):
         )
 
         # Check the target repo for pushed changes
+        with Repo(self.target_path) as r:
+            self.assertEqual(r[b"HEAD"].id, self.repo[b"HEAD"].id)
+
+    def test_pull_updates_working_tree(self) -> None:
+        """Test that pull updates the working tree with new files."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create a new file with content in the source repo
+        new_file = os.path.join(self.repo.path, "newfile.txt")
+        with open(new_file, "w") as f:
+            f.write("This is new content")
+
+        porcelain.add(repo=self.repo.path, paths=[new_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Add new file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Before pull, the file should not exist in target
+        target_file = os.path.join(self.target_path, "newfile.txt")
+        self.assertFalse(os.path.exists(target_file))
+
+        # Pull changes into the cloned repo
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # After pull, the file should exist with correct content
+        self.assertTrue(os.path.exists(target_file))
+        with open(target_file) as f:
+            self.assertEqual(f.read(), "This is new content")
+
+        # Check the HEAD is updated too
         with Repo(self.target_path) as r:
             self.assertEqual(r[b"HEAD"].id, self.repo[b"HEAD"].id)
 

@@ -835,6 +835,49 @@ class cmd_describe(Command):
         print(porcelain.describe("."))
 
 
+class cmd_merge(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("commit", type=str, help="Commit to merge")
+        parser.add_argument(
+            "--no-commit", action="store_true", help="Do not create a merge commit"
+        )
+        parser.add_argument(
+            "--no-ff", action="store_true", help="Force create a merge commit"
+        )
+        parser.add_argument("-m", "--message", type=str, help="Merge commit message")
+        args = parser.parse_args(args)
+
+        try:
+            merge_commit_id, conflicts = porcelain.merge(
+                ".",
+                args.commit,
+                no_commit=args.no_commit,
+                no_ff=args.no_ff,
+                message=args.message,
+            )
+
+            if conflicts:
+                print(f"Merge conflicts in {len(conflicts)} file(s):")
+                for conflict_path in conflicts:
+                    print(f"  {conflict_path.decode()}")
+                print(
+                    "\nAutomatic merge failed; fix conflicts and then commit the result."
+                )
+                sys.exit(1)
+            elif merge_commit_id is None:
+                print("Already up to date.")
+            elif args.no_commit:
+                print("Automatic merge successful; not committing as requested.")
+            else:
+                print(
+                    f"Merge successful. Created merge commit {merge_commit_id.decode()}"
+                )
+        except porcelain.Error as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = optparse.OptionParser()
@@ -888,6 +931,7 @@ commands = {
     "ls-files": cmd_ls_files,
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
+    "merge": cmd_merge,
     "pack-objects": cmd_pack_objects,
     "pack-refs": cmd_pack_refs,
     "pull": cmd_pull,

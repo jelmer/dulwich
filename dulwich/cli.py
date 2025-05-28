@@ -766,9 +766,9 @@ class cmd_checkout(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            "branch",
+            "target",
             type=str,
-            help="Name of the branch",
+            help="Name of the branch, tag, or commit to checkout",
         )
         parser.add_argument(
             "-f",
@@ -776,13 +776,21 @@ class cmd_checkout(Command):
             action="store_true",
             help="Force checkout",
         )
+        parser.add_argument(
+            "-b",
+            "--new-branch",
+            type=str,
+            help="Create a new branch at the target and switch to it",
+        )
         args = parser.parse_args(args)
-        if not args.branch:
-            print("Usage: dulwich checkout BRANCH_NAME [--force]")
+        if not args.target:
+            print("Usage: dulwich checkout TARGET [--force] [-b NEW_BRANCH]")
             sys.exit(1)
 
         try:
-            porcelain.checkout_branch(".", target=args.branch, force=args.force)
+            porcelain.checkout(
+                ".", target=args.target, force=args.force, new_branch=args.new_branch
+            )
         except porcelain.CheckoutError as e:
             sys.stderr.write(f"{e}\n")
             sys.exit(1)

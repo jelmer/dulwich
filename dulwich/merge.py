@@ -47,8 +47,10 @@ class Merger:
             Tuple of (merged_content, had_conflicts)
         """
         if merge3 is None:
-            raise ImportError("merge3 is required for merging. Install with: pip install dulwich[merge]")
-            
+            raise ImportError(
+                "merge3 is required for merging. Install with: pip install dulwich[merge]"
+            )
+
         # Handle deletion cases
         if ours_blob is None and theirs_blob is None:
             return b"", False
@@ -123,7 +125,7 @@ class Merger:
         # Check for conflicts and generate merged content
         merged_content = self._merge3_to_bytes(m)
         has_conflicts = b"<<<<<<< ours" in merged_content
-        
+
         return merged_content, has_conflicts
 
     def _merge3_to_bytes(self, m: merge3.Merge3) -> bytes:
@@ -141,14 +143,14 @@ class Merger:
                 result.extend(group[1])
             elif group[0] == "a":
                 result.extend(group[1])
-            elif group[0] == "b": 
+            elif group[0] == "b":
                 result.extend(group[1])
             elif group[0] == "same":
                 result.extend(group[1])
             elif group[0] == "conflict":
                 # Check if this is a real conflict or just different changes
                 base_lines, a_lines, b_lines = group[1], group[2], group[3]
-                
+
                 # Try to merge line by line
                 if self._can_merge_lines(base_lines, a_lines, b_lines):
                     merged_lines = self._merge_lines(base_lines, a_lines, b_lines)
@@ -162,8 +164,10 @@ class Merger:
                     result.append(b">>>>>>> theirs\n")
 
         return b"".join(result)
-        
-    def _can_merge_lines(self, base_lines: list[bytes], a_lines: list[bytes], b_lines: list[bytes]) -> bool:
+
+    def _can_merge_lines(
+        self, base_lines: list[bytes], a_lines: list[bytes], b_lines: list[bytes]
+    ) -> bool:
         """Check if lines can be merged without conflict."""
         # If one side is unchanged, we can take the other side
         if base_lines == a_lines:
@@ -174,8 +178,10 @@ class Merger:
             # For now, treat any difference as a conflict
             # A more sophisticated algorithm would check for non-overlapping changes
             return False
-        
-    def _merge_lines(self, base_lines: list[bytes], a_lines: list[bytes], b_lines: list[bytes]) -> list[bytes]:
+
+    def _merge_lines(
+        self, base_lines: list[bytes], a_lines: list[bytes], b_lines: list[bytes]
+    ) -> list[bytes]:
         """Merge lines when possible."""
         if base_lines == a_lines:
             return b_lines
@@ -219,17 +225,21 @@ class Merger:
             base_entry = None
             if base_tree:
                 try:
-                    base_entry = base_tree.lookup_path(self.object_store.__getitem__, path)
+                    base_entry = base_tree.lookup_path(
+                        self.object_store.__getitem__, path
+                    )
                 except KeyError:
                     pass
-            
+
             try:
                 ours_entry = ours_tree.lookup_path(self.object_store.__getitem__, path)
             except KeyError:
                 ours_entry = None
-                
+
             try:
-                theirs_entry = theirs_tree.lookup_path(self.object_store.__getitem__, path)
+                theirs_entry = theirs_tree.lookup_path(
+                    self.object_store.__getitem__, path
+                )
             except KeyError:
                 theirs_entry = None
 
@@ -313,9 +323,17 @@ class Merger:
                     merged_entries[path] = (ours_mode, ours_sha)
                 else:
                     # Try to merge blobs
-                    base_blob = cast(Blob, self.object_store[base_sha]) if base_sha else None
-                    ours_blob = cast(Blob, self.object_store[ours_sha]) if ours_sha else None
-                    theirs_blob = cast(Blob, self.object_store[theirs_sha]) if theirs_sha else None
+                    base_blob = (
+                        cast(Blob, self.object_store[base_sha]) if base_sha else None
+                    )
+                    ours_blob = (
+                        cast(Blob, self.object_store[ours_sha]) if ours_sha else None
+                    )
+                    theirs_blob = (
+                        cast(Blob, self.object_store[theirs_sha])
+                        if theirs_sha
+                        else None
+                    )
 
                     merged_content, had_conflict = self.merge_blobs(
                         base_blob, ours_blob, theirs_blob

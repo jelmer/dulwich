@@ -1,5 +1,6 @@
 """Tests for merge functionality."""
 
+import importlib.util
 import unittest
 
 from dulwich.merge import MergeConflict, Merger, three_way_merge
@@ -12,6 +13,9 @@ class MergeTests(unittest.TestCase):
 
     def setUp(self):
         self.repo = MemoryRepo()
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise unittest.SkipTest("merge3 module not available, skipping merge tests")
         self.merger = Merger(self.repo.object_store)
 
     def test_merge_blobs_no_conflict(self):

@@ -102,6 +102,7 @@ from .index import (
     build_file_from_blob,
     get_unstaged_changes,
     index_entry_from_stat,
+    update_working_tree,
 )
 from .object_store import iter_tree_contents, tree_lookup_path
 from .objects import (
@@ -1165,7 +1166,50 @@ def reset(repo, mode, treeish="HEAD") -> None:
 
     with open_repo_closing(repo) as r:
         tree = parse_tree(r, treeish)
-        r.reset_index(tree.id)
+
+        # Get current HEAD tree for comparison
+        try:
+            current_head = r.refs[b"HEAD"]
+            current_tree = r[current_head].tree
+        except KeyError:
+            current_tree = None
+
+        # Get configuration for working directory update
+        config = r.get_config()
+        honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
+
+        # Import validation functions
+        from .index import validate_path_element_default, validate_path_element_ntfs
+
+        if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
+            validate_path_element = validate_path_element_ntfs
+        else:
+            validate_path_element = validate_path_element_default
+
+        # Import symlink function
+        from .index import symlink
+
+        if config.get_boolean(b"core", b"symlinks", True):
+            symlink_fn = symlink
+        else:
+
+            def symlink_fn(  # type: ignore
+                source, target, target_is_directory=False, *, dir_fd=None
+            ) -> None:
+                mode = "w" + ("b" if isinstance(source, bytes) else "")
+                with open(target, mode) as f:
+                    f.write(source)
+
+        # Update working tree and index
+        update_working_tree(
+            r,
+            current_tree,
+            tree.id,
+            honor_filemode=honor_filemode,
+            validate_path_element=validate_path_element,
+            symlink_fn=symlink_fn,
+            force_remove_untracked=True,
+        )
 
 
 def get_remote_repo(
@@ -1281,6 +1325,7 @@ def pull(
     outstream=default_bytes_out_stream,
     errstream=default_bytes_err_stream,
     fast_forward=True,
+    ff_only=False,
     force=False,
     filter_spec=None,
     protocol_version=None,
@@ -1295,6 +1340,9 @@ def pull(
         bytestring/string.
       outstream: A stream file to write to output
       errstream: A stream file to write to errors
+      fast_forward: If True, raise an exception when fast-forward is not possible
+      ff_only: If True, only allow fast-forward merges. Raises DivergedBranches
+        when branches have diverged rather than performing a merge.
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
@@ -1333,22 +1381,43 @@ def pull(
             filter_spec=filter_spec,
             protocol_version=protocol_version,
         )
+
+        # Store the old HEAD tree before making changes
+        try:
+            old_head = r.refs[b"HEAD"]
+            old_tree_id = r[old_head].tree
+        except KeyError:
+            old_tree_id = None
+
+        merged = False
         for lh, rh, force_ref in selected_refs:
             if not force_ref and rh in r.refs:
                 try:
                     check_diverged(r, r.refs.follow(rh)[1], fetch_result.refs[lh])
                 except DivergedBranches as exc:
-                    if fast_forward:
+                    if ff_only or fast_forward:
                         raise
                     else:
-                        raise NotImplementedError("merge is not yet supported") from exc
+                        # Perform merge
+                        merge_result, conflicts = _do_merge(r, fetch_result.refs[lh])
+                        if conflicts:
+                            raise Error(
+                                f"Merge conflicts occurred: {conflicts}"
+                            ) from exc
+                        merged = True
+                        # Skip updating ref since merge already updated HEAD
+                        continue
             r.refs[rh] = fetch_result.refs[lh]
-        if selected_refs:
+
+        # Only update HEAD if we didn't perform a merge
+        if selected_refs and not merged:
             r[b"HEAD"] = fetch_result.refs[selected_refs[0][1]]
 
-        # Perform 'git checkout .' - syncs staged changes
-        tree = r[b"HEAD"].tree
-        r.reset_index(tree=tree)
+        # Update working tree to match the new HEAD
+        # Skip if merge was performed as merge already updates the working tree
+        if not merged and old_tree_id is not None:
+            new_tree_id = r[b"HEAD"].tree
+            update_working_tree(r, old_tree_id, new_tree_id)
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 
@@ -2447,6 +2516,115 @@ def write_tree(repo):
         return r.open_index().commit(r.object_store)
 
 
+def _do_merge(
+    r,
+    merge_commit_id,
+    no_commit=False,
+    no_ff=False,
+    message=None,
+    author=None,
+    committer=None,
+):
+    """Internal merge implementation that operates on an open repository.
+
+    Args:
+      r: Open repository object
+      merge_commit_id: SHA of commit to merge
+      no_commit: If True, do not create a merge commit
+      no_ff: If True, force creation of a merge commit
+      message: Optional merge commit message
+      author: Optional author for merge commit
+      committer: Optional committer for merge commit
+
+    Returns:
+      Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
+      if no_commit=True or there were conflicts
+    """
+    from .graph import find_merge_base
+    from .merge import three_way_merge
+
+    # Get HEAD commit
+    try:
+        head_commit_id = r.refs[b"HEAD"]
+    except KeyError:
+        raise Error("No HEAD reference found")
+
+    head_commit = r[head_commit_id]
+    merge_commit = r[merge_commit_id]
+
+    # Check if fast-forward is possible
+    merge_bases = find_merge_base(r, [head_commit_id, merge_commit_id])
+
+    if not merge_bases:
+        raise Error("No common ancestor found")
+
+    # Use the first merge base
+    base_commit_id = merge_bases[0]
+
+    # Check for fast-forward
+    if base_commit_id == head_commit_id and not no_ff:
+        # Fast-forward merge
+        r.refs[b"HEAD"] = merge_commit_id
+        # Update the working directory
+        update_working_tree(r, head_commit.tree, merge_commit.tree)
+        return (merge_commit_id, [])
+
+    if base_commit_id == merge_commit_id:
+        # Already up to date
+        return (None, [])
+
+    # Perform three-way merge
+    base_commit = r[base_commit_id]
+    merged_tree, conflicts = three_way_merge(
+        r.object_store, base_commit, head_commit, merge_commit
+    )
+
+    # Add merged tree to object store
+    r.object_store.add_object(merged_tree)
+
+    # Update index and working directory
+    update_working_tree(r, head_commit.tree, merged_tree.id)
+
+    if conflicts or no_commit:
+        # Don't create a commit if there are conflicts or no_commit is True
+        return (None, conflicts)
+
+    # Create merge commit
+    merge_commit_obj = Commit()
+    merge_commit_obj.tree = merged_tree.id
+    merge_commit_obj.parents = [head_commit_id, merge_commit_id]
+
+    # Set author/committer
+    if author is None:
+        author = get_user_identity(r.get_config_stack())
+    if committer is None:
+        committer = author
+
+    merge_commit_obj.author = author
+    merge_commit_obj.committer = committer
+
+    # Set timestamps
+    timestamp = int(time.time())
+    timezone = 0  # UTC
+    merge_commit_obj.author_time = timestamp
+    merge_commit_obj.author_timezone = timezone
+    merge_commit_obj.commit_time = timestamp
+    merge_commit_obj.commit_timezone = timezone
+
+    # Set commit message
+    if message is None:
+        message = f"Merge commit '{merge_commit_id.decode()[:7]}'\n"
+    merge_commit_obj.message = message.encode() if isinstance(message, str) else message
+
+    # Add commit to object store
+    r.object_store.add_object(merge_commit_obj)
+
+    # Update HEAD
+    r.refs[b"HEAD"] = merge_commit_obj.id
+
+    return (merge_commit_obj.id, [])
+
+
 def merge(
     repo,
     committish,
@@ -2474,101 +2652,13 @@ def merge(
     Raises:
       Error: If there is no HEAD reference or commit cannot be found
     """
-    from .graph import find_merge_base
-    from .index import build_index_from_tree
-    from .merge import three_way_merge
-
     with open_repo_closing(repo) as r:
-        # Get HEAD commit
-        try:
-            head_commit_id = r.refs[b"HEAD"]
-        except KeyError:
-            raise Error("No HEAD reference found")
-
         # Parse the commit to merge
         try:
             merge_commit_id = parse_commit(r, committish)
         except KeyError:
             raise Error(f"Cannot find commit '{committish}'")
 
-        head_commit = r[head_commit_id]
-        merge_commit = r[merge_commit_id]
-
-        # Check if fast-forward is possible
-        merge_bases = find_merge_base(r, [head_commit_id, merge_commit_id])
-
-        if not merge_bases:
-            raise Error("No common ancestor found")
-
-        # Use the first merge base
-        base_commit_id = merge_bases[0]
-
-        # Check for fast-forward
-        if base_commit_id == head_commit_id and not no_ff:
-            # Fast-forward merge
-            r.refs[b"HEAD"] = merge_commit_id
-            # Update the working directory
-            index = r.open_index()
-            tree = r[merge_commit.tree]
-            build_index_from_tree(r.path, index, r.object_store, tree.id)
-            index.write()
-            return (merge_commit_id, [])
-
-        if base_commit_id == merge_commit_id:
-            # Already up to date
-            return (None, [])
-
-        # Perform three-way merge
-        base_commit = r[base_commit_id]
-        merged_tree, conflicts = three_way_merge(
-            r.object_store, base_commit, head_commit, merge_commit
+        return _do_merge(
+            r, merge_commit_id, no_commit, no_ff, message, author, committer
         )
-
-        # Add merged tree to object store
-        r.object_store.add_object(merged_tree)
-
-        # Update index and working directory
-        index = r.open_index()
-        build_index_from_tree(r.path, index, r.object_store, merged_tree.id)
-        index.write()
-
-        if conflicts or no_commit:
-            # Don't create a commit if there are conflicts or no_commit is True
-            return (None, conflicts)
-
-        # Create merge commit
-        merge_commit_obj = Commit()
-        merge_commit_obj.tree = merged_tree.id
-        merge_commit_obj.parents = [head_commit_id, merge_commit_id]
-
-        # Set author/committer
-        if author is None:
-            author = get_user_identity(r.get_config_stack())
-        if committer is None:
-            committer = author
-
-        merge_commit_obj.author = author
-        merge_commit_obj.committer = committer
-
-        # Set timestamps
-        timestamp = int(time())
-        timezone = 0  # UTC
-        merge_commit_obj.author_time = timestamp
-        merge_commit_obj.author_timezone = timezone
-        merge_commit_obj.commit_time = timestamp
-        merge_commit_obj.commit_timezone = timezone
-
-        # Set commit message
-        if message is None:
-            message = f"Merge commit '{merge_commit_id.decode()[:7]}'\n"
-        merge_commit_obj.message = (
-            message.encode() if isinstance(message, str) else message
-        )
-
-        # Add commit to object store
-        r.object_store.add_object(merge_commit_obj)
-
-        # Update HEAD
-        r.refs[b"HEAD"] = merge_commit_obj.id
-
-        return (merge_commit_obj.id, [])

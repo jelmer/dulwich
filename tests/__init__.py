@@ -136,6 +136,7 @@ def self_test_suite():
         "log_utils",
         "lru_cache",
         "mailmap",
+        "merge",
         "objects",
         "objectspec",
         "object_store",

@@ -19,6 +19,11 @@
    when the subprocess hasn't terminated when closing
    the channel. (Jelmer Vernooĳ)
 
+ * Add type hint for ``dulwich.client.get_ssh_vendor``.
+   (Jelmer Vernooĳ, #1471)
+
+ * Add basic merge command. (Jelmer Vernooĳ)
+
 * Fix typing for ``dulwich.client`` methods that take repositories.
    (Jelmer Vernooĳ, #1521)
 

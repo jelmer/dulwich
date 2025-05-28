@@ -1190,7 +1190,9 @@ def reset(repo, mode, treeish="HEAD") -> None:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(source, target) -> None:  # type: ignore
+            def symlink_fn(  # type: ignore
+                source, target, target_is_directory=False, *, dir_fd=None
+            ) -> None:
                 mode = "w" + ("b" if isinstance(source, bytes) else "")
                 with open(target, mode) as f:
                     f.write(source)
@@ -2219,6 +2221,7 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
       force: true or not to force checkout
     """
     import warnings
+
     warnings.warn(
         "checkout_branch is deprecated, use checkout instead.",
         DeprecationWarning,

@@ -23,8 +23,6 @@
 
 Todo:
  * preserve formatting when updating configuration files
- * treat subsection names as case-insensitive for [branch.foo] style
-   subsections
 """
 
 import os
@@ -49,7 +47,11 @@ def lower_key(key):
         return key.lower()
 
     if isinstance(key, Iterable):
-        return type(key)(map(lower_key, key))  # type: ignore
+        # For config sections, only lowercase the section name (first element)
+        # but preserve the case of subsection names (remaining elements)
+        if len(key) > 0:
+            return (key[0].lower(),) + key[1:]
+        return key
 
     return key
 

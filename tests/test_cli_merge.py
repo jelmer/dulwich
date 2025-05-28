@@ -94,9 +94,7 @@ class CLIMergeTests(TestCase):
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
                 f.write("Feature content\n")
             porcelain.add(tmpdir, paths=["file1.txt"])
-            porcelain.commit(
-                tmpdir, message=b"Modify file1 in feature"
-            )
+            porcelain.commit(tmpdir, message=b"Modify file1 in feature")
 
             # Go back to master and modify file1 differently
             porcelain.checkout_branch(tmpdir, "master")

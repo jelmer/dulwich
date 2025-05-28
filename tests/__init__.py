@@ -53,13 +53,13 @@ class TestCase(_TestCase):
         def restore() -> None:
             if oldval is not None:
                 os.environ[name] = oldval
-            else:
+            elif name in os.environ:
                 del os.environ[name]
 
         oldval = os.environ.get(name)
         if value is not None:
             os.environ[name] = value
-        else:
+        elif name in os.environ:
             del os.environ[name]
         self.addCleanup(restore)
 

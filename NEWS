@@ -19,6 +19,9 @@
    when the subprocess hasn't terminated when closing
    the channel. (Jelmer Vernooĳ)
 
+ * Add type hint for ``dulwich.client.get_ssh_vendor``.
+   (Jelmer Vernooĳ, #1471)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

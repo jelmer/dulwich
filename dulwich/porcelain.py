@@ -40,6 +40,7 @@ Currently implemented:
  * ls_files
  * ls_remote
  * ls_tree
+ * merge
  * pull
  * push
  * rm
@@ -2444,3 +2445,130 @@ def write_tree(repo):
     """
     with open_repo_closing(repo) as r:
         return r.open_index().commit(r.object_store)
+
+
+def merge(
+    repo,
+    committish,
+    no_commit=False,
+    no_ff=False,
+    message=None,
+    author=None,
+    committer=None,
+):
+    """Merge a commit into the current branch.
+
+    Args:
+      repo: Repository to merge into
+      committish: Commit to merge
+      no_commit: If True, do not create a merge commit
+      no_ff: If True, force creation of a merge commit
+      message: Optional merge commit message
+      author: Optional author for merge commit
+      committer: Optional committer for merge commit
+
+    Returns:
+      Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
+      if no_commit=True or there were conflicts
+
+    Raises:
+      Error: If there is no HEAD reference or commit cannot be found
+    """
+    from .graph import find_merge_base
+    from .index import build_index_from_tree
+    from .merge import three_way_merge
+
+    with open_repo_closing(repo) as r:
+        # Get HEAD commit
+        try:
+            head_commit_id = r.refs[b"HEAD"]
+        except KeyError:
+            raise Error("No HEAD reference found")
+
+        # Parse the commit to merge
+        try:
+            merge_commit_id = parse_commit(r, committish)
+        except KeyError:
+            raise Error(f"Cannot find commit '{committish}'")
+
+        head_commit = r[head_commit_id]
+        merge_commit = r[merge_commit_id]
+
+        # Check if fast-forward is possible
+        merge_bases = find_merge_base(r, [head_commit_id, merge_commit_id])
+
+        if not merge_bases:
+            raise Error("No common ancestor found")
+
+        # Use the first merge base
+        base_commit_id = merge_bases[0]
+
+        # Check for fast-forward
+        if base_commit_id == head_commit_id and not no_ff:
+            # Fast-forward merge
+            r.refs[b"HEAD"] = merge_commit_id
+            # Update the working directory
+            index = r.open_index()
+            tree = r[merge_commit.tree]
+            build_index_from_tree(r.path, index, r.object_store, tree.id)
+            index.write()
+            return (merge_commit_id, [])
+
+        if base_commit_id == merge_commit_id:
+            # Already up to date
+            return (None, [])
+
+        # Perform three-way merge
+        base_commit = r[base_commit_id]
+        merged_tree, conflicts = three_way_merge(
+            r.object_store, base_commit, head_commit, merge_commit
+        )
+
+        # Add merged tree to object store
+        r.object_store.add_object(merged_tree)
+
+        # Update index and working directory
+        index = r.open_index()
+        build_index_from_tree(r.path, index, r.object_store, merged_tree.id)
+        index.write()
+
+        if conflicts or no_commit:
+            # Don't create a commit if there are conflicts or no_commit is True
+            return (None, conflicts)
+
+        # Create merge commit
+        merge_commit_obj = Commit()
+        merge_commit_obj.tree = merged_tree.id
+        merge_commit_obj.parents = [head_commit_id, merge_commit_id]
+
+        # Set author/committer
+        if author is None:
+            author = get_user_identity(r.get_config_stack())
+        if committer is None:
+            committer = author
+
+        merge_commit_obj.author = author
+        merge_commit_obj.committer = committer
+
+        # Set timestamps
+        timestamp = int(time())
+        timezone = 0  # UTC
+        merge_commit_obj.author_time = timestamp
+        merge_commit_obj.author_timezone = timezone
+        merge_commit_obj.commit_time = timestamp
+        merge_commit_obj.commit_timezone = timezone
+
+        # Set commit message
+        if message is None:
+            message = f"Merge commit '{merge_commit_id.decode()[:7]}'\n"
+        merge_commit_obj.message = (
+            message.encode() if isinstance(message, str) else message
+        )
+
+        # Add commit to object store
+        r.object_store.add_object(merge_commit_obj)
+
+        # Update HEAD
+        r.refs[b"HEAD"] = merge_commit_obj.id
+
+        return (merge_commit_obj.id, [])

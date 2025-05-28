@@ -10,7 +10,10 @@
  * ``Config.set`` replaces values by default, ``Config.add``
    appends them. (Jelmer Vernooĳ, #1545)
 
-* Bump PyO3 to 0.25. (Jelmer Vernooĳ)
+ * Support ``core.sshCommand`` setting.
+   (Jelmer Vernooĳ, #1548)
+
+ * Bump PyO3 to 0.25. (Jelmer Vernooĳ)
 
 0.22.8	2025-03-02
 

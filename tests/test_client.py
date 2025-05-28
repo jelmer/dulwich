@@ -527,6 +527,24 @@ class TestGetTransportAndPath(TestCase):
         self.assertIsInstance(c, LocalGitClient)
         self.assertEqual("foo.bar/baz", path)
 
+    def test_ssh_with_config(self) -> None:
+        # Test that core.sshCommand from config is passed to SSHGitClient
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config.set((b"core",), b"sshCommand", b"custom-ssh -o CustomOption=yes")
+
+        c, path = get_transport_and_path(
+            "ssh://git@github.com/user/repo.git", config=config
+        )
+        self.assertIsInstance(c, SSHGitClient)
+        self.assertEqual("custom-ssh -o CustomOption=yes", c.ssh_command)
+
+        # Test rsync-style URL also gets the config
+        c, path = get_transport_and_path("git@github.com:user/repo.git", config=config)
+        self.assertIsInstance(c, SSHGitClient)
+        self.assertEqual("custom-ssh -o CustomOption=yes", c.ssh_command)
+
     @skipIf(sys.platform != "win32", "Behaviour only happens on windows.")
     def test_local_abs_windows_path(self) -> None:
         c, path = get_transport_and_path("C:\\foo.bar\\baz")
@@ -817,6 +835,33 @@ class SSHGitClientTests(TestCase):
 
         test_client = SSHGitClient("git.samba.org", ssh_command="ssh -o Option1=Value1")
         self.assertEqual(test_client.ssh_command, "ssh -o Option1=Value1")
+
+    def test_ssh_command_config(self) -> None:
+        # Test core.sshCommand config setting
+        from dulwich.config import ConfigDict
+
+        # No config, no environment - should be None
+        self.overrideEnv("GIT_SSH", None)
+        self.overrideEnv("GIT_SSH_COMMAND", None)
+        test_client = SSHGitClient("git.samba.org")
+        self.assertIsNone(test_client.ssh_command)
+
+        # Config with core.sshCommand
+        config = ConfigDict()
+        config.set((b"core",), b"sshCommand", b"ssh -o StrictHostKeyChecking=no")
+        test_client = SSHGitClient("git.samba.org", config=config)
+        self.assertEqual(test_client.ssh_command, "ssh -o StrictHostKeyChecking=no")
+
+        # ssh_command parameter takes precedence over config
+        test_client = SSHGitClient(
+            "git.samba.org", config=config, ssh_command="custom-ssh"
+        )
+        self.assertEqual(test_client.ssh_command, "custom-ssh")
+
+        # Environment variables take precedence over config when no ssh_command parameter
+        self.overrideEnv("GIT_SSH_COMMAND", "/usr/bin/ssh -v")
+        test_client = SSHGitClient("git.samba.org", config=config)
+        self.assertEqual(test_client.ssh_command, "/usr/bin/ssh -v")
 
 
 class ReportStatusParserTests(TestCase):

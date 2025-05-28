@@ -315,6 +315,20 @@ class ConfigDictTests(TestCase):
 
         self.assertEqual([(b"core2",)], list(cd.sections()))
 
+    def test_set_vs_add(self) -> None:
+        cd = ConfigDict()
+        # Test add() creates multivars
+        cd.add((b"core",), b"foo", b"value1")
+        cd.add((b"core",), b"foo", b"value2")
+        self.assertEqual(
+            [b"value1", b"value2"], list(cd.get_multivar((b"core",), b"foo"))
+        )
+
+        # Test set() replaces values
+        cd.set((b"core",), b"foo", b"value3")
+        self.assertEqual([b"value3"], list(cd.get_multivar((b"core",), b"foo")))
+        self.assertEqual(b"value3", cd.get((b"core",), b"foo"))
+
 
 class StackedConfigTests(TestCase):
     def test_default_backends(self) -> None:
@@ -491,8 +505,8 @@ class ApplyInsteadOfTests(TestCase):
 
     def test_apply_multiple(self) -> None:
         config = ConfigDict()
-        config.set(("url", "https://samba.org/"), "insteadOf", "https://blah.com/")
-        config.set(("url", "https://samba.org/"), "insteadOf", "https://example.com/")
+        config.add(("url", "https://samba.org/"), "insteadOf", "https://blah.com/")
+        config.add(("url", "https://samba.org/"), "insteadOf", "https://example.com/")
         self.assertEqual(
             [b"https://blah.com/", b"https://example.com/"],
             list(config.get_multivar(("url", "https://samba.org/"), "insteadOf")),
@@ -618,3 +632,22 @@ class CaseInsensitiveConfigTests(TestCase):
         config[("branch", "master")] = "value"
         self.assertEqual("value", config[("BRANCH", "MASTER")])
         self.assertEqual("value", config[("Branch", "Master")])
+
+
+class ConfigFileSetTests(TestCase):
+    def test_set_replaces_value(self) -> None:
+        # Test that set() replaces the value instead of appending
+        cf = ConfigFile()
+        cf.set((b"core",), b"sshCommand", b"ssh -i ~/.ssh/id_rsa1")
+        cf.set((b"core",), b"sshCommand", b"ssh -i ~/.ssh/id_rsa2")
+
+        # Should only have one value
+        self.assertEqual(b"ssh -i ~/.ssh/id_rsa2", cf.get((b"core",), b"sshCommand"))
+
+        # When written to file, should only have one entry
+        f = BytesIO()
+        cf.write_to_file(f)
+        content = f.getvalue()
+        self.assertEqual(1, content.count(b"sshCommand"))
+        self.assertIn(b"sshCommand = ssh -i ~/.ssh/id_rsa2", content)
+        self.assertNotIn(b"id_rsa1", content)

@@ -1193,7 +1193,9 @@ def reset(repo, mode, treeish="HEAD") -> None:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(source, target) -> None:
+            def symlink_fn(  # type: ignore
+                source, target, target_is_directory=False, *, dir_fd=None
+            ) -> None:
                 mode = "w" + ("b" if isinstance(source, bytes) else "")
                 with open(target, mode) as f:
                     f.write(source)

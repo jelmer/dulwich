@@ -24,6 +24,9 @@
 
  * Add basic merge command. (Jelmer Vernooĳ)
 
+* Fix typing for ``dulwich.client`` methods that take repositories.
+   (Jelmer Vernooĳ, #1521)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

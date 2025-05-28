@@ -129,7 +129,7 @@ from .refs import (
     read_info_refs,
     split_peeled_refs,
 )
-from .repo import Repo
+from .repo import BaseRepo, Repo
 
 # Default ref prefix, used if none is specified.
 # GitHub defaults to just sending HEAD if no ref-prefix is
@@ -922,7 +922,7 @@ class GitClient:
     def fetch(
         self,
         path: str,
-        target: Repo,
+        target: BaseRepo,
         determine_wants: Optional[
             Callable[[dict[bytes, bytes], Optional[int]], list[bytes]]
         ] = None,
@@ -1831,7 +1831,7 @@ class LocalGitClient(GitClient):
     def fetch(
         self,
         path: str,
-        target: Repo,
+        target: BaseRepo,
         determine_wants: Optional[
             Callable[[dict[bytes, bytes], Optional[int]], list[bytes]]
         ] = None,

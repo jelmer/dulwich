@@ -10,6 +10,9 @@
  * ``Config.set`` replaces values by default, ``Config.add``
    appends them. (Jelmer Vernooĳ, #1545)
 
+ * Support ``core.sshCommand`` setting.
+   (Jelmer Vernooĳ, #1548)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

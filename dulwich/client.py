@@ -2125,9 +2125,21 @@ class SSHGitClient(TraditionalGitClient):
         self.username = username
         self.password = password
         self.key_filename = key_filename
-        self.ssh_command = ssh_command or os.environ.get(
-            "GIT_SSH_COMMAND", os.environ.get("GIT_SSH")
-        )
+        # Priority: ssh_command parameter, then env vars, then core.sshCommand config
+        if ssh_command:
+            self.ssh_command = ssh_command
+        else:
+            # Check environment variables first
+            self.ssh_command = os.environ.get(
+                "GIT_SSH_COMMAND", os.environ.get("GIT_SSH")
+            )
+
+            # Fall back to config if no environment variable set
+            if not self.ssh_command and config is not None:
+                config_ssh_command = config.get((b"core",), b"sshCommand")
+                self.ssh_command = (
+                    config_ssh_command.decode() if config_ssh_command else None
+                )
         super().__init__(**kwargs)
         self.alternative_paths: dict[bytes, bytes] = {}
         if vendor is not None:
@@ -2920,7 +2932,7 @@ def _get_transport_and_path_from_url(url, config, operation, **kwargs):
     if parsed.scheme == "git":
         return (TCPGitClient.from_parsedurl(parsed, **kwargs), parsed.path)
     elif parsed.scheme in ("git+ssh", "ssh"):
-        return SSHGitClient.from_parsedurl(parsed, **kwargs), parsed.path
+        return SSHGitClient.from_parsedurl(parsed, config=config, **kwargs), parsed.path
     elif parsed.scheme in ("http", "https"):
         return (
             HttpGitClient.from_parsedurl(parsed, config=config, **kwargs),
@@ -2997,7 +3009,7 @@ def get_transport_and_path(
         # Otherwise, assume it's a local path.
         return default_local_git_client_cls(**kwargs), location
     else:
-        return SSHGitClient(hostname, username=username, **kwargs), path
+        return SSHGitClient(hostname, username=username, config=config, **kwargs), path
 
 
 DEFAULT_GIT_CREDENTIALS_PATHS = [

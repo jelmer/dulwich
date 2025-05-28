@@ -1661,12 +1661,19 @@ class SubprocessWrapper:
         else:
             return _fileno_can_read(self.proc.stdout.fileno())
 
-    def close(self) -> None:
+    def close(self, timeout: Optional[int] = 60) -> None:
         self.proc.stdin.close()
         self.proc.stdout.close()
         if self.proc.stderr:
             self.proc.stderr.close()
-        self.proc.wait()
+        try:
+            self.proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired as e:
+            self.proc.kill()
+            self.proc.wait()
+            raise GitProtocolError(
+                f"Git subprocess did not terminate within {timeout} seconds; killed it."
+            ) from e
 
 
 def find_git_command() -> list[str]:

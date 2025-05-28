@@ -1007,6 +1007,157 @@ def _has_directory_changed(tree_path: bytes, entry) -> bool:
     return False
 
 
+def update_working_tree(
+    repo,
+    old_tree_id,
+    new_tree_id,
+    honor_filemode=True,
+    validate_path_element=None,
+    symlink_fn=None,
+    force_remove_untracked=False,
+):
+    """Update the working tree and index to match a new tree.
+
+    This function handles:
+    - Adding new files
+    - Updating modified files
+    - Removing deleted files
+    - Cleaning up empty directories
+
+    Args:
+      repo: Repository object
+      old_tree_id: SHA of the tree before the update
+      new_tree_id: SHA of the tree to update to
+      honor_filemode: An optional flag to honor core.filemode setting
+      validate_path_element: Function to validate path elements to check out
+      symlink_fn: Function to use for creating symlinks
+      force_remove_untracked: If True, remove files that exist in working
+        directory but not in target tree, even if old_tree_id is None
+    """
+    import os
+
+    # Set default validate_path_element if not provided
+    if validate_path_element is None:
+        validate_path_element = validate_path_element_default
+
+    # Get the trees
+    old_tree = repo[old_tree_id] if old_tree_id else None
+    repo[new_tree_id]
+
+    # Open the index
+    index = repo.open_index()
+
+    # Track which paths we've dealt with
+    handled_paths = set()
+
+    # Get repo path as string for comparisons
+    repo_path_str = repo.path if isinstance(repo.path, str) else repo.path.decode()
+
+    # First, update/add all files in the new tree
+    for entry in iter_tree_contents(repo.object_store, new_tree_id):
+        handled_paths.add(entry.path)
+
+        # Skip .git directory
+        if entry.path.startswith(b".git"):
+            continue
+
+        # Validate path element
+        if not validate_path(entry.path, validate_path_element):
+            continue
+
+        # Build full path
+        full_path = os.path.join(repo_path_str, entry.path.decode())
+
+        # Get the blob
+        blob = repo.object_store[entry.sha]
+
+        # Ensure parent directory exists
+        parent_dir = os.path.dirname(full_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
+
+        # Write the file
+        st = build_file_from_blob(
+            blob,
+            entry.mode,
+            full_path.encode(),
+            honor_filemode=honor_filemode,
+            symlink_fn=symlink_fn,
+        )
+
+        # Update index
+        index[entry.path] = index_entry_from_stat(st, entry.sha)
+
+    # Remove files that existed in old tree but not in new tree
+    if old_tree:
+        for entry in iter_tree_contents(repo.object_store, old_tree_id):
+            if entry.path not in handled_paths:
+                # Skip .git directory
+                if entry.path.startswith(b".git"):
+                    continue
+
+                # File was deleted
+                full_path = os.path.join(repo_path_str, entry.path.decode())
+
+                # Remove from working tree
+                if os.path.exists(full_path):
+                    os.remove(full_path)
+
+                # Remove from index
+                if entry.path in index:
+                    del index[entry.path]
+
+                # Clean up empty directories
+                dir_path = os.path.dirname(full_path)
+                while (
+                    dir_path and dir_path != repo_path_str and os.path.exists(dir_path)
+                ):
+                    try:
+                        if not os.listdir(dir_path):
+                            os.rmdir(dir_path)
+                            dir_path = os.path.dirname(dir_path)
+                        else:
+                            break
+                    except OSError:
+                        break
+
+    # If force_remove_untracked is True, remove any files in working directory
+    # that are not in the target tree (useful for reset --hard)
+    if force_remove_untracked:
+        # Walk through all files in the working directory
+        for root, dirs, files in os.walk(repo_path_str):
+            # Skip .git directory
+            if ".git" in dirs:
+                dirs.remove(".git")
+
+            for file in files:
+                full_path = os.path.join(root, file)
+                # Get relative path from repo root
+                rel_path = os.path.relpath(full_path, repo_path_str)
+                rel_path_bytes = rel_path.encode()
+
+                # If this file is not in the target tree, remove it
+                if rel_path_bytes not in handled_paths:
+                    os.remove(full_path)
+
+                    # Remove from index if present
+                    if rel_path_bytes in index:
+                        del index[rel_path_bytes]
+
+        # Clean up empty directories
+        for root, dirs, files in os.walk(repo_path_str, topdown=False):
+            if ".git" in root:
+                continue
+            if root != repo_path_str and not files and not dirs:
+                try:
+                    os.rmdir(root)
+                except OSError:
+                    pass
+
+    # Write the updated index
+    index.write()
+
+
 def get_unstaged_changes(
     index: Index, root_path: Union[str, bytes], filter_blob_callback=None
 ):

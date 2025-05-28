@@ -26,6 +26,9 @@
 
  * Update working tree in pull. (Jelmer Vernooĳ, #452)
 
+ * Support switching branch in a way that updates
+   working tree. (Jelmer Vernooĳ, #576)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

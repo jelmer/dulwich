@@ -30,6 +30,8 @@
  * Fix handling of casing of subsection names in config.
    (Jelmer Vernooĳ, #1183)
 
+ * Update working tree in pull. (Jelmer Vernooĳ, #452)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

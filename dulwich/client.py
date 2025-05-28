@@ -2111,7 +2111,7 @@ def ParamikoSSHVendor(**kwargs):
 
 
 # Can be overridden by users
-get_ssh_vendor = SubprocessSSHVendor
+get_ssh_vendor: Callable[[], SSHVendor] = SubprocessSSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):

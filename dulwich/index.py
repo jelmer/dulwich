@@ -69,6 +69,173 @@ EXTENDED_FLAG_INTEND_TO_ADD = 0x2000
 DEFAULT_VERSION = 2
 
 
+def _encode_varint(value: int) -> bytes:
+    """Encode an integer using variable-width encoding.
+
+    Same format as used for OFS_DELTA pack entries and index v4 path compression.
+    Uses 7 bits per byte, with the high bit indicating continuation.
+
+    Args:
+      value: Integer to encode
+    Returns:
+      Encoded bytes
+    """
+    if value == 0:
+        return b"\x00"
+
+    result = []
+    while value > 0:
+        byte = value & 0x7F  # Take lower 7 bits
+        value >>= 7
+        if value > 0:
+            byte |= 0x80  # Set continuation bit
+        result.append(byte)
+
+    return bytes(result)
+
+
+def _decode_varint(data: bytes, offset: int = 0) -> tuple[int, int]:
+    """Decode a variable-width encoded integer.
+
+    Args:
+      data: Bytes to decode from
+      offset: Starting offset in data
+    Returns:
+      tuple of (decoded_value, new_offset)
+    """
+    value = 0
+    shift = 0
+    pos = offset
+
+    while pos < len(data):
+        byte = data[pos]
+        pos += 1
+        value |= (byte & 0x7F) << shift
+        shift += 7
+        if not (byte & 0x80):  # No continuation bit
+            break
+
+    return value, pos
+
+
+def _compress_path(path: bytes, previous_path: bytes) -> bytes:
+    """Compress a path relative to the previous path for index version 4.
+
+    Args:
+      path: Path to compress
+      previous_path: Previous path for comparison
+    Returns:
+      Compressed path data (varint prefix_len + suffix)
+    """
+    # Find the common prefix length
+    common_len = 0
+    min_len = min(len(path), len(previous_path))
+
+    for i in range(min_len):
+        if path[i] == previous_path[i]:
+            common_len += 1
+        else:
+            break
+
+    # The number of bytes to remove from the end of previous_path
+    # to get the common prefix
+    remove_len = len(previous_path) - common_len
+
+    # The suffix to append
+    suffix = path[common_len:]
+
+    # Encode: varint(remove_len) + suffix + NUL
+    return _encode_varint(remove_len) + suffix + b"\x00"
+
+
+def _decompress_path(
+    data: bytes, offset: int, previous_path: bytes
+) -> tuple[bytes, int]:
+    """Decompress a path from index version 4 compressed format.
+
+    Args:
+      data: Raw data containing compressed path
+      offset: Starting offset in data
+      previous_path: Previous path for decompression
+    Returns:
+      tuple of (decompressed_path, new_offset)
+    """
+    # Decode the number of bytes to remove from previous path
+    remove_len, new_offset = _decode_varint(data, offset)
+
+    # Find the NUL terminator for the suffix
+    suffix_start = new_offset
+    suffix_end = suffix_start
+    while suffix_end < len(data) and data[suffix_end] != 0:
+        suffix_end += 1
+
+    if suffix_end >= len(data):
+        raise ValueError("Unterminated path suffix in compressed entry")
+
+    suffix = data[suffix_start:suffix_end]
+    new_offset = suffix_end + 1  # Skip the NUL terminator
+
+    # Reconstruct the path
+    if remove_len > len(previous_path):
+        raise ValueError(
+            f"Invalid path compression: trying to remove {remove_len} bytes from {len(previous_path)}-byte path"
+        )
+
+    prefix = previous_path[:-remove_len] if remove_len > 0 else previous_path
+    path = prefix + suffix
+
+    return path, new_offset
+
+
+def _decompress_path_from_stream(f, previous_path: bytes) -> tuple[bytes, int]:
+    """Decompress a path from index version 4 compressed format, reading from stream.
+
+    Args:
+      f: File-like object to read from
+      previous_path: Previous path for decompression
+    Returns:
+      tuple of (decompressed_path, bytes_consumed)
+    """
+    # Decode the varint for remove_len by reading byte by byte
+    remove_len = 0
+    shift = 0
+    bytes_consumed = 0
+
+    while True:
+        byte_data = f.read(1)
+        if not byte_data:
+            raise ValueError("Unexpected end of file while reading varint")
+        byte = byte_data[0]
+        bytes_consumed += 1
+        remove_len |= (byte & 0x7F) << shift
+        shift += 7
+        if not (byte & 0x80):  # No continuation bit
+            break
+
+    # Read the suffix until NUL terminator
+    suffix = b""
+    while True:
+        byte_data = f.read(1)
+        if not byte_data:
+            raise ValueError("Unexpected end of file while reading path suffix")
+        byte = byte_data[0]
+        bytes_consumed += 1
+        if byte == 0:  # NUL terminator
+            break
+        suffix += bytes([byte])
+
+    # Reconstruct the path
+    if remove_len > len(previous_path):
+        raise ValueError(
+            f"Invalid path compression: trying to remove {remove_len} bytes from {len(previous_path)}-byte path"
+        )
+
+    prefix = previous_path[:-remove_len] if remove_len > 0 else previous_path
+    path = prefix + suffix
+
+    return path, bytes_consumed
+
+
 class Stage(Enum):
     NORMAL = 0
     MERGE_CONFLICT_ANCESTOR = 1
@@ -241,11 +408,15 @@ def write_cache_time(f, t) -> None:
     f.write(struct.pack(">LL", *t))
 
 
-def read_cache_entry(f, version: int) -> SerializedIndexEntry:
+def read_cache_entry(
+    f, version: int, previous_path: bytes = b""
+) -> SerializedIndexEntry:
     """Read an entry from a cache file.
 
     Args:
       f: File-like object to read from
+      version: Index version
+      previous_path: Previous entry's path (for version 4 compression)
     """
     beginoffset = f.tell()
     ctime = read_cache_time(f)
@@ -266,11 +437,26 @@ def read_cache_entry(f, version: int) -> SerializedIndexEntry:
         (extended_flags,) = struct.unpack(">H", f.read(2))
     else:
         extended_flags = 0
-    name = f.read(flags & FLAG_NAMEMASK)
+
+    if version >= 4:
+        # Version 4: path is compressed, name length should be 0
+        name_len = flags & FLAG_NAMEMASK
+        if name_len != 0:
+            raise ValueError(
+                f"Non-zero name length {name_len} in version 4 index entry"
+            )
+
+        # Read compressed path data byte by byte to avoid seeking
+        name, consumed = _decompress_path_from_stream(f, previous_path)
+    else:
+        # Versions < 4: regular name reading
+        name = f.read(flags & FLAG_NAMEMASK)
+
     # Padding:
     if version < 4:
         real_size = (f.tell() - beginoffset + 8) & ~7
         f.read((beginoffset + real_size) - f.tell())
+
     return SerializedIndexEntry(
         name,
         ctime,
@@ -287,21 +473,33 @@ def read_cache_entry(f, version: int) -> SerializedIndexEntry:
     )
 
 
-def write_cache_entry(f, entry: SerializedIndexEntry, version: int) -> None:
+def write_cache_entry(
+    f, entry: SerializedIndexEntry, version: int, previous_path: bytes = b""
+) -> None:
     """Write an index entry to a file.
 
     Args:
       f: File object
-      entry: IndexEntry to write, tuple with:
+      entry: IndexEntry to write
+      version: Index format version
+      previous_path: Previous entry's path (for version 4 compression)
     """
     beginoffset = f.tell()
     write_cache_time(f, entry.ctime)
     write_cache_time(f, entry.mtime)
-    flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+
+    if version >= 4:
+        # Version 4: use path compression, set name length to 0
+        flags = 0 | (entry.flags & ~FLAG_NAMEMASK)
+    else:
+        # Versions < 4: include actual name length
+        flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+
     if entry.extended_flags:
         flags |= FLAG_EXTENDED
     if flags & FLAG_EXTENDED and version is not None and version < 3:
         raise AssertionError("unable to use extended flags in version < 3")
+
     f.write(
         struct.pack(
             b">LLLLLL20sH",
@@ -317,8 +515,14 @@ def write_cache_entry(f, entry: SerializedIndexEntry, version: int) -> None:
     )
     if flags & FLAG_EXTENDED:
         f.write(struct.pack(b">H", entry.extended_flags))
-    f.write(entry.name)
-    if version < 4:
+
+    if version >= 4:
+        # Version 4: write compressed path
+        compressed_path = _compress_path(entry.name, previous_path)
+        f.write(compressed_path)
+    else:
+        # Versions < 4: write regular path and padding
+        f.write(entry.name)
         real_size = (f.tell() - beginoffset + 8) & ~7
         f.write(b"\0" * ((beginoffset + real_size) - f.tell()))
 
@@ -348,8 +552,11 @@ def read_index_header(f: BinaryIO) -> tuple[int, int]:
 def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
     """Read an index file, yielding the individual entries."""
     version, num_entries = read_index_header(f)
+    previous_path = b""
     for i in range(num_entries):
-        yield read_cache_entry(f, version)
+        entry = read_cache_entry(f, version, previous_path)
+        previous_path = entry.name
+        yield entry
 
 
 def read_index_dict_with_version(
@@ -363,8 +570,10 @@ def read_index_dict_with_version(
     version, num_entries = read_index_header(f)
 
     ret: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
+    previous_path = b""
     for i in range(num_entries):
-        entry = read_cache_entry(f, version)
+        entry = read_cache_entry(f, version, previous_path)
+        previous_path = entry.name
         stage = entry.stage()
         if stage == Stage.NORMAL:
             ret[entry.name] = IndexEntry.from_serialized(entry)
@@ -432,8 +641,10 @@ def write_index(
     # Proceed with the existing code to write the header and entries.
     f.write(b"DIRC")
     f.write(struct.pack(b">LL", version, len(entries)))
+    previous_path = b""
     for entry in entries:
-        write_cache_entry(f, entry, version=version)
+        write_cache_entry(f, entry, version=version, previous_path=previous_path)
+        previous_path = entry.name
 
 
 def write_index_dict(

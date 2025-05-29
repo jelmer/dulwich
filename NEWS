@@ -1,5 +1,11 @@
 0.22.9	UNRELEASED
 
+ * Add support for Git's ``feature.manyFiles`` configuration and index version 4.
+   This enables compatibility with repositories using manyFiles feature and
+   provides faster index writes through optional hash skipping. Supports
+   ``feature.manyFiles``, ``index.version``, and ``index.skipHash`` configuration
+   options. Path prefix compression not yet implemented. (Jelmer Vernooĳ, #1462)
+
  * In dulwich.porcelain docstring, list functions by their Python identifiers.
    (Marnanel Thurman)
 

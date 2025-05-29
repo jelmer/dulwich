@@ -1211,3 +1211,163 @@ class TestIndexEntryFromPath(TestCase):
         self.assertEqual(
             sorted(changes), [b"conflict", b"file1", b"file2", b"file3", b"file4"]
         )
+
+
+class TestManyFilesFeature(TestCase):
+    """Tests for the manyFiles feature (index version 4 and skipHash)."""
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def test_index_version_4_parsing(self):
+        """Test that index version 4 files can be parsed."""
+        index_path = os.path.join(self.tempdir, "index")
+
+        # Create an index with version 4
+        index = Index(index_path, read=False, version=4)
+
+        # Add some entries
+        entry = IndexEntry(
+            ctime=(1234567890, 0),
+            mtime=(1234567890, 0),
+            dev=1,
+            ino=1,
+            mode=0o100644,
+            uid=1000,
+            gid=1000,
+            size=5,
+            sha=b"0" * 40,
+        )
+        index[b"test.txt"] = entry
+
+        # Write and read back
+        index.write()
+
+        # Read the index back
+        index2 = Index(index_path)
+        self.assertEqual(index2._version, 4)
+        self.assertIn(b"test.txt", index2)
+
+    def test_skip_hash_feature(self):
+        """Test that skipHash feature works correctly."""
+        index_path = os.path.join(self.tempdir, "index")
+
+        # Create an index with skipHash enabled
+        index = Index(index_path, read=False, skip_hash=True)
+
+        # Add some entries
+        entry = IndexEntry(
+            ctime=(1234567890, 0),
+            mtime=(1234567890, 0),
+            dev=1,
+            ino=1,
+            mode=0o100644,
+            uid=1000,
+            gid=1000,
+            size=5,
+            sha=b"0" * 40,
+        )
+        index[b"test.txt"] = entry
+
+        # Write the index
+        index.write()
+
+        # Verify the file was written with zero hash
+        with open(index_path, "rb") as f:
+            f.seek(-20, 2)  # Seek to last 20 bytes
+            trailing_hash = f.read(20)
+            self.assertEqual(trailing_hash, b"\x00" * 20)
+
+        # Verify we can still read it back
+        index2 = Index(index_path)
+        self.assertIn(b"test.txt", index2)
+
+    def test_version_4_no_padding(self):
+        """Test that version 4 entries have no padding."""
+        # Create a version 4 entry and version 2 entry to compare
+        entry = SerializedIndexEntry(
+            name=b"test.txt",
+            ctime=(1234567890, 0),
+            mtime=(1234567890, 0),
+            dev=1,
+            ino=1,
+            mode=0o100644,
+            uid=1000,
+            gid=1000,
+            size=5,
+            sha=b"0" * 40,
+            flags=len(b"test.txt"),
+            extended_flags=0,
+        )
+
+        # Test version 2 (with padding)
+        buf_v2 = BytesIO()
+        from dulwich.index import write_cache_entry
+
+        write_cache_entry(buf_v2, entry, version=2)
+        v2_data = buf_v2.getvalue()
+
+        # Test version 4 (without padding)
+        buf_v4 = BytesIO()
+        write_cache_entry(buf_v4, entry, version=4)
+        v4_data = buf_v4.getvalue()
+
+        # Version 4 should be shorter due to no padding
+        self.assertLess(len(v4_data), len(v2_data))
+
+        # Both should parse correctly
+        buf_v2.seek(0)
+        from dulwich.index import read_cache_entry
+
+        parsed_v2 = read_cache_entry(buf_v2, version=2)
+
+        buf_v4.seek(0)
+        parsed_v4 = read_cache_entry(buf_v4, version=4)
+
+        # Both should have the same content
+        self.assertEqual(parsed_v2.name, parsed_v4.name)
+        self.assertEqual(parsed_v2.sha, parsed_v4.sha)
+
+
+class TestManyFilesRepoIntegration(TestCase):
+    """Tests for manyFiles feature integration with Repo."""
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def test_repo_with_manyfiles_config(self):
+        """Test that a repository with feature.manyFiles=true uses the right settings."""
+        from dulwich.repo import Repo
+
+        # Create a new repository
+        repo = Repo.init(self.tempdir)
+
+        # Set feature.manyFiles=true in config
+        config = repo.get_config()
+        config.set(b"feature", b"manyFiles", b"true")
+        config.write_to_path()
+
+        # Open the index - should have skipHash enabled and version 4
+        index = repo.open_index()
+        self.assertTrue(index._skip_hash)
+        self.assertEqual(index._version, 4)
+
+    def test_repo_with_explicit_index_settings(self):
+        """Test that explicit index.version and index.skipHash work."""
+        from dulwich.repo import Repo
+
+        # Create a new repository
+        repo = Repo.init(self.tempdir)
+
+        # Set explicit index settings
+        config = repo.get_config()
+        config.set(b"index", b"version", b"3")
+        config.set(b"index", b"skipHash", b"false")
+        config.write_to_path()
+
+        # Open the index - should respect explicit settings
+        index = repo.open_index()
+        self.assertFalse(index._skip_hash)
+        self.assertEqual(index._version, 3)

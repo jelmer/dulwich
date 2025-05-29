@@ -330,16 +330,55 @@ class UnsupportedIndexFormat(Exception):
         self.index_format_version = version
 
 
-def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
-    """Read an index file, yielding the individual entries."""
+def read_index_header(f: BinaryIO) -> tuple[int, int]:
+    """Read an index header from a file.
+
+    Returns:
+      tuple of (version, num_entries)
+    """
     header = f.read(4)
     if header != b"DIRC":
         raise AssertionError(f"Invalid index file header: {header!r}")
     (version, num_entries) = struct.unpack(b">LL", f.read(4 * 2))
-    if version not in (1, 2, 3):
+    if version not in (1, 2, 3, 4):
         raise UnsupportedIndexFormat(version)
+    return version, num_entries
+
+
+def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
+    """Read an index file, yielding the individual entries."""
+    version, num_entries = read_index_header(f)
     for i in range(num_entries):
         yield read_cache_entry(f, version)
+
+
+def read_index_dict_with_version(
+    f: BinaryIO,
+) -> tuple[dict[bytes, Union[IndexEntry, ConflictedIndexEntry]], int]:
+    """Read an index file and return it as a dictionary along with the version.
+
+    Returns:
+      tuple of (entries_dict, version)
+    """
+    version, num_entries = read_index_header(f)
+
+    ret: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
+    for i in range(num_entries):
+        entry = read_cache_entry(f, version)
+        stage = entry.stage()
+        if stage == Stage.NORMAL:
+            ret[entry.name] = IndexEntry.from_serialized(entry)
+        else:
+            existing = ret.setdefault(entry.name, ConflictedIndexEntry())
+            if isinstance(existing, IndexEntry):
+                raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
+            if stage == Stage.MERGE_CONFLICT_ANCESTOR:
+                existing.ancestor = IndexEntry.from_serialized(entry)
+            elif stage == Stage.MERGE_CONFLICT_THIS:
+                existing.this = IndexEntry.from_serialized(entry)
+            elif stage == Stage.MERGE_CONFLICT_OTHER:
+                existing.other = IndexEntry.from_serialized(entry)
+    return ret, version
 
 
 def read_index_dict(f) -> dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
@@ -454,16 +493,25 @@ class Index:
 
     _byname: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
 
-    def __init__(self, filename: Union[bytes, str], read=True) -> None:
+    def __init__(
+        self,
+        filename: Union[bytes, str],
+        read=True,
+        skip_hash: bool = False,
+        version: Optional[int] = None,
+    ) -> None:
         """Create an index object associated with the given filename.
 
         Args:
           filename: Path to the index file
           read: Whether to initialize the index from the given file, should it exist.
+          skip_hash: Whether to skip SHA1 hash when writing (for manyfiles feature)
+          version: Index format version to use (None = auto-detect from file or use default)
         """
         self._filename = filename
         # TODO(jelmer): Store the version returned by read_index
-        self._version = None
+        self._version = version
+        self._skip_hash = skip_hash
         self.clear()
         if read:
             self.read()
@@ -479,10 +527,19 @@ class Index:
         """Write current contents of index to disk."""
         f = GitFile(self._filename, "wb")
         try:
-            f = SHA1Writer(f)
-            write_index_dict(f, self._byname, version=self._version)
-        finally:
+            if self._skip_hash:
+                # When skipHash is enabled, write the index without computing SHA1
+                write_index_dict(f, self._byname, version=self._version)
+                # Write 20 zero bytes instead of SHA1
+                f.write(b"\x00" * 20)
+                f.close()
+            else:
+                f = SHA1Writer(f)
+                write_index_dict(f, self._byname, version=self._version)
+                f.close()
+        except:
             f.close()
+            raise
 
     def read(self) -> None:
         """Read current contents of index from disk."""
@@ -491,7 +548,9 @@ class Index:
         f = GitFile(self._filename, "rb")
         try:
             f = SHA1Reader(f)
-            self.update(read_index_dict(f))
+            entries, version = read_index_dict_with_version(f)
+            self._version = version
+            self.update(entries)
             # FIXME: Additional data?
             f.read(os.path.getsize(self._filename) - f.tell() - 20)
             f.check_sha(allow_empty=True)

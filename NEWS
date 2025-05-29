@@ -1,10 +1,11 @@
 0.22.9	UNRELEASED
 
- * Add full support for Git's ``feature.manyFiles`` configuration and index version 4.
+ * Add support for Git's ``feature.manyFiles`` configuration and index version 4.
    This enables faster Git operations in large repositories through path prefix
    compression (30-50% smaller index files) and optional hash skipping for faster
    writes. Supports ``feature.manyFiles``, ``index.version``, and ``index.skipHash``
-   configuration options with complete index v4 compatibility. (Jelmer Vernooĳ, #1462)
+   configuration options.
+   (Jelmer Vernooĳ, #1462)
 
  * In dulwich.porcelain docstring, list functions by their Python identifiers.
    (Marnanel Thurman)

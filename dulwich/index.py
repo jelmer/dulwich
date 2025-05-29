@@ -68,6 +68,13 @@ EXTENDED_FLAG_INTEND_TO_ADD = 0x2000
 
 DEFAULT_VERSION = 2
 
+# Index extension signatures
+TREE_EXTENSION = b"TREE"
+REUC_EXTENSION = b"REUC"
+UNTR_EXTENSION = b"UNTR"
+EOIE_EXTENSION = b"EOIE"
+IEOT_EXTENSION = b"IEOT"
+
 
 def _encode_varint(value: int) -> bytes:
     """Encode an integer using variable-width encoding.
@@ -263,6 +270,83 @@ class SerializedIndexEntry:
 
 
 @dataclass
+class IndexExtension:
+    """Base class for index extensions."""
+
+    signature: bytes
+    data: bytes
+
+    @classmethod
+    def from_raw(cls, signature: bytes, data: bytes) -> "IndexExtension":
+        """Create an extension from raw data.
+
+        Args:
+          signature: 4-byte extension signature
+          data: Extension data
+        Returns:
+          Parsed extension object
+        """
+        if signature == TREE_EXTENSION:
+            return TreeExtension.from_bytes(data)
+        elif signature == REUC_EXTENSION:
+            return ResolveUndoExtension.from_bytes(data)
+        elif signature == UNTR_EXTENSION:
+            return UntrackedExtension.from_bytes(data)
+        else:
+            # Unknown extension - just store raw data
+            return cls(signature, data)
+
+    def to_bytes(self) -> bytes:
+        """Serialize extension to bytes."""
+        return self.data
+
+
+class TreeExtension(IndexExtension):
+    """Tree cache extension."""
+
+    def __init__(self, entries: list[tuple[bytes, bytes, int]]) -> None:
+        self.entries = entries
+        super().__init__(TREE_EXTENSION, b"")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "TreeExtension":
+        # TODO: Implement tree cache parsing
+        return cls([])
+
+    def to_bytes(self) -> bytes:
+        # TODO: Implement tree cache serialization
+        return b""
+
+
+class ResolveUndoExtension(IndexExtension):
+    """Resolve undo extension for recording merge conflicts."""
+
+    def __init__(self, entries: list[tuple[bytes, list[tuple[int, bytes]]]]) -> None:
+        self.entries = entries
+        super().__init__(REUC_EXTENSION, b"")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "ResolveUndoExtension":
+        # TODO: Implement resolve undo parsing
+        return cls([])
+
+    def to_bytes(self) -> bytes:
+        # TODO: Implement resolve undo serialization
+        return b""
+
+
+class UntrackedExtension(IndexExtension):
+    """Untracked cache extension."""
+
+    def __init__(self, data: bytes) -> None:
+        super().__init__(UNTR_EXTENSION, data)
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "UntrackedExtension":
+        return cls(data)
+
+
+@dataclass
 class IndexEntry:
     ctime: Union[int, float, tuple[int, int]]
     mtime: Union[int, float, tuple[int, int]]
@@ -439,14 +523,7 @@ def read_cache_entry(
         extended_flags = 0
 
     if version >= 4:
-        # Version 4: path is compressed, name length should be 0
-        name_len = flags & FLAG_NAMEMASK
-        if name_len != 0:
-            raise ValueError(
-                f"Non-zero name length {name_len} in version 4 index entry"
-            )
-
-        # Read compressed path data byte by byte to avoid seeking
+        # Version 4: paths are always compressed (name_len should be 0)
         name, consumed = _decompress_path_from_stream(f, previous_path)
     else:
         # Versions < 4: regular name reading
@@ -489,11 +566,15 @@ def write_cache_entry(
     write_cache_time(f, entry.mtime)
 
     if version >= 4:
-        # Version 4: use path compression, set name length to 0
-        flags = 0 | (entry.flags & ~FLAG_NAMEMASK)
+        # Version 4: use compression but set name_len to actual filename length
+        # This matches how C Git implements index v4 flags
+        compressed_path = _compress_path(entry.name, previous_path)
+        flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+        use_compression = True
     else:
         # Versions < 4: include actual name length
         flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+        use_compression = False
 
     if entry.extended_flags:
         flags |= FLAG_EXTENDED
@@ -517,8 +598,7 @@ def write_cache_entry(
         f.write(struct.pack(b">H", entry.extended_flags))
 
     if version >= 4:
-        # Version 4: write compressed path
-        compressed_path = _compress_path(entry.name, previous_path)
+        # Version 4: always write compressed path
         f.write(compressed_path)
     else:
         # Versions < 4: write regular path and padding
@@ -547,6 +627,23 @@ def read_index_header(f: BinaryIO) -> tuple[int, int]:
     if version not in (1, 2, 3, 4):
         raise UnsupportedIndexFormat(version)
     return version, num_entries
+
+
+
+
+
+
+def write_index_extension(f: BinaryIO, extension: IndexExtension) -> None:
+    """Write an index extension.
+
+    Args:
+      f: File-like object to write to
+      extension: Extension to write
+    """
+    data = extension.to_bytes()
+    f.write(extension.signature)
+    f.write(struct.pack(">I", len(data)))
+    f.write(data)
 
 
 def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
@@ -580,13 +677,16 @@ def read_index_dict_with_version(
         else:
             existing = ret.setdefault(entry.name, ConflictedIndexEntry())
             if isinstance(existing, IndexEntry):
-                raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
+                raise AssertionError(
+                    f"Non-conflicted entry for {entry.name!r} exists"
+                )
             if stage == Stage.MERGE_CONFLICT_ANCESTOR:
                 existing.ancestor = IndexEntry.from_serialized(entry)
             elif stage == Stage.MERGE_CONFLICT_THIS:
                 existing.this = IndexEntry.from_serialized(entry)
             elif stage == Stage.MERGE_CONFLICT_OTHER:
                 existing.other = IndexEntry.from_serialized(entry)
+
     return ret, version
 
 
@@ -762,8 +862,10 @@ class Index:
             entries, version = read_index_dict_with_version(f)
             self._version = version
             self.update(entries)
-            # FIXME: Additional data?
-            f.read(os.path.getsize(self._filename) - f.tell() - 20)
+            # Read any remaining data before the SHA
+            remaining = os.path.getsize(self._filename) - f.tell() - 20
+            if remaining > 0:
+                f.read(remaining)
             f.check_sha(allow_empty=True)
         finally:
             f.close()

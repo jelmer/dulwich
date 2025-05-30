@@ -40,6 +40,8 @@ jobs:
         if: "matrix.os == 'macos-latest'"
       - name: Install dependencies
         run: |
+          # Install build-time dependencies
+          python -m pip install --upgrade "setuptools>=77"
           python -m pip install --upgrade pip
           pip install --upgrade ".[merge,fastimport,paramiko,https]"  setuptools-rust
       - name: Install gpg on supported platforms

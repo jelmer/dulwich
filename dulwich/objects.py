@@ -26,7 +26,6 @@ import binascii
 import os
 import posixpath
 import stat
-import warnings
 import zlib
 from collections import namedtuple
 from collections.abc import Callable, Iterable, Iterator
@@ -39,6 +38,7 @@ from typing import (
     Union,
 )
 
+from . import replace_me
 from .errors import (
     ChecksumMismatch,
     FileFormatException,
@@ -1320,6 +1320,7 @@ def format_time_entry(person, time, timezone_info):
     )
 
 
+@replace_me(since="0.21.0")
 def parse_commit(chunks):
     """Parse a commit object from chunks.
 
@@ -1328,7 +1329,6 @@ def parse_commit(chunks):
     Returns: Tuple of (tree, parents, author_info, commit_info,
         encoding, mergetag, gpgsig, message, extra)
     """
-    warnings.warn("parse_commit will be removed in 0.22", DeprecationWarning)
     parents = []
     extra = []
     tree = None
@@ -1616,13 +1616,9 @@ class Commit(ShaFile):
         doc="Parents of this commit, by their SHA1.",
     )
 
+    @replace_me(since="0.21.0")
     def _get_extra(self):
         """Return extra settings of this commit."""
-        warnings.warn(
-            "Commit.extra is deprecated. Use Commit._extra instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         return self._extra
 
     extra = property(

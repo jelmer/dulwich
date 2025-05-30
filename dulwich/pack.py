@@ -74,6 +74,7 @@ else:
 if sys.platform == "Plan9":
     has_mmap = False
 
+from . import replace_me
 from .errors import ApplyDeltaError, ChecksumMismatch
 from .file import GitFile
 from .lru_cache import LRUSizeCache
@@ -484,10 +485,8 @@ class PackIndex:
         """
         raise NotImplementedError(self.get_pack_checksum)
 
+    @replace_me(since="0.21.0")
     def object_index(self, sha: bytes) -> int:
-        warnings.warn(
-            "Please use object_offset instead", DeprecationWarning, stacklevel=2
-        )
         return self.object_offset(sha)
 
     def object_offset(self, sha: bytes) -> int:

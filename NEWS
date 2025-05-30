@@ -5,7 +5,7 @@
    compression (30-50% smaller index files) and optional hash skipping for faster
    writes. Supports ``feature.manyFiles``, ``index.version``, and ``index.skipHash``
    configuration options.
-   (Jelmer Vernooĳ, #1462)
+   (Jelmer Vernooĳ, #1061, #1462)
 
  * In dulwich.porcelain docstring, list functions by their Python identifiers.
    (Marnanel Thurman)

@@ -1211,3 +1211,358 @@ class TestIndexEntryFromPath(TestCase):
         self.assertEqual(
             sorted(changes), [b"conflict", b"file1", b"file2", b"file3", b"file4"]
         )
+
+
+class TestManyFilesFeature(TestCase):
+    """Tests for the manyFiles feature (index version 4 and skipHash)."""
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def test_index_version_4_parsing(self):
+        """Test that index version 4 files can be parsed."""
+        index_path = os.path.join(self.tempdir, "index")
+
+        # Create an index with version 4
+        index = Index(index_path, read=False, version=4)
+
+        # Add some entries
+        entry = IndexEntry(
+            ctime=(1234567890, 0),
+            mtime=(1234567890, 0),
+            dev=1,
+            ino=1,
+            mode=0o100644,
+            uid=1000,
+            gid=1000,
+            size=5,
+            sha=b"0" * 40,
+        )
+        index[b"test.txt"] = entry
+
+        # Write and read back
+        index.write()
+
+        # Read the index back
+        index2 = Index(index_path)
+        self.assertEqual(index2._version, 4)
+        self.assertIn(b"test.txt", index2)
+
+    def test_skip_hash_feature(self):
+        """Test that skipHash feature works correctly."""
+        index_path = os.path.join(self.tempdir, "index")
+
+        # Create an index with skipHash enabled
+        index = Index(index_path, read=False, skip_hash=True)
+
+        # Add some entries
+        entry = IndexEntry(
+            ctime=(1234567890, 0),
+            mtime=(1234567890, 0),
+            dev=1,
+            ino=1,
+            mode=0o100644,
+            uid=1000,
+            gid=1000,
+            size=5,
+            sha=b"0" * 40,
+        )
+        index[b"test.txt"] = entry
+
+        # Write the index
+        index.write()
+
+        # Verify the file was written with zero hash
+        with open(index_path, "rb") as f:
+            f.seek(-20, 2)  # Seek to last 20 bytes
+            trailing_hash = f.read(20)
+            self.assertEqual(trailing_hash, b"\x00" * 20)
+
+        # Verify we can still read it back
+        index2 = Index(index_path)
+        self.assertIn(b"test.txt", index2)
+
+    def test_version_4_no_padding(self):
+        """Test that version 4 entries have no padding."""
+        # Create entries with names that would show compression benefits
+        entries = [
+            SerializedIndexEntry(
+                name=b"src/main/java/com/example/Service.java",
+                ctime=(1234567890, 0),
+                mtime=(1234567890, 0),
+                dev=1,
+                ino=1,
+                mode=0o100644,
+                uid=1000,
+                gid=1000,
+                size=5,
+                sha=b"0" * 40,
+                flags=0,
+                extended_flags=0,
+            ),
+            SerializedIndexEntry(
+                name=b"src/main/java/com/example/Controller.java",
+                ctime=(1234567890, 0),
+                mtime=(1234567890, 0),
+                dev=1,
+                ino=2,
+                mode=0o100644,
+                uid=1000,
+                gid=1000,
+                size=5,
+                sha=b"1" * 40,
+                flags=0,
+                extended_flags=0,
+            ),
+        ]
+
+        # Test version 2 (with padding, full paths)
+        buf_v2 = BytesIO()
+        from dulwich.index import write_cache_entry
+
+        previous_path = b""
+        for entry in entries:
+            # Set proper flags for v2
+            entry_v2 = SerializedIndexEntry(
+                entry.name,
+                entry.ctime,
+                entry.mtime,
+                entry.dev,
+                entry.ino,
+                entry.mode,
+                entry.uid,
+                entry.gid,
+                entry.size,
+                entry.sha,
+                len(entry.name),
+                entry.extended_flags,
+            )
+            write_cache_entry(buf_v2, entry_v2, version=2, previous_path=previous_path)
+            previous_path = entry.name
+        v2_data = buf_v2.getvalue()
+
+        # Test version 4 (path compression, no padding)
+        buf_v4 = BytesIO()
+        previous_path = b""
+        for entry in entries:
+            write_cache_entry(buf_v4, entry, version=4, previous_path=previous_path)
+            previous_path = entry.name
+        v4_data = buf_v4.getvalue()
+
+        # Version 4 should be shorter due to compression and no padding
+        self.assertLess(len(v4_data), len(v2_data))
+
+        # Both should parse correctly
+        buf_v2.seek(0)
+        from dulwich.index import read_cache_entry
+
+        previous_path = b""
+        parsed_v2_entries = []
+        for _ in entries:
+            parsed = read_cache_entry(buf_v2, version=2, previous_path=previous_path)
+            parsed_v2_entries.append(parsed)
+            previous_path = parsed.name
+
+        buf_v4.seek(0)
+        previous_path = b""
+        parsed_v4_entries = []
+        for _ in entries:
+            parsed = read_cache_entry(buf_v4, version=4, previous_path=previous_path)
+            parsed_v4_entries.append(parsed)
+            previous_path = parsed.name
+
+        # Both should have the same paths
+        for v2_entry, v4_entry in zip(parsed_v2_entries, parsed_v4_entries):
+            self.assertEqual(v2_entry.name, v4_entry.name)
+            self.assertEqual(v2_entry.sha, v4_entry.sha)
+
+
+class TestManyFilesRepoIntegration(TestCase):
+    """Tests for manyFiles feature integration with Repo."""
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def test_repo_with_manyfiles_config(self):
+        """Test that a repository with feature.manyFiles=true uses the right settings."""
+        from dulwich.repo import Repo
+
+        # Create a new repository
+        repo = Repo.init(self.tempdir)
+
+        # Set feature.manyFiles=true in config
+        config = repo.get_config()
+        config.set(b"feature", b"manyFiles", b"true")
+        config.write_to_path()
+
+        # Open the index - should have skipHash enabled and version 4
+        index = repo.open_index()
+        self.assertTrue(index._skip_hash)
+        self.assertEqual(index._version, 4)
+
+    def test_repo_with_explicit_index_settings(self):
+        """Test that explicit index.version and index.skipHash work."""
+        from dulwich.repo import Repo
+
+        # Create a new repository
+        repo = Repo.init(self.tempdir)
+
+        # Set explicit index settings
+        config = repo.get_config()
+        config.set(b"index", b"version", b"3")
+        config.set(b"index", b"skipHash", b"false")
+        config.write_to_path()
+
+        # Open the index - should respect explicit settings
+        index = repo.open_index()
+        self.assertFalse(index._skip_hash)
+        self.assertEqual(index._version, 3)
+
+
+class TestPathPrefixCompression(TestCase):
+    """Tests for index version 4 path prefix compression."""
+
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def test_varint_encoding_decoding(self):
+        """Test variable-width integer encoding and decoding."""
+        from dulwich.index import _decode_varint, _encode_varint
+
+        test_values = [0, 1, 127, 128, 255, 256, 16383, 16384, 65535, 65536]
+
+        for value in test_values:
+            encoded = _encode_varint(value)
+            decoded, _ = _decode_varint(encoded, 0)
+            self.assertEqual(value, decoded, f"Failed for value {value}")
+
+    def test_path_compression_simple(self):
+        """Test simple path compression cases."""
+        from dulwich.index import _compress_path, _decompress_path
+
+        # Test case 1: No common prefix
+        compressed = _compress_path(b"file1.txt", b"")
+        decompressed, _ = _decompress_path(compressed, 0, b"")
+        self.assertEqual(b"file1.txt", decompressed)
+
+        # Test case 2: Common prefix
+        compressed = _compress_path(b"src/file2.txt", b"src/file1.txt")
+        decompressed, _ = _decompress_path(compressed, 0, b"src/file1.txt")
+        self.assertEqual(b"src/file2.txt", decompressed)
+
+        # Test case 3: Completely different paths
+        compressed = _compress_path(b"docs/readme.md", b"src/file1.txt")
+        decompressed, _ = _decompress_path(compressed, 0, b"src/file1.txt")
+        self.assertEqual(b"docs/readme.md", decompressed)
+
+    def test_path_compression_deep_directories(self):
+        """Test compression with deep directory structures."""
+        from dulwich.index import _compress_path, _decompress_path
+
+        path1 = b"src/main/java/com/example/service/UserService.java"
+        path2 = b"src/main/java/com/example/service/OrderService.java"
+        path3 = b"src/main/java/com/example/model/User.java"
+
+        # Compress path2 relative to path1
+        compressed = _compress_path(path2, path1)
+        decompressed, _ = _decompress_path(compressed, 0, path1)
+        self.assertEqual(path2, decompressed)
+
+        # Compress path3 relative to path2
+        compressed = _compress_path(path3, path2)
+        decompressed, _ = _decompress_path(compressed, 0, path2)
+        self.assertEqual(path3, decompressed)
+
+    def test_index_version_4_with_compression(self):
+        """Test full index version 4 write/read with path compression."""
+        index_path = os.path.join(self.tempdir, "index")
+
+        # Create an index with version 4
+        index = Index(index_path, read=False, version=4)
+
+        # Add multiple entries with common prefixes
+        paths = [
+            b"src/main/java/App.java",
+            b"src/main/java/Utils.java",
+            b"src/main/resources/config.properties",
+            b"src/test/java/AppTest.java",
+            b"docs/README.md",
+            b"docs/INSTALL.md",
+        ]
+
+        for i, path in enumerate(paths):
+            entry = IndexEntry(
+                ctime=(1234567890, 0),
+                mtime=(1234567890, 0),
+                dev=1,
+                ino=i + 1,
+                mode=0o100644,
+                uid=1000,
+                gid=1000,
+                size=10,
+                sha=f"{i:040d}".encode(),
+            )
+            index[path] = entry
+
+        # Write and read back
+        index.write()
+
+        # Read the index back
+        index2 = Index(index_path)
+        self.assertEqual(index2._version, 4)
+
+        # Verify all paths were preserved correctly
+        for path in paths:
+            self.assertIn(path, index2)
+
+        # Verify the index file is smaller than version 2 would be
+        with open(index_path, "rb") as f:
+            v4_size = len(f.read())
+
+        # Create equivalent version 2 index for comparison
+        index_v2_path = os.path.join(self.tempdir, "index_v2")
+        index_v2 = Index(index_v2_path, read=False, version=2)
+        for path in paths:
+            entry = IndexEntry(
+                ctime=(1234567890, 0),
+                mtime=(1234567890, 0),
+                dev=1,
+                ino=1,
+                mode=0o100644,
+                uid=1000,
+                gid=1000,
+                size=10,
+                sha=b"0" * 40,
+            )
+            index_v2[path] = entry
+        index_v2.write()
+
+        with open(index_v2_path, "rb") as f:
+            v2_size = len(f.read())
+
+        # Version 4 should be smaller due to compression
+        self.assertLess(
+            v4_size, v2_size, "Version 4 index should be smaller than version 2"
+        )
+
+    def test_path_compression_edge_cases(self):
+        """Test edge cases in path compression."""
+        from dulwich.index import _compress_path, _decompress_path
+
+        # Empty paths
+        compressed = _compress_path(b"", b"")
+        decompressed, _ = _decompress_path(compressed, 0, b"")
+        self.assertEqual(b"", decompressed)
+
+        # Path identical to previous
+        compressed = _compress_path(b"same.txt", b"same.txt")
+        decompressed, _ = _decompress_path(compressed, 0, b"same.txt")
+        self.assertEqual(b"same.txt", decompressed)
+
+        # Path shorter than previous
+        compressed = _compress_path(b"short", b"very/long/path/file.txt")
+        decompressed, _ = _decompress_path(compressed, 0, b"very/long/path/file.txt")
+        self.assertEqual(b"short", decompressed)

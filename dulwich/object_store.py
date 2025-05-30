@@ -1150,6 +1150,7 @@ class MemoryObjectStore(BaseObjectStore):
                 for obj in PackInflater.for_pack_data(p, self.get_raw):
                     self.add_object(obj)
                 p.close()
+                f.close()
             else:
                 f.close()
 
@@ -1719,12 +1720,16 @@ class BucketBasedObjectStore(PackBasedObjectStore):
                 if pack.get_stored_checksum() == p.get_stored_checksum():
                     p.close()
                     idx.close()
+                    pf.close()
+                    idxf.close()
                     return pack
             pf.seek(0)
             idxf.seek(0)
             self._upload_pack(basename, pf, idxf)
             final_pack = Pack.from_objects(p, idx)
             self._add_cached_pack(basename, final_pack)
+            pf.close()
+            idxf.close()
             return final_pack
 
         return pf, commit, pf.close

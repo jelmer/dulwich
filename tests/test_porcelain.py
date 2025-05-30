@@ -1739,14 +1739,14 @@ class CheckoutTests(PorcelainTestCase):
 
     def test_checkout_to_existing_branch(self) -> None:
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
     def test_checkout_to_non_existing_branch(self) -> None:
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
 
         with self.assertRaises(KeyError):
-            porcelain.checkout_branch(self.repo, b"bob")
+            porcelain.checkout(self.repo, b"bob")
 
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
 
@@ -1762,13 +1762,13 @@ class CheckoutTests(PorcelainTestCase):
 
         # The new checkout behavior prevents switching with staged changes
         with self.assertRaises(porcelain.CheckoutError):
-            porcelain.checkout_branch(self.repo, b"uni")
+            porcelain.checkout(self.repo, b"uni")
 
         # Should still be on master
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
 
         # Force checkout should work
-        porcelain.checkout_branch(self.repo, b"uni", force=True)
+        porcelain.checkout(self.repo, b"uni", force=True)
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
     def test_checkout_with_deleted_files(self) -> None:
@@ -1780,13 +1780,13 @@ class CheckoutTests(PorcelainTestCase):
 
         # The new checkout behavior prevents switching with staged deletions
         with self.assertRaises(porcelain.CheckoutError):
-            porcelain.checkout_branch(self.repo, b"uni")
+            porcelain.checkout(self.repo, b"uni")
 
         # Should still be on master
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
 
         # Force checkout should work
-        porcelain.checkout_branch(self.repo, b"uni", force=True)
+        porcelain.checkout(self.repo, b"uni", force=True)
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
     def test_checkout_to_branch_with_added_files(self) -> None:
@@ -1801,7 +1801,7 @@ class CheckoutTests(PorcelainTestCase):
         )
 
         # Both branches have file 'foo' checkout should be fine.
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
         status = list(porcelain.status(self.repo))
@@ -1824,7 +1824,7 @@ class CheckoutTests(PorcelainTestCase):
 
         # The new checkout behavior allows switching if the file doesn't exist in target branch
         # (changes can be preserved)
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
         # The staged changes are lost and the file is removed from working tree
@@ -1848,7 +1848,7 @@ class CheckoutTests(PorcelainTestCase):
         )
 
         # 'uni' branch doesn't have 'nee' and it has been modified, but we force to reset the entire index.
-        porcelain.checkout_branch(self.repo, b"uni", force=True)
+        porcelain.checkout(self.repo, b"uni", force=True)
 
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
@@ -1867,13 +1867,13 @@ class CheckoutTests(PorcelainTestCase):
 
         # The new checkout behavior prevents switching with unstaged changes
         with self.assertRaises(porcelain.CheckoutError):
-            porcelain.checkout_branch(self.repo, b"uni")
+            porcelain.checkout(self.repo, b"uni")
 
         # Should still be on master
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
 
         # Force checkout should work
-        porcelain.checkout_branch(self.repo, b"uni", force=True)
+        porcelain.checkout(self.repo, b"uni", force=True)
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
     def test_checkout_to_branch_with_untracked_files(self) -> None:
@@ -1883,13 +1883,13 @@ class CheckoutTests(PorcelainTestCase):
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["neu"]], status)
 
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
 
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["neu"]], status)
 
     def test_checkout_to_branch_with_new_files(self) -> None:
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
         sub_directory = os.path.join(self.repo.path, "sub1")
         os.mkdir(sub_directory)
         for index in range(5):
@@ -1905,12 +1905,12 @@ class CheckoutTests(PorcelainTestCase):
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
 
-        porcelain.checkout_branch(self.repo, b"master")
+        porcelain.checkout(self.repo, b"master")
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
 
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
@@ -1936,7 +1936,7 @@ class CheckoutTests(PorcelainTestCase):
         self.assertTrue(os.path.isdir(sub_directory))
         self.assertTrue(os.path.isdir(os.path.dirname(sub_directory)))
 
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
 
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
@@ -1944,7 +1944,7 @@ class CheckoutTests(PorcelainTestCase):
         self.assertFalse(os.path.isdir(sub_directory))
         self.assertFalse(os.path.isdir(os.path.dirname(sub_directory)))
 
-        porcelain.checkout_branch(self.repo, b"master")
+        porcelain.checkout(self.repo, b"master")
 
         self.assertTrue(os.path.isdir(sub_directory))
         self.assertTrue(os.path.isdir(os.path.dirname(sub_directory)))
@@ -1974,7 +1974,7 @@ class CheckoutTests(PorcelainTestCase):
         self.assertTrue(os.path.isdir(sub_directory))
         self.assertTrue(os.path.isdir(os.path.dirname(sub_directory)))
 
-        porcelain.checkout_branch(self.repo, b"uni")
+        porcelain.checkout(self.repo, b"uni")
 
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
@@ -1997,13 +1997,13 @@ class CheckoutTests(PorcelainTestCase):
     def test_checkout_to_commit_sha(self) -> None:
         self._commit_something_wrong()
 
-        porcelain.checkout_branch(self.repo, self._sha)
+        porcelain.checkout(self.repo, self._sha)
         self.assertEqual(self._sha, self.repo.head())
 
     def test_checkout_to_head(self) -> None:
         new_sha = self._commit_something_wrong()
 
-        porcelain.checkout_branch(self.repo, b"HEAD")
+        porcelain.checkout(self.repo, b"HEAD")
         self.assertEqual(new_sha, self.repo.head())
 
     def _checkout_remote_branch(self):
@@ -2060,7 +2060,7 @@ class CheckoutTests(PorcelainTestCase):
         )
 
         # The new checkout behavior treats origin/foo as a ref and creates detached HEAD
-        porcelain.checkout_branch(target_repo, b"origin/foo")
+        porcelain.checkout(target_repo, b"origin/foo")
         original_id = target_repo[b"HEAD"].id
         uni_id = target_repo[b"refs/remotes/origin/uni"].id
 
@@ -2097,13 +2097,13 @@ class CheckoutTests(PorcelainTestCase):
         )
         self.assertTrue(os.path.isfile(os.path.join(target_repo.path, "bar")))
 
-        porcelain.checkout_branch(target_repo, b"master")
+        porcelain.checkout(target_repo, b"master")
 
         self.assertEqual(b"master", porcelain.active_branch(target_repo))
         self.assertFalse(os.path.isfile(os.path.join(target_repo.path, "bar")))
 
         # Going back to origin/foo won't have bar because the commit was made in detached state
-        porcelain.checkout_branch(target_repo, b"origin/foo")
+        porcelain.checkout(target_repo, b"origin/foo")
 
         # Should be in detached HEAD state again
         with self.assertRaises((ValueError, IndexError)):
@@ -2112,7 +2112,7 @@ class CheckoutTests(PorcelainTestCase):
         self.assertFalse(os.path.isfile(os.path.join(target_repo.path, "bar")))
 
         # But we can checkout the specific commit to get bar back
-        porcelain.checkout_branch(target_repo, detached_commit_sha.decode())
+        porcelain.checkout(target_repo, detached_commit_sha.decode())
         self.assertTrue(os.path.isfile(os.path.join(target_repo.path, "bar")))
 
         target_repo.close()

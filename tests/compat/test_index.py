@@ -469,7 +469,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         run_git_or_fail(["commit", "-m", "master change"], cwd=repo.path)
 
         # Try to merge (should create conflicts)
-        result = run_git_or_fail(["merge", "feature"], cwd=repo.path, check=False)
+        run_git_or_fail(["merge", "feature"], cwd=repo.path, check=False)
 
         # Read the index with conflicts
         index_path = os.path.join(repo.path, ".git", "index")
@@ -512,7 +512,7 @@ class IndexV4CompatTestCase(CompatTestCase):
                 filepath = os.path.join(repo.path, filename)
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 with open(filepath, "w") as f:
-                    f.write(f"Content\n")
+                    f.write("Content\n")
                 valid_files.append(filename)
             except (OSError, ValueError):
                 # Skip files that can't be created on this system
@@ -867,7 +867,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         batch_size = 50
         for i in range(0, len(files), batch_size):
             batch = files[i : i + batch_size]
-            run_git_or_fail(["add"] + batch, cwd=repo.path)
+            run_git_or_fail(["add", *batch], cwd=repo.path)
 
         # Test reading large index
         index_path = os.path.join(repo.path, ".git", "index")

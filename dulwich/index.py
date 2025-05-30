@@ -570,11 +570,9 @@ def write_cache_entry(
         # This matches how C Git implements index v4 flags
         compressed_path = _compress_path(entry.name, previous_path)
         flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
-        use_compression = True
     else:
         # Versions < 4: include actual name length
         flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
-        use_compression = False
 
     if entry.extended_flags:
         flags |= FLAG_EXTENDED
@@ -629,10 +627,6 @@ def read_index_header(f: BinaryIO) -> tuple[int, int]:
     return version, num_entries
 
 
-
-
-
-
 def write_index_extension(f: BinaryIO, extension: IndexExtension) -> None:
     """Write an index extension.
 
@@ -677,9 +671,7 @@ def read_index_dict_with_version(
         else:
             existing = ret.setdefault(entry.name, ConflictedIndexEntry())
             if isinstance(existing, IndexEntry):
-                raise AssertionError(
-                    f"Non-conflicted entry for {entry.name!r} exists"
-                )
+                raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
             if stage == Stage.MERGE_CONFLICT_ANCESTOR:
                 existing.ancestor = IndexEntry.from_serialized(entry)
             elif stage == Stage.MERGE_CONFLICT_THIS:

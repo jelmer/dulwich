@@ -68,6 +68,180 @@ EXTENDED_FLAG_INTEND_TO_ADD = 0x2000
 
 DEFAULT_VERSION = 2
 
+# Index extension signatures
+TREE_EXTENSION = b"TREE"
+REUC_EXTENSION = b"REUC"
+UNTR_EXTENSION = b"UNTR"
+EOIE_EXTENSION = b"EOIE"
+IEOT_EXTENSION = b"IEOT"
+
+
+def _encode_varint(value: int) -> bytes:
+    """Encode an integer using variable-width encoding.
+
+    Same format as used for OFS_DELTA pack entries and index v4 path compression.
+    Uses 7 bits per byte, with the high bit indicating continuation.
+
+    Args:
+      value: Integer to encode
+    Returns:
+      Encoded bytes
+    """
+    if value == 0:
+        return b"\x00"
+
+    result = []
+    while value > 0:
+        byte = value & 0x7F  # Take lower 7 bits
+        value >>= 7
+        if value > 0:
+            byte |= 0x80  # Set continuation bit
+        result.append(byte)
+
+    return bytes(result)
+
+
+def _decode_varint(data: bytes, offset: int = 0) -> tuple[int, int]:
+    """Decode a variable-width encoded integer.
+
+    Args:
+      data: Bytes to decode from
+      offset: Starting offset in data
+    Returns:
+      tuple of (decoded_value, new_offset)
+    """
+    value = 0
+    shift = 0
+    pos = offset
+
+    while pos < len(data):
+        byte = data[pos]
+        pos += 1
+        value |= (byte & 0x7F) << shift
+        shift += 7
+        if not (byte & 0x80):  # No continuation bit
+            break
+
+    return value, pos
+
+
+def _compress_path(path: bytes, previous_path: bytes) -> bytes:
+    """Compress a path relative to the previous path for index version 4.
+
+    Args:
+      path: Path to compress
+      previous_path: Previous path for comparison
+    Returns:
+      Compressed path data (varint prefix_len + suffix)
+    """
+    # Find the common prefix length
+    common_len = 0
+    min_len = min(len(path), len(previous_path))
+
+    for i in range(min_len):
+        if path[i] == previous_path[i]:
+            common_len += 1
+        else:
+            break
+
+    # The number of bytes to remove from the end of previous_path
+    # to get the common prefix
+    remove_len = len(previous_path) - common_len
+
+    # The suffix to append
+    suffix = path[common_len:]
+
+    # Encode: varint(remove_len) + suffix + NUL
+    return _encode_varint(remove_len) + suffix + b"\x00"
+
+
+def _decompress_path(
+    data: bytes, offset: int, previous_path: bytes
+) -> tuple[bytes, int]:
+    """Decompress a path from index version 4 compressed format.
+
+    Args:
+      data: Raw data containing compressed path
+      offset: Starting offset in data
+      previous_path: Previous path for decompression
+    Returns:
+      tuple of (decompressed_path, new_offset)
+    """
+    # Decode the number of bytes to remove from previous path
+    remove_len, new_offset = _decode_varint(data, offset)
+
+    # Find the NUL terminator for the suffix
+    suffix_start = new_offset
+    suffix_end = suffix_start
+    while suffix_end < len(data) and data[suffix_end] != 0:
+        suffix_end += 1
+
+    if suffix_end >= len(data):
+        raise ValueError("Unterminated path suffix in compressed entry")
+
+    suffix = data[suffix_start:suffix_end]
+    new_offset = suffix_end + 1  # Skip the NUL terminator
+
+    # Reconstruct the path
+    if remove_len > len(previous_path):
+        raise ValueError(
+            f"Invalid path compression: trying to remove {remove_len} bytes from {len(previous_path)}-byte path"
+        )
+
+    prefix = previous_path[:-remove_len] if remove_len > 0 else previous_path
+    path = prefix + suffix
+
+    return path, new_offset
+
+
+def _decompress_path_from_stream(f, previous_path: bytes) -> tuple[bytes, int]:
+    """Decompress a path from index version 4 compressed format, reading from stream.
+
+    Args:
+      f: File-like object to read from
+      previous_path: Previous path for decompression
+    Returns:
+      tuple of (decompressed_path, bytes_consumed)
+    """
+    # Decode the varint for remove_len by reading byte by byte
+    remove_len = 0
+    shift = 0
+    bytes_consumed = 0
+
+    while True:
+        byte_data = f.read(1)
+        if not byte_data:
+            raise ValueError("Unexpected end of file while reading varint")
+        byte = byte_data[0]
+        bytes_consumed += 1
+        remove_len |= (byte & 0x7F) << shift
+        shift += 7
+        if not (byte & 0x80):  # No continuation bit
+            break
+
+    # Read the suffix until NUL terminator
+    suffix = b""
+    while True:
+        byte_data = f.read(1)
+        if not byte_data:
+            raise ValueError("Unexpected end of file while reading path suffix")
+        byte = byte_data[0]
+        bytes_consumed += 1
+        if byte == 0:  # NUL terminator
+            break
+        suffix += bytes([byte])
+
+    # Reconstruct the path
+    if remove_len > len(previous_path):
+        raise ValueError(
+            f"Invalid path compression: trying to remove {remove_len} bytes from {len(previous_path)}-byte path"
+        )
+
+    prefix = previous_path[:-remove_len] if remove_len > 0 else previous_path
+    path = prefix + suffix
+
+    return path, bytes_consumed
+
 
 class Stage(Enum):
     NORMAL = 0
@@ -93,6 +267,83 @@ class SerializedIndexEntry:
 
     def stage(self) -> Stage:
         return Stage((self.flags & FLAG_STAGEMASK) >> FLAG_STAGESHIFT)
+
+
+@dataclass
+class IndexExtension:
+    """Base class for index extensions."""
+
+    signature: bytes
+    data: bytes
+
+    @classmethod
+    def from_raw(cls, signature: bytes, data: bytes) -> "IndexExtension":
+        """Create an extension from raw data.
+
+        Args:
+          signature: 4-byte extension signature
+          data: Extension data
+        Returns:
+          Parsed extension object
+        """
+        if signature == TREE_EXTENSION:
+            return TreeExtension.from_bytes(data)
+        elif signature == REUC_EXTENSION:
+            return ResolveUndoExtension.from_bytes(data)
+        elif signature == UNTR_EXTENSION:
+            return UntrackedExtension.from_bytes(data)
+        else:
+            # Unknown extension - just store raw data
+            return cls(signature, data)
+
+    def to_bytes(self) -> bytes:
+        """Serialize extension to bytes."""
+        return self.data
+
+
+class TreeExtension(IndexExtension):
+    """Tree cache extension."""
+
+    def __init__(self, entries: list[tuple[bytes, bytes, int]]) -> None:
+        self.entries = entries
+        super().__init__(TREE_EXTENSION, b"")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "TreeExtension":
+        # TODO: Implement tree cache parsing
+        return cls([])
+
+    def to_bytes(self) -> bytes:
+        # TODO: Implement tree cache serialization
+        return b""
+
+
+class ResolveUndoExtension(IndexExtension):
+    """Resolve undo extension for recording merge conflicts."""
+
+    def __init__(self, entries: list[tuple[bytes, list[tuple[int, bytes]]]]) -> None:
+        self.entries = entries
+        super().__init__(REUC_EXTENSION, b"")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "ResolveUndoExtension":
+        # TODO: Implement resolve undo parsing
+        return cls([])
+
+    def to_bytes(self) -> bytes:
+        # TODO: Implement resolve undo serialization
+        return b""
+
+
+class UntrackedExtension(IndexExtension):
+    """Untracked cache extension."""
+
+    def __init__(self, data: bytes) -> None:
+        super().__init__(UNTR_EXTENSION, data)
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "UntrackedExtension":
+        return cls(data)
 
 
 @dataclass
@@ -241,11 +492,15 @@ def write_cache_time(f, t) -> None:
     f.write(struct.pack(">LL", *t))
 
 
-def read_cache_entry(f, version: int) -> SerializedIndexEntry:
+def read_cache_entry(
+    f, version: int, previous_path: bytes = b""
+) -> SerializedIndexEntry:
     """Read an entry from a cache file.
 
     Args:
       f: File-like object to read from
+      version: Index version
+      previous_path: Previous entry's path (for version 4 compression)
     """
     beginoffset = f.tell()
     ctime = read_cache_time(f)
@@ -266,11 +521,19 @@ def read_cache_entry(f, version: int) -> SerializedIndexEntry:
         (extended_flags,) = struct.unpack(">H", f.read(2))
     else:
         extended_flags = 0
-    name = f.read(flags & FLAG_NAMEMASK)
+
+    if version >= 4:
+        # Version 4: paths are always compressed (name_len should be 0)
+        name, consumed = _decompress_path_from_stream(f, previous_path)
+    else:
+        # Versions < 4: regular name reading
+        name = f.read(flags & FLAG_NAMEMASK)
+
     # Padding:
     if version < 4:
         real_size = (f.tell() - beginoffset + 8) & ~7
         f.read((beginoffset + real_size) - f.tell())
+
     return SerializedIndexEntry(
         name,
         ctime,
@@ -287,21 +550,35 @@ def read_cache_entry(f, version: int) -> SerializedIndexEntry:
     )
 
 
-def write_cache_entry(f, entry: SerializedIndexEntry, version: int) -> None:
+def write_cache_entry(
+    f, entry: SerializedIndexEntry, version: int, previous_path: bytes = b""
+) -> None:
     """Write an index entry to a file.
 
     Args:
       f: File object
-      entry: IndexEntry to write, tuple with:
+      entry: IndexEntry to write
+      version: Index format version
+      previous_path: Previous entry's path (for version 4 compression)
     """
     beginoffset = f.tell()
     write_cache_time(f, entry.ctime)
     write_cache_time(f, entry.mtime)
-    flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+
+    if version >= 4:
+        # Version 4: use compression but set name_len to actual filename length
+        # This matches how C Git implements index v4 flags
+        compressed_path = _compress_path(entry.name, previous_path)
+        flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+    else:
+        # Versions < 4: include actual name length
+        flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+
     if entry.extended_flags:
         flags |= FLAG_EXTENDED
     if flags & FLAG_EXTENDED and version is not None and version < 3:
         raise AssertionError("unable to use extended flags in version < 3")
+
     f.write(
         struct.pack(
             b">LLLLLL20sH",
@@ -317,8 +594,13 @@ def write_cache_entry(f, entry: SerializedIndexEntry, version: int) -> None:
     )
     if flags & FLAG_EXTENDED:
         f.write(struct.pack(b">H", entry.extended_flags))
-    f.write(entry.name)
-    if version < 4:
+
+    if version >= 4:
+        # Version 4: always write compressed path
+        f.write(compressed_path)
+    else:
+        # Versions < 4: write regular path and padding
+        f.write(entry.name)
         real_size = (f.tell() - beginoffset + 8) & ~7
         f.write(b"\0" * ((beginoffset + real_size) - f.tell()))
 
@@ -330,16 +612,74 @@ class UnsupportedIndexFormat(Exception):
         self.index_format_version = version
 
 
-def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
-    """Read an index file, yielding the individual entries."""
+def read_index_header(f: BinaryIO) -> tuple[int, int]:
+    """Read an index header from a file.
+
+    Returns:
+      tuple of (version, num_entries)
+    """
     header = f.read(4)
     if header != b"DIRC":
         raise AssertionError(f"Invalid index file header: {header!r}")
     (version, num_entries) = struct.unpack(b">LL", f.read(4 * 2))
-    if version not in (1, 2, 3):
+    if version not in (1, 2, 3, 4):
         raise UnsupportedIndexFormat(version)
+    return version, num_entries
+
+
+def write_index_extension(f: BinaryIO, extension: IndexExtension) -> None:
+    """Write an index extension.
+
+    Args:
+      f: File-like object to write to
+      extension: Extension to write
+    """
+    data = extension.to_bytes()
+    f.write(extension.signature)
+    f.write(struct.pack(">I", len(data)))
+    f.write(data)
+
+
+def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
+    """Read an index file, yielding the individual entries."""
+    version, num_entries = read_index_header(f)
+    previous_path = b""
     for i in range(num_entries):
-        yield read_cache_entry(f, version)
+        entry = read_cache_entry(f, version, previous_path)
+        previous_path = entry.name
+        yield entry
+
+
+def read_index_dict_with_version(
+    f: BinaryIO,
+) -> tuple[dict[bytes, Union[IndexEntry, ConflictedIndexEntry]], int]:
+    """Read an index file and return it as a dictionary along with the version.
+
+    Returns:
+      tuple of (entries_dict, version)
+    """
+    version, num_entries = read_index_header(f)
+
+    ret: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
+    previous_path = b""
+    for i in range(num_entries):
+        entry = read_cache_entry(f, version, previous_path)
+        previous_path = entry.name
+        stage = entry.stage()
+        if stage == Stage.NORMAL:
+            ret[entry.name] = IndexEntry.from_serialized(entry)
+        else:
+            existing = ret.setdefault(entry.name, ConflictedIndexEntry())
+            if isinstance(existing, IndexEntry):
+                raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
+            if stage == Stage.MERGE_CONFLICT_ANCESTOR:
+                existing.ancestor = IndexEntry.from_serialized(entry)
+            elif stage == Stage.MERGE_CONFLICT_THIS:
+                existing.this = IndexEntry.from_serialized(entry)
+            elif stage == Stage.MERGE_CONFLICT_OTHER:
+                existing.other = IndexEntry.from_serialized(entry)
+
+    return ret, version
 
 
 def read_index_dict(f) -> dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
@@ -393,8 +733,10 @@ def write_index(
     # Proceed with the existing code to write the header and entries.
     f.write(b"DIRC")
     f.write(struct.pack(b">LL", version, len(entries)))
+    previous_path = b""
     for entry in entries:
-        write_cache_entry(f, entry, version=version)
+        write_cache_entry(f, entry, version=version, previous_path=previous_path)
+        previous_path = entry.name
 
 
 def write_index_dict(
@@ -454,16 +796,25 @@ class Index:
 
     _byname: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
 
-    def __init__(self, filename: Union[bytes, str], read=True) -> None:
+    def __init__(
+        self,
+        filename: Union[bytes, str],
+        read=True,
+        skip_hash: bool = False,
+        version: Optional[int] = None,
+    ) -> None:
         """Create an index object associated with the given filename.
 
         Args:
           filename: Path to the index file
           read: Whether to initialize the index from the given file, should it exist.
+          skip_hash: Whether to skip SHA1 hash when writing (for manyfiles feature)
+          version: Index format version to use (None = auto-detect from file or use default)
         """
         self._filename = filename
         # TODO(jelmer): Store the version returned by read_index
-        self._version = None
+        self._version = version
+        self._skip_hash = skip_hash
         self.clear()
         if read:
             self.read()
@@ -479,10 +830,19 @@ class Index:
         """Write current contents of index to disk."""
         f = GitFile(self._filename, "wb")
         try:
-            f = SHA1Writer(f)
-            write_index_dict(f, self._byname, version=self._version)
-        finally:
+            if self._skip_hash:
+                # When skipHash is enabled, write the index without computing SHA1
+                write_index_dict(f, self._byname, version=self._version)
+                # Write 20 zero bytes instead of SHA1
+                f.write(b"\x00" * 20)
+                f.close()
+            else:
+                f = SHA1Writer(f)
+                write_index_dict(f, self._byname, version=self._version)
+                f.close()
+        except:
             f.close()
+            raise
 
     def read(self) -> None:
         """Read current contents of index from disk."""
@@ -491,9 +851,13 @@ class Index:
         f = GitFile(self._filename, "rb")
         try:
             f = SHA1Reader(f)
-            self.update(read_index_dict(f))
-            # FIXME: Additional data?
-            f.read(os.path.getsize(self._filename) - f.tell() - 20)
+            entries, version = read_index_dict_with_version(f)
+            self._version = version
+            self.update(entries)
+            # Read any remaining data before the SHA
+            remaining = os.path.getsize(self._filename) - f.tell() - 20
+            if remaining > 0:
+                f.read(remaining)
             f.check_sha(allow_empty=True)
         finally:
             f.close()

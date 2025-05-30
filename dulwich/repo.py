@@ -1369,7 +1369,31 @@ class Repo(BaseRepo):
 
         if not self.has_index():
             raise NoIndexPresent
-        return Index(self.index_path())
+
+        # Check for manyFiles feature configuration
+        config = self.get_config_stack()
+        many_files = config.get_boolean(b"feature", b"manyFiles", False)
+        skip_hash = False
+        index_version = None
+
+        if many_files:
+            # When feature.manyFiles is enabled, set index.version=4 and index.skipHash=true
+            try:
+                index_version_str = config.get(b"index", b"version")
+                index_version = int(index_version_str)
+            except KeyError:
+                index_version = 4  # Default to version 4 for manyFiles
+            skip_hash = config.get_boolean(b"index", b"skipHash", True)
+        else:
+            # Check for explicit index settings
+            try:
+                index_version_str = config.get(b"index", b"version")
+                index_version = int(index_version_str)
+            except KeyError:
+                index_version = None
+            skip_hash = config.get_boolean(b"index", b"skipHash", False)
+
+        return Index(self.index_path(), skip_hash=skip_hash, version=index_version)
 
     def has_index(self) -> bool:
         """Check if an index is present."""

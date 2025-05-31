@@ -1825,6 +1825,7 @@ def fetch(
                 prune=prune,
                 prune_tags=prune_tags,
             )
+
     return fetch_result
 
 

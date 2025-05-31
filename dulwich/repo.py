@@ -334,6 +334,9 @@ class ParentsProvider:
         self.grafts = grafts
         self.shallows = set(shallows)
 
+        # Get commit graph once at initialization for performance
+        self.commit_graph = store.get_commit_graph()
+
     def get_parents(self, commit_id, commit=None):
         try:
             return self.grafts[commit_id]
@@ -341,6 +344,14 @@ class ParentsProvider:
             pass
         if commit_id in self.shallows:
             return []
+
+        # Try to use commit graph for faster parent lookup
+        if self.commit_graph:
+            parents = self.commit_graph.get_parents(commit_id)
+            if parents is not None:
+                return parents
+
+        # Fallback to reading the commit object
         if commit is None:
             commit = self.store[commit_id]
         return commit.parents

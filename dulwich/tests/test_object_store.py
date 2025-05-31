@@ -22,7 +22,7 @@
 """Tests for the object store interface."""
 
 from typing import TYPE_CHECKING, Any, Callable
-from unittest import skipUnless
+from unittest.mock import patch
 
 from dulwich.index import commit_tree
 from dulwich.object_store import (
@@ -41,11 +41,6 @@ from .utils import make_object, make_tag
 
 if TYPE_CHECKING:
     from dulwich.object_store import BaseObjectStore
-
-try:
-    from unittest.mock import patch
-except ImportError:
-    patch = None  # type: ignore
 
 
 testobject = make_object(Blob, data=b"yummy data")
@@ -72,7 +67,6 @@ class ObjectStoreTests:
             [], self.store.determine_wants_all({b"refs/heads/foo": b"0" * 40})
         )
 
-    @skipUnless(patch, "Required mock.patch")
     def test_determine_wants_all_depth(self) -> None:
         self.store.add_object(testobject)
         refs = {b"refs/heads/foo": testobject.id}

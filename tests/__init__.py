@@ -120,6 +120,7 @@ def self_test_suite():
         "bundle",
         "client",
         "cloud_gcs",
+        "commit_graph",
         "config",
         "credentials",
         "diff_tree",

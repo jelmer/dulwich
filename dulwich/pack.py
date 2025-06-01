@@ -485,7 +485,7 @@ class PackIndex:
         """
         raise NotImplementedError(self.get_pack_checksum)
 
-    @replace_me(since="0.21.0")
+    @replace_me(since="0.21.0", remove_in="0.23.0")
     def object_index(self, sha: bytes) -> int:
         return self.object_offset(sha)
 

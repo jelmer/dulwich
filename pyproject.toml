@@ -43,7 +43,7 @@ paramiko = ["paramiko"]
 dev = [
     "ruff==0.11.11",
     "mypy==1.15.0",
-    "dissolve"
+    "dissolve>=0.1.1"
 ]
 merge = ["merge3"]
 

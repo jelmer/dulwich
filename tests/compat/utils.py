@@ -140,6 +140,19 @@ def run_git(
     env["LC_ALL"] = env["LANG"] = "C"
     env["PATH"] = os.getenv("PATH")
 
+    # Preserve Git identity environment variables if they exist, otherwise set dummy values
+    git_env_defaults = {
+        "GIT_AUTHOR_NAME": "Test User",
+        "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "Test User",
+        "GIT_COMMITTER_EMAIL": "test@example.com",
+    }
+
+    for git_env_var, default_value in git_env_defaults.items():
+        if git_env_var not in env:
+            # If the environment variable is not set, use the default value
+            env[git_env_var] = default_value
+
     args = [git_path, *args]
     popen_kwargs["stdin"] = subprocess.PIPE
     if capture_stdout:

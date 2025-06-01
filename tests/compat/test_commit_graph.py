@@ -14,7 +14,6 @@ identically to C Git's implementation.
 """
 
 import os
-import shutil
 import tempfile
 
 from dulwich.commit_graph import find_commit_graph_file, read_commit_graph
@@ -42,7 +41,9 @@ class CommitGraphCompatTests(CompatTestCase):
         self.overrideEnv("GIT_AUTHOR_EMAIL", "test@example.com")
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        from .utils import rmtree_ro
+
+        rmtree_ro(self.test_dir)
 
     def create_test_repo_with_history(self):
         """Create a test repository with some commit history."""

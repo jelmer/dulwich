@@ -1320,7 +1320,7 @@ def format_time_entry(person, time, timezone_info):
     )
 
 
-@replace_me(since="0.21.0")
+@replace_me(since="0.21.0", remove_in="0.24.0")
 def parse_commit(chunks):
     """Parse a commit object from chunks.
 
@@ -1616,7 +1616,7 @@ class Commit(ShaFile):
         doc="Parents of this commit, by their SHA1.",
     )
 
-    @replace_me(since="0.21.0")
+    @replace_me(since="0.21.0", remove_in="0.24.0")
     def _get_extra(self):
         """Return extra settings of this commit."""
         return self._extra

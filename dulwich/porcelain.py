@@ -2210,7 +2210,7 @@ def reset_file(repo, file_path: str, target: bytes = b"HEAD", symlink_fn=None) -
     build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)
 
 
-@replace_me(since="0.22.9")
+@replace_me(since="0.22.9", remove_in="0.24.0")
 def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> None:
     """Switch branches or restore working tree files.
 

@@ -82,6 +82,7 @@ from io import BytesIO, RawIOBase
 from pathlib import Path
 from typing import Optional, Union
 
+from . import replace_me
 from .archive import tar_stream
 from .client import get_transport_and_path
 from .config import Config, ConfigFile, StackedConfig, read_submodules
@@ -2209,6 +2210,7 @@ def reset_file(repo, file_path: str, target: bytes = b"HEAD", symlink_fn=None) -
     build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)
 
 
+@replace_me(since="0.22.9")
 def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> None:
     """Switch branches or restore working tree files.
 
@@ -2220,15 +2222,8 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
       target: branch name or commit sha to checkout
       force: true or not to force checkout
     """
-    import warnings
-
-    warnings.warn(
-        "checkout_branch is deprecated, use checkout instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
     # Simply delegate to the new checkout function
-    checkout(repo, target, force=force)
+    return checkout(repo, target, force=force)
 
 
 def sparse_checkout(

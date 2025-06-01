@@ -49,6 +49,17 @@ Merge requests
 Please either send pull requests to the maintainer (jelmer@jelmer.uk) or create
 new pull requests on GitHub.
 
+Deprecating functionality
+-------------------------
+Dulwich uses the `dissolve` package to manage deprecations. If you want to deprecate
+functionality, please use the `@replace_me` decorator from the root of the
+dulwich package. This will ensure that the deprecation is handled correctly:
+
+* It will be logged as a warning
+* When the version of Dulwich is bumped, the deprecation will be removed
+* Users can use `dissolve migrate` to automatically replace deprecated
+  functionality in their code
+
 Licensing
 ---------
 All contributions should be made under the same license that Dulwich itself

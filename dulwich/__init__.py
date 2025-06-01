@@ -29,7 +29,7 @@ __all__ = ["replace_me"]
 
 try:
     from dissolve import replace_me
-except ModuleNotFoundError:
+except ImportError:
     # if dissolve is not installed, then just provide a basic implementation
     # of its replace_me decorator
     def replace_me(since=None, remove_in=None):

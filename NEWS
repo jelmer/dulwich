@@ -46,6 +46,9 @@
 
  * Use ``dissolve`` to manage deprecations. (Jelmer Vernooĳ)
 
+ * Handle trailing backslashes in config files appropriately.
+   (Jelmer Vernooĳ, #1088)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

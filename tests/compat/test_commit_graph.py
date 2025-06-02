@@ -310,7 +310,13 @@ class CommitGraphCompatTests(CompatTestCase):
                     self.repo_path, "objects", "info", "commit-graph"
                 )
                 if os.path.exists(graph_path):
-                    os.remove(graph_path)
+                    try:
+                        os.remove(graph_path)
+                    except PermissionError:
+                        # On Windows, handle read-only files
+                        from .utils import remove_ro
+
+                        remove_ro(graph_path)
 
                 if strategy == ["--stdin-commits"]:
                     # For stdin-commits, we need to provide commit IDs

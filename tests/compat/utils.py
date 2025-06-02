@@ -287,12 +287,15 @@ class CompatTestCase(TestCase):
         return repo
 
 
+def remove_ro(path: str) -> None:
+    """Remove a read-only file."""
+    os.chmod(path, stat.S_IWRITE)
+    os.remove(path)
+
+
 if sys.platform == "win32":
-
-    def remove_ro(action, name, exc) -> None:
-        os.chmod(name, stat.S_IWRITE)
-        os.remove(name)
-
-    rmtree_ro = functools.partial(shutil.rmtree, onerror=remove_ro)
+    rmtree_ro = functools.partial(
+        shutil.rmtree, onerror=lambda action, name, exc: remove_ro(name)
+    )
 else:
     rmtree_ro = shutil.rmtree

@@ -1592,15 +1592,15 @@ class PackInflater(DeltaChainIterator[ShaFile]):
         return unpacked.sha_file()
 
 
-class SHA1Reader:
+class SHA1Reader(BinaryIO):
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f) -> None:
         self.f = f
         self.sha1 = sha1(b"")
 
-    def read(self, num=None):
-        data = self.f.read(num)
+    def read(self, size: int = -1) -> bytes:
+        data = self.f.read(size)
         self.sha1.update(data)
         return data
 
@@ -1616,11 +1616,64 @@ class SHA1Reader:
     def close(self):
         return self.f.close()
 
-    def tell(self):
+    def tell(self) -> int:
         return self.f.tell()
 
+    # BinaryIO abstract methods
+    def readable(self) -> bool:
+        return True
 
-class SHA1Writer:
+    def writable(self) -> bool:
+        return False
+
+    def seekable(self) -> bool:
+        return getattr(self.f, "seekable", lambda: False)()
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self.f.seek(offset, whence)
+
+    def flush(self) -> None:
+        if hasattr(self.f, "flush"):
+            self.f.flush()
+
+    def readline(self, size: int = -1) -> bytes:
+        return self.f.readline(size)
+
+    def readlines(self, hint: int = -1) -> list[bytes]:
+        return self.f.readlines(hint)
+
+    def writelines(self, lines) -> None:
+        raise UnsupportedOperation("writelines")
+
+    def write(self, data) -> int:
+        raise UnsupportedOperation("write")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> bytes:
+        line = self.readline()
+        if not line:
+            raise StopIteration
+        return line
+
+    def fileno(self) -> int:
+        return self.f.fileno()
+
+    def isatty(self) -> bool:
+        return getattr(self.f, "isatty", lambda: False)()
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        raise UnsupportedOperation("truncate")
+
+
+class SHA1Writer(BinaryIO):
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f) -> None:
@@ -1628,10 +1681,11 @@ class SHA1Writer:
         self.length = 0
         self.sha1 = sha1(b"")
 
-    def write(self, data) -> None:
+    def write(self, data) -> int:
         self.sha1.update(data)
         self.f.write(data)
         self.length += len(data)
+        return len(data)
 
     def write_sha(self):
         sha = self.sha1.digest()
@@ -1648,8 +1702,59 @@ class SHA1Writer:
     def offset(self):
         return self.length
 
-    def tell(self):
+    def tell(self) -> int:
         return self.f.tell()
+
+    # BinaryIO abstract methods
+    def readable(self) -> bool:
+        return False
+
+    def writable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return getattr(self.f, "seekable", lambda: False)()
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self.f.seek(offset, whence)
+
+    def flush(self) -> None:
+        if hasattr(self.f, "flush"):
+            self.f.flush()
+
+    def readline(self, size: int = -1) -> bytes:
+        raise UnsupportedOperation("readline")
+
+    def readlines(self, hint: int = -1) -> list[bytes]:
+        raise UnsupportedOperation("readlines")
+
+    def writelines(self, lines) -> None:
+        for line in lines:
+            self.write(line)
+
+    def read(self, size: int = -1) -> bytes:
+        raise UnsupportedOperation("read")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> bytes:
+        raise UnsupportedOperation("__next__")
+
+    def fileno(self) -> int:
+        return self.f.fileno()
+
+    def isatty(self) -> bool:
+        return getattr(self.f, "isatty", lambda: False)()
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        raise UnsupportedOperation("truncate")
 
 
 def pack_object_header(type_num, delta_base, size):

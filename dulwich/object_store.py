@@ -609,7 +609,7 @@ class PackBasedObjectStore(BaseObjectStore):
         include_comp=False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
-    ) -> Iterator[ShaFile]:
+    ) -> Iterator[UnpackedObject]:
         todo: set[bytes] = set(shas)
         for p in self._iter_cached_packs():
             for unpacked in p.iter_unpacked_subset(

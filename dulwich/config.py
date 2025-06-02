@@ -419,20 +419,26 @@ def _parse_string(value: bytes) -> bytes:
         c = value[i]
         if c == ord(b"\\"):
             i += 1
-            try:
-                v = _ESCAPE_TABLE[value[i]]
-            except IndexError as exc:
-                raise ValueError(
-                    f"escape character in {value!r} at {i} before end of string"
-                ) from exc
-            except KeyError as exc:
-                raise ValueError(
-                    f"escape character followed by unknown character {value[i]!r} at {i} in {value!r}"
-                ) from exc
-            if whitespace:
-                ret.extend(whitespace)
-                whitespace = bytearray()
-            ret.append(v)
+            if i >= len(value):
+                # Backslash at end of string - treat as literal backslash
+                if whitespace:
+                    ret.extend(whitespace)
+                    whitespace = bytearray()
+                ret.append(ord(b"\\"))
+            else:
+                try:
+                    v = _ESCAPE_TABLE[value[i]]
+                    if whitespace:
+                        ret.extend(whitespace)
+                        whitespace = bytearray()
+                    ret.append(v)
+                except KeyError:
+                    # Unknown escape sequence - treat backslash as literal and process next char normally
+                    if whitespace:
+                        ret.extend(whitespace)
+                        whitespace = bytearray()
+                    ret.append(ord(b"\\"))
+                    i -= 1  # Reprocess the character after the backslash
         elif c == ord(b'"'):
             in_quotes = not in_quotes
         elif c in _COMMENT_CHARS and not in_quotes:
@@ -491,6 +497,44 @@ def _strip_comments(line: bytes) -> bytes:
         elif not string_open and character in comment_bytes:
             return line[:i]
     return line
+
+
+def _is_line_continuation(value: bytes) -> bool:
+    """Check if a value ends with a line continuation backslash.
+
+    A line continuation occurs when a line ends with a backslash that is:
+    1. Not escaped (not preceded by another backslash)
+    2. Not within quotes
+
+    Args:
+        value: The value to check
+
+    Returns:
+        True if the value ends with a line continuation backslash
+    """
+    if not value.endswith((b"\\\n", b"\\\r\n")):
+        return False
+
+    # Remove only the newline characters, keep the content including the backslash
+    if value.endswith(b"\\\r\n"):
+        content = value[:-2]  # Remove \r\n, keep the \
+    else:
+        content = value[:-1]  # Remove \n, keep the \
+
+    if not content.endswith(b"\\"):
+        return False
+
+    # Count consecutive backslashes at the end
+    backslash_count = 0
+    for i in range(len(content) - 1, -1, -1):
+        if content[i : i + 1] == b"\\":
+            backslash_count += 1
+        else:
+            break
+
+    # If we have an odd number of backslashes, the last one is a line continuation
+    # If we have an even number, they are all escaped and there's no continuation
+    return backslash_count % 2 == 1
 
 
 def _parse_section_header_line(line: bytes) -> tuple[Section, bytes]:
@@ -573,10 +617,11 @@ class ConfigFile(ConfigDict):
                 setting = setting.strip()
                 if not _check_variable_name(setting):
                     raise ValueError(f"invalid variable name {setting!r}")
-                if value.endswith(b"\\\n"):
-                    continuation = value[:-2]
-                elif value.endswith(b"\\\r\n"):
-                    continuation = value[:-3]
+                if _is_line_continuation(value):
+                    if value.endswith(b"\\\r\n"):
+                        continuation = value[:-3]
+                    else:
+                        continuation = value[:-2]
                 else:
                     continuation = None
                     value = _parse_string(value)
@@ -584,10 +629,11 @@ class ConfigFile(ConfigDict):
                     setting = None
             else:  # continuation line
                 assert continuation is not None
-                if line.endswith(b"\\\n"):
-                    continuation += line[:-2]
-                elif line.endswith(b"\\\r\n"):
-                    continuation += line[:-3]
+                if _is_line_continuation(line):
+                    if line.endswith(b"\\\r\n"):
+                        continuation += line[:-3]
+                    else:
+                        continuation += line[:-2]
                 else:
                     continuation += line
                     value = _parse_string(continuation)

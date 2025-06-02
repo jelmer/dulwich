@@ -41,7 +41,7 @@ https = ["urllib3>=1.24.1"]
 pgp = ["gpg"]
 paramiko = ["paramiko"]
 dev = [
-    "ruff==0.11.11",
+    "ruff==0.11.12",
     "mypy==1.15.0",
     "dissolve>=0.1.1"
 ]

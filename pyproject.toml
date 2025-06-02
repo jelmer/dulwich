@@ -42,7 +42,7 @@ pgp = ["gpg"]
 paramiko = ["paramiko"]
 dev = [
     "ruff==0.11.12",
-    "mypy==1.15.0",
+    "mypy==1.16.0",
     "dissolve>=0.1.1"
 ]
 merge = ["merge3"]

@@ -1203,17 +1203,31 @@ class Repo(BaseRepo):
         if format_version not in (0, 1):
             raise UnsupportedVersion(format_version)
 
-        for extension, _value in config.items((b"extensions",)):
-            if extension.lower() not in (b"worktreeconfig",):
+        # Track extensions we encounter
+        has_reftable_extension = False
+        for extension, value in config.items((b"extensions",)):
+            if extension.lower() == b"refstorage":
+                if value == b"reftable":
+                    has_reftable_extension = True
+                else:
+                    raise UnsupportedExtension(f"refStorage = {value.decode()}")
+            elif extension.lower() not in (b"worktreeconfig",):
                 raise UnsupportedExtension(extension)
 
         if object_store is None:
             object_store = DiskObjectStore.from_config(
                 os.path.join(self.commondir(), OBJECTDIR), config
             )
-        refs = DiskRefsContainer(
-            self.commondir(), self._controldir, logger=self._write_reflog
-        )
+
+        # Use reftable if extension is configured
+        if has_reftable_extension:
+            from .reftable import ReftableRefsContainer
+
+            refs: RefsContainer = ReftableRefsContainer(self.commondir())
+        else:
+            refs = DiskRefsContainer(
+                self.commondir(), self._controldir, logger=self._write_reflog
+            )
         BaseRepo.__init__(self, object_store, refs)
 
         self._graftpoints = {}

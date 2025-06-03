@@ -159,6 +159,7 @@ def self_test_suite():
         "rebase",
         "reflog",
         "refs",
+        "reftable",
         "repository",
         "server",
         "sparse_patterns",

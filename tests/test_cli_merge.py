@@ -29,7 +29,8 @@ from unittest.mock import patch
 
 from dulwich import porcelain
 from dulwich.cli import main
-from dulwich.tests import TestCase
+
+from . import TestCase
 
 
 class CLIMergeTests(TestCase):

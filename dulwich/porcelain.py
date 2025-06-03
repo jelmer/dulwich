@@ -596,18 +596,26 @@ def add(repo=".", paths=None):
         repo_path = Path(r.path).resolve()
         ignore_manager = IgnoreFilterManager.from_repo(r)
         if not paths:
+            cwd = Path(os.getcwd()).resolve()
             paths = list(
                 get_untracked_paths(
-                    str(Path(os.getcwd()).resolve()),
+                    str(cwd),
                     str(repo_path),
                     r.open_index(),
                 )
             )
+            # If we're in a subdirectory, adjust paths to be relative to repo root
+            if cwd != repo_path:
+                cwd_relative_to_repo = cwd.relative_to(repo_path)
+                paths = [str(cwd_relative_to_repo / p) for p in paths]
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
         for p in paths:
             path = Path(p)
+            if not path.is_absolute():
+                # Make relative paths relative to the repo directory
+                path = repo_path / path
             relpath = str(path.resolve().relative_to(repo_path))
             # FIXME: Support patterns
             if path.is_dir():
@@ -2592,6 +2600,11 @@ def _do_merge(
     # Use the first merge base
     base_commit_id = merge_bases[0]
 
+    # Check if we're trying to merge the same commit
+    if head_commit_id == merge_commit_id:
+        # Already up to date
+        return (None, [])
+
     # Check for fast-forward
     if base_commit_id == head_commit_id and not no_ff:
         # Fast-forward merge
@@ -2686,7 +2699,7 @@ def merge(
     with open_repo_closing(repo) as r:
         # Parse the commit to merge
         try:
-            merge_commit_id = parse_commit(r, committish)
+            merge_commit_id = parse_commit(r, committish).id
         except KeyError:
             raise Error(f"Cannot find commit '{committish}'")
 

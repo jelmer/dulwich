@@ -48,6 +48,7 @@ from .objects import (
     sha_to_hex,
 )
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
+from .varint import decode_varint, encode_varint
 
 # 2-bit stage (during merge)
 FLAG_STAGEMASK = 0x3000
@@ -74,55 +75,6 @@ REUC_EXTENSION = b"REUC"
 UNTR_EXTENSION = b"UNTR"
 EOIE_EXTENSION = b"EOIE"
 IEOT_EXTENSION = b"IEOT"
-
-
-def _encode_varint(value: int) -> bytes:
-    """Encode an integer using variable-width encoding.
-
-    Same format as used for OFS_DELTA pack entries and index v4 path compression.
-    Uses 7 bits per byte, with the high bit indicating continuation.
-
-    Args:
-      value: Integer to encode
-    Returns:
-      Encoded bytes
-    """
-    if value == 0:
-        return b"\x00"
-
-    result = []
-    while value > 0:
-        byte = value & 0x7F  # Take lower 7 bits
-        value >>= 7
-        if value > 0:
-            byte |= 0x80  # Set continuation bit
-        result.append(byte)
-
-    return bytes(result)
-
-
-def _decode_varint(data: bytes, offset: int = 0) -> tuple[int, int]:
-    """Decode a variable-width encoded integer.
-
-    Args:
-      data: Bytes to decode from
-      offset: Starting offset in data
-    Returns:
-      tuple of (decoded_value, new_offset)
-    """
-    value = 0
-    shift = 0
-    pos = offset
-
-    while pos < len(data):
-        byte = data[pos]
-        pos += 1
-        value |= (byte & 0x7F) << shift
-        shift += 7
-        if not (byte & 0x80):  # No continuation bit
-            break
-
-    return value, pos
 
 
 def _compress_path(path: bytes, previous_path: bytes) -> bytes:
@@ -152,7 +104,7 @@ def _compress_path(path: bytes, previous_path: bytes) -> bytes:
     suffix = path[common_len:]
 
     # Encode: varint(remove_len) + suffix + NUL
-    return _encode_varint(remove_len) + suffix + b"\x00"
+    return encode_varint(remove_len) + suffix + b"\x00"
 
 
 def _decompress_path(
@@ -168,7 +120,7 @@ def _decompress_path(
       tuple of (decompressed_path, new_offset)
     """
     # Decode the number of bytes to remove from previous path
-    remove_len, new_offset = _decode_varint(data, offset)
+    remove_len, new_offset = decode_varint(data, offset)
 
     # Find the NUL terminator for the suffix
     suffix_start = new_offset

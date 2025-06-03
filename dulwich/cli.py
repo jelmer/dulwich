@@ -873,7 +873,7 @@ class cmd_merge(Command):
                     "\nAutomatic merge failed; fix conflicts and then commit the result."
                 )
                 sys.exit(1)
-            elif merge_commit_id is None:
+            elif merge_commit_id is None and not args.no_commit:
                 print("Already up to date.")
             elif args.no_commit:
                 print("Automatic merge successful; not committing as requested.")

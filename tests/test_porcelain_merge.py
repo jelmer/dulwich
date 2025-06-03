@@ -27,7 +27,8 @@ import unittest
 
 from dulwich import porcelain
 from dulwich.repo import Repo
-from dulwich.tests import TestCase
+
+from . import TestCase
 
 
 class PorcelainMergeTests(TestCase):

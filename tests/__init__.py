@@ -151,6 +151,7 @@ def self_test_suite():
         "protocol",
         "reflog",
         "refs",
+        "reftable",
         "repository",
         "server",
         "stash",

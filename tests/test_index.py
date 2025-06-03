@@ -33,6 +33,8 @@ from dulwich.index import (
     Index,
     IndexEntry,
     SerializedIndexEntry,
+    _decode_varint,
+    _encode_varint,
     _fs_to_tree_path,
     _tree_to_fs_path,
     build_index_from_tree,
@@ -1430,8 +1432,6 @@ class TestPathPrefixCompression(TestCase):
 
     def test_varint_encoding_decoding(self):
         """Test variable-width integer encoding and decoding."""
-        from dulwich.index import _decode_varint, _encode_varint
-
         test_values = [0, 1, 127, 128, 255, 256, 16383, 16384, 65535, 65536]
 
         for value in test_values:

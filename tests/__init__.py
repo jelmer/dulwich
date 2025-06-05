@@ -155,7 +155,6 @@ def self_test_suite():
         "stash",
         "submodule",
         "utils",
-        "varint",
         "walk",
         "web",
     ]

@@ -1430,13 +1430,13 @@ class TestPathPrefixCompression(TestCase):
 
     def test_varint_encoding_decoding(self):
         """Test variable-width integer encoding and decoding."""
-        from dulwich.varint import decode_varint, encode_varint
+        from dulwich.index import _decode_varint, _encode_varint
 
         test_values = [0, 1, 127, 128, 255, 256, 16383, 16384, 65535, 65536]
 
         for value in test_values:
-            encoded = encode_varint(value)
-            decoded, _ = decode_varint(encoded, 0)
+            encoded = _encode_varint(value)
+            decoded, _ = _decode_varint(encoded, 0)
             self.assertEqual(value, decoded, f"Failed for value {value}")
 
     def test_path_compression_simple(self):

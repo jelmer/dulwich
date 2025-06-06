@@ -524,13 +524,16 @@ def clone(
       branch: Optional branch or tag to be used as HEAD in the new repository
         instead of the cloned repository's HEAD.
       config: Configuration to use
-      refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
-        bytestring/string.
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
       protocol_version: desired Git protocol version. By default the highest
         mutually supported protocol version will be used.
+
+    Keyword Args:
+      refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
+        bytestring/string.
+
     Returns: The new repository
     """
     if outstream is not None:
@@ -1846,8 +1849,7 @@ def for_each_ref(
     Args:
       repo: Path to the repository
       pattern: Optional glob (7) patterns to filter the refs with
-    Returns:
-      List of bytes tuples with: (sha, object_type, ref_name)
+    Returns: List of bytes tuples with: (sha, object_type, ref_name)
     """
     if isinstance(pattern, str):
         pattern = os.fsencode(pattern)

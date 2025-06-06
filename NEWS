@@ -1,5 +1,13 @@
 0.22.9	UNRELEASED
 
+ * Fix gitignore pattern matching for directory negation patterns. Patterns like
+   ``!data/*/`` now correctly unignore direct subdirectories while still ignoring
+   files in the parent directory, matching Git's behavior. The ``is_ignored()`` method
+   now documents that directory paths should end with ``/`` for consistent behavior.
+   (Jelmer Vernooĳ, #1203)
+
+ * Support quote_path flag for ignore checking. (Jelmer Vernooĳ)
+
  * Add support for Git's ``feature.manyFiles`` configuration and index version 4.
    This enables faster Git operations in large repositories through path prefix
    compression (30-50% smaller index files) and optional hash skipping for faster

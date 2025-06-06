@@ -2023,25 +2023,85 @@ def remote_remove(repo: Repo, name: Union[bytes, str]) -> None:
         c.write_to_path()
 
 
-def check_ignore(repo, paths, no_index=False):
-    """Debug gitignore files.
+def _quote_path(path: str) -> str:
+    """Quote a path using C-style quoting similar to git's core.quotePath.
+
+    Args:
+        path: Path to quote
+
+    Returns:
+        Quoted path string
+    """
+    # Check if path needs quoting (non-ASCII or special characters)
+    needs_quoting = False
+    for char in path:
+        if ord(char) > 127 or char in '"\\':
+            needs_quoting = True
+            break
+
+    if not needs_quoting:
+        return path
+
+    # Apply C-style quoting
+    quoted = '"'
+    for char in path:
+        if ord(char) > 127:
+            # Non-ASCII character, encode as octal escape
+            utf8_bytes = char.encode("utf-8")
+            for byte in utf8_bytes:
+                quoted += f"\\{byte:03o}"
+        elif char == '"':
+            quoted += '\\"'
+        elif char == "\\":
+            quoted += "\\\\"
+        else:
+            quoted += char
+    quoted += '"'
+    return quoted
+
+
+def check_ignore(repo, paths, no_index=False, quote_path=True):
+    r"""Debug gitignore files.
 
     Args:
       repo: Path to the repository
       paths: List of paths to check for
       no_index: Don't check index
+      quote_path: If True, quote non-ASCII characters in returned paths using
+                  C-style octal escapes (e.g. "тест.txt" becomes "\\321\\202\\320\\265\\321\\201\\321\\202.txt").
+                  If False, return raw unicode paths.
     Returns: List of ignored files
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
         ignore_manager = IgnoreFilterManager.from_repo(r)
-        for path in paths:
-            if not no_index and path_to_tree_path(r.path, path) in index:
+        for original_path in paths:
+            if not no_index and path_to_tree_path(r.path, original_path) in index:
                 continue
-            if os.path.isabs(path):
-                path = os.path.relpath(path, r.path)
-            if ignore_manager.is_ignored(path):
-                yield path
+
+            # Preserve whether the original path had a trailing slash
+            had_trailing_slash = original_path.endswith("/")
+
+            if os.path.isabs(original_path):
+                path = os.path.relpath(original_path, r.path)
+            else:
+                path = original_path
+
+            # Restore trailing slash if it was in the original
+            if had_trailing_slash and not path.endswith("/"):
+                path = path + "/"
+
+            # For directories, check with trailing slash to get correct ignore behavior
+            test_path = path
+            path_without_slash = path.rstrip("/")
+            is_directory = os.path.isdir(os.path.join(r.path, path_without_slash))
+
+            # If this is a directory path, ensure we test it correctly
+            if is_directory and not path.endswith("/"):
+                test_path = path + "/"
+
+            if ignore_manager.is_ignored(test_path):
+                yield _quote_path(path) if quote_path else path
 
 
 def update_head(repo, target, detached=False, new_branch=None) -> None:

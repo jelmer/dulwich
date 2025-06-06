@@ -52,6 +52,9 @@
  * Add basic support for reading git commit graphs.
    (Jelmer Vernooĳ, #1191)
 
+ * Add basic support for reftables.
+   (Jelmer Vernooĳ, #1366)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

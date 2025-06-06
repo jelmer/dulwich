@@ -403,7 +403,6 @@ class PackBasedObjectStore(BaseObjectStore):
 
         Args:
           count: Number of items to add
-          pack_data: Iterator over pack data tuples
         """
         if count == 0:
             # Don't bother writing an empty pack file
@@ -1273,7 +1272,6 @@ class MemoryObjectStore(BaseObjectStore):
 
         Args:
           count: Number of items to add
-          pack_data: Iterator over pack data tuples
         """
         for unpacked_object in unpacked_objects:
             self.add_object(unpacked_object.sha_file())
@@ -1398,7 +1396,6 @@ class MissingObjectFinder:
       get_tagged: Function that returns a dict of pointed-to sha -> tag
         sha for including tags.
       get_parents: Optional function for getting the parents of a commit.
-      tagged: dict of pointed-to sha -> tag sha for including tags
     """
 
     def __init__(

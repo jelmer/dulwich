@@ -2918,6 +2918,8 @@ def get_transport_and_path_from_url(
       url: URL to open (a unicode string)
       config: Optional config object
       operation: Kind of operation that'll be performed; "pull" or "push"
+
+    Keyword Args:
       thin_packs: Whether or not thin packs should be retrieved
       report_activity: Optional callback for reporting transport
         activity.
@@ -2987,6 +2989,8 @@ def get_transport_and_path(
       location: URL or path (a string)
       config: Optional config object
       operation: Kind of operation that'll be performed; "pull" or "push"
+
+    Keyword Args:
       thin_packs: Whether or not thin packs should be retrieved
       report_activity: Optional callback for reporting transport
         activity.

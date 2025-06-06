@@ -118,6 +118,7 @@ def self_test_suite():
         "archive",
         "blackbox",
         "bundle",
+        "cli",
         "cli_merge",
         "client",
         "cloud_gcs",

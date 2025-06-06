@@ -2425,7 +2425,7 @@ def stash_pop(repo) -> None:
         from .stash import Stash
 
         stash = Stash.from_repo(r)
-        stash.pop()
+        stash.pop(0)
 
 
 def stash_drop(repo, index) -> None:
@@ -2475,11 +2475,12 @@ def describe(repo, abbrev=None):
             _, tag = key.rsplit("/", 1)
 
             try:
+                # Annotated tag case
                 commit = obj.object
-            except AttributeError:
-                continue
-            else:
                 commit = r.get_object(commit[1])
+            except AttributeError:
+                # Lightweight tag case - obj is already the commit
+                commit = obj
             tags[tag] = [
                 datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
                 commit.id.decode("ascii"),

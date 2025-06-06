@@ -201,7 +201,7 @@ def filter_ref_prefix(refs, prefixes):
 
     Args:
       refs: A list of refs.
-      prefix: The prefix to filter by.
+      prefixes: The prefixes to filter by.
     """
     return {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
 

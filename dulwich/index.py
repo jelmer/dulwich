@@ -1105,7 +1105,7 @@ def build_file_from_blob(
       target_path: Path to write to
       honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
-      symlink: Function to use for creating symlinks
+      symlink_fn: Function to use for creating symlinks
     Returns: stat object for the file
     """
     try:

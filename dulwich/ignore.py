@@ -185,7 +185,7 @@ def _handle_double_asterisk(segments: list[bytes], i: int) -> tuple[bytes, bool]
 
 
 def _handle_leading_patterns(pat: bytes, res: bytes) -> tuple[bytes, bytes]:
-    """Handle leading patterns like /**/, **/, or /."""
+    """Handle leading patterns like ``/**/``, ``**/``, or ``/``."""
     if pat.startswith(b"/**/"):
         # Leading /** is same as **
         return pat[4:], b"(.*/)?"

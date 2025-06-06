@@ -797,6 +797,8 @@ class BaseRepo:
         Args:
           include: Iterable of SHAs of commits to include along with their
             ancestors. Defaults to [HEAD]
+
+        Keyword Args:
           exclude: Iterable of SHAs of commits to exclude along with their
             ancestors, overriding includes.
           order: ORDER_* constant specifying the order of results.
@@ -815,6 +817,7 @@ class BaseRepo:
           queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the
             Walker.
+
         Returns: A `Walker` object
         """
         from .walk import Walker

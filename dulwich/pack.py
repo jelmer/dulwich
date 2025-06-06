@@ -1841,8 +1841,6 @@ def write_pack(
 
     Args:
       filename: Path to the new pack file (without .pack extension)
-      container: PackedObjectContainer
-      entries: Sequence of (object_id, path) tuples to write
       delta_window_size: Delta window size
       deltify: Whether to deltify pack objects
       compression_level: the zlib compression level
@@ -2051,8 +2049,6 @@ def generate_unpacked_objects(
 ) -> Iterator[UnpackedObject]:
     """Create pack data from objects.
 
-    Args:
-      objects: Pack objects
     Returns: Tuples with (type_num, hexdigest, delta base, object chunks)
     """
     todo = dict(object_ids)
@@ -2105,7 +2101,6 @@ def write_pack_from_container(
     Args:
       write: write function to use
       container: PackedObjectContainer
-      entries: Sequence of (object_id, path) tuples to write
       delta_window_size: Sliding window size for searching for deltas;
                          Set to None for default window size.
       deltify: Whether to deltify objects

@@ -981,7 +981,7 @@ class AddTests(PorcelainTestCase):
         )
         self.assertIn(b"bar", self.repo.open_index())
         self.assertEqual({"bar"}, set(added))
-        self.assertEqual({"foo", os.path.join("subdir", "")}, ignored)
+        self.assertEqual({"foo", "subdir/"}, ignored)
 
     def test_add_file_absolute_path(self) -> None:
         # Absolute paths are (not yet) supported
@@ -1043,6 +1043,185 @@ class AddTests(PorcelainTestCase):
         # Verify symlink is actually staged
         index = self.repo.open_index()
         self.assertIn(b"symlink_to_nowhere", index)
+
+    def test_add_repo_path(self) -> None:
+        """Test adding the repository path itself should add all untracked files."""
+        # Create some untracked files
+        with open(os.path.join(self.repo.path, "file1.txt"), "w") as f:
+            f.write("content1")
+        with open(os.path.join(self.repo.path, "file2.txt"), "w") as f:
+            f.write("content2")
+
+        # Add the repository path itself
+        added, ignored = porcelain.add(self.repo.path, paths=[self.repo.path])
+
+        # Should add all untracked files, not stage './'
+        self.assertIn("file1.txt", added)
+        self.assertIn("file2.txt", added)
+        self.assertNotIn("./", added)
+
+        # Verify files are actually staged
+        index = self.repo.open_index()
+        self.assertIn(b"file1.txt", index)
+        self.assertIn(b"file2.txt", index)
+
+    def test_add_directory_contents(self) -> None:
+        """Test adding a directory adds all files within it."""
+        # Create a subdirectory with multiple files
+        subdir = os.path.join(self.repo.path, "subdir")
+        os.mkdir(subdir)
+        with open(os.path.join(subdir, "file1.txt"), "w") as f:
+            f.write("content1")
+        with open(os.path.join(subdir, "file2.txt"), "w") as f:
+            f.write("content2")
+        with open(os.path.join(subdir, "file3.txt"), "w") as f:
+            f.write("content3")
+
+        # Add the directory
+        added, ignored = porcelain.add(self.repo.path, paths=["subdir"])
+
+        # Should add all files in the directory
+        self.assertEqual(len(added), 3)
+        self.assertIn("subdir/file1.txt", added)
+        self.assertIn("subdir/file2.txt", added)
+        self.assertIn("subdir/file3.txt", added)
+
+        # Verify files are actually staged
+        index = self.repo.open_index()
+        self.assertIn(b"subdir/file1.txt", index)
+        self.assertIn(b"subdir/file2.txt", index)
+        self.assertIn(b"subdir/file3.txt", index)
+
+    def test_add_nested_directories(self) -> None:
+        """Test adding a directory with nested subdirectories."""
+        # Create nested directory structure
+        dir1 = os.path.join(self.repo.path, "dir1")
+        dir2 = os.path.join(dir1, "dir2")
+        dir3 = os.path.join(dir2, "dir3")
+        os.makedirs(dir3)
+
+        # Add files at each level
+        with open(os.path.join(dir1, "file1.txt"), "w") as f:
+            f.write("level1")
+        with open(os.path.join(dir2, "file2.txt"), "w") as f:
+            f.write("level2")
+        with open(os.path.join(dir3, "file3.txt"), "w") as f:
+            f.write("level3")
+
+        # Add the top-level directory
+        added, ignored = porcelain.add(self.repo.path, paths=["dir1"])
+
+        # Should add all files recursively
+        self.assertEqual(len(added), 3)
+        self.assertIn("dir1/file1.txt", added)
+        self.assertIn("dir1/dir2/file2.txt", added)
+        self.assertIn("dir1/dir2/dir3/file3.txt", added)
+
+        # Verify files are actually staged
+        index = self.repo.open_index()
+        self.assertIn(b"dir1/file1.txt", index)
+        self.assertIn(b"dir1/dir2/file2.txt", index)
+        self.assertIn(b"dir1/dir2/dir3/file3.txt", index)
+
+    def test_add_directory_with_tracked_files(self) -> None:
+        """Test adding a directory with some files already tracked."""
+        # Create a subdirectory with files
+        subdir = os.path.join(self.repo.path, "mixed")
+        os.mkdir(subdir)
+
+        # Create and commit one file
+        tracked_file = os.path.join(subdir, "tracked.txt")
+        with open(tracked_file, "w") as f:
+            f.write("already tracked")
+        porcelain.add(self.repo.path, paths=[tracked_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Add tracked file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Add more untracked files
+        with open(os.path.join(subdir, "untracked1.txt"), "w") as f:
+            f.write("new file 1")
+        with open(os.path.join(subdir, "untracked2.txt"), "w") as f:
+            f.write("new file 2")
+
+        # Add the directory
+        added, ignored = porcelain.add(self.repo.path, paths=["mixed"])
+
+        # Should only add the untracked files
+        self.assertEqual(len(added), 2)
+        self.assertIn("mixed/untracked1.txt", added)
+        self.assertIn("mixed/untracked2.txt", added)
+        self.assertNotIn("mixed/tracked.txt", added)
+
+        # Verify the index contains all files
+        index = self.repo.open_index()
+        self.assertIn(b"mixed/tracked.txt", index)
+        self.assertIn(b"mixed/untracked1.txt", index)
+        self.assertIn(b"mixed/untracked2.txt", index)
+
+    def test_add_directory_with_gitignore(self) -> None:
+        """Test adding a directory respects .gitignore patterns."""
+        # Create .gitignore
+        with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
+            f.write("*.log\n*.tmp\nbuild/\n")
+
+        # Create directory with mixed files
+        testdir = os.path.join(self.repo.path, "testdir")
+        os.mkdir(testdir)
+
+        # Create various files
+        with open(os.path.join(testdir, "important.txt"), "w") as f:
+            f.write("keep this")
+        with open(os.path.join(testdir, "debug.log"), "w") as f:
+            f.write("ignore this")
+        with open(os.path.join(testdir, "temp.tmp"), "w") as f:
+            f.write("ignore this too")
+        with open(os.path.join(testdir, "readme.md"), "w") as f:
+            f.write("keep this too")
+
+        # Create a build directory that should be ignored
+        builddir = os.path.join(testdir, "build")
+        os.mkdir(builddir)
+        with open(os.path.join(builddir, "output.txt"), "w") as f:
+            f.write("ignore entire directory")
+
+        # Add the directory
+        added, ignored = porcelain.add(self.repo.path, paths=["testdir"])
+
+        # Should only add non-ignored files
+        self.assertEqual(set(added), {"testdir/important.txt", "testdir/readme.md"})
+
+        # Check ignored files
+        self.assertIn("testdir/debug.log", ignored)
+        self.assertIn("testdir/temp.tmp", ignored)
+        self.assertIn("testdir/build/", ignored)
+
+    def test_add_multiple_directories(self) -> None:
+        """Test adding multiple directories in one call."""
+        # Create multiple directories
+        for dirname in ["dir1", "dir2", "dir3"]:
+            dirpath = os.path.join(self.repo.path, dirname)
+            os.mkdir(dirpath)
+            # Add files to each directory
+            for i in range(2):
+                with open(os.path.join(dirpath, f"file{i}.txt"), "w") as f:
+                    f.write(f"content {dirname} {i}")
+
+        # Add all directories at once
+        added, ignored = porcelain.add(self.repo.path, paths=["dir1", "dir2", "dir3"])
+
+        # Should add all files from all directories
+        self.assertEqual(len(added), 6)
+        for dirname in ["dir1", "dir2", "dir3"]:
+            for i in range(2):
+                self.assertIn(f"{dirname}/file{i}.txt", added)
+
+        # Verify all files are staged
+        index = self.repo.open_index()
+        self.assertEqual(len(index), 6)
 
 
 class RemoveTests(PorcelainTestCase):

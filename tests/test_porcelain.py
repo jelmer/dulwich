@@ -1027,6 +1027,23 @@ class AddTests(PorcelainTestCase):
         blob = self.repo[entry.sha]
         self.assertEqual(blob.data, b"line1\nline2")
 
+    def test_add_symlink_outside_repo(self) -> None:
+        """Test adding a symlink that points outside the repository."""
+        # Create a symlink pointing outside the repository
+        symlink_path = os.path.join(self.repo.path, "symlink_to_nowhere")
+        os.symlink("/nonexistent/path", symlink_path)
+
+        # Adding the symlink should succeed (matching Git's behavior)
+        added, ignored = porcelain.add(self.repo.path, paths=[symlink_path])
+
+        # Should successfully add the symlink
+        self.assertIn("symlink_to_nowhere", added)
+        self.assertEqual(len(ignored), 0)
+
+        # Verify symlink is actually staged
+        index = self.repo.open_index()
+        self.assertIn(b"symlink_to_nowhere", index)
+
 
 class RemoveTests(PorcelainTestCase):
     def test_remove_file(self) -> None:

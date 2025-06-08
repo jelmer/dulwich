@@ -620,25 +620,50 @@ def add(repo=".", paths=None):
                 # Make relative paths relative to the repo directory
                 path = repo_path / path
 
-            try:
-                # Don't resolve symlinks completely - only resolve the parent directory
-                # to avoid issues when symlinks point outside the repository
-                if path.is_symlink():
-                    # For symlinks, resolve only the parent directory
-                    parent_resolved = path.parent.resolve()
-                    resolved_path = parent_resolved / path.name
-                else:
-                    # For regular files/dirs, resolve normally
-                    resolved_path = path.resolve()
+            # Don't resolve symlinks completely - only resolve the parent directory
+            # to avoid issues when symlinks point outside the repository
+            if path.is_symlink():
+                # For symlinks, resolve only the parent directory
+                parent_resolved = path.parent.resolve()
+                resolved_path = parent_resolved / path.name
+            else:
+                # For regular files/dirs, resolve normally
+                resolved_path = path.resolve()
 
+            try:
                 relpath = str(resolved_path.relative_to(repo_path))
             except ValueError:
                 # Path is not within the repository
                 raise ValueError(f"Path {p} is not within repository {repo_path}")
 
+            # Handle directories by scanning their contents
+            if resolved_path.is_dir():
+                # Check if the directory itself is ignored
+                dir_relpath = os.path.join(relpath, "") if relpath != "." else ""
+                if dir_relpath and ignore_manager.is_ignored(dir_relpath):
+                    ignored.add(dir_relpath)
+                    continue
+
+                # When adding a directory, add all untracked files within it
+                current_untracked = list(
+                    get_untracked_paths(
+                        str(resolved_path),
+                        str(repo_path),
+                        r.open_index(),
+                    )
+                )
+                for untracked_path in current_untracked:
+                    # If we're scanning a subdirectory, adjust the path
+                    if relpath != ".":
+                        untracked_path = os.path.join(relpath, untracked_path)
+
+                    if not ignore_manager.is_ignored(untracked_path):
+                        relpaths.append(untracked_path)
+                    else:
+                        ignored.add(untracked_path)
+                continue
+
             # FIXME: Support patterns
-            if path.is_dir():
-                relpath = os.path.join(relpath, "")
             if ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
                 continue

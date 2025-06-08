@@ -920,9 +920,12 @@ class AddTests(PorcelainTestCase):
         try:
             os.chdir(self.repo.path)
             self.assertEqual({"foo", "blah", "adir", ".git"}, set(os.listdir(".")))
+            added, ignored = porcelain.add(self.repo.path)
+            # Normalize paths to use forward slashes for comparison
+            added_normalized = [path.replace(os.sep, "/") for path in added]
             self.assertEqual(
-                (["foo", os.path.join("adir", "afile")], set()),
-                porcelain.add(self.repo.path),
+                (added_normalized, ignored),
+                (["foo", "adir/afile"], set()),
             )
         finally:
             os.chdir(cwd)
@@ -1082,9 +1085,11 @@ class AddTests(PorcelainTestCase):
 
         # Should add all files in the directory
         self.assertEqual(len(added), 3)
-        self.assertIn("subdir/file1.txt", added)
-        self.assertIn("subdir/file2.txt", added)
-        self.assertIn("subdir/file3.txt", added)
+        # Normalize paths to use forward slashes for comparison
+        added_normalized = [path.replace(os.sep, "/") for path in added]
+        self.assertIn("subdir/file1.txt", added_normalized)
+        self.assertIn("subdir/file2.txt", added_normalized)
+        self.assertIn("subdir/file3.txt", added_normalized)
 
         # Verify files are actually staged
         index = self.repo.open_index()
@@ -1113,9 +1118,11 @@ class AddTests(PorcelainTestCase):
 
         # Should add all files recursively
         self.assertEqual(len(added), 3)
-        self.assertIn("dir1/file1.txt", added)
-        self.assertIn("dir1/dir2/file2.txt", added)
-        self.assertIn("dir1/dir2/dir3/file3.txt", added)
+        # Normalize paths to use forward slashes for comparison
+        added_normalized = [path.replace(os.sep, "/") for path in added]
+        self.assertIn("dir1/file1.txt", added_normalized)
+        self.assertIn("dir1/dir2/file2.txt", added_normalized)
+        self.assertIn("dir1/dir2/dir3/file3.txt", added_normalized)
 
         # Verify files are actually staged
         index = self.repo.open_index()
@@ -1152,8 +1159,10 @@ class AddTests(PorcelainTestCase):
 
         # Should only add the untracked files
         self.assertEqual(len(added), 2)
-        self.assertIn("mixed/untracked1.txt", added)
-        self.assertIn("mixed/untracked2.txt", added)
+        # Normalize paths to use forward slashes for comparison
+        added_normalized = [path.replace(os.sep, "/") for path in added]
+        self.assertIn("mixed/untracked1.txt", added_normalized)
+        self.assertIn("mixed/untracked2.txt", added_normalized)
         self.assertNotIn("mixed/tracked.txt", added)
 
         # Verify the index contains all files
@@ -1192,12 +1201,18 @@ class AddTests(PorcelainTestCase):
         added, ignored = porcelain.add(self.repo.path, paths=["testdir"])
 
         # Should only add non-ignored files
-        self.assertEqual(set(added), {"testdir/important.txt", "testdir/readme.md"})
+        # Normalize paths to use forward slashes for comparison
+        added_normalized = {path.replace(os.sep, "/") for path in added}
+        self.assertEqual(
+            added_normalized, {"testdir/important.txt", "testdir/readme.md"}
+        )
 
         # Check ignored files
-        self.assertIn("testdir/debug.log", ignored)
-        self.assertIn("testdir/temp.tmp", ignored)
-        self.assertIn("testdir/build/", ignored)
+        # Normalize paths to use forward slashes for comparison
+        ignored_normalized = {path.replace(os.sep, "/") for path in ignored}
+        self.assertIn("testdir/debug.log", ignored_normalized)
+        self.assertIn("testdir/temp.tmp", ignored_normalized)
+        self.assertIn("testdir/build/", ignored_normalized)
 
     def test_add_multiple_directories(self) -> None:
         """Test adding multiple directories in one call."""
@@ -1215,9 +1230,11 @@ class AddTests(PorcelainTestCase):
 
         # Should add all files from all directories
         self.assertEqual(len(added), 6)
+        # Normalize paths to use forward slashes for comparison
+        added_normalized = [path.replace(os.sep, "/") for path in added]
         for dirname in ["dir1", "dir2", "dir3"]:
             for i in range(2):
-                self.assertIn(f"{dirname}/file{i}.txt", added)
+                self.assertIn(f"{dirname}/file{i}.txt", added_normalized)
 
         # Verify all files are staged
         index = self.repo.open_index()

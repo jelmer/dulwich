@@ -587,12 +587,17 @@ def add(repo=".", paths=None):
 
     Args:
       repo: Repository for the files
-      paths: Paths to add.  No value passed stages all modified files.
+      paths: Paths to add. If None, stages all untracked files from the
+        current working directory (mimicking 'git add .' behavior).
     Returns: Tuple with set of added files and ignored files
 
     If the repository contains ignored directories, the returned set will
     contain the path to an ignored directory (with trailing slash). Individual
     files within ignored directories will not be returned.
+
+    Note: When paths=None, this function respects the current working directory,
+    so if called from a subdirectory, it will only add files from that
+    subdirectory and below, matching Git's behavior.
     """
     ignored = set()
     with open_repo_closing(repo) as r:
@@ -631,7 +636,7 @@ def add(repo=".", paths=None):
                 resolved_path = path.resolve()
 
             try:
-                relpath = str(resolved_path.relative_to(repo_path))
+                relpath = str(resolved_path.relative_to(repo_path)).replace(os.sep, "/")
             except ValueError:
                 # Path is not within the repository
                 raise ValueError(f"Path {p} is not within repository {repo_path}")
@@ -639,7 +644,7 @@ def add(repo=".", paths=None):
             # Handle directories by scanning their contents
             if resolved_path.is_dir():
                 # Check if the directory itself is ignored
-                dir_relpath = os.path.join(relpath, "") if relpath != "." else ""
+                dir_relpath = posixpath.join(relpath, "") if relpath != "." else ""
                 if dir_relpath and ignore_manager.is_ignored(dir_relpath):
                     ignored.add(dir_relpath)
                     continue
@@ -655,7 +660,7 @@ def add(repo=".", paths=None):
                 for untracked_path in current_untracked:
                     # If we're scanning a subdirectory, adjust the path
                     if relpath != ".":
-                        untracked_path = os.path.join(relpath, untracked_path)
+                        untracked_path = posixpath.join(relpath, untracked_path)
 
                     if not ignore_manager.is_ignored(untracked_path):
                         relpaths.append(untracked_path)

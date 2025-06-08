@@ -619,7 +619,23 @@ def add(repo=".", paths=None):
             if not path.is_absolute():
                 # Make relative paths relative to the repo directory
                 path = repo_path / path
-            relpath = str(path.resolve().relative_to(repo_path))
+
+            try:
+                # Don't resolve symlinks completely - only resolve the parent directory
+                # to avoid issues when symlinks point outside the repository
+                if path.is_symlink():
+                    # For symlinks, resolve only the parent directory
+                    parent_resolved = path.parent.resolve()
+                    resolved_path = parent_resolved / path.name
+                else:
+                    # For regular files/dirs, resolve normally
+                    resolved_path = path.resolve()
+
+                relpath = str(resolved_path.relative_to(repo_path))
+            except ValueError:
+                # Path is not within the repository
+                raise ValueError(f"Path {p} is not within repository {repo_path}")
+
             # FIXME: Support patterns
             if path.is_dir():
                 relpath = os.path.join(relpath, "")

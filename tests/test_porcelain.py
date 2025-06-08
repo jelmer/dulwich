@@ -1047,6 +1047,172 @@ class AddTests(PorcelainTestCase):
         index = self.repo.open_index()
         self.assertIn(b"symlink_to_nowhere", index)
 
+    def test_add_symlink_to_file_inside_repo(self) -> None:
+        """Test adding a symlink that points to a file inside the repository."""
+        # Create a regular file
+        target_file = os.path.join(self.repo.path, "target.txt")
+        with open(target_file, "w") as f:
+            f.write("target content")
+        
+        # Create a symlink to the file
+        symlink_path = os.path.join(self.repo.path, "link_to_target")
+        os.symlink("target.txt", symlink_path)
+        
+        # Add both the target and the symlink
+        added, ignored = porcelain.add(self.repo.path, paths=[target_file, symlink_path])
+        
+        # Both should be added successfully
+        self.assertIn("target.txt", added)
+        self.assertIn("link_to_target", added)
+        self.assertEqual(len(ignored), 0)
+        
+        # Verify both are in the index
+        index = self.repo.open_index()
+        self.assertIn(b"target.txt", index)
+        self.assertIn(b"link_to_target", index)
+
+    def test_add_symlink_to_directory_inside_repo(self) -> None:
+        """Test adding a symlink that points to a directory inside the repository."""
+        # Create a directory with some files
+        target_dir = os.path.join(self.repo.path, "target_dir")
+        os.mkdir(target_dir)
+        with open(os.path.join(target_dir, "file1.txt"), "w") as f:
+            f.write("content1")
+        with open(os.path.join(target_dir, "file2.txt"), "w") as f:
+            f.write("content2")
+        
+        # Create a symlink to the directory
+        symlink_path = os.path.join(self.repo.path, "link_to_dir")
+        os.symlink("target_dir", symlink_path)
+        
+        # Add the symlink
+        added, ignored = porcelain.add(self.repo.path, paths=[symlink_path])
+        
+        # When adding a symlink to a directory, it follows the symlink and adds contents
+        self.assertEqual(len(added), 2)
+        self.assertIn("link_to_dir/file1.txt", added)
+        self.assertIn("link_to_dir/file2.txt", added)
+        self.assertEqual(len(ignored), 0)
+        
+        # Verify files are added through the symlink path
+        index = self.repo.open_index()
+        self.assertIn(b"link_to_dir/file1.txt", index)
+        self.assertIn(b"link_to_dir/file2.txt", index)
+        # The original target directory files are not added
+        self.assertNotIn(b"target_dir/file1.txt", index)
+        self.assertNotIn(b"target_dir/file2.txt", index)
+
+    def test_add_symlink_chain(self) -> None:
+        """Test adding a chain of symlinks (symlink to symlink)."""
+        # Create a regular file
+        target_file = os.path.join(self.repo.path, "original.txt")
+        with open(target_file, "w") as f:
+            f.write("original content")
+        
+        # Create first symlink
+        first_link = os.path.join(self.repo.path, "link1")
+        os.symlink("original.txt", first_link)
+        
+        # Create second symlink pointing to first
+        second_link = os.path.join(self.repo.path, "link2")
+        os.symlink("link1", second_link)
+        
+        # Add all files
+        added, ignored = porcelain.add(self.repo.path, paths=[target_file, first_link, second_link])
+        
+        # All should be added
+        self.assertEqual(len(added), 3)
+        self.assertIn("original.txt", added)
+        self.assertIn("link1", added)
+        self.assertIn("link2", added)
+        
+        # Verify all are in the index
+        index = self.repo.open_index()
+        self.assertIn(b"original.txt", index)
+        self.assertIn(b"link1", index)
+        self.assertIn(b"link2", index)
+
+    def test_add_broken_symlink(self) -> None:
+        """Test adding a broken symlink (points to non-existent target)."""
+        # Create a symlink to a non-existent file
+        broken_link = os.path.join(self.repo.path, "broken_link")
+        os.symlink("does_not_exist.txt", broken_link)
+        
+        # Add the broken symlink
+        added, ignored = porcelain.add(self.repo.path, paths=[broken_link])
+        
+        # Should be added successfully (Git tracks the symlink, not its target)
+        self.assertIn("broken_link", added)
+        self.assertEqual(len(ignored), 0)
+        
+        # Verify it's in the index
+        index = self.repo.open_index()
+        self.assertIn(b"broken_link", index)
+
+    def test_add_symlink_relative_outside_repo(self) -> None:
+        """Test adding a symlink that uses '..' to point outside the repository."""
+        # Create a file outside the repo
+        outside_file = os.path.join(self.test_dir, "outside.txt")
+        with open(outside_file, "w") as f:
+            f.write("outside content")
+        
+        # Create a symlink using relative path to go outside
+        symlink_path = os.path.join(self.repo.path, "link_outside")
+        os.symlink("../outside.txt", symlink_path)
+        
+        # Add the symlink
+        added, ignored = porcelain.add(self.repo.path, paths=[symlink_path])
+        
+        # Should be added successfully
+        self.assertIn("link_outside", added)
+        self.assertEqual(len(ignored), 0)
+        
+        # Verify it's in the index
+        index = self.repo.open_index()
+        self.assertIn(b"link_outside", index)
+
+    def test_add_symlink_absolute_to_system(self) -> None:
+        """Test adding a symlink with absolute path to system directory."""
+        # Create a symlink to a system directory
+        symlink_path = os.path.join(self.repo.path, "link_to_tmp")
+        os.symlink("/tmp", symlink_path)
+        
+        # Adding a symlink to a directory outside the repo should raise ValueError
+        with self.assertRaises(ValueError) as cm:
+            porcelain.add(self.repo.path, paths=[symlink_path])
+        
+        # Check that the error indicates the path is outside the repository
+        self.assertIn("is not in the subpath of", str(cm.exception))
+
+    def test_add_file_through_symlink(self) -> None:
+        """Test adding a file through a symlinked directory."""
+        # Create a directory with a file
+        real_dir = os.path.join(self.repo.path, "real_dir")
+        os.mkdir(real_dir)
+        real_file = os.path.join(real_dir, "file.txt")
+        with open(real_file, "w") as f:
+            f.write("content")
+        
+        # Create a symlink to the directory
+        link_dir = os.path.join(self.repo.path, "link_dir")
+        os.symlink("real_dir", link_dir)
+        
+        # Try to add the file through the symlink path
+        symlink_file_path = os.path.join(link_dir, "file.txt")
+        
+        # This should add the real file, not create a new entry
+        added, ignored = porcelain.add(self.repo.path, paths=[symlink_file_path])
+        
+        # The real file should be added
+        self.assertIn("real_dir/file.txt", added)
+        self.assertEqual(len(added), 1)
+        
+        # Verify correct path in index
+        index = self.repo.open_index()
+        self.assertIn(b"real_dir/file.txt", index)
+        # Should not create a separate entry for the symlink path
+        self.assertNotIn(b"link_dir/file.txt", index)
+
     def test_add_repo_path(self) -> None:
         """Test adding the repository path itself should add all untracked files."""
         # Create some untracked files

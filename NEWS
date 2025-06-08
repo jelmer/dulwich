@@ -1,5 +1,11 @@
 0.22.9	UNRELEASED
 
+ * Fix ``porcelain.add()`` symlink handling to allow adding symlinks that point
+   outside the repository. Previously, the function would fail when trying to
+   add a symlink pointing outside the repo due to aggressive path resolution.
+   Now only resolves the parent directory for symlinks, matching Git's behavior.
+   (Jelmer Vernooĳ, #789)
+
  * Fix gitignore pattern matching for directory negation patterns. Patterns like
    ``!data/*/`` now correctly unignore direct subdirectories while still ignoring
    files in the parent directory, matching Git's behavior. The ``is_ignored()`` method

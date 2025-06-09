@@ -587,7 +587,7 @@ def add(repo=".", paths=None):
 
     Args:
       repo: Repository for the files
-      paths: Paths to add. If None, stages all untracked files from the
+      paths: Paths to add. If None, stages all untracked and modified files from the
         current working directory (mimicking 'git add .' behavior).
     Returns: Tuple with set of added files and ignored files
 
@@ -595,27 +595,23 @@ def add(repo=".", paths=None):
     contain the path to an ignored directory (with trailing slash). Individual
     files within ignored directories will not be returned.
 
-    Note: When paths=None, this function respects the current working directory,
-    so if called from a subdirectory, it will only add files from that
-    subdirectory and below, matching Git's behavior.
+    Note: When paths=None, this function adds all untracked and modified files
+    from the entire repository, mimicking 'git add -A' behavior.
     """
     ignored = set()
     with open_repo_closing(repo) as r:
         repo_path = Path(r.path).resolve()
         ignore_manager = IgnoreFilterManager.from_repo(r)
+
+        # Get unstaged changes once for the entire operation
+        index = r.open_index()
+        normalizer = r.get_blob_normalizer()
+        filter_callback = normalizer.checkin_normalize
+        all_unstaged_paths = list(get_unstaged_changes(index, r.path, filter_callback))
+
         if not paths:
-            cwd = Path(os.getcwd()).resolve()
-            paths = list(
-                get_untracked_paths(
-                    str(cwd),
-                    str(repo_path),
-                    r.open_index(),
-                )
-            )
-            # If we're in a subdirectory, adjust paths to be relative to repo root
-            if cwd != repo_path:
-                cwd_relative_to_repo = cwd.relative_to(repo_path)
-                paths = [str(cwd_relative_to_repo / p) for p in paths]
+            # When no paths specified, add all untracked and modified files from repo root
+            paths = [str(repo_path)]
         relpaths = []
         if not isinstance(paths, list):
             paths = [paths]
@@ -654,7 +650,7 @@ def add(repo=".", paths=None):
                     get_untracked_paths(
                         str(resolved_path),
                         str(repo_path),
-                        r.open_index(),
+                        index,
                     )
                 )
                 for untracked_path in current_untracked:
@@ -666,6 +662,24 @@ def add(repo=".", paths=None):
                         relpaths.append(untracked_path)
                     else:
                         ignored.add(untracked_path)
+
+                # Also add unstaged (modified) files within this directory
+                for unstaged_path in all_unstaged_paths:
+                    if isinstance(unstaged_path, bytes):
+                        unstaged_path = unstaged_path.decode("utf-8")
+
+                    # Check if this unstaged file is within the directory we're processing
+                    unstaged_full_path = repo_path / unstaged_path
+                    try:
+                        unstaged_full_path.relative_to(resolved_path)
+                        # File is within this directory, add it
+                        if not ignore_manager.is_ignored(unstaged_path):
+                            relpaths.append(unstaged_path)
+                        else:
+                            ignored.add(unstaged_path)
+                    except ValueError:
+                        # File is not within this directory, skip it
+                        continue
                 continue
 
             # FIXME: Support patterns

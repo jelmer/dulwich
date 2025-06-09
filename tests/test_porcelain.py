@@ -1180,7 +1180,13 @@ class AddTests(PorcelainTestCase):
         """Test adding a symlink with absolute path to system directory."""
         # Create a symlink to a system directory
         symlink_path = os.path.join(self.repo.path, "link_to_tmp")
-        os.symlink("/tmp", symlink_path)
+        if os.name == "nt":
+            # On Windows, use a system directory like TEMP
+            symlink_target = os.environ["TEMP"]
+        else:
+            # On Unix-like systems, use /tmp
+            symlink_target = "/tmp"
+        os.symlink(symlink_target, symlink_path)
 
         # Adding a symlink to a directory outside the repo should raise ValueError
         with self.assertRaises(ValueError) as cm:

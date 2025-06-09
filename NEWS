@@ -6,6 +6,14 @@
    Now only resolves the parent directory for symlinks, matching Git's behavior.
    (Jelmer Vernooĳ, #789)
 
+ * Fix ``porcelain.add()`` when adding repository root path or directories.
+   Previously, adding the repository path itself would incorrectly stage
+   ``b'./'`` instead of the actual untracked files, leading to
+   repository corruption.  (Jelmer Vernooĳ, #1178)
+
+ * Improve ``porcelain.add()`` documentation to correctly describe default
+   behavior. (Jelmer Vernooĳ, #895)
+
  * Fix gitignore pattern matching for directory negation patterns. Patterns like
    ``!data/*/`` now correctly unignore direct subdirectories while still ignoring
    files in the parent directory, matching Git's behavior. The ``is_ignored()`` method

@@ -1,5 +1,10 @@
 0.22.9	UNRELEASED
 
+ * Fix ``porcelain.add()`` to stage both untracked and modified files when no
+   paths are specified. Previously, only untracked files were staged, inconsistent
+   with Git's behavior. Now behaves like ``git add -A`` when called without paths.
+   (Jelmer Vernooĳ, #746)
+
  * Fix ``porcelain.add()`` symlink handling to allow adding symlinks that point
    outside the repository. Previously, the function would fail when trying to
    add a symlink pointing outside the repo due to aggressive path resolution.
@@ -9,7 +14,7 @@
  * Fix ``porcelain.add()`` when adding repository root path or directories.
    Previously, adding the repository path itself would incorrectly stage
    ``b'./'`` instead of the actual untracked files, leading to
-   repository corruption.  (Jelmer Vernooĳ, #1178)
+   repository corruption.  (Jelmer Vernooĳ, #1178, #655)
 
  * Improve ``porcelain.add()`` documentation to correctly describe default
    behavior. (Jelmer Vernooĳ, #895)

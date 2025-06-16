@@ -273,8 +273,10 @@ class ObjectStoreTests:
         self.store.add_object(blob1)
         missing_sha = b"1" * 40
 
-        with self.assertRaises(KeyError):
-            list(self.store.iterobjects_subset([blob1.id, missing_sha]))
+        self.assertRaises(
+            KeyError,
+            lambda: list(self.store.iterobjects_subset([blob1.id, missing_sha])),
+        )
 
     def test_iterobjects_subset_missing_allowed(self) -> None:
         """Test iterating with missing objects when allowed."""

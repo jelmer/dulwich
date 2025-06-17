@@ -1,5 +1,10 @@
 0.22.9	UNRELEASED
 
+ * Add support for ``format`` argument to ``Repo.init()`` and ``Repo.init_bare()``
+   to specify repository format version (0 or 1). This allows creating repositories
+   with different format versions by setting the ``core.repositoryformatversion``
+   configuration value. (Jelmer Vernooĳ)
+
  * Fix ``porcelain.add()`` to stage both untracked and modified files when no
    paths are specified. Previously, only untracked files were staged, inconsistent
    with Git's behavior. Now behaves like ``git add -A`` when called without paths.

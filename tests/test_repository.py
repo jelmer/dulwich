@@ -342,6 +342,42 @@ class RepositoryRootTests(TestCase):
         self.assertEqual(os.listdir(repo_dir), [".git"])
         self.assertFilesystemHidden(os.path.join(repo_dir, ".git"))
 
+    def test_init_format(self) -> None:
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Test format 0
+        t0 = Repo.init(tmp_dir + "0", mkdir=True, format=0)
+        self.addCleanup(t0.close)
+        self.assertEqual(t0.get_config().get("core", "repositoryformatversion"), b"0")
+
+        # Test format 1
+        t1 = Repo.init(tmp_dir + "1", mkdir=True, format=1)
+        self.addCleanup(t1.close)
+        self.assertEqual(t1.get_config().get("core", "repositoryformatversion"), b"1")
+
+        # Test default format
+        td = Repo.init(tmp_dir + "d", mkdir=True)
+        self.addCleanup(td.close)
+        self.assertEqual(td.get_config().get("core", "repositoryformatversion"), b"0")
+
+        # Test invalid format
+        with self.assertRaises(ValueError):
+            Repo.init(tmp_dir + "bad", mkdir=True, format=99)
+
+    def test_init_bare_format(self) -> None:
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Test format 1 for bare repo
+        t = Repo.init_bare(tmp_dir + "bare", mkdir=True, format=1)
+        self.addCleanup(t.close)
+        self.assertEqual(t.get_config().get("core", "repositoryformatversion"), b"1")
+
+        # Test invalid format for bare repo
+        with self.assertRaises(ValueError):
+            Repo.init_bare(tmp_dir + "badbr", mkdir=True, format=2)
+
     @skipIf(sys.platform == "win32", "fails on Windows")
     def test_fetch(self) -> None:
         r = self.open_repo("a.git")

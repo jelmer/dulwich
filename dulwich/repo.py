@@ -401,14 +401,20 @@ class BaseRepo:
         # For now, just mimic the old behaviour
         return sys.platform != "win32"
 
-    def _init_files(self, bare: bool, symlinks: Optional[bool] = None) -> None:
+    def _init_files(
+        self, bare: bool, symlinks: Optional[bool] = None, format: Optional[int] = None
+    ) -> None:
         """Initialize a default set of named files."""
         from .config import ConfigFile
 
         self._put_named_file("description", b"Unnamed repository")
         f = BytesIO()
         cf = ConfigFile()
-        cf.set("core", "repositoryformatversion", "0")
+        if format is None:
+            format = 0
+        if format not in (0, 1):
+            raise ValueError(f"Unsupported repository format version: {format}")
+        cf.set("core", "repositoryformatversion", str(format))
         if self._determine_file_mode():
             cf.set("core", "filemode", True)
         else:
@@ -1737,6 +1743,7 @@ class Repo(BaseRepo):
         config=None,
         default_branch=None,
         symlinks: Optional[bool] = None,
+        format: Optional[int] = None,
     ):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(controldir, *d))
@@ -1753,7 +1760,7 @@ class Repo(BaseRepo):
             except KeyError:
                 default_branch = DEFAULT_BRANCH
         ret.refs.set_symbolic_ref(b"HEAD", LOCAL_BRANCH_PREFIX + default_branch)
-        ret._init_files(bare=bare, symlinks=symlinks)
+        ret._init_files(bare=bare, symlinks=symlinks, format=format)
         return ret
 
     @classmethod
@@ -1765,12 +1772,14 @@ class Repo(BaseRepo):
         config=None,
         default_branch=None,
         symlinks: Optional[bool] = None,
+        format: Optional[int] = None,
     ) -> "Repo":
         """Create a new repository.
 
         Args:
           path: Path in which to create the repository
           mkdir: Whether to create the directory
+          format: Repository format version (defaults to 0)
         Returns: `Repo` instance
         """
         if mkdir:
@@ -1785,6 +1794,7 @@ class Repo(BaseRepo):
             config=config,
             default_branch=default_branch,
             symlinks=symlinks,
+            format=format,
         )
 
     @classmethod
@@ -1827,7 +1837,14 @@ class Repo(BaseRepo):
 
     @classmethod
     def init_bare(
-        cls, path, *, mkdir=False, object_store=None, config=None, default_branch=None
+        cls,
+        path,
+        *,
+        mkdir=False,
+        object_store=None,
+        config=None,
+        default_branch=None,
+        format: Optional[int] = None,
     ):
         """Create a new bare repository.
 
@@ -1835,6 +1852,7 @@ class Repo(BaseRepo):
 
         Args:
           path: Path to create bare repository in
+          format: Repository format version (defaults to 0)
         Returns: a `Repo` instance
         """
         if mkdir:
@@ -1846,6 +1864,7 @@ class Repo(BaseRepo):
             object_store=object_store,
             config=config,
             default_branch=default_branch,
+            format=format,
         )
 
     create = init_bare
@@ -2032,7 +2051,7 @@ class MemoryRepo(BaseRepo):
         return self._config
 
     @classmethod
-    def init_bare(cls, objects, refs):
+    def init_bare(cls, objects, refs, format: Optional[int] = None):
         """Create a new bare repository in memory.
 
         Args:
@@ -2040,11 +2059,12 @@ class MemoryRepo(BaseRepo):
             as iterable
           refs: Refs as dictionary, mapping names
             to object SHA1s
+          format: Repository format version (defaults to 0)
         """
         ret = cls()
         for obj in objects:
             ret.object_store.add_object(obj)
         for refname, sha in refs.items():
             ret.refs.add_if_new(refname, sha)
-        ret._init_files(bare=True)
+        ret._init_files(bare=True, format=format)
         return ret

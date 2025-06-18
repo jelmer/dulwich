@@ -21,23 +21,29 @@
 
 """Mailmap file reader."""
 
-from typing import Optional
+from collections.abc import Iterator
+from typing import IO, Optional, Union
 
 
-def parse_identity(text):
+def parse_identity(text: bytes) -> tuple[Optional[bytes], Optional[bytes]]:
     # TODO(jelmer): Integrate this with dulwich.fastexport.split_email and
     # dulwich.repo.check_user_identity
-    (name, email) = text.rsplit(b"<", 1)
-    name = name.strip()
-    email = email.rstrip(b">").strip()
-    if not name:
-        name = None
-    if not email:
-        email = None
+    (name_str, email_str) = text.rsplit(b"<", 1)
+    name_str = name_str.strip()
+    email_str = email_str.rstrip(b">").strip()
+    name: Optional[bytes] = name_str if name_str else None
+    email: Optional[bytes] = email_str if email_str else None
     return (name, email)
 
 
-def read_mailmap(f):
+def read_mailmap(
+    f: IO[bytes],
+) -> Iterator[
+    tuple[
+        tuple[Optional[bytes], Optional[bytes]],
+        Optional[tuple[Optional[bytes], Optional[bytes]]],
+    ]
+]:
     """Read a mailmap.
 
     Args:
@@ -64,13 +70,30 @@ def read_mailmap(f):
 class Mailmap:
     """Class for accessing a mailmap file."""
 
-    def __init__(self, map=None) -> None:
-        self._table: dict[tuple[Optional[str], Optional[str]], tuple[str, str]] = {}
+    def __init__(
+        self,
+        map: Optional[
+            Iterator[
+                tuple[
+                    tuple[Optional[bytes], Optional[bytes]],
+                    Optional[tuple[Optional[bytes], Optional[bytes]]],
+                ]
+            ]
+        ] = None,
+    ) -> None:
+        self._table: dict[
+            tuple[Optional[bytes], Optional[bytes]],
+            tuple[Optional[bytes], Optional[bytes]],
+        ] = {}
         if map:
             for canonical_identity, from_identity in map:
                 self.add_entry(canonical_identity, from_identity)
 
-    def add_entry(self, canonical_identity, from_identity=None) -> None:
+    def add_entry(
+        self,
+        canonical_identity: tuple[Optional[bytes], Optional[bytes]],
+        from_identity: Optional[tuple[Optional[bytes], Optional[bytes]]] = None,
+    ) -> None:
         """Add an entry to the mail mail.
 
         Any of the fields can be None, but at least one of them needs to be
@@ -91,7 +114,9 @@ class Mailmap:
         else:
             self._table[from_name, from_email] = canonical_identity
 
-    def lookup(self, identity):
+    def lookup(
+        self, identity: Union[bytes, tuple[Optional[bytes], Optional[bytes]]]
+    ) -> Union[bytes, tuple[Optional[bytes], Optional[bytes]]]:
         """Lookup an identity in this mailmail."""
         if not isinstance(identity, tuple):
             was_tuple = False
@@ -109,9 +134,14 @@ class Mailmap:
         if was_tuple:
             return identity
         else:
-            return identity[0] + b" <" + identity[1] + b">"
+            name, email = identity
+            if name is None:
+                name = b""
+            if email is None:
+                email = b""
+            return name + b" <" + email + b">"
 
     @classmethod
-    def from_path(cls, path):
+    def from_path(cls, path: str) -> "Mailmap":
         with open(path, "rb") as f:
             return cls(read_mailmap(f))

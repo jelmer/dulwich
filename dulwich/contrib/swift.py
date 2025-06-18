@@ -39,7 +39,7 @@ import zlib
 from collections.abc import Iterator
 from configparser import ConfigParser
 from io import BytesIO
-from typing import BinaryIO, Callable, Optional, cast
+from typing import BinaryIO, Callable, Optional, Union, cast
 
 from geventhttpclient import HTTPClient
 
@@ -97,7 +97,7 @@ cache_length = 20
 
 
 class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
-    def next(self) -> Optional[tuple[bytes, int, bytes | None]]:
+    def next(self) -> Optional[tuple[bytes, int, Union[bytes, None]]]:
         while True:
             if not self.objects_to_send:
                 return None
@@ -440,7 +440,7 @@ class SwiftConnector:
 
     def get_object(
         self, name: str, range: Optional[str] = None
-    ) -> Optional[bytes | BytesIO]:
+    ) -> Optional[Union[bytes, BytesIO]]:
         """Retrieve an object.
 
         Args:
@@ -590,7 +590,7 @@ class SwiftPackData(PackData):
     using the Range header feature of Swift.
     """
 
-    def __init__(self, scon: SwiftConnector, filename: str) -> None:
+    def __init__(self, scon: SwiftConnector, filename: Union[str, os.PathLike]) -> None:
         """Initialize a SwiftPackReader.
 
         Args:
@@ -600,11 +600,11 @@ class SwiftPackData(PackData):
         self.scon = scon
         self._filename = filename
         self._header_size = 12
-        headers = self.scon.get_object_stat(self._filename)
+        headers = self.scon.get_object_stat(str(self._filename))
         if headers is None:
             raise Exception(f"Could not get stats for {self._filename}")
         self.pack_length = int(headers["content-length"])
-        pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
+        pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
         (version, self._num_objects) = read_pack_header(pack_reader.read)
         self._offset_cache = LRUSizeCache(
             1024 * 1024 * self.scon.cache_length,
@@ -614,18 +614,18 @@ class SwiftPackData(PackData):
 
     def get_object_at(
         self, offset: int
-    ) -> tuple[int, tuple[bytes | int, list[bytes]] | list[bytes]]:
+    ) -> tuple[int, Union[tuple[Union[bytes, int], list[bytes]], list[bytes]]]:
         if offset in self._offset_cache:
             return self._offset_cache[offset]
         assert offset >= self._header_size
-        pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
+        pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
         pack_reader.seek(offset)
         unpacked, _ = unpack_object(pack_reader.read)
         obj_data = unpacked._obj()
         return (unpacked.pack_type_num, obj_data)
 
     def get_stored_checksum(self) -> bytes:
-        pack_reader = SwiftPackReader(self.scon, self._filename, self.pack_length)
+        pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
         return pack_reader.read_checksum()
 
     def close(self) -> None:
@@ -881,7 +881,9 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
             f = BytesIO(f)
         super().__init__(f)
 
-    def _load_check_ref(self, name: bytes, old_ref: Optional[bytes]) -> dict | bool:
+    def _load_check_ref(
+        self, name: bytes, old_ref: Optional[bytes]
+    ) -> Union[dict, bool]:
         self._check_refname(name)
         obj = self.scon.get_object(self.filename)
         if not obj:

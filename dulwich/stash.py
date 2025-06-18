@@ -22,7 +22,7 @@
 """Stash handling."""
 
 import os
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, TypedDict
 
 from .file import GitFile
 from .index import commit_tree, iter_fresh_objects
@@ -33,6 +33,14 @@ from .refs import Ref
 if TYPE_CHECKING:
     from .reflog import Entry
     from .repo import Repo
+
+
+class CommitKwargs(TypedDict, total=False):
+    """Keyword arguments for do_commit."""
+
+    committer: bytes
+    author: bytes
+
 
 DEFAULT_STASH_REF = b"refs/stash"
 
@@ -54,7 +62,7 @@ class Stash:
     def stashes(self) -> list["Entry"]:
         try:
             with GitFile(self._reflog_path, "rb") as f:
-                return list(reversed(list(read_reflog(f))))  # type: ignore[arg-type]
+                return list(reversed(list(read_reflog(f))))
         except FileNotFoundError:
             return []
 
@@ -91,7 +99,7 @@ class Stash:
           message: Optional commit message
         """
         # First, create the index commit.
-        commit_kwargs = {}
+        commit_kwargs = CommitKwargs()
         if committer is not None:
             commit_kwargs["committer"] = committer
         if author is not None:
@@ -104,17 +112,23 @@ class Stash:
             message=b"Index stash",
             merge_heads=[self._repo.head()],
             no_verify=True,
-            **commit_kwargs,  # type: ignore
+            **commit_kwargs,
         )
 
         # Then, the working tree one.
-        stash_tree_id = commit_tree(
-            self._repo.object_store,
-            iter_fresh_objects(  # type: ignore
+        # Filter out entries with None values since commit_tree expects non-None values
+        fresh_objects = [
+            (path, sha, mode)
+            for path, sha, mode in iter_fresh_objects(
                 index,
                 os.fsencode(self._repo.path),
                 object_store=self._repo.object_store,
-            ),
+            )
+            if sha is not None and mode is not None
+        ]
+        stash_tree_id = commit_tree(
+            self._repo.object_store,
+            fresh_objects,
         )
 
         if message is None:
@@ -129,7 +143,7 @@ class Stash:
             message=message,
             merge_heads=[index_commit_id],
             no_verify=True,
-            **commit_kwargs,  # type: ignore
+            **commit_kwargs,
         )
 
         return cid

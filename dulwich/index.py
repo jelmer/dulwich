@@ -1167,7 +1167,9 @@ if sys.platform == "win32":
                 src, dst, target_is_directory=target_is_directory, dir_fd=dir_fd
             )
         except PermissionError as e:
-            raise WindowsSymlinkPermissionError(e.errno, e.strerror, e.filename) from e
+            raise WindowsSymlinkPermissionError(
+                e.errno or 0, e.strerror or "", e.filename
+            ) from e
 else:
     symlink = os.symlink
 
@@ -1202,9 +1204,11 @@ def build_file_from_blob(
             os.unlink(target_path)
         if sys.platform == "win32":
             # os.readlink on Python3 on Windows requires a unicode string.
-            contents = contents.decode(tree_encoding)
-            target_path = target_path.decode(tree_encoding)
-        (symlink_fn or symlink)(contents, target_path)
+            contents_str = contents.decode(tree_encoding)
+            target_path_str = target_path.decode(tree_encoding)
+            (symlink_fn or symlink)(contents_str, target_path_str)
+        else:
+            (symlink_fn or symlink)(contents, target_path)
     else:
         if oldstat is not None and oldstat.st_size == len(contents):
             with open(target_path, "rb") as f:

@@ -234,6 +234,8 @@ def apply_included_paths(
                     pass
                 except FileNotFoundError:
                     pass
+                except PermissionError:
+                    pass
         else:
             # Included => materialize if missing
             if not os.path.exists(full_path):

@@ -183,11 +183,8 @@ def apply_included_paths(
     def local_modifications_exist(full_path: str, index_entry: IndexEntry) -> bool:
         if not os.path.exists(full_path):
             return False
-        try:
-            with open(full_path, "rb") as f:
-                disk_data = f.read()
-        except OSError:
-            return True
+        with open(full_path, "rb") as f:
+            disk_data = f.read()
         try:
             blob_obj = repo_obj.object_store[index_entry.sha]
         except KeyError:
@@ -234,6 +231,9 @@ def apply_included_paths(
                     pass
                 except FileNotFoundError:
                     pass
+                except PermissionError:
+                    if not force:
+                        raise
         else:
             # Included => materialize if missing
             if not os.path.exists(full_path):

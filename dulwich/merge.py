@@ -371,6 +371,9 @@ class Merger:
                                 f"Expected blob for {path!r}, got {theirs_obj.type_name.decode()}"
                             )
 
+                    assert isinstance(base_blob, Blob)
+                    assert isinstance(ours_blob, Blob)
+                    assert isinstance(theirs_blob, Blob)
                     merged_content, had_conflict = self.merge_blobs(
                         base_blob, ours_blob, theirs_blob
                     )
@@ -431,4 +434,7 @@ def three_way_merge(
     else:
         raise TypeError(f"Expected tree, got {theirs_obj.type_name.decode()}")
 
+    assert isinstance(base_tree, Tree)
+    assert isinstance(ours_tree, Tree)
+    assert isinstance(theirs_tree, Tree)
     return merger.merge_trees(base_tree, ours_tree, theirs_tree)

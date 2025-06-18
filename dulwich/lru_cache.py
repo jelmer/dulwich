@@ -41,7 +41,9 @@ class _LRUNode(Generic[K, V]):
     next_key: K
     size: Optional[int]
 
-    def __init__(self, key: K, value: V, cleanup=None) -> None:
+    def __init__(
+        self, key: K, value: V, cleanup: Optional[Callable[[K, V], None]] = None
+    ) -> None:
         self.prev = None
         self.next_key = _null_key  # type: ignore
         self.key = key
@@ -292,7 +294,9 @@ class LRUCache(Generic[K, V]):
         """Change the number of entries that will be cached."""
         self._update_max_cache(max_cache, after_cleanup_count=after_cleanup_count)
 
-    def _update_max_cache(self, max_cache, after_cleanup_count=None) -> None:
+    def _update_max_cache(
+        self, max_cache: int, after_cleanup_count: Optional[int] = None
+    ) -> None:
         self._max_cache = max_cache
         if after_cleanup_count is None:
             self._after_cleanup_count = self._max_cache * 8 / 10

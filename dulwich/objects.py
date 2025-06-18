@@ -52,8 +52,9 @@ from .errors import (
 from .file import GitFile
 
 if TYPE_CHECKING:
-    from .file import _GitFile
     from _hashlib import HASH
+
+    from .file import _GitFile
 
 ZERO_SHA = b"0" * 40
 

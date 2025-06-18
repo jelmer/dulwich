@@ -45,7 +45,7 @@ getLogger = logging.getLogger
 class _NullHandler(logging.Handler):
     """No-op logging handler to avoid unexpected logging warnings."""
 
-    def emit(self, record) -> None:
+    def emit(self, record: logging.LogRecord) -> None:
         pass
 
 

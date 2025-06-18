@@ -69,7 +69,7 @@ class CLIMergeTests(TestCase):
                     ret = main(["merge", "feature"])
                     output = mock_stdout.getvalue()
 
-                self.assertEqual(ret, None)  # Success
+                self.assertEqual(ret, 0)  # Success
                 self.assertIn("Merge successful", output)
 
                 # Check that file2.txt exists
@@ -138,7 +138,7 @@ class CLIMergeTests(TestCase):
                     ret = main(["merge", "HEAD"])
                     output = mock_stdout.getvalue()
 
-                self.assertEqual(ret, None)  # Success
+                self.assertEqual(ret, 0)  # Success
                 self.assertIn("Already up to date", output)
             finally:
                 os.chdir(old_cwd)
@@ -180,7 +180,7 @@ class CLIMergeTests(TestCase):
                     ret = main(["merge", "--no-commit", "feature"])
                     output = mock_stdout.getvalue()
 
-                self.assertEqual(ret, None)  # Success
+                self.assertEqual(ret, 0)  # Success
                 self.assertIn("not committing", output)
 
                 # Check that files are merged
@@ -222,7 +222,7 @@ class CLIMergeTests(TestCase):
                     ret = main(["merge", "--no-ff", "feature"])
                     output = mock_stdout.getvalue()
 
-                self.assertEqual(ret, None)  # Success
+                self.assertEqual(ret, 0)  # Success
                 self.assertIn("Merge successful", output)
                 self.assertIn("Created merge commit", output)
             finally:
@@ -265,7 +265,7 @@ class CLIMergeTests(TestCase):
                     ret = main(["merge", "-m", "Custom merge message", "feature"])
                     output = mock_stdout.getvalue()
 
-                self.assertEqual(ret, None)  # Success
+                self.assertEqual(ret, 0)  # Success
                 self.assertIn("Merge successful", output)
             finally:
                 os.chdir(old_cwd)

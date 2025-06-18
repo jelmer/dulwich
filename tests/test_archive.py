@@ -36,7 +36,7 @@ from . import TestCase
 try:
     from unittest.mock import patch
 except ImportError:
-    patch = None  # type: ignore
+    patch = None
 
 
 class ArchiveTests(TestCase):

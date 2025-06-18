@@ -22,10 +22,17 @@
 """Stash handling."""
 
 import os
+from typing import TYPE_CHECKING, Optional
 
 from .file import GitFile
 from .index import commit_tree, iter_fresh_objects
+from .objects import ObjectID
 from .reflog import drop_reflog_entry, read_reflog
+from .refs import Ref
+
+if TYPE_CHECKING:
+    from .reflog import Entry
+    from .repo import Repo
 
 DEFAULT_STASH_REF = b"refs/stash"
 
@@ -36,27 +43,27 @@ class Stash:
     Note that this doesn't currently update the working tree.
     """
 
-    def __init__(self, repo, ref=DEFAULT_STASH_REF) -> None:
+    def __init__(self, repo: "Repo", ref: Ref = DEFAULT_STASH_REF) -> None:
         self._ref = ref
         self._repo = repo
 
     @property
-    def _reflog_path(self):
+    def _reflog_path(self) -> str:
         return os.path.join(self._repo.commondir(), "logs", os.fsdecode(self._ref))
 
-    def stashes(self):
+    def stashes(self) -> list["Entry"]:
         try:
             with GitFile(self._reflog_path, "rb") as f:
-                return reversed(list(read_reflog(f)))
+                return list(reversed(list(read_reflog(f))))  # type: ignore[arg-type]
         except FileNotFoundError:
             return []
 
     @classmethod
-    def from_repo(cls, repo):
+    def from_repo(cls, repo: "Repo") -> "Stash":
         """Create a new stash from a Repo object."""
         return cls(repo)
 
-    def drop(self, index) -> None:
+    def drop(self, index: int) -> None:
         """Drop entry with specified index."""
         with open(self._reflog_path, "rb+") as f:
             drop_reflog_entry(f, index, rewrite=True)
@@ -67,10 +74,15 @@ class Stash:
         if index == 0:
             self._repo.refs[self._ref] = self[0].new_sha
 
-    def pop(self, index):
+    def pop(self, index: int) -> "Entry":
         raise NotImplementedError(self.pop)
 
-    def push(self, committer=None, author=None, message=None):
+    def push(
+        self,
+        committer: Optional[bytes] = None,
+        author: Optional[bytes] = None,
+        message: Optional[bytes] = None,
+    ) -> ObjectID:
         """Create a new stash.
 
         Args:
@@ -88,18 +100,17 @@ class Stash:
         index = self._repo.open_index()
         index_tree_id = index.commit(self._repo.object_store)
         index_commit_id = self._repo.do_commit(
-            ref=None,
             tree=index_tree_id,
             message=b"Index stash",
             merge_heads=[self._repo.head()],
             no_verify=True,
-            **commit_kwargs,
+            **commit_kwargs,  # type: ignore
         )
 
         # Then, the working tree one.
         stash_tree_id = commit_tree(
             self._repo.object_store,
-            iter_fresh_objects(
+            iter_fresh_objects(  # type: ignore
                 index,
                 os.fsencode(self._repo.path),
                 object_store=self._repo.object_store,
@@ -118,12 +129,12 @@ class Stash:
             message=message,
             merge_heads=[index_commit_id],
             no_verify=True,
-            **commit_kwargs,
+            **commit_kwargs,  # type: ignore
         )
 
         return cid
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> "Entry":
         return list(self.stashes())[index]
 
     def __len__(self) -> int:

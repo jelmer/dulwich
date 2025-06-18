@@ -22,6 +22,8 @@
 """Utilities for reading and generating reflogs."""
 
 import collections
+from collections.abc import Generator
+from typing import BinaryIO, Optional, Union
 
 from .objects import ZERO_SHA, format_timezone, parse_timezone
 
@@ -31,7 +33,14 @@ Entry = collections.namedtuple(
 )
 
 
-def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message):
+def format_reflog_line(
+    old_sha: Optional[bytes],
+    new_sha: bytes,
+    committer: bytes,
+    timestamp: Union[int, float],
+    timezone: int,
+    message: bytes,
+) -> bytes:
     """Generate a single reflog line.
 
     Args:
@@ -59,7 +68,7 @@ def format_reflog_line(old_sha, new_sha, committer, timestamp, timezone, message
     )
 
 
-def parse_reflog_line(line):
+def parse_reflog_line(line: bytes) -> Entry:
     """Parse a reflog line.
 
     Args:
@@ -80,7 +89,7 @@ def parse_reflog_line(line):
     )
 
 
-def read_reflog(f):
+def read_reflog(f: BinaryIO) -> Generator[Entry, None, None]:
     """Read reflog.
 
     Args:
@@ -91,7 +100,7 @@ def read_reflog(f):
         yield parse_reflog_line(line)
 
 
-def drop_reflog_entry(f, index, rewrite=False) -> None:
+def drop_reflog_entry(f: BinaryIO, index: int, rewrite: bool = False) -> None:
     """Drop the specified reflog entry.
 
     Args:

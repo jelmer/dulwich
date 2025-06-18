@@ -23,7 +23,7 @@
 """A simple least-recently-used (LRU) cache."""
 
 from collections.abc import Iterable, Iterator
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, Generic, Optional, TypeVar, Union, cast
 
 _null_key = object()
 
@@ -38,14 +38,14 @@ class _LRUNode(Generic[K, V]):
     __slots__ = ("cleanup", "key", "next_key", "prev", "size", "value")
 
     prev: Optional["_LRUNode[K, V]"]
-    next_key: K
+    next_key: Union[K, object]
     size: Optional[int]
 
     def __init__(
         self, key: K, value: V, cleanup: Optional[Callable[[K, V], None]] = None
     ) -> None:
         self.prev = None
-        self.next_key = _null_key  # type: ignore
+        self.next_key = _null_key
         self.key = key
         self.value = value
         self.cleanup = cleanup
@@ -109,7 +109,7 @@ class LRUCache(Generic[K, V]):
             # 'next' item. So move the current lru to the previous node.
             self._least_recently_used = node_prev
         else:
-            node_next = cache[next_key]
+            node_next = cache[cast(K, next_key)]
             node_next.prev = node_prev
         assert node_prev
         assert mru
@@ -142,7 +142,7 @@ class LRUCache(Generic[K, V]):
                     )
                 node_next = None
             else:
-                node_next = self._cache[node.next_key]
+                node_next = self._cache[cast(K, node.next_key)]
                 if node_next.prev is not node:
                     raise AssertionError(
                         f"inconsistency found, node.next.prev != node: {node}"
@@ -249,7 +249,7 @@ class LRUCache(Generic[K, V]):
         if node.prev is not None:
             node.prev.next_key = node.next_key
         if node.next_key is not _null_key:
-            node_next = self._cache[node.next_key]
+            node_next = self._cache[cast(K, node.next_key)]
             node_next.prev = node.prev
         # INSERT
         node.next_key = self._most_recently_used.key
@@ -269,11 +269,11 @@ class LRUCache(Generic[K, V]):
         if node.prev is not None:
             node.prev.next_key = node.next_key
         if node.next_key is not _null_key:
-            node_next = self._cache[node.next_key]
+            node_next = self._cache[cast(K, node.next_key)]
             node_next.prev = node.prev
         # And remove this node's pointers
         node.prev = None
-        node.next_key = _null_key  # type: ignore
+        node.next_key = _null_key
 
     def _remove_lru(self) -> None:
         """Remove one entry from the lru, and handle consequences.
@@ -339,7 +339,7 @@ class LRUSizeCache(LRUCache[K, V]):
         """
         self._value_size = 0
         if compute_size is None:
-            self._compute_size = len  # type: ignore
+            self._compute_size = cast(Callable[[V], int], len)
         else:
             self._compute_size = compute_size
         self._update_max_size(max_size, after_cleanup_size=after_cleanup_size)

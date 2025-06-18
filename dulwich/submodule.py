@@ -22,12 +22,18 @@
 """Working with Git submodules."""
 
 from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK
 
+if TYPE_CHECKING:
+    from .object_store import ObjectContainer
 
-def iter_cached_submodules(store, root_tree_id: bytes) -> Iterator[tuple[str, bytes]]:
+
+def iter_cached_submodules(
+    store: "ObjectContainer", root_tree_id: bytes
+) -> Iterator[tuple[str, bytes]]:
     """Iterate over cached submodules.
 
     Args:

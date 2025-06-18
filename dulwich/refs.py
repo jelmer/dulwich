@@ -26,7 +26,7 @@ import os
 import warnings
 from collections.abc import Iterator
 from contextlib import suppress
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists
@@ -611,16 +611,19 @@ class InfoRefsContainer(RefsContainer):
 class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 
-    def __init__(self, path, worktree_path=None, logger=None) -> None:
+    def __init__(
+        self,
+        path: Union[str, bytes, os.PathLike],
+        worktree_path: Optional[Union[str, bytes, os.PathLike]] = None,
+        logger=None,
+    ) -> None:
         super().__init__(logger=logger)
-        if getattr(path, "encode", None) is not None:
-            path = os.fsencode(path)
-        self.path = path
+        # Convert path-like objects to strings, then to bytes for Git compatibility
+        self.path = os.fsencode(os.fspath(path))
         if worktree_path is None:
-            worktree_path = path
-        if getattr(worktree_path, "encode", None) is not None:
-            worktree_path = os.fsencode(worktree_path)
-        self.worktree_path = worktree_path
+            self.worktree_path = self.path
+        else:
+            self.worktree_path = os.fsencode(os.fspath(worktree_path))
         self._packed_refs = None
         self._peeled_refs = None
 

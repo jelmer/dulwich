@@ -24,7 +24,7 @@
 import os
 import sys
 import warnings
-from typing import ClassVar
+from typing import ClassVar, Union
 
 
 def ensure_dir_exists(dirname) -> None:
@@ -68,7 +68,9 @@ def _fancy_rename(oldname, newname) -> None:
     os.remove(tmpfile)
 
 
-def GitFile(filename, mode="rb", bufsize=-1, mask=0o644):
+def GitFile(
+    filename: Union[str, bytes, os.PathLike], mode="rb", bufsize=-1, mask=0o644
+):
     """Create a file object that obeys the git file locking protocol.
 
     Returns: a builtin file object or a _GitFile object
@@ -140,10 +142,13 @@ class _GitFile:
         "writelines",
     }
 
-    def __init__(self, filename, mode, bufsize, mask) -> None:
-        self._filename = filename
+    def __init__(
+        self, filename: Union[str, bytes, os.PathLike], mode, bufsize, mask
+    ) -> None:
+        # Convert PathLike to str/bytes for our internal use
+        self._filename: Union[str, bytes] = os.fspath(filename)
         if isinstance(self._filename, bytes):
-            self._lockfilename = self._filename + b".lock"
+            self._lockfilename: Union[str, bytes] = self._filename + b".lock"
         else:
             self._lockfilename = self._filename + ".lock"
         try:

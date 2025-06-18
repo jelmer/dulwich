@@ -262,7 +262,7 @@ def get_user_timezones():
     return author_timezone, commit_timezone
 
 
-def open_repo(path_or_repo):
+def open_repo(path_or_repo: Union[str, os.PathLike, BaseRepo]):
     """Open an argument that can be a repository or a path for a repository."""
     if isinstance(path_or_repo, BaseRepo):
         return path_or_repo
@@ -275,7 +275,7 @@ def _noop_context_manager(obj):
     yield obj
 
 
-def open_repo_closing(path_or_repo):
+def open_repo_closing(path_or_repo: Union[str, os.PathLike, BaseRepo]):
     """Open an argument that can be a repository or a path for a repository.
     returns a context manager that will close the repo on exit if the argument
     is a path, else does nothing if the argument is a repo.
@@ -477,7 +477,9 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
         )
 
 
-def init(path=".", *, bare=False, symlinks: Optional[bool] = None):
+def init(
+    path: Union[str, os.PathLike] = ".", *, bare=False, symlinks: Optional[bool] = None
+):
     """Create a new git repository.
 
     Args:
@@ -497,7 +499,7 @@ def init(path=".", *, bare=False, symlinks: Optional[bool] = None):
 
 def clone(
     source,
-    target=None,
+    target: Optional[Union[str, os.PathLike]] = None,
     bare=False,
     checkout=None,
     errstream=default_bytes_err_stream,
@@ -582,7 +584,7 @@ def clone(
     )
 
 
-def add(repo=".", paths=None):
+def add(repo: Union[str, os.PathLike, BaseRepo] = ".", paths=None):
     """Add files to the staging area.
 
     Args:

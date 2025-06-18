@@ -35,6 +35,7 @@ from typing import (
     Callable,
     Optional,
     Protocol,
+    Union,
     cast,
 )
 
@@ -750,7 +751,10 @@ class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
     def __init__(
-        self, path, loose_compression_level=-1, pack_compression_level=-1
+        self,
+        path: Union[str, os.PathLike],
+        loose_compression_level=-1,
+        pack_compression_level=-1,
     ) -> None:
         """Open an object store.
 
@@ -773,7 +777,7 @@ class DiskObjectStore(PackBasedObjectStore):
         return f"<{self.__class__.__name__}({self.path!r})>"
 
     @classmethod
-    def from_config(cls, path, config):
+    def from_config(cls, path: Union[str, os.PathLike], config):
         try:
             default_compression_level = int(
                 config.get((b"core",), b"compression").decode()
@@ -1046,7 +1050,7 @@ class DiskObjectStore(PackBasedObjectStore):
             )
 
     @classmethod
-    def init(cls, path):
+    def init(cls, path: Union[str, os.PathLike]):
         try:
             os.mkdir(path)
         except FileExistsError:

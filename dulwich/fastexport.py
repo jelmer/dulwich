@@ -275,7 +275,7 @@ class GitImportProcessor(processor.ImportProcessor):
         tag = Tag()
         tag.tagger = cmd.tagger
         tag.message = cmd.message
-        tag.name = cmd.tag
+        tag.name = cmd.from_
         self.repo.object_store.add_object(tag)
         self.repo.refs["refs/tags/" + tag.name] = tag.id
 

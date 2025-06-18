@@ -437,7 +437,7 @@ class IgnoreFilter:
         cls, path: Union[str, os.PathLike], ignorecase: bool = False
     ) -> "IgnoreFilter":
         with open(path, "rb") as f:
-            return cls(read_ignore_patterns(f), ignorecase, path=path)
+            return cls(read_ignore_patterns(f), ignorecase, path=str(path))
 
     def __repr__(self) -> str:
         path = getattr(self, "_path", None)

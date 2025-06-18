@@ -46,9 +46,11 @@ EG::
 """
 
 import datetime
+import logging
 import re
 import sys
 import time
+from typing import Any, Optional, cast
 
 from ..repo import Repo
 
@@ -57,7 +59,7 @@ PROJDIR = "."
 PATTERN = r"[ a-zA-Z_\-]*([\d\.]+[\-\w\.]*)"
 
 
-def get_recent_tags(projdir=PROJDIR):
+def get_recent_tags(projdir: str = PROJDIR) -> list[tuple[str, list[Any]]]:
     """Get list of tags in order from newest to oldest and their datetimes.
 
     Args:
@@ -74,8 +76,8 @@ def get_recent_tags(projdir=PROJDIR):
         refs = project.get_refs()  # dictionary of refs and their SHA-1 values
         tags = {}  # empty dictionary to hold tags, commits and datetimes
         # iterate over refs in repository
-        for key, value in refs.items():
-            key = key.decode("utf-8")  # compatible with Python-3
+        for key_bytes, value in refs.items():
+            key = key_bytes.decode("utf-8")  # compatible with Python-3
             obj = project.get_object(value)  # dulwich object from SHA-1
             # don't just check if object is "tag" b/c it could be a "commit"
             # instead check if "tags" is in the ref-name
@@ -85,25 +87,27 @@ def get_recent_tags(projdir=PROJDIR):
             # strip the leading text from refs to get "tag name"
             _, tag = key.rsplit("/", 1)
             # check if tag object is "commit" or "tag" pointing to a "commit"
-            try:
-                commit = obj.object  # a tuple (commit class, commit id)
-            except AttributeError:
-                commit = obj
-                tag_meta = None
-            else:
+            from ..objects import Commit, Tag
+
+            if isinstance(obj, Tag):
+                commit_info = obj.object  # a tuple (commit class, commit id)
                 tag_meta = (
                     datetime.datetime(*time.gmtime(obj.tag_time)[:6]),
                     obj.id.decode("utf-8"),
                     obj.name.decode("utf-8"),
                 )  # compatible with Python-3
-                commit = project.get_object(commit[1])  # commit object
+                commit = project.get_object(commit_info[1])  # commit object
+            else:
+                commit = obj
+                tag_meta = None
             # get tag commit datetime, but dulwich returns seconds since
             # beginning of epoch, so use Python time module to convert it to
             # timetuple then convert to datetime
+            commit_obj = cast(Commit, commit)
             tags[tag] = [
-                datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
-                commit.id.decode("utf-8"),
-                commit.author.decode("utf-8"),
+                datetime.datetime(*time.gmtime(commit_obj.commit_time)[:6]),
+                commit_obj.id.decode("utf-8"),
+                commit_obj.author.decode("utf-8"),
                 tag_meta,
             ]  # compatible with Python-3
 
@@ -111,7 +115,11 @@ def get_recent_tags(projdir=PROJDIR):
     return sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
 
 
-def get_current_version(projdir=PROJDIR, pattern=PATTERN, logger=None):
+def get_current_version(
+    projdir: str = PROJDIR,
+    pattern: str = PATTERN,
+    logger: Optional[logging.Logger] = None,
+) -> Optional[str]:
     """Return the most recent tag, using an options regular expression pattern.
 
     The default pattern will strip any characters preceding the first semantic
@@ -129,15 +137,20 @@ def get_current_version(projdir=PROJDIR, pattern=PATTERN, logger=None):
     try:
         tag = tags[0][0]
     except IndexError:
-        return
+        return None
     matches = re.match(pattern, tag)
-    try:
-        current_version = matches.group(1)
-    except (IndexError, AttributeError) as err:
+    if matches:
+        try:
+            current_version = matches.group(1)
+            return current_version
+        except IndexError as err:
+            if logger:
+                logger.debug("Pattern %r didn't match tag %r: %s", pattern, tag, err)
+            return tag
+    else:
         if logger:
-            logger.debug("Pattern %r didn't match tag %r: %s", pattern, tag, err)
+            logger.debug("Pattern %r didn't match tag %r", pattern, tag)
         return tag
-    return current_version
 
 
 if __name__ == "__main__":

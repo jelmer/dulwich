@@ -353,7 +353,7 @@ class ReceivePackHandlerTestCase(TestCase):
             [ONE, ZERO_SHA, b"refs/heads/fake-branch"],
         ]
         self._handler.set_client_capabilities([b"delete-refs"])
-        status = self._handler._apply_pack(update_refs)
+        status = list(self._handler._apply_pack(update_refs))
         self.assertEqual(status[0][0], b"unpack")
         self.assertEqual(status[0][1], b"ok")
         self.assertEqual(status[1][0], b"refs/heads/fake-branch")

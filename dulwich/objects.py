@@ -35,9 +35,13 @@ from typing import (
     IO,
     TYPE_CHECKING,
     Optional,
-    TypeGuard,
     Union,
 )
+
+try:
+    from typing import TypeGuard  # type: ignore
+except ImportError:
+    from typing_extensions import TypeGuard
 
 from . import replace_me
 from .errors import (

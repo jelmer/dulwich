@@ -1008,6 +1008,82 @@ class TreeTests(ShaFileCheckTests):
             _do_test_sorted_tree_items_name_order, _sorted_tree_items_rs
         )
 
+    def _do_test_sorted_tree_items_issue_1325(self, sorted_tree_items) -> None:
+        """Test case to reproduce issue #1325: submodules incorrectly sorted as directories.
+
+        The bug: Rust uses (mode & 0o40000 != 0) which incorrectly matches
+        submodules (0o160000) since 0o160000 & 0o40000 = 0o40000
+        """
+        # Test case 1: Minimal test - submodule vs file
+        entries = {
+            b"sub": (
+                0o160000,
+                b"a03f423a81b39df39dc87fd269736ca86d80c186",
+            ),  # submodule
+            b"sub.txt": (0o100644, b"81b39df39dc87fd269736ca86d80c186a03f423a"),  # file
+        }
+
+        result = list(sorted_tree_items(entries, False))
+        paths = [entry.path for entry in result]
+
+        # Submodules should sort as regular files, not directories
+        # Expected order: sub, sub.txt
+        # Bug causes: sub.txt, sub (because sub is treated as sub/)
+        self.assertEqual([b"sub", b"sub.txt"], paths)
+
+        # Test case 2: Scenario from issue - file rename + submodule
+        # This simulates the "gamma" scenario mentioned in the issue
+        entries2 = {
+            b"alpha": (0o100644, b"a03f423a81b39df39dc87fd269736ca86d80c186"),
+            b"beta": (0o100644, b"81b39df39dc87fd269736ca86d80c186a03f423a"),
+            b"gamma": (
+                0o160000,
+                b"d80c186a03f423a81b39df39dc87fd269736ca86",
+            ),  # submodule (was file)
+            b"delta": (0o100644, b"cf7a729ca69bfabd0995fc9b083e86a18215bd91"),
+        }
+
+        result2 = list(sorted_tree_items(entries2, False))
+        paths2 = [entry.path for entry in result2]
+
+        # All entries should sort in alphabetical order since none are directories
+        self.assertEqual([b"alpha", b"beta", b"delta", b"gamma"], paths2)
+
+    test_sorted_tree_items_issue_1325 = functest_builder(
+        _do_test_sorted_tree_items_issue_1325, _sorted_tree_items_py
+    )
+    if _sorted_tree_items_rs is not None:
+        test_sorted_tree_items_issue_1325_extension = ext_functest_builder(
+            _do_test_sorted_tree_items_issue_1325, _sorted_tree_items_rs
+        )
+
+    def test_sorted_tree_items_issue_1325_comparison(self) -> None:
+        """Direct comparison test to show the difference between Python and Rust implementations."""
+        if _sorted_tree_items_rs is None:
+            self.skipTest("Rust extension not available")
+
+        # Minimal test case: submodule vs file
+        entries = {
+            b"sub": (
+                0o160000,
+                b"a03f423a81b39df39dc87fd269736ca86d80c186",
+            ),  # submodule
+            b"sub.txt": (0o100644, b"81b39df39dc87fd269736ca86d80c186a03f423a"),  # file
+        }
+
+        # Get results from both implementations
+        py_result = list(_sorted_tree_items_py(entries, False))
+        rs_result = list(_sorted_tree_items_rs(entries, False))
+
+        # Show the actual ordering from each
+        py_paths = [entry.path for entry in py_result]
+        rs_paths = [entry.path for entry in rs_result]
+
+        # This test shows the bug: Rust treats submodules as directories
+        self.assertEqual(
+            py_paths, rs_paths, "Bug: Rust treats submodules (0o160000) as directories"
+        )
+
     def test_check(self) -> None:
         t = Tree
         sha = hex_to_sha(a_sha)

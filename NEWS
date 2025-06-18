@@ -5,6 +5,11 @@
    with different format versions by setting the ``core.repositoryformatversion``
    configuration value. (Jelmer Vernooĳ)
 
+ * Fix Rust implementation of ``sorted_tree_items()`` to correctly handle submodules.
+   Previously, submodules (mode 0o160000) were incorrectly treated as directories
+   in the sorting order, causing different results compared to the Python
+   implementation. (Jelmer Vernooĳ, #1325)
+
  * Fix ``porcelain.add()`` to stage both untracked and modified files when no
    paths are specified. Previously, only untracked files were staged, inconsistent
    with Git's behavior. Now behaves like ``git add -A`` when called without paths.

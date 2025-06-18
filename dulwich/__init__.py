@@ -23,17 +23,23 @@
 
 """Python implementation of the Git file formats and protocols."""
 
+from typing import Any, Callable, Optional, TypeVar
+
 __version__ = (0, 23, 0)
 
 __all__ = ["replace_me"]
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 try:
     from dissolve import replace_me
 except ImportError:
     # if dissolve is not installed, then just provide a basic implementation
     # of its replace_me decorator
-    def replace_me(since=None, remove_in=None):
-        def decorator(func):
+    def replace_me(
+        since: Optional[str] = None, remove_in: Optional[str] = None
+    ) -> Callable[[F], F]:
+        def decorator(func: F) -> F:
             import warnings
 
             m = f"{func.__name__} is deprecated"

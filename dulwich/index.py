@@ -798,7 +798,7 @@ class Index:
 
     def __init__(
         self,
-        filename: Union[bytes, str],
+        filename: Union[bytes, str, os.PathLike],
         read=True,
         skip_hash: bool = False,
         version: Optional[int] = None,
@@ -811,7 +811,7 @@ class Index:
           skip_hash: Whether to skip SHA1 hash when writing (for manyfiles feature)
           version: Index format version to use (None = auto-detect from file or use default)
         """
-        self._filename = filename
+        self._filename = os.fspath(filename)
         # TODO(jelmer): Store the version returned by read_index
         self._version = version
         self._skip_hash = skip_hash

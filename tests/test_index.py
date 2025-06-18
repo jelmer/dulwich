@@ -127,6 +127,41 @@ class SimpleIndexTestCase(IndexTestCase):
         self.assertEqual(b"bla", newname)
         self.assertEqual(b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", newsha)
 
+    def test_index_pathlib(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        # Create a temporary index file
+        with tempfile.NamedTemporaryFile(suffix=".index", delete=False) as f:
+            temp_path = f.name
+
+        try:
+            # Test creating Index with pathlib.Path
+            path_obj = Path(temp_path)
+            index = Index(path_obj, read=False)
+            self.assertEqual(str(path_obj), index.path)
+
+            # Add an entry and write
+            index[b"test"] = IndexEntry(
+                ctime=(0, 0),
+                mtime=(0, 0),
+                dev=0,
+                ino=0,
+                mode=33188,
+                uid=0,
+                gid=0,
+                size=0,
+                sha=b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+            )
+            index.write()
+
+            # Read it back with pathlib.Path
+            index2 = Index(path_obj)
+            self.assertIn(b"test", index2)
+        finally:
+            # Clean up
+            os.unlink(temp_path)
+
 
 class SimpleIndexWriterTestCase(IndexTestCase):
     def setUp(self) -> None:

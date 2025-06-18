@@ -643,18 +643,22 @@ class ConfigFile(ConfigDict):
         return ret
 
     @classmethod
-    def from_path(cls, path: str) -> "ConfigFile":
+    def from_path(cls, path: Union[str, os.PathLike]) -> "ConfigFile":
         """Read configuration from a file on disk."""
         with GitFile(path, "rb") as f:
             ret = cls.from_file(f)
-            ret.path = path
+            ret.path = os.fspath(path)
             return ret
 
-    def write_to_path(self, path: Optional[str] = None) -> None:
+    def write_to_path(self, path: Optional[Union[str, os.PathLike]] = None) -> None:
         """Write configuration to a file on disk."""
         if path is None:
-            path = self.path
-        with GitFile(path, "wb") as f:
+            if self.path is None:
+                raise ValueError("No path specified and no default path available")
+            path_to_use: Union[str, os.PathLike] = self.path
+        else:
+            path_to_use = path
+        with GitFile(path_to_use, "wb") as f:
             self.write_to_file(f)
 
     def write_to_file(self, f: BinaryIO) -> None:
@@ -809,7 +813,9 @@ class StackedConfig(Config):
                     yield section
 
 
-def read_submodules(path: str) -> Iterator[tuple[bytes, bytes, bytes]]:
+def read_submodules(
+    path: Union[str, os.PathLike],
+) -> Iterator[tuple[bytes, bytes, bytes]]:
     """Read a .gitmodules file."""
     cfg = ConfigFile.from_path(path)
     return parse_submodules(cfg)

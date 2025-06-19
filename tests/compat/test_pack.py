@@ -28,12 +28,19 @@ import shutil
 import tempfile
 from typing import NoReturn
 
+from dulwich.file import GitFile
 from dulwich.objects import Blob
-from dulwich.pack import write_pack
+from dulwich.pack import (
+    PackData,
+    PackIndex3,
+    load_pack_index,
+    write_pack,
+    write_pack_index_v3,
+)
 
 from .. import SkipTest
 from ..test_pack import PackTests, a_sha, pack1_sha
-from .utils import require_git_version, run_git_or_fail
+from .utils import require_git_version, rmtree_ro, run_git_or_fail
 
 _NON_DELTA_RE = re.compile(b"non delta: (?P<non_delta>\\d+) objects")
 
@@ -163,3 +170,75 @@ class TestPack(PackTests):
             got_non_delta,
             f"Expected 4 non-delta objects, got {got_non_delta}",
         )
+
+
+class TestPackIndexCompat(PackTests):
+    """Compatibility tests for pack index formats."""
+
+    def setUp(self) -> None:
+        require_git_version((1, 5, 0))
+        super().setUp()
+        self._tempdir = tempfile.mkdtemp()
+        self.addCleanup(rmtree_ro, self._tempdir)
+
+    def test_dulwich_create_index_git_readable(self) -> None:
+        """Test that git can read pack indexes created by dulwich."""
+        # Create a simple pack with objects
+        blob = Blob()
+        blob.data = b"Test blob"
+
+        pack_path = os.path.join(self._tempdir, "test_pack")
+        entries = [(blob, None)]
+        write_pack(pack_path, entries)
+
+        # Load the pack and create v2 index (most compatible)
+        pack_data = PackData(pack_path + ".pack")
+        pack_data.create_index(pack_path + ".idx", version=2)
+
+        # Verify git can read it
+        output = run_git_or_fail(["verify-pack", "-v", pack_path + ".pack"])
+        self.assertIn(blob.id.decode("ascii"), output.decode("ascii"))
+
+    def test_dulwich_read_git_index(self) -> None:
+        """Test that dulwich can read pack indexes created by git."""
+        # Create a simple pack with objects
+        blob = Blob()
+        blob.data = b"Test blob for git"
+
+        pack_path = os.path.join(self._tempdir, "git_pack")
+        entries = [(blob, None)]
+        write_pack(pack_path, entries)
+
+        # Create index with git
+        run_git_or_fail(["index-pack", pack_path + ".pack"])
+
+        # Load with dulwich
+        idx = load_pack_index(pack_path + ".idx")
+
+        # Verify it works
+        self.assertIn(blob.id, idx)
+        self.assertEqual(len(idx), 1)
+
+    def test_index_format_v3_sha256_future(self) -> None:
+        """Test that v3 index format is ready for SHA-256 support."""
+        # This test verifies the v3 implementation structure is ready
+        # for SHA-256, even though SHA-256 itself is not yet implemented
+
+        # Create a dummy v3 index to test the format
+        entries = [(b"a" * 20, 100, 1234)]  # SHA-1 for now
+
+        v3_path = os.path.join(self._tempdir, "v3_test.idx")
+        with GitFile(v3_path, "wb") as f:
+            write_pack_index_v3(f, entries, b"x" * 20, hash_algorithm=1)
+
+        # Load and verify structure
+        idx = load_pack_index(v3_path)
+        self.assertIsInstance(idx, PackIndex3)
+        self.assertEqual(idx.version, 3)
+        self.assertEqual(idx.hash_algorithm, 1)  # SHA-1
+        self.assertEqual(idx.hash_size, 20)
+
+        # Verify SHA-256 would raise NotImplementedError
+        with self.assertRaises(NotImplementedError):
+            with GitFile(v3_path + ".sha256", "wb") as f:
+                write_pack_index_v3(f, entries, b"x" * 32, hash_algorithm=2)

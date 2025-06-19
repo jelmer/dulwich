@@ -363,7 +363,7 @@ def iter_sha1(iter):
     return sha.hexdigest().encode("ascii")
 
 
-def load_pack_index(path):
+def load_pack_index(path: Union[str, os.PathLike]):
     """Load an index file by path.
 
     Args:
@@ -396,7 +396,7 @@ def _load_file_contents(f, size=None):
     return contents, size
 
 
-def load_pack_index_file(path, f):
+def load_pack_index_file(path: Union[str, os.PathLike], f):
     """Load an index file from a file-like object.
 
     Args:
@@ -404,15 +404,20 @@ def load_pack_index_file(path, f):
       f: File-like object
     Returns: A PackIndex loaded from the given file
     """
+    # Ensure path is a string for PackIndex classes
+    path_str = os.fspath(path)
+    if isinstance(path_str, bytes):
+        path_str = os.fsdecode(path_str)
+
     contents, size = _load_file_contents(f)
     if contents[:4] == b"\377tOc":
         version = struct.unpack(b">L", contents[4:8])[0]
         if version == 2:
-            return PackIndex2(path, file=f, contents=contents, size=size)
+            return PackIndex2(path_str, file=f, contents=contents, size=size)
         else:
             raise KeyError(f"Unknown pack index format {version}")
     else:
-        return PackIndex1(path, file=f, contents=contents, size=size)
+        return PackIndex1(path_str, file=f, contents=contents, size=size)
 
 
 def bisect_find_sha(start, end, sha, unpack_name):
@@ -1191,7 +1196,7 @@ class PackData:
     position.  It will all just throw a zlib or KeyError.
     """
 
-    def __init__(self, filename, file=None, size=None) -> None:
+    def __init__(self, filename: Union[str, os.PathLike], file=None, size=None) -> None:
         """Create a PackData object representing the pack in the given filename.
 
         The file must exist and stay readable until the object is disposed of.
@@ -1225,7 +1230,7 @@ class PackData:
         return cls(str(file), file=file, size=size)
 
     @classmethod
-    def from_path(cls, path):
+    def from_path(cls, path: Union[str, os.PathLike]):
         return cls(filename=path)
 
     def close(self) -> None:

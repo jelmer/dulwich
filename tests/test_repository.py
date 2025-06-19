@@ -122,6 +122,56 @@ class CreateRepositoryTests(TestCase):
         self.assertEqual(target_dir, repo._controldir)
         self._check_repo_contents(repo, True)
 
+    def test_create_disk_bare_pathlib(self) -> None:
+        from pathlib import Path
+
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo_path = Path(tmp_dir)
+        repo = Repo.init_bare(repo_path)
+        self.assertEqual(tmp_dir, repo._controldir)
+        self._check_repo_contents(repo, True)
+        # Test that refpath works with pathlib
+        ref_path = repo.refs.refpath(b"refs/heads/master")
+        self.assertTrue(isinstance(ref_path, bytes))
+        expected_path = os.path.join(tmp_dir.encode(), b"refs", b"heads", b"master")
+        self.assertEqual(ref_path, expected_path)
+
+    def test_create_disk_non_bare_pathlib(self) -> None:
+        from pathlib import Path
+
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo_path = Path(tmp_dir)
+        repo = Repo.init(repo_path)
+        self.assertEqual(os.path.join(tmp_dir, ".git"), repo._controldir)
+        self._check_repo_contents(repo, False)
+
+    def test_open_repo_pathlib(self) -> None:
+        from pathlib import Path
+
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        # First create a repo
+        repo = Repo.init_bare(tmp_dir)
+        repo.close()
+        # Now open it with pathlib
+        repo_path = Path(tmp_dir)
+        repo2 = Repo(repo_path)
+        self.assertEqual(tmp_dir, repo2._controldir)
+        self.assertTrue(repo2.bare)
+        repo2.close()
+
+    def test_create_disk_bare_mkdir_pathlib(self) -> None:
+        from pathlib import Path
+
+        tmp_dir = tempfile.mkdtemp()
+        target_path = Path(tmp_dir) / "target"
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init_bare(target_path, mkdir=True)
+        self.assertEqual(str(target_path), repo._controldir)
+        self._check_repo_contents(repo, True)
+
 
 class MemoryRepoTests(TestCase):
     def test_set_description(self) -> None:

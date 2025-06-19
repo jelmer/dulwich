@@ -316,6 +316,47 @@ who\"
             cf2.get((b"remote", b"origin"), b"fetch"),
         )
 
+    def test_from_path_pathlib(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        # Create a temporary config file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".config", delete=False) as f:
+            f.write("[core]\n    filemode = true\n")
+            temp_path = f.name
+
+        try:
+            # Test with pathlib.Path
+            path_obj = Path(temp_path)
+            cf = ConfigFile.from_path(path_obj)
+            self.assertEqual(cf.get((b"core",), b"filemode"), b"true")
+        finally:
+            # Clean up
+            os.unlink(temp_path)
+
+    def test_write_to_path_pathlib(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        # Create a config
+        cf = ConfigFile()
+        cf.set((b"user",), b"name", b"Test User")
+
+        # Write to pathlib.Path
+        with tempfile.NamedTemporaryFile(suffix=".config", delete=False) as f:
+            temp_path = f.name
+
+        try:
+            path_obj = Path(temp_path)
+            cf.write_to_path(path_obj)
+
+            # Read it back
+            cf2 = ConfigFile.from_path(path_obj)
+            self.assertEqual(cf2.get((b"user",), b"name"), b"Test User")
+        finally:
+            # Clean up
+            os.unlink(temp_path)
+
 
 class ConfigDictTests(TestCase):
     def test_get_set(self) -> None:

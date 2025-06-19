@@ -1151,7 +1151,7 @@ class Repo(BaseRepo):
 
     def __init__(
         self,
-        root: str,
+        root: Union[str, bytes, os.PathLike],
         object_store: Optional[PackBasedObjectStore] = None,
         bare: Optional[bool] = None,
     ) -> None:
@@ -1163,6 +1163,9 @@ class Repo(BaseRepo):
             repository's default object store
           bare: True if this is a bare repository.
         """
+        root = os.fspath(root)
+        if isinstance(root, bytes):
+            root = os.fsdecode(root)
         hidden_path = os.path.join(root, CONTROLDIR)
         if bare is None:
             if os.path.isfile(hidden_path) or os.path.isdir(
@@ -1736,8 +1739,8 @@ class Repo(BaseRepo):
     @classmethod
     def _init_maybe_bare(
         cls,
-        path,
-        controldir,
+        path: Union[str, bytes, os.PathLike],
+        controldir: Union[str, bytes, os.PathLike],
         bare,
         object_store=None,
         config=None,
@@ -1745,6 +1748,12 @@ class Repo(BaseRepo):
         symlinks: Optional[bool] = None,
         format: Optional[int] = None,
     ):
+        path = os.fspath(path)
+        if isinstance(path, bytes):
+            path = os.fsdecode(path)
+        controldir = os.fspath(controldir)
+        if isinstance(controldir, bytes):
+            controldir = os.fsdecode(controldir)
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(controldir, *d))
         if object_store is None:
@@ -1766,7 +1775,7 @@ class Repo(BaseRepo):
     @classmethod
     def init(
         cls,
-        path: str,
+        path: Union[str, bytes, os.PathLike],
         *,
         mkdir: bool = False,
         config=None,
@@ -1782,6 +1791,9 @@ class Repo(BaseRepo):
           format: Repository format version (defaults to 0)
         Returns: `Repo` instance
         """
+        path = os.fspath(path)
+        if isinstance(path, bytes):
+            path = os.fsdecode(path)
         if mkdir:
             os.mkdir(path)
         controldir = os.path.join(path, CONTROLDIR)
@@ -1798,7 +1810,13 @@ class Repo(BaseRepo):
         )
 
     @classmethod
-    def _init_new_working_directory(cls, path, main_repo, identifier=None, mkdir=False):
+    def _init_new_working_directory(
+        cls,
+        path: Union[str, bytes, os.PathLike],
+        main_repo,
+        identifier=None,
+        mkdir=False,
+    ):
         """Create a new working directory linked to a repository.
 
         Args:
@@ -1808,6 +1826,9 @@ class Repo(BaseRepo):
           mkdir: Whether to create the directory
         Returns: `Repo` instance
         """
+        path = os.fspath(path)
+        if isinstance(path, bytes):
+            path = os.fsdecode(path)
         if mkdir:
             os.mkdir(path)
         if identifier is None:
@@ -1838,7 +1859,7 @@ class Repo(BaseRepo):
     @classmethod
     def init_bare(
         cls,
-        path,
+        path: Union[str, bytes, os.PathLike],
         *,
         mkdir=False,
         object_store=None,
@@ -1855,6 +1876,9 @@ class Repo(BaseRepo):
           format: Repository format version (defaults to 0)
         Returns: a `Repo` instance
         """
+        path = os.fspath(path)
+        if isinstance(path, bytes):
+            path = os.fsdecode(path)
         if mkdir:
             os.mkdir(path)
         return cls._init_maybe_bare(

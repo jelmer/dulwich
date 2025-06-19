@@ -757,6 +757,49 @@ _TEST_REFS_SERIALIZED = (
 )
 
 
+class DiskRefsContainerPathlibTests(TestCase):
+    def test_pathlib_init(self) -> None:
+        from pathlib import Path
+
+        from dulwich.refs import DiskRefsContainer
+
+        # Create a temporary directory
+        temp_dir = tempfile.mkdtemp()
+        self.addCleanup(os.rmdir, temp_dir)
+
+        # Test with pathlib.Path
+        path_obj = Path(temp_dir)
+        refs = DiskRefsContainer(path_obj)
+        self.assertEqual(refs.path, temp_dir.encode())
+
+        # Test refpath with pathlib initialized container
+        ref_path = refs.refpath(b"HEAD")
+        self.assertTrue(isinstance(ref_path, bytes))
+        self.assertEqual(ref_path, os.path.join(temp_dir.encode(), b"HEAD"))
+
+    def test_pathlib_worktree_path(self) -> None:
+        from pathlib import Path
+
+        from dulwich.refs import DiskRefsContainer
+
+        # Create temporary directories
+        temp_dir = tempfile.mkdtemp()
+        worktree_dir = tempfile.mkdtemp()
+        self.addCleanup(os.rmdir, temp_dir)
+        self.addCleanup(os.rmdir, worktree_dir)
+
+        # Test with pathlib.Path for both paths
+        path_obj = Path(temp_dir)
+        worktree_obj = Path(worktree_dir)
+        refs = DiskRefsContainer(path_obj, worktree_path=worktree_obj)
+        self.assertEqual(refs.path, temp_dir.encode())
+        self.assertEqual(refs.worktree_path, worktree_dir.encode())
+
+        # Test refpath returns worktree path for HEAD
+        ref_path = refs.refpath(b"HEAD")
+        self.assertEqual(ref_path, os.path.join(worktree_dir.encode(), b"HEAD"))
+
+
 class InfoRefsContainerTests(TestCase):
     def test_invalid_refname(self) -> None:
         text = _TEST_REFS_SERIALIZED + b"00" * 20 + b"\trefs/stash\n"

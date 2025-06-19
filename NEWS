@@ -5,6 +5,12 @@
    when trying to process pack data from repositories that were cloned externally.
    (Jelmer Vernooĳ, #1179)
 
+ * Add support for ``os.PathLike`` objects throughout the API. Functions that
+   accept file paths now support ``pathlib.Path`` objects in addition to
+   strings and bytes. This includes repository operations, configuration file
+   handling, ignore file processing, and all major entry points.
+   (Jelmer Vernooĳ, #1074)
+
  * Add support for ``format`` argument to ``Repo.init()`` and ``Repo.init_bare()``
    to specify repository format version (0 or 1). This allows creating repositories
    with different format versions by setting the ``core.repositoryformatversion``

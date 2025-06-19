@@ -136,6 +136,53 @@ class MemoryRepoTests(TestCase):
         self.addCleanup(tear_down_repo, repo)
         repo.fetch(r)
 
+    def test_fetch_from_git_cloned_repo(self) -> None:
+        """Test fetching from a git-cloned repo into MemoryRepo (issue #1179)."""
+        import tempfile
+
+        from dulwich.client import LocalGitClient
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create initial repo using dulwich
+            initial_path = os.path.join(tmpdir, "initial")
+            initial_repo = Repo.init(initial_path, mkdir=True)
+
+            # Create some content
+            test_file = os.path.join(initial_path, "test.txt")
+            with open(test_file, "w") as f:
+                f.write("test content\n")
+
+            # Stage and commit using dulwich
+            initial_repo.stage(["test.txt"])
+            initial_repo.do_commit(
+                b"Initial commit\n",
+                committer=b"Test Committer <test@example.com>",
+                author=b"Test Author <test@example.com>",
+            )
+
+            # Clone using dulwich
+            cloned_path = os.path.join(tmpdir, "cloned")
+            cloned_repo = initial_repo.clone(cloned_path, mkdir=True)
+
+            initial_repo.close()
+            cloned_repo.close()
+
+            # Fetch from the cloned repo into MemoryRepo
+            memory_repo = MemoryRepo()
+            client = LocalGitClient()
+
+            # This should not raise AssertionError
+            result = client.fetch(cloned_path, memory_repo)
+
+            # Verify the fetch worked
+            self.assertIn(b"HEAD", result.refs)
+            self.assertIn(b"refs/heads/master", result.refs)
+
+            # Verify we can read the fetched objects
+            head_sha = result.refs[b"HEAD"]
+            commit = memory_repo[head_sha]
+            self.assertEqual(commit.message, b"Initial commit\n")
+
 
 class RepositoryRootTests(TestCase):
     def mkdtemp(self):

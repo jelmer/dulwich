@@ -193,6 +193,30 @@ class IgnoreFilterTests(TestCase):
         self.assertTrue(filter.is_ignored("foo"))
         self.assertTrue(filter.is_ignored("foo[bar]"))
 
+    def test_from_path_pathlib(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        # Create a temporary .gitignore file
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".gitignore", delete=False
+        ) as f:
+            f.write("*.pyc\n__pycache__/\n")
+            temp_path = f.name
+
+        try:
+            # Test with pathlib.Path
+            path_obj = Path(temp_path)
+            ignore_filter = IgnoreFilter.from_path(path_obj)
+
+            # Test that it loaded the patterns correctly
+            self.assertTrue(ignore_filter.is_ignored("test.pyc"))
+            self.assertTrue(ignore_filter.is_ignored("__pycache__/"))
+            self.assertFalse(ignore_filter.is_ignored("test.py"))
+        finally:
+            # Clean up
+            os.unlink(temp_path)
+
 
 class IgnoreFilterStackTests(TestCase):
     def test_stack_first(self) -> None:

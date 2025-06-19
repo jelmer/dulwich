@@ -421,7 +421,9 @@ class IgnoreFilter:
         return _check_parent_exclusion(path, matching_patterns)
 
     @classmethod
-    def from_path(cls, path, ignorecase: bool = False) -> "IgnoreFilter":
+    def from_path(
+        cls, path: Union[str, os.PathLike], ignorecase: bool = False
+    ) -> "IgnoreFilter":
         with open(path, "rb") as f:
             return cls(read_ignore_patterns(f), ignorecase, path=path)
 

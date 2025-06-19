@@ -883,6 +883,28 @@ class CloneTests(PorcelainTestCase):
         ) as r:
             self.assertEqual(c3.id, r.refs[b"HEAD"])
 
+    def test_clone_pathlib(self) -> None:
+        from pathlib import Path
+
+        f1_1 = make_object(Blob, data=b"f1")
+        commit_spec = [[1]]
+        trees = {1: [(b"f1", f1_1)]}
+
+        c1 = build_commit_graph(self.repo.object_store, commit_spec, trees)[0]
+        self.repo.refs[b"refs/heads/master"] = c1.id
+
+        target_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_dir)
+        target_path = Path(target_dir) / "clone_repo"
+
+        errstream = BytesIO()
+        r = porcelain.clone(
+            self.repo.path, target_path, checkout=False, errstream=errstream
+        )
+        self.addCleanup(r.close)
+        self.assertEqual(r.path, str(target_path))
+        self.assertTrue(os.path.exists(str(target_path)))
+
 
 class InitTests(TestCase):
     def test_non_bare(self) -> None:
@@ -894,6 +916,30 @@ class InitTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
         porcelain.init(repo_dir, bare=True)
+
+    def test_init_pathlib(self) -> None:
+        from pathlib import Path
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        repo_path = Path(repo_dir)
+
+        # Test non-bare repo with pathlib
+        repo = porcelain.init(repo_path)
+        self.assertTrue(os.path.exists(os.path.join(repo_dir, ".git")))
+        repo.close()
+
+    def test_init_bare_pathlib(self) -> None:
+        from pathlib import Path
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        repo_path = Path(repo_dir)
+
+        # Test bare repo with pathlib
+        repo = porcelain.init(repo_path, bare=True)
+        self.assertTrue(os.path.exists(os.path.join(repo_dir, "refs")))
+        repo.close()
 
 
 class AddTests(PorcelainTestCase):

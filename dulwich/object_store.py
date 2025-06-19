@@ -1273,8 +1273,25 @@ class MemoryObjectStore(BaseObjectStore):
         Args:
           count: Number of items to add
         """
-        for unpacked_object in unpacked_objects:
-            self.add_object(unpacked_object.sha_file())
+        if count == 0:
+            return
+
+        # Since MemoryObjectStore doesn't support pack files, we need to
+        # extract individual objects. To handle deltas properly, we write
+        # to a temporary pack and then use PackInflater to resolve them.
+        f, commit, abort = self.add_pack()
+        try:
+            write_pack_data(
+                f.write,
+                unpacked_objects,
+                num_records=count,
+                progress=progress,
+            )
+        except BaseException:
+            abort()
+            raise
+        else:
+            commit()
 
     def add_thin_pack(self, read_all, read_some, progress=None) -> None:
         """Add a new thin pack to this object store.

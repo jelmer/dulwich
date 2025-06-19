@@ -42,6 +42,7 @@ from dulwich.pack import (
     MemoryPackIndex,
     Pack,
     PackData,
+    PackIndex3,
     PackStreamReader,
     UnpackedObject,
     UnresolvedDeltas,
@@ -58,6 +59,7 @@ from dulwich.pack import (
     write_pack_header,
     write_pack_index_v1,
     write_pack_index_v2,
+    write_pack_index_v3,
     write_pack_object,
 )
 from dulwich.tests.utils import build_pack, make_object
@@ -406,6 +408,25 @@ class TestPackData(PackTests):
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
+
+    def test_create_index_v3(self) -> None:
+        with self.get_pack_data(pack1_sha) as p:
+            filename = os.path.join(self.tempdir, "v3test.idx")
+            p.create_index_v3(filename)
+            idx1 = load_pack_index(filename)
+            idx2 = self.get_pack_index(pack1_sha)
+            self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
+            self.assertEqual(idx1, idx2)
+            self.assertIsInstance(idx1, PackIndex3)
+            self.assertEqual(idx1.version, 3)
+
+    def test_create_index_version3(self) -> None:
+        with self.get_pack_data(pack1_sha) as p:
+            filename = os.path.join(self.tempdir, "version3test.idx")
+            p.create_index(filename, version=3)
+            idx = load_pack_index(filename)
+            self.assertIsInstance(idx, PackIndex3)
+            self.assertEqual(idx.version, 3)
 
     def test_compute_file_sha(self) -> None:
         f = BytesIO(b"abcd1234wxyz")
@@ -876,6 +897,74 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
     def tearDown(self) -> None:
         TestCase.tearDown(self)
         BaseTestFilePackIndexWriting.tearDown(self)
+
+
+class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
+    def setUp(self) -> None:
+        TestCase.setUp(self)
+        BaseTestFilePackIndexWriting.setUp(self)
+        self._has_crc32_checksum = True
+        self._supports_large = True
+        self._expected_version = 3
+        self._write_fn = write_pack_index_v3
+
+    def tearDown(self) -> None:
+        TestCase.tearDown(self)
+        BaseTestFilePackIndexWriting.tearDown(self)
+
+    def test_load_v3_index_returns_packindex3(self) -> None:
+        """Test that loading a v3 index file returns a PackIndex3 instance."""
+        entries = [(b"abcd" * 5, 0, zlib.crc32(b""))]
+        filename = os.path.join(self.tempdir, "test.idx")
+        self.writeIndex(filename, entries, b"1234567890" * 2)
+        idx = load_pack_index(filename)
+        self.assertIsInstance(idx, PackIndex3)
+        self.assertEqual(idx.version, 3)
+        self.assertEqual(idx.hash_algorithm, 1)  # SHA-1
+        self.assertEqual(idx.hash_size, 20)
+        self.assertEqual(idx.shortened_oid_len, 20)
+
+    def test_v3_hash_algorithm(self) -> None:
+        """Test v3 index correctly handles hash algorithm field."""
+        entries = [(b"a" * 20, 42, zlib.crc32(b"data"))]
+        filename = os.path.join(self.tempdir, "test_hash.idx")
+        # Write v3 index with SHA-1 (algorithm=1)
+        with GitFile(filename, "wb") as f:
+            write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=1)
+        idx = load_pack_index(filename)
+        self.assertEqual(idx.hash_algorithm, 1)
+        self.assertEqual(idx.hash_size, 20)
+
+    def test_v3_sha256_length(self) -> None:
+        """Test v3 index with SHA-256 hash length."""
+        # For now, test that SHA-256 is not yet implemented
+        entries = [(b"a" * 32, 42, zlib.crc32(b"data"))]
+        filename = os.path.join(self.tempdir, "test_sha256.idx")
+        # SHA-256 should raise NotImplementedError
+        with self.assertRaises(NotImplementedError) as cm:
+            with GitFile(filename, "wb") as f:
+                write_pack_index_v3(f, entries, b"1" * 32, hash_algorithm=2)
+        self.assertIn("SHA-256", str(cm.exception))
+
+    def test_v3_invalid_hash_algorithm(self) -> None:
+        """Test v3 index with invalid hash algorithm."""
+        entries = [(b"a" * 20, 42, zlib.crc32(b"data"))]
+        filename = os.path.join(self.tempdir, "test_invalid.idx")
+        # Invalid hash algorithm should raise ValueError
+        with self.assertRaises(ValueError) as cm:
+            with GitFile(filename, "wb") as f:
+                write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=99)
+        self.assertIn("Unknown hash algorithm", str(cm.exception))
+
+    def test_v3_wrong_hash_length(self) -> None:
+        """Test v3 index with mismatched hash length."""
+        # Entry with wrong hash length for SHA-1
+        entries = [(b"a" * 15, 42, zlib.crc32(b"data"))]  # Too short
+        filename = os.path.join(self.tempdir, "test_wrong_len.idx")
+        with self.assertRaises(ValueError) as cm:
+            with GitFile(filename, "wb") as f:
+                write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=1)
+        self.assertIn("wrong length", str(cm.exception))
 
 
 class MockFileWithoutFileno:

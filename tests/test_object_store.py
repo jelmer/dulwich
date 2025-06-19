@@ -114,6 +114,42 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         self.assertEqual([], entries)
         o.add_thin_pack(f.read, None)
 
+    def test_add_pack_data_with_deltas(self) -> None:
+        """Test that add_pack_data properly handles delta objects.
+
+        This test verifies that MemoryObjectStore.add_pack_data can handle
+        pack data containing delta objects. Before the fix for issue #1179,
+        this would fail with AssertionError when trying to call sha_file()
+        on unresolved delta objects.
+
+        The fix routes through add_pack() which properly resolves deltas.
+        """
+        o1 = MemoryObjectStore()
+        o2 = MemoryObjectStore()
+        base_blob = make_object(Blob, data=b"base data")
+        o1.add_object(base_blob)
+
+        # Create a pack with a delta object
+        f = BytesIO()
+        entries = build_pack(
+            f,
+            [
+                (REF_DELTA, (base_blob.id, b"more data")),
+            ],
+            store=o1,
+        )
+
+        # Use add_thin_pack which internally calls add_pack_data
+        # This demonstrates the scenario where delta resolution is needed
+        f.seek(0)
+        o2.add_object(base_blob)  # Need base object for thin pack
+        o2.add_thin_pack(f.read, None)
+
+        # Verify the delta object was properly resolved and added
+        packed_blob_sha = sha_to_hex(entries[0][3])
+        self.assertIn(packed_blob_sha, o2)
+        self.assertEqual((Blob.type_num, b"more data"), o2.get_raw(packed_blob_sha))
+
 
 class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
     def setUp(self) -> None:

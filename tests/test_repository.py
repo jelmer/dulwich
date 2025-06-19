@@ -134,7 +134,8 @@ class CreateRepositoryTests(TestCase):
         # Test that refpath works with pathlib
         ref_path = repo.refs.refpath(b"refs/heads/master")
         self.assertTrue(isinstance(ref_path, bytes))
-        self.assertEqual(ref_path, os.path.join(tmp_dir.encode(), b"refs/heads/master"))
+        expected_path = os.path.join(tmp_dir.encode(), b"refs", b"heads", b"master")
+        self.assertEqual(ref_path, expected_path)
 
     def test_create_disk_non_bare_pathlib(self) -> None:
         from pathlib import Path

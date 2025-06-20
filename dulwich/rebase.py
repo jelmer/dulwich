@@ -370,7 +370,7 @@ class Rebaser:
 
         return new_commit.id, []
 
-    def start_rebase(
+    def start(
         self,
         upstream: bytes,
         onto: Optional[bytes] = None,
@@ -421,7 +421,7 @@ class Rebaser:
 
         return commits
 
-    def continue_rebase(self) -> Optional[tuple[bytes, list[bytes]]]:
+    def continue_(self) -> Optional[tuple[bytes, list[bytes]]]:
         """Continue an in-progress rebase.
 
         Returns:
@@ -449,7 +449,7 @@ class Rebaser:
 
             # Continue with next commit if any
             if self._todo:
-                return self.continue_rebase()
+                return self.continue_()
             else:
                 return self._finish_rebase()
         else:
@@ -461,7 +461,7 @@ class Rebaser:
         """Check if a rebase is currently in progress."""
         return self._state_manager.exists()
 
-    def abort_rebase(self) -> None:
+    def abort(self) -> None:
         """Abort an in-progress rebase and restore original state."""
         if not self.is_in_progress():
             raise RebaseError("No rebase in progress")
@@ -560,10 +560,10 @@ def rebase(
     rebaser = Rebaser(repo)
 
     # Start rebase
-    rebaser.start_rebase(upstream, onto, branch)
+    rebaser.start(upstream, onto, branch)
 
     # Continue rebase
-    result = rebaser.continue_rebase()
+    result = rebaser.continue_()
     if result is not None:
         # Conflicts
         raise RebaseConflict(result[1])

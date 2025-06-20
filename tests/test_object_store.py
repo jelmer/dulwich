@@ -355,6 +355,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.addCleanup(shutil.rmtree, store_dir)
         os.makedirs(os.path.join(store_dir, "pack"))
         store = DiskObjectStore.from_config(store_dir, config)
+        self.addCleanup(store.close)
 
         # Create some objects to pack
         b1 = make_object(Blob, data=b"blob1")
@@ -391,6 +392,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.addCleanup(shutil.rmtree, store_dir2)
         os.makedirs(os.path.join(store_dir2, "pack"))
         store2 = DiskObjectStore.from_config(store_dir2, config)
+        self.addCleanup(store2.close)
 
         b3 = make_object(Blob, data=b"blob3")
         store2.add_objects([(b3, None)])

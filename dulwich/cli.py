@@ -633,6 +633,16 @@ class cmd_pack_objects(Command):
             f.close()
 
 
+class cmd_unpack_objects(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("pack_file", help="Pack file to unpack")
+        args = parser.parse_args(args)
+
+        count = porcelain.unpack_objects(args.pack_file)
+        print(f"Unpacked {count} objects")
+
+
 class cmd_pull(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -975,6 +985,7 @@ commands = {
     "symbolic-ref": cmd_symbolic_ref,
     "submodule": cmd_submodule,
     "tag": cmd_tag,
+    "unpack-objects": cmd_unpack_objects,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
     "web-daemon": cmd_web_daemon,

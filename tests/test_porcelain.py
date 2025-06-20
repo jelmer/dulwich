@@ -42,6 +42,7 @@ from dulwich.errors import CommitError
 from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
 from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
+    CountObjectsResult,
     add,
     commit,
 )
@@ -5016,3 +5017,60 @@ class UnpackObjectsTest(PorcelainTestCase):
         unpacked_b2 = target_repo.object_store[b2.id]
         self.assertEqual(b1.data, unpacked_b1.data)
         self.assertEqual(b2.data, unpacked_b2.data)
+
+
+class CountObjectsTests(PorcelainTestCase):
+    def test_count_objects_empty_repo(self):
+        """Test counting objects in an empty repository."""
+        stats = porcelain.count_objects(self.repo)
+        self.assertEqual(0, stats.count)
+        self.assertEqual(0, stats.size)
+
+    def test_count_objects_verbose_empty_repo(self):
+        """Test verbose counting in an empty repository."""
+        stats = porcelain.count_objects(self.repo, verbose=True)
+        self.assertEqual(0, stats.count)
+        self.assertEqual(0, stats.size)
+        self.assertEqual(0, stats.in_pack)
+        self.assertEqual(0, stats.packs)
+        self.assertEqual(0, stats.size_pack)
+
+    def test_count_objects_with_loose_objects(self):
+        """Test counting loose objects."""
+        # Create some loose objects
+        blob1 = make_object(Blob, data=b"data1")
+        blob2 = make_object(Blob, data=b"data2")
+        self.repo.object_store.add_object(blob1)
+        self.repo.object_store.add_object(blob2)
+
+        stats = porcelain.count_objects(self.repo)
+        self.assertEqual(2, stats.count)
+        self.assertGreater(stats.size, 0)
+
+    def test_count_objects_verbose_with_objects(self):
+        """Test verbose counting with both loose and packed objects."""
+        # Add some loose objects
+        for i in range(3):
+            blob = make_object(Blob, data=f"data{i}".encode())
+            self.repo.object_store.add_object(blob)
+
+        # Create a simple commit to have some objects in a pack
+        tree = Tree()
+        c1 = make_commit(tree=tree.id, message=b"Test commit")
+        self.repo.object_store.add_objects([(tree, None), (c1, None)])
+        self.repo.refs[b"HEAD"] = c1.id
+
+        # Repack to create a pack file
+        porcelain.repack(self.repo)
+
+        stats = porcelain.count_objects(self.repo, verbose=True)
+
+        # After repacking, loose objects might be cleaned up
+        self.assertIsInstance(stats.count, int)
+        self.assertIsInstance(stats.size, int)
+        self.assertGreater(stats.in_pack, 0)  # Should have packed objects
+        self.assertGreater(stats.packs, 0)  # Should have at least one pack
+        self.assertGreater(stats.size_pack, 0)  # Pack should have size
+
+        # Verify it's the correct dataclass type
+        self.assertIsInstance(stats, CountObjectsResult)

@@ -49,15 +49,13 @@ fn sha_to_pyhex(py: Python, sha: &[u8]) -> PyResult<Py<PyAny>> {
     Ok(PyBytes::new(py, hexsha.as_slice()).into())
 }
 
-#[pyfunction]
-#[pyo3(signature = (text, strict=None))]
-fn parse_tree(
+fn parse_tree_with_length(
     py: Python,
     mut text: &[u8],
-    strict: Option<bool>,
-) -> PyResult<Vec<(Py<PyAny>, u32, Py<PyAny>)>> {
+    strict: bool,
+    hash_len: usize,
+) -> PyResult<Vec<(PyObject, u32, PyObject)>> {
     let mut entries = Vec::new();
-    let strict = strict.unwrap_or(false);
     while !text.is_empty() {
         let mode_end = memchr(b' ', text)
             .ok_or_else(|| ObjectFormatException::new_err(("Missing terminator for mode",)))?;
@@ -73,19 +71,52 @@ fn parse_tree(
         let namelen = memchr(b'\0', text)
             .ok_or_else(|| ObjectFormatException::new_err(("Missing trailing \\0",)))?;
         let name = &text[..namelen];
-        if namelen + 20 >= text.len() {
+
+        // Skip name and null terminator
+        text = &text[namelen + 1..];
+
+        // Check if we have enough bytes for the hash
+        if text.len() < hash_len {
             return Err(ObjectFormatException::new_err(("SHA truncated",)));
         }
-        text = &text[namelen + 1..];
-        let sha = &text[..20];
+
+        let sha = &text[..hash_len];
         entries.push((
             PyBytes::new(py, name).into_pyobject(py)?.unbind().into(),
             mode,
             sha_to_pyhex(py, sha)?,
         ));
-        text = &text[20..];
+        text = &text[hash_len..];
     }
     Ok(entries)
+}
+
+#[pyfunction]
+#[pyo3(signature = (text, strict=None, hash_algorithm=None))]
+fn parse_tree(
+    py: Python,
+    text: &[u8],
+    strict: Option<bool>,
+    hash_algorithm: Option<PyObject>,
+) -> PyResult<Vec<(PyObject, u32, PyObject)>> {
+    let strict = strict.unwrap_or(false);
+
+    // Determine hash length from hash_algorithm if provided
+    if let Some(algo) = hash_algorithm {
+        // Get oid_length attribute from hash algorithm object
+        let oid_length: usize = algo.getattr(py, "oid_length")?.extract(py)?;
+        parse_tree_with_length(py, text, strict, oid_length)
+    } else {
+        // Try to auto-detect by attempting to parse with both lengths
+        // We'll attempt to parse with SHA1 first (20 bytes), then SHA256 (32 bytes)
+        match parse_tree_with_length(py, text, strict, 20) {
+            Ok(entries) => Ok(entries),
+            Err(_) => {
+                // SHA1 failed, try SHA256
+                parse_tree_with_length(py, text, strict, 32)
+            }
+        }
+    }
 }
 
 fn cmp_with_suffix(a: (u32, &[u8]), b: (u32, &[u8])) -> std::cmp::Ordering {

@@ -530,15 +530,16 @@ def iter_sha1(iter: Iterable[bytes]) -> bytes:
     return sha.hexdigest().encode("ascii")
 
 
-def load_pack_index(path: str | os.PathLike[str]) -> "PackIndex":
+def load_pack_index(path: str | os.PathLike[str], hash_algorithm: int | None = None) -> "PackIndex":
     """Load an index file by path.
 
     Args:
       path: Path to the index file
+      hash_algorithm: Hash algorithm used by the repository
     Returns: A PackIndex loaded from the given path
     """
     with GitFile(path, "rb") as f:
-        return load_pack_index_file(path, f)
+        return load_pack_index_file(path, f, hash_algorithm=hash_algorithm)
 
 
 def _load_file_contents(
@@ -574,25 +575,35 @@ def _load_file_contents(
 
 def load_pack_index_file(
     path: str | os.PathLike[str], f: IO[bytes] | _GitFile
+    hash_algorithm: int | None = None,
 ) -> "PackIndex":
     """Load an index file from a file-like object.
 
     Args:
       path: Path for the index file
       f: File-like object
+      hash_algorithm: Hash algorithm used by the repository
     Returns: A PackIndex loaded from the given file
     """
     contents, size = _load_file_contents(f)
     if contents[:4] == b"\377tOc":
         version = struct.unpack(b">L", contents[4:8])[0]
         if version == 2:
-            return PackIndex2(path, file=f, contents=contents, size=size)
+            return PackIndex2(
+                path,
+                file=f,
+                contents=contents,
+                size=size,
+                hash_algorithm=hash_algorithm,
+            )
         elif version == 3:
             return PackIndex3(path, file=f, contents=contents, size=size)
         else:
             raise KeyError(f"Unknown pack index format {version}")
     else:
-        return PackIndex1(path, file=f, contents=contents, size=size)
+        return PackIndex1(
+            path, file=f, contents=contents, size=size, hash_algorithm=hash_algorithm
+        )
 
 
 def bisect_find_sha(
@@ -777,7 +788,7 @@ class MemoryPackIndex(PackIndex):
           sha: SHA to look up (binary or hex)
         Returns: Offset in the pack file
         """
-        if len(sha) == 40:
+        if len(sha) in (40, 64):  # Hex string (SHA1 or SHA256)
             sha = hex_to_sha(cast(ObjectID, sha))
         return self._by_sha[cast(RawObjectID, sha)]
 
@@ -976,7 +987,8 @@ class FilePackIndex(PackIndex):
         Args:
           sha: A *binary* SHA string. (20 characters long)_
         """
-        assert len(sha) == 20
+        hash_size = getattr(self, "hash_size", 20)  # Default to SHA1 for v1
+        assert len(sha) == hash_size
         idx = ord(sha[:1])
         if idx == 0:
             start = 0
@@ -1020,6 +1032,7 @@ class PackIndex1(FilePackIndex):
         file: IO[bytes] | _GitFile | None = None,
         contents: bytes | None = None,
         size: int | None = None,
+        hash_algorithm: int | None = None,
     ) -> None:
         """Initialize a version 1 pack index.
 
@@ -1028,24 +1041,35 @@ class PackIndex1(FilePackIndex):
             file: Optional file object
             contents: Optional mmap'd contents
             size: Optional size of the index
+            hash_algorithm: Hash algorithm used by the repository
         """
         super().__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
+        # Use provided hash algorithm if available, otherwise default to SHA1
+        if hash_algorithm:
+            self.hash_size = hash_algorithm.oid_length
+        else:
+            self.hash_size = 20  # Default to SHA1
+
+        self._entry_size = 4 + self.hash_size
 
     def _unpack_entry(self, i: int) -> tuple[RawObjectID, int, None]:
-        (offset, name) = unpack_from(">L20s", self._contents, (0x100 * 4) + (i * 24))
+        base_offset = (0x100 * 4) + (i * self._entry_size)
+        if self.hash_size == 20:
+            (offset, name) = unpack_from(">L20s", self._contents, base_offset)
+        else:  # SHA256
+            offset = unpack_from(">L", self._contents, base_offset)[0]
+            name = self._contents[base_offset + 4 : base_offset + 4 + self.hash_size]
         return (RawObjectID(name), offset, None)
 
     def _unpack_name(self, i: int) -> bytes:
-        offset = (0x100 * 4) + (i * 24) + 4
-        return self._contents[offset : offset + 20]
+        offset = (0x100 * 4) + (i * self._entry_size) + 4
+        return self._contents[offset : offset + self.hash_size]
 
     def _unpack_offset(self, i: int) -> int:
-        offset = (0x100 * 4) + (i * 24)
-        result = unpack_from(">L", self._contents, offset)[0]
-        assert isinstance(result, int)
-        return result
+        offset = (0x100 * 4) + (i * self._entry_size)
+        return unpack_from(">L", self._contents, offset)[0]
 
     def _unpack_crc32_checksum(self, i: int) -> None:
         # Not stored in v1 index files
@@ -1061,6 +1085,7 @@ class PackIndex2(FilePackIndex):
         file: IO[bytes] | _GitFile | None = None,
         contents: bytes | None = None,
         size: int | None = None,
+        hash_algorithm: int | None = None,
     ) -> None:
         """Initialize a version 2 pack index.
 
@@ -1069,6 +1094,7 @@ class PackIndex2(FilePackIndex):
             file: Optional file object
             contents: Optional mmap'd contents
             size: Optional size of the index
+            hash_algorithm: Hash algorithm used by the repository
         """
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
@@ -1077,8 +1103,15 @@ class PackIndex2(FilePackIndex):
         if self.version != 2:
             raise AssertionError(f"Version was {self.version}")
         self._fan_out_table = self._read_fan_out_table(8)
+
+        # Use provided hash algorithm if available, otherwise default to SHA1
+        if hash_algorithm:
+            self.hash_size = hash_algorithm.oid_length
+        else:
+            self.hash_size = 20  # Default to SHA1
+
         self._name_table_offset = 8 + 0x100 * 4
-        self._crc32_table_offset = self._name_table_offset + 20 * len(self)
+        self._crc32_table_offset = self._name_table_offset + self.hash_size * len(self)
         self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
         self._pack_offset_largetable_offset = self._pack_offset_table_offset + 4 * len(
             self
@@ -1092,25 +1125,27 @@ class PackIndex2(FilePackIndex):
         )
 
     def _unpack_name(self, i: int) -> bytes:
-        offset = self._name_table_offset + i * 20
-        return self._contents[offset : offset + 20]
+        offset = self._name_table_offset + i * self.hash_size
+        return self._contents[offset : offset + self.hash_size]
 
     def _unpack_offset(self, i: int) -> int:
-        offset_pos = self._pack_offset_table_offset + i * 4
-        offset = unpack_from(">L", self._contents, offset_pos)[0]
-        assert isinstance(offset, int)
+        offset = self._pack_offset_table_offset + i * 4
+        offset = unpack_from(">L", self._contents, offset)[0]
         if offset & (2**31):
-            large_offset_pos = (
-                self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
-            )
-            offset = unpack_from(">Q", self._contents, large_offset_pos)[0]
-            assert isinstance(offset, int)
+            offset = self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
+            offset = unpack_from(">Q", self._contents, offset)[0]
         return offset
 
     def _unpack_crc32_checksum(self, i: int) -> int:
-        result = unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
-        assert isinstance(result, int)
-        return result
+        return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+
+    def get_pack_checksum(self) -> bytes:
+        """Return the checksum stored for the corresponding packfile.
+
+        Returns: binary digest (always 20 bytes - SHA1)
+        """
+        # Pack checksums are always SHA1, even in SHA256 repositories
+        return bytes(self._contents[-40:-20])
 
 
 class PackIndex3(FilePackIndex):
@@ -3172,6 +3207,8 @@ def write_pack_index_v1(
         f.write(struct.pack(">L", fan_out_table[i]))
         fan_out_table[i + 1] += fan_out_table[i]
     for name, offset, _entry_checksum in entries:
+        if len(name) != 20:
+            raise TypeError("pack index v1 only supports SHA-1 names")
         if not (offset <= 0xFFFFFFFF):
             raise TypeError("pack format 1 only supports offsets < 2Gb")
         f.write(struct.pack(">L20s", offset, name))
@@ -3250,11 +3287,11 @@ def _create_delta_py(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
             o = j1
             while s > 127:
                 yield bytes([127])
-                yield bytes(memoryview(target_buf)[o : o + 127])
+                yield memoryview(target_buf)[o : o + 127]
                 s -= 127
                 o += 127
             yield bytes([s])
-            yield bytes(memoryview(target_buf)[o : o + s])
+            yield memoryview(target_buf)[o : o + s]
 
 
 # Default to pure Python implementation
@@ -3357,12 +3394,20 @@ def write_pack_index_v2(
     fan_out_table: dict[int, int] = defaultdict(lambda: 0)
     for name, offset, entry_checksum in entries:
         fan_out_table[ord(name[:1])] += 1
+    try:
+        hash_size = len(next(iter(entries))[0])
+    except StopIteration:
+        hash_size = 20  # Default to SHA-1 size if no entries
     # Fan-out table
     largetable: list[int] = []
     for i in range(0x100):
         f.write(struct.pack(b">L", fan_out_table[i]))
         fan_out_table[i + 1] += fan_out_table[i]
     for name, offset, entry_checksum in entries:
+        if len(name) != hash_size:
+            raise TypeError(
+                f"Object name has wrong length: expected {hash_size}, got {len(name)}"
+            )
         f.write(name)
     for name, offset, entry_checksum in entries:
         f.write(struct.pack(b">L", entry_checksum))
@@ -3512,6 +3557,7 @@ class Pack:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
+        hash_algorithm: int | None = None,
     ) -> None:
         """Initialize a Pack object.
 
@@ -3524,6 +3570,7 @@ class Pack:
           depth: Maximum depth for delta chains
           threads: Number of threads to use for operations
           big_file_threshold: Size threshold for big file handling
+          hash_algorithm: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
         """
         self._basename = basename
         self._data = None
@@ -3549,21 +3596,25 @@ class Pack:
         )
         self._idx_load = lambda: load_pack_index(self._idx_path)
         self.resolve_ext_ref = resolve_ext_ref
+        self.hash_algorithm = (
+            hash_algorithm if hash_algorithm is not None else DEFAULT_HASH_ALGORITHM
+        )
 
     @classmethod
     def from_lazy_objects(
-        cls, data_fn: Callable[[], PackData], idx_fn: Callable[[], PackIndex]
+        cls, data_fn: Callable[[], PackData], idx_fn: Callable[[], PackIndex],
+        hash_algorithm: int | None = None
     ) -> "Pack":
         """Create a new pack object from callables to load pack data and index objects."""
-        ret = cls("")
+        ret = cls("", hash_algorithm=hash_algorithm)
         ret._data_load = data_fn
         ret._idx_load = idx_fn
         return ret
 
     @classmethod
-    def from_objects(cls, data: PackData, idx: PackIndex) -> "Pack":
+    def from_objects(cls, data: PackData, idx: PackIndex, hash_algorithm: int | None = None) -> "Pack":
         """Create a new pack object from pack data and index objects."""
-        ret = cls("")
+        ret = cls("", hash_algorithm=hash_algorithm)
         ret._data = data
         ret._data_load = None
         ret._idx = idx

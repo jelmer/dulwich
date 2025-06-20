@@ -967,6 +967,87 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         self.assertIn("wrong length", str(cm.exception))
 
 
+class WritePackIndexTests(TestCase):
+    """Tests for the configurable write_pack_index function."""
+
+    def test_default_pack_index_version_constant(self) -> None:
+        from dulwich.pack import DEFAULT_PACK_INDEX_VERSION
+
+        # Ensure the constant is set to version 2 (current Git default)
+        self.assertEqual(2, DEFAULT_PACK_INDEX_VERSION)
+
+    def test_write_pack_index_defaults_to_v2(self) -> None:
+        import tempfile
+
+        from dulwich.pack import (
+            DEFAULT_PACK_INDEX_VERSION,
+            load_pack_index,
+            write_pack_index,
+        )
+
+        tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tempdir)
+
+        entries = [(b"1" * 20, 42, zlib.crc32(b"data"))]
+        filename = os.path.join(tempdir, "test_default.idx")
+
+        with GitFile(filename, "wb") as f:
+            write_pack_index(f, entries, b"P" * 20)
+
+        idx = load_pack_index(filename)
+        self.assertEqual(DEFAULT_PACK_INDEX_VERSION, idx.version)
+
+    def test_write_pack_index_version_1(self) -> None:
+        import tempfile
+
+        from dulwich.pack import load_pack_index, write_pack_index
+
+        tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tempdir)
+
+        entries = [(b"1" * 20, 42, zlib.crc32(b"data"))]
+        filename = os.path.join(tempdir, "test_v1.idx")
+
+        with GitFile(filename, "wb") as f:
+            write_pack_index(f, entries, b"P" * 20, version=1)
+
+        idx = load_pack_index(filename)
+        self.assertEqual(1, idx.version)
+
+    def test_write_pack_index_version_3(self) -> None:
+        import tempfile
+
+        from dulwich.pack import load_pack_index, write_pack_index
+
+        tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tempdir)
+
+        entries = [(b"1" * 20, 42, zlib.crc32(b"data"))]
+        filename = os.path.join(tempdir, "test_v3.idx")
+
+        with GitFile(filename, "wb") as f:
+            write_pack_index(f, entries, b"P" * 20, version=3)
+
+        idx = load_pack_index(filename)
+        self.assertEqual(3, idx.version)
+
+    def test_write_pack_index_invalid_version(self) -> None:
+        import tempfile
+
+        from dulwich.pack import write_pack_index
+
+        tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tempdir)
+
+        entries = [(b"1" * 20, 42, zlib.crc32(b"data"))]
+        filename = os.path.join(tempdir, "test_invalid.idx")
+
+        with self.assertRaises(ValueError) as cm:
+            with GitFile(filename, "wb") as f:
+                write_pack_index(f, entries, b"P" * 20, version=99)
+        self.assertIn("Unsupported pack index version: 99", str(cm.exception))
+
+
 class MockFileWithoutFileno:
     """Mock file-like object without fileno method."""
 

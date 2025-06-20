@@ -2893,3 +2893,40 @@ def merge_tree(repo, base_tree, our_tree, their_tree):
         r.object_store.add_object(merged_tree)
 
         return merged_tree.id, conflicts
+
+
+def gc(
+    repo,
+    auto: bool = False,
+    aggressive: bool = False,
+    prune: bool = True,
+    grace_period: Optional[int] = 1209600,  # 2 weeks default
+    dry_run: bool = False,
+    progress=None,
+):
+    """Run garbage collection on a repository.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      auto: If True, only run gc if needed
+      aggressive: If True, use more aggressive settings
+      prune: If True, prune unreachable objects
+      grace_period: Grace period in seconds for pruning (default 2 weeks)
+      dry_run: If True, only report what would be done
+      progress: Optional progress callback
+
+    Returns:
+      GCStats object with garbage collection statistics
+    """
+    from .gc import garbage_collect
+
+    with open_repo_closing(repo) as r:
+        return garbage_collect(
+            r,
+            auto=auto,
+            aggressive=aggressive,
+            prune=prune,
+            grace_period=grace_period,
+            dry_run=dry_run,
+            progress=progress,
+        )

@@ -58,6 +58,71 @@ def signal_quit(signal, frame) -> None:
     pdb.set_trace()
 
 
+def parse_relative_time(time_str):
+    """Parse a relative time string like '2 weeks ago' into seconds.
+
+    Args:
+        time_str: String like '2 weeks ago' or 'now'
+
+    Returns:
+        Number of seconds
+
+    Raises:
+        ValueError: If the time string cannot be parsed
+    """
+    if time_str == "now":
+        return 0
+
+    if not time_str.endswith(" ago"):
+        raise ValueError(f"Invalid relative time format: {time_str}")
+
+    parts = time_str[:-4].split()
+    if len(parts) != 2:
+        raise ValueError(f"Invalid relative time format: {time_str}")
+
+    try:
+        num = int(parts[0])
+        unit = parts[1]
+
+        multipliers = {
+            "second": 1,
+            "seconds": 1,
+            "minute": 60,
+            "minutes": 60,
+            "hour": 3600,
+            "hours": 3600,
+            "day": 86400,
+            "days": 86400,
+            "week": 604800,
+            "weeks": 604800,
+        }
+
+        if unit in multipliers:
+            return num * multipliers[unit]
+        else:
+            raise ValueError(f"Unknown time unit: {unit}")
+    except ValueError as e:
+        if "invalid literal" in str(e):
+            raise ValueError(f"Invalid number in relative time: {parts[0]}")
+        raise
+
+
+def format_bytes(bytes):
+    """Format bytes as human-readable string.
+
+    Args:
+        bytes: Number of bytes
+
+    Returns:
+        Human-readable string like "1.5 MB"
+    """
+    for unit in ["B", "KB", "MB", "GB"]:
+        if bytes < 1024.0:
+            return f"{bytes:.1f} {unit}"
+        bytes /= 1024.0
+    return f"{bytes:.1f} TB"
+
+
 class Command:
     """A Dulwich subcommand."""
 
@@ -979,6 +1044,102 @@ class cmd_merge_tree(Command):
             return 1
 
 
+class cmd_gc(Command):
+    def run(self, args) -> Optional[int]:
+        import datetime
+        import time
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--auto",
+            action="store_true",
+            help="Only run gc if needed",
+        )
+        parser.add_argument(
+            "--aggressive",
+            action="store_true",
+            help="Use more aggressive settings",
+        )
+        parser.add_argument(
+            "--no-prune",
+            action="store_true",
+            help="Do not prune unreachable objects",
+        )
+        parser.add_argument(
+            "--prune",
+            nargs="?",
+            const="now",
+            help="Prune unreachable objects older than date (default: 2 weeks ago)",
+        )
+        parser.add_argument(
+            "--dry-run",
+            "-n",
+            action="store_true",
+            help="Only report what would be done",
+        )
+        parser.add_argument(
+            "--quiet",
+            "-q",
+            action="store_true",
+            help="Only report errors",
+        )
+        args = parser.parse_args(args)
+
+        # Parse prune grace period
+        grace_period = None
+        if args.prune:
+            try:
+                grace_period = parse_relative_time(args.prune)
+            except ValueError:
+                # Try to parse as absolute date
+                try:
+                    date = datetime.datetime.strptime(args.prune, "%Y-%m-%d")
+                    grace_period = int(time.time() - date.timestamp())
+                except ValueError:
+                    print(f"Error: Invalid prune date: {args.prune}")
+                    return 1
+        elif not args.no_prune:
+            # Default to 2 weeks
+            grace_period = 1209600
+
+        # Progress callback
+        def progress(msg):
+            if not args.quiet:
+                print(msg)
+
+        try:
+            stats = porcelain.gc(
+                ".",
+                auto=args.auto,
+                aggressive=args.aggressive,
+                prune=not args.no_prune,
+                grace_period=grace_period,
+                dry_run=args.dry_run,
+                progress=progress if not args.quiet else None,
+            )
+
+            # Report results
+            if not args.quiet:
+                if args.dry_run:
+                    print("\nDry run results:")
+                else:
+                    print("\nGarbage collection complete:")
+
+                if stats.pruned_objects:
+                    print(f"  Pruned {len(stats.pruned_objects)} unreachable objects")
+                    print(f"  Freed {format_bytes(stats.bytes_freed)}")
+
+                if stats.packs_before != stats.packs_after:
+                    print(
+                        f"  Reduced pack files from {stats.packs_before} to {stats.packs_after}"
+                    )
+
+        except porcelain.Error as e:
+            print(f"Error: {e}")
+            return 1
+        return None
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1025,6 +1186,7 @@ commands = {
     "fetch": cmd_fetch,
     "for-each-ref": cmd_for_each_ref,
     "fsck": cmd_fsck,
+    "gc": cmd_gc,
     "help": cmd_help,
     "init": cmd_init,
     "log": cmd_log,

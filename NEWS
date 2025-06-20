@@ -1,5 +1,7 @@
 0.22.9	UNRELEASED
 
+ * Add ``gc`` command to ``dulwich.porcelain.`` (Jelmer Vernooĳ, #92)
+
  * Add ``unpack-objects`` plumbing command to unpack objects from pack files
    into loose objects in the repository. This command extracts all objects
    from a pack file and writes them to the object store as individual files.

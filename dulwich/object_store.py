@@ -387,6 +387,19 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.write_commit_graph)
 
+    def get_object_mtime(self, sha):
+        """Get the modification time of an object.
+
+        Args:
+          sha: SHA1 of the object
+
+        Returns:
+          Modification time as seconds since epoch, or None if not available
+        """
+        # Default implementation returns None
+        # Subclasses can override to provide actual mtime
+        return None
+
 
 class PackBasedObjectStore(BaseObjectStore):
     def __init__(self, pack_compression_level=-1) -> None:
@@ -518,8 +531,13 @@ class PackBasedObjectStore(BaseObjectStore):
     def _get_loose_object(self, sha) -> Optional[ShaFile]:
         raise NotImplementedError(self._get_loose_object)
 
-    def _remove_loose_object(self, sha) -> None:
-        raise NotImplementedError(self._remove_loose_object)
+    def delete_loose_object(self, sha) -> None:
+        """Delete a loose object.
+
+        This method only handles loose objects. For packed objects,
+        use repack(exclude=...) to exclude them during repacking.
+        """
+        raise NotImplementedError(self.delete_loose_object)
 
     def _remove_pack(self, name) -> None:
         raise NotImplementedError(self._remove_pack)
@@ -534,32 +552,50 @@ class PackBasedObjectStore(BaseObjectStore):
             objects.add((self._get_loose_object(sha), None))
         self.add_objects(list(objects))
         for obj, path in objects:
-            self._remove_loose_object(obj.id)
+            self.delete_loose_object(obj.id)
         return len(objects)
 
-    def repack(self):
+    def repack(self, exclude=None):
         """Repack the packs in this repository.
 
         Note that this implementation is fairly naive and currently keeps all
         objects in memory while it repacks.
+
+        Args:
+          exclude: Optional set of object SHAs to exclude from repacking
         """
+        if exclude is None:
+            exclude = set()
+
         loose_objects = set()
+        excluded_loose_objects = set()
         for sha in self._iter_loose_objects():
-            loose_objects.add(self._get_loose_object(sha))
+            if sha not in exclude:
+                loose_objects.add(self._get_loose_object(sha))
+            else:
+                excluded_loose_objects.add(sha)
+
         objects = {(obj, None) for obj in loose_objects}
         old_packs = {p.name(): p for p in self.packs}
         for name, pack in old_packs.items():
-            objects.update((obj, None) for obj in pack.iterobjects())
+            objects.update(
+                (obj, None) for obj in pack.iterobjects() if obj.id not in exclude
+            )
 
-        # The name of the consolidated pack might match the name of a
-        # pre-existing pack. Take care not to remove the newly created
-        # consolidated pack.
+        # Only create a new pack if there are objects to pack
+        if objects:
+            # The name of the consolidated pack might match the name of a
+            # pre-existing pack. Take care not to remove the newly created
+            # consolidated pack.
+            consolidated = self.add_objects(objects)
+            old_packs.pop(consolidated.name(), None)
 
-        consolidated = self.add_objects(objects)
-        old_packs.pop(consolidated.name(), None)
-
+        # Delete loose objects that were packed
         for obj in loose_objects:
-            self._remove_loose_object(obj.id)
+            self.delete_loose_object(obj.id)
+        # Delete excluded loose objects
+        for sha in excluded_loose_objects:
+            self.delete_loose_object(sha)
         for name, pack in old_packs.items():
             self._remove_pack(pack)
         self._update_pack_cache()
@@ -893,8 +929,26 @@ class DiskObjectStore(PackBasedObjectStore):
         except FileNotFoundError:
             return None
 
-    def _remove_loose_object(self, sha) -> None:
+    def delete_loose_object(self, sha) -> None:
         os.remove(self._get_shafile_path(sha))
+
+    def get_object_mtime(self, sha):
+        """Get the modification time of a loose object.
+
+        Args:
+          sha: SHA1 of the object
+
+        Returns:
+          Modification time as seconds since epoch, or None if not a loose object
+        """
+        if not self.contains_loose(sha):
+            return None
+
+        path = self._get_shafile_path(sha)
+        try:
+            return os.path.getmtime(path)
+        except (OSError, FileNotFoundError):
+            return None
 
     def _remove_pack(self, pack) -> None:
         try:
@@ -1781,7 +1835,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
     def _get_loose_object(self, sha) -> None:
         return None
 
-    def _remove_loose_object(self, sha) -> None:
+    def delete_loose_object(self, sha) -> None:
         # Doesn't exist..
         pass
 

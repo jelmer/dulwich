@@ -381,6 +381,41 @@ class DictRefsContainerTests(RefsContainerTests, TestCase):
         expected_refs[b"refs/stash"] = b"00" * 20
         self.assertEqual(expected_refs, self._refs.as_dict())
 
+    def test_set_if_equals_with_symbolic_ref(self) -> None:
+        # Test that set_if_equals only updates the requested ref,
+        # not all refs in a symbolic reference chain
+        
+        # The bug in the original implementation was that when follow()
+        # was called on a ref, it would return all refs in the chain,
+        # and set_if_equals would update ALL of them instead of just the
+        # requested ref.
+        
+        # Set up refs
+        master_sha = b"1" * 40
+        feature_sha = b"2" * 40  
+        new_sha = b"3" * 40
+        
+        self._refs[b"refs/heads/master"] = master_sha
+        self._refs[b"refs/heads/feature"] = feature_sha
+        # Create a second symbolic ref pointing to feature
+        self._refs.set_symbolic_ref(b"refs/heads/other", b"refs/heads/feature")
+        
+        # Update refs/heads/other through set_if_equals
+        # With the bug, this would update BOTH refs/heads/other AND refs/heads/feature
+        # Without the bug, only refs/heads/other should be updated
+        # Note: old_ref needs to be the actual stored value (the symref)
+        self.assertTrue(
+            self._refs.set_if_equals(b"refs/heads/other", b"ref: refs/heads/feature", new_sha)
+        )
+        
+        # refs/heads/other should now directly point to new_sha
+        self.assertEqual(self._refs.read_ref(b"refs/heads/other"), new_sha)
+        
+        # refs/heads/feature should remain unchanged
+        # With the bug, refs/heads/feature would also be incorrectly updated to new_sha
+        self.assertEqual(self._refs[b"refs/heads/feature"], feature_sha)
+        self.assertEqual(self._refs[b"refs/heads/master"], master_sha)
+
 
 class DiskRefsContainerTests(RefsContainerTests, TestCase):
     def setUp(self) -> None:

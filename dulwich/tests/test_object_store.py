@@ -55,6 +55,8 @@ class ObjectStoreTests:
     assertNotIn: Callable[[object, object], None]
     assertNotEqual: Callable[[object, object], None]
     assertIn: Callable[[object, object], None]
+    assertTrue: Callable[[bool], None]
+    assertFalse: Callable[[bool], None]
 
     def test_determine_wants_all(self) -> None:
         self.assertEqual(
@@ -353,3 +355,43 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.assertEqual(2, self.store.repack())
         self.assertEqual(1, len(self.store.packs))
         self.assertEqual(0, self.store.pack_loose_objects())
+
+    def test_repack_with_exclude(self) -> None:
+        """Test repacking while excluding specific objects."""
+        b1 = make_object(Blob, data=b"yummy data")
+        self.store.add_object(b1)
+        b2 = make_object(Blob, data=b"more yummy data")
+        self.store.add_object(b2)
+        b3 = make_object(Blob, data=b"even more yummy data")
+        b4 = make_object(Blob, data=b"and more yummy data")
+        self.store.add_objects([(b3, None), (b4, None)])
+
+        self.assertEqual({b1.id, b2.id, b3.id, b4.id}, set(self.store))
+        self.assertEqual(1, len(self.store.packs))
+
+        # Repack, excluding b2 and b3
+        excluded = {b2.id, b3.id}
+        self.assertEqual(2, self.store.repack(exclude=excluded))
+
+        # Should have repacked only b1 and b4
+        self.assertEqual(1, len(self.store.packs))
+        self.assertIn(b1.id, self.store)
+        self.assertNotIn(b2.id, self.store)
+        self.assertNotIn(b3.id, self.store)
+        self.assertIn(b4.id, self.store)
+
+    def test_delete_loose_object(self) -> None:
+        """Test deleting loose objects."""
+        b1 = make_object(Blob, data=b"test data")
+        self.store.add_object(b1)
+
+        # Verify it's loose
+        self.assertTrue(self.store.contains_loose(b1.id))
+        self.assertIn(b1.id, self.store)
+
+        # Delete it
+        self.store.delete_loose_object(b1.id)
+
+        # Verify it's gone
+        self.assertFalse(self.store.contains_loose(b1.id))
+        self.assertNotIn(b1.id, self.store)

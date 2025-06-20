@@ -1139,10 +1139,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         if name == ZERO_SHA:
             raise KeyError(name)
-        if len(name) == 40:
+        if len(name) in (40, 64):  # Support both SHA1 (40) and SHA256 (64) hex
             sha = hex_to_sha(cast(ObjectID, name))
             hexsha = cast(ObjectID, name)
-        elif len(name) == 20:
+        elif len(name) in (20, 32):  # Support both SHA1 (20) and SHA256 (32) binary
             sha = cast(RawObjectID, name)
             hexsha = None
         else:
@@ -1352,6 +1352,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_write_bitmap_lookup_table: bool = True,
         file_mode: int | None = None,
         dir_mode: int | None = None,
+        hash_algorithm=None,
     ) -> None:
         """Open an object store.
 
@@ -1372,6 +1373,7 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_write_bitmap_lookup_table: whether to include lookup table in bitmaps
           file_mode: File permission mask for shared repository
           dir_mode: Directory permission mask for shared repository
+          hash_algorithm: Hash algorithm to use (SHA1 or SHA256)
         """
         super().__init__(
             pack_compression_level=pack_compression_level,
@@ -1395,6 +1397,11 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_write_bitmap_lookup_table = pack_write_bitmap_lookup_table
         self.file_mode = file_mode
         self.dir_mode = dir_mode
+
+        # Import here to avoid circular dependency
+        from .hash import get_hash_algorithm
+
+        self.hash_algorithm = hash_algorithm if hash_algorithm else get_hash_algorithm()
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -1510,6 +1517,24 @@ class DiskObjectStore(PackBasedObjectStore):
                 (b"repack",), b"writeBitmaps", False
             )
 
+        # Get hash algorithm from config
+        from .hash import get_hash_algorithm
+
+        hash_algorithm = None
+        try:
+            try:
+                version = int(config.get((b"core",), b"repositoryformatversion"))
+            except KeyError:
+                version = 0
+            if version == 1:
+                try:
+                    object_format = config.get((b"extensions",), b"objectformat")
+                except KeyError:
+                    object_format = b"sha1"
+                hash_algorithm = get_hash_algorithm(object_format.decode("ascii"))
+        except (KeyError, ValueError):
+            pass
+
         instance = cls(
             path,
             loose_compression_level=loose_compression_level,
@@ -1527,6 +1552,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_write_bitmap_lookup_table=pack_write_bitmap_lookup_table,
             file_mode=file_mode,
             dir_mode=dir_mode,
+            hash_algorithm=hash_algorithm,
         )
         instance._use_commit_graph = use_commit_graph
         instance._use_midx = use_midx
@@ -1617,6 +1643,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     depth=self.pack_depth,
                     threads=self.pack_threads,
                     big_file_threshold=self.pack_big_file_threshold,
+                    hash_algorithm=self.hash_algorithm,
                 )
                 new_packs.append(pack)
                 self._pack_cache[f] = pack
@@ -1668,7 +1695,9 @@ class DiskObjectStore(PackBasedObjectStore):
     def _get_loose_object(self, sha: ObjectID | RawObjectID) -> ShaFile | None:
         path = self._get_shafile_path(sha)
         try:
-            return ShaFile.from_path(path)
+            # Load the object from path with SHA for hash algorithm detection
+            # sha parameter here is already hex, so pass it directly
+            return ShaFile.from_path(path, sha)
         except FileNotFoundError:
             return None
 
@@ -1855,6 +1884,7 @@ class DiskObjectStore(PackBasedObjectStore):
             depth=self.pack_depth,
             threads=self.pack_threads,
             big_file_threshold=self.pack_big_file_threshold,
+            hash_algorithm=self.hash_algorithm,
         )
         final_pack.check_length_and_checksum()
         self._add_cached_pack(pack_base_name, final_pack)
@@ -1934,7 +1964,9 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           obj: Object to add
         """
-        path = self._get_shafile_path(obj.id)
+        # Use the correct hash algorithm for the object ID
+        obj_id = obj.get_id(self.hash_algorithm)
+        path = self._get_shafile_path(obj_id)
         dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
@@ -1957,6 +1989,7 @@ class DiskObjectStore(PackBasedObjectStore):
         *,
         file_mode: int | None = None,
         dir_mode: int | None = None,
+        hash_algorithm=None,
     ) -> "DiskObjectStore":
         """Initialize a new disk object store.
 
@@ -1966,6 +1999,7 @@ class DiskObjectStore(PackBasedObjectStore):
           path: Path where the object store should be created
           file_mode: Optional file permission mask for shared repository
           dir_mode: Optional directory permission mask for shared repository
+          hash_algorithm: Hash algorithm to use (SHA1 or SHA256)
 
         Returns:
           New DiskObjectStore instance
@@ -1983,7 +2017,7 @@ class DiskObjectStore(PackBasedObjectStore):
         if dir_mode is not None:
             os.chmod(info_path, dir_mode)
             os.chmod(pack_path, dir_mode)
-        return cls(path, file_mode=file_mode, dir_mode=dir_mode)
+        return cls(path, file_mode=file_mode, dir_mode=dir_mode, hash_algorithm=hash_algorithm)
 
     def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
         """Iterate over all object SHAs with the given prefix.

@@ -41,6 +41,8 @@ def test_suite() -> unittest.TestSuite:
         "reftable",
         "repository",
         "server",
+        "sha256",
+        "sha256_packs",
         "utils",
         "web",
     ]

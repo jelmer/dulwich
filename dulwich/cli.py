@@ -1051,6 +1051,74 @@ class cmd_notes(SuperCommand):
     default_command = cmd_notes_list
 
 
+class cmd_cherry_pick(Command):
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Apply the changes introduced by some existing commits"
+        )
+        parser.add_argument("commit", nargs="?", help="Commit to cherry-pick")
+        parser.add_argument(
+            "-n",
+            "--no-commit",
+            action="store_true",
+            help="Apply changes without making a commit",
+        )
+        parser.add_argument(
+            "--continue",
+            dest="continue_",
+            action="store_true",
+            help="Continue after resolving conflicts",
+        )
+        parser.add_argument(
+            "--abort",
+            action="store_true",
+            help="Abort the current cherry-pick operation",
+        )
+        args = parser.parse_args(args)
+
+        # Check argument validity
+        if args.continue_ or args.abort:
+            if args.commit is not None:
+                parser.error("Cannot specify commit with --continue or --abort")
+                return 1
+        else:
+            if args.commit is None:
+                parser.error("Commit argument is required")
+                return 1
+
+        try:
+            commit_arg = args.commit
+
+            result = porcelain.cherry_pick(
+                ".",
+                commit_arg,
+                no_commit=args.no_commit,
+                continue_=args.continue_,
+                abort=args.abort,
+            )
+
+            if args.abort:
+                print("Cherry-pick aborted.")
+            elif args.continue_:
+                if result:
+                    print(f"Cherry-pick completed: {result.decode()}")
+                else:
+                    print("Cherry-pick completed.")
+            elif result is None:
+                if args.no_commit:
+                    print("Cherry-pick applied successfully (no commit created).")
+                else:
+                    # This shouldn't happen unless there were conflicts
+                    print("Cherry-pick resulted in conflicts.")
+            else:
+                print(f"Cherry-pick successful: {result.decode()}")
+
+            return None
+        except porcelain.Error as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+
 class cmd_merge_tree(Command):
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser(
@@ -1339,6 +1407,7 @@ commands = {
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
     "checkout": cmd_checkout,
+    "cherry-pick": cmd_cherry_pick,
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,

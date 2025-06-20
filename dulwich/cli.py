@@ -58,6 +58,71 @@ def signal_quit(signal, frame) -> None:
     pdb.set_trace()
 
 
+def parse_relative_time(time_str):
+    """Parse a relative time string like '2 weeks ago' into seconds.
+
+    Args:
+        time_str: String like '2 weeks ago' or 'now'
+
+    Returns:
+        Number of seconds
+
+    Raises:
+        ValueError: If the time string cannot be parsed
+    """
+    if time_str == "now":
+        return 0
+
+    if not time_str.endswith(" ago"):
+        raise ValueError(f"Invalid relative time format: {time_str}")
+
+    parts = time_str[:-4].split()
+    if len(parts) != 2:
+        raise ValueError(f"Invalid relative time format: {time_str}")
+
+    try:
+        num = int(parts[0])
+        unit = parts[1]
+
+        multipliers = {
+            "second": 1,
+            "seconds": 1,
+            "minute": 60,
+            "minutes": 60,
+            "hour": 3600,
+            "hours": 3600,
+            "day": 86400,
+            "days": 86400,
+            "week": 604800,
+            "weeks": 604800,
+        }
+
+        if unit in multipliers:
+            return num * multipliers[unit]
+        else:
+            raise ValueError(f"Unknown time unit: {unit}")
+    except ValueError as e:
+        if "invalid literal" in str(e):
+            raise ValueError(f"Invalid number in relative time: {parts[0]}")
+        raise
+
+
+def format_bytes(bytes):
+    """Format bytes as human-readable string.
+
+    Args:
+        bytes: Number of bytes
+
+    Returns:
+        Human-readable string like "1.5 MB"
+    """
+    for unit in ["B", "KB", "MB", "GB"]:
+        if bytes < 1024.0:
+            return f"{bytes:.1f} {unit}"
+        bytes /= 1024.0
+    return f"{bytes:.1f} TB"
+
+
 class Command:
     """A Dulwich subcommand."""
 

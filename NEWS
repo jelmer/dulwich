@@ -54,6 +54,11 @@
 
  * Support quote_path flag for ignore checking. (Jelmer Vernooĳ)
 
+ * Clarify documentation for ``IgnoreFilter`` and ``IgnoreFilterManager`` to
+   explicitly state that directory paths should include trailing slashes when
+   checking if they are ignored. This matches Git's behavior and ensures
+   consistent results. (Jelmer Vernooĳ, #972)
+
  * Add support for Git's ``feature.manyFiles`` configuration and index version 4.
    This enables faster Git operations in large repositories through path prefix
    compression (30-50% smaller index files) and optional hash skipping for faster

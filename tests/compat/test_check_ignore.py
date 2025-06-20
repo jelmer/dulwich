@@ -150,6 +150,16 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         paths = ["build/", "node_modules/", "build.txt"]
         self._assert_ignore_match(paths)
 
+    def test_issue_972_directory_pattern_with_slash(self) -> None:
+        """Test issue #972: /data/ pattern should match both 'data' and 'data/'."""
+        self._write_gitignore("/data/\n")
+        self._create_dir("data")
+        self._create_file("data/file.txt")
+
+        # Both 'data' and 'data/' should be matched by /data/ pattern
+        paths = ["data", "data/", "data/file.txt"]
+        self._assert_ignore_match(paths)
+
     def test_wildcard_patterns(self) -> None:
         """Test wildcard patterns."""
         self._write_gitignore("*.py[cod]\n__pycache__/\n*.so\n")

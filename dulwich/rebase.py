@@ -21,7 +21,7 @@
 
 """Git rebase implementation."""
 
-from typing import Optional
+from typing import Optional, Protocol
 
 from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
@@ -48,6 +48,214 @@ class RebaseAbort(RebaseError):
     """Raised when rebase is aborted."""
 
 
+class RebaseStateManager(Protocol):
+    """Protocol for managing rebase state."""
+
+    def save(
+        self,
+        original_head: Optional[bytes],
+        rebasing_branch: Optional[bytes],
+        onto: Optional[bytes],
+        todo: list[Commit],
+        done: list[Commit],
+    ) -> None:
+        """Save rebase state."""
+        ...
+
+    def load(
+        self,
+    ) -> tuple[
+        Optional[bytes],  # original_head
+        Optional[bytes],  # rebasing_branch
+        Optional[bytes],  # onto
+        list[Commit],  # todo
+        list[Commit],  # done
+    ]:
+        """Load rebase state."""
+        ...
+
+    def clean(self) -> None:
+        """Clean up rebase state."""
+        ...
+
+    def exists(self) -> bool:
+        """Check if rebase state exists."""
+        ...
+
+
+class DiskRebaseStateManager:
+    """Manages rebase state on disk using same files as C Git."""
+
+    def __init__(self, repo: Repo) -> None:
+        self.repo = repo
+
+    def save(
+        self,
+        original_head: Optional[bytes],
+        rebasing_branch: Optional[bytes],
+        onto: Optional[bytes],
+        todo: list[Commit],
+        done: list[Commit],
+    ) -> None:
+        """Save rebase state to disk."""
+        # For file-based repos, ensure the directory exists
+        if hasattr(self.repo, "controldir"):
+            import os
+
+            rebase_dir = os.path.join(self.repo.controldir(), "rebase-merge")
+            if not os.path.exists(rebase_dir):
+                os.makedirs(rebase_dir)
+
+        # Store the original HEAD ref (e.g. "refs/heads/feature")
+        if original_head:
+            self.repo._put_named_file("rebase-merge/orig-head", original_head)
+
+        # Store the branch name being rebased
+        if rebasing_branch:
+            self.repo._put_named_file("rebase-merge/head-name", rebasing_branch)
+
+        # Store the commit we're rebasing onto
+        if onto:
+            self.repo._put_named_file("rebase-merge/onto", onto)
+
+        # Track progress
+        if todo:
+            # Store the current commit being rebased (same as C Git)
+            current_commit = todo[0]
+            self.repo._put_named_file("rebase-merge/stopped-sha", current_commit.id)
+
+            # Store progress counters
+            msgnum = len(done) + 1  # Current commit number (1-based)
+            end = len(done) + len(todo)  # Total number of commits
+            self.repo._put_named_file("rebase-merge/msgnum", str(msgnum).encode())
+            self.repo._put_named_file("rebase-merge/end", str(end).encode())
+
+        # TODO: Add support for writing git-rebase-todo for interactive rebase
+
+    def load(
+        self,
+    ) -> tuple[
+        Optional[bytes],
+        Optional[bytes],
+        Optional[bytes],
+        list[Commit],
+        list[Commit],
+    ]:
+        """Load rebase state from disk."""
+        original_head = None
+        rebasing_branch = None
+        onto = None
+        todo: list[Commit] = []
+        done: list[Commit] = []
+
+        # Load rebase state files
+        orig_head_file = self.repo.get_named_file("rebase-merge/orig-head")
+        if orig_head_file:
+            original_head = orig_head_file.read().strip()
+            orig_head_file.close()
+
+        head_name_file = self.repo.get_named_file("rebase-merge/head-name")
+        if head_name_file:
+            rebasing_branch = head_name_file.read().strip()
+            head_name_file.close()
+
+        onto_file = self.repo.get_named_file("rebase-merge/onto")
+        if onto_file:
+            onto = onto_file.read().strip()
+            onto_file.close()
+
+        # TODO: Load todo list and done list for resuming rebase
+
+        return original_head, rebasing_branch, onto, todo, done
+
+    def clean(self) -> None:
+        """Clean up rebase state files."""
+        # Clean up rebase state files matching C Git
+        for filename in [
+            "rebase-merge/stopped-sha",
+            "rebase-merge/orig-head",
+            "rebase-merge/onto",
+            "rebase-merge/head-name",
+            "rebase-merge/msgnum",
+            "rebase-merge/end",
+        ]:
+            self.repo._del_named_file(filename)
+
+        # For file-based repos, remove the directory
+        if hasattr(self.repo, "controldir"):
+            import os
+            import shutil
+
+            rebase_dir = os.path.join(self.repo.controldir(), "rebase-merge")
+            try:
+                shutil.rmtree(rebase_dir)
+            except FileNotFoundError:
+                # Directory doesn't exist, that's ok
+                pass
+
+    def exists(self) -> bool:
+        """Check if rebase state exists."""
+        f = self.repo.get_named_file("rebase-merge/orig-head")
+        if f:
+            f.close()
+            return True
+        return False
+
+
+class MemoryRebaseStateManager:
+    """Manages rebase state in memory for MemoryRepo."""
+
+    def __init__(self, repo: Repo) -> None:
+        self.repo = repo
+        self._state: Optional[dict] = None
+
+    def save(
+        self,
+        original_head: Optional[bytes],
+        rebasing_branch: Optional[bytes],
+        onto: Optional[bytes],
+        todo: list[Commit],
+        done: list[Commit],
+    ) -> None:
+        """Save rebase state in memory."""
+        self._state = {
+            "original_head": original_head,
+            "rebasing_branch": rebasing_branch,
+            "onto": onto,
+            "todo": todo[:],  # Copy the lists
+            "done": done[:],
+        }
+
+    def load(
+        self,
+    ) -> tuple[
+        Optional[bytes],
+        Optional[bytes],
+        Optional[bytes],
+        list[Commit],
+        list[Commit],
+    ]:
+        """Load rebase state from memory."""
+        if self._state is None:
+            return None, None, None, [], []
+
+        return (
+            self._state["original_head"],
+            self._state["rebasing_branch"],
+            self._state["onto"],
+            self._state["todo"][:],  # Return copies
+            self._state["done"][:],
+        )
+
+    def clean(self) -> None:
+        """Clean up rebase state."""
+        self._state = None
+
+    def exists(self) -> bool:
+        """Check if rebase state exists."""
+        return self._state is not None
+
+
 class Rebaser:
     """Handles git rebase operations."""
 
@@ -59,11 +267,17 @@ class Rebaser:
         """
         self.repo = repo
         self.object_store = repo.object_store
+        self._state_manager = repo.get_rebase_state_manager()
+
+        # Initialize state
         self._original_head = None
         self._onto = None
         self._todo = []
         self._done = []
         self._rebasing_branch = None
+
+        # Load any existing rebase state
+        self._load_rebase_state()
 
     def _get_commits_to_rebase(
         self, upstream: bytes, branch: Optional[bytes] = None
@@ -243,9 +457,13 @@ class Rebaser:
             self._save_rebase_state()
             return (commit.id, conflicts)
 
+    def is_in_progress(self) -> bool:
+        """Check if a rebase is currently in progress."""
+        return self._state_manager.exists()
+
     def abort_rebase(self) -> None:
         """Abort an in-progress rebase and restore original state."""
-        if self._original_head is None:
+        if not self.is_in_progress():
             raise RebaseError("No rebase in progress")
 
         # Restore original HEAD
@@ -295,46 +513,27 @@ class Rebaser:
 
     def _save_rebase_state(self) -> None:
         """Save rebase state to allow resuming."""
-        # Store rebase state in named files
-        # Real git uses .git/rebase-merge/ directory
+        self._state_manager.save(
+            self._original_head,
+            self._rebasing_branch,
+            self._onto,
+            self._todo,
+            self._done,
+        )
 
-        # For file-based repos, ensure the directory exists
-        if hasattr(self.repo, "controldir"):
-            import os
-
-            rebase_dir = os.path.join(self.repo.controldir(), "rebase-merge")
-            if not os.path.exists(rebase_dir):
-                os.makedirs(rebase_dir)
-
-        if self._todo:
-            # Store the current commit being rebased
-            current_commit = self._todo[0]
-            self.repo._put_named_file("rebase-merge/stopped-sha", current_commit.id)
-
-        # Store other rebase state
-        if self._original_head:
-            self.repo._put_named_file("rebase-merge/orig-head", self._original_head)
-        if self._onto:
-            self.repo._put_named_file("rebase-merge/onto", self._onto)
+    def _load_rebase_state(self) -> None:
+        """Load existing rebase state if present."""
+        (
+            self._original_head,
+            self._rebasing_branch,
+            self._onto,
+            self._todo,
+            self._done,
+        ) = self._state_manager.load()
 
     def _clean_rebase_state(self) -> None:
         """Clean up rebase state files."""
-        # Clean up rebase state files
-        for filename in [
-            "rebase-merge/stopped-sha",
-            "rebase-merge/orig-head",
-            "rebase-merge/onto",
-        ]:
-            self.repo._del_named_file(filename)
-
-        # For file-based repos, remove the directory
-        if hasattr(self.repo, "controldir"):
-            import os
-            import shutil
-
-            rebase_dir = os.path.join(self.repo.controldir(), "rebase-merge")
-            if os.path.exists(rebase_dir):
-                shutil.rmtree(rebase_dir)
+        self._state_manager.clean()
 
 
 def rebase(

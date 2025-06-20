@@ -736,6 +736,13 @@ class BaseRepo:
         """
         raise NotImplementedError(self.set_description)
 
+    def get_rebase_state_manager(self):
+        """Get the appropriate rebase state manager for this repository.
+
+        Returns: RebaseStateManager instance
+        """
+        raise NotImplementedError(self.get_rebase_state_manager)
+
     def get_config_stack(self) -> "StackedConfig":
         """Return a config stack for this repository.
 
@@ -1713,6 +1720,15 @@ class Repo(BaseRepo):
             ret.path = path
             return ret
 
+    def get_rebase_state_manager(self):
+        """Get the appropriate rebase state manager for this repository.
+
+        Returns: DiskRebaseStateManager instance
+        """
+        from .rebase import DiskRebaseStateManager
+
+        return DiskRebaseStateManager(self)
+
     def get_description(self):
         """Retrieve the description of this repository.
 
@@ -2073,6 +2089,15 @@ class MemoryRepo(BaseRepo):
         Returns: `ConfigFile` object.
         """
         return self._config
+
+    def get_rebase_state_manager(self):
+        """Get the appropriate rebase state manager for this repository.
+
+        Returns: MemoryRebaseStateManager instance
+        """
+        from .rebase import MemoryRebaseStateManager
+
+        return MemoryRebaseStateManager(self)
 
     @classmethod
     def init_bare(cls, objects, refs, format: Optional[int] = None):

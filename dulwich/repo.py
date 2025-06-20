@@ -1725,9 +1725,12 @@ class Repo(BaseRepo):
 
         Returns: DiskRebaseStateManager instance
         """
+        import os
+
         from .rebase import DiskRebaseStateManager
 
-        return DiskRebaseStateManager(self)
+        path = os.path.join(self.controldir(), "rebase-merge")
+        return DiskRebaseStateManager(path)
 
     def get_description(self):
         """Retrieve the description of this repository.

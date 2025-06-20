@@ -130,9 +130,7 @@ class RebaserTestCase(TestCase):
 
         # Perform rebase
         rebaser = Rebaser(self.repo)
-        commits = rebaser.start(
-            b"refs/heads/master", branch=b"refs/heads/feature"
-        )
+        commits = rebaser.start(b"refs/heads/master", branch=b"refs/heads/feature")
 
         self.assertEqual(len(commits), 1)
         self.assertEqual(commits[0].id, feature_commit.id)

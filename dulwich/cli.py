@@ -1169,7 +1169,7 @@ class cmd_count_objects(Command):
 
 
 class cmd_rebase(Command):
-    def run(self, args) -> Optional[int]:
+    def run(self, args) -> int:
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "upstream", nargs="?", help="Upstream branch to rebase onto"
@@ -1195,21 +1195,23 @@ class cmd_rebase(Command):
         # Handle abort/continue/skip first
         if args.abort:
             try:
-                porcelain.rebase(".", None, abort=True)
+                porcelain.rebase(".", args.upstream or "HEAD", abort=True)
                 print("Rebase aborted.")
             except porcelain.Error as e:
                 print(f"Error: {e}")
                 return 1
-            return
+            return 0
 
         if args.continue_rebase:
             try:
-                new_shas = porcelain.rebase(".", None, continue_rebase=True)
+                new_shas = porcelain.rebase(
+                    ".", args.upstream or "HEAD", continue_rebase=True
+                )
                 print("Rebase complete.")
             except porcelain.Error as e:
                 print(f"Error: {e}")
                 return 1
-            return
+            return 0
 
         # Normal rebase requires upstream
         if not args.upstream:
@@ -1228,6 +1230,7 @@ class cmd_rebase(Command):
                 print(f"Successfully rebased {len(new_shas)} commits.")
             else:
                 print("Already up to date.")
+            return 0
 
         except porcelain.Error as e:
             print(f"Error: {e}")

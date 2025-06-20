@@ -130,7 +130,7 @@ class RebaserTestCase(TestCase):
 
         # Perform rebase
         rebaser = Rebaser(self.repo)
-        commits = rebaser.start_rebase(
+        commits = rebaser.start(
             b"refs/heads/master", branch=b"refs/heads/feature"
         )
 
@@ -138,7 +138,7 @@ class RebaserTestCase(TestCase):
         self.assertEqual(commits[0].id, feature_commit.id)
 
         # Continue rebase
-        result = rebaser.continue_rebase()
+        result = rebaser.continue_()
         self.assertIsNone(result)  # Rebase complete
 
         # Check that feature branch was updated
@@ -235,10 +235,10 @@ class RebaserTestCase(TestCase):
 
         # Start rebase
         rebaser = Rebaser(self.repo)
-        rebaser.start_rebase(b"refs/heads/master")
+        rebaser.start(b"refs/heads/master")
 
         # Abort rebase
-        rebaser.abort_rebase()
+        rebaser.abort()
 
         # Check that HEAD is restored
         self.assertEqual(self.repo.refs.read_ref(b"HEAD"), b"ref: refs/heads/feature")
@@ -340,7 +340,7 @@ class RebaserTestCase(TestCase):
 
         # Rebase B and C onto initial commit (skipping A)
         rebaser = Rebaser(self.repo)
-        commits = rebaser.start_rebase(
+        commits = rebaser.start(
             upstream=commit_a.id,
             onto=self.initial_commit.id,
             branch=b"refs/heads/topic",
@@ -352,7 +352,7 @@ class RebaserTestCase(TestCase):
         self.assertEqual(commits[1].id, commit_c.id)
 
         # Continue rebase
-        result = rebaser.continue_rebase()
+        result = rebaser.continue_()
         self.assertIsNone(result)
 
         # Check result

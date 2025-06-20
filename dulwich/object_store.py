@@ -402,9 +402,10 @@ class BaseObjectStore:
 
 
 class PackBasedObjectStore(BaseObjectStore):
-    def __init__(self, pack_compression_level=-1) -> None:
+    def __init__(self, pack_compression_level=-1, pack_index_version=None) -> None:
         self._pack_cache: dict[str, Pack] = {}
         self.pack_compression_level = pack_compression_level
+        self.pack_index_version = pack_index_version
 
     def add_pack(self) -> tuple[BytesIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack to this object store."""
@@ -791,6 +792,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path: Union[str, os.PathLike],
         loose_compression_level=-1,
         pack_compression_level=-1,
+        pack_index_version=None,
     ) -> None:
         """Open an object store.
 
@@ -798,13 +800,18 @@ class DiskObjectStore(PackBasedObjectStore):
           path: Path of the object store.
           loose_compression_level: zlib compression level for loose objects
           pack_compression_level: zlib compression level for pack objects
+          pack_index_version: pack index version to use (1, 2, or 3)
         """
-        super().__init__(pack_compression_level=pack_compression_level)
+        super().__init__(
+            pack_compression_level=pack_compression_level,
+            pack_index_version=pack_index_version,
+        )
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._alternates = None
         self.loose_compression_level = loose_compression_level
         self.pack_compression_level = pack_compression_level
+        self.pack_index_version = pack_index_version
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -832,7 +839,13 @@ class DiskObjectStore(PackBasedObjectStore):
             )
         except KeyError:
             pack_compression_level = default_compression_level
-        return cls(path, loose_compression_level, pack_compression_level)
+        try:
+            pack_index_version = int(config.get((b"pack",), b"indexVersion").decode())
+        except KeyError:
+            pack_index_version = None
+        return cls(
+            path, loose_compression_level, pack_compression_level, pack_index_version
+        )
 
     @property
     def alternates(self):
@@ -1019,7 +1032,9 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Write the index.
         with GitFile(target_index_path, "wb", mask=PACK_MODE) as index_file:
-            write_pack_index(index_file, entries, pack_sha)
+            write_pack_index(
+                index_file, entries, pack_sha, version=self.pack_index_version
+            )
 
         # Add the pack to the store and return it.
         final_pack = Pack(pack_base_name)
@@ -1892,7 +1907,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
                 max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix="incoming-"
             )
             checksum = p.get_stored_checksum()
-            write_pack_index(idxf, entries, checksum)
+            write_pack_index(idxf, entries, checksum, version=self.pack_index_version)
             idxf.seek(0)
             idx = load_pack_index_file(basename + ".idx", idxf)
             for pack in self.packs:

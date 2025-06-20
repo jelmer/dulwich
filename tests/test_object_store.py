@@ -341,6 +341,80 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual([], entries)
             o.add_thin_pack(f.read, None)
 
+    def test_pack_index_version_config(self) -> None:
+        # Test that pack.indexVersion configuration is respected
+        from dulwich.config import ConfigDict
+        from dulwich.pack import load_pack_index
+
+        # Create config with pack.indexVersion = 1
+        config = ConfigDict()
+        config[(b"pack",)] = {b"indexVersion": b"1"}
+
+        # Create object store with config
+        store_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, store_dir)
+        os.makedirs(os.path.join(store_dir, "pack"))
+        store = DiskObjectStore.from_config(store_dir, config)
+        self.addCleanup(store.close)
+
+        # Create some objects to pack
+        b1 = make_object(Blob, data=b"blob1")
+        b2 = make_object(Blob, data=b"blob2")
+        store.add_objects([(b1, None), (b2, None)])
+
+        # Add a pack
+        f, commit, abort = store.add_pack()
+        try:
+            # build_pack expects (type_num, data) tuples
+            objects_spec = [
+                (b1.type_num, b1.as_raw_string()),
+                (b2.type_num, b2.as_raw_string()),
+            ]
+            build_pack(f, objects_spec, store=store)
+            commit()
+        except:
+            abort()
+            raise
+
+        # Find the created pack index
+        pack_dir = os.path.join(store_dir, "pack")
+        idx_files = [f for f in os.listdir(pack_dir) if f.endswith(".idx")]
+        self.assertEqual(1, len(idx_files))
+
+        # Load and verify it's version 1
+        idx_path = os.path.join(pack_dir, idx_files[0])
+        idx = load_pack_index(idx_path)
+        self.assertEqual(1, idx.version)
+
+        # Test version 3
+        config[(b"pack",)] = {b"indexVersion": b"3"}
+        store_dir2 = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, store_dir2)
+        os.makedirs(os.path.join(store_dir2, "pack"))
+        store2 = DiskObjectStore.from_config(store_dir2, config)
+        self.addCleanup(store2.close)
+
+        b3 = make_object(Blob, data=b"blob3")
+        store2.add_objects([(b3, None)])
+
+        f2, commit2, abort2 = store2.add_pack()
+        try:
+            objects_spec2 = [(b3.type_num, b3.as_raw_string())]
+            build_pack(f2, objects_spec2, store=store2)
+            commit2()
+        except:
+            abort2()
+            raise
+
+        # Find and verify version 3 index
+        pack_dir2 = os.path.join(store_dir2, "pack")
+        idx_files2 = [f for f in os.listdir(pack_dir2) if f.endswith(".idx")]
+        self.assertEqual(1, len(idx_files2))
+
+        idx_path2 = os.path.join(pack_dir2, idx_files2[0])
+        idx2 = load_pack_index(idx_path2)
+        self.assertEqual(3, idx2.version)
+
 
 class TreeLookupPathTests(TestCase):
     def setUp(self) -> None:

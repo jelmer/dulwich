@@ -42,6 +42,7 @@ Currently implemented:
  * ls_remote
  * ls_tree
  * merge
+ * merge_tree
  * pull
  * push
  * rm
@@ -2854,3 +2855,41 @@ def unpack_objects(pack_path, target="."):
                 r.object_store.add_object(obj)
                 count += 1
             return count
+
+
+def merge_tree(repo, base_tree, our_tree, their_tree):
+    """Perform a three-way tree merge without touching the working directory.
+
+    This is similar to git merge-tree, performing a merge at the tree level
+    without creating commits or updating any references.
+
+    Args:
+      repo: Repository containing the trees
+      base_tree: Tree-ish of the common ancestor (or None for no common ancestor)
+      our_tree: Tree-ish of our side of the merge
+      their_tree: Tree-ish of their side of the merge
+
+    Returns:
+      Tuple of (merged_tree_id, conflicts) where:
+        - merged_tree_id is the SHA-1 of the merged tree
+        - conflicts is a list of paths (as bytes) that had conflicts
+
+    Raises:
+      KeyError: If any of the tree-ish arguments cannot be resolved
+    """
+    from .merge import Merger
+
+    with open_repo_closing(repo) as r:
+        # Resolve tree-ish arguments to actual trees
+        base = parse_tree(r, base_tree) if base_tree else None
+        ours = parse_tree(r, our_tree)
+        theirs = parse_tree(r, their_tree)
+
+        # Perform the merge
+        merger = Merger(r.object_store)
+        merged_tree, conflicts = merger.merge_trees(base, ours, theirs)
+
+        # Add the merged tree to the object store
+        r.object_store.add_object(merged_tree)
+
+        return merged_tree.id, conflicts

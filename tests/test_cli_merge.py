@@ -109,9 +109,8 @@ class CLIMergeTests(TestCase):
             try:
                 os.chdir(tmpdir)
                 with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-                    with patch("sys.exit") as mock_exit:
-                        main(["merge", "feature"])
-                        mock_exit.assert_called_with(1)
+                    exit_code = main(["merge", "feature"])
+                    self.assertEqual(1, exit_code)
                     output = mock_stdout.getvalue()
 
                 self.assertIn("Merge conflicts", output)

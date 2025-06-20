@@ -437,6 +437,14 @@ class RefsContainer:
                 ret[src] = dst
         return ret
 
+    def pack_refs(self, all: bool = False) -> None:
+        """Pack loose refs into packed-refs file.
+
+        Args:
+            all: If True, pack all refs. If False, only pack tags.
+        """
+        raise NotImplementedError(self.pack_refs)
+
 
 class DictRefsContainer(RefsContainer):
     """RefsContainer backed by a simple dict.
@@ -1053,6 +1061,29 @@ class DiskRefsContainer(RefsContainer):
                 break
 
         return True
+
+    def pack_refs(self, all: bool = False) -> None:
+        """Pack loose refs into packed-refs file.
+
+        Args:
+            all: If True, pack all refs. If False, only pack tags.
+        """
+        refs_to_pack: dict[Ref, Optional[ObjectID]] = {}
+        for ref in self.allkeys():
+            if ref == HEADREF:
+                # Never pack HEAD
+                continue
+            if all or ref.startswith(LOCAL_TAG_PREFIX):
+                try:
+                    sha = self[ref]
+                    if sha:
+                        refs_to_pack[ref] = sha
+                except KeyError:
+                    # Broken ref, skip it
+                    pass
+
+        if refs_to_pack:
+            self.add_packed_refs(refs_to_pack)
 
 
 def _split_ref_line(line):

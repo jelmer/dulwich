@@ -22,16 +22,21 @@
 import hashlib
 import os
 import tempfile
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from .repo import Repo
 
 
 class LFSStore:
     """Stores objects on disk, indexed by SHA256."""
 
-    def __init__(self, path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
 
     @classmethod
-    def create(cls, lfs_dir):
+    def create(cls, lfs_dir: str) -> "LFSStore":
         if not os.path.isdir(lfs_dir):
             os.mkdir(lfs_dir)
         os.mkdir(os.path.join(lfs_dir, "tmp"))
@@ -39,23 +44,23 @@ class LFSStore:
         return cls(lfs_dir)
 
     @classmethod
-    def from_repo(cls, repo, create=False):
-        lfs_dir = os.path.join(repo.controldir, "lfs")
+    def from_repo(cls, repo: "Repo", create: bool = False) -> "LFSStore":
+        lfs_dir = os.path.join(repo.controldir(), "lfs")
         if create:
             return cls.create(lfs_dir)
         return cls(lfs_dir)
 
-    def _sha_path(self, sha):
+    def _sha_path(self, sha: str) -> str:
         return os.path.join(self.path, "objects", sha[0:2], sha[2:4], sha)
 
-    def open_object(self, sha):
+    def open_object(self, sha: str) -> BinaryIO:
         """Open an object by sha."""
         try:
             return open(self._sha_path(sha), "rb")
         except FileNotFoundError as exc:
             raise KeyError(sha) from exc
 
-    def write_object(self, chunks):
+    def write_object(self, chunks: Iterable[bytes]) -> str:
         """Write an object.
 
         Returns: object SHA

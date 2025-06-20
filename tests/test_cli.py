@@ -54,12 +54,42 @@ class DulwichCliTestCase(TestCase):
 
     def _run_cli(self, *args, stdout_stream=None):
         """Run CLI command and capture output."""
+
+        class MockStream:
+            def __init__(self):
+                self._buffer = io.BytesIO()
+                self.buffer = self._buffer
+
+            def write(self, data):
+                if isinstance(data, bytes):
+                    self._buffer.write(data)
+                else:
+                    self._buffer.write(data.encode("utf-8"))
+
+            def getvalue(self):
+                value = self._buffer.getvalue()
+                try:
+                    return value.decode("utf-8")
+                except UnicodeDecodeError:
+                    return value
+
+            def __getattr__(self, name):
+                return getattr(self._buffer, name)
+
         old_stdout = sys.stdout
         old_stderr = sys.stderr
         old_cwd = os.getcwd()
         try:
-            sys.stdout = stdout_stream or io.StringIO()
-            sys.stderr = io.StringIO()
+            # Use custom stdout_stream if provided, otherwise use MockStream
+            if stdout_stream:
+                sys.stdout = stdout_stream
+                if not hasattr(sys.stdout, "buffer"):
+                    sys.stdout.buffer = sys.stdout
+            else:
+                sys.stdout = MockStream()
+
+            sys.stderr = MockStream()
+
             os.chdir(self.repo_path)
             result = cli.main(list(args))
             return result, sys.stdout.getvalue(), sys.stderr.getvalue()

@@ -2004,7 +2004,7 @@ def find_reusable_deltas(
         if progress is not None and i % 1000 == 0:
             progress(f"checking for reusable deltas: {i}/{len(object_ids)}\r".encode())
         if unpacked.pack_type_num == REF_DELTA:
-            hexsha = sha_to_hex(unpacked.delta_base)
+            hexsha = sha_to_hex(unpacked.delta_base)  # type: ignore
             if hexsha in object_ids or hexsha in other_haves:
                 yield unpacked
                 reused += 1

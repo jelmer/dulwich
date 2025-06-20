@@ -289,7 +289,7 @@ class cmd_dump_pack(Command):
         basename, _ = os.path.splitext(args.filename)
         x = Pack(basename)
         print(f"Object names checksum: {x.name()}")
-        print(f"Checksum: {sha_to_hex(x.get_stored_checksum())}")
+        print(f"Checksum: {sha_to_hex(x.get_stored_checksum())!r}")
         x.check()
         print(f"Length: {len(x)}")
         for name in x:
@@ -829,7 +829,7 @@ class cmd_check_mailmap(Command):
 
 
 class cmd_branch(Command):
-    def run(self, args) -> None:
+    def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "branch",
@@ -845,7 +845,7 @@ class cmd_branch(Command):
         args = parser.parse_args(args)
         if not args.branch:
             print("Usage: dulwich branch [-d] BRANCH_NAME")
-            sys.exit(1)
+            return 1
 
         if args.delete:
             porcelain.branch_delete(".", name=args.branch)
@@ -854,11 +854,12 @@ class cmd_branch(Command):
                 porcelain.branch_create(".", name=args.branch)
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")
-                sys.exit(1)
+                return 1
+        return 0
 
 
 class cmd_checkout(Command):
-    def run(self, args) -> None:
+    def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "target",
@@ -880,7 +881,7 @@ class cmd_checkout(Command):
         args = parser.parse_args(args)
         if not args.target:
             print("Usage: dulwich checkout TARGET [--force] [-b NEW_BRANCH]")
-            sys.exit(1)
+            return 1
 
         try:
             porcelain.checkout(
@@ -888,7 +889,8 @@ class cmd_checkout(Command):
             )
         except porcelain.CheckoutError as e:
             sys.stderr.write(f"{e}\n")
-            sys.exit(1)
+            return 1
+        return 0
 
 
 class cmd_stash_list(Command):
@@ -976,7 +978,7 @@ class cmd_merge(Command):
                 print(
                     f"Merge successful. Created merge commit {merge_commit_id.decode()}"
                 )
-            return None
+            return 0
         except porcelain.Error as e:
             print(f"Error: {e}")
             return 1
@@ -1318,7 +1320,7 @@ commands = {
 }
 
 
-def main(argv=None):
+def main(argv=None) -> Optional[int]:
     if argv is None:
         argv = sys.argv[1:]
 

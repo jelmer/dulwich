@@ -3045,14 +3045,14 @@ def rebase(
 
         if abort:
             try:
-                rebaser.abort_rebase()
+                rebaser.abort()
                 return []
             except RebaseError as e:
                 raise Error(str(e))
 
         if continue_rebase:
             try:
-                result = rebaser.continue_rebase()
+                result = rebaser.continue_()
                 if result is None:
                     # Rebase complete
                     return []
@@ -3074,10 +3074,10 @@ def rebase(
 
         try:
             # Start rebase
-            rebaser.start_rebase(upstream, onto, branch)
+            rebaser.start(upstream, onto, branch)
 
             # Continue rebase automatically
-            result = rebaser.continue_rebase()
+            result = rebaser.continue_()
             if result is not None:
                 # Conflicts
                 raise RebaseConflict(result[1])

@@ -402,14 +402,7 @@ def symbolic_ref(repo, ref_name, force=False) -> None:
 
 def pack_refs(repo, all=False) -> None:
     with open_repo_closing(repo) as repo_obj:
-        refs = repo_obj.refs
-        packed_refs = {
-            ref: refs[ref]
-            for ref in refs
-            if (all or ref.startswith(LOCAL_TAG_PREFIX)) and ref != b"HEAD"
-        }
-
-        refs.add_packed_refs(packed_refs)
+        repo_obj.refs.pack_refs(all=all)
 
 
 def commit(

@@ -274,5 +274,201 @@ class PorcelainMergeTests(TestCase):
             self.assertRaises(porcelain.Error, porcelain.merge, tmpdir, "nonexistent")
 
 
+class PorcelainMergeTreeTests(TestCase):
+    """Tests for the porcelain merge_tree functionality."""
+
+    def test_merge_tree_no_conflicts(self):
+        """Test merge_tree with no conflicts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+            repo = Repo(tmpdir)
+
+            # Create base tree
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            base_commit = porcelain.commit(tmpdir, message=b"Base commit")
+
+            # Create our branch
+            porcelain.branch_create(tmpdir, "ours")
+            porcelain.checkout_branch(tmpdir, "ours")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Our content\n")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Our new file\n")
+            porcelain.add(tmpdir, paths=["file1.txt", "file2.txt"])
+            our_commit = porcelain.commit(tmpdir, message=b"Our commit")
+
+            # Create their branch
+            porcelain.checkout_branch(tmpdir, b"master")
+            porcelain.branch_create(tmpdir, "theirs")
+            porcelain.checkout_branch(tmpdir, "theirs")
+            with open(os.path.join(tmpdir, "file3.txt"), "w") as f:
+                f.write("Their new file\n")
+            porcelain.add(tmpdir, paths=["file3.txt"])
+            their_commit = porcelain.commit(tmpdir, message=b"Their commit")
+
+            # Perform merge_tree
+            merged_tree_id, conflicts = porcelain.merge_tree(
+                tmpdir, base_commit, our_commit, their_commit
+            )
+
+            # Should have no conflicts
+            self.assertEqual(conflicts, [])
+
+            # Check merged tree contains all files
+            merged_tree = repo[merged_tree_id]
+            self.assertIn(b"file1.txt", merged_tree)
+            self.assertIn(b"file2.txt", merged_tree)
+            self.assertIn(b"file3.txt", merged_tree)
+
+    def test_merge_tree_with_conflicts(self):
+        """Test merge_tree with conflicts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+            repo = Repo(tmpdir)
+
+            # Create base tree
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            base_commit = porcelain.commit(tmpdir, message=b"Base commit")
+
+            # Create our branch with changes
+            porcelain.branch_create(tmpdir, "ours")
+            porcelain.checkout_branch(tmpdir, "ours")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Our content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            our_commit = porcelain.commit(tmpdir, message=b"Our commit")
+
+            # Create their branch with conflicting changes
+            porcelain.checkout_branch(tmpdir, b"master")
+            porcelain.branch_create(tmpdir, "theirs")
+            porcelain.checkout_branch(tmpdir, "theirs")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Their content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            their_commit = porcelain.commit(tmpdir, message=b"Their commit")
+
+            # Perform merge_tree
+            merged_tree_id, conflicts = porcelain.merge_tree(
+                tmpdir, base_commit, our_commit, their_commit
+            )
+
+            # Should have conflicts
+            self.assertEqual(conflicts, [b"file1.txt"])
+
+            # Check merged tree exists and contains conflict markers
+            merged_tree = repo[merged_tree_id]
+            self.assertIn(b"file1.txt", merged_tree)
+
+            # Get the merged blob content
+            file_mode, file_sha = merged_tree[b"file1.txt"]
+            merged_blob = repo[file_sha]
+            content = merged_blob.data
+
+            # Should contain conflict markers
+            self.assertIn(b"<<<<<<< ours", content)
+            self.assertIn(b"=======", content)
+            self.assertIn(b">>>>>>> theirs", content)
+
+    def test_merge_tree_no_base(self):
+        """Test merge_tree without a base commit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+            repo = Repo(tmpdir)
+
+            # Create our tree
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Our content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            our_commit = porcelain.commit(tmpdir, message=b"Our commit")
+
+            # Create their tree (independent)
+            os.remove(os.path.join(tmpdir, "file1.txt"))
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Their content\n")
+            porcelain.add(tmpdir, paths=["file2.txt"])
+            their_commit = porcelain.commit(tmpdir, message=b"Their commit")
+
+            # Perform merge_tree without base
+            merged_tree_id, conflicts = porcelain.merge_tree(
+                tmpdir, None, our_commit, their_commit
+            )
+
+            # Should have no conflicts (different files)
+            self.assertEqual(conflicts, [])
+
+            # Check merged tree contains both files
+            merged_tree = repo[merged_tree_id]
+            self.assertIn(b"file1.txt", merged_tree)
+            self.assertIn(b"file2.txt", merged_tree)
+
+    def test_merge_tree_with_tree_objects(self):
+        """Test merge_tree with tree objects instead of commits."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+            repo = Repo(tmpdir)
+
+            # Create base tree
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            base_commit_id = porcelain.commit(tmpdir, message=b"Base commit")
+            base_tree_id = repo[base_commit_id].tree
+
+            # Create our tree
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Our content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            our_commit_id = porcelain.commit(tmpdir, message=b"Our commit")
+            our_tree_id = repo[our_commit_id].tree
+
+            # Create their tree
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Their content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            their_commit_id = porcelain.commit(tmpdir, message=b"Their commit")
+            their_tree_id = repo[their_commit_id].tree
+
+            # Perform merge_tree with tree SHAs
+            merged_tree_id, conflicts = porcelain.merge_tree(
+                tmpdir,
+                base_tree_id if base_tree_id else None,
+                our_tree_id,
+                their_tree_id,
+            )
+
+            # Should have conflicts
+            self.assertEqual(conflicts, [b"file1.txt"])
+
+    def test_merge_tree_invalid_object(self):
+        """Test merge_tree with invalid object reference."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create a commit
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            commit_id = porcelain.commit(tmpdir, message=b"Commit")
+
+            # Try to merge with nonexistent object
+            self.assertRaises(
+                KeyError,
+                porcelain.merge_tree,
+                tmpdir,
+                None,
+                commit_id,
+                "0" * 40,  # Invalid SHA
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

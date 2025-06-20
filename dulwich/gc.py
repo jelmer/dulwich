@@ -3,10 +3,10 @@
 import collections
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Deque
+from typing import Optional
 
 from dulwich.object_store import BaseObjectStore, PackBasedObjectStore
-from dulwich.objects import Commit, Tag, Tree, ObjectID
+from dulwich.objects import Commit, ObjectID, Tag, Tree
 from dulwich.refs import RefsContainer
 
 
@@ -40,7 +40,7 @@ def find_reachable_objects(
         Set of reachable object SHAs
     """
     reachable = set()
-    pending: Deque[ObjectID] = collections.deque()
+    pending: collections.deque[ObjectID] = collections.deque()
 
     # Start with all refs
     for ref in refs_container.allkeys():
@@ -256,9 +256,7 @@ def garbage_collect(
     if progress:
         progress("Packing references")
     if not dry_run:
-        from dulwich.porcelain import pack_refs
-
-        pack_refs(repo)
+        repo.refs.pack_refs()
 
     # Delete loose unreachable objects
     if prune and not dry_run:

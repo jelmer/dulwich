@@ -1984,6 +1984,7 @@ def pack_objects(
     delta_window_size=None,
     deltify=None,
     reuse_deltas=True,
+    pack_index_version=None,
 ) -> None:
     """Pack objects into a file.
 
@@ -1996,6 +1997,7 @@ def pack_objects(
                          Set to None for default window size.
       deltify: Whether to deltify objects
       reuse_deltas: Allow reuse of existing deltas while deltifying
+      pack_index_version: Pack index version to use (1, 2, or 3). If None, uses default version.
     """
     with open_repo_closing(repo) as r:
         entries, data_sum = write_pack_from_container(
@@ -2008,7 +2010,7 @@ def pack_objects(
         )
     if idxf is not None:
         entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
-        write_pack_index(idxf, entries, data_sum)
+        write_pack_index(idxf, entries, data_sum, version=pack_index_version)
 
 
 def ls_tree(

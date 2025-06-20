@@ -1140,6 +1140,34 @@ class cmd_gc(Command):
         return None
 
 
+class cmd_count_objects(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            help="Display verbose information.",
+        )
+        args = parser.parse_args(args)
+
+        if args.verbose:
+            stats = porcelain.count_objects(".", verbose=True)
+            # Display verbose output
+            print(f"count: {stats.count}")
+            print(f"size: {stats.size // 1024}")  # Size in KiB
+            assert stats.in_pack is not None
+            print(f"in-pack: {stats.in_pack}")
+            assert stats.packs is not None
+            print(f"packs: {stats.packs}")
+            assert stats.size_pack is not None
+            print(f"size-pack: {stats.size_pack // 1024}")  # Size in KiB
+        else:
+            # Simple output
+            stats = porcelain.count_objects(".", verbose=False)
+            print(f"{stats.count} objects, {stats.size // 1024} kilobytes")
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1176,6 +1204,7 @@ commands = {
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
+    "count-objects": cmd_count_objects,
     "describe": cmd_describe,
     "daemon": cmd_daemon,
     "diff": cmd_diff,

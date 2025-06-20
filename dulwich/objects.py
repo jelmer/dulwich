@@ -112,6 +112,24 @@ if TYPE_CHECKING:
 
     from .file import _GitFile
 
+# Zero SHA constants for backward compatibility
+ZERO_SHA = b"0" * 40  # SHA1 - kept for backward compatibility
+
+
+def zero_sha_for(hash_algorithm=None):
+    """Get the zero SHA for a given hash algorithm.
+
+    Args:
+        hash_algorithm: HashAlgorithm instance. If None, returns SHA1 zero.
+
+    Returns:
+        Zero SHA as hex bytes (40 chars for SHA1, 64 for SHA256)
+    """
+    if hash_algorithm is None:
+        return ZERO_SHA
+    return hash_algorithm.zero_oid
+
+
 # Header fields for commits
 _TREE_HEADER = b"tree"
 _PARENT_HEADER = b"parent"
@@ -175,13 +193,17 @@ def _decompress(string: bytes) -> bytes:
 def sha_to_hex(sha: RawObjectID) -> ObjectID:
     """Takes a string and returns the hex of the sha within."""
     hexsha = binascii.hexlify(sha)
-    assert len(hexsha) == 40, f"Incorrect length of sha1 string: {hexsha!r}"
+    # Support both SHA1 (40 chars) and SHA256 (64 chars)
+    if len(hexsha) not in (40, 64):
+        raise ValueError(f"Incorrect length of sha string: {hexsha!r}")
     return ObjectID(hexsha)
 
 
 def hex_to_sha(hex: ObjectID | str) -> RawObjectID:
     """Takes a hex sha and returns a binary sha."""
-    assert len(hex) == 40, f"Incorrect length of hexsha: {hex!r}"
+    # Support both SHA1 (40 chars) and SHA256 (64 chars)
+    if len(hex) not in (40, 64):
+        raise ValueError(f"Incorrect length of hexsha: {hex}")
     try:
         return RawObjectID(binascii.unhexlify(hex))
     except TypeError as exc:
@@ -191,15 +213,15 @@ def hex_to_sha(hex: ObjectID | str) -> RawObjectID:
 
 
 def valid_hexsha(hex: bytes | str) -> bool:
-    """Check if a string is a valid hex SHA.
+    """Check if a hex string is a valid SHA1 or SHA256.
 
     Args:
-      hex: Hex string to check
+        hex: Hex string to validate
 
     Returns:
-      True if valid hex SHA, False otherwise
+        True if valid SHA1 (40 chars) or SHA256 (64 chars), False otherwise
     """
-    if len(hex) != 40:
+    if len(hex) not in (40, 64):
         return False
     try:
         binascii.unhexlify(hex)
@@ -549,11 +571,12 @@ class ShaFile:
     ) -> None:
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
-        self._deserialize(chunks)
+        # Set SHA before deserialization so Tree can detect hash algorithm
         if sha is None:
             self._sha = None
         else:
-            self._sha = FixedSha(sha)
+            self._sha = FixedSha(sha)  # type: ignore
+        self._deserialize(chunks)
         self._needs_serialization = False
 
     @staticmethod
@@ -613,17 +636,21 @@ class ShaFile:
         raise NotImplementedError(self._serialize)
 
     @classmethod
-    def from_path(cls, path: str | bytes) -> "ShaFile":
+    def from_path(cls, path: str | bytes, sha: ObjectID | None = None) -> "ShaFile":
         """Open a SHA file from disk."""
         with GitFile(path, "rb") as f:
-            return cls.from_file(f)
+            return cls.from_file(f, sha)
 
     @classmethod
-    def from_file(cls, f: BufferedIOBase | IO[bytes] | "_GitFile") -> "ShaFile":
+    def from_file(cls, f: BufferedIOBase | IO[bytes] | "_GitFile", sha: ObjectID | None = None) -> "ShaFile":
         """Get the contents of a SHA file on disk."""
         try:
             obj = cls._parse_file(f)
-            obj._sha = None
+            # Set SHA after parsing but before any further processing
+            if sha is not None:
+                obj._sha = FixedSha(sha)
+            else:
+                obj._sha = None
             return obj
         except (IndexError, ValueError) as exc:
             raise ObjectFormatException("invalid object header") from exc
@@ -713,8 +740,21 @@ class ShaFile:
         """Returns the length of the raw string of this object."""
         return sum(map(len, self.as_raw_chunks()))
 
-    def sha(self) -> "FixedSha | HASH":
-        """The SHA1 object that is the name of this object."""
+    def sha(self, hash_algorithm=None) -> "FixedSha | HASH":
+        """The SHA object that is the name of this object.
+
+        Args:
+            hash_algorithm: Optional HashAlgorithm to use. Defaults to SHA1.
+        """
+        # If using a different hash algorithm, always recalculate
+        if hash_algorithm is not None:
+            new_sha = hash_algorithm.new_hash()
+            new_sha.update(self._header())
+            for chunk in self.as_raw_chunks():
+                new_sha.update(chunk)
+            return new_sha
+
+        # Otherwise use cached SHA1 value
         if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha
             new_sha = sha1()
@@ -733,8 +773,31 @@ class ShaFile:
 
     @property
     def id(self) -> ObjectID:
-        """The hex SHA of this object."""
+        """The hex SHA1 of this object.
+
+        For SHA256 repositories, use get_id(hash_algorithm) instead.
+        This property always returns SHA1 for backward compatibility.
+        """
         return ObjectID(self.sha().hexdigest().encode("ascii"))
+
+    def get_id(self, hash_algorithm=None):
+        """Get the hex SHA of this object using the specified hash algorithm.
+
+        Args:
+            hash_algorithm: Optional HashAlgorithm to use. Defaults to SHA1.
+
+        Example:
+            >>> blob = Blob()
+            >>> blob.data = b"Hello, World!"
+            >>> blob.id  # Always returns SHA1 for backward compatibility
+            b'4ab299c8ad6ed14f31923dd94f8b5f5cb89dfb54'
+            >>> blob.get_id()  # Same as .id
+            b'4ab299c8ad6ed14f31923dd94f8b5f5cb89dfb54'
+            >>> from dulwich.hash import SHA256
+            >>> blob.get_id(SHA256)  # Get SHA256 hash
+            b'03ba204e2f2e707...'  # 64-character SHA256
+        """
+        return self.sha(hash_algorithm).hexdigest().encode("ascii")
 
     def __repr__(self) -> str:
         """Return string representation of this object."""
@@ -1247,20 +1310,37 @@ class TreeEntry(NamedTuple):
 
 
 def parse_tree(
-    text: bytes, strict: bool = False
+    text: bytes, strict: bool = False, hash_algorithm=None
 ) -> Iterator[tuple[bytes, int, ObjectID]]:
     """Parse a tree text.
 
     Args:
       text: Serialized text to parse
-      strict: If True, enforce strict validation
+      strict: Whether to be strict about format
+      hash_algorithm: Hash algorithm object (SHA1 or SHA256) - if None, auto-detect
     Returns: iterator of tuples of (name, mode, sha)
 
     Raises:
       ObjectFormatException: if the object was malformed in some way
     """
+    if hash_algorithm is not None:
+        sha_len = hash_algorithm.oid_length
+        return _parse_tree_with_sha_len(text, strict, sha_len)
+
+    # Try both hash lengths and use the one that works
+    try:
+        # Try SHA1 first (more common)
+        return _parse_tree_with_sha_len(text, strict, 20)
+    except ObjectFormatException:
+        # If SHA1 fails, try SHA256
+        return _parse_tree_with_sha_len(text, strict, 32)
+
+
+def _parse_tree_with_sha_len(text, strict, sha_len):
+    """Helper function to parse tree with a specific hash length."""
     count = 0
     length = len(text)
+
     while count < length:
         mode_end = text.index(b" ", count)
         mode_text = text[count:mode_end]
@@ -1272,10 +1352,18 @@ def parse_tree(
             raise ObjectFormatException(f"Invalid mode {mode_text!r}") from exc
         name_end = text.index(b"\0", mode_end)
         name = text[mode_end + 1 : name_end]
-        count = name_end + 21
+
+        count = name_end + 1 + sha_len
+        if count > length:
+            raise ObjectFormatException(
+                f"Tree entry extends beyond tree length: {count} > {length}"
+            )
+
         sha = text[name_end + 1 : count]
-        if len(sha) != 20:
-            raise ObjectFormatException("Sha has invalid length")
+        if len(sha) != sha_len:
+            raise ObjectFormatException(
+                f"Sha has invalid length: {len(sha)} != {sha_len}"
+            )
         hexsha = sha_to_hex(RawObjectID(sha))
         yield (name, mode, hexsha)
 
@@ -1386,12 +1474,34 @@ class Tree(ShaFile):
         super().__init__()
         self._entries: dict[bytes, tuple[int, ObjectID]] = {}
 
+    def _get_hash_algorithm(self):
+        """Get the hash algorithm based on the object's SHA."""
+        if not hasattr(self, "_sha") or self._sha is None:
+            return None
+
+        # Get the raw SHA bytes
+        sha = self._sha.digest() if hasattr(self._sha, "digest") else self._sha
+        if not isinstance(sha, bytes):
+            return None
+
+        # Import hash modules lazily to avoid circular imports
+        if len(sha) == 32:
+            from .hash import SHA256
+
+            return SHA256
+        elif len(sha) == 20:
+            from .hash import SHA1
+
+            return SHA1
+        return None
+
     @classmethod
-    def from_path(cls, filename: str | bytes) -> "Tree":
+    def from_path(cls, filename: str | bytes, sha: ObjectID | None = None) -> "Tree":
         """Read a tree from a file on disk.
 
         Args:
           filename: Path to the tree file
+          sha: Optional known SHA for the object
 
         Returns:
           A Tree object
@@ -1399,7 +1509,7 @@ class Tree(ShaFile):
         Raises:
           NotTreeError: If the file is not a tree
         """
-        tree = ShaFile.from_path(filename)
+        tree = ShaFile.from_path(filename, sha)
         if not isinstance(tree, cls):
             raise NotTreeError(_path_to_bytes(filename))
         return tree
@@ -1470,7 +1580,9 @@ class Tree(ShaFile):
     def _deserialize(self, chunks: list[bytes]) -> None:
         """Grab the entries in the tree."""
         try:
-            parsed_entries = parse_tree(b"".join(chunks))
+            parsed_entries = parse_tree(
+                b"".join(chunks), hash_algorithm=self._get_hash_algorithm()
+            )
         except ValueError as exc:
             raise ObjectFormatException(exc) from exc
         # TODO: list comprehension is for efficiency in the common (small)
@@ -1496,8 +1608,12 @@ class Tree(ShaFile):
             # TODO: optionally exclude as in git fsck --strict
             stat.S_IFREG | 0o664,
         )
-        for name, mode, sha in parse_tree(b"".join(self._chunked_text), True):
-            check_hexsha(sha, f"invalid sha {sha!r}")
+        for name, mode, sha in parse_tree(
+            b"".join(self._chunked_text),
+            strict=True,
+            hash_algorithm=self._get_hash_algorithm(),
+        ):
+            check_hexsha(sha, f"invalid sha {sha}")
             if b"/" in name or name in (b"", b".", b"..", b".git"):
                 raise ObjectFormatException(
                     "invalid name {}".format(name.decode("utf-8", "replace"))

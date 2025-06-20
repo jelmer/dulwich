@@ -4970,3 +4970,49 @@ class ConeModeTests(PorcelainTestCase):
         self.assertIn("/docs/", lines)
         self.assertIn("/src/", lines)
         self.assertIn("/tests/", lines)
+
+
+class UnpackObjectsTest(PorcelainTestCase):
+    def test_unpack_objects(self):
+        """Test unpacking objects from a pack file."""
+        # Create a test repository with some objects
+        b1 = Blob()
+        b1.data = b"test content 1"
+        b2 = Blob()
+        b2.data = b"test content 2"
+
+        # Add objects to the repo
+        self.repo.object_store.add_object(b1)
+        self.repo.object_store.add_object(b2)
+
+        # Create a pack file with these objects
+        pack_path = os.path.join(self.test_dir, "test_pack")
+        with (
+            open(pack_path + ".pack", "wb") as pack_f,
+            open(pack_path + ".idx", "wb") as idx_f,
+        ):
+            porcelain.pack_objects(
+                self.repo,
+                [b1.id, b2.id],
+                pack_f,
+                idx_f,
+            )
+
+        # Create a new repository to unpack into
+        target_repo_path = os.path.join(self.test_dir, "target_repo")
+        target_repo = Repo.init(target_repo_path, mkdir=True)
+        self.addCleanup(target_repo.close)
+
+        # Unpack the objects
+        count = porcelain.unpack_objects(pack_path + ".pack", target_repo_path)
+
+        # Verify the objects were unpacked
+        self.assertEqual(2, count)
+        self.assertIn(b1.id, target_repo.object_store)
+        self.assertIn(b2.id, target_repo.object_store)
+
+        # Verify the content is correct
+        unpacked_b1 = target_repo.object_store[b1.id]
+        unpacked_b2 = target_repo.object_store[b2.id]
+        self.assertEqual(b1.data, unpacked_b1.data)
+        self.assertEqual(b2.data, unpacked_b2.data)

@@ -2831,3 +2831,26 @@ def merge(
         return _do_merge(
             r, merge_commit_id, no_commit, no_ff, message, author, committer
         )
+
+
+def unpack_objects(pack_path, target="."):
+    """Unpack objects from a pack file into the repository.
+
+    Args:
+      pack_path: Path to the pack file to unpack
+      target: Path to the repository to unpack into
+
+    Returns:
+      Number of objects unpacked
+    """
+    from .pack import Pack
+
+    with open_repo_closing(target) as r:
+        pack_basename = os.path.splitext(pack_path)[0]
+        with Pack(pack_basename) as pack:
+            count = 0
+            for unpacked in pack.iter_unpacked():
+                obj = unpacked.sha_file()
+                r.object_store.add_object(obj)
+                count += 1
+            return count

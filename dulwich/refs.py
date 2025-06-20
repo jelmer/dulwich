@@ -507,21 +507,20 @@ class DictRefsContainer(RefsContainer):
     ) -> bool:
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
-        realnames, _ = self.follow(name)
-        for realname in realnames:
-            self._check_refname(realname)
-            old = self._refs.get(realname)
-            self._refs[realname] = new_ref
-            self._notify(realname, new_ref)
-            self._log(
-                realname,
-                old,
-                new_ref,
-                committer=committer,
-                timestamp=timestamp,
-                timezone=timezone,
-                message=message,
-            )
+        # Only update the specific ref requested, not the whole chain
+        self._check_refname(name)
+        old = self._refs.get(name)
+        self._refs[name] = new_ref
+        self._notify(name, new_ref)
+        self._log(
+            name,
+            old,
+            new_ref,
+            committer=committer,
+            timestamp=timestamp,
+            timezone=timezone,
+            message=message,
+        )
         return True
 
     def add_if_new(

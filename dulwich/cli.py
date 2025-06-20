@@ -1168,6 +1168,72 @@ class cmd_count_objects(Command):
             print(f"{stats.count} objects, {stats.size // 1024} kilobytes")
 
 
+class cmd_rebase(Command):
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "upstream", nargs="?", help="Upstream branch to rebase onto"
+        )
+        parser.add_argument("--onto", type=str, help="Rebase onto specific commit")
+        parser.add_argument(
+            "--branch", type=str, help="Branch to rebase (default: current)"
+        )
+        parser.add_argument(
+            "--abort", action="store_true", help="Abort an in-progress rebase"
+        )
+        parser.add_argument(
+            "--continue",
+            dest="continue_rebase",
+            action="store_true",
+            help="Continue an in-progress rebase",
+        )
+        parser.add_argument(
+            "--skip", action="store_true", help="Skip current commit and continue"
+        )
+        args = parser.parse_args(args)
+
+        # Handle abort/continue/skip first
+        if args.abort:
+            try:
+                porcelain.rebase(".", None, abort=True)
+                print("Rebase aborted.")
+            except porcelain.Error as e:
+                print(f"Error: {e}")
+                return 1
+            return
+
+        if args.continue_rebase:
+            try:
+                new_shas = porcelain.rebase(".", None, continue_rebase=True)
+                print("Rebase complete.")
+            except porcelain.Error as e:
+                print(f"Error: {e}")
+                return 1
+            return
+
+        # Normal rebase requires upstream
+        if not args.upstream:
+            print("Error: Missing required argument 'upstream'")
+            return 1
+
+        try:
+            new_shas = porcelain.rebase(
+                ".",
+                args.upstream,
+                onto=args.onto,
+                branch=args.branch,
+            )
+
+            if new_shas:
+                print(f"Successfully rebased {len(new_shas)} commits.")
+            else:
+                print("Already up to date.")
+
+        except porcelain.Error as e:
+            print(f"Error: {e}")
+            return 1
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1228,6 +1294,7 @@ commands = {
     "pack-refs": cmd_pack_refs,
     "pull": cmd_pull,
     "push": cmd_push,
+    "rebase": cmd_rebase,
     "receive-pack": cmd_receive_pack,
     "remote": cmd_remote,
     "repack": cmd_repack,

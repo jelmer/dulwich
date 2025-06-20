@@ -874,7 +874,7 @@ class cmd_describe(Command):
 
 
 class cmd_merge(Command):
-    def run(self, args) -> None:
+    def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument("commit", type=str, help="Commit to merge")
         parser.add_argument(
@@ -902,7 +902,7 @@ class cmd_merge(Command):
                 print(
                     "\nAutomatic merge failed; fix conflicts and then commit the result."
                 )
-                sys.exit(1)
+                return 1
             elif merge_commit_id is None and not args.no_commit:
                 print("Already up to date.")
             elif args.no_commit:
@@ -911,9 +911,72 @@ class cmd_merge(Command):
                 print(
                     f"Merge successful. Created merge commit {merge_commit_id.decode()}"
                 )
+            return None
         except porcelain.Error as e:
             print(f"Error: {e}")
-            sys.exit(1)
+            return 1
+
+
+class cmd_merge_tree(Command):
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Perform a tree-level merge without touching the working directory"
+        )
+        parser.add_argument(
+            "base_tree",
+            nargs="?",
+            help="The common ancestor tree (optional, defaults to empty tree)",
+        )
+        parser.add_argument("our_tree", help="Our side of the merge")
+        parser.add_argument("their_tree", help="Their side of the merge")
+        parser.add_argument(
+            "-z",
+            "--name-only",
+            action="store_true",
+            help="Output only conflict paths, null-terminated",
+        )
+        args = parser.parse_args(args)
+
+        try:
+            # Determine base tree - if only two args provided, base is None
+            if args.base_tree is None:
+                # Only two arguments provided
+                base_tree = None
+                our_tree = args.our_tree
+                their_tree = args.their_tree
+            else:
+                # Three arguments provided
+                base_tree = args.base_tree
+                our_tree = args.our_tree
+                their_tree = args.their_tree
+
+            merged_tree_id, conflicts = porcelain.merge_tree(
+                ".", base_tree, our_tree, their_tree
+            )
+
+            if args.name_only:
+                # Output only conflict paths, null-terminated
+                for conflict_path in conflicts:
+                    sys.stdout.buffer.write(conflict_path)
+                    sys.stdout.buffer.write(b"\0")
+            else:
+                # Output the merged tree SHA
+                print(merged_tree_id.decode("ascii"))
+
+                # Output conflict information
+                if conflicts:
+                    print(f"\nConflicts in {len(conflicts)} file(s):")
+                    for conflict_path in conflicts:
+                        print(f"  {conflict_path.decode()}")
+
+            return None
+
+        except porcelain.Error as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        except KeyError as e:
+            print(f"Error: Object not found: {e}", file=sys.stderr)
+            return 1
 
 
 class cmd_help(Command):
@@ -969,6 +1032,7 @@ commands = {
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "merge": cmd_merge,
+    "merge-tree": cmd_merge_tree,
     "pack-objects": cmd_pack_objects,
     "pack-refs": cmd_pack_refs,
     "pull": cmd_pull,

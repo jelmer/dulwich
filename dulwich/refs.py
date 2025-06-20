@@ -1000,7 +1000,7 @@ class DiskRefsContainer(RefsContainer):
         """Read a reference file and return its contents.
 
         If the reference file a symbolic reference, only read the first line of
-        the file. Otherwise, only read the first 40 bytes.
+        the file. Otherwise, read the hash (40 bytes for SHA1, 64 bytes for SHA256).
 
         Args:
           name: the refname to read, relative to refpath
@@ -1018,8 +1018,10 @@ class DiskRefsContainer(RefsContainer):
                     # Read only the first line
                     return header + next(iter(f)).rstrip(b"\r\n")
                 else:
-                    # Read only the first 40 bytes
-                    return header + f.read(40 - len(SYMREF))
+                    # Read the entire line to get the full hash (handles both SHA1 and SHA256)
+                    f.seek(0)
+                    line = f.readline().rstrip(b"\r\n")
+                    return line
         except (OSError, UnicodeError):
             # don't assume anything specific about the error; in
             # particular, invalid or forbidden paths can raise weird

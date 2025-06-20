@@ -30,8 +30,9 @@ pyo3::import_exception!(dulwich.errors, ApplyDeltaError);
 fn py_is_sha(sha: &Py<PyAny>, py: Python) -> PyResult<bool> {
     // Check if the object is a bytes object
     if sha.bind(py).is_instance_of::<PyBytes>() {
-        // Check if the bytes object has a size of 20
-        if sha.extract::<&[u8]>(py)?.len() == 20 {
+        // Check if the bytes object has a size of 20 (SHA1) or 32 (SHA256)
+        let len = sha.extract::<&[u8]>(py)?.len();
+        if len == 20 || len == 32 {
             Ok(true)
         } else {
             Ok(false)
@@ -53,9 +54,11 @@ fn bisect_find_sha(
     let sha = sha.as_bytes(py);
     let sha_len = sha.len();
 
-    // Check if sha is 20 bytes long
-    if sha_len != 20 {
-        return Err(PyValueError::new_err("Sha is not 20 bytes long"));
+    // Check if sha is 20 bytes (SHA1) or 32 bytes (SHA256)
+    if sha_len != 20 && sha_len != 32 {
+        return Err(PyValueError::new_err(
+            "Sha must be 20 (SHA1) or 32 (SHA256) bytes long",
+        ));
     }
 
     // Check if start > end

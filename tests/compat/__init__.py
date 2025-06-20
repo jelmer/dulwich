@@ -33,6 +33,8 @@ def test_suite():
         "porcelain",
         "repository",
         "server",
+        "sha256",
+        "sha256_packs",
         "utils",
         "web",
     ]

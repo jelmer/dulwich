@@ -385,6 +385,7 @@ class BaseRepo:
 
         self._graftpoints: dict[bytes, list[bytes]] = {}
         self.hooks: dict[str, Hook] = {}
+        self._hash_algorithm = None  # Cached hash algorithm
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
@@ -402,7 +403,11 @@ class BaseRepo:
         return sys.platform != "win32"
 
     def _init_files(
-        self, bare: bool, symlinks: Optional[bool] = None, format: Optional[int] = None
+        self,
+        bare: bool,
+        symlinks: Optional[bool] = None,
+        format: Optional[int] = None,
+        object_format: Optional[str] = None,
     ) -> None:
         """Initialize a default set of named files."""
         from .config import ConfigFile
@@ -410,11 +415,30 @@ class BaseRepo:
         self._put_named_file("description", b"Unnamed repository")
         f = BytesIO()
         cf = ConfigFile()
-        if format is None:
-            format = 0
+
+        # Determine the appropriate format version
+        if object_format == "sha256":
+            # SHA256 requires format version 1
+            if format is None:
+                format = 1
+            elif format != 1:
+                raise ValueError(
+                    "SHA256 object format requires repository format version 1"
+                )
+        else:
+            # SHA1 (default) can use format 0 or 1
+            if format is None:
+                format = 0
+
         if format not in (0, 1):
             raise ValueError(f"Unsupported repository format version: {format}")
+
         cf.set("core", "repositoryformatversion", str(format))
+
+        # Set object format extension if using SHA256
+        if object_format == "sha256":
+            cf.set("extensions", "objectformat", "sha256")
+
         if self._determine_file_mode():
             cf.set("core", "filemode", True)
         else:
@@ -431,6 +455,19 @@ class BaseRepo:
         cf.write_to_file(f)
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")
+
+        # Allow subclasses to handle config initialization
+        self._init_config(cf)
+
+    def _init_config(self, config: "ConfigFile") -> None:
+        """Initialize repository configuration.
+
+        This method can be overridden by subclasses to handle config initialization.
+
+        Args:
+            config: The ConfigFile object that was just created
+        """
+        # Default implementation does nothing
 
     def get_named_file(self, path: str) -> Optional[BinaryIO]:
         """Get a file from the control dir with a specific name.
@@ -716,6 +753,42 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_config)
 
+    def get_hash_algorithm(self):
+        """Get the hash algorithm used by this repository.
+
+        Returns: HashAlgorithm instance (SHA1 or SHA256)
+        """
+        if self._hash_algorithm is None:
+            from .hash import get_hash_algorithm
+
+            # Check if repository uses SHA256
+            try:
+                config = self.get_config()
+                try:
+                    version = int(config.get(("core",), "repositoryformatversion"))
+                except KeyError:
+                    version = 0  # Default version is 0
+
+                if version == 1:
+                    # Check for SHA256 extension
+                    try:
+                        object_format = config.get(("extensions",), "objectformat")
+                        if object_format == b"sha256":
+                            self._hash_algorithm = get_hash_algorithm("sha256")
+                        else:
+                            self._hash_algorithm = get_hash_algorithm("sha1")
+                    except KeyError:
+                        # No objectformat extension, default to SHA1
+                        self._hash_algorithm = get_hash_algorithm("sha1")
+                else:
+                    # Version 0 always uses SHA1
+                    self._hash_algorithm = get_hash_algorithm("sha1")
+            except (KeyError, ValueError):
+                # If we can't read config, default to SHA1
+                self._hash_algorithm = get_hash_algorithm("sha1")
+
+        return self._hash_algorithm
+
     def get_worktree_config(self) -> "ConfigFile":
         """Retrieve the worktree config object."""
         raise NotImplementedError(self.get_worktree_config)
@@ -846,7 +919,7 @@ class BaseRepo:
         """
         if not isinstance(name, bytes):
             raise TypeError(f"'name' must be bytestring, not {type(name).__name__:.80}")
-        if len(name) in (20, 40):
+        if len(name) in (20, 32, 40, 64):  # Support both SHA1 and SHA256
             try:
                 return self.object_store[name]
             except (KeyError, ValueError):
@@ -1216,7 +1289,7 @@ class Repo(BaseRepo):
             raise UnsupportedVersion(format_version)
 
         for extension, _value in config.items((b"extensions",)):
-            if extension.lower() not in (b"worktreeconfig",):
+            if extension.lower() not in (b"worktreeconfig", b"objectformat"):
                 raise UnsupportedExtension(extension)
 
         if object_store is None:
@@ -1747,6 +1820,7 @@ class Repo(BaseRepo):
         default_branch=None,
         symlinks: Optional[bool] = None,
         format: Optional[int] = None,
+        object_format: Optional[str] = None,
     ):
         path = os.fspath(path)
         if isinstance(path, bytes):
@@ -1757,7 +1831,15 @@ class Repo(BaseRepo):
         for d in BASE_DIRECTORIES:
             os.mkdir(os.path.join(controldir, *d))
         if object_store is None:
-            object_store = DiskObjectStore.init(os.path.join(controldir, OBJECTDIR))
+            # Get hash algorithm for object store
+            from .hash import get_hash_algorithm
+
+            hash_alg = get_hash_algorithm(
+                "sha256" if object_format == "sha256" else "sha1"
+            )
+            object_store = DiskObjectStore.init(
+                os.path.join(controldir, OBJECTDIR), hash_algorithm=hash_alg
+            )
         ret = cls(path, bare=bare, object_store=object_store)
         if default_branch is None:
             if config is None:
@@ -1769,7 +1851,9 @@ class Repo(BaseRepo):
             except KeyError:
                 default_branch = DEFAULT_BRANCH
         ret.refs.set_symbolic_ref(b"HEAD", LOCAL_BRANCH_PREFIX + default_branch)
-        ret._init_files(bare=bare, symlinks=symlinks, format=format)
+        ret._init_files(
+            bare=bare, symlinks=symlinks, format=format, object_format=object_format
+        )
         return ret
 
     @classmethod
@@ -1782,6 +1866,7 @@ class Repo(BaseRepo):
         default_branch=None,
         symlinks: Optional[bool] = None,
         format: Optional[int] = None,
+        object_format: Optional[str] = None,
     ) -> "Repo":
         """Create a new repository.
 
@@ -1789,6 +1874,7 @@ class Repo(BaseRepo):
           path: Path in which to create the repository
           mkdir: Whether to create the directory
           format: Repository format version (defaults to 0)
+          object_format: Object format to use ("sha1" or "sha256", defaults to "sha1")
         Returns: `Repo` instance
         """
         path = os.fspath(path)
@@ -1807,6 +1893,7 @@ class Repo(BaseRepo):
             default_branch=default_branch,
             symlinks=symlinks,
             format=format,
+            object_format=object_format,
         )
 
     @classmethod
@@ -1866,6 +1953,7 @@ class Repo(BaseRepo):
         config=None,
         default_branch=None,
         format: Optional[int] = None,
+        object_format: Optional[str] = None,
     ):
         """Create a new bare repository.
 
@@ -1874,6 +1962,7 @@ class Repo(BaseRepo):
         Args:
           path: Path to create bare repository in
           format: Repository format version (defaults to 0)
+          object_format: Object format to use ("sha1" or "sha256", defaults to "sha1")
         Returns: a `Repo` instance
         """
         path = os.fspath(path)
@@ -1889,6 +1978,7 @@ class Repo(BaseRepo):
             config=config,
             default_branch=default_branch,
             format=format,
+            object_format=object_format,
         )
 
     create = init_bare
@@ -2067,6 +2157,10 @@ class MemoryRepo(BaseRepo):
         """
         raise NoIndexPresent
 
+    def _init_config(self, config: "ConfigFile") -> None:
+        """Initialize repository configuration for MemoryRepo."""
+        self._config = config
+
     def get_config(self):
         """Retrieve the config object.
 
@@ -2075,7 +2169,13 @@ class MemoryRepo(BaseRepo):
         return self._config
 
     @classmethod
-    def init_bare(cls, objects, refs, format: Optional[int] = None):
+    def init_bare(
+        cls,
+        objects,
+        refs,
+        format: Optional[int] = None,
+        object_format: Optional[str] = None,
+    ):
         """Create a new bare repository in memory.
 
         Args:
@@ -2084,11 +2184,12 @@ class MemoryRepo(BaseRepo):
           refs: Refs as dictionary, mapping names
             to object SHA1s
           format: Repository format version (defaults to 0)
+          object_format: Object format to use ("sha1" or "sha256", defaults to "sha1")
         """
         ret = cls()
         for obj in objects:
             ret.object_store.add_object(obj)
         for refname, sha in refs.items():
             ret.refs.add_if_new(refname, sha)
-        ret._init_files(bare=True, format=format)
+        ret._init_files(bare=True, format=format, object_format=object_format)
         return ret

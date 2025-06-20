@@ -106,7 +106,7 @@ def make_object(cls, **attrs):
         if name == "id":
             # id property is read-only, so we overwrite sha instead.
             sha = FixedSha(value)
-            obj.sha = lambda: sha
+            obj.sha = lambda hash_algorithm=None: sha
         else:
             setattr(obj, name, value)
     return obj

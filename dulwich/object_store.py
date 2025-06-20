@@ -592,10 +592,10 @@ class PackBasedObjectStore(BaseObjectStore):
         """
         if name == ZERO_SHA:
             raise KeyError(name)
-        if len(name) == 40:
+        if len(name) in (40, 64):  # Support both SHA1 (40) and SHA256 (64) hex
             sha = hex_to_sha(name)
             hexsha = name
-        elif len(name) == 20:
+        elif len(name) in (20, 32):  # Support both SHA1 (20) and SHA256 (32) binary
             sha = name
             hexsha = None
         else:
@@ -755,6 +755,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path: Union[str, os.PathLike],
         loose_compression_level=-1,
         pack_compression_level=-1,
+        hash_algorithm=None,
     ) -> None:
         """Open an object store.
 
@@ -762,6 +763,7 @@ class DiskObjectStore(PackBasedObjectStore):
           path: Path of the object store.
           loose_compression_level: zlib compression level for loose objects
           pack_compression_level: zlib compression level for pack objects
+          hash_algorithm: Hash algorithm to use (SHA1 or SHA256)
         """
         super().__init__(pack_compression_level=pack_compression_level)
         self.path = path
@@ -769,6 +771,11 @@ class DiskObjectStore(PackBasedObjectStore):
         self._alternates = None
         self.loose_compression_level = loose_compression_level
         self.pack_compression_level = pack_compression_level
+
+        # Import here to avoid circular dependency
+        from .hash import get_hash_algorithm
+
+        self.hash_algorithm = hash_algorithm if hash_algorithm else get_hash_algorithm()
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -796,7 +803,28 @@ class DiskObjectStore(PackBasedObjectStore):
             )
         except KeyError:
             pack_compression_level = default_compression_level
-        return cls(path, loose_compression_level, pack_compression_level)
+
+        # Get hash algorithm from config
+        from .hash import get_hash_algorithm
+
+        hash_algorithm = None
+        try:
+            try:
+                version = int(config.get((b"core",), b"repositoryformatversion"))
+            except KeyError:
+                version = 0
+            if version == 1:
+                try:
+                    object_format = config.get((b"extensions",), b"objectformat")
+                except KeyError:
+                    object_format = b"sha1"
+                hash_algorithm = get_hash_algorithm(object_format.decode("ascii"))
+        except (KeyError, ValueError):
+            pass
+
+        return cls(
+            path, loose_compression_level, pack_compression_level, hash_algorithm
+        )
 
     @property
     def alternates(self):
@@ -864,7 +892,9 @@ class DiskObjectStore(PackBasedObjectStore):
         new_packs = []
         for f in pack_files:
             if f not in self._pack_cache:
-                pack = Pack(os.path.join(self.pack_dir, f))
+                pack = Pack(
+                    os.path.join(self.pack_dir, f), hash_algorithm=self.hash_algorithm
+                )
                 new_packs.append(pack)
                 self._pack_cache[f] = pack
         # Remove disappeared pack files
@@ -889,7 +919,9 @@ class DiskObjectStore(PackBasedObjectStore):
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
         try:
-            return ShaFile.from_path(path)
+            # Load the object from path with SHA for hash algorithm detection
+            # sha parameter here is already hex, so pass it directly
+            return ShaFile.from_path(path, sha)
         except FileNotFoundError:
             return None
 
@@ -968,7 +1000,7 @@ class DiskObjectStore(PackBasedObjectStore):
             write_pack_index(index_file, entries, pack_sha)
 
         # Add the pack to the store and return it.
-        final_pack = Pack(pack_base_name)
+        final_pack = Pack(pack_base_name, hash_algorithm=self.hash_algorithm)
         final_pack.check_length_and_checksum()
         self._add_cached_pack(pack_base_name, final_pack)
         return final_pack
@@ -1036,7 +1068,9 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           obj: Object to add
         """
-        path = self._get_shafile_path(obj.id)
+        # Use the correct hash algorithm for the object ID
+        obj_id = obj.get_id(self.hash_algorithm)
+        path = self._get_shafile_path(obj_id)
         dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
@@ -1050,14 +1084,14 @@ class DiskObjectStore(PackBasedObjectStore):
             )
 
     @classmethod
-    def init(cls, path: Union[str, os.PathLike]):
+    def init(cls, path: Union[str, os.PathLike], hash_algorithm=None):
         try:
             os.mkdir(path)
         except FileExistsError:
             pass
         os.mkdir(os.path.join(path, "info"))
         os.mkdir(os.path.join(path, PACKDIR))
-        return cls(path)
+        return cls(path, hash_algorithm=hash_algorithm)
 
     def iter_prefix(self, prefix):
         if len(prefix) < 2:

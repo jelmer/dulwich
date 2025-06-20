@@ -79,6 +79,7 @@ import sys
 import time
 from collections import namedtuple
 from contextlib import closing, contextmanager
+from dataclasses import dataclass
 from io import BytesIO, RawIOBase
 from pathlib import Path
 from typing import Optional, Union
@@ -145,6 +146,25 @@ from .sparse_patterns import (
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
+
+
+@dataclass
+class CountObjectsResult:
+    """Result of counting objects in a repository.
+
+    Attributes:
+      count: Number of loose objects
+      size: Total size of loose objects in bytes
+      in_pack: Number of objects in pack files
+      packs: Number of pack files
+      size_pack: Total size of pack files in bytes
+    """
+
+    count: int
+    size: int
+    in_pack: Optional[int] = None
+    packs: Optional[int] = None
+    size_pack: Optional[int] = None
 
 
 class NoneStream(RawIOBase):
@@ -2922,4 +2942,69 @@ def gc(
             grace_period=grace_period,
             dry_run=dry_run,
             progress=progress,
+        )
+
+
+def count_objects(repo=".", verbose=False) -> CountObjectsResult:
+    """Count unpacked objects and their disk usage.
+
+    Args:
+      repo: Path to repository or repository object
+      verbose: Whether to return verbose information
+
+    Returns:
+      CountObjectsResult object with detailed statistics
+    """
+    with open_repo_closing(repo) as r:
+        object_store = r.object_store
+
+        # Count loose objects
+        loose_count = 0
+        loose_size = 0
+        for sha in object_store._iter_loose_objects():
+            loose_count += 1
+            path = object_store._get_shafile_path(sha)
+            try:
+                stat_info = os.stat(path)
+                # Git uses disk usage, not file size. st_blocks is always in
+                # 512-byte blocks per POSIX standard
+                if hasattr(stat_info, "st_blocks"):
+                    # Available on Linux and macOS
+                    loose_size += stat_info.st_blocks * 512  # type: ignore
+                else:
+                    # Fallback for Windows
+                    loose_size += stat_info.st_size
+            except FileNotFoundError:
+                # Object may have been removed between iteration and stat
+                pass
+
+        if not verbose:
+            return CountObjectsResult(count=loose_count, size=loose_size)
+
+        # Count pack information
+        pack_count = len(object_store.packs)
+        in_pack_count = 0
+        pack_size = 0
+
+        for pack in object_store.packs:
+            in_pack_count += len(pack)
+            # Get pack file size
+            pack_path = pack._data_path
+            try:
+                pack_size += os.path.getsize(pack_path)
+            except FileNotFoundError:
+                pass
+            # Get index file size
+            idx_path = pack._idx_path
+            try:
+                pack_size += os.path.getsize(idx_path)
+            except FileNotFoundError:
+                pass
+
+        return CountObjectsResult(
+            count=loose_count,
+            size=loose_size,
+            in_pack=in_pack_count,
+            packs=pack_count,
+            size_pack=pack_size,
         )

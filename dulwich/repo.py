@@ -515,6 +515,7 @@ class BaseRepo:
 
         self._graftpoints: dict[ObjectID, list[ObjectID]] = {}
         self.hooks: dict[str, Hook] = {}
+        self._hash_algorithm = None  # Cached hash algorithm
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
@@ -537,6 +538,7 @@ class BaseRepo:
         symlinks: bool | None = None,
         format: int | None = None,
         shared_repository: str | bool | None = None,
+        object_format: str | None = None,
     ) -> None:
         """Initialize a default set of named files."""
         from .config import ConfigFile
@@ -544,11 +546,30 @@ class BaseRepo:
         self._put_named_file("description", b"Unnamed repository")
         f = BytesIO()
         cf = ConfigFile()
-        if format is None:
-            format = 0
+
+        # Determine the appropriate format version
+        if object_format == "sha256":
+            # SHA256 requires format version 1
+            if format is None:
+                format = 1
+            elif format != 1:
+                raise ValueError(
+                    "SHA256 object format requires repository format version 1"
+                )
+        else:
+            # SHA1 (default) can use format 0 or 1
+            if format is None:
+                format = 0
+
         if format not in (0, 1):
             raise ValueError(f"Unsupported repository format version: {format}")
+
         cf.set("core", "repositoryformatversion", str(format))
+
+        # Set object format extension if using SHA256
+        if object_format == "sha256":
+            cf.set("extensions", "objectformat", "sha256")
+
         if self._determine_file_mode():
             cf.set("core", "filemode", True)
         else:
@@ -573,6 +594,19 @@ class BaseRepo:
         cf.write_to_file(f)
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")
+
+        # Allow subclasses to handle config initialization
+        self._init_config(cf)
+
+    def _init_config(self, config: "ConfigFile") -> None:
+        """Initialize repository configuration.
+
+        This method can be overridden by subclasses to handle config initialization.
+
+        Args:
+            config: The ConfigFile object that was just created
+        """
+        # Default implementation does nothing
 
     def get_named_file(self, path: str) -> BinaryIO | None:
         """Get a file from the control dir with a specific name.
@@ -912,6 +946,42 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_config)
 
+    def get_hash_algorithm(self):
+        """Get the hash algorithm used by this repository.
+
+        Returns: HashAlgorithm instance (SHA1 or SHA256)
+        """
+        if self._hash_algorithm is None:
+            from .hash import get_hash_algorithm
+
+            # Check if repository uses SHA256
+            try:
+                config = self.get_config()
+                try:
+                    version = int(config.get(("core",), "repositoryformatversion"))
+                except KeyError:
+                    version = 0  # Default version is 0
+
+                if version == 1:
+                    # Check for SHA256 extension
+                    try:
+                        object_format = config.get(("extensions",), "objectformat")
+                        if object_format == b"sha256":
+                            self._hash_algorithm = get_hash_algorithm("sha256")
+                        else:
+                            self._hash_algorithm = get_hash_algorithm("sha1")
+                    except KeyError:
+                        # No objectformat extension, default to SHA1
+                        self._hash_algorithm = get_hash_algorithm("sha1")
+                else:
+                    # Version 0 always uses SHA1
+                    self._hash_algorithm = get_hash_algorithm("sha1")
+            except (KeyError, ValueError):
+                # If we can't read config, default to SHA1
+                self._hash_algorithm = get_hash_algorithm("sha1")
+
+        return self._hash_algorithm
+
     def get_worktree_config(self) -> "ConfigFile":
         """Retrieve the worktree config object."""
         raise NotImplementedError(self.get_worktree_config)
@@ -1103,7 +1173,7 @@ class BaseRepo:
         """
         if not isinstance(name, bytes):
             raise TypeError(f"'name' must be bytestring, not {type(name).__name__:.80}")
-        if len(name) in (20, 40):
+        if len(name) in (20, 32, 40, 64):  # Support both SHA1 and SHA256
             try:
                 # Try as ObjectID/RawObjectID
                 return self.object_store[
@@ -1424,7 +1494,7 @@ class Repo(BaseRepo):
                     has_reftable_extension = True
                 else:
                     raise UnsupportedExtension(f"refStorage = {value.decode()}")
-            elif extension.lower() not in (b"worktreeconfig",):
+            elif extension.lower() not in (b"worktreeconfig", b"objectformat"):
                 raise UnsupportedExtension(extension.decode("utf-8"))
 
         if object_store is None:
@@ -2055,6 +2125,7 @@ class Repo(BaseRepo):
         symlinks: bool | None = None,
         format: int | None = None,
         shared_repository: str | bool | None = None,
+        object_format: str | None = None,
     ) -> "Repo":
         path = os.fspath(path)
         if isinstance(path, bytes):
@@ -2077,10 +2148,17 @@ class Repo(BaseRepo):
                 os.chmod(dir_path, dir_mode)
 
         if object_store is None:
+            # Get hash algorithm for object store
+            from .hash import get_hash_algorithm
+
+            hash_alg = get_hash_algorithm(
+                "sha256" if object_format == "sha256" else "sha1"
+            )
             object_store = DiskObjectStore.init(
                 os.path.join(controldir, OBJECTDIR),
                 file_mode=file_mode,
                 dir_mode=dir_mode,
+                hash_algorithm=hash_alg,
             )
         ret = cls(path, bare=bare, object_store=object_store)
         if default_branch is None:
@@ -2098,6 +2176,7 @@ class Repo(BaseRepo):
             symlinks=symlinks,
             format=format,
             shared_repository=shared_repository,
+            object_format=object_format,
         )
         return ret
 
@@ -2112,6 +2191,7 @@ class Repo(BaseRepo):
         symlinks: bool | None = None,
         format: int | None = None,
         shared_repository: str | bool | None = None,
+        object_format: str | None = None,
     ) -> "Repo":
         """Create a new repository.
 
@@ -2123,6 +2203,7 @@ class Repo(BaseRepo):
           symlinks: Whether to support symlinks
           format: Repository format version (defaults to 0)
           shared_repository: Shared repository setting (group, all, umask, or octal)
+          object_format: Object format to use ("sha1" or "sha256", defaults to "sha1")
         Returns: `Repo` instance
         """
         path = os.fspath(path)
@@ -2142,6 +2223,7 @@ class Repo(BaseRepo):
             symlinks=symlinks,
             format=format,
             shared_repository=shared_repository,
+            object_format=object_format,
         )
 
     @classmethod
@@ -2213,6 +2295,7 @@ class Repo(BaseRepo):
         default_branch: bytes | None = None,
         format: int | None = None,
         shared_repository: str | bool | None = None,
+        object_format: str | None = None,
     ) -> "Repo":
         """Create a new bare repository.
 
@@ -2226,6 +2309,7 @@ class Repo(BaseRepo):
           default_branch: Default branch name
           format: Repository format version (defaults to 0)
           shared_repository: Shared repository setting (group, all, umask, or octal)
+          object_format: Object format to use ("sha1" or "sha256", defaults to "sha1")
         Returns: a `Repo` instance
         """
         path = os.fspath(path)
@@ -2242,6 +2326,7 @@ class Repo(BaseRepo):
             default_branch=default_branch,
             format=format,
             shared_repository=shared_repository,
+            object_format=object_format,
         )
 
     create = init_bare
@@ -2551,6 +2636,10 @@ class MemoryRepo(BaseRepo):
         """
         raise NoIndexPresent
 
+    def _init_config(self, config: "ConfigFile") -> None:
+        """Initialize repository configuration for MemoryRepo."""
+        self._config = config
+
     def get_config(self) -> "ConfigFile":
         """Retrieve the config object.
 
@@ -2739,6 +2828,7 @@ class MemoryRepo(BaseRepo):
         objects: Iterable[ShaFile],
         refs: Mapping[Ref, ObjectID],
         format: int | None = None,
+        object_format: str | None = None,
     ) -> "MemoryRepo":
         """Create a new bare repository in memory.
 
@@ -2748,11 +2838,12 @@ class MemoryRepo(BaseRepo):
           refs: Refs as dictionary, mapping names
             to object SHA1s
           format: Repository format version (defaults to 0)
+          object_format: Object format to use ("sha1" or "sha256", defaults to "sha1")
         """
         ret = cls()
         for obj in objects:
             ret.object_store.add_object(obj)
         for refname, sha in refs.items():
             ret.refs.add_if_new(refname, sha)
-        ret._init_files(bare=True, format=format)
+        ret._init_files(bare=True, format=format, object_format=object_format)
         return ret

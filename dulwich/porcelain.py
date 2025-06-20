@@ -3010,3 +3010,82 @@ def count_objects(repo=".", verbose=False) -> CountObjectsResult:
             packs=pack_count,
             size_pack=pack_size,
         )
+
+
+def rebase(
+    repo: Union[Repo, str],
+    upstream: Union[bytes, str],
+    onto: Optional[Union[bytes, str]] = None,
+    branch: Optional[Union[bytes, str]] = None,
+    abort: bool = False,
+    continue_rebase: bool = False,
+    skip: bool = False,
+) -> list[bytes]:
+    """Rebase commits onto another branch.
+
+    Args:
+      repo: Repository to rebase in
+      upstream: Upstream branch/commit to rebase onto
+      onto: Specific commit to rebase onto (defaults to upstream)
+      branch: Branch to rebase (defaults to current branch)
+      abort: Abort an in-progress rebase
+      continue_rebase: Continue an in-progress rebase
+      skip: Skip current commit and continue rebase
+
+    Returns:
+      List of new commit SHAs created by rebase
+
+    Raises:
+      Error: If rebase fails or conflicts occur
+    """
+    from .rebase import RebaseConflict, RebaseError, Rebaser
+
+    with open_repo_closing(repo) as r:
+        rebaser = Rebaser(r)
+
+        if abort:
+            try:
+                rebaser.abort_rebase()
+                return []
+            except RebaseError as e:
+                raise Error(str(e))
+
+        if continue_rebase:
+            try:
+                result = rebaser.continue_rebase()
+                if result is None:
+                    # Rebase complete
+                    return []
+                elif isinstance(result, tuple) and result[1]:
+                    # Still have conflicts
+                    raise Error(
+                        f"Conflicts in: {', '.join(f.decode('utf-8', 'replace') for f in result[1])}"
+                    )
+            except RebaseError as e:
+                raise Error(str(e))
+
+        # Convert string refs to bytes
+        if isinstance(upstream, str):
+            upstream = upstream.encode("utf-8")
+        if isinstance(onto, str):
+            onto = onto.encode("utf-8") if onto else None
+        if isinstance(branch, str):
+            branch = branch.encode("utf-8") if branch else None
+
+        try:
+            # Start rebase
+            rebaser.start_rebase(upstream, onto, branch)
+
+            # Continue rebase automatically
+            result = rebaser.continue_rebase()
+            if result is not None:
+                # Conflicts
+                raise RebaseConflict(result[1])
+
+            # Return the SHAs of the rebased commits
+            return [c.id for c in rebaser._done]
+
+        except RebaseConflict as e:
+            raise Error(str(e))
+        except RebaseError as e:
+            raise Error(str(e))

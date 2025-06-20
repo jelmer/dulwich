@@ -1044,6 +1044,102 @@ class cmd_merge_tree(Command):
             return 1
 
 
+class cmd_gc(Command):
+    def run(self, args) -> Optional[int]:
+        import datetime
+        import time
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--auto",
+            action="store_true",
+            help="Only run gc if needed",
+        )
+        parser.add_argument(
+            "--aggressive",
+            action="store_true",
+            help="Use more aggressive settings",
+        )
+        parser.add_argument(
+            "--no-prune",
+            action="store_true",
+            help="Do not prune unreachable objects",
+        )
+        parser.add_argument(
+            "--prune",
+            nargs="?",
+            const="now",
+            help="Prune unreachable objects older than date (default: 2 weeks ago)",
+        )
+        parser.add_argument(
+            "--dry-run",
+            "-n",
+            action="store_true",
+            help="Only report what would be done",
+        )
+        parser.add_argument(
+            "--quiet",
+            "-q",
+            action="store_true",
+            help="Only report errors",
+        )
+        args = parser.parse_args(args)
+
+        # Parse prune grace period
+        grace_period = None
+        if args.prune:
+            try:
+                grace_period = parse_relative_time(args.prune)
+            except ValueError:
+                # Try to parse as absolute date
+                try:
+                    date = datetime.datetime.strptime(args.prune, "%Y-%m-%d")
+                    grace_period = int(time.time() - date.timestamp())
+                except ValueError:
+                    print(f"Error: Invalid prune date: {args.prune}")
+                    return 1
+        elif not args.no_prune:
+            # Default to 2 weeks
+            grace_period = 1209600
+
+        # Progress callback
+        def progress(msg):
+            if not args.quiet:
+                print(msg)
+
+        try:
+            stats = porcelain.gc(
+                ".",
+                auto=args.auto,
+                aggressive=args.aggressive,
+                prune=not args.no_prune,
+                grace_period=grace_period,
+                dry_run=args.dry_run,
+                progress=progress if not args.quiet else None,
+            )
+
+            # Report results
+            if not args.quiet:
+                if args.dry_run:
+                    print("\nDry run results:")
+                else:
+                    print("\nGarbage collection complete:")
+
+                if stats.pruned_objects:
+                    print(f"  Pruned {len(stats.pruned_objects)} unreachable objects")
+                    print(f"  Freed {format_bytes(stats.bytes_freed)}")
+
+                if stats.packs_before != stats.packs_after:
+                    print(
+                        f"  Reduced pack files from {stats.packs_before} to {stats.packs_after}"
+                    )
+
+        except porcelain.Error as e:
+            print(f"Error: {e}")
+            return 1
+        return None
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1090,6 +1186,7 @@ commands = {
     "fetch": cmd_fetch,
     "for-each-ref": cmd_for_each_ref,
     "fsck": cmd_fsck,
+    "gc": cmd_gc,
     "help": cmd_help,
     "init": cmd_init,
     "log": cmd_log,

@@ -77,7 +77,9 @@ class ParseRelativeTimeTestCase(TestCase):
         """Test parsing weeks."""
         self.assertEqual(604800, parse_relative_time("1 week ago"))
         self.assertEqual(1209600, parse_relative_time("2 weeks ago"))
-        self.assertEqual(36288000, parse_relative_time("60 weeks ago"))  # 60 * 7 * 24 * 60 * 60
+        self.assertEqual(
+            36288000, parse_relative_time("60 weeks ago")
+        )  # 60 * 7 * 24 * 60 * 60
 
     def test_invalid_format(self):
         """Test invalid time formats."""
@@ -109,8 +111,18 @@ class ParseRelativeTimeTestCase(TestCase):
 
     def test_singular_plural(self):
         """Test that both singular and plural forms work."""
-        self.assertEqual(parse_relative_time("1 second ago"), parse_relative_time("1 seconds ago"))
-        self.assertEqual(parse_relative_time("1 minute ago"), parse_relative_time("1 minutes ago"))
-        self.assertEqual(parse_relative_time("1 hour ago"), parse_relative_time("1 hours ago"))
-        self.assertEqual(parse_relative_time("1 day ago"), parse_relative_time("1 days ago"))
-        self.assertEqual(parse_relative_time("1 week ago"), parse_relative_time("1 weeks ago"))
+        self.assertEqual(
+            parse_relative_time("1 second ago"), parse_relative_time("1 seconds ago")
+        )
+        self.assertEqual(
+            parse_relative_time("1 minute ago"), parse_relative_time("1 minutes ago")
+        )
+        self.assertEqual(
+            parse_relative_time("1 hour ago"), parse_relative_time("1 hours ago")
+        )
+        self.assertEqual(
+            parse_relative_time("1 day ago"), parse_relative_time("1 days ago")
+        )
+        self.assertEqual(
+            parse_relative_time("1 week ago"), parse_relative_time("1 weeks ago")
+        )

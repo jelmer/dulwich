@@ -21,6 +21,9 @@
 """Parsing of gitignore files.
 
 For details for the matching rules, see https://git-scm.com/docs/gitignore
+
+Important: When checking if directories are ignored, include a trailing slash in the path.
+For example, use "dir/" instead of "dir" to check if a directory is ignored.
 """
 
 import os.path
@@ -360,6 +363,12 @@ class Pattern:
 
 
 class IgnoreFilter:
+    """Filter to apply gitignore patterns.
+
+    Important: When checking if directories are ignored, include a trailing slash.
+    For example, use is_ignored("dir/") instead of is_ignored("dir").
+    """
+
     def __init__(
         self, patterns: Iterable[bytes], ignorecase: bool = False, path=None
     ) -> None:
@@ -477,7 +486,11 @@ def default_user_ignore_filter_path(config: Config) -> str:
 
 
 class IgnoreFilterManager:
-    """Ignore file manager with Git-compliant behavior."""
+    """Ignore file manager with Git-compliant behavior.
+
+    Important: When checking if directories are ignored, include a trailing slash.
+    For example, use is_ignored("dir/") instead of is_ignored("dir").
+    """
 
     def __init__(
         self,

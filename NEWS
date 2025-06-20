@@ -13,6 +13,11 @@
    directory or creating commits, similar to ``git merge-tree``. It outputs
    the merged tree SHA and lists any conflicted paths. (Jelmer Vernooĳ)
 
+ * Add ``porcelain.count_objects()`` function to count unpacked objects and
+   their disk usage. Returns a tuple of (count, size) for simple usage or
+   a ``CountObjectsResult`` dataclass with detailed statistics when
+   ``verbose=True``. (Jelmer Vernooĳ)
+
  * Add support for pack index format version 3. This format supports variable
    hash sizes to enable future SHA-256 support. The implementation includes
    reading and writing v3 indexes with proper hash algorithm identification

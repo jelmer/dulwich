@@ -91,6 +91,9 @@ DEFAULT_PACK_DELTA_WINDOW_SIZE = 10
 # Keep pack files under 16Mb in memory, otherwise write them out to disk
 PACK_SPOOL_FILE_MAX_SIZE = 16 * 1024 * 1024
 
+# Default pack index version to use when none is specified
+DEFAULT_PACK_INDEX_VERSION = 2
+
 
 OldUnpackedObject = Union[tuple[Union[bytes, int], list[bytes]], list[bytes]]
 ResolveExtRefFn = Callable[[bytes], tuple[int, OldUnpackedObject]]
@@ -1960,7 +1963,7 @@ def write_pack(
         )
     entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + ".idx", "wb") as f:
-        return data_sum, write_pack_index_v2(f, entries, data_sum)
+        return data_sum, write_pack_index(f, entries, data_sum)
 
 
 def pack_header_chunks(num_objects):
@@ -2672,7 +2675,32 @@ def write_pack_index_v3(
     return f.write_sha()
 
 
-write_pack_index = write_pack_index_v2
+def write_pack_index(
+    index_filename, entries, pack_checksum, progress=None, version=None
+):
+    """Write a pack index file.
+
+    Args:
+      index_filename: Index filename.
+      entries: List of (checksum, offset, crc32) tuples
+      pack_checksum: Checksum of the pack file.
+      progress: Progress function (not currently used)
+      version: Pack index version to use (1, 2, or 3). If None, defaults to DEFAULT_PACK_INDEX_VERSION.
+
+    Returns:
+      SHA of the written index file
+    """
+    if version is None:
+        version = DEFAULT_PACK_INDEX_VERSION
+
+    if version == 1:
+        return write_pack_index_v1(index_filename, entries, pack_checksum)
+    elif version == 2:
+        return write_pack_index_v2(index_filename, entries, pack_checksum)
+    elif version == 3:
+        return write_pack_index_v3(index_filename, entries, pack_checksum)
+    else:
+        raise ValueError(f"Unsupported pack index version: {version}")
 
 
 class Pack:

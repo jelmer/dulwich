@@ -1,5 +1,7 @@
 0.23.1	UNRELEASED
 
+ * Add basic support for managing Notes. (Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

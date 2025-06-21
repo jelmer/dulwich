@@ -126,6 +126,7 @@ from .patch import write_tree_diff
 from .protocol import ZERO_SHA, Protocol
 from .refs import (
     LOCAL_BRANCH_PREFIX,
+    LOCAL_NOTES_PREFIX,
     LOCAL_TAG_PREFIX,
     Ref,
     _import_remote_refs,
@@ -1236,6 +1237,136 @@ def tag_delete(repo, name) -> None:
             raise Error(f"Unexpected tag name type {name!r}")
         for name in names:
             del r.refs[_make_tag_ref(name)]
+
+
+def _make_notes_ref(name: bytes) -> bytes:
+    """Make a notes ref name."""
+    if name.startswith(b"refs/notes/"):
+        return name
+    return LOCAL_NOTES_PREFIX + name
+
+
+def notes_add(
+    repo, object_sha, note, ref=b"commits", author=None, committer=None, message=None
+):
+    """Add or update a note for an object.
+
+    Args:
+      repo: Path to repository
+      object_sha: SHA of the object to annotate
+      note: Note content
+      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
+      author: Author identity (defaults to committer)
+      committer: Committer identity (defaults to config)
+      message: Commit message for the notes update
+
+    Returns:
+      SHA of the new notes commit
+    """
+    with open_repo_closing(repo) as r:
+        # Parse the object to get its SHA
+        obj = parse_object(r, object_sha)
+        object_sha = obj.id
+
+        if isinstance(note, str):
+            note = note.encode(DEFAULT_ENCODING)
+        if isinstance(ref, str):
+            ref = ref.encode(DEFAULT_ENCODING)
+
+        notes_ref = _make_notes_ref(ref)
+        config = r.get_config_stack()
+
+        return r.notes.set_note(
+            object_sha,
+            note,
+            notes_ref,
+            author=author,
+            committer=committer,
+            message=message,
+            config=config,
+        )
+
+
+def notes_remove(
+    repo, object_sha, ref=b"commits", author=None, committer=None, message=None
+):
+    """Remove a note for an object.
+
+    Args:
+      repo: Path to repository
+      object_sha: SHA of the object to remove notes from
+      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
+      author: Author identity (defaults to committer)
+      committer: Committer identity (defaults to config)
+      message: Commit message for the notes removal
+
+    Returns:
+      SHA of the new notes commit, or None if no note existed
+    """
+    with open_repo_closing(repo) as r:
+        # Parse the object to get its SHA
+        obj = parse_object(r, object_sha)
+        object_sha = obj.id
+
+        if isinstance(ref, str):
+            ref = ref.encode(DEFAULT_ENCODING)
+
+        notes_ref = _make_notes_ref(ref)
+        config = r.get_config_stack()
+
+        return r.notes.remove_note(
+            object_sha,
+            notes_ref,
+            author=author,
+            committer=committer,
+            message=message,
+            config=config,
+        )
+
+
+def notes_show(repo, object_sha, ref=b"commits"):
+    """Show the note for an object.
+
+    Args:
+      repo: Path to repository
+      object_sha: SHA of the object
+      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
+
+    Returns:
+      Note content as bytes, or None if no note exists
+    """
+    with open_repo_closing(repo) as r:
+        # Parse the object to get its SHA
+        obj = parse_object(r, object_sha)
+        object_sha = obj.id
+
+        if isinstance(ref, str):
+            ref = ref.encode(DEFAULT_ENCODING)
+
+        notes_ref = _make_notes_ref(ref)
+        config = r.get_config_stack()
+
+        return r.notes.get_note(object_sha, notes_ref, config=config)
+
+
+def notes_list(repo, ref=b"commits"):
+    """List all notes in a notes ref.
+
+    Args:
+      repo: Path to repository
+      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
+
+    Returns:
+      List of tuples of (object_sha, note_content)
+    """
+    with open_repo_closing(repo) as r:
+        if isinstance(ref, str):
+            ref = ref.encode(DEFAULT_ENCODING)
+
+        notes_ref = _make_notes_ref(ref)
+        config = r.get_config_stack()
+
+        return r.notes.list_notes(notes_ref, config=config)
 
 
 def reset(repo, mode, treeish="HEAD") -> None:

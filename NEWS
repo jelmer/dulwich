@@ -1,4 +1,6 @@
-0.22.9	UNRELEASED
+0.23.0	UNRELEASED
+
+ * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)
 
  * Add ``gc`` command to ``dulwich.porcelain.`` (Jelmer Vernooĳ, #92)
 

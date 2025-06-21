@@ -3016,7 +3016,7 @@ def merge_tree(repo, base_tree, our_tree, their_tree):
       their_tree: Tree-ish of their side of the merge
 
     Returns:
-      Tuple of (merged_tree_id, conflicts) where:
+      tuple: A tuple of (merged_tree_id, conflicts) where:
         - merged_tree_id is the SHA-1 of the merged tree
         - conflicts is a list of paths (as bytes) that had conflicts
 
@@ -3054,7 +3054,7 @@ def cherry_pick(
       repo: Repository to cherry-pick into
       committish: Commit to cherry-pick
       no_commit: If True, do not create a commit after applying changes
-      continue_: Continue an in-progress cherry-pick after resolving conflicts
+      continue\\_: Continue an in-progress cherry-pick after resolving conflicts
       abort: Abort an in-progress cherry-pick
 
     Returns:

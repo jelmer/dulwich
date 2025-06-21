@@ -3048,7 +3048,7 @@ def cherry_pick(
     continue_=False,
     abort=False,
 ):
-    """Cherry-pick a commit onto the current branch.
+    r"""Cherry-pick a commit onto the current branch.
 
     Args:
       repo: Repository to cherry-pick into

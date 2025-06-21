@@ -40,6 +40,7 @@ SYMREF = b"ref: "
 LOCAL_BRANCH_PREFIX = b"refs/heads/"
 LOCAL_TAG_PREFIX = b"refs/tags/"
 LOCAL_REMOTE_PREFIX = b"refs/remotes/"
+LOCAL_NOTES_PREFIX = b"refs/notes/"
 BAD_REF_CHARS = set(b"\177 ~^:?*[")
 PEELED_TAG_SUFFIX = b"^{}"
 

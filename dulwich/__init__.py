@@ -23,7 +23,7 @@
 
 """Python implementation of the Git file formats and protocols."""
 
-__version__ = (0, 22, 9)
+__version__ = (0, 23, 0)
 
 __all__ = ["replace_me"]
 

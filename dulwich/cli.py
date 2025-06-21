@@ -982,6 +982,75 @@ class cmd_merge(Command):
             return 1
 
 
+class cmd_notes_add(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("object", help="Object to annotate")
+        parser.add_argument("-m", "--message", help="Note message", required=True)
+        parser.add_argument(
+            "--ref", default="commits", help="Notes ref (default: commits)"
+        )
+        args = parser.parse_args(args)
+
+        porcelain.notes_add(".", args.object, args.message, ref=args.ref)
+
+
+class cmd_notes_show(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("object", help="Object to show notes for")
+        parser.add_argument(
+            "--ref", default="commits", help="Notes ref (default: commits)"
+        )
+        args = parser.parse_args(args)
+
+        note = porcelain.notes_show(".", args.object, ref=args.ref)
+        if note:
+            sys.stdout.buffer.write(note)
+        else:
+            print(f"No notes found for object {args.object}")
+
+
+class cmd_notes_remove(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("object", help="Object to remove notes from")
+        parser.add_argument(
+            "--ref", default="commits", help="Notes ref (default: commits)"
+        )
+        args = parser.parse_args(args)
+
+        result = porcelain.notes_remove(".", args.object, ref=args.ref)
+        if result:
+            print(f"Removed notes for object {args.object}")
+        else:
+            print(f"No notes found for object {args.object}")
+
+
+class cmd_notes_list(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--ref", default="commits", help="Notes ref (default: commits)"
+        )
+        args = parser.parse_args(args)
+
+        notes = porcelain.notes_list(".", ref=args.ref)
+        for object_sha, note_content in notes:
+            print(f"{object_sha.hex()}")
+
+
+class cmd_notes(SuperCommand):
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "add": cmd_notes_add,
+        "show": cmd_notes_show,
+        "remove": cmd_notes_remove,
+        "list": cmd_notes_list,
+    }
+
+    default_command = cmd_notes_list
+
+
 class cmd_merge_tree(Command):
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser(
@@ -1293,6 +1362,7 @@ commands = {
     "ls-tree": cmd_ls_tree,
     "merge": cmd_merge,
     "merge-tree": cmd_merge_tree,
+    "notes": cmd_notes,
     "pack-objects": cmd_pack_objects,
     "pack-refs": cmd_pack_refs,
     "pull": cmd_pull,

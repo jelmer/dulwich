@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     # these imports.
     from .config import ConfigFile, StackedConfig
     from .index import Index
+    from .notes import Notes
 
 from .errors import (
     CommitError,
@@ -803,6 +804,17 @@ class BaseRepo:
         if cached is not None:
             return cached
         return peel_sha(self.object_store, self.refs[ref])[1].id
+
+    @property
+    def notes(self) -> "Notes":
+        """Access notes functionality for this repository.
+
+        Returns:
+            Notes object for accessing notes
+        """
+        from .notes import Notes
+
+        return Notes(self.object_store, self.refs)
 
     def get_walker(self, include: Optional[list[bytes]] = None, *args, **kwargs):
         """Obtain a walker for this repository.

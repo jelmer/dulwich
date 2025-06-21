@@ -1,4 +1,4 @@
-0.23.0	UNRELEASED
+0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)
 

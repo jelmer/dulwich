@@ -3515,3 +3515,26 @@ def rebase(
             raise Error(str(e))
         except RebaseError as e:
             raise Error(str(e))
+
+
+def annotate(repo, path, committish=None):
+    """Annotate the history of a file.
+
+    :param repo: Path to the repository
+    :param path: Path to annotate
+    :param committish: Commit id to find path in
+    :return: List of ((Commit, TreeChange), line) tuples
+    """
+    if committish is None:
+        committish = "HEAD"
+    from dulwich.annotate import annotate_lines
+
+    with open_repo_closing(repo) as r:
+        commit_id = parse_commit(r, committish).id
+        # Ensure path is bytes
+        if isinstance(path, str):
+            path = path.encode()
+        return annotate_lines(r.object_store, commit_id, path)
+
+
+blame = annotate

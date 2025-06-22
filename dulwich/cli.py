@@ -171,6 +171,28 @@ class cmd_add(Command):
         porcelain.add(".", paths=paths)
 
 
+class cmd_annotate(Command):
+    def run(self, argv) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("path", help="Path to file to annotate")
+        parser.add_argument("committish", nargs="?", help="Commit to start from")
+        args = parser.parse_args(argv)
+
+        from dulwich import porcelain
+
+        results = porcelain.annotate(".", args.path, args.committish)
+        for (commit, entry), line in results:
+            # Show shortened commit hash and line content
+            commit_hash = commit.id[:8]
+            print(f"{commit_hash.decode()} {line.decode()}")
+
+
+class cmd_blame(Command):
+    def run(self, argv) -> None:
+        # blame is an alias for annotate
+        cmd_annotate().run(argv)
+
+
 class cmd_rm(Command):
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
@@ -1423,7 +1445,9 @@ For a list of supported commands, see 'dulwich help -a'.
 
 commands = {
     "add": cmd_add,
+    "annotate": cmd_annotate,
     "archive": cmd_archive,
+    "blame": cmd_blame,
     "branch": cmd_branch,
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,

@@ -2700,7 +2700,32 @@ class AbstractHttpGitClient(GitClient):
         if not wants:
             return FetchPackResult(refs, symrefs, agent)
         if self.dumb:
-            raise NotImplementedError(self.fetch_pack)
+            # Use dumb HTTP protocol
+            from .dumb import DumbRemoteRepo
+
+            dumb_repo = DumbRemoteRepo(url, self._http_request)
+
+            # Fetch pack data from dumb remote
+            pack_data_list = list(
+                dumb_repo.fetch_pack_data(
+                    graph_walker, lambda refs: wants, progress=progress, depth=depth
+                )
+            )
+
+            # Write pack data
+            if pack_data:
+                from .pack import pack_objects_to_data
+
+                # Convert unpacked objects to ShaFile objects for packing
+                objects = []
+                for unpacked in pack_data_list:
+                    objects.append(unpacked.sha_file())
+
+                # Generate pack data
+                pack_bytes = pack_objects_to_data(objects)
+                pack_data(pack_bytes)
+
+            return FetchPackResult(refs, symrefs, agent)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (new_shallow, new_unshallow) = _handle_upload_pack_head(

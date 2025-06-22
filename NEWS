@@ -13,6 +13,12 @@
  * Add annotate support as well as ``annotate`` and ``blame``
    commands.  (#245, Jelmer Vernooĳ)
 
+ * Fix ``apply_delta`` to raise ``ApplyDeltaError`` instead of ``AssertionError``
+   when the source buffer size doesn't match the delta header. This issue only
+   affected the pure Python implementation when the Rust extension was not
+   available. The Rust implementation already raised the correct exception.
+   (#1606, Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

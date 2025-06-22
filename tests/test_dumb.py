@@ -25,9 +25,9 @@ import zlib
 from unittest import TestCase
 from unittest.mock import Mock
 
-from dulwich.dumb import DumbHTTPObjectStore, DumbRemoteRepo
+from dulwich.dumb import DumbHTTPObjectStore, DumbRemoteHTTPRepo
 from dulwich.errors import NotGitRepository
-from dulwich.objects import Blob, Commit, Tag, Tree, hex_to_sha, sha_to_hex
+from dulwich.objects import Blob, Commit, Tag, Tree, sha_to_hex
 
 
 class MockResponse:
@@ -56,7 +56,22 @@ class DumbHTTPObjectStoreTests(TestCase):
             resp = MockResponse(
                 resp_data.get("status", 200), resp_data.get("content", b"")
             )
-            return resp, lambda size: resp.content
+            # Create a mock read function that behaves like urllib3's read
+            content = resp.content
+            offset = [0]  # Use list to make it mutable in closure
+
+            def read_func(size=None):
+                if offset[0] >= len(content):
+                    return b""
+                if size is None:
+                    result = content[offset[0] :]
+                    offset[0] = len(content)
+                else:
+                    result = content[offset[0] : offset[0] + size]
+                    offset[0] += size
+                return result
+
+            return resp, read_func
         else:
             resp = MockResponse(404)
             return resp, lambda size: b""
@@ -83,21 +98,20 @@ class DumbHTTPObjectStoreTests(TestCase):
         # Create a blob object
         blob = Blob()
         blob.data = b"Hello, world!"
-        sha = blob.sha().digest()
-        hex_sha = sha_to_hex(sha)
+        hex_sha = blob.id
 
         # Add mock response
-        path = f"objects/{hex_sha[:2]}/{hex_sha[2:]}"
+        path = f"objects/{hex_sha[:2].decode('ascii')}/{hex_sha[2:].decode('ascii')}"
         self._add_response(path, self._make_object(blob))
 
         # Fetch the object
-        type_num, content = self.store._fetch_loose_object(sha)
+        type_num, content = self.store._fetch_loose_object(blob.id)
         self.assertEqual(Blob.type_num, type_num)
         self.assertEqual(b"Hello, world!", content)
 
     def test_fetch_loose_object_not_found(self):
-        sha = b"1" * 20
-        self.assertRaises(KeyError, self.store._fetch_loose_object, sha)
+        hex_sha = b"1" * 40
+        self.assertRaises(KeyError, self.store._fetch_loose_object, hex_sha)
 
     def test_fetch_loose_object_invalid_format(self):
         sha = b"1" * 20
@@ -130,7 +144,7 @@ P pack-abcdef1234567890abcdef1234567890abcdef12.pack
         )
 
     def test_get_raw_from_cache(self):
-        sha = b"1" * 20
+        sha = b"1" * 40
         self.store._cached_objects[sha] = (Blob.type_num, b"cached content")
 
         type_num, content = self.store.get_raw(sha)
@@ -141,15 +155,14 @@ P pack-abcdef1234567890abcdef1234567890abcdef12.pack
         # Create a blob object
         blob = Blob()
         blob.data = b"Test blob"
-        sha = blob.sha().digest()
-        hex_sha = sha_to_hex(sha)
+        hex_sha = blob.id
 
         # Add mock response
-        path = f"objects/{hex_sha[:2]}/{hex_sha[2:]}"
+        path = f"objects/{hex_sha[:2].decode('ascii')}/{hex_sha[2:].decode('ascii')}"
         self._add_response(path, self._make_object(blob))
 
-        self.assertTrue(self.store.contains_loose(sha))
-        self.assertFalse(self.store.contains_loose(b"0" * 20))
+        self.assertTrue(self.store.contains_loose(hex_sha))
+        self.assertFalse(self.store.contains_loose(b"0" * 40))
 
     def test_add_object_not_implemented(self):
         blob = Blob()
@@ -160,13 +173,13 @@ P pack-abcdef1234567890abcdef1234567890abcdef12.pack
         self.assertRaises(NotImplementedError, self.store.add_objects, [])
 
 
-class DumbRemoteRepoTests(TestCase):
-    """Tests for DumbRemoteRepo."""
+class DumbRemoteHTTPRepoTests(TestCase):
+    """Tests for DumbRemoteHTTPRepo."""
 
     def setUp(self):
         self.base_url = "https://example.com/repo.git/"
         self.responses = {}
-        self.repo = DumbRemoteRepo(self.base_url, self._mock_http_request)
+        self.repo = DumbRemoteHTTPRepo(self.base_url, self._mock_http_request)
 
     def _mock_http_request(self, url, headers):
         """Mock HTTP request function."""
@@ -175,7 +188,22 @@ class DumbRemoteRepoTests(TestCase):
             resp = MockResponse(
                 resp_data.get("status", 200), resp_data.get("content", b"")
             )
-            return resp, lambda size: resp.content[:size] if size else resp.content
+            # Create a mock read function that behaves like urllib3's read
+            content = resp.content
+            offset = [0]  # Use list to make it mutable in closure
+
+            def read_func(size=None):
+                if offset[0] >= len(content):
+                    return b""
+                if size is None:
+                    result = content[offset[0] :]
+                    offset[0] = len(content)
+                else:
+                    result = content[offset[0] : offset[0] + size]
+                    offset[0] += size
+                return result
+
+            return resp, read_func
         else:
             resp = MockResponse(404)
             return resp, lambda size: b""
@@ -195,15 +223,15 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         refs = self.repo.get_refs()
         self.assertEqual(3, len(refs))
         self.assertEqual(
-            hex_to_sha(b"0123456789abcdef0123456789abcdef01234567"),
+            b"0123456789abcdef0123456789abcdef01234567",
             refs[b"refs/heads/master"],
         )
         self.assertEqual(
-            hex_to_sha(b"abcdef0123456789abcdef0123456789abcdef01"),
+            b"abcdef0123456789abcdef0123456789abcdef01",
             refs[b"refs/heads/develop"],
         )
         self.assertEqual(
-            hex_to_sha(b"fedcba9876543210fedcba9876543210fedcba98"),
+            b"fedcba9876543210fedcba9876543210fedcba98",
             refs[b"refs/tags/v1.0"],
         )
 
@@ -216,9 +244,7 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
 
         # For dumb HTTP, peeled just returns the ref value
         peeled = self.repo.get_peeled(b"refs/heads/master")
-        self.assertEqual(
-            hex_to_sha(b"0123456789abcdef0123456789abcdef01234567"), peeled
-        )
+        self.assertEqual(b"0123456789abcdef0123456789abcdef01234567", peeled)
 
     def test_fetch_pack_data_no_wants(self):
         refs_content = b"0123456789abcdef0123456789abcdef01234567\trefs/heads/master\n"
@@ -240,7 +266,7 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         # Create a simple blob object
         blob = Blob()
         blob.data = b"Test content"
-        blob_sha = blob.sha().digest()
+        blob_sha = blob.id
         # Add blob response
         self.repo._object_store._cached_objects[blob_sha] = (
             Blob.type_num,
@@ -257,7 +283,7 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         result = list(self.repo.fetch_pack_data(graph_walker, determine_wants))
         self.assertEqual(1, len(result))
         self.assertEqual(Blob.type_num, result[0].pack_type_num)
-        self.assertEqual(blob.as_raw_string(), result[0].obj)
+        self.assertEqual([blob.as_raw_string()], result[0].obj_chunks)
 
     def test_object_store_property(self):
         self.assertIsInstance(self.repo.object_store, DumbHTTPObjectStore)

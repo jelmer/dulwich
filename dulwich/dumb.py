@@ -23,24 +23,24 @@
 
 import os
 import tempfile
+import zlib
 from collections.abc import Iterator
 from io import BytesIO
 from typing import Optional
 from urllib.parse import urljoin
-import zlib
 
 from .errors import NotGitRepository, ObjectFormatException
 from .object_store import BaseObjectStore
 from .objects import (
     ZERO_SHA,
-    ObjectID,
-    ShaFile,
-    hex_to_sha,
-    sha_to_hex,
     Blob,
     Commit,
+    ObjectID,
+    ShaFile,
     Tag,
     Tree,
+    hex_to_sha,
+    sha_to_hex,
 )
 from .pack import Pack, PackIndex, UnpackedObject, load_pack_index_file
 from .refs import Ref, read_info_refs, split_peeled_refs
@@ -56,7 +56,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         Args:
           base_url: Base URL of the remote repository (e.g. "https://example.com/repo.git/")
           http_request_func: Function to make HTTP requests, should accept (url, headers)
-                           and return (response, read_func)
+                           and return (response, read_func).
         """
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
@@ -102,14 +102,15 @@ class DumbHTTPObjectStore(BaseObjectStore):
         """Fetch a loose object by SHA.
 
         Args:
-          sha: SHA1 of the object
+          sha: SHA1 of the object (hex string as bytes)
+
         Returns:
           Tuple of (type_num, content)
 
         Raises:
           KeyError: If object not found
         """
-        hex_sha = sha_to_hex(sha).decode("ascii")
+        hex_sha = sha.decode("ascii")
         path = f"objects/{hex_sha[:2]}/{hex_sha[2:]}"
 
         try:
@@ -199,7 +200,8 @@ class DumbHTTPObjectStore(BaseObjectStore):
         """Try to fetch an object from pack files.
 
         Args:
-          sha: SHA1 of the object
+          sha: SHA1 of the object (hex string as bytes)
+
         Returns:
           Tuple of (type_num, content)
 
@@ -207,6 +209,8 @@ class DumbHTTPObjectStore(BaseObjectStore):
           KeyError: If object not found in any pack
         """
         self._load_packs()
+        # Convert hex to binary for pack operations
+        binsha = hex_to_sha(sha)
 
         for pack_name, idx in self._packs or []:
             if idx is None:
@@ -214,7 +218,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
             try:
                 # Check if object is in this pack
-                idx.object_offset(sha)
+                idx.object_offset(binsha)
             except KeyError:
                 continue
 
@@ -235,7 +239,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
             # Open the pack and get the object
             pack = Pack(pack_path[:-5])  # Remove .pack extension
             try:
-                return pack.get_raw(sha)
+                return pack.get_raw(binsha)
             finally:
                 pack.close()
 
@@ -312,7 +316,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
             for sha in idx:
                 if sha not in seen:
                     seen.add(sha)
-                    yield sha
+                    yield sha_to_hex(sha)
 
     @property
     def packs(self):
@@ -338,15 +342,15 @@ class DumbHTTPObjectStore(BaseObjectStore):
             shutil.rmtree(self._temp_pack_dir, ignore_errors=True)
 
 
-class DumbRemoteRepo(BaseRepo):
+class DumbRemoteHTTPRepo(BaseRepo):
     """Repository implementation for dumb HTTP remotes."""
 
     def __init__(self, base_url: str, http_request_func):
-        """Initialize a DumbRemoteRepo.
+        """Initialize a DumbRemoteHTTPRepo.
 
         Args:
           base_url: Base URL of the remote repository
-          http_request_func: Function to make HTTP requests
+          http_request_func: Function to make HTTP requests.
         """
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
@@ -389,11 +393,8 @@ class DumbRemoteRepo(BaseRepo):
                 raise NotGitRepository(f"Cannot read refs from {self.base_url}")
 
             refs_hex = read_info_refs(BytesIO(refs_data))
-            # Convert hex SHAs to binary
-            refs = {}
-            for ref, hex_sha in refs_hex.items():
-                refs[ref] = hex_to_sha(hex_sha)
-            self._refs, self._peeled = split_peeled_refs(refs)
+            # Keep SHAs as hex
+            self._refs, self._peeled = split_peeled_refs(refs_hex)
 
         return dict(self._refs)
 
@@ -420,7 +421,6 @@ class DumbRemoteRepo(BaseRepo):
         Returns:
           Iterator of UnpackedObject instances
         """
-
         refs = self.get_refs()
         wants = determine_wants(refs)
 
@@ -444,29 +444,24 @@ class DumbRemoteRepo(BaseRepo):
                 continue
 
             # Fetch the object
-            try:
-                type_num, content = self._object_store.get_raw(sha)
-                unpacked = UnpackedObject(type_num, sha=sha)
-                unpacked.obj_type_num = type_num
-                unpacked.obj_chunks = [content]
-                yield unpacked
+            type_num, content = self._object_store.get_raw(sha)
+            unpacked = UnpackedObject(type_num, sha=sha)
+            unpacked.obj_type_num = type_num
+            unpacked.obj_chunks = [content]
+            yield unpacked
 
-                # If it's a commit or tag, we need to fetch its references
-                obj = ShaFile.from_raw_string(type_num, content)
+            # If it's a commit or tag, we need to fetch its references
+            obj = ShaFile.from_raw_string(type_num, content)
 
-                if hasattr(obj, "tree"):  # Commit
-                    to_fetch.add(obj.tree)
-                    for parent in obj.parents:
-                        to_fetch.add(parent)
-                elif hasattr(obj, "object"):  # Tag
-                    to_fetch.add(obj.object[1])
-                elif hasattr(obj, "items"):  # Tree
-                    for _, _, item_sha in obj.items():
-                        to_fetch.add(item_sha)
-
-            except KeyError:
-                # Object not found, skip it
-                pass
+            if isinstance(obj, Commit):  # Commit
+                to_fetch.add(obj.tree)
+                for parent in obj.parents:
+                    to_fetch.add(parent)
+            elif isinstance(obj, Tag):  # Tag
+                to_fetch.add(obj.object[1])
+            elif isinstance(obj, Tree):  # Tree
+                for _, _, item_sha in obj.items():
+                    to_fetch.add(item_sha)
 
             if progress:
                 progress(f"Fetching objects: {len(seen)} done")

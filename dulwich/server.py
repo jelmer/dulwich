@@ -67,7 +67,7 @@ from .errors import (
     ObjectFormatException,
     UnexpectedCommandError,
 )
-from .object_store import peel_sha
+from .object_store import find_shallow
 from .objects import Commit, ObjectID, valid_hexsha
 from .pack import ObjectContainer, PackedObjectContainer, write_pack_from_container
 from .protocol import (
@@ -459,47 +459,6 @@ def _split_proto_line(line, allowed):
     raise GitProtocolError(f"Received invalid line from client: {line!r}")
 
 
-def _find_shallow(store: ObjectContainer, heads, depth):
-    """Find shallow commits according to a given depth.
-
-    Args:
-      store: An ObjectStore for looking up objects.
-      heads: Iterable of head SHAs to start walking from.
-      depth: The depth of ancestors to include. A depth of one includes
-        only the heads themselves.
-    Returns: A tuple of (shallow, not_shallow), sets of SHAs that should be
-        considered shallow and unshallow according to the arguments. Note that
-        these sets may overlap if a commit is reachable along multiple paths.
-    """
-    parents: dict[bytes, list[bytes]] = {}
-
-    def get_parents(sha):
-        result = parents.get(sha, None)
-        if not result:
-            result = store[sha].parents
-            parents[sha] = result
-        return result
-
-    todo = []  # stack of (sha, depth)
-    for head_sha in heads:
-        _unpeeled, peeled = peel_sha(store, head_sha)
-        if isinstance(peeled, Commit):
-            todo.append((peeled.id, 1))
-
-    not_shallow = set()
-    shallow = set()
-    while todo:
-        sha, cur_depth = todo.pop()
-        if cur_depth < depth:
-            not_shallow.add(sha)
-            new_depth = cur_depth + 1
-            todo.extend((p, new_depth) for p in get_parents(sha))
-        else:
-            shallow.add(sha)
-
-    return shallow, not_shallow
-
-
 def _want_satisfied(store: ObjectContainer, haves, want, earliest) -> bool:
     o = store[want]
     pending = collections.deque([o])
@@ -719,7 +678,7 @@ class _ProtocolGraphWalker:
             self.client_shallow.add(val)
         self.read_proto_line((None,))  # consume client's flush-pkt
 
-        shallow, not_shallow = _find_shallow(self.store, wants, depth)
+        shallow, not_shallow = find_shallow(self.store, wants, depth)
 
         # Update self.shallow instead of reassigning it since we passed a
         # reference to it before this method was called.
@@ -727,6 +686,9 @@ class _ProtocolGraphWalker:
         new_shallow = self.shallow - self.client_shallow
         unshallow = self.unshallow = not_shallow & self.client_shallow
 
+        self.update_shallow(new_shallow, unshallow)
+
+    def update_shallow(self, new_shallow, unshallow):
         for sha in sorted(new_shallow):
             self.proto.write_pkt_line(format_shallow_line(sha))
         for sha in sorted(unshallow):

@@ -3016,7 +3016,7 @@ def merge_tree(repo, base_tree, our_tree, their_tree):
       their_tree: Tree-ish of their side of the merge
 
     Returns:
-      Tuple of (merged_tree_id, conflicts) where:
+      tuple: A tuple of (merged_tree_id, conflicts) where:
         - merged_tree_id is the SHA-1 of the merged tree
         - conflicts is a list of paths (as bytes) that had conflicts
 
@@ -3039,6 +3039,160 @@ def merge_tree(repo, base_tree, our_tree, their_tree):
         r.object_store.add_object(merged_tree)
 
         return merged_tree.id, conflicts
+
+
+def cherry_pick(
+    repo,
+    committish,
+    no_commit=False,
+    continue_=False,
+    abort=False,
+):
+    r"""Cherry-pick a commit onto the current branch.
+
+    Args:
+      repo: Repository to cherry-pick into
+      committish: Commit to cherry-pick
+      no_commit: If True, do not create a commit after applying changes
+      continue\\_: Continue an in-progress cherry-pick after resolving conflicts
+      abort: Abort an in-progress cherry-pick
+
+    Returns:
+      The SHA of the newly created commit, or None if no_commit=True or there were conflicts
+
+    Raises:
+      Error: If there is no HEAD reference, commit cannot be found, or operation fails
+    """
+    from .merge import three_way_merge
+
+    with open_repo_closing(repo) as r:
+        # Handle abort
+        if abort:
+            # Clean up any cherry-pick state
+            try:
+                os.remove(os.path.join(r.controldir(), "CHERRY_PICK_HEAD"))
+            except FileNotFoundError:
+                pass
+            try:
+                os.remove(os.path.join(r.controldir(), "MERGE_MSG"))
+            except FileNotFoundError:
+                pass
+            # Reset index to HEAD
+            r.reset_index(r[b"HEAD"].tree)
+            return None
+
+        # Handle continue
+        if continue_:
+            # Check if there's a cherry-pick in progress
+            cherry_pick_head_path = os.path.join(r.controldir(), "CHERRY_PICK_HEAD")
+            try:
+                with open(cherry_pick_head_path, "rb") as f:
+                    cherry_pick_commit_id = f.read().strip()
+                cherry_pick_commit = r[cherry_pick_commit_id]
+            except FileNotFoundError:
+                raise Error("No cherry-pick in progress")
+
+            # Check for unresolved conflicts
+            conflicts = list(r.open_index().conflicts())
+            if conflicts:
+                raise Error("Unresolved conflicts remain")
+
+            # Create the commit
+            tree_id = r.open_index().commit(r.object_store)
+
+            # Read saved message if any
+            merge_msg_path = os.path.join(r.controldir(), "MERGE_MSG")
+            try:
+                with open(merge_msg_path, "rb") as f:
+                    message = f.read()
+            except FileNotFoundError:
+                message = cherry_pick_commit.message
+
+            new_commit = r.do_commit(
+                message=message,
+                tree=tree_id,
+                author=cherry_pick_commit.author,
+                author_timestamp=cherry_pick_commit.author_time,
+                author_timezone=cherry_pick_commit.author_timezone,
+            )
+
+            # Clean up state files
+            try:
+                os.remove(cherry_pick_head_path)
+            except FileNotFoundError:
+                pass
+            try:
+                os.remove(merge_msg_path)
+            except FileNotFoundError:
+                pass
+
+            return new_commit
+
+        # Normal cherry-pick operation
+        # Get current HEAD
+        try:
+            head_commit = r[b"HEAD"]
+        except KeyError:
+            raise Error("No HEAD reference found")
+
+        # Parse the commit to cherry-pick
+        try:
+            cherry_pick_commit = parse_commit(r, committish)
+        except KeyError:
+            raise Error(f"Cannot find commit '{committish}'")
+
+        # Check if commit has parents
+        if not cherry_pick_commit.parents:
+            raise Error("Cannot cherry-pick root commit")
+
+        # Get parent of cherry-pick commit
+        parent_commit = r[cherry_pick_commit.parents[0]]
+
+        # Perform three-way merge
+        try:
+            merged_tree, conflicts = three_way_merge(
+                r.object_store, parent_commit, head_commit, cherry_pick_commit
+            )
+        except Exception as e:
+            raise Error(f"Cherry-pick failed: {e}")
+
+        # Add merged tree to object store
+        r.object_store.add_object(merged_tree)
+
+        # Update working tree and index
+        # Reset index to match merged tree
+        r.reset_index(merged_tree.id)
+
+        # Update working tree from the new index
+        update_working_tree(r, head_commit.tree, merged_tree.id)
+
+        if conflicts:
+            # Save state for later continuation
+            with open(os.path.join(r.controldir(), "CHERRY_PICK_HEAD"), "wb") as f:
+                f.write(cherry_pick_commit.id + b"\n")
+
+            # Save commit message
+            with open(os.path.join(r.controldir(), "MERGE_MSG"), "wb") as f:
+                f.write(cherry_pick_commit.message)
+
+            raise Error(
+                f"Conflicts in: {', '.join(c.decode('utf-8', 'replace') for c in conflicts)}\n"
+                f"Fix conflicts and run 'dulwich cherry-pick --continue'"
+            )
+
+        if no_commit:
+            return None
+
+        # Create the commit
+        new_commit = r.do_commit(
+            message=cherry_pick_commit.message,
+            tree=merged_tree.id,
+            author=cherry_pick_commit.author,
+            author_timestamp=cherry_pick_commit.author_time,
+            author_timezone=cherry_pick_commit.author_timezone,
+        )
+
+        return new_commit
 
 
 def gc(

@@ -524,6 +524,27 @@ class cmd_reset(Command):
             raise NotImplementedError("Mixed reset not yet implemented")
 
 
+class cmd_revert(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--no-commit",
+            "-n",
+            action="store_true",
+            help="Apply changes but don't create a commit",
+        )
+        parser.add_argument("-m", "--message", help="Custom commit message")
+        parser.add_argument("commits", nargs="+", help="Commits to revert")
+        args = parser.parse_args(args)
+
+        result = porcelain.revert(
+            ".", commits=args.commits, no_commit=args.no_commit, message=args.message
+        )
+
+        if result and not args.no_commit:
+            print(f"[{result.decode('ascii')[:7]}] Revert completed")
+
+
 class cmd_daemon(Command):
     def run(self, args) -> None:
         from dulwich import log_utils
@@ -1441,6 +1462,7 @@ commands = {
     "remote": cmd_remote,
     "repack": cmd_repack,
     "reset": cmd_reset,
+    "revert": cmd_revert,
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
     "show": cmd_show,

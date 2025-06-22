@@ -79,6 +79,7 @@ from .object_store import (
     MissingObjectFinder,
     ObjectStoreGraphWalker,
     PackBasedObjectStore,
+    find_shallow,
     peel_sha,
 )
 from .objects import (
@@ -468,7 +469,9 @@ class BaseRepo:
         """
         raise NotImplementedError(self.open_index)
 
-    def fetch(self, target, determine_wants=None, progress=None, depth=None):
+    def fetch(
+        self, target, determine_wants=None, progress=None, depth: Optional[int] = None
+    ):
         """Fetch objects into another repository.
 
         Args:
@@ -495,8 +498,9 @@ class BaseRepo:
         determine_wants,
         graph_walker,
         progress,
+        *,
         get_tagged=None,
-        depth=None,
+        depth: Optional[int] = None,
     ):
         """Fetch the pack data required for a set of revisions.
 
@@ -514,8 +518,10 @@ class BaseRepo:
         Returns: count and iterator over pack data
         """
         missing_objects = self.find_missing_objects(
-            determine_wants, graph_walker, progress, get_tagged, depth=depth
+            determine_wants, graph_walker, progress, get_tagged=get_tagged, depth=depth
         )
+        if missing_objects is None:
+            return 0, iter([])
         remote_has = missing_objects.get_remote_has()
         object_ids = list(missing_objects)
         return len(object_ids), generate_unpacked_objects(
@@ -527,8 +533,9 @@ class BaseRepo:
         determine_wants,
         graph_walker,
         progress,
+        *,
         get_tagged=None,
-        depth=None,
+        depth: Optional[int] = None,
     ) -> Optional[MissingObjectFinder]:
         """Fetch the missing objects required for a set of revisions.
 
@@ -545,25 +552,31 @@ class BaseRepo:
           depth: Shallow fetch depth
         Returns: iterator over objects, with __len__ implemented
         """
-        if depth not in (None, 0):
-            raise NotImplementedError("depth not supported yet")
-
         refs = serialize_refs(self.object_store, self.get_refs())
 
         wants = determine_wants(refs)
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
-        shallows: frozenset[ObjectID] = getattr(graph_walker, "shallow", frozenset())
-        unshallows: frozenset[ObjectID] = getattr(
-            graph_walker, "unshallow", frozenset()
-        )
+        current_shallow = set(getattr(graph_walker, "shallow", set()))
+
+        if depth not in (None, 0):
+            shallow, not_shallow = find_shallow(self.object_store, wants, depth)
+            # Only update if graph_walker has shallow attribute
+            if hasattr(graph_walker, "shallow"):
+                graph_walker.shallow.update(shallow - not_shallow)
+                new_shallow = graph_walker.shallow - current_shallow
+                unshallow = graph_walker.unshallow = not_shallow & current_shallow
+                if hasattr(graph_walker, "update_shallow"):
+                    graph_walker.update_shallow(new_shallow, unshallow)
+        else:
+            unshallow = getattr(graph_walker, "unshallow", frozenset())
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
             # this interface.
 
-            if shallows or unshallows:
+            if getattr(graph_walker, "shallow", set()) or unshallow:
                 # Do not send a pack in shallow short-circuit path
                 return None
 
@@ -586,12 +599,12 @@ class BaseRepo:
 
         # Deal with shallow requests separately because the haves do
         # not reflect what objects are missing
-        if shallows or unshallows:
+        if getattr(graph_walker, "shallow", set()) or unshallow:
             # TODO: filter the haves commits from iter_shas. the specific
             # commits aren't missing.
             haves = []
 
-        parents_provider = ParentsProvider(self.object_store, shallows=shallows)
+        parents_provider = ParentsProvider(self.object_store, shallows=current_shallow)
 
         def get_parents(commit):
             return parents_provider.get_parents(commit.id, commit)
@@ -600,7 +613,7 @@ class BaseRepo:
             self.object_store,
             haves=haves,
             wants=wants,
-            shallow=self.get_shallow(),
+            shallow=getattr(graph_walker, "shallow", set()),
             progress=progress,
             get_tagged=get_tagged,
             get_parents=get_parents,
@@ -649,7 +662,10 @@ class BaseRepo:
             ]
         parents_provider = ParentsProvider(self.object_store)
         return ObjectStoreGraphWalker(
-            heads, parents_provider.get_parents, shallow=self.get_shallow()
+            heads,
+            parents_provider.get_parents,
+            shallow=self.get_shallow(),
+            update_shallow=self.update_shallow,
         )
 
     def get_refs(self) -> dict[bytes, bytes]:
@@ -816,7 +832,7 @@ class BaseRepo:
 
         return Notes(self.object_store, self.refs)
 
-    def get_walker(self, include: Optional[list[bytes]] = None, *args, **kwargs):
+    def get_walker(self, include: Optional[list[bytes]] = None, **kwargs):
         """Obtain a walker for this repository.
 
         Args:
@@ -852,7 +868,7 @@ class BaseRepo:
 
         kwargs["get_parents"] = lambda commit: self.get_parents(commit.id, commit)
 
-        return Walker(self.object_store, include, *args, **kwargs)
+        return Walker(self.object_store, include, **kwargs)
 
     def __getitem__(self, name: Union[ObjectID, Ref]):
         """Retrieve a Git object by SHA1 or ref.
@@ -1576,7 +1592,7 @@ class Repo(BaseRepo):
         checkout=None,
         branch=None,
         progress=None,
-        depth=None,
+        depth: Optional[int] = None,
         symlinks=None,
     ) -> "Repo":
         """Clone this repository.

@@ -22,11 +22,14 @@
 """Tests for the object store interface."""
 
 from typing import TYPE_CHECKING, Any, Callable
+from unittest import TestCase
 from unittest.mock import patch
 
 from dulwich.index import commit_tree
 from dulwich.object_store import (
+    MemoryObjectStore,
     PackBasedObjectStore,
+    find_shallow,
     iter_tree_contents,
     peel_sha,
 )
@@ -37,7 +40,7 @@ from dulwich.objects import (
 )
 from dulwich.protocol import DEPTH_INFINITE
 
-from .utils import make_object, make_tag
+from .utils import make_commit, make_object, make_tag
 
 if TYPE_CHECKING:
     from dulwich.object_store import BaseObjectStore
@@ -395,3 +398,88 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         # Verify it's gone
         self.assertFalse(self.store.contains_loose(b1.id))
         self.assertNotIn(b1.id, self.store)
+
+
+class FindShallowTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        self._store = MemoryObjectStore()
+
+    def make_commit(self, **attrs):
+        commit = make_commit(**attrs)
+        self._store.add_object(commit)
+        return commit
+
+    def make_linear_commits(self, n, message=b""):
+        commits = []
+        parents = []
+        for _ in range(n):
+            commits.append(self.make_commit(parents=parents, message=message))
+            parents = [commits[-1].id]
+        return commits
+
+    def assertSameElements(self, expected, actual):
+        self.assertEqual(set(expected), set(actual))
+
+    def test_linear(self):
+        c1, c2, c3 = self.make_linear_commits(3)
+
+        self.assertEqual((set([c3.id]), set([])), find_shallow(self._store, [c3.id], 1))
+        self.assertEqual(
+            (set([c2.id]), set([c3.id])),
+            find_shallow(self._store, [c3.id], 2),
+        )
+        self.assertEqual(
+            (set([c1.id]), set([c2.id, c3.id])),
+            find_shallow(self._store, [c3.id], 3),
+        )
+        self.assertEqual(
+            (set([]), set([c1.id, c2.id, c3.id])),
+            find_shallow(self._store, [c3.id], 4),
+        )
+
+    def test_multiple_independent(self):
+        a = self.make_linear_commits(2, message=b"a")
+        b = self.make_linear_commits(2, message=b"b")
+        c = self.make_linear_commits(2, message=b"c")
+        heads = [a[1].id, b[1].id, c[1].id]
+
+        self.assertEqual(
+            (set([a[0].id, b[0].id, c[0].id]), set(heads)),
+            find_shallow(self._store, heads, 2),
+        )
+
+    def test_multiple_overlapping(self):
+        # Create the following commit tree:
+        # 1--2
+        #  \
+        #   3--4
+        c1, c2 = self.make_linear_commits(2)
+        c3 = self.make_commit(parents=[c1.id])
+        c4 = self.make_commit(parents=[c3.id])
+
+        # 1 is shallow along the path from 4, but not along the path from 2.
+        self.assertEqual(
+            (set([c1.id]), set([c1.id, c2.id, c3.id, c4.id])),
+            find_shallow(self._store, [c2.id, c4.id], 3),
+        )
+
+    def test_merge(self):
+        c1 = self.make_commit()
+        c2 = self.make_commit()
+        c3 = self.make_commit(parents=[c1.id, c2.id])
+
+        self.assertEqual(
+            (set([c1.id, c2.id]), set([c3.id])),
+            find_shallow(self._store, [c3.id], 2),
+        )
+
+    def test_tag(self):
+        c1, c2 = self.make_linear_commits(2)
+        tag = make_tag(c2, name=b"tag")
+        self._store.add_object(tag)
+
+        self.assertEqual(
+            (set([c1.id]), set([c2.id])),
+            find_shallow(self._store, [tag.id], 2),
+        )

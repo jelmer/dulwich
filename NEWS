@@ -4,6 +4,9 @@
 
  * Add basic ``cherry-pick`` subcommand.  (#1599, Jelmer Vernooĳ)
 
+ * Add ``revert`` command to ``dulwich.porcelain`` and CLI.
+   (#1599, Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

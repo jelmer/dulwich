@@ -2516,7 +2516,10 @@ def apply_delta(src_buf, delta):
 
     src_size, index = get_delta_header_size(delta, index)
     dest_size, index = get_delta_header_size(delta, index)
-    assert src_size == len(src_buf), f"{src_size} vs {len(src_buf)}"
+    if src_size != len(src_buf):
+        raise ApplyDeltaError(
+            f"Unexpected source buffer size: {src_size} vs {len(src_buf)}"
+        )
     while index < delta_length:
         cmd = ord(delta[index : index + 1])
         index += 1

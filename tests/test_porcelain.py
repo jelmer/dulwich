@@ -2202,6 +2202,174 @@ def _commit_file_with_content(repo, filename, content):
     return sha, file_path
 
 
+class RevertTests(PorcelainTestCase):
+    def test_revert_simple(self) -> None:
+        # Create initial commit
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("initial content\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Initial commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Make a change
+        with open(fullpath, "w") as f:
+            f.write("modified content\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        change_sha = porcelain.commit(
+            self.repo.path,
+            message=b"Change content",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Revert the change
+        revert_sha = porcelain.revert(self.repo.path, commits=[change_sha])
+
+        # Check the file content is back to initial
+        with open(fullpath) as f:
+            self.assertEqual("initial content\n", f.read())
+
+        # Check the revert commit message
+        revert_commit = self.repo[revert_sha]
+        self.assertIn(b'Revert "Change content"', revert_commit.message)
+        self.assertIn(change_sha[:7], revert_commit.message)
+
+    def test_revert_multiple(self) -> None:
+        # Create initial commit
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("line1\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Initial commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Add line2
+        with open(fullpath, "a") as f:
+            f.write("line2\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        commit1 = porcelain.commit(
+            self.repo.path,
+            message=b"Add line2",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Add line3
+        with open(fullpath, "a") as f:
+            f.write("line3\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        commit2 = porcelain.commit(
+            self.repo.path,
+            message=b"Add line3",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Revert both commits (in reverse order)
+        porcelain.revert(self.repo.path, commits=[commit2, commit1])
+
+        # Check file is back to initial state
+        with open(fullpath) as f:
+            self.assertEqual("line1\n", f.read())
+
+    def test_revert_no_commit(self) -> None:
+        # Create initial commit
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("initial\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Initial",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Make a change
+        with open(fullpath, "w") as f:
+            f.write("changed\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        change_sha = porcelain.commit(
+            self.repo.path,
+            message=b"Change",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Revert with no_commit
+        result = porcelain.revert(self.repo.path, commits=[change_sha], no_commit=True)
+
+        # Should return None
+        self.assertIsNone(result)
+
+        # File should be reverted
+        with open(fullpath) as f:
+            self.assertEqual("initial\n", f.read())
+
+        # HEAD should still point to the change commit
+        self.assertEqual(self.repo.refs[b"HEAD"], change_sha)
+
+    def test_revert_custom_message(self) -> None:
+        # Create commits
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("initial\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Initial",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        with open(fullpath, "w") as f:
+            f.write("changed\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        change_sha = porcelain.commit(
+            self.repo.path,
+            message=b"Change",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Revert with custom message
+        custom_msg = "Custom revert message"
+        revert_sha = porcelain.revert(
+            self.repo.path, commits=[change_sha], message=custom_msg
+        )
+
+        # Check the message
+        revert_commit = self.repo[revert_sha]
+        self.assertEqual(custom_msg.encode("utf-8"), revert_commit.message)
+
+    def test_revert_no_parent(self) -> None:
+        # Try to revert the initial commit (no parent)
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("content\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        initial_sha = porcelain.commit(
+            self.repo.path,
+            message=b"Initial",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Should raise an error
+        with self.assertRaises(porcelain.Error) as cm:
+            porcelain.revert(self.repo.path, commits=[initial_sha])
+        self.assertIn("no parents", str(cm.exception))
+
+
 class CheckoutTests(PorcelainTestCase):
     def setUp(self) -> None:
         super().setUp()

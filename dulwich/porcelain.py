@@ -49,6 +49,7 @@ Currently implemented:
  * remote{_add}
  * receive_pack
  * reset
+ * revert
  * sparse_checkout
  * submodule_add
  * submodule_init
@@ -3193,6 +3194,146 @@ def cherry_pick(
         )
 
         return new_commit
+
+
+def revert(
+    repo,
+    commits,
+    no_commit=False,
+    message=None,
+    author=None,
+    committer=None,
+):
+    """Revert one or more commits.
+
+    This creates a new commit that undoes the changes introduced by the
+    specified commits. Unlike reset, revert creates a new commit that
+    preserves history.
+
+    Args:
+      repo: Path to repository or repository object
+      commits: List of commit-ish (SHA, ref, etc.) to revert, or a single commit-ish
+      no_commit: If True, apply changes to index/working tree but don't commit
+      message: Optional commit message (default: "Revert <original subject>")
+      author: Optional author for revert commit
+      committer: Optional committer for revert commit
+
+    Returns:
+      SHA1 of the new revert commit, or None if no_commit=True
+
+    Raises:
+      Error: If revert fails due to conflicts or other issues
+    """
+    from .merge import three_way_merge
+
+    # Normalize commits to a list
+    if isinstance(commits, (str, bytes)):
+        commits = [commits]
+
+    with open_repo_closing(repo) as r:
+        # Convert string refs to bytes
+        commits_to_revert = []
+        for commit_ref in commits:
+            if isinstance(commit_ref, str):
+                commit_ref = commit_ref.encode("utf-8")
+            commit = parse_commit(r, commit_ref)
+            commits_to_revert.append(commit)
+
+        # Get current HEAD
+        try:
+            head_commit_id = r.refs[b"HEAD"]
+        except KeyError:
+            raise Error("No HEAD reference found")
+
+        head_commit = r[head_commit_id]
+        current_tree = head_commit.tree
+
+        # Process commits in order
+        for commit_to_revert in commits_to_revert:
+            # For revert, we want to apply the inverse of the commit
+            # This means using the commit's tree as "base" and its parent as "theirs"
+
+            if not commit_to_revert.parents:
+                raise Error(
+                    f"Cannot revert commit {commit_to_revert.id} - it has no parents"
+                )
+
+            # For simplicity, we only handle commits with one parent (no merge commits)
+            if len(commit_to_revert.parents) > 1:
+                raise Error(
+                    f"Cannot revert merge commit {commit_to_revert.id} - not yet implemented"
+                )
+
+            parent_commit = r[commit_to_revert.parents[0]]
+
+            # Perform three-way merge:
+            # - base: the commit we're reverting (what we want to remove)
+            # - ours: current HEAD (what we have now)
+            # - theirs: parent of commit being reverted (what we want to go back to)
+            merged_tree, conflicts = three_way_merge(
+                r.object_store,
+                commit_to_revert,  # base
+                r[head_commit_id],  # ours
+                parent_commit,  # theirs
+            )
+
+            if conflicts:
+                # Update working tree with conflicts
+                update_working_tree(r, current_tree, merged_tree.id)
+                conflicted_paths = [c.decode("utf-8", "replace") for c in conflicts]
+                raise Error(f"Conflicts while reverting: {', '.join(conflicted_paths)}")
+
+            # Add merged tree to object store
+            r.object_store.add_object(merged_tree)
+
+            # Update working tree
+            update_working_tree(r, current_tree, merged_tree.id)
+            current_tree = merged_tree.id
+
+            if not no_commit:
+                # Create revert commit
+                revert_commit = Commit()
+                revert_commit.tree = merged_tree.id
+                revert_commit.parents = [head_commit_id]
+
+                # Set author/committer
+                if author is None:
+                    author = get_user_identity(r.get_config_stack())
+                if committer is None:
+                    committer = author
+
+                revert_commit.author = author
+                revert_commit.committer = committer
+
+                # Set timestamps
+                timestamp = int(time.time())
+                timezone = 0  # UTC
+                revert_commit.author_time = timestamp
+                revert_commit.author_timezone = timezone
+                revert_commit.commit_time = timestamp
+                revert_commit.commit_timezone = timezone
+
+                # Set message
+                if message is None:
+                    # Extract original commit subject
+                    original_message = commit_to_revert.message
+                    if isinstance(original_message, bytes):
+                        original_message = original_message.decode("utf-8", "replace")
+                    subject = original_message.split("\n")[0]
+                    message = f'Revert "{subject}"\n\nThis reverts commit {commit_to_revert.id.decode("ascii")}.'.encode()
+                elif isinstance(message, str):
+                    message = message.encode("utf-8")
+
+                revert_commit.message = message
+
+                # Add commit to object store
+                r.object_store.add_object(revert_commit)
+
+                # Update HEAD
+                r.refs[b"HEAD"] = revert_commit.id
+                head_commit_id = revert_commit.id
+
+        return head_commit_id if not no_commit else None
 
 
 def gc(

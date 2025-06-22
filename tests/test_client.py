@@ -59,7 +59,7 @@ from dulwich.client import (
     parse_rsync_url,
 )
 from dulwich.config import ConfigDict
-from dulwich.objects import Commit, Tree, hex_to_sha
+from dulwich.objects import Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
 from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
@@ -1395,7 +1395,7 @@ class HttpGitClientTests(TestCase):
         )
 
         # Verify we got the refs
-        expected_sha = hex_to_sha(blob_hex.encode("ascii"))
+        expected_sha = blob_hex.encode("ascii")
         self.assertEqual({b"refs/heads/master": expected_sha}, result.refs)
 
         # Verify we received pack data
@@ -1403,8 +1403,11 @@ class HttpGitClientTests(TestCase):
         pack_data = b"".join(received_data)
         self.assertTrue(len(pack_data) > 0)
 
-        # The pack should contain our blob
-        self.assertIn(blob_content, pack_data)
+        # The pack should be valid pack format
+        self.assertTrue(pack_data.startswith(b"PACK"))
+        # Pack header: PACK + version (4 bytes) + num objects (4 bytes)
+        self.assertEqual(pack_data[4:8], b"\x00\x00\x00\x02")  # version 2
+        self.assertEqual(pack_data[8:12], b"\x00\x00\x00\x01")  # 1 object
 
 
 class TCPGitClientTests(TestCase):

@@ -10,6 +10,9 @@
  * Add ``revert`` command to ``dulwich.porcelain`` and CLI.
    (#1599, Jelmer Vernooĳ)
 
+ * Add annotate support as well as ``annotate`` and ``blame``
+   commands.  (#245, Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)
@@ -1436,6 +1439,11 @@
   * Repo is now a context manager, so that it can be easily
     closed using a ``with`` statement. (Søren Løvborg)
 
+ IMPROVEMENTS
+
+  * Add naive annotate implementation in ``dulwich.annotate``.
+    It works, but performance needs work. (Jelmer Vernooĳ)
+
  TEST FIXES
 
   * Only run worktree list compat tests against git 2.7.0,
@@ -1504,7 +1512,7 @@
     (Mark Mikofski)
 
   * Add ``Blob.splitlines`` method.
-    (Jelmer Vernooij)
+    (Jelmer Vernooĳ)
 
  BUG FIXES
 
@@ -1523,9 +1531,9 @@
  BUG FIXES
 
   * Allow missing trailing LF when reading service name from
-    HTTP servers. (Jelmer Vernooij, Andrew Shadura, #442)
+    HTTP servers. (Jelmer Vernooĳ, Andrew Shadura, #442)
 
-  * Fix dulwich.porcelain.pull() on Python3. (Jelmer Vernooij, #451)
+  * Fix dulwich.porcelain.pull() on Python3. (Jelmer Vernooĳ, #451)
 
   * Properly pull in tags during dulwich.porcelain.clone.
     (Jelmer Vernooĳ, #408)
@@ -1538,7 +1546,7 @@
 
  IMPROVEMENTS
 
-  * Add ``dulwich.porcelain.ls_tree`` implementation. (Jelmer Vernooij)
+  * Add ``dulwich.porcelain.ls_tree`` implementation. (Jelmer Vernooĳ)
 
 0.14.1	2016-07-05
 

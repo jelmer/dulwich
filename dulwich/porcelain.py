@@ -3528,8 +3528,12 @@ def annotate(repo, path, committish=None):
     if committish is None:
         committish = "HEAD"
     from dulwich.annotate import annotate_lines
+
     with open_repo_closing(repo) as r:
         commit_id = parse_commit(r, committish).id
+        # Ensure path is bytes
+        if isinstance(path, str):
+            path = path.encode()
         return annotate_lines(r.object_store, commit_id, path)
 
 

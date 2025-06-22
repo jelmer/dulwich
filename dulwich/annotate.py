@@ -31,8 +31,7 @@ import difflib
 from dulwich.walk import (
     ORDER_DATE,
     Walker,
-    )
-
+)
 
 # Walk over ancestry graph breadth-first
 # When checking each revision, find lines that according to difflib.Differ()
@@ -41,28 +40,27 @@ from dulwich.walk import (
 # If there were no lines kept from the older version, stop going deeper in the
 # graph.
 
+
 def update_lines(annotated_lines, new_history_data, new_blob):
-    """Update annotation lines with old blob lines.
-    """
+    """Update annotation lines with old blob lines."""
     ret = []
     new_lines = new_blob.splitlines()
     matcher = difflib.SequenceMatcher(
-        a=[l for (h, l) in annotated_lines],
-        b=new_lines)
+        a=[line for (h, line) in annotated_lines], b=new_lines
+    )
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
+        if tag == "equal":
             ret.extend(annotated_lines[i1:i2])
-        elif tag in ('insert', 'replace'):
-            ret.extend([(new_history_data, l) for l in new_lines[j1:j2]])
-        elif tag == 'delete':
+        elif tag in ("insert", "replace"):
+            ret.extend([(new_history_data, line) for line in new_lines[j1:j2]])
+        elif tag == "delete":
             pass  # don't care
         else:
-            raise RuntimeError('Unknown tag %s returned in diff' % tag)
+            raise RuntimeError(f"Unknown tag {tag} returned in diff")
     return ret
 
 
-def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None,
-                   follow=True):
+def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=True):
     """Annotate the lines of a blob.
 
     :param store: Object store to retrieve objects from
@@ -70,12 +68,13 @@ def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None,
     :param path: Path to annotate
     :param order: Order in which to process history (defaults to ORDER_DATE)
     :param lines: Initial lines to compare to (defaults to specified)
-    :param follow: Wether to follow changes across renames/copies
+    :param follow: Whether to follow changes across renames/copies
     :return: List of (commit, line) entries where
         commit is the oldest commit that changed a line
     """
-    walker = Walker(store, include=[commit_id], paths=[path], order=order,
-                    follow=follow)
+    walker = Walker(
+        store, include=[commit_id], paths=[path], order=order, follow=follow
+    )
     revs = []
     for log_entry in walker:
         for tree_change in log_entry.changes():
@@ -88,6 +87,6 @@ def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None,
                     break
 
     lines = []
-    for (commit, entry) in reversed(revs):
+    for commit, entry in reversed(revs):
         lines = update_lines(lines, (commit, entry), store[entry.sha])
     return lines

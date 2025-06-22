@@ -10,6 +10,9 @@
  * Add ``revert`` command to ``dulwich.porcelain`` and CLI.
    (#1599, Jelmer Vernooĳ)
 
+ * Add annotate support as well as ``annotate`` and ``blame``
+   commands.  (#245, Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

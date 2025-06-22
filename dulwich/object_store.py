@@ -90,6 +90,83 @@ PACKDIR = "pack"
 PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
 
 
+def find_shallow(store, heads, depth):
+    """Find shallow commits according to a given depth.
+
+    Args:
+      store: An ObjectStore for looking up objects.
+      heads: Iterable of head SHAs to start walking from.
+      depth: The depth of ancestors to include. A depth of one includes
+        only the heads themselves.
+    Returns: A tuple of (shallow, not_shallow), sets of SHAs that should be
+        considered shallow and unshallow according to the arguments. Note that
+        these sets may overlap if a commit is reachable along multiple paths.
+    """
+    parents = {}
+
+    def get_parents(sha):
+        result = parents.get(sha, None)
+        if not result:
+            result = store[sha].parents
+            parents[sha] = result
+        return result
+
+    todo = []  # stack of (sha, depth)
+    for head_sha in heads:
+        obj = store[head_sha]
+        # Peel tags if necessary
+        while isinstance(obj, Tag):
+            _, sha = obj.object
+            obj = store[sha]
+        if isinstance(obj, Commit):
+            todo.append((obj.id, 1))
+
+    not_shallow = set()
+    shallow = set()
+    while todo:
+        sha, cur_depth = todo.pop()
+        if cur_depth < depth:
+            not_shallow.add(sha)
+            new_depth = cur_depth + 1
+            todo.extend((p, new_depth) for p in get_parents(sha))
+        else:
+            shallow.add(sha)
+
+    return shallow, not_shallow
+
+
+def get_depth(
+    store,
+    head,
+    get_parents=lambda commit: commit.parents,
+    max_depth=None,
+):
+    """Return the current available depth for the given head.
+    For commits with multiple parents, the largest possible depth will be
+    returned.
+
+    Args:
+        head: commit to start from
+        get_parents: optional function for getting the parents of a commit
+        max_depth: maximum depth to search
+    """
+    if head not in store:
+        return 0
+    current_depth = 1
+    queue = [(head, current_depth)]
+    while queue and (max_depth is None or current_depth < max_depth):
+        e, depth = queue.pop(0)
+        current_depth = max(current_depth, depth)
+        cmt = store[e]
+        if isinstance(cmt, Tag):
+            _cls, sha = cmt.object
+            cmt = store[sha]
+        queue.extend(
+            (parent, depth + 1) for parent in get_parents(cmt) if parent in store
+        )
+    return current_depth
+
+
 class PackContainer(Protocol):
     def add_pack(self) -> tuple[BytesIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack."""
@@ -334,21 +411,7 @@ class BaseObjectStore:
             get_parents: optional function for getting the parents of a commit
             max_depth: maximum depth to search
         """
-        if head not in self:
-            return 0
-        current_depth = 1
-        queue = [(head, current_depth)]
-        while queue and (max_depth is None or current_depth < max_depth):
-            e, depth = queue.pop(0)
-            current_depth = max(current_depth, depth)
-            cmt = self[e]
-            if isinstance(cmt, Tag):
-                _cls, sha = cmt.object
-                cmt = self[sha]
-            queue.extend(
-                (parent, depth + 1) for parent in get_parents(cmt) if parent in self
-            )
-        return current_depth
+        return get_depth(self, head, get_parents=get_parents, max_depth=max_depth)
 
     def close(self) -> None:
         """Close any files opened by this object store."""
@@ -401,7 +464,7 @@ class BaseObjectStore:
         return None
 
 
-class PackBasedObjectStore(BaseObjectStore):
+class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
     def __init__(self, pack_compression_level=-1, pack_index_version=None) -> None:
         self._pack_cache: dict[str, Pack] = {}
         self.pack_compression_level = pack_compression_level
@@ -663,9 +726,8 @@ class PackBasedObjectStore(BaseObjectStore):
 
     def iter_unpacked_subset(
         self,
-        shas,
-        *,
-        include_comp=False,
+        shas: set[bytes],
+        include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
     ) -> Iterator[UnpackedObject]:
@@ -1629,6 +1691,7 @@ class ObjectStoreGraphWalker:
         local_heads: Iterable[ObjectID],
         get_parents,
         shallow: Optional[set[ObjectID]] = None,
+        update_shallow=None,
     ) -> None:
         """Create a new instance.
 
@@ -1642,6 +1705,7 @@ class ObjectStoreGraphWalker:
         if shallow is None:
             shallow = set()
         self.shallow = shallow
+        self.update_shallow = update_shallow
 
     def nak(self) -> None:
         """Nothing in common was found."""

@@ -33,7 +33,7 @@ from dulwich.errors import (
     NotGitRepository,
     UnexpectedCommandError,
 )
-from dulwich.object_store import MemoryObjectStore
+from dulwich.object_store import MemoryObjectStore, find_shallow
 from dulwich.objects import Tree
 from dulwich.protocol import ZERO_SHA, format_capability_line
 from dulwich.repo import MemoryRepo, Repo
@@ -47,7 +47,6 @@ from dulwich.server import (
     ReceivePackHandler,
     SingleAckGraphWalkerImpl,
     UploadPackHandler,
-    _find_shallow,
     _ProtocolGraphWalker,
     _split_proto_line,
     serve_command,
@@ -271,18 +270,18 @@ class FindShallowTests(TestCase):
     def test_linear(self) -> None:
         c1, c2, c3 = self.make_linear_commits(3)
 
-        self.assertEqual(({c3.id}, set()), _find_shallow(self._store, [c3.id], 1))
+        self.assertEqual(({c3.id}, set()), find_shallow(self._store, [c3.id], 1))
         self.assertEqual(
             ({c2.id}, {c3.id}),
-            _find_shallow(self._store, [c3.id], 2),
+            find_shallow(self._store, [c3.id], 2),
         )
         self.assertEqual(
             ({c1.id}, {c2.id, c3.id}),
-            _find_shallow(self._store, [c3.id], 3),
+            find_shallow(self._store, [c3.id], 3),
         )
         self.assertEqual(
             (set(), {c1.id, c2.id, c3.id}),
-            _find_shallow(self._store, [c3.id], 4),
+            find_shallow(self._store, [c3.id], 4),
         )
 
     def test_multiple_independent(self) -> None:
@@ -293,7 +292,7 @@ class FindShallowTests(TestCase):
 
         self.assertEqual(
             ({a[0].id, b[0].id, c[0].id}, set(heads)),
-            _find_shallow(self._store, heads, 2),
+            find_shallow(self._store, heads, 2),
         )
 
     def test_multiple_overlapping(self) -> None:
@@ -308,7 +307,7 @@ class FindShallowTests(TestCase):
         # 1 is shallow along the path from 4, but not along the path from 2.
         self.assertEqual(
             ({c1.id}, {c1.id, c2.id, c3.id, c4.id}),
-            _find_shallow(self._store, [c2.id, c4.id], 3),
+            find_shallow(self._store, [c2.id, c4.id], 3),
         )
 
     def test_merge(self) -> None:
@@ -318,7 +317,7 @@ class FindShallowTests(TestCase):
 
         self.assertEqual(
             ({c1.id, c2.id}, {c3.id}),
-            _find_shallow(self._store, [c3.id], 2),
+            find_shallow(self._store, [c3.id], 2),
         )
 
     def test_tag(self) -> None:
@@ -328,7 +327,7 @@ class FindShallowTests(TestCase):
 
         self.assertEqual(
             ({c1.id}, {c2.id}),
-            _find_shallow(self._store, [tag.id], 2),
+            find_shallow(self._store, [tag.id], 2),
         )
 
 

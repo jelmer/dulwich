@@ -10,7 +10,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "diff-tree-py"
-version = "0.22.9"
+version = "0.23.0"
 dependencies = [
  "pyo3",
 ]
@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "objects-py"
-version = "0.22.9"
+version = "0.23.0"
 dependencies = [
  "memchr",
  "pyo3",
@@ -64,7 +64,7 @@ checksum = "945462a4b81e43c4e3ba96bd7b49d834c6f61198356aa858733bc4acf3cbe62e"
 
 [[package]]
 name = "pack-py"
-version = "0.22.9"
+version = "0.23.0"
 dependencies = [
  "memchr",
  "pyo3",

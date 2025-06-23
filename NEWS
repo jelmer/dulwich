@@ -1,5 +1,8 @@
 0.23.1	UNRELEASED
 
+ * Support short commit hashes in ``porcelain.reset()``.
+   (Jelmer Vernooĳ, #1154)
+
  * Support dumb repository access.
    (Jelmer Vernooĳ, #1097)
 

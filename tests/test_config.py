@@ -635,7 +635,7 @@ who\"
 
                 # Check that it was logged
                 log_output = log_capture.getvalue()
-                self.assertIn("Failed to read include file", log_output)
+                self.assertIn("Invalid include path", log_output)
                 self.assertIn("nonexistent.config", log_output)
         finally:
             logger.removeHandler(handler)

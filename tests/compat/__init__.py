@@ -26,8 +26,11 @@ import unittest
 
 def test_suite():
     names = [
+        "check_ignore",
         "client",
         "commit_graph",
+        "dumb",
+        "index",
         "pack",
         "patch",
         "porcelain",

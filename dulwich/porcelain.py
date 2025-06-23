@@ -2294,10 +2294,13 @@ def check_ignore(repo, paths, no_index=False, quote_path=True):
                 continue
 
             # Preserve whether the original path had a trailing slash
-            had_trailing_slash = original_path.endswith("/")
+            had_trailing_slash = original_path.endswith(("/", os.path.sep))
 
             if os.path.isabs(original_path):
                 path = os.path.relpath(original_path, r.path)
+                # Normalize Windows paths to use forward slashes
+                if os.path.sep != "/":
+                    path = path.replace(os.path.sep, "/")
             else:
                 path = original_path
 
@@ -2315,7 +2318,12 @@ def check_ignore(repo, paths, no_index=False, quote_path=True):
                 test_path = path + "/"
 
             if ignore_manager.is_ignored(test_path):
-                yield _quote_path(path) if quote_path else path
+                # Return relative path (like git does) when absolute path was provided
+                if os.path.isabs(original_path):
+                    output_path = path
+                else:
+                    output_path = original_path
+                yield _quote_path(output_path) if quote_path else output_path
 
 
 def update_head(repo, target, detached=False, new_branch=None) -> None:

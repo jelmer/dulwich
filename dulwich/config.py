@@ -847,7 +847,13 @@ class ConfigFile(ConfigDict):
             else:
                 opener = file_opener
 
-            with opener(include_path) as included_file:
+            f = opener(include_path)
+        except (OSError, ValueError) as e:
+            # Git silently ignores missing or unreadable include files
+            # Log for debugging purposes
+            logger.debug("Invalid include path %r: %s", include_path, e)
+        else:
+            with f as included_file:
                 # Track this path to prevent cycles
                 self._included_paths.add(abs_path)
 
@@ -864,10 +870,6 @@ class ConfigFile(ConfigDict):
 
                 # Merge the included configuration
                 self._merge_config(included_config)
-        except OSError as e:
-            # Git silently ignores missing or unreadable include files
-            # Log for debugging purposes
-            logger.debug("Failed to read include file %r: %s", include_path, e)
 
     def _merge_config(self, other: "ConfigFile") -> None:
         """Merge another config file into this one."""

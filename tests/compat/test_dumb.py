@@ -30,7 +30,7 @@ from unittest import skipUnless
 
 from dulwich.client import HttpGitClient
 from dulwich.repo import Repo
-from dulwich.tests.compat.utils import (
+from tests.compat.utils import (
     CompatTestCase,
     run_git_or_fail,
 )
@@ -131,7 +131,7 @@ class DumbHTTPClientTests(CompatTestCase):
         client = HttpGitClient(self.server.url)
 
         # Create destination repo
-        dest_repo = Repo.init(dest_path)
+        dest_repo = Repo.init(dest_path, mkdir=True)
 
         # Fetch from dumb HTTP
         def determine_wants(refs):
@@ -191,7 +191,7 @@ class DumbHTTPClientTests(CompatTestCase):
                 dest_repo.refs[ref] = sha
 
         # Reset to new commit
-        dest_repo.reset_index(dest_repo.refs[b"refs/heads/master"])
+        dest_repo.reset_index()
 
         # Verify the new file exists
         test_file2_dest = os.path.join(dest_path, "test2.txt")
@@ -213,7 +213,7 @@ class DumbHTTPClientTests(CompatTestCase):
 
         # Clone with dulwich
         dest_path = os.path.join(self.temp_dir, "cloned_with_tags")
-        dest_repo = Repo.init(dest_path)
+        dest_repo = Repo.init(dest_path, mkdir=True)
 
         client = HttpGitClient(self.server.url)
 

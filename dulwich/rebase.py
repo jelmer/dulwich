@@ -316,7 +316,9 @@ class Rebaser:
         # Return in chronological order (oldest first)
         return list(reversed(commits))
 
-    def _cherry_pick(self, commit: Commit, onto: bytes) -> tuple[bytes, list[bytes]]:
+    def _cherry_pick(
+        self, commit: Commit, onto: bytes
+    ) -> tuple[Optional[bytes], list[bytes]]:
         """Cherry-pick a commit onto another commit.
 
         Args:
@@ -341,7 +343,7 @@ class Rebaser:
         if conflicts:
             # Store merge state for conflict resolution
             self.repo._put_named_file("rebase-merge/stopped-sha", commit.id)
-            return commit.id, conflicts
+            return None, conflicts
 
         # Create new commit
         new_commit = Commit()

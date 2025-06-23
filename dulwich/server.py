@@ -204,6 +204,10 @@ class FileSystemBackend(Backend):
 
     def open_repository(self, path):
         logger.debug("opening repository at %s", path)
+        # Ensure path is a string to avoid TypeError when joining with self.root
+        path = os.fspath(path)
+        if isinstance(path, bytes):
+            path = os.fsdecode(path)
         abspath = os.path.abspath(os.path.join(self.root, path)) + os.sep
         normcase_abspath = os.path.normcase(abspath)
         normcase_root = os.path.normcase(self.root)

@@ -22,7 +22,7 @@
 """Compatibility tests for dumb HTTP git repositories."""
 
 import os
-import shutil
+import sys
 import tempfile
 import threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -32,6 +32,7 @@ from dulwich.client import HttpGitClient
 from dulwich.repo import Repo
 from tests.compat.utils import (
     CompatTestCase,
+    rmtree_ro,
     run_git_or_fail,
 )
 
@@ -57,7 +58,8 @@ class DumbHTTPGitServer:
         def handler(*args, **kwargs):
             return DumbHTTPRequestHandler(*args, directory=root_path, **kwargs)
 
-        self.server = HTTPServer(("localhost", port), handler)
+        self.server = HTTPServer(("127.0.0.1", port), handler)
+        self.server.allow_reuse_address = True
         self.port = self.server.server_port
         self.thread = None
 
@@ -66,6 +68,25 @@ class DumbHTTPGitServer:
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
         self.thread.start()
+
+        # Give the server a moment to start and verify it's listening
+        import socket
+        import time
+
+        for i in range(50):  # Try for up to 5 seconds
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.1)
+                result = sock.connect_ex(("127.0.0.1", self.port))
+                sock.close()
+                if result == 0:
+                    return  # Server is ready
+            except OSError:
+                pass
+            time.sleep(0.1)
+
+        # If we get here, server failed to start
+        raise RuntimeError(f"HTTP server failed to start on port {self.port}")
 
     def stop(self):
         """Stop the HTTP server."""
@@ -76,7 +97,7 @@ class DumbHTTPGitServer:
     @property
     def url(self):
         """Get the base URL for this server."""
-        return f"http://localhost:{self.port}"
+        return f"http://127.0.0.1:{self.port}"
 
 
 class DumbHTTPClientTests(CompatTestCase):
@@ -86,7 +107,7 @@ class DumbHTTPClientTests(CompatTestCase):
         super().setUp()
         # Create a temporary directory for test repos
         self.temp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.temp_dir)
+        self.addCleanup(rmtree_ro, self.temp_dir)
 
         # Create origin repository
         self.origin_path = os.path.join(self.temp_dir, "origin.git")
@@ -133,30 +154,40 @@ class DumbHTTPClientTests(CompatTestCase):
         # Create destination repo
         dest_repo = Repo.init(dest_path, mkdir=True)
 
-        # Fetch from dumb HTTP
-        def determine_wants(refs):
-            return [sha for ref, sha in refs.items() if ref.startswith(b"refs/heads/")]
+        try:
+            # Fetch from dumb HTTP
+            def determine_wants(refs):
+                return [
+                    sha for ref, sha in refs.items() if ref.startswith(b"refs/heads/")
+                ]
 
-        result = client.fetch("/", dest_repo, determine_wants=determine_wants)
+            result = client.fetch("/", dest_repo, determine_wants=determine_wants)
 
-        # Update refs
-        for ref, sha in result.refs.items():
-            if ref.startswith(b"refs/heads/"):
-                dest_repo.refs[ref] = sha
+            # Update refs
+            for ref, sha in result.refs.items():
+                if ref.startswith(b"refs/heads/"):
+                    dest_repo.refs[ref] = sha
 
-        # Checkout files
-        dest_repo.reset_index()
+            # Checkout files
+            dest_repo.reset_index()
 
-        # Verify the clone
-        test_file = os.path.join(dest_path, "test.txt")
-        self.assertTrue(os.path.exists(test_file))
-        with open(test_file) as f:
-            self.assertEqual("Hello, world!\n", f.read())
+            # Verify the clone
+            test_file = os.path.join(dest_path, "test.txt")
+            self.assertTrue(os.path.exists(test_file))
+            with open(test_file) as f:
+                self.assertEqual("Hello, world!\n", f.read())
+        finally:
+            # Ensure repo is closed before cleanup
+            dest_repo.close()
 
+    @skipUnless(
+        sys.platform != "win32", "git clone from Python HTTPServer fails on Windows"
+    )
     def test_fetch_new_commit_from_dumb_http(self):
         """Test fetching new commits from a dumb HTTP server."""
         # First clone the repository
         dest_path = os.path.join(self.temp_dir, "cloned")
+
         run_git_or_fail(["clone", self.server.url, dest_path])
 
         # Make a new commit in the origin
@@ -174,30 +205,34 @@ class DumbHTTPClientTests(CompatTestCase):
         client = HttpGitClient(self.server.url)
         dest_repo = Repo(dest_path)
 
-        old_refs = dest_repo.get_refs()
+        try:
+            old_refs = dest_repo.get_refs()
 
-        def determine_wants(refs):
-            wants = []
-            for ref, sha in refs.items():
-                if ref.startswith(b"refs/heads/") and sha != old_refs.get(ref):
-                    wants.append(sha)
-            return wants
+            def determine_wants(refs):
+                wants = []
+                for ref, sha in refs.items():
+                    if ref.startswith(b"refs/heads/") and sha != old_refs.get(ref):
+                        wants.append(sha)
+                return wants
 
-        result = client.fetch("/", dest_repo, determine_wants=determine_wants)
+            result = client.fetch("/", dest_repo, determine_wants=determine_wants)
 
-        # Update refs
-        for ref, sha in result.refs.items():
-            if ref.startswith(b"refs/heads/"):
-                dest_repo.refs[ref] = sha
+            # Update refs
+            for ref, sha in result.refs.items():
+                if ref.startswith(b"refs/heads/"):
+                    dest_repo.refs[ref] = sha
 
-        # Reset to new commit
-        dest_repo.reset_index()
+            # Reset to new commit
+            dest_repo.reset_index()
 
-        # Verify the new file exists
-        test_file2_dest = os.path.join(dest_path, "test2.txt")
-        self.assertTrue(os.path.exists(test_file2_dest))
-        with open(test_file2_dest) as f:
-            self.assertEqual("Second file\n", f.read())
+            # Verify the new file exists
+            test_file2_dest = os.path.join(dest_path, "test2.txt")
+            self.assertTrue(os.path.exists(test_file2_dest))
+            with open(test_file2_dest) as f:
+                self.assertEqual("Second file\n", f.read())
+        finally:
+            # Ensure repo is closed before cleanup
+            dest_repo.close()
 
     @skipUnless(
         os.name == "posix", "Skipping on non-POSIX systems due to permission handling"
@@ -215,25 +250,29 @@ class DumbHTTPClientTests(CompatTestCase):
         dest_path = os.path.join(self.temp_dir, "cloned_with_tags")
         dest_repo = Repo.init(dest_path, mkdir=True)
 
-        client = HttpGitClient(self.server.url)
+        try:
+            client = HttpGitClient(self.server.url)
 
-        def determine_wants(refs):
-            return [
-                sha
-                for ref, sha in refs.items()
-                if ref.startswith((b"refs/heads/", b"refs/tags/"))
-            ]
+            def determine_wants(refs):
+                return [
+                    sha
+                    for ref, sha in refs.items()
+                    if ref.startswith((b"refs/heads/", b"refs/tags/"))
+                ]
 
-        result = client.fetch("/", dest_repo, determine_wants=determine_wants)
+            result = client.fetch("/", dest_repo, determine_wants=determine_wants)
 
-        # Update refs
-        for ref, sha in result.refs.items():
-            dest_repo.refs[ref] = sha
+            # Update refs
+            for ref, sha in result.refs.items():
+                dest_repo.refs[ref] = sha
 
-        # Check that the tag exists
-        self.assertIn(b"refs/tags/v1.0", dest_repo.refs)
+            # Check that the tag exists
+            self.assertIn(b"refs/tags/v1.0", dest_repo.refs)
 
-        # Verify tag points to the right commit
-        tag_sha = dest_repo.refs[b"refs/tags/v1.0"]
-        tag_obj = dest_repo[tag_sha]
-        self.assertEqual(b"tag", tag_obj.type_name)
+            # Verify tag points to the right commit
+            tag_sha = dest_repo.refs[b"refs/tags/v1.0"]
+            tag_obj = dest_repo[tag_sha]
+            self.assertEqual(b"tag", tag_obj.type_name)
+        finally:
+            # Ensure repo is closed before cleanup
+            dest_repo.close()

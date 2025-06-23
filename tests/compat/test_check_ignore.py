@@ -94,8 +94,12 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
             path_mapping[abs_path] = orig_path
 
         for path in ignored:
-            if path.startswith(self.test_dir + "/"):
-                rel_path = path[len(self.test_dir) + 1 :]
+            # Normalize the path to use forward slashes for comparison
+            normalized_path = path.replace("\\", "/")
+            test_dir_normalized = self.test_dir.replace("\\", "/")
+
+            if normalized_path.startswith(test_dir_normalized + "/"):
+                rel_path = normalized_path[len(test_dir_normalized) + 1 :]
                 # Find the original path format that was requested
                 orig_path = None
                 for requested_path in paths:
@@ -104,7 +108,8 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
                         break
                 result.add(orig_path if orig_path else rel_path)
             else:
-                result.add(path)
+                # For relative paths, normalize to forward slashes
+                result.add(path.replace("\\", "/"))
         return result
 
     def _assert_ignore_match(self, paths: list[str]) -> None:
@@ -970,22 +975,29 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
 
     def test_asterisk_escaping_and_special_chars(self) -> None:
         """Test asterisk patterns with special characters and potential escaping."""
+        import sys
+
         self._write_gitignore(
             "\\*literal\n**/*.\\*\n[*]bracket\n*\\[escape\\]\n*.{tmp,log}\n"
         )
 
         # Test \*literal pattern (literal asterisk)
-        self._create_file("*literal")  # Literal asterisk at start
+        # Skip files with asterisks on Windows as they're invalid filenames
+        if sys.platform != "win32":
+            self._create_file("*literal")  # Literal asterisk at start
+            self._create_file("prefix*literal")  # Literal asterisk in middle
         self._create_file("xliteral")  # Should not match (no literal asterisk)
-        self._create_file("prefix*literal")  # Literal asterisk in middle
 
         # Test **/*.* pattern (files with .* extension)
-        self._create_file("file.*")  # Literal .* extension
-        self._create_file("dir/test.*")  # At any depth
+        # Skip files with asterisks on Windows
+        if sys.platform != "win32":
+            self._create_file("file.*")  # Literal .* extension
+            self._create_file("dir/test.*")  # At any depth
         self._create_file("file.txt")  # Should not match (not .* extension)
 
         # Test [*]bracket pattern (bracket containing asterisk)
-        self._create_file("*bracket")  # Literal asterisk from bracket
+        if sys.platform != "win32":
+            self._create_file("*bracket")  # Literal asterisk from bracket
         self._create_file("xbracket")  # Should not match
         self._create_file("abracket")  # Should not match
 
@@ -1001,13 +1013,8 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         self._create_file("test.{other}")  # Should not match
 
         paths = [
-            "*literal",
             "xliteral",
-            "prefix*literal",
-            "file.*",
-            "dir/test.*",
             "file.txt",
-            "*bracket",
             "xbracket",
             "abracket",
             "test[escape]",
@@ -1018,6 +1025,19 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
             "test.log",
             "test.{other}",
         ]
+
+        # Add files with asterisks only on non-Windows platforms
+        if sys.platform != "win32":
+            paths.extend(
+                [
+                    "*literal",
+                    "prefix*literal",
+                    "file.*",
+                    "dir/test.*",
+                    "*bracket",
+                ]
+            )
+
         self._assert_ignore_match(paths)
 
     def test_quote_path_true_unicode_filenames(self) -> None:

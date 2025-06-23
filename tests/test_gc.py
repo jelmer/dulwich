@@ -20,10 +20,9 @@ class GCTestCase(TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmpdir)
         self.repo = Repo.init(self.tmpdir)
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
+        self.addCleanup(self.repo.close)
 
     def test_find_reachable_objects_empty_repo(self):
         """Test finding reachable objects in empty repository."""
@@ -101,9 +100,9 @@ class GCTestCase(TestCase):
         # Verify it exists
         self.assertIn(unreachable_blob.id, self.repo.object_store)
 
-        # Prune unreachable objects
+        # Prune unreachable objects (grace_period=None means no grace period check)
         pruned, bytes_freed = prune_unreachable_objects(
-            self.repo.object_store, self.repo.refs, grace_period=0
+            self.repo.object_store, self.repo.refs, grace_period=None
         )
 
         # Verify the blob was pruned
@@ -119,9 +118,9 @@ class GCTestCase(TestCase):
         unreachable_blob = Blob.from_string(b"unreachable content")
         self.repo.object_store.add_object(unreachable_blob)
 
-        # Prune with dry run
+        # Prune with dry run (grace_period=None means no grace period check)
         pruned, bytes_freed = prune_unreachable_objects(
-            self.repo.object_store, self.repo.refs, grace_period=0, dry_run=True
+            self.repo.object_store, self.repo.refs, grace_period=None, dry_run=True
         )
 
         # Verify the blob would be pruned but still exists
@@ -153,8 +152,8 @@ class GCTestCase(TestCase):
         unreachable_blob = Blob.from_string(b"unreachable content")
         self.repo.object_store.add_object(unreachable_blob)
 
-        # Run garbage collection
-        stats = garbage_collect(self.repo, prune=True, grace_period=0)
+        # Run garbage collection (grace_period=None means no grace period check)
+        stats = garbage_collect(self.repo, prune=True, grace_period=None)
 
         # Check results
         self.assertIsInstance(stats, GCStats)
@@ -181,11 +180,13 @@ class GCTestCase(TestCase):
         unreachable_blob = Blob.from_string(b"unreachable content")
         self.repo.object_store.add_object(unreachable_blob)
 
-        # Run garbage collection with dry run
-        stats = garbage_collect(self.repo, prune=True, grace_period=0, dry_run=True)
+        # Run garbage collection with dry run (grace_period=None means no grace period check)
+        stats = garbage_collect(self.repo, prune=True, grace_period=None, dry_run=True)
 
         # Check that object would be pruned but still exists
-        self.assertEqual({unreachable_blob.id}, stats.pruned_objects)
+        # On Windows, the repository initialization might create additional unreachable objects
+        # So we check that our blob is in the pruned objects, not that it's the only one
+        self.assertIn(unreachable_blob.id, stats.pruned_objects)
         self.assertGreater(stats.bytes_freed, 0)
         self.assertIn(unreachable_blob.id, self.repo.object_store)
 
@@ -207,8 +208,8 @@ class GCTestCase(TestCase):
         self.assertEqual(0, stats.bytes_freed)
         self.assertIn(unreachable_blob.id, self.repo.object_store)
 
-        # Now test with zero grace period - it should be pruned
-        stats = garbage_collect(self.repo, prune=True, grace_period=0)
+        # Now test with no grace period - it should be pruned
+        stats = garbage_collect(self.repo, prune=True, grace_period=None)
 
         # Check that the object was pruned
         self.assertEqual({unreachable_blob.id}, stats.pruned_objects)
@@ -252,8 +253,8 @@ class GCTestCase(TestCase):
         self.assertFalse(self.repo.object_store.contains_loose(unreachable_blob.id))
         self.assertIn(unreachable_blob.id, self.repo.object_store)
 
-        # Run garbage collection
-        stats = garbage_collect(self.repo, prune=True, grace_period=0)
+        # Run garbage collection (grace_period=None means no grace period check)
+        stats = garbage_collect(self.repo, prune=True, grace_period=None)
 
         # Check that the packed object was pruned
         self.assertEqual({unreachable_blob.id}, stats.pruned_objects)

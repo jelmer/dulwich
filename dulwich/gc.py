@@ -156,8 +156,8 @@ def prune_unreachable_objects(
 
             # Check grace period
             if grace_period is not None:
-                mtime = object_store.get_object_mtime(sha)
-                if mtime is not None:
+                try:
+                    mtime = object_store.get_object_mtime(sha)
                     age = time.time() - mtime
                     if age < grace_period:
                         if progress:
@@ -165,6 +165,9 @@ def prune_unreachable_objects(
                                 f"Keeping {sha.decode('ascii', 'replace')} (age: {age:.0f}s < grace period: {grace_period}s)"
                             )
                         continue
+                except KeyError:
+                    # Object not found, skip it
+                    continue
 
             if progress:
                 progress(f"Pruning {sha.decode('ascii', 'replace')}")
@@ -234,8 +237,8 @@ def garbage_collect(
         for sha in unreachable:
             try:
                 if grace_period is not None:
-                    mtime = object_store.get_object_mtime(sha)
-                    if mtime is not None:
+                    try:
+                        mtime = object_store.get_object_mtime(sha)
                         age = time.time() - mtime
                         if age < grace_period:
                             if progress:
@@ -243,6 +246,9 @@ def garbage_collect(
                                     f"Keeping {sha.decode('ascii', 'replace')} (age: {age:.0f}s < grace period: {grace_period}s)"
                                 )
                             continue
+                    except KeyError:
+                        # Object not found, skip it
+                        continue
 
                 unreachable_to_prune.add(sha)
                 obj = object_store[sha]

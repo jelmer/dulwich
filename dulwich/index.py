@@ -1549,6 +1549,8 @@ def update_working_tree(
                 full_path = os.path.join(root, file)
                 # Get relative path from repo root
                 rel_path = os.path.relpath(full_path, repo_path_str)
+                # Normalize to use forward slashes like Git does internally
+                rel_path = rel_path.replace(os.sep, "/")
                 rel_path_bytes = rel_path.encode()
 
                 # If this file is not in the target tree, remove it

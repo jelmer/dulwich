@@ -2155,6 +2155,124 @@ class ResetTests(PorcelainTestCase):
 
         self.assertEqual([], changes)
 
+    def test_hard_deletes_untracked_files(self) -> None:
+        """Test that reset --hard deletes files that don't exist in target tree."""
+        # Create and commit a file
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        sha1 = porcelain.commit(
+            self.repo.path,
+            message=b"First commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Create another file and commit
+        fullpath2 = os.path.join(self.repo.path, "bar")
+        with open(fullpath2, "w") as f:
+            f.write("BAZ")
+        porcelain.add(self.repo.path, paths=[fullpath2])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Second commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Reset hard to first commit - this should delete 'bar'
+        porcelain.reset(self.repo, "hard", sha1)
+
+        # Check that 'foo' still exists and 'bar' is deleted
+        self.assertTrue(os.path.exists(fullpath))
+        self.assertFalse(os.path.exists(fullpath2))
+
+        # Check index matches first commit
+        index = self.repo.open_index()
+        self.assertIn(b"foo", index)
+        self.assertNotIn(b"bar", index)
+
+    def test_hard_deletes_files_in_subdirs(self) -> None:
+        """Test that reset --hard deletes files in subdirectories."""
+        # Create and commit files in subdirectory
+        subdir = os.path.join(self.repo.path, "subdir")
+        os.makedirs(subdir)
+        file1 = os.path.join(subdir, "file1")
+        file2 = os.path.join(subdir, "file2")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        porcelain.add(self.repo.path, paths=[file1, file2])
+        porcelain.commit(
+            self.repo.path,
+            message=b"First commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Remove one file from subdirectory and commit
+        porcelain.rm(self.repo.path, paths=[file2])
+        sha2 = porcelain.commit(
+            self.repo.path,
+            message=b"Remove file2",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Create file2 again (untracked)
+        with open(file2, "w") as f:
+            f.write("new content")
+
+        # Reset to commit that has file2 removed - should delete untracked file2
+        porcelain.reset(self.repo, "hard", sha2)
+
+        self.assertTrue(os.path.exists(file1))
+        self.assertFalse(os.path.exists(file2))
+
+    def test_hard_reset_to_remote_branch(self) -> None:
+        """Test reset --hard to remote branch deletes local files not in remote."""
+        # Create a file and commit
+        file1 = os.path.join(self.repo.path, "file1")
+        with open(file1, "w") as f:
+            f.write("content1")
+        porcelain.add(self.repo.path, paths=[file1])
+        sha1 = porcelain.commit(
+            self.repo.path,
+            message=b"Initial commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Create a "remote" ref that doesn't have additional files
+        self.repo.refs[b"refs/remotes/origin/master"] = sha1
+
+        # Add another file locally and commit
+        file2 = os.path.join(self.repo.path, "file2")
+        with open(file2, "w") as f:
+            f.write("content2")
+        porcelain.add(self.repo.path, paths=[file2])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Add file2",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Both files should exist
+        self.assertTrue(os.path.exists(file1))
+        self.assertTrue(os.path.exists(file2))
+
+        # Reset to remote branch - should delete file2
+        porcelain.reset(self.repo, "hard", b"refs/remotes/origin/master")
+
+        # file1 should exist, file2 should be deleted
+        self.assertTrue(os.path.exists(file1))
+        self.assertFalse(os.path.exists(file2))
+
 
 class ResetFileTests(PorcelainTestCase):
     def test_reset_modify_file_to_commit(self) -> None:

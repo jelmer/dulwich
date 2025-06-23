@@ -675,11 +675,21 @@ class cmd_status(Command):
 class cmd_ls_remote(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--symref", action="store_true", help="Show symbolic references"
+        )
         parser.add_argument("url", help="Remote URL to list references from")
         args = parser.parse_args(args)
-        refs = porcelain.ls_remote(args.url)
-        for ref in sorted(refs):
-            sys.stdout.write(f"{ref}\t{refs[ref]}\n")
+        result = porcelain.ls_remote(args.url)
+
+        if args.symref:
+            # Show symrefs first, like git does
+            for ref, target in sorted(result.symrefs.items()):
+                sys.stdout.write(f"ref: {target.decode()}\t{ref.decode()}\n")
+
+        # Show regular refs
+        for ref in sorted(result.refs):
+            sys.stdout.write(f"{result.refs[ref].decode()}\t{ref.decode()}\n")
 
 
 class cmd_ls_tree(Command):

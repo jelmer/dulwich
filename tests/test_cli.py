@@ -324,6 +324,43 @@ class FetchPackCommandTest(DulwichCliTestCase):
         mock_client.fetch.assert_called_once()
 
 
+class LsRemoteCommandTest(DulwichCliTestCase):
+    """Tests for ls-remote command."""
+
+    def test_ls_remote_basic(self):
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Test basic ls-remote
+        result, stdout, stderr = self._run_cli("ls-remote", self.repo_path)
+        lines = stdout.strip().split("\n")
+        self.assertTrue(any("HEAD" in line for line in lines))
+        self.assertTrue(any("refs/heads/master" in line for line in lines))
+
+    def test_ls_remote_symref(self):
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Test ls-remote with --symref option
+        result, stdout, stderr = self._run_cli("ls-remote", "--symref", self.repo_path)
+        lines = stdout.strip().split("\n")
+        # Should show symref for HEAD in exact format: "ref: refs/heads/master\tHEAD"
+        expected_line = "ref: refs/heads/master\tHEAD"
+        self.assertIn(
+            expected_line,
+            lines,
+            f"Expected line '{expected_line}' not found in output: {lines}",
+        )
+
+
 class PullCommandTest(DulwichCliTestCase):
     """Tests for pull command."""
 

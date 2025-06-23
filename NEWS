@@ -1,5 +1,7 @@
 0.23.1	UNRELEASED
 
+ * Return symrefs from ls_refs. (Jelmer Vernooĳ, #863)
+
  * Support short commit hashes in ``porcelain.reset()``.
    (Jelmer Vernooĳ, #1154)
 

@@ -66,7 +66,15 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str]) -> "Tree":
         treeish = parse_ref(repo, treeish)
     except KeyError:  # treeish is commit sha
         pass
-    o = repo[treeish]
+    try:
+        o = repo[treeish]
+    except KeyError:
+        # Try parsing as commit (handles short hashes)
+        try:
+            commit = parse_commit(repo, treeish)
+            return repo[commit.tree]
+        except KeyError:
+            raise KeyError(treeish)
     if o.type_name == b"commit":
         return repo[o.tree]
     return o

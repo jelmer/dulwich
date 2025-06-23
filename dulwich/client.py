@@ -121,6 +121,7 @@ from .protocol import (
 )
 from .refs import (
     PEELED_TAG_SUFFIX,
+    SYMREF,
     Ref,
     _import_remote_refs,
     _set_default_branch,
@@ -393,6 +394,77 @@ class FetchPackResult:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.refs!r}, {self.symrefs!r}, {self.agent!r})"
+
+
+class LsRemoteResult:
+    """Result of a ls-remote operation.
+
+    Attributes:
+      refs: Dictionary with all remote refs
+      symrefs: Dictionary with remote symrefs
+    """
+
+    _FORWARDED_ATTRS: ClassVar[set[str]] = {
+        "clear",
+        "copy",
+        "fromkeys",
+        "get",
+        "items",
+        "keys",
+        "pop",
+        "popitem",
+        "setdefault",
+        "update",
+        "values",
+        "viewitems",
+        "viewkeys",
+        "viewvalues",
+    }
+
+    def __init__(self, refs, symrefs) -> None:
+        self.refs = refs
+        self.symrefs = symrefs
+
+    def _warn_deprecated(self) -> None:
+        import warnings
+
+        warnings.warn(
+            "Treating LsRemoteResult as a dictionary is deprecated. "
+            "Use result.refs instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            self._warn_deprecated()
+            return self.refs == other
+        return self.refs == other.refs and self.symrefs == other.symrefs
+
+    def __contains__(self, name) -> bool:
+        self._warn_deprecated()
+        return name in self.refs
+
+    def __getitem__(self, name):
+        self._warn_deprecated()
+        return self.refs[name]
+
+    def __len__(self) -> int:
+        self._warn_deprecated()
+        return len(self.refs)
+
+    def __iter__(self):
+        self._warn_deprecated()
+        return iter(self.refs)
+
+    def __getattribute__(self, name):
+        if name in type(self)._FORWARDED_ATTRS:
+            self._warn_deprecated()
+            return getattr(self.refs, name)
+        return super().__getattribute__(name)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.refs!r}, {self.symrefs!r})"
 
 
 class SendPackResult:
@@ -1041,11 +1113,16 @@ class GitClient:
         path,
         protocol_version: Optional[int] = None,
         ref_prefix: Optional[list[Ref]] = None,
-    ) -> dict[Ref, ObjectID]:
+    ) -> LsRemoteResult:
         """Retrieve the current refs from a git smart server.
 
         Args:
           path: Path to the repo to fetch from. (as bytestring)
+          protocol_version: Desired Git protocol version.
+          ref_prefix: Prefix filter for refs.
+
+        Returns:
+          LsRemoteResult object with refs and symrefs
         """
         raise NotImplementedError(self.get_refs)
 
@@ -1484,13 +1561,13 @@ class TraditionalGitClient(GitClient):
             proto.write_pkt_line(None)
             with proto:
                 try:
-                    refs, _symrefs, peeled = read_pkt_refs_v2(proto.read_pkt_seq())
+                    refs, symrefs, peeled = read_pkt_refs_v2(proto.read_pkt_seq())
                 except HangupException as exc:
                     raise _remote_error_from_stderr(stderr) from exc
                 proto.write_pkt_line(None)
                 for refname, refvalue in peeled.items():
                     refs[refname + PEELED_TAG_SUFFIX] = refvalue
-                return refs
+                return LsRemoteResult(refs, symrefs)
         else:
             with proto:
                 try:
@@ -1498,10 +1575,10 @@ class TraditionalGitClient(GitClient):
                 except HangupException as exc:
                     raise _remote_error_from_stderr(stderr) from exc
                 proto.write_pkt_line(None)
-                (_symrefs, _agent) = _extract_symrefs_and_agent(server_capabilities)
+                (symrefs, _agent) = _extract_symrefs_and_agent(server_capabilities)
                 if ref_prefix is not None:
                     refs = filter_ref_prefix(refs, ref_prefix)
-                return refs
+                return LsRemoteResult(refs, symrefs)
 
     def archive(
         self,
@@ -1932,7 +2009,20 @@ class LocalGitClient(GitClient):
     ):
         """Retrieve the current refs from a local on-disk repository."""
         with self._open_repo(path) as target:
-            return target.get_refs()
+            refs = target.get_refs()
+            # Extract symrefs from the local repository
+            symrefs = {}
+            for ref in refs:
+                try:
+                    # Check if this ref is symbolic by reading it directly
+                    ref_value = target.refs.read_ref(ref)
+                    if ref_value and ref_value.startswith(SYMREF):
+                        # Extract the target from the symref
+                        symrefs[ref] = ref_value[len(SYMREF) :]
+                except (KeyError, ValueError):
+                    # Not a symbolic ref or error reading it
+                    pass
+            return LsRemoteResult(refs, symrefs)
 
 
 # What Git client to use for local access
@@ -2799,7 +2889,7 @@ class AbstractHttpGitClient(GitClient):
     ):
         """Retrieve the current refs from a git smart server."""
         url = self._get_url(path)
-        refs, _, _, _, peeled = self._discover_references(
+        refs, _, _, symrefs, peeled = self._discover_references(
             b"git-upload-pack",
             url,
             protocol_version=protocol_version,
@@ -2807,7 +2897,7 @@ class AbstractHttpGitClient(GitClient):
         )
         for refname, refvalue in peeled.items():
             refs[refname + PEELED_TAG_SUFFIX] = refvalue
-        return refs
+        return LsRemoteResult(refs, symrefs)
 
     def get_url(self, path):
         return self._get_url(path).rstrip("/")

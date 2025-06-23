@@ -1,5 +1,9 @@
 0.23.1	UNRELEASED
 
+ * Support ``untracked_files="normal"`` argument to ``porcelain.status``,
+   and make this the default.
+   (Jelmer Vernooĳ, #835)
+
  * Return symrefs from ls_refs. (Jelmer Vernooĳ, #863)
 
  * Support short commit hashes in ``porcelain.reset()``.
@@ -37,6 +41,8 @@
 
  * Add support for includes in configuration files.
    (#1216, Jelmer Vernooĳ)
+
+ * Support timeouts for HTTP client operations.  (Jelmer Vernooĳ)
 
 0.23.0	2025-06-21
 

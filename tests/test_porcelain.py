@@ -3876,6 +3876,32 @@ class StatusTests(PorcelainTestCase):
         with self.assertRaises(NotImplementedError):
             _, _, _ = porcelain.status(repo=self.repo.path, untracked_files="normal")
 
+    def test_get_untracked_paths_top_level_issue_1247(self) -> None:
+        """Test for issue #1247: ensure top-level untracked files are detected."""
+        # Create a single top-level untracked file
+        with open(os.path.join(self.repo.path, "sample.txt"), "w") as f:
+            f.write("test content")
+
+        # Test get_untracked_paths directly
+        untracked = list(
+            porcelain.get_untracked_paths(
+                self.repo.path, self.repo.path, self.repo.open_index()
+            )
+        )
+        self.assertIn(
+            "sample.txt",
+            untracked,
+            "Top-level file 'sample.txt' should be in untracked list",
+        )
+
+        # Test via status
+        status = porcelain.status(self.repo)
+        self.assertIn(
+            "sample.txt",
+            status.untracked,
+            "Top-level file 'sample.txt' should be in status.untracked",
+        )
+
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 

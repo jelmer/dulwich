@@ -2325,6 +2325,7 @@ def default_urllib3_manager(
     pool_manager_cls=None,
     proxy_manager_cls=None,
     base_url=None,
+    timeout=None,
     **override_kwargs,
 ) -> Union["urllib3.ProxyManager", "urllib3.PoolManager"]:
     """Return urllib3 connection pool manager.
@@ -2333,6 +2334,7 @@ def default_urllib3_manager(
 
     Args:
       config: `dulwich.config.ConfigDict` instance with Git configuration.
+      timeout: Timeout for HTTP requests in seconds
       override_kwargs: Additional arguments for `urllib3.ProxyManager`
 
     Returns:
@@ -2376,6 +2378,15 @@ def default_urllib3_manager(
         except KeyError:
             ca_certs = None
 
+        # Check for timeout configuration
+        if timeout is None:
+            try:
+                timeout = config.get(b"http", b"timeout")
+                if timeout is not None:
+                    timeout = int(timeout)
+            except KeyError:
+                pass
+
     if user_agent is None:
         user_agent = default_user_agent_string()
 
@@ -2384,6 +2395,10 @@ def default_urllib3_manager(
     kwargs = {
         "ca_certs": ca_certs,
     }
+
+    # Add timeout if specified
+    if timeout is not None:
+        kwargs["timeout"] = timeout
     if ssl_verify is True:
         kwargs["cert_reqs"] = "CERT_REQUIRED"
     elif ssl_verify is False:
@@ -2930,13 +2945,17 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         config=None,
         username=None,
         password=None,
+        timeout=None,
         **kwargs,
     ) -> None:
         self._username = username
         self._password = password
+        self._timeout = timeout
 
         if pool_manager is None:
-            self.pool_manager = default_urllib3_manager(config, base_url=base_url)
+            self.pool_manager = default_urllib3_manager(
+                config, base_url=base_url, timeout=timeout
+            )
         else:
             self.pool_manager = pool_manager
 
@@ -2969,14 +2988,18 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         req_headers["Pragma"] = "no-cache"
 
         try:
+            request_kwargs = {
+                "headers": req_headers,
+                "preload_content": False,
+            }
+            if self._timeout is not None:
+                request_kwargs["timeout"] = self._timeout
+
             if data is None:
-                resp = self.pool_manager.request(
-                    "GET", url, headers=req_headers, preload_content=False
-                )
+                resp = self.pool_manager.request("GET", url, **request_kwargs)
             else:
-                resp = self.pool_manager.request(
-                    "POST", url, headers=req_headers, body=data, preload_content=False
-                )
+                request_kwargs["body"] = data
+                resp = self.pool_manager.request("POST", url, **request_kwargs)
         except urllib3.exceptions.HTTPError as e:
             raise GitProtocolError(str(e)) from e
 

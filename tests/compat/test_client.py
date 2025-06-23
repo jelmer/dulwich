@@ -269,7 +269,7 @@ class DulwichClientTestBase:
                 b"refs/tags/v1.0",
                 b"refs/tags/v1.0^{}",
             ],
-            sorted(refs.keys()),
+            sorted(refs.refs.keys()),
         )
 
     def test_get_refs_with_ref_prefix(self) -> None:
@@ -282,7 +282,7 @@ class DulwichClientTestBase:
                 b"refs/heads/branch",
                 b"refs/heads/master",
             ],
-            sorted(refs.keys()),
+            sorted(refs.refs.keys()),
         )
 
     def test_fetch_pack_depth(self) -> None:
@@ -405,7 +405,7 @@ class DulwichClientTestBase:
 
         repo_dir = os.path.join(self.gitroot, "server_new.export")
         with repo.Repo(repo_dir) as dest:
-            self.assertDictEqual(dest.refs.as_dict(), refs)
+            self.assertDictEqual(dest.refs.as_dict(), refs.refs)
 
 
 class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):

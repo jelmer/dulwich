@@ -4357,7 +4357,9 @@ class LsTreeTests(PorcelainTestCase):
 
 class LsRemoteTests(PorcelainTestCase):
     def test_empty(self) -> None:
-        self.assertEqual({}, porcelain.ls_remote(self.repo.path))
+        result = porcelain.ls_remote(self.repo.path)
+        self.assertEqual({}, result.refs)
+        self.assertEqual({}, result.symrefs)
 
     def test_some(self) -> None:
         cid = porcelain.commit(
@@ -4367,10 +4369,13 @@ class LsRemoteTests(PorcelainTestCase):
             committer=b"committer <email>",
         )
 
+        result = porcelain.ls_remote(self.repo.path)
         self.assertEqual(
             {b"refs/heads/master": cid, b"HEAD": cid},
-            porcelain.ls_remote(self.repo.path),
+            result.refs,
         )
+        # HEAD should be a symref to refs/heads/master
+        self.assertEqual({b"HEAD": b"refs/heads/master"}, result.symrefs)
 
 
 class LsFilesTests(PorcelainTestCase):

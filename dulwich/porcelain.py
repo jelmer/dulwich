@@ -2110,7 +2110,7 @@ def ls_remote(remote, config: Optional[Config] = None, **kwargs):
       remote: Remote repository location
       config: Configuration to use
     Returns:
-      Dictionary with remote refs
+      LsRemoteResult object with refs and symrefs
     """
     if config is None:
         config = StackedConfig.default()

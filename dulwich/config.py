@@ -25,13 +25,16 @@ Todo:
  * preserve formatting when updating configuration files
 """
 
+import logging
 import os
 import sys
 from collections.abc import Iterable, Iterator, KeysView, MutableMapping
 from contextlib import suppress
+from pathlib import Path
 from typing import (
     Any,
     BinaryIO,
+    Callable,
     Optional,
     Union,
     overload,
@@ -39,7 +42,70 @@ from typing import (
 
 from .file import GitFile
 
+logger = logging.getLogger(__name__)
+
+# Type for file opener callback
+FileOpener = Callable[[Union[str, os.PathLike]], BinaryIO]
+
+# Security limits for include files
+MAX_INCLUDE_FILE_SIZE = 1024 * 1024  # 1MB max for included config files
+DEFAULT_MAX_INCLUDE_DEPTH = 10  # Maximum recursion depth for includes
+
 SENTINEL = object()
+
+
+def _match_gitdir_pattern(
+    path: bytes, pattern: bytes, ignorecase: bool = False
+) -> bool:
+    """Simple gitdir pattern matching for includeIf conditions.
+
+    This handles the basic gitdir patterns used in includeIf directives.
+    """
+    # Convert to strings for easier manipulation
+    path_str = path.decode("utf-8", errors="replace")
+    pattern_str = pattern.decode("utf-8", errors="replace")
+
+    # Normalize paths to use forward slashes for consistent matching
+    path_str = path_str.replace("\\", "/")
+    pattern_str = pattern_str.replace("\\", "/")
+
+    if ignorecase:
+        path_str = path_str.lower()
+        pattern_str = pattern_str.lower()
+
+    # Handle the common cases for gitdir patterns
+    if pattern_str.startswith("**/") and pattern_str.endswith("/**"):
+        # Pattern like **/dirname/** should match any path containing dirname
+        dirname = pattern_str[3:-3]  # Remove **/ and /**
+        # Check if path contains the directory name as a path component
+        return ("/" + dirname + "/") in path_str or path_str.endswith("/" + dirname)
+    elif pattern_str.startswith("**/"):
+        # Pattern like **/filename
+        suffix = pattern_str[3:]  # Remove **/
+        return suffix in path_str or path_str.endswith("/" + suffix)
+    elif pattern_str.endswith("/**"):
+        # Pattern like /path/to/dir/** should match /path/to/dir and any subdirectory
+        base_pattern = pattern_str[:-3]  # Remove /**
+        return path_str == base_pattern or path_str.startswith(base_pattern + "/")
+    elif "**" in pattern_str:
+        # Handle patterns with ** in the middle
+        parts = pattern_str.split("**")
+        if len(parts) == 2:
+            prefix, suffix = parts
+            # Path must start with prefix and end with suffix (if any)
+            if prefix and not path_str.startswith(prefix):
+                return False
+            if suffix and not path_str.endswith(suffix):
+                return False
+            return True
+
+    # Direct match or simple glob pattern
+    if "*" in pattern_str or "?" in pattern_str or "[" in pattern_str:
+        import fnmatch
+
+        return fnmatch.fnmatch(path_str, pattern_str)
+    else:
+        return path_str == pattern_str
 
 
 def lower_key(key):
@@ -50,7 +116,7 @@ def lower_key(key):
         # For config sections, only lowercase the section name (first element)
         # but preserve the case of subsection names (remaining elements)
         if len(key) > 0:
-            return (key[0].lower(),) + key[1:]
+            return (key[0].lower(), *key[1:])
         return key
 
     return key
@@ -559,10 +625,19 @@ def _parse_section_header_line(line: bytes) -> tuple[Section, bytes]:
     line = line[last + 1 :]
     section: Section
     if len(pts) == 2:
-        if pts[1][:1] != b'"' or pts[1][-1:] != b'"':
-            raise ValueError(f"Invalid subsection {pts[1]!r}")
-        else:
+        # Handle subsections - Git allows more complex syntax for certain sections like includeIf
+        if pts[1][:1] == b'"' and pts[1][-1:] == b'"':
+            # Standard quoted subsection
             pts[1] = pts[1][1:-1]
+        elif pts[0] == b"includeIf":
+            # Special handling for includeIf sections which can have complex conditions
+            # Git allows these without strict quote validation
+            pts[1] = pts[1].strip()
+            if pts[1][:1] == b'"' and pts[1][-1:] == b'"':
+                pts[1] = pts[1][1:-1]
+        else:
+            # Other sections must have quoted subsections
+            raise ValueError(f"Invalid subsection {pts[1]!r}")
         if not _check_section_name(pts[0]):
             raise ValueError(f"invalid section name {pts[0]!r}")
         section = (pts[0], pts[1])
@@ -589,11 +664,39 @@ class ConfigFile(ConfigDict):
     ) -> None:
         super().__init__(values=values, encoding=encoding)
         self.path: Optional[str] = None
+        self._included_paths: set[str] = set()  # Track included files to prevent cycles
 
     @classmethod
-    def from_file(cls, f: BinaryIO) -> "ConfigFile":
-        """Read configuration from a file-like object."""
+    def from_file(
+        cls,
+        f: BinaryIO,
+        *,
+        config_dir: Optional[str] = None,
+        repo_dir: Optional[str] = None,
+        included_paths: Optional[set[str]] = None,
+        include_depth: int = 0,
+        max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
+        file_opener: Optional[FileOpener] = None,
+    ) -> "ConfigFile":
+        """Read configuration from a file-like object.
+
+        Args:
+            f: File-like object to read from
+            config_dir: Directory containing the config file (for relative includes)
+            repo_dir: Repository directory (for gitdir conditions)
+            included_paths: Set of already included paths (to prevent cycles)
+            include_depth: Current include depth (to prevent infinite recursion)
+            max_include_depth: Maximum allowed include depth
+            file_opener: Optional callback to open included files
+        """
+        if include_depth > max_include_depth:
+            # Prevent excessive recursion
+            raise ValueError(f"Maximum include depth ({max_include_depth}) exceeded")
+
         ret = cls()
+        if included_paths is not None:
+            ret._included_paths = included_paths.copy()
+
         section: Optional[Section] = None
         setting = None
         continuation = None
@@ -626,6 +729,19 @@ class ConfigFile(ConfigDict):
                     continuation = None
                     value = _parse_string(value)
                     ret._values[section][setting] = value
+
+                    # Process include/includeIf directives
+                    ret._handle_include_directive(
+                        section,
+                        setting,
+                        value,
+                        config_dir=config_dir,
+                        repo_dir=repo_dir,
+                        include_depth=include_depth,
+                        max_include_depth=max_include_depth,
+                        file_opener=file_opener,
+                    )
+
                     setting = None
             else:  # continuation line
                 assert continuation is not None
@@ -638,16 +754,247 @@ class ConfigFile(ConfigDict):
                     continuation += line
                     value = _parse_string(continuation)
                     ret._values[section][setting] = value
+
+                    # Process include/includeIf directives
+                    ret._handle_include_directive(
+                        section,
+                        setting,
+                        value,
+                        config_dir=config_dir,
+                        repo_dir=repo_dir,
+                        include_depth=include_depth,
+                        max_include_depth=max_include_depth,
+                        file_opener=file_opener,
+                    )
+
                     continuation = None
                     setting = None
         return ret
 
+    def _handle_include_directive(
+        self,
+        section: Optional[Section],
+        setting: bytes,
+        value: bytes,
+        *,
+        config_dir: Optional[str],
+        repo_dir: Optional[str],
+        include_depth: int,
+        max_include_depth: int,
+        file_opener: Optional[FileOpener],
+    ) -> None:
+        """Handle include/includeIf directives during config parsing."""
+        if (
+            section is not None
+            and setting == b"path"
+            and (
+                section[0].lower() == b"include"
+                or (len(section) > 1 and section[0].lower() == b"includeif")
+            )
+        ):
+            self._process_include(
+                section,
+                value,
+                config_dir=config_dir,
+                repo_dir=repo_dir,
+                include_depth=include_depth,
+                max_include_depth=max_include_depth,
+                file_opener=file_opener,
+            )
+
+    def _process_include(
+        self,
+        section: Section,
+        path_value: bytes,
+        *,
+        config_dir: Optional[str],
+        repo_dir: Optional[str],
+        include_depth: int,
+        max_include_depth: int,
+        file_opener: Optional[FileOpener],
+    ) -> None:
+        """Process an include or includeIf directive."""
+        path_str = path_value.decode(self.encoding, errors="replace")
+
+        # Handle includeIf conditions
+        if len(section) > 1 and section[0].lower() == b"includeif":
+            condition = section[1].decode(self.encoding, errors="replace")
+            if not self._evaluate_includeif_condition(condition, repo_dir):
+                return
+
+        # Resolve the include path
+        include_path = self._resolve_include_path(path_str, config_dir)
+        if not include_path:
+            return
+
+        # Check for circular includes
+        try:
+            abs_path = str(Path(include_path).resolve())
+        except (OSError, ValueError) as e:
+            # Invalid path - log and skip
+            logger.debug("Invalid include path %r: %s", include_path, e)
+            return
+        if abs_path in self._included_paths:
+            return
+
+        # Load and merge the included file
+        try:
+            # Use provided file opener or default to GitFile
+            if file_opener is None:
+
+                def opener(path):
+                    return GitFile(path, "rb")
+            else:
+                opener = file_opener
+
+            with opener(include_path) as included_file:
+                # Track this path to prevent cycles
+                self._included_paths.add(abs_path)
+
+                # Parse the included file
+                included_config = ConfigFile.from_file(
+                    included_file,
+                    config_dir=os.path.dirname(include_path),
+                    repo_dir=repo_dir,
+                    included_paths=self._included_paths,
+                    include_depth=include_depth + 1,
+                    max_include_depth=max_include_depth,
+                    file_opener=file_opener,
+                )
+
+                # Merge the included configuration
+                self._merge_config(included_config)
+        except OSError as e:
+            # Git silently ignores missing or unreadable include files
+            # Log for debugging purposes
+            logger.debug("Failed to read include file %r: %s", include_path, e)
+
+    def _merge_config(self, other: "ConfigFile") -> None:
+        """Merge another config file into this one."""
+        for section, values in other._values.items():
+            if section not in self._values:
+                self._values[section] = CaseInsensitiveOrderedMultiDict()
+            for key, value in values.items():
+                self._values[section][key] = value
+
+    def _resolve_include_path(
+        self, path: str, config_dir: Optional[str]
+    ) -> Optional[str]:
+        """Resolve an include path to an absolute path."""
+        # Expand ~ to home directory
+        path = os.path.expanduser(path)
+
+        # If path is relative and we have a config directory, make it relative to that
+        if not os.path.isabs(path) and config_dir:
+            path = os.path.join(config_dir, path)
+
+        return path
+
+    def _evaluate_includeif_condition(
+        self, condition: str, repo_dir: Optional[str]
+    ) -> bool:
+        """Evaluate an includeIf condition."""
+        if condition.startswith("gitdir:"):
+            return self._evaluate_gitdir_condition(condition[7:], repo_dir)
+        elif condition.startswith("gitdir/i:"):
+            return self._evaluate_gitdir_condition(
+                condition[9:], repo_dir, case_sensitive=False
+            )
+        elif condition.startswith("hasconfig:"):
+            # hasconfig conditions require special handling and access to the full config
+            # For now, we'll skip these as they require more complex implementation
+            return False
+        else:
+            # Unknown condition type - log and ignore (Git behavior)
+            logger.debug("Unknown includeIf condition: %r", condition)
+            return False
+
+    def _evaluate_gitdir_condition(
+        self, pattern: str, repo_dir: Optional[str], case_sensitive: bool = True
+    ) -> bool:
+        """Evaluate a gitdir condition using simplified pattern matching."""
+        if not repo_dir:
+            return False
+
+        # Skip relative patterns for now (would need config file path)
+        if pattern.startswith("./"):
+            return False
+
+        # Normalize repository path
+        try:
+            repo_path = str(Path(repo_dir).resolve())
+        except (OSError, ValueError) as e:
+            logger.debug("Invalid repository path %r: %s", repo_dir, e)
+            return False
+
+        # Expand ~ in pattern and normalize
+        pattern = os.path.expanduser(pattern)
+        pattern = self._normalize_gitdir_pattern(pattern)
+
+        # Use simple pattern matching for gitdir conditions
+        pattern_bytes = pattern.encode("utf-8", errors="replace")
+        repo_path_bytes = repo_path.encode("utf-8", errors="replace")
+
+        return _match_gitdir_pattern(
+            repo_path_bytes, pattern_bytes, ignorecase=not case_sensitive
+        )
+
+    def _normalize_gitdir_pattern(self, pattern: str) -> str:
+        """Normalize a gitdir pattern following Git's rules."""
+        # Normalize path separators to forward slashes
+        pattern = pattern.replace("\\", "/")
+
+        # If pattern doesn't start with ~/, ./, /, drive letter (Windows), or **, prepend **/
+        if not pattern.startswith(("~/", "./", "/", "**")):
+            # Check for Windows absolute path (e.g., C:/, D:/)
+            if len(pattern) >= 2 and pattern[1] == ":":
+                pass  # Don't prepend **/ for Windows absolute paths
+            else:
+                pattern = "**/" + pattern
+
+        # If pattern ends with /, append **
+        if pattern.endswith("/"):
+            pattern = pattern + "**"
+
+        return pattern
+
     @classmethod
-    def from_path(cls, path: Union[str, os.PathLike]) -> "ConfigFile":
-        """Read configuration from a file on disk."""
-        with GitFile(path, "rb") as f:
-            ret = cls.from_file(f)
-            ret.path = os.fspath(path)
+    def from_path(
+        cls,
+        path: Union[str, os.PathLike],
+        *,
+        repo_dir: Optional[str] = None,
+        max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
+        file_opener: Optional[FileOpener] = None,
+    ) -> "ConfigFile":
+        """Read configuration from a file on disk.
+
+        Args:
+            path: Path to the configuration file
+            repo_dir: Repository directory (for gitdir conditions in includeIf)
+            max_include_depth: Maximum allowed include depth
+            file_opener: Optional callback to open included files
+        """
+        abs_path = os.fspath(path)
+        config_dir = os.path.dirname(abs_path)
+
+        # Use provided file opener or default to GitFile
+        if file_opener is None:
+
+            def opener(p):
+                return GitFile(p, "rb")
+        else:
+            opener = file_opener
+
+        with opener(abs_path) as f:
+            ret = cls.from_file(
+                f,
+                config_dir=config_dir,
+                repo_dir=repo_dir,
+                max_include_depth=max_include_depth,
+                file_opener=file_opener,
+            )
+            ret.path = abs_path
             return ret
 
     def write_to_path(self, path: Optional[Union[str, os.PathLike]] = None) -> None:

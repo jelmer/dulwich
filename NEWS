@@ -3,6 +3,9 @@
  * Support dumb repository access.
    (Jelmer Vernooĳ, #1097)
 
+ * Fix TypeError when cloning repositories with bytes paths on Windows.
+   (Jelmer Vernooĳ, #973)
+
  * Support ``depth`` for local clones.
    (Jelmer Vernooĳ)
 

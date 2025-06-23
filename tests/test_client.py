@@ -993,8 +993,10 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, local)
 
         client = LocalGitClient()
-        refs = client.get_refs(local.path)
-        self.assertDictEqual(local.refs.as_dict(), refs)
+        result = client.get_refs(local.path)
+        self.assertDictEqual(local.refs.as_dict(), result.refs)
+        # Check that symrefs are detected correctly
+        self.assertIn(b"HEAD", result.symrefs)
 
     def send_and_verify(self, branch, local, target) -> None:
         """Send branch from local to remote repository and verify it worked."""

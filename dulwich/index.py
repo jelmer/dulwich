@@ -661,11 +661,13 @@ def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
 
 def read_index_dict_with_version(
     f: BinaryIO,
-) -> tuple[dict[bytes, Union[IndexEntry, ConflictedIndexEntry]], int]:
+) -> tuple[
+    dict[bytes, Union[IndexEntry, ConflictedIndexEntry]], int, list[IndexExtension]
+]:
     """Read an index file and return it as a dictionary along with the version.
 
     Returns:
-      tuple of (entries_dict, version)
+      tuple of (entries_dict, version, extensions)
     """
     version, num_entries = read_index_header(f)
 
@@ -688,7 +690,44 @@ def read_index_dict_with_version(
             elif stage == Stage.MERGE_CONFLICT_OTHER:
                 existing.other = IndexEntry.from_serialized(entry)
 
-    return ret, version
+    # Read extensions
+    extensions = []
+    while True:
+        # Check if we're at the end (20 bytes before EOF for SHA checksum)
+        current_pos = f.tell()
+        f.seek(0, 2)  # EOF
+        eof_pos = f.tell()
+        f.seek(current_pos)
+
+        if current_pos >= eof_pos - 20:
+            break
+
+        # Try to read extension signature
+        signature = f.read(4)
+        if len(signature) < 4:
+            break
+
+        # Check if it's a valid extension signature (4 uppercase letters)
+        if not all(65 <= b <= 90 for b in signature):
+            # Not an extension, seek back
+            f.seek(-4, 1)
+            break
+
+        # Read extension size
+        size_data = f.read(4)
+        if len(size_data) < 4:
+            break
+        size = struct.unpack(">I", size_data)[0]
+
+        # Read extension data
+        data = f.read(size)
+        if len(data) < size:
+            break
+
+        extension = IndexExtension.from_raw(signature, data)
+        extensions.append(extension)
+
+    return ret, version, extensions
 
 
 def read_index_dict(
@@ -719,7 +758,10 @@ def read_index_dict(
 
 
 def write_index(
-    f: BinaryIO, entries: list[SerializedIndexEntry], version: Optional[int] = None
+    f: BinaryIO,
+    entries: list[SerializedIndexEntry],
+    version: Optional[int] = None,
+    extensions: Optional[list[IndexExtension]] = None,
 ) -> None:
     """Write an index file.
 
@@ -727,6 +769,7 @@ def write_index(
       f: File-like object to write to
       version: Version number to write
       entries: Iterable over the entries to write
+      extensions: Optional list of extensions to write
     """
     if version is None:
         version = DEFAULT_VERSION
@@ -749,11 +792,17 @@ def write_index(
         write_cache_entry(f, entry, version=version, previous_path=previous_path)
         previous_path = entry.name
 
+    # Write extensions
+    if extensions:
+        for extension in extensions:
+            write_index_extension(f, extension)
+
 
 def write_index_dict(
     f: BinaryIO,
     entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]],
     version: Optional[int] = None,
+    extensions: Optional[list[IndexExtension]] = None,
 ) -> None:
     """Write an index file based on the contents of a dictionary.
     being careful to sort by path and then by stage.
@@ -776,7 +825,8 @@ def write_index_dict(
                 )
         else:
             entries_list.append(value.serialize(key, Stage.NORMAL))
-    write_index(f, entries_list, version=version)
+
+    write_index(f, entries_list, version=version, extensions=extensions)
 
 
 def cleanup_mode(mode: int) -> int:
@@ -826,6 +876,7 @@ class Index:
         # TODO(jelmer): Store the version returned by read_index
         self._version = version
         self._skip_hash = skip_hash
+        self._extensions: list[IndexExtension] = []
         self.clear()
         if read:
             self.read()
@@ -845,14 +896,22 @@ class Index:
         try:
             if self._skip_hash:
                 # When skipHash is enabled, write the index without computing SHA1
-                write_index_dict(cast(BinaryIO, f), self._byname, version=self._version)
+                write_index_dict(
+                    cast(BinaryIO, f),
+                    self._byname,
+                    version=self._version,
+                    extensions=self._extensions,
+                )
                 # Write 20 zero bytes instead of SHA1
                 f.write(b"\x00" * 20)
                 f.close()
             else:
                 sha1_writer = SHA1Writer(cast(BinaryIO, f))
                 write_index_dict(
-                    cast(BinaryIO, sha1_writer), self._byname, version=self._version
+                    cast(BinaryIO, sha1_writer),
+                    self._byname,
+                    version=self._version,
+                    extensions=self._extensions,
                 )
                 sha1_writer.close()
         except:
@@ -866,13 +925,13 @@ class Index:
         f = GitFile(self._filename, "rb")
         try:
             sha1_reader = SHA1Reader(f)
-            entries, version = read_index_dict_with_version(cast(BinaryIO, sha1_reader))
+            entries, version, extensions = read_index_dict_with_version(
+                cast(BinaryIO, sha1_reader)
+            )
             self._version = version
+            self._extensions = extensions
             self.update(entries)
-            # Read any remaining data before the SHA
-            remaining = os.path.getsize(self._filename) - sha1_reader.tell() - 20
-            if remaining > 0:
-                sha1_reader.read(remaining)
+            # Extensions have already been read by read_index_dict_with_version
             sha1_reader.check_sha(allow_empty=True)
         finally:
             f.close()

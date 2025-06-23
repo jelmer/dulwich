@@ -27,7 +27,7 @@ import tempfile
 from dulwich.index import Index, read_index_dict_with_version, write_index_dict
 from dulwich.repo import Repo
 
-from .utils import CompatTestCase, require_git_version, run_git_or_fail
+from .utils import CompatTestCase, require_git_version, run_git, run_git_or_fail
 
 
 class IndexV4CompatTestCase(CompatTestCase):
@@ -84,7 +84,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Read the index with dulwich
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         # Verify it's version 4
         self.assertEqual(version, 4)
@@ -96,7 +96,11 @@ class IndexV4CompatTestCase(CompatTestCase):
 
         # Write the index back with dulwich
         with open(index_path + ".dulwich", "wb") as f:
-            write_index_dict(f, entries, version=4)
+            from dulwich.pack import SHA1Writer
+
+            sha1_writer = SHA1Writer(f)
+            write_index_dict(sha1_writer, entries, version=4, extensions=extensions)
+            sha1_writer.close()
 
         # Compare with C git - use git ls-files to read both indexes
         output1 = run_git_or_fail(["ls-files", "--stage"], cwd=repo.path)
@@ -165,7 +169,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Read the index
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertIn(b"test.txt", entries)
@@ -217,7 +221,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Read with dulwich
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertEqual(len(entries), len(test_files))
@@ -229,14 +233,19 @@ class IndexV4CompatTestCase(CompatTestCase):
 
         # Test round-trip: dulwich write -> C Git read
         with open(index_path + ".dulwich", "wb") as f:
-            write_index_dict(f, entries, version=4)
+            from dulwich.pack import SHA1Writer
+
+            sha1_writer = SHA1Writer(f)
+            write_index_dict(sha1_writer, entries, version=4, extensions=extensions)
+            sha1_writer.close()
 
         # Replace index
         os.rename(index_path + ".dulwich", index_path)
 
         # Verify C Git can read all files
-        output = run_git_or_fail(["ls-files"], cwd=repo.path)
-        git_files = set(output.strip().split(b"\n"))
+        # Use -z flag to avoid quoting of non-ASCII filenames
+        output = run_git_or_fail(["ls-files", "-z"], cwd=repo.path)
+        git_files = set(output.strip(b"\x00").split(b"\x00"))
         expected_files = {f.encode("utf-8") for f in test_files}
         self.assertEqual(git_files, expected_files)
 
@@ -276,7 +285,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Read the index
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertEqual(len(entries), len(all_files))
@@ -287,14 +296,22 @@ class IndexV4CompatTestCase(CompatTestCase):
 
         # Test that dulwich can write a compatible index
         with open(index_path + ".dulwich", "wb") as f:
-            write_index_dict(f, entries, version=4)
+            from dulwich.pack import SHA1Writer
 
-        # Verify the written index is smaller (compression should help)
+            sha1_writer = SHA1Writer(f)
+            write_index_dict(sha1_writer, entries, version=4, extensions=extensions)
+            sha1_writer.close()
+
+        # Verify the written index is the same size (for byte-for-byte compatibility)
         original_size = os.path.getsize(index_path)
         dulwich_size = os.path.getsize(index_path + ".dulwich")
 
-        # Allow some variance due to different compression decisions
-        self.assertLess(abs(original_size - dulwich_size), original_size * 0.2)
+        # For v4 format with proper compression, checksum, and extensions, sizes should match
+        self.assertEqual(
+            original_size,
+            dulwich_size,
+            f"Index sizes don't match: Git={original_size}, Dulwich={dulwich_size}",
+        )
 
     def test_index_v4_with_extensions(self) -> None:
         """Test v4 index with various extensions."""
@@ -320,7 +337,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Read index with extensions
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertEqual(len(entries), len(files))
@@ -348,14 +365,20 @@ class IndexV4CompatTestCase(CompatTestCase):
         index_path = os.path.join(repo.path, ".git", "index")
         if os.path.exists(index_path):
             with open(index_path, "rb") as f:
-                entries, version = read_index_dict_with_version(f)
+                entries, version, extensions = read_index_dict_with_version(f)
 
             # Even empty indexes should be readable
             self.assertEqual(len(entries), 0)
 
             # Test writing empty index
             with open(index_path + ".dulwich", "wb") as f:
-                write_index_dict(f, entries, version=version)
+                from dulwich.pack import SHA1Writer
+
+                sha1_writer = SHA1Writer(f)
+                write_index_dict(
+                    sha1_writer, entries, version=version, extensions=extensions
+                )
+                sha1_writer.close()
 
     def test_index_v4_large_file_count(self) -> None:
         """Test v4 index with many files (stress test)."""
@@ -379,7 +402,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Read index
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertEqual(len(entries), len(files))
@@ -422,7 +445,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test dulwich can read the updated index
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertEqual(len(entries), 4)  # 3 original + 1 new
@@ -469,13 +492,13 @@ class IndexV4CompatTestCase(CompatTestCase):
         run_git_or_fail(["commit", "-m", "master change"], cwd=repo.path)
 
         # Try to merge (should create conflicts)
-        run_git_or_fail(["merge", "feature"], cwd=repo.path, check=False)
+        run_git(["merge", "feature"], cwd=repo.path)
 
         # Read the index with conflicts
         index_path = os.path.join(repo.path, ".git", "index")
         if os.path.exists(index_path):
             with open(index_path, "rb") as f:
-                entries, version = read_index_dict_with_version(f)
+                entries, version, extensions = read_index_dict_with_version(f)
 
             self.assertEqual(version, 4)
 
@@ -525,7 +548,7 @@ class IndexV4CompatTestCase(CompatTestCase):
             # Test reading
             index_path = os.path.join(repo.path, ".git", "index")
             with open(index_path, "rb") as f:
-                entries, version = read_index_dict_with_version(f)
+                entries, version, extensions = read_index_dict_with_version(f)
 
             self.assertEqual(version, 4)
 
@@ -579,7 +602,7 @@ class IndexV4CompatTestCase(CompatTestCase):
             # Test reading
             index_path = os.path.join(repo.path, ".git", "index")
             with open(index_path, "rb") as f:
-                entries, version = read_index_dict_with_version(f)
+                entries, version, extensions = read_index_dict_with_version(f)
 
             self.assertEqual(version, 4)
             self.assertGreater(len(entries), 0)
@@ -618,7 +641,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test reading
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
 
@@ -675,7 +698,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test reading
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertEqual(len(entries), len(files))
@@ -716,7 +739,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test reading index with submodule
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
 
@@ -759,7 +782,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test reading this complex index state
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertIn(b"partial.txt", entries)
@@ -806,7 +829,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test reading
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
 
@@ -872,7 +895,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test reading large index
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
         self.assertEqual(len(entries), len(files))
@@ -912,7 +935,7 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Test reading index with renames
         index_path = os.path.join(repo.path, ".git", "index")
         with open(index_path, "rb") as f:
-            entries, version = read_index_dict_with_version(f)
+            entries, version, extensions = read_index_dict_with_version(f)
 
         self.assertEqual(version, 4)
 

@@ -1697,3 +1697,143 @@ class CheckUserIdentityTests(TestCase):
         self.assertRaises(
             InvalidUserIdentity, check_user_identity, b"Contains\nnewline byte <>"
         )
+
+
+class RepoConfigIncludeIfTests(TestCase):
+    """Test includeIf functionality in repository config loading."""
+
+    def test_repo_config_includeif_gitdir(self) -> None:
+        """Test that includeIf gitdir conditions work when loading repo config."""
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a repository
+            repo_path = os.path.join(tmpdir, "myrepo")
+            r = Repo.init(repo_path, mkdir=True)
+            # Use realpath to resolve any symlinks (important on macOS)
+            repo_path = os.path.realpath(repo_path)
+
+            # Create an included config file
+            included_path = os.path.join(tmpdir, "work.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    email = work@example.com\n")
+
+            # Add includeIf to the repo config
+            config_path = os.path.join(repo_path, ".git", "config")
+            with open(config_path, "ab") as f:
+                f.write(f'\n[includeIf "gitdir:{repo_path}/.git/"]\n'.encode())
+                escaped_path = included_path.replace("\\", "\\\\")
+                f.write(f"    path = {escaped_path}\n".encode())
+
+            # Close and reopen to reload config
+            r.close()
+            r = Repo(repo_path)
+
+            # Check if include was processed
+            config = r.get_config()
+            self.assertEqual(b"work@example.com", config.get((b"user",), b"email"))
+            r.close()
+
+    def test_repo_config_includeif_gitdir_pattern(self) -> None:
+        """Test includeIf gitdir pattern matching in repository config."""
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a repository under "work" directory
+            work_dir = os.path.join(tmpdir, "work", "project1")
+            os.makedirs(os.path.dirname(work_dir), exist_ok=True)
+            r = Repo.init(work_dir, mkdir=True)
+
+            # Create an included config file
+            included_path = os.path.join(tmpdir, "work.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    email = work@company.com\n")
+
+            # Add includeIf with pattern to the repo config
+            config_path = os.path.join(work_dir, ".git", "config")
+            with open(config_path, "ab") as f:
+                # Use a pattern that will match paths containing /work/
+                f.write(b'\n[includeIf "gitdir:**/work/**"]\n')
+                escaped_path = included_path.replace("\\", "\\\\")
+                f.write(f"    path = {escaped_path}\n".encode())
+
+            # Close and reopen to reload config
+            r.close()
+            r = Repo(work_dir)
+
+            # Check if include was processed
+            config = r.get_config()
+            self.assertEqual(b"work@company.com", config.get((b"user",), b"email"))
+            r.close()
+
+    def test_repo_config_includeif_no_match(self) -> None:
+        """Test that includeIf doesn't include when condition doesn't match."""
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a repository
+            repo_path = os.path.join(tmpdir, "personal", "project")
+            os.makedirs(os.path.dirname(repo_path), exist_ok=True)
+            r = Repo.init(repo_path, mkdir=True)
+
+            # Create an included config file
+            included_path = os.path.join(tmpdir, "work.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    email = work@company.com\n")
+
+            # Add includeIf that won't match
+            config_path = os.path.join(repo_path, ".git", "config")
+            with open(config_path, "ab") as f:
+                f.write(b'\n[includeIf "gitdir:**/work/**"]\n')
+                escaped_path = included_path.replace("\\", "\\\\")
+                f.write(f"    path = {escaped_path}\n".encode())
+
+            # Close and reopen to reload config
+            r.close()
+            r = Repo(repo_path)
+
+            # Check that include was NOT processed
+            config = r.get_config()
+            with self.assertRaises(KeyError):
+                config.get((b"user",), b"email")
+            r.close()
+
+    def test_bare_repo_config_includeif(self) -> None:
+        """Test includeIf in bare repository."""
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a bare repository
+            repo_path = os.path.join(tmpdir, "bare.git")
+            r = Repo.init_bare(repo_path, mkdir=True)
+            # Use realpath to resolve any symlinks (important on macOS)
+            repo_path = os.path.realpath(repo_path)
+
+            # Create an included config file
+            included_path = os.path.join(tmpdir, "server.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[receive]\n    denyNonFastForwards = true\n")
+
+            # Add includeIf to the repo config
+            config_path = os.path.join(repo_path, "config")
+            with open(config_path, "ab") as f:
+                f.write(f'\n[includeIf "gitdir:{repo_path}/"]\n'.encode())
+                escaped_path = included_path.replace("\\", "\\\\")
+                f.write(f"    path = {escaped_path}\n".encode())
+
+            # Close and reopen to reload config
+            r.close()
+            r = Repo(repo_path)
+
+            # Check if include was processed
+            config = r.get_config()
+            self.assertEqual(b"true", config.get((b"receive",), b"denyNonFastForwards"))
+            r.close()

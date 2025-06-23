@@ -106,6 +106,8 @@ class IndexV4CompatTestCase(CompatTestCase):
         output1 = run_git_or_fail(["ls-files", "--stage"], cwd=repo.path)
 
         # Replace index with dulwich version
+        if os.path.exists(index_path):
+            os.remove(index_path)
         os.rename(index_path + ".dulwich", index_path)
 
         output2 = run_git_or_fail(["ls-files", "--stage"], cwd=repo.path)
@@ -240,6 +242,8 @@ class IndexV4CompatTestCase(CompatTestCase):
             sha1_writer.close()
 
         # Replace index
+        if os.path.exists(index_path):
+            os.remove(index_path)
         os.rename(index_path + ".dulwich", index_path)
 
         # Verify C Git can read all files
@@ -516,16 +520,29 @@ class IndexV4CompatTestCase(CompatTestCase):
 
         repo = self._init_repo_with_manyfiles()
 
+        import sys
+
         # Test various boundary conditions
-        boundary_files = [
-            "",  # Empty name (invalid, but test robustness)
-            "x",  # Single char
-            "xx",  # Two chars
-            "x" * 255,  # Max typical filename length
-            "x" * 4095,  # Max path length in many filesystems
-            "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z",  # Deep nesting
-            "file_with_" + "very_" * 50 + "long_name.txt",  # Very long name
-        ]
+        if sys.platform == "win32":
+            # Windows has path length limitations
+            boundary_files = [
+                "",  # Empty name (invalid, but test robustness)
+                "x",  # Single char
+                "xx",  # Two chars
+                "x" * 100,  # Long but within Windows limit
+                "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p",  # Deep nesting but shorter
+                "file_with_" + "very_" * 10 + "long_name.txt",  # Long name within limit
+            ]
+        else:
+            boundary_files = [
+                "",  # Empty name (invalid, but test robustness)
+                "x",  # Single char
+                "xx",  # Two chars
+                "x" * 255,  # Max typical filename length
+                "x" * 4095,  # Max path length in many filesystems
+                "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z",  # Deep nesting
+                "file_with_" + "very_" * 50 + "long_name.txt",  # Very long name
+            ]
 
         valid_files = []
         for filename in boundary_files:

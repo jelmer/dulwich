@@ -457,11 +457,14 @@ class BaseObjectStore:
           sha: SHA1 of the object
 
         Returns:
-          Modification time as seconds since epoch, or None if not available
+          Modification time as seconds since epoch
+
+        Raises:
+          KeyError: if the object is not found
         """
-        # Default implementation returns None
-        # Subclasses can override to provide actual mtime
-        return None
+        # Default implementation raises KeyError
+        # Subclasses should override to provide actual mtime
+        raise KeyError(sha)
 
 
 class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
@@ -1008,22 +1011,39 @@ class DiskObjectStore(PackBasedObjectStore):
         os.remove(self._get_shafile_path(sha))
 
     def get_object_mtime(self, sha):
-        """Get the modification time of a loose object.
+        """Get the modification time of an object.
 
         Args:
           sha: SHA1 of the object
 
         Returns:
-          Modification time as seconds since epoch, or None if not a loose object
-        """
-        if not self.contains_loose(sha):
-            return None
+          Modification time as seconds since epoch
 
-        path = self._get_shafile_path(sha)
-        try:
-            return os.path.getmtime(path)
-        except (OSError, FileNotFoundError):
-            return None
+        Raises:
+          KeyError: if the object is not found
+        """
+        # First check if it's a loose object
+        if self.contains_loose(sha):
+            path = self._get_shafile_path(sha)
+            try:
+                return os.path.getmtime(path)
+            except (OSError, FileNotFoundError):
+                pass
+
+        # Check if it's in a pack file
+        for pack in self.packs:
+            try:
+                if sha in pack:
+                    # Use the pack file's mtime for packed objects
+                    pack_path = pack._data_path
+                    try:
+                        return os.path.getmtime(pack_path)
+                    except (OSError, FileNotFoundError, AttributeError):
+                        pass
+            except PackFileDisappeared:
+                pass
+
+        raise KeyError(sha)
 
     def _remove_pack(self, pack) -> None:
         try:

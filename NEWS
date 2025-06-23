@@ -33,6 +33,9 @@
    in the remote were not removed locally due to incorrect path normalization
    on Windows. (#840, Jelmer Vernooĳ)
 
+ * Add support for includes in configuration files.
+   (#1216, Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

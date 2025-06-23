@@ -111,7 +111,7 @@ def _parse_patch(
 
 # note must all done using bytes not string because on linux filenames
 # may not be encodable even to utf-8
-def diffstat(lines, max_width=80):
+def diffstat(lines: list[bytes], max_width: int = 80) -> bytes:
     """Generate summary statistics from a git style diff ala
        (git diff tag1 tag2 --stat).
 

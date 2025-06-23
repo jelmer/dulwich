@@ -1533,7 +1533,7 @@ class TraditionalGitClient(GitClient):
                 return
             elif pkt == b"ACK\n" or pkt == b"ACK":
                 pass
-            elif pkt.startswith(b"ERR "):
+            elif pkt and pkt.startswith(b"ERR "):
                 raise GitProtocolError(pkt[4:].rstrip(b"\n").decode("utf-8", "replace"))
             else:
                 raise AssertionError(f"invalid response {pkt!r}")
@@ -2489,7 +2489,7 @@ class AbstractHttpGitClient(GitClient):
                     proto = Protocol(read, None)
                     return server_capabilities, resp, read, proto
 
-                proto = Protocol(read, None)
+                proto = Protocol(read, None)  # type: ignore
                 server_protocol_version = negotiate_protocol_version(proto)
                 if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
                     raise ValueError(
@@ -2744,7 +2744,7 @@ class AbstractHttpGitClient(GitClient):
 
             return FetchPackResult(refs, symrefs, agent)
         req_data = BytesIO()
-        req_proto = Protocol(None, req_data.write)
+        req_proto = Protocol(None, req_data.write)  # type: ignore
         (new_shallow, new_unshallow) = _handle_upload_pack_head(
             req_proto,
             negotiated_capabilities,
@@ -2774,7 +2774,7 @@ class AbstractHttpGitClient(GitClient):
             data = req_data.getvalue()
         resp, read = self._smart_request("git-upload-pack", url, data)
         try:
-            resp_proto = Protocol(read, None)
+            resp_proto = Protocol(read, None)  # type: ignore
             if new_shallow is None and new_unshallow is None:
                 (new_shallow, new_unshallow) = _read_shallow_updates(
                     resp_proto.read_pkt_seq()

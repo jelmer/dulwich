@@ -684,17 +684,19 @@ def add(repo: Union[str, os.PathLike, BaseRepo] = ".", paths=None):
                 # Also add unstaged (modified) files within this directory
                 for unstaged_path in all_unstaged_paths:
                     if isinstance(unstaged_path, bytes):
-                        unstaged_path = unstaged_path.decode("utf-8")
+                        unstaged_path_str = unstaged_path.decode("utf-8")
+                    else:
+                        unstaged_path_str = unstaged_path
 
                     # Check if this unstaged file is within the directory we're processing
-                    unstaged_full_path = repo_path / unstaged_path
+                    unstaged_full_path = repo_path / unstaged_path_str
                     try:
                         unstaged_full_path.relative_to(resolved_path)
                         # File is within this directory, add it
-                        if not ignore_manager.is_ignored(unstaged_path):
-                            relpaths.append(unstaged_path)
+                        if not ignore_manager.is_ignored(unstaged_path_str):
+                            relpaths.append(unstaged_path_str)
                         else:
-                            ignored.add(unstaged_path)
+                            ignored.add(unstaged_path_str)
                     except ValueError:
                         # File is not within this directory, skip it
                         continue
@@ -1197,7 +1199,7 @@ def tag_create(
             if tag_timezone is None:
                 tag_timezone = get_user_timezones()[1]
             elif isinstance(tag_timezone, str):
-                tag_timezone = parse_timezone(tag_timezone)
+                tag_timezone = parse_timezone(tag_timezone.encode())
             tag_obj.tag_timezone = tag_timezone
             if sign:
                 tag_obj.sign(sign if isinstance(sign, str) else None)

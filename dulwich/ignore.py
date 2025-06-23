@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 from .config import Config, get_xdg_config_home_path
 
 
-def _pattern_to_str(pattern) -> str:
+def _pattern_to_str(pattern: Union["Pattern", bytes, str]) -> str:
     """Convert a pattern to string, handling both Pattern objects and raw patterns."""
     if hasattr(pattern, "pattern"):
         pattern_bytes = pattern.pattern
@@ -370,7 +370,10 @@ class IgnoreFilter:
     """
 
     def __init__(
-        self, patterns: Iterable[bytes], ignorecase: bool = False, path=None
+        self,
+        patterns: Iterable[bytes],
+        ignorecase: bool = False,
+        path: Optional[str] = None,
     ) -> None:
         self._patterns: list[Pattern] = []
         self._ignorecase = ignorecase
@@ -396,7 +399,7 @@ class IgnoreFilter:
             if pattern.match(path):
                 yield pattern
 
-    def is_ignored(self, path: bytes) -> Optional[bool]:
+    def is_ignored(self, path: Union[bytes, str]) -> Optional[bool]:
         """Check whether a path is ignored using Git-compliant logic.
 
         For directories, include a trailing slash.
@@ -434,7 +437,7 @@ class IgnoreFilter:
         cls, path: Union[str, os.PathLike], ignorecase: bool = False
     ) -> "IgnoreFilter":
         with open(path, "rb") as f:
-            return cls(read_ignore_patterns(f), ignorecase, path=path)
+            return cls(read_ignore_patterns(f), ignorecase, path=str(path))
 
     def __repr__(self) -> str:
         path = getattr(self, "_path", None)
@@ -447,7 +450,7 @@ class IgnoreFilter:
 class IgnoreFilterStack:
     """Check for ignore status in multiple filters."""
 
-    def __init__(self, filters) -> None:
+    def __init__(self, filters: list[IgnoreFilter]) -> None:
         self._filters = filters
 
     def is_ignored(self, path: str) -> Optional[bool]:

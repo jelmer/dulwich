@@ -31,12 +31,14 @@ the dulwich.client.get_ssh_vendor attribute:
 This implementation is experimental and does not have any tests.
 """
 
+from typing import Any, BinaryIO, Optional, cast
+
 import paramiko
 import paramiko.client
 
 
 class _ParamikoWrapper:
-    def __init__(self, client, channel) -> None:
+    def __init__(self, client: paramiko.SSHClient, channel: paramiko.Channel) -> None:
         self.client = client
         self.channel = channel
 
@@ -44,17 +46,17 @@ class _ParamikoWrapper:
         self.channel.setblocking(True)
 
     @property
-    def stderr(self):
-        return self.channel.makefile_stderr("rb")
+    def stderr(self) -> BinaryIO:
+        return cast(BinaryIO, self.channel.makefile_stderr("rb"))
 
-    def can_read(self):
+    def can_read(self) -> bool:
         return self.channel.recv_ready()
 
-    def write(self, data):
+    def write(self, data: bytes) -> None:
         return self.channel.sendall(data)
 
-    def read(self, n=None):
-        data = self.channel.recv(n)
+    def read(self, n: Optional[int] = None) -> bytes:
+        data = self.channel.recv(n or 4096)
         data_len = len(data)
 
         # Closed socket
@@ -74,24 +76,24 @@ class _ParamikoWrapper:
 class ParamikoSSHVendor:
     # http://docs.paramiko.org/en/2.4/api/client.html
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: object) -> None:
         self.kwargs = kwargs
 
     def run_command(
         self,
-        host,
-        command,
-        username=None,
-        port=None,
-        password=None,
-        pkey=None,
-        key_filename=None,
-        protocol_version=None,
-        **kwargs,
-    ):
+        host: str,
+        command: str,
+        username: Optional[str] = None,
+        port: Optional[int] = None,
+        password: Optional[str] = None,
+        pkey: Optional[paramiko.PKey] = None,
+        key_filename: Optional[str] = None,
+        protocol_version: Optional[int] = None,
+        **kwargs: object,
+    ) -> _ParamikoWrapper:
         client = paramiko.SSHClient()
 
-        connection_kwargs = {"hostname": host}
+        connection_kwargs: dict[str, Any] = {"hostname": host}
         connection_kwargs.update(self.kwargs)
         if username:
             connection_kwargs["username"] = username
@@ -110,7 +112,10 @@ class ParamikoSSHVendor:
         client.connect(**connection_kwargs)
 
         # Open SSH session
-        channel = client.get_transport().open_session()
+        transport = client.get_transport()
+        if transport is None:
+            raise RuntimeError("Transport is None")
+        channel = transport.open_session()
 
         if protocol_version is None or protocol_version == 2:
             channel.set_environment_variable(name="GIT_PROTOCOL", value="version=2")

@@ -193,7 +193,10 @@ class TestPackIndexCompat(PackTests):
 
         # Load the pack and create v2 index (most compatible)
         pack_data = PackData(pack_path + ".pack")
-        pack_data.create_index(pack_path + ".idx", version=2)
+        try:
+            pack_data.create_index(pack_path + ".idx", version=2)
+        finally:
+            pack_data.close()
 
         # Verify git can read it
         output = run_git_or_fail(["verify-pack", "-v", pack_path + ".pack"])

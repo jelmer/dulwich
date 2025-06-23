@@ -3723,6 +3723,69 @@ class StatusTests(PorcelainTestCase):
         _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
         self.assertEqual(untracked, ["untracked_dir/untracked_file"])
 
+    def test_status_untracked_path_normal(self) -> None:
+        # Create an untracked directory with multiple files
+        untracked_dir = os.path.join(self.repo_path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        untracked_file1 = os.path.join(untracked_dir, "file1")
+        untracked_file2 = os.path.join(untracked_dir, "file2")
+        with open(untracked_file1, "w") as fh:
+            fh.write("untracked1")
+        with open(untracked_file2, "w") as fh:
+            fh.write("untracked2")
+
+        # Create a nested untracked directory
+        nested_dir = os.path.join(untracked_dir, "nested")
+        os.mkdir(nested_dir)
+        nested_file = os.path.join(nested_dir, "file3")
+        with open(nested_file, "w") as fh:
+            fh.write("untracked3")
+
+        # Test "normal" mode - should only show the directory, not individual files
+        _, _, untracked = porcelain.status(self.repo.path, untracked_files="normal")
+        self.assertEqual(untracked, ["untracked_dir/"])
+
+        # Test "all" mode - should show all files
+        _, _, untracked_all = porcelain.status(self.repo.path, untracked_files="all")
+        self.assertEqual(
+            sorted(untracked_all),
+            [
+                "untracked_dir/file1",
+                "untracked_dir/file2",
+                "untracked_dir/nested/file3",
+            ],
+        )
+
+    def test_status_mixed_tracked_untracked(self) -> None:
+        # Create a directory with both tracked and untracked files
+        mixed_dir = os.path.join(self.repo_path, "mixed_dir")
+        os.mkdir(mixed_dir)
+
+        # Add a tracked file
+        tracked_file = os.path.join(mixed_dir, "tracked.txt")
+        with open(tracked_file, "w") as fh:
+            fh.write("tracked content")
+        porcelain.add(self.repo.path, paths=[tracked_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"add tracked file",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Add untracked files to the same directory
+        untracked_file = os.path.join(mixed_dir, "untracked.txt")
+        with open(untracked_file, "w") as fh:
+            fh.write("untracked content")
+
+        # In "normal" mode, should show individual untracked files in mixed dirs
+        _, _, untracked = porcelain.status(self.repo.path, untracked_files="normal")
+        self.assertEqual(untracked, ["mixed_dir/untracked.txt"])
+
+        # In "all" mode, should be the same for mixed directories
+        _, _, untracked_all = porcelain.status(self.repo.path, untracked_files="all")
+        self.assertEqual(untracked_all, ["mixed_dir/untracked.txt"])
+
     def test_status_crlf_mismatch(self) -> None:
         # First make a commit as if the file has been added on a Linux system
         # or with core.autocrlf=True
@@ -4028,8 +4091,19 @@ class StatusTests(PorcelainTestCase):
             )
 
     def test_get_untracked_paths_normal(self) -> None:
-        with self.assertRaises(NotImplementedError):
-            _, _, _ = porcelain.status(repo=self.repo.path, untracked_files="normal")
+        # Create an untracked directory with files
+        untracked_dir = os.path.join(self.repo.path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        with open(os.path.join(untracked_dir, "file1.txt"), "w") as f:
+            f.write("untracked content")
+        with open(os.path.join(untracked_dir, "file2.txt"), "w") as f:
+            f.write("more untracked content")
+
+        # Test that "normal" mode works and returns only the directory
+        _, _, untracked = porcelain.status(
+            repo=self.repo.path, untracked_files="normal"
+        )
+        self.assertEqual(untracked, ["untracked_dir/"])
 
     def test_get_untracked_paths_top_level_issue_1247(self) -> None:
         """Test for issue #1247: ensure top-level untracked files are detected."""

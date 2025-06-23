@@ -2547,7 +2547,14 @@ class AbstractHttpGitClient(GitClient):
                     return refs, server_capabilities, base_url, symrefs, peeled
             else:
                 self.protocol_version = 0  # dumb servers only support protocol v0
-                (refs, peeled) = split_peeled_refs(read_info_refs(resp))
+                # Read all the response data
+                data = b""
+                while True:
+                    chunk = read(4096)
+                    if not chunk:
+                        break
+                    data += chunk
+                (refs, peeled) = split_peeled_refs(read_info_refs(BytesIO(data)))
                 if ref_prefix is not None:
                     refs = filter_ref_prefix(refs, ref_prefix)
                 return refs, set(), base_url, {}, peeled
@@ -2700,7 +2707,42 @@ class AbstractHttpGitClient(GitClient):
         if not wants:
             return FetchPackResult(refs, symrefs, agent)
         if self.dumb:
-            raise NotImplementedError(self.fetch_pack)
+            # Use dumb HTTP protocol
+            from .dumb import DumbRemoteHTTPRepo
+
+            # Pass http_request function
+            dumb_repo = DumbRemoteHTTPRepo(url, self._http_request)
+
+            # Fetch pack data from dumb remote
+            pack_data_list = list(
+                dumb_repo.fetch_pack_data(
+                    graph_walker, lambda refs: wants, progress=progress, depth=depth
+                )
+            )
+
+            # Write pack data
+            if pack_data:
+                from .pack import pack_objects_to_data, write_pack_data
+
+                # Convert unpacked objects to ShaFile objects for packing
+                objects = []
+                for unpacked in pack_data_list:
+                    objects.append(unpacked.sha_file())
+
+                # Generate pack data and write it to a buffer
+                pack_buffer = BytesIO()
+                count, unpacked_iter = pack_objects_to_data(objects)
+                write_pack_data(
+                    pack_buffer.write,
+                    unpacked_iter,
+                    num_records=count,
+                    progress=progress,
+                )
+
+                # Pass the raw pack data to pack_data callback
+                pack_data(pack_buffer.getvalue())
+
+            return FetchPackResult(refs, symrefs, agent)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)
         (new_shallow, new_unshallow) = _handle_upload_pack_head(

@@ -1727,7 +1727,8 @@ class Repo(BaseRepo):
 
         path = os.path.join(self.commondir(), "config.worktree")
         try:
-            return ConfigFile.from_path(path)
+            # Pass the git directory (not working tree) for includeIf gitdir conditions
+            return ConfigFile.from_path(path, repo_dir=self._controldir)
         except FileNotFoundError:
             cf = ConfigFile()
             cf.path = path
@@ -1742,7 +1743,8 @@ class Repo(BaseRepo):
 
         path = os.path.join(self._commondir, "config")
         try:
-            return ConfigFile.from_path(path)
+            # Pass the git directory (not working tree) for includeIf gitdir conditions
+            return ConfigFile.from_path(path, repo_dir=self._controldir)
         except FileNotFoundError:
             ret = ConfigFile()
             ret.path = path

@@ -32,6 +32,10 @@ This implementation is experimental and does not have any tests.
 """
 
 from io import BytesIO
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+if TYPE_CHECKING:
+    from ..config import ConfigFile
 
 from requests import Session
 
@@ -46,7 +50,13 @@ from ..errors import GitProtocolError, NotGitRepository
 
 class RequestsHttpGitClient(AbstractHttpGitClient):
     def __init__(
-        self, base_url, dumb=None, config=None, username=None, password=None, **kwargs
+        self,
+        base_url: str,
+        dumb: Optional[bool] = None,
+        config: Optional["ConfigFile"] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        **kwargs: object,
     ) -> None:
         self._username = username
         self._password = password
@@ -54,12 +64,20 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         self.session = get_session(config)
 
         if username is not None:
-            self.session.auth = (username, password)
+            self.session.auth = (username, password)  # type: ignore[assignment]
 
-        super().__init__(base_url=base_url, dumb=dumb, **kwargs)
+        super().__init__(
+            base_url=base_url, dumb=bool(dumb) if dumb is not None else False, **kwargs
+        )
 
-    def _http_request(self, url, headers=None, data=None, allow_compression=False):
-        req_headers = self.session.headers.copy()
+    def _http_request(
+        self,
+        url: str,
+        headers: Optional[dict[str, str]] = None,
+        data: Optional[bytes] = None,
+        allow_compression: bool = False,
+    ) -> tuple[Any, Callable[[int], bytes]]:
+        req_headers = self.session.headers.copy()  # type: ignore[attr-defined]
         if headers is not None:
             req_headers.update(headers)
 
@@ -83,34 +101,37 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
             raise GitProtocolError(f"unexpected http resp {resp.status_code} for {url}")
 
         # Add required fields as stated in AbstractHttpGitClient._http_request
-        resp.content_type = resp.headers.get("Content-Type")
-        resp.redirect_location = ""
+        resp.content_type = resp.headers.get("Content-Type")  # type: ignore[attr-defined]
+        resp.redirect_location = ""  # type: ignore[attr-defined]
         if resp.history:
-            resp.redirect_location = resp.url
+            resp.redirect_location = resp.url  # type: ignore[attr-defined]
 
         read = BytesIO(resp.content).read
 
         return resp, read
 
 
-def get_session(config):
+def get_session(config: Optional["ConfigFile"]) -> Session:
     session = Session()
     session.headers.update({"Pragma": "no-cache"})
 
-    proxy_server = user_agent = ca_certs = ssl_verify = None
+    proxy_server: Optional[str] = None
+    user_agent: Optional[str] = None
+    ca_certs: Optional[str] = None
+    ssl_verify: Optional[bool] = None
 
     if config is not None:
         try:
-            proxy_server = config.get(b"http", b"proxy")
-            if isinstance(proxy_server, bytes):
-                proxy_server = proxy_server.decode()
+            proxy_bytes = config.get(b"http", b"proxy")
+            if isinstance(proxy_bytes, bytes):
+                proxy_server = proxy_bytes.decode()
         except KeyError:
             pass
 
         try:
-            user_agent = config.get(b"http", b"useragent")
-            if isinstance(user_agent, bytes):
-                user_agent = user_agent.decode()
+            agent_bytes = config.get(b"http", b"useragent")
+            if isinstance(agent_bytes, bytes):
+                user_agent = agent_bytes.decode()
         except KeyError:
             pass
 
@@ -120,21 +141,22 @@ def get_session(config):
             ssl_verify = True
 
         try:
-            ca_certs = config.get(b"http", b"sslCAInfo")
-            if isinstance(ca_certs, bytes):
-                ca_certs = ca_certs.decode()
+            certs_bytes = config.get(b"http", b"sslCAInfo")
+            if isinstance(certs_bytes, bytes):
+                ca_certs = certs_bytes.decode()
         except KeyError:
             ca_certs = None
 
     if user_agent is None:
         user_agent = default_user_agent_string()
-    session.headers.update({"User-agent": user_agent})
+    if user_agent is not None:
+        session.headers.update({"User-agent": user_agent})
 
     if ca_certs:
         session.verify = ca_certs
     elif ssl_verify is False:
         session.verify = ssl_verify
 
-    if proxy_server:
+    if proxy_server is not None:
         session.proxies.update({"http": proxy_server, "https": proxy_server})
     return session

@@ -1092,6 +1092,15 @@ class FileSystemBackendTests(TestCase):
 
         self.assertRaises(NotGitRepository, lambda: backend.open_repository("/ups"))
 
+    def test_bytes_path(self) -> None:
+        # Test that FileSystemBackend can handle bytes paths (issue #973)
+        repo = self.backend.open_repository(self.path.encode("utf-8"))
+        self.assertTrue(
+            os.path.samefile(
+                os.path.abspath(repo.path), os.path.abspath(self.repo.path)
+            )
+        )
+
 
 class DictBackendTests(TestCase):
     """Tests for DictBackend."""

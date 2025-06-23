@@ -21,3 +21,5 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Ensure all functionality is available in pure Python (Rust implementations optional)
 - Add unit tests for new functionality and bug fixes
 - All contributions must be under Apache License 2.0+ or GPL 2.0+
+- When adding new test files, ensure the test accumulation functions are updated
+  (i.e. ``self_test_suite()`` in `tests/__init__.py` or ``test_suite()`` in `tests/compat/__init__.py`)

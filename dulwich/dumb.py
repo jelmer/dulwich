@@ -410,13 +410,13 @@ class DumbRemoteHTTPRepo(BaseRepo):
 
         This is the main method for fetching objects from a dumb HTTP remote.
         Since dumb HTTP doesn't support negotiation, we need to download
-        all objects reachable from the wanted refs that we don't have locally.
+        all objects reachable from the wanted refs.
 
         Args:
-          graph_walker: GraphWalker instance that can tell us which commits we have
+          graph_walker: GraphWalker instance (not used for dumb HTTP)
           determine_wants: Function that returns list of wanted SHAs
           progress: Optional progress callback
-          depth: Depth for shallow clones (not fully supported)
+          depth: Depth for shallow clones (not supported for dumb HTTP)
 
         Returns:
           Iterator of UnpackedObject instances
@@ -427,8 +427,7 @@ class DumbRemoteHTTPRepo(BaseRepo):
         if not wants:
             return
 
-        # For dumb HTTP, we can't negotiate, so we need to fetch all objects
-        # reachable from wants that we don't already have
+        # For dumb HTTP, we traverse the object graph starting from wants
         to_fetch = set(wants)
         seen = set()
 
@@ -438,19 +437,17 @@ class DumbRemoteHTTPRepo(BaseRepo):
                 continue
             seen.add(sha)
 
-            # Check if we already have this object
-            haves = list(graph_walker.ack(sha))
-            if haves:
+            # Fetch the object
+            try:
+                type_num, content = self._object_store.get_raw(sha)
+            except KeyError:
+                # Object not found, skip it
                 continue
 
-            # Fetch the object
-            type_num, content = self._object_store.get_raw(sha)
-            unpacked = UnpackedObject(type_num, sha=sha)
-            unpacked.obj_type_num = type_num
-            unpacked.obj_chunks = [content]
+            unpacked = UnpackedObject(type_num, sha=sha, decomp_chunks=[content])
             yield unpacked
 
-            # If it's a commit or tag, we need to fetch its references
+            # Parse the object to find references to other objects
             obj = ShaFile.from_raw_string(type_num, content)
 
             if isinstance(obj, Commit):  # Commit

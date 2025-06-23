@@ -944,6 +944,18 @@ class InitTests(TestCase):
 
 
 class AddTests(PorcelainTestCase):
+    def _normalize_paths(self, paths):
+        """Normalize paths returned by porcelain.add() for comparison.
+
+        Handles both bytes and strings, converts to strings with forward slashes.
+        """
+        normalized = []
+        for path in paths:
+            if isinstance(path, bytes):
+                path = path.decode("utf-8")
+            normalized.append(path.replace(os.sep, "/"))
+        return normalized
+
     def test_add_default_paths(self) -> None:
         # create a file for initial commit
         fullpath = os.path.join(self.repo.path, "blah")
@@ -969,7 +981,7 @@ class AddTests(PorcelainTestCase):
             self.assertEqual({"foo", "blah", "adir", ".git"}, set(os.listdir(".")))
             added, ignored = porcelain.add(self.repo.path)
             # Normalize paths to use forward slashes for comparison
-            added_normalized = [path.replace(os.sep, "/") for path in added]
+            added_normalized = self._normalize_paths(added)
             self.assertEqual(
                 (added_normalized, ignored),
                 (["foo", "adir/afile"], set()),
@@ -1140,8 +1152,10 @@ class AddTests(PorcelainTestCase):
 
         # When adding a symlink to a directory, it follows the symlink and adds contents
         self.assertEqual(len(added), 2)
-        self.assertIn("link_to_dir/file1.txt", added)
-        self.assertIn("link_to_dir/file2.txt", added)
+        # Convert bytes to strings for comparison
+        added_normalized = self._normalize_paths(added)
+        self.assertIn("link_to_dir/file1.txt", added_normalized)
+        self.assertIn("link_to_dir/file2.txt", added_normalized)
         self.assertEqual(len(ignored), 0)
 
         # Verify files are added through the symlink path
@@ -1283,9 +1297,10 @@ class AddTests(PorcelainTestCase):
         added, ignored = porcelain.add(self.repo.path, paths=[self.repo.path])
 
         # Should add all untracked files, not stage './'
-        self.assertIn("file1.txt", added)
-        self.assertIn("file2.txt", added)
-        self.assertNotIn("./", added)
+        added_normalized = self._normalize_paths(added)
+        self.assertIn("file1.txt", added_normalized)
+        self.assertIn("file2.txt", added_normalized)
+        self.assertNotIn("./", added_normalized)
 
         # Verify files are actually staged
         index = self.repo.open_index()
@@ -1310,7 +1325,7 @@ class AddTests(PorcelainTestCase):
         # Should add all files in the directory
         self.assertEqual(len(added), 3)
         # Normalize paths to use forward slashes for comparison
-        added_normalized = [path.replace(os.sep, "/") for path in added]
+        added_normalized = self._normalize_paths(added)
         self.assertIn("subdir/file1.txt", added_normalized)
         self.assertIn("subdir/file2.txt", added_normalized)
         self.assertIn("subdir/file3.txt", added_normalized)
@@ -1343,7 +1358,7 @@ class AddTests(PorcelainTestCase):
         # Should add all files recursively
         self.assertEqual(len(added), 3)
         # Normalize paths to use forward slashes for comparison
-        added_normalized = [path.replace(os.sep, "/") for path in added]
+        added_normalized = self._normalize_paths(added)
         self.assertIn("dir1/file1.txt", added_normalized)
         self.assertIn("dir1/dir2/file2.txt", added_normalized)
         self.assertIn("dir1/dir2/dir3/file3.txt", added_normalized)
@@ -1384,7 +1399,7 @@ class AddTests(PorcelainTestCase):
         # Should only add the untracked files
         self.assertEqual(len(added), 2)
         # Normalize paths to use forward slashes for comparison
-        added_normalized = [path.replace(os.sep, "/") for path in added]
+        added_normalized = self._normalize_paths(added)
         self.assertIn("mixed/untracked1.txt", added_normalized)
         self.assertIn("mixed/untracked2.txt", added_normalized)
         self.assertNotIn("mixed/tracked.txt", added)
@@ -1426,14 +1441,14 @@ class AddTests(PorcelainTestCase):
 
         # Should only add non-ignored files
         # Normalize paths to use forward slashes for comparison
-        added_normalized = {path.replace(os.sep, "/") for path in added}
+        added_normalized = set(self._normalize_paths(added))
         self.assertEqual(
             added_normalized, {"testdir/important.txt", "testdir/readme.md"}
         )
 
         # Check ignored files
         # Normalize paths to use forward slashes for comparison
-        ignored_normalized = {path.replace(os.sep, "/") for path in ignored}
+        ignored_normalized = set(self._normalize_paths(ignored))
         self.assertIn("testdir/debug.log", ignored_normalized)
         self.assertIn("testdir/temp.tmp", ignored_normalized)
         self.assertIn("testdir/build/", ignored_normalized)
@@ -1455,7 +1470,7 @@ class AddTests(PorcelainTestCase):
         # Should add all files from all directories
         self.assertEqual(len(added), 6)
         # Normalize paths to use forward slashes for comparison
-        added_normalized = [path.replace(os.sep, "/") for path in added]
+        added_normalized = self._normalize_paths(added)
         for dirname in ["dir1", "dir2", "dir3"]:
             for i in range(2):
                 self.assertIn(f"{dirname}/file{i}.txt", added_normalized)
@@ -1491,8 +1506,9 @@ class AddTests(PorcelainTestCase):
         added_files, ignored_files = porcelain.add(repo=self.repo.path)
 
         # Verify both files were added
-        self.assertIn("existing.txt", added_files)
-        self.assertIn("new.txt", added_files)
+        added_normalized = self._normalize_paths(added_files)
+        self.assertIn("existing.txt", added_normalized)
+        self.assertIn("new.txt", added_normalized)
         self.assertEqual(len(ignored_files), 0)
 
         # Verify both files are now staged
@@ -2677,11 +2693,15 @@ class CheckoutTests(PorcelainTestCase):
             f.write("new message\n")
 
         status = list(porcelain.status(self.repo))
+        # Convert bytes to strings for comparison
+        status[2] = [f.decode() if isinstance(f, bytes) else f for f in status[2]]
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["neu"]], status)
 
         porcelain.checkout(self.repo, b"uni")
 
         status = list(porcelain.status(self.repo))
+        # Convert bytes to strings for comparison
+        status[2] = [f.decode() if isinstance(f, bytes) else f for f in status[2]]
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["neu"]], status)
 
     def test_checkout_to_branch_with_new_files(self) -> None:
@@ -3706,6 +3726,7 @@ class StatusTests(PorcelainTestCase):
             results.staged,
         )
         self.assertListEqual(results.unstaged, [b"blye"])
+        self.assertListEqual(results.untracked, [b"blyat"])
         results_no_untracked = porcelain.status(self.repo.path, untracked_files="no")
         self.assertListEqual(results_no_untracked.untracked, [])
 
@@ -3721,7 +3742,7 @@ class StatusTests(PorcelainTestCase):
             fh.write("untracked")
 
         _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
-        self.assertEqual(untracked, ["untracked_dir/untracked_file"])
+        self.assertEqual(untracked, [b"untracked_dir/untracked_file"])
 
     def test_status_crlf_mismatch(self) -> None:
         # First make a commit as if the file has been added on a Linux system
@@ -3896,7 +3917,7 @@ class StatusTests(PorcelainTestCase):
             os.path.join(self.repo.path, "link"),
         )
         self.assertEqual(
-            {"ignored", "notignored", ".gitignore", "link"},
+            {b"ignored", b"notignored", b".gitignore", b"link"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -3904,11 +3925,11 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            {".gitignore", "notignored", "link"},
+            {b".gitignore", b"notignored", b"link"},
             set(porcelain.status(self.repo).untracked),
         )
         self.assertEqual(
-            {".gitignore", "notignored", "ignored", "link"},
+            {b".gitignore", b"notignored", b"ignored", b"link"},
             set(porcelain.status(self.repo, ignored=True).untracked),
         )
 
@@ -3927,7 +3948,7 @@ class StatusTests(PorcelainTestCase):
             f.write("blop\n")
 
         self.assertEqual(
-            {".gitignore", "notignored", os.path.join("nested", "")},
+            {b".gitignore", b"notignored", os.fsencode(os.path.join("nested", ""))},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path, self.repo.path, self.repo.open_index()
@@ -3935,7 +3956,7 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            {".gitignore", "notignored"},
+            {b".gitignore", b"notignored"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -3946,7 +3967,7 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            {"ignored", "with", "manager"},
+            {b"ignored", b"with", b"manager"},
             set(
                 porcelain.get_untracked_paths(
                     subrepo.path, subrepo.path, subrepo.open_index()
@@ -3965,9 +3986,9 @@ class StatusTests(PorcelainTestCase):
         )
         self.assertEqual(
             {
-                os.path.join("nested", "ignored"),
-                os.path.join("nested", "with"),
-                os.path.join("nested", "manager"),
+                os.fsencode(os.path.join("nested", "ignored")),
+                os.fsencode(os.path.join("nested", "with")),
+                os.fsencode(os.path.join("nested", "manager")),
             },
             set(
                 porcelain.get_untracked_paths(
@@ -3991,10 +4012,10 @@ class StatusTests(PorcelainTestCase):
 
         self.assertEqual(
             {
-                ".gitignore",
-                "notignored",
-                "ignored",
-                os.path.join("subdir", ""),
+                b".gitignore",
+                b"notignored",
+                b"ignored",
+                os.fsencode(os.path.join("subdir", "")),
             },
             set(
                 porcelain.get_untracked_paths(
@@ -4005,7 +4026,7 @@ class StatusTests(PorcelainTestCase):
             ),
         )
         self.assertEqual(
-            {".gitignore", "notignored"},
+            {b".gitignore", b"notignored"},
             set(
                 porcelain.get_untracked_paths(
                     self.repo.path,
@@ -4044,7 +4065,7 @@ class StatusTests(PorcelainTestCase):
             )
         )
         self.assertIn(
-            "sample.txt",
+            b"sample.txt",
             untracked,
             "Top-level file 'sample.txt' should be in untracked list",
         )
@@ -4052,7 +4073,7 @@ class StatusTests(PorcelainTestCase):
         # Test via status
         status = porcelain.status(self.repo)
         self.assertIn(
-            "sample.txt",
+            b"sample.txt",
             status.untracked,
             "Top-level file 'sample.txt' should be in status.untracked",
         )

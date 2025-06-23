@@ -1,5 +1,8 @@
 0.23.1	UNRELEASED
 
+ * status: Return untracked paths as bytestrings, similar to other
+   paths. (Jelmer Vernooĳ, #889)
+
  * Support short commit hashes in ``porcelain.reset()``.
    (Jelmer Vernooĳ, #1154)
 

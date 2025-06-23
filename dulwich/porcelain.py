@@ -672,11 +672,22 @@ def add(repo: Union[str, os.PathLike, BaseRepo] = ".", paths=None):
                     )
                 )
                 for untracked_path in current_untracked:
+                    # Convert bytes to string if needed
+                    if isinstance(untracked_path, bytes):
+                        untracked_path_str = untracked_path.decode("utf-8")
+                    else:
+                        untracked_path_str = untracked_path
+
                     # If we're scanning a subdirectory, adjust the path
                     if relpath != ".":
-                        untracked_path = posixpath.join(relpath, untracked_path)
+                        untracked_path_str = posixpath.join(relpath, untracked_path_str)
+                        untracked_path = (
+                            untracked_path_str.encode("utf-8")
+                            if isinstance(untracked_path, bytes)
+                            else untracked_path_str
+                        )
 
-                    if not ignore_manager.is_ignored(untracked_path):
+                    if not ignore_manager.is_ignored(untracked_path_str):
                         relpaths.append(untracked_path)
                     else:
                         ignored.add(untracked_path)
@@ -1678,7 +1689,7 @@ def status(repo=".", ignored=False, untracked_files="all"):
         )
         if sys.platform == "win32":
             untracked_changes = [
-                path.replace(os.path.sep, "/") for path in untracked_paths
+                path.replace(os.fsencode(os.path.sep), b"/") for path in untracked_paths
             ]
         else:
             untracked_changes = list(untracked_paths)
@@ -1758,7 +1769,7 @@ def get_untracked_paths(
             if ignore_manager.is_ignored(ip):
                 if not exclude_ignored:
                     ignored_dirs.append(
-                        os.path.join(os.path.relpath(path, frompath), "")
+                        os.fsencode(os.path.join(os.path.relpath(path, frompath), ""))
                     )
                 del dirnames[i]
         return dirnames
@@ -1772,7 +1783,7 @@ def get_untracked_paths(
                 if not exclude_ignored or not ignore_manager.is_ignored(
                     os.path.relpath(ap, basepath)
                 ):
-                    yield os.path.relpath(ap, frompath)
+                    yield os.fsencode(os.path.relpath(ap, frompath))
 
     yield from ignored_dirs
 

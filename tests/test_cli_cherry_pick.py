@@ -120,6 +120,9 @@ class CherryPickCommandTests(TestCase):
 
     def test_cherry_pick_missing_argument(self):
         """Test cherry-pick without commit argument."""
+        import io
+        import sys
+
         with tempfile.TemporaryDirectory() as tmpdir:
             orig_cwd = os.getcwd()
             try:
@@ -128,10 +131,17 @@ class CherryPickCommandTests(TestCase):
 
                 # Try to cherry-pick without argument
                 cmd = cmd_cherry_pick()
-                with self.assertRaises(SystemExit) as cm:
-                    cmd.run([])
 
-                self.assertEqual(cm.exception.code, 2)  # argparse error code
+                # Capture stderr to prevent argparse from printing to console
+                old_stderr = sys.stderr
+                sys.stderr = io.StringIO()
+
+                try:
+                    with self.assertRaises(SystemExit) as cm:
+                        cmd.run([])
+                    self.assertEqual(cm.exception.code, 2)  # argparse error code
+                finally:
+                    sys.stderr = old_stderr
 
             finally:
                 os.chdir(orig_cwd)

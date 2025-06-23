@@ -2812,25 +2812,15 @@ class AbstractHttpGitClient(GitClient):
 
             # Write pack data
             if pack_data:
-                from .pack import pack_objects_to_data, write_pack_data
+                from .pack import write_pack_data
 
-                # Convert unpacked objects to ShaFile objects for packing
-                objects = []
-                for unpacked in pack_data_list:
-                    objects.append(unpacked.sha_file())
-
-                # Generate pack data and write it to a buffer
-                pack_buffer = BytesIO()
-                count, unpacked_iter = pack_objects_to_data(objects)
+                # Write pack data directly using the unpacked objects
                 write_pack_data(
-                    pack_buffer.write,
-                    unpacked_iter,
-                    num_records=count,
+                    pack_data,
+                    iter(pack_data_list),
+                    num_records=len(pack_data_list),
                     progress=progress,
                 )
-
-                # Pass the raw pack data to pack_data callback
-                pack_data(pack_buffer.getvalue())
 
             return FetchPackResult(refs, symrefs, agent)
         req_data = BytesIO()

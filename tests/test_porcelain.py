@@ -2118,6 +2118,43 @@ class ResetTests(PorcelainTestCase):
 
         self.assertEqual([], changes)
 
+    def test_hard_commit_short_hash(self) -> None:
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        sha = porcelain.commit(
+            self.repo.path,
+            message=b"Some message",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        with open(fullpath, "wb") as f:
+            f.write(b"BAZ")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Some other message",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Test with short hash (7 characters)
+        short_sha = sha[:7].decode("ascii")
+        porcelain.reset(self.repo, "hard", short_sha)
+
+        index = self.repo.open_index()
+        changes = list(
+            tree_changes(
+                self.repo,
+                index.commit(self.repo.object_store),
+                self.repo[sha].tree,
+            )
+        )
+
+        self.assertEqual([], changes)
+
 
 class ResetFileTests(PorcelainTestCase):
     def test_reset_modify_file_to_commit(self) -> None:

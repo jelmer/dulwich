@@ -1,5 +1,8 @@
 0.23.1	UNRELEASED
 
+ * Support dumb repository access.
+   (Jelmer Vernooĳ, #1097)
+
  * Support ``depth`` for local clones.
    (Jelmer Vernooĳ)
 

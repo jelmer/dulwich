@@ -1641,7 +1641,7 @@ def pull(
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 
 
-def status(repo=".", ignored=False, untracked_files="all"):
+def status(repo=".", ignored=False, untracked_files="normal"):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     Args:
@@ -1649,11 +1649,12 @@ def status(repo=".", ignored=False, untracked_files="all"):
       ignored: Whether to include ignored files in untracked
       untracked_files: How to handle untracked files, defaults to "all":
           "no": do not return untracked files
+          "normal": return untracked directories, not their contents
           "all": include all files in untracked directories
-        Using untracked_files="no" can be faster than "all" when the worktreee
+        Using untracked_files="no" can be faster than "all" when the worktree
           contains many untracked files/directories.
-
-    Note: untracked_files="normal" (git's default) is not implemented.
+        Using untracked_files="normal" provides a good balance, only showing
+          directories that are entirely untracked without listing all their contents.
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (diff index/HEAD)
@@ -1731,17 +1732,14 @@ def get_untracked_paths(
       untracked_files: How to handle untracked files:
         - "no": return an empty list
         - "all": return all files in untracked directories
-        - "normal": Not implemented
+        - "normal": return untracked directories without listing their contents
 
     Note: ignored directories will never be walked for performance reasons.
       If exclude_ignored is False, only the path to an ignored directory will
       be yielded, no files inside the directory will be returned
     """
-    if untracked_files == "normal":
-        raise NotImplementedError("normal is not yet supported")
-
-    if untracked_files not in ("no", "all"):
-        raise ValueError("untracked_files must be one of (no, all)")
+    if untracked_files not in ("no", "all", "normal"):
+        raise ValueError("untracked_files must be one of (no, all, normal)")
 
     if untracked_files == "no":
         return
@@ -1750,29 +1748,84 @@ def get_untracked_paths(
         ignore_manager = IgnoreFilterManager.from_repo(r)
 
     ignored_dirs = []
+    # List to store untracked directories found during traversal
+    untracked_dir_list = []
 
     def prune_dirnames(dirpath, dirnames):
         for i in range(len(dirnames) - 1, -1, -1):
             path = os.path.join(dirpath, dirnames[i])
             ip = os.path.join(os.path.relpath(path, basepath), "")
+
+            # Check if directory is ignored
             if ignore_manager.is_ignored(ip):
                 if not exclude_ignored:
                     ignored_dirs.append(
                         os.path.join(os.path.relpath(path, frompath), "")
                     )
                 del dirnames[i]
+                continue
+
+            # For "normal" mode, check if the directory is entirely untracked
+            if untracked_files == "normal":
+                # Convert directory path to tree path for index lookup
+                dir_tree_path = path_to_tree_path(basepath, path)
+
+                # Check if any file in this directory is tracked
+                dir_prefix = dir_tree_path + b"/" if dir_tree_path else b""
+                has_tracked_files = any(name.startswith(dir_prefix) for name in index)
+
+                if not has_tracked_files:
+                    # This directory is entirely untracked
+                    # Check if it should be excluded due to ignore rules
+                    is_ignored = ignore_manager.is_ignored(
+                        os.path.relpath(path, basepath)
+                    )
+                    if not exclude_ignored or not is_ignored:
+                        rel_path = os.path.join(os.path.relpath(path, frompath), "")
+                        untracked_dir_list.append(rel_path)
+                    del dirnames[i]
+
         return dirnames
 
-    for ap, is_dir in _walk_working_dir_paths(
-        frompath, basepath, prune_dirnames=prune_dirnames
-    ):
-        if not is_dir:
-            ip = path_to_tree_path(basepath, ap)
-            if ip not in index:
-                if not exclude_ignored or not ignore_manager.is_ignored(
-                    os.path.relpath(ap, basepath)
-                ):
-                    yield os.path.relpath(ap, frompath)
+    # For "all" mode, use the original behavior
+    if untracked_files == "all":
+        for ap, is_dir in _walk_working_dir_paths(
+            frompath, basepath, prune_dirnames=prune_dirnames
+        ):
+            if not is_dir:
+                ip = path_to_tree_path(basepath, ap)
+                if ip not in index:
+                    if not exclude_ignored or not ignore_manager.is_ignored(
+                        os.path.relpath(ap, basepath)
+                    ):
+                        yield os.path.relpath(ap, frompath)
+    else:  # "normal" mode
+        # Walk directories, handling both files and directories
+        for ap, is_dir in _walk_working_dir_paths(
+            frompath, basepath, prune_dirnames=prune_dirnames
+        ):
+            # This part won't be reached for pruned directories
+            if is_dir:
+                # Check if this directory is entirely untracked
+                dir_tree_path = path_to_tree_path(basepath, ap)
+                dir_prefix = dir_tree_path + b"/" if dir_tree_path else b""
+                has_tracked_files = any(name.startswith(dir_prefix) for name in index)
+                if not has_tracked_files:
+                    if not exclude_ignored or not ignore_manager.is_ignored(
+                        os.path.relpath(ap, basepath)
+                    ):
+                        yield os.path.join(os.path.relpath(ap, frompath), "")
+            else:
+                # Check individual files in directories that contain tracked files
+                ip = path_to_tree_path(basepath, ap)
+                if ip not in index:
+                    if not exclude_ignored or not ignore_manager.is_ignored(
+                        os.path.relpath(ap, basepath)
+                    ):
+                        yield os.path.relpath(ap, frompath)
+
+        # Yield any untracked directories found during pruning
+        yield from untracked_dir_list
 
     yield from ignored_dirs
 

@@ -23,3 +23,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - All contributions must be under Apache License 2.0+ or GPL 2.0+
 - When adding new test files, ensure the test accumulation functions are updated
   (i.e. ``self_test_suite()`` in `tests/__init__.py` or ``test_suite()`` in `tests/compat/__init__.py`)
+- Do not ignore exceptions. Never catch ``Exception`` unless you're going to
+  re-raise it, always something more specific. Catch specific exceptions. Don't catch OSError, but specific subclasses.
+- Keep code in try/except blocks to a minimum, and use else:. This keeps the code that can raise an exception
+  to a minimum.
+- There is almost never a good reason to catch AttributeError.

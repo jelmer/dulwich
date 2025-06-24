@@ -36,6 +36,7 @@ Currently implemented:
  * describe
  * diff_tree
  * fetch
+ * filter_branch
  * for_each_ref
  * init
  * ls_files
@@ -3654,3 +3655,95 @@ def annotate(repo, path, committish=None):
 
 
 blame = annotate
+
+
+def filter_branch(
+    repo=".",
+    branch="HEAD",
+    *,
+    filter_fn=None,
+    filter_author=None,
+    filter_committer=None,
+    filter_message=None,
+    force=False,
+    keep_original=True,
+    refs=None,
+):
+    """Rewrite branch history by creating new commits with filtered properties.
+
+    This is similar to git filter-branch, allowing you to rewrite commit
+    history by modifying author, committer, or commit messages.
+
+    Args:
+      repo: Path to repository
+      branch: Branch to rewrite (defaults to HEAD)
+      filter_fn: Optional callable that takes a Commit object and returns
+        a dict of updated fields (author, committer, message, etc.)
+      filter_author: Optional callable that takes author bytes and returns
+        updated author bytes or None to keep unchanged
+      filter_committer: Optional callable that takes committer bytes and returns  
+        updated committer bytes or None to keep unchanged
+      filter_message: Optional callable that takes commit message bytes
+        and returns updated message bytes
+      force: Force operation even if branch has been filtered before
+      keep_original: Keep original refs under refs/original/
+      refs: List of refs to rewrite (defaults to [branch])
+
+    Returns:
+      Dict mapping old commit SHAs to new commit SHAs
+
+    Raises:
+      Error: If branch is already filtered and force is False
+    """
+    from .filter_branch import CommitFilter, filter_refs
+    
+    with open_repo_closing(repo) as r:
+        # Parse branch/committish
+        if isinstance(branch, str):
+            branch = branch.encode()
+        
+        # Determine which refs to process
+        if refs is None:
+            if branch == b"HEAD":
+                # Resolve HEAD to actual branch
+                try:
+                    resolved = r.refs.follow(b"HEAD")
+                    if resolved and resolved[0]:
+                        # resolved is a list of (refname, sha) tuples
+                        resolved_ref = resolved[0][0]
+                        if resolved_ref and resolved_ref != b"HEAD":
+                            refs = [resolved_ref]
+                        else:
+                            # HEAD points directly to a commit
+                            refs = [b"HEAD"]
+                    else:
+                        refs = [b"HEAD"]
+                except Exception:
+                    refs = [b"HEAD"]
+            else:
+                # Convert branch name to full ref if needed
+                if not branch.startswith(b"refs/"):
+                    branch = b"refs/heads/" + branch
+                refs = [branch]
+        
+        # Create commit filter
+        commit_filter = CommitFilter(
+            r.object_store,
+            filter_fn=filter_fn,
+            filter_author=filter_author,
+            filter_committer=filter_committer,
+            filter_message=filter_message,
+        )
+        
+        # Filter refs
+        try:
+            return filter_refs(
+                r.refs,
+                r.object_store,
+                refs,
+                commit_filter,
+                keep_original=keep_original,
+                force=force,
+            )
+        except ValueError as e:
+            raise Error(str(e)) from e

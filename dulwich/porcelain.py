@@ -43,6 +43,7 @@ Currently implemented:
  * ls_tree
  * merge
  * merge_tree
+ * prune
  * pull
  * push
  * rm
@@ -3434,6 +3435,31 @@ def gc(
             dry_run=dry_run,
             progress=progress,
         )
+
+
+def prune(
+    repo,
+    grace_period: Optional[int] = None,
+    dry_run: bool = False,
+    progress=None,
+):
+    """Prune/clean up a repository's object store.
+
+    This removes temporary files that were left behind by interrupted
+    pack operations.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      grace_period: Grace period in seconds for removing temporary files
+                    (default 2 weeks)
+      dry_run: If True, only report what would be done
+      progress: Optional progress callback
+    """
+    with open_repo_closing(repo) as r:
+        if progress:
+            progress("Pruning temporary files")
+        if not dry_run:
+            r.object_store.prune(grace_period=grace_period)
 
 
 def count_objects(repo=".", verbose=False) -> CountObjectsResult:

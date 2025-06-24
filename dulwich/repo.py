@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
     # as possible to reduce start-up time for anything that doesn't need
     # these imports.
-    from .config import ConfigFile, StackedConfig
+    from .config import ConditionMatcher, ConfigFile, StackedConfig
     from .index import Index
     from .notes import Notes
 
@@ -1241,6 +1241,12 @@ class Repo(BaseRepo):
         else:
             self._commondir = self._controldir
         self.path = root
+
+        # Initialize refs early so they're available for config condition matchers
+        self.refs = DiskRefsContainer(
+            self.commondir(), self._controldir, logger=self._write_reflog
+        )
+
         config = self.get_config()
         try:
             repository_format_version = config.get("core", "repositoryformatversion")
@@ -1263,10 +1269,7 @@ class Repo(BaseRepo):
             object_store = DiskObjectStore.from_config(
                 os.path.join(self.commondir(), OBJECTDIR), config
             )
-        refs = DiskRefsContainer(
-            self.commondir(), self._controldir, logger=self._write_reflog
-        )
-        BaseRepo.__init__(self, object_store, refs)
+        BaseRepo.__init__(self, object_store, self.refs)
 
         self._graftpoints = {}
         graft_file = self.get_named_file(
@@ -1727,13 +1730,83 @@ class Repo(BaseRepo):
             symlink_fn=symlink_fn,
         )
 
+    def _get_config_condition_matchers(self) -> dict[str, "ConditionMatcher"]:
+        """Get condition matchers for includeIf conditions.
+
+        Returns a dict of condition prefix to matcher function.
+        """
+        from pathlib import Path
+
+        from .config import ConditionMatcher, match_glob_pattern
+
+        # Add gitdir matchers
+        def match_gitdir(pattern: str, case_sensitive: bool = True) -> bool:
+            # Handle relative patterns (starting with ./)
+            if pattern.startswith("./"):
+                # Can't handle relative patterns without config directory context
+                return False
+
+            # Normalize repository path
+            try:
+                repo_path = str(Path(self._controldir).resolve())
+            except (OSError, ValueError):
+                return False
+
+            # Expand ~ in pattern and normalize
+            pattern = os.path.expanduser(pattern)
+
+            # Normalize pattern following Git's rules
+            pattern = pattern.replace("\\", "/")
+            if not pattern.startswith(("~/", "./", "/", "**")):
+                # Check for Windows absolute path
+                if len(pattern) >= 2 and pattern[1] == ":":
+                    pass
+                else:
+                    pattern = "**/" + pattern
+            if pattern.endswith("/"):
+                pattern = pattern + "**"
+
+            # Use the existing _match_gitdir_pattern function
+            from .config import _match_gitdir_pattern
+
+            pattern_bytes = pattern.encode("utf-8", errors="replace")
+            repo_path_bytes = repo_path.encode("utf-8", errors="replace")
+
+            return _match_gitdir_pattern(
+                repo_path_bytes, pattern_bytes, ignorecase=not case_sensitive
+            )
+
+        # Add onbranch matcher
+        def match_onbranch(pattern: str) -> bool:
+            try:
+                # Get the current branch using refs
+                ref_chain, _ = self.refs.follow(b"HEAD")
+                head_ref = ref_chain[-1]  # Get the final resolved ref
+            except KeyError:
+                pass
+            else:
+                if head_ref and head_ref.startswith(b"refs/heads/"):
+                    # Extract branch name from ref
+                    branch = head_ref[11:].decode("utf-8", errors="replace")
+                    return match_glob_pattern(branch, pattern)
+            return False
+
+        matchers: dict[str, ConditionMatcher] = {
+            "onbranch:": match_onbranch,
+            "gitdir:": lambda pattern: match_gitdir(pattern, True),
+            "gitdir/i:": lambda pattern: match_gitdir(pattern, False),
+        }
+
+        return matchers
+
     def get_worktree_config(self) -> "ConfigFile":
         from .config import ConfigFile
 
         path = os.path.join(self.commondir(), "config.worktree")
         try:
-            # Pass the git directory (not working tree) for includeIf gitdir conditions
-            return ConfigFile.from_path(path, repo_dir=self._controldir)
+            # Pass condition matchers for includeIf evaluation
+            condition_matchers = self._get_config_condition_matchers()
+            return ConfigFile.from_path(path, condition_matchers=condition_matchers)
         except FileNotFoundError:
             cf = ConfigFile()
             cf.path = path
@@ -1748,8 +1821,9 @@ class Repo(BaseRepo):
 
         path = os.path.join(self._commondir, "config")
         try:
-            # Pass the git directory (not working tree) for includeIf gitdir conditions
-            return ConfigFile.from_path(path, repo_dir=self._controldir)
+            # Pass condition matchers for includeIf evaluation
+            condition_matchers = self._get_config_condition_matchers()
+            return ConfigFile.from_path(path, condition_matchers=condition_matchers)
         except FileNotFoundError:
             ret = ConfigFile()
             ret.path = path

@@ -1837,3 +1837,82 @@ class RepoConfigIncludeIfTests(TestCase):
             config = r.get_config()
             self.assertEqual(b"true", config.get((b"receive",), b"denyNonFastForwards"))
             r.close()
+
+    def test_repo_config_includeif_hasconfig(self) -> None:
+        """Test includeIf hasconfig conditions in repository config."""
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a repository
+            repo_path = os.path.join(tmpdir, "myrepo")
+            r = Repo.init(repo_path, mkdir=True)
+
+            # Create an included config file
+            included_path = os.path.join(tmpdir, "work.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    name = WorkUser\n")
+
+            # Add a remote and includeIf hasconfig to the repo config
+            config_path = os.path.join(repo_path, ".git", "config")
+            with open(config_path, "ab") as f:
+                f.write(b'\n[remote "origin"]\n')
+                f.write(b"    url = ssh://org-work@github.com/company/project\n")
+                f.write(
+                    b'[includeIf "hasconfig:remote.*.url:ssh://org-*@github.com/**"]\n'
+                )
+                escaped_path = included_path.replace("\\", "\\\\")
+                f.write(f"    path = {escaped_path}\n".encode())
+
+            # Close and reopen to reload config
+            r.close()
+            r = Repo(repo_path)
+
+            # Check if include was processed
+            config = r.get_config()
+            self.assertEqual(b"WorkUser", config.get((b"user",), b"name"))
+            r.close()
+
+    def test_repo_config_includeif_onbranch(self) -> None:
+        """Test includeIf onbranch conditions in repository config."""
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a repository
+            repo_path = os.path.join(tmpdir, "myrepo")
+            r = Repo.init(repo_path, mkdir=True)
+
+            # Create HEAD pointing to main branch
+            refs_heads_dir = os.path.join(repo_path, ".git", "refs", "heads")
+            os.makedirs(refs_heads_dir, exist_ok=True)
+            main_ref_path = os.path.join(refs_heads_dir, "main")
+            with open(main_ref_path, "wb") as f:
+                f.write(b"0123456789012345678901234567890123456789\n")
+
+            head_path = os.path.join(repo_path, ".git", "HEAD")
+            with open(head_path, "wb") as f:
+                f.write(b"ref: refs/heads/main\n")
+
+            # Create an included config file
+            included_path = os.path.join(tmpdir, "main.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[core]\n    autocrlf = true\n")
+
+            # Add includeIf onbranch to the repo config
+            config_path = os.path.join(repo_path, ".git", "config")
+            with open(config_path, "ab") as f:
+                f.write(b'\n[includeIf "onbranch:main"]\n')
+                escaped_path = included_path.replace("\\", "\\\\")
+                f.write(f"    path = {escaped_path}\n".encode())
+
+            # Close and reopen to reload config
+            r.close()
+            r = Repo(repo_path)
+
+            # Check if include was processed
+            config = r.get_config()
+            self.assertEqual(b"true", config.get((b"core",), b"autocrlf"))
+            r.close()

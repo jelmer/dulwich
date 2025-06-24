@@ -5531,15 +5531,13 @@ class PruneTests(PorcelainTestCase):
         tmp_pack_path = os.path.join(objects_dir, "tmp_pack_recent")
         with open(tmp_pack_path, "wb") as f:
             f.write(b"recent temporary data")
+        self.addCleanup(os.remove, tmp_pack_path)
 
         # Run prune
         porcelain.prune(self.repo.path)
 
         # Verify the file was NOT removed
         self.assertTrue(os.path.exists(tmp_pack_path))
-
-        # Clean up
-        os.remove(tmp_pack_path)
 
     def test_prune_with_custom_grace_period(self):
         """Test prune with custom grace period."""
@@ -5566,6 +5564,7 @@ class PruneTests(PorcelainTestCase):
         tmp_pack_path = os.path.join(objects_dir, "tmp_pack_dryrun")
         with open(tmp_pack_path, "wb") as f:
             f.write(b"old temporary data")
+        self.addCleanup(os.remove, tmp_pack_path)
 
         # Make it old
         old_time = time.time() - (DEFAULT_TEMPFILE_GRACE_PERIOD + 3600)
@@ -5576,6 +5575,3 @@ class PruneTests(PorcelainTestCase):
 
         # Verify the file was NOT removed (dry run)
         self.assertTrue(os.path.exists(tmp_pack_path))
-
-        # Clean up
-        os.remove(tmp_pack_path)

@@ -49,6 +49,9 @@
    behavior. Also added ``prune`` command to ``dulwich.porcelain``.
    (Jelmer Vernooĳ, #558)
 
+ * Add support for auto garbage collection, and invoke from
+   some porcelain commands. (Jelmer Vernooĳ, #1600)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

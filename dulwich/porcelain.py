@@ -36,6 +36,7 @@ Currently implemented:
  * describe
  * diff_tree
  * fetch
+ * filter_branch
  * for_each_ref
  * init
  * ls_files
@@ -131,6 +132,7 @@ from .refs import (
     LOCAL_NOTES_PREFIX,
     LOCAL_TAG_PREFIX,
     Ref,
+    SymrefLoop,
     _import_remote_refs,
 )
 from .repo import BaseRepo, Repo, get_user_identity
@@ -3654,3 +3656,132 @@ def annotate(repo, path, committish=None):
 
 
 blame = annotate
+
+
+def filter_branch(
+    repo=".",
+    branch="HEAD",
+    *,
+    filter_fn=None,
+    filter_author=None,
+    filter_committer=None,
+    filter_message=None,
+    tree_filter=None,
+    index_filter=None,
+    parent_filter=None,
+    commit_filter=None,
+    subdirectory_filter=None,
+    prune_empty=False,
+    tag_name_filter=None,
+    force=False,
+    keep_original=True,
+    refs=None,
+):
+    """Rewrite branch history by creating new commits with filtered properties.
+
+    This is similar to git filter-branch, allowing you to rewrite commit
+    history by modifying trees, parents, author, committer, or commit messages.
+
+    Args:
+      repo: Path to repository
+      branch: Branch to rewrite (defaults to HEAD)
+      filter_fn: Optional callable that takes a Commit object and returns
+        a dict of updated fields (author, committer, message, etc.)
+      filter_author: Optional callable that takes author bytes and returns
+        updated author bytes or None to keep unchanged
+      filter_committer: Optional callable that takes committer bytes and returns
+        updated committer bytes or None to keep unchanged
+      filter_message: Optional callable that takes commit message bytes
+        and returns updated message bytes
+      tree_filter: Optional callable that takes (tree_sha, temp_dir) and returns
+        new tree SHA after modifying working directory
+      index_filter: Optional callable that takes (tree_sha, temp_index_path) and
+        returns new tree SHA after modifying index
+      parent_filter: Optional callable that takes parent list and returns
+        modified parent list
+      commit_filter: Optional callable that takes (Commit, tree_sha) and returns
+        new commit SHA or None to skip commit
+      subdirectory_filter: Optional subdirectory path to extract as new root
+      prune_empty: Whether to prune commits that become empty
+      tag_name_filter: Optional callable to rename tags
+      force: Force operation even if branch has been filtered before
+      keep_original: Keep original refs under refs/original/
+      refs: List of refs to rewrite (defaults to [branch])
+
+    Returns:
+      Dict mapping old commit SHAs to new commit SHAs
+
+    Raises:
+      Error: If branch is already filtered and force is False
+    """
+    from .filter_branch import CommitFilter, filter_refs
+
+    with open_repo_closing(repo) as r:
+        # Parse branch/committish
+        if isinstance(branch, str):
+            branch = branch.encode()
+
+        # Determine which refs to process
+        if refs is None:
+            if branch == b"HEAD":
+                # Resolve HEAD to actual branch
+                try:
+                    resolved = r.refs.follow(b"HEAD")
+                    if resolved and resolved[0]:
+                        # resolved is a list of (refname, sha) tuples
+                        resolved_ref = resolved[0][-1]
+                        if resolved_ref and resolved_ref != b"HEAD":
+                            refs = [resolved_ref]
+                        else:
+                            # HEAD points directly to a commit
+                            refs = [b"HEAD"]
+                    else:
+                        refs = [b"HEAD"]
+                except SymrefLoop:
+                    refs = [b"HEAD"]
+            else:
+                # Convert branch name to full ref if needed
+                if not branch.startswith(b"refs/"):
+                    branch = b"refs/heads/" + branch
+                refs = [branch]
+
+        # Convert subdirectory filter to bytes if needed
+        if subdirectory_filter and isinstance(subdirectory_filter, str):
+            subdirectory_filter = subdirectory_filter.encode()
+
+        # Create commit filter
+        commit_filter = CommitFilter(
+            r.object_store,
+            filter_fn=filter_fn,
+            filter_author=filter_author,
+            filter_committer=filter_committer,
+            filter_message=filter_message,
+            tree_filter=tree_filter,
+            index_filter=index_filter,
+            parent_filter=parent_filter,
+            commit_filter=commit_filter,
+            subdirectory_filter=subdirectory_filter,
+            prune_empty=prune_empty,
+            tag_name_filter=tag_name_filter,
+        )
+
+        # Tag callback for renaming tags
+        def rename_tag(old_ref, new_ref):
+            # Copy tag to new name
+            r.refs[new_ref] = r.refs[old_ref]
+            # Delete old tag
+            del r.refs[old_ref]
+
+        # Filter refs
+        try:
+            return filter_refs(
+                r.refs,
+                r.object_store,
+                refs,
+                commit_filter,
+                keep_original=keep_original,
+                force=force,
+                tag_callback=rename_tag if tag_name_filter else None,
+            )
+        except ValueError as e:
+            raise Error(str(e)) from e

@@ -52,6 +52,11 @@
  * Add support for auto garbage collection, and invoke from
    some porcelain commands. (Jelmer Vernooĳ, #1600)
 
+ * Add ``filter-branch`` support to ``dulwich.porcelain`` and
+   ``dulwich.filter_branch`` module for rewriting commit history.
+   Supports filtering author, committer, and message fields.
+   (#745, Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

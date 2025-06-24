@@ -46,7 +46,8 @@
 
  * Add ``prune`` method to object stores for cleaning up orphaned temporary
    pack files. This is now called by ``garbage_collect()`` to match Git's
-   behavior. (#558, Jelmer Vernooĳ)
+   behavior. Also added ``prune`` command to ``dulwich.porcelain``.
+   (Jelmer Vernooĳ, #558)
 
 0.23.0	2025-06-21
 

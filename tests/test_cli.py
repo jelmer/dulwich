@@ -29,6 +29,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
 from dulwich import cli
@@ -372,6 +373,7 @@ class FilterBranchCommandTest(DulwichCliTestCase):
             len(original_refs) > 0, "No original refs found after filter-branch"
         )
 
+    @skipIf(sys.platform == "win32", "sed command not available on Windows")
     def test_filter_branch_msg_filter(self):
         """Test filter-branch with message filter."""
         # Run filter-branch to prepend [FILTERED] to commit messages
@@ -420,6 +422,7 @@ class FilterBranchCommandTest(DulwichCliTestCase):
         result, stdout, stderr = self._run_cli("log")
         self.assertNotIn("Modify root file only", stdout)
 
+    @skipIf(sys.platform == "win32", "sed command not available on Windows")
     def test_filter_branch_force(self):
         """Test filter-branch with force option."""
         # Run filter-branch once with a filter that actually changes something
@@ -449,6 +452,7 @@ class FilterBranchCommandTest(DulwichCliTestCase):
         )
         self.assertEqual(result, 0)
 
+    @skipIf(sys.platform == "win32", "sed command not available on Windows")
     def test_filter_branch_specific_branch(self):
         """Test filter-branch on a specific branch."""
         # Switch to test-branch and add a commit

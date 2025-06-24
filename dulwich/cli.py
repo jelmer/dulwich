@@ -33,19 +33,17 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import ClassVar, Optional
 
 from dulwich import porcelain
 
 from .client import GitProtocolError, get_transport_and_path
 from .errors import ApplyDeltaError
 from .index import Index
+from .objects import valid_hexsha
 from .objectspec import parse_commit
 from .pack import Pack, sha_to_hex
 from .repo import Repo
-
-if TYPE_CHECKING:
-    pass
 
 
 def signal_int(signal, frame) -> None:
@@ -177,8 +175,6 @@ class cmd_annotate(Command):
         parser.add_argument("path", help="Path to file to annotate")
         parser.add_argument("committish", nargs="?", help="Commit to start from")
         args = parser.parse_args(argv)
-
-        from dulwich import porcelain
 
         results = porcelain.annotate(".", args.path, args.committish)
         for (commit, entry), line in results:
@@ -1491,6 +1487,240 @@ class cmd_rebase(Command):
             return 1
 
 
+class cmd_filter_branch(Command):
+    def run(self, args) -> Optional[int]:
+        import subprocess
+
+        parser = argparse.ArgumentParser(description="Rewrite branches")
+
+        # Supported Git-compatible options
+        parser.add_argument(
+            "--subdirectory-filter",
+            type=str,
+            help="Only include history for subdirectory",
+        )
+        parser.add_argument("--env-filter", type=str, help="Environment filter command")
+        parser.add_argument("--tree-filter", type=str, help="Tree filter command")
+        parser.add_argument("--index-filter", type=str, help="Index filter command")
+        parser.add_argument("--parent-filter", type=str, help="Parent filter command")
+        parser.add_argument("--msg-filter", type=str, help="Message filter command")
+        parser.add_argument("--commit-filter", type=str, help="Commit filter command")
+        parser.add_argument(
+            "--tag-name-filter", type=str, help="Tag name filter command"
+        )
+        parser.add_argument(
+            "--prune-empty", action="store_true", help="Remove empty commits"
+        )
+        parser.add_argument(
+            "--original",
+            type=str,
+            default="refs/original",
+            help="Namespace for original refs",
+        )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force operation even if refs/original/* exists",
+        )
+
+        # Branch/ref to rewrite (defaults to HEAD)
+        parser.add_argument(
+            "branch", nargs="?", default="HEAD", help="Branch or ref to rewrite"
+        )
+
+        args = parser.parse_args(args)
+
+        # Track if any filter fails
+        filter_error = False
+
+        # Setup environment for filters
+        env = os.environ.copy()
+
+        # Helper function to run shell commands
+        def run_filter(cmd, input_data=None, cwd=None, extra_env=None):
+            nonlocal filter_error
+            filter_env = env.copy()
+            if extra_env:
+                filter_env.update(extra_env)
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                input=input_data,
+                cwd=cwd,
+                env=filter_env,
+                capture_output=True,
+            )
+            if result.returncode != 0:
+                filter_error = True
+                return None
+            return result.stdout
+
+        # Create filter functions based on arguments
+        filter_message = None
+        if args.msg_filter:
+
+            def filter_message(message):
+                result = run_filter(args.msg_filter, input_data=message)
+                return result if result is not None else message
+
+        tree_filter = None
+        if args.tree_filter:
+
+            def tree_filter(tree_sha, tmpdir):
+                from dulwich.objects import Blob, Tree
+
+                # Export tree to tmpdir
+                with Repo(".") as r:
+                    tree = r.object_store[tree_sha]
+                    for entry in tree.items():
+                        path = Path(tmpdir) / entry.path.decode()
+                        if entry.mode & 0o040000:  # Directory
+                            path.mkdir(exist_ok=True)
+                        else:
+                            obj = r.object_store[entry.sha]
+                            path.write_bytes(obj.data)
+
+                    # Run the filter command in the temp directory
+                    run_filter(args.tree_filter, cwd=tmpdir)
+
+                    # Rebuild tree from modified temp directory
+                    def build_tree_from_dir(dir_path):
+                        tree = Tree()
+                        for name in sorted(os.listdir(dir_path)):
+                            if name.startswith("."):
+                                continue
+                            path = os.path.join(dir_path, name)
+                            if os.path.isdir(path):
+                                subtree_sha = build_tree_from_dir(path)
+                                tree.add(name.encode(), 0o040000, subtree_sha)
+                            else:
+                                with open(path, "rb") as f:
+                                    data = f.read()
+                                blob = Blob.from_string(data)
+                                r.object_store.add_object(blob)
+                                # Use appropriate file mode
+                                mode = os.stat(path).st_mode
+                                if mode & 0o100:
+                                    file_mode = 0o100755
+                                else:
+                                    file_mode = 0o100644
+                                tree.add(name.encode(), file_mode, blob.id)
+                        r.object_store.add_object(tree)
+                        return tree.id
+
+                    return build_tree_from_dir(tmpdir)
+
+        index_filter = None
+        if args.index_filter:
+
+            def index_filter(tree_sha, index_path):
+                run_filter(args.index_filter, extra_env={"GIT_INDEX_FILE": index_path})
+                return None  # Read back from index
+
+        parent_filter = None
+        if args.parent_filter:
+
+            def parent_filter(parents):
+                parent_str = " ".join(p.hex() for p in parents)
+                result = run_filter(args.parent_filter, input_data=parent_str.encode())
+                if result is None:
+                    return parents
+
+                output = result.decode().strip()
+                if not output:
+                    return []
+                new_parents = []
+                for sha in output.split():
+                    if valid_hexsha(sha):
+                        new_parents.append(sha)
+                return new_parents
+
+        commit_filter = None
+        if args.commit_filter:
+
+            def commit_filter(commit_obj, tree_sha):
+                # The filter receives: tree parent1 parent2...
+                cmd_input = tree_sha.hex()
+                for parent in commit_obj.parents:
+                    cmd_input += " " + parent.hex()
+
+                result = run_filter(
+                    args.commit_filter,
+                    input_data=cmd_input.encode(),
+                    extra_env={"GIT_COMMIT": commit_obj.id.hex()},
+                )
+                if result is None:
+                    return None
+
+                output = result.decode().strip()
+                if not output:
+                    return None  # Skip commit
+
+                if valid_hexsha(output):
+                    return output
+                return None
+
+        tag_name_filter = None
+        if args.tag_name_filter:
+
+            def tag_name_filter(tag_name):
+                result = run_filter(args.tag_name_filter, input_data=tag_name)
+                return result.strip() if result is not None else tag_name
+
+        # Open repo once
+        with Repo(".") as r:
+            # Check for refs/original if not forcing
+            if not args.force:
+                original_prefix = args.original.encode() + b"/"
+                for ref in r.refs.allkeys():
+                    if ref.startswith(original_prefix):
+                        print("Cannot create a new backup.")
+                        print(f"A previous backup already exists in {args.original}/")
+                        print("Force overwriting the backup with -f")
+                        return 1
+
+            try:
+                # Call porcelain.filter_branch with the repo object
+                result = porcelain.filter_branch(
+                    r,
+                    args.branch,
+                    filter_message=filter_message,
+                    tree_filter=tree_filter if args.tree_filter else None,
+                    index_filter=index_filter if args.index_filter else None,
+                    parent_filter=parent_filter if args.parent_filter else None,
+                    commit_filter=commit_filter if args.commit_filter else None,
+                    subdirectory_filter=args.subdirectory_filter,
+                    prune_empty=args.prune_empty,
+                    tag_name_filter=tag_name_filter if args.tag_name_filter else None,
+                    force=args.force,
+                    keep_original=True,  # Always keep original with git
+                )
+
+                # Check if any filter failed
+                if filter_error:
+                    print("Error: Filter command failed", file=sys.stderr)
+                    return 1
+
+                # Git filter-branch shows progress
+                if result:
+                    print(f"Rewrite {args.branch} ({len(result)} commits)")
+                    # Git shows: Ref 'refs/heads/branch' was rewritten
+                    if args.branch != "HEAD":
+                        ref_name = (
+                            args.branch
+                            if args.branch.startswith("refs/")
+                            else f"refs/heads/{args.branch}"
+                        )
+                        print(f"Ref '{ref_name}' was rewritten")
+
+                return 0
+
+            except porcelain.Error as e:
+                print(f"Error: {e}", file=sys.stderr)
+                return 1
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1539,6 +1769,7 @@ commands = {
     "dump-index": cmd_dump_index,
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
+    "filter-branch": cmd_filter_branch,
     "for-each-ref": cmd_for_each_ref,
     "fsck": cmd_fsck,
     "gc": cmd_gc,

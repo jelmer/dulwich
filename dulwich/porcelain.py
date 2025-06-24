@@ -777,13 +777,20 @@ def remove(repo=".", paths=None, cached=False) -> None:
 
     Args:
       repo: Repository for the files
-      paths: Paths to remove
+      paths: Paths to remove. Can be absolute or relative to the repository root.
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
         for p in paths:
-            full_path = os.fsencode(os.path.abspath(p))
-            tree_path = path_to_tree_path(r.path, p)
+            # If path is absolute, use it as-is. Otherwise, treat it as relative to repo
+            if os.path.isabs(p):
+                full_path = p
+            else:
+                # Treat relative paths as relative to the repository root
+                full_path = os.path.join(r.path, p)
+            tree_path = path_to_tree_path(r.path, full_path)
+            # Convert to bytes for file operations
+            full_path_bytes = os.fsencode(full_path)
             try:
                 index_sha = index[tree_path].sha
             except KeyError as exc:
@@ -791,12 +798,12 @@ def remove(repo=".", paths=None, cached=False) -> None:
 
             if not cached:
                 try:
-                    st = os.lstat(full_path)
+                    st = os.lstat(full_path_bytes)
                 except OSError:
                     pass
                 else:
                     try:
-                        blob = blob_from_path_and_stat(full_path, st)
+                        blob = blob_from_path_and_stat(full_path_bytes, st)
                     except OSError:
                         pass
                     else:
@@ -815,7 +822,7 @@ def remove(repo=".", paths=None, cached=False) -> None:
 
                         if index_sha != committed_sha:
                             raise Error(f"file has staged changes: {p}")
-                        os.remove(full_path)
+                        os.remove(full_path_bytes)
             del index[tree_path]
         index.write()
 

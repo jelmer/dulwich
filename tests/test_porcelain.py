@@ -1549,6 +1549,66 @@ class RemoveTests(PorcelainTestCase):
             os.chdir(cwd)
         self.assertFalse(os.path.exists(os.path.join(self.repo.path, "foo")))
 
+    def test_remove_from_different_directory(self) -> None:
+        # Create a subdirectory with a file
+        subdir = os.path.join(self.repo.path, "mydir")
+        os.makedirs(subdir)
+        fullpath = os.path.join(subdir, "myfile")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+
+        # Add and commit the file
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Change to a different directory
+        cwd = os.getcwd()
+        tempdir = tempfile.mkdtemp()
+        try:
+            os.chdir(tempdir)
+            # Remove the file using relative path from repository root
+            porcelain.remove(self.repo.path, paths=["mydir/myfile"])
+        finally:
+            os.chdir(cwd)
+            os.rmdir(tempdir)
+
+        # Verify file was removed
+        self.assertFalse(os.path.exists(fullpath))
+
+    def test_remove_with_absolute_path(self) -> None:
+        # Create a file
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+
+        # Add and commit the file
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Change to a different directory
+        cwd = os.getcwd()
+        tempdir = tempfile.mkdtemp()
+        try:
+            os.chdir(tempdir)
+            # Remove the file using absolute path
+            porcelain.remove(self.repo.path, paths=[fullpath])
+        finally:
+            os.chdir(cwd)
+            os.rmdir(tempdir)
+
+        # Verify file was removed
+        self.assertFalse(os.path.exists(fullpath))
+
 
 class LogTests(PorcelainTestCase):
     def test_simple(self) -> None:

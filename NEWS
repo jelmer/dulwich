@@ -4,6 +4,10 @@
    and make this the default.
    (Jelmer Vernooĳ, #835)
 
+ * Fix KeyError when pulling from a shallow clone. Handle missing commits
+   gracefully in graph traversal operations for shallow repositories.
+   (Jelmer Vernooĳ, #813)
+
  * Return symrefs from ls_refs. (Jelmer Vernooĳ, #863)
 
  * Support short commit hashes in ``porcelain.reset()``.

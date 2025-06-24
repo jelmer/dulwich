@@ -44,6 +44,10 @@
 
  * Support timeouts for HTTP client operations.  (Jelmer Vernooĳ)
 
+ * Add ``prune`` method to object stores for cleaning up orphaned temporary
+   pack files. This is now called by ``garbage_collect()`` to match Git's
+   behavior. (#558, Jelmer Vernooĳ)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

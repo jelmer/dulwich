@@ -33,19 +33,17 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import ClassVar, Optional
 
 from dulwich import porcelain
 
 from .client import GitProtocolError, get_transport_and_path
 from .errors import ApplyDeltaError
 from .index import Index
+from .objects import valid_hexsha
 from .objectspec import parse_commit
 from .pack import Pack, sha_to_hex
 from .repo import Repo
-
-if TYPE_CHECKING:
-    pass
 
 
 def signal_int(signal, frame) -> None:
@@ -177,8 +175,6 @@ class cmd_annotate(Command):
         parser.add_argument("path", help="Path to file to annotate")
         parser.add_argument("committish", nargs="?", help="Commit to start from")
         args = parser.parse_args(argv)
-
-        from dulwich import porcelain
 
         results = porcelain.annotate(".", args.path, args.committish)
         for (commit, entry), line in results:
@@ -1494,132 +1490,184 @@ class cmd_rebase(Command):
 class cmd_filter_branch(Command):
     def run(self, args) -> Optional[int]:
         import subprocess
-        
-        parser = argparse.ArgumentParser(
-            description="Rewrite branches",
-            add_help=False,  # We'll handle help ourselves for compatibility
+
+        parser = argparse.ArgumentParser(description="Rewrite branches")
+
+        # Supported Git-compatible options
+        parser.add_argument(
+            "--subdirectory-filter",
+            type=str,
+            help="Only include history for subdirectory",
         )
-        
-        # Git-compatible options
-        parser.add_argument("--setup", type=str, help="Not supported")
-        parser.add_argument("--subdirectory-filter", type=str, help="Not supported")
         parser.add_argument("--env-filter", type=str, help="Environment filter command")
-        parser.add_argument("--tree-filter", type=str, help="Not supported")
-        parser.add_argument("--index-filter", type=str, help="Not supported")
-        parser.add_argument("--parent-filter", type=str, help="Not supported")
+        parser.add_argument("--tree-filter", type=str, help="Tree filter command")
+        parser.add_argument("--index-filter", type=str, help="Index filter command")
+        parser.add_argument("--parent-filter", type=str, help="Parent filter command")
         parser.add_argument("--msg-filter", type=str, help="Message filter command")
-        parser.add_argument("--commit-filter", type=str, help="Not supported")
-        parser.add_argument("--tag-name-filter", type=str, help="Not supported")
-        parser.add_argument("--prune-empty", action="store_true", help="Not supported")
+        parser.add_argument("--commit-filter", type=str, help="Commit filter command")
         parser.add_argument(
-            "--original", type=str, default="refs/original",
-            help="Namespace for original refs"
+            "--tag-name-filter", type=str, help="Tag name filter command"
         )
-        parser.add_argument("-d", type=str, help="Not supported")
         parser.add_argument(
-            "-f", "--force", action="store_true",
-            help="Force operation even if refs/original/* exists"
+            "--prune-empty", action="store_true", help="Remove empty commits"
         )
-        parser.add_argument("--state-branch", type=str, help="Not supported")
-        
-        # Help option
-        parser.add_argument("-h", "--help", action="store_true", help="Show help")
-        
-        # Separator and rev-list options
-        parser.add_argument("rev_list_args", nargs="*", help="Rev-list options")
-        
-        # Parse known args to handle -- separator
-        args, remaining = parser.parse_known_args(args)
-        
-        # Handle help
-        if args.help:
-            print("usage: dulwich filter-branch [options] [--] [<rev-list-options>...]")
-            print("\nSupported options:")
-            print("  --env-filter <command>     Command to modify environment variables")
-            print("  --msg-filter <command>     Command to rewrite commit messages")
-            print("  -f, --force                Force rewrite even if refs/original exists")
-            print("  --original <namespace>     Namespace for saving original refs")
-            print("\nNote: This is a limited implementation. Only --env-filter and")
-            print("--msg-filter are supported. Use git filter-repo for full functionality.")
-            return 0
-        
-        # Check for unsupported options
-        unsupported = []
-        if args.setup:
-            unsupported.append("--setup")
-        if args.subdirectory_filter:
-            unsupported.append("--subdirectory-filter")
-        if args.tree_filter:
-            unsupported.append("--tree-filter")
-        if args.index_filter:
-            unsupported.append("--index-filter")
-        if args.parent_filter:
-            unsupported.append("--parent-filter")
-        if args.commit_filter:
-            unsupported.append("--commit-filter")
-        if args.tag_name_filter:
-            unsupported.append("--tag-name-filter")
-        if args.prune_empty:
-            unsupported.append("--prune-empty")
-        if args.d:
-            unsupported.append("-d")
-        if args.state_branch:
-            unsupported.append("--state-branch")
-            
-        if unsupported:
-            print(f"Error: The following options are not supported: {', '.join(unsupported)}")
-            print("Only --env-filter and --msg-filter are currently supported.")
-            return 1
-        
-        # Process remaining args after --
-        if remaining and remaining[0] == "--":
-            remaining = remaining[1:]
-        
-        # Combine with rev_list_args
-        rev_list_args = args.rev_list_args + remaining
-        
-        # Determine refs to process
-        refs = None
-        branch = "HEAD"
-        if rev_list_args:
-            # Simple parsing - just take the first non-option arg as branch
-            for arg in rev_list_args:
-                if not arg.startswith("-"):
-                    branch = arg
-                    break
-        
-        # Create filter functions
-        filter_author = None
-        filter_committer = None
+        parser.add_argument(
+            "--original",
+            type=str,
+            default="refs/original",
+            help="Namespace for original refs",
+        )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force operation even if refs/original/* exists",
+        )
+
+        # Branch/ref to rewrite (defaults to HEAD)
+        parser.add_argument(
+            "branch", nargs="?", default="HEAD", help="Branch or ref to rewrite"
+        )
+
+        args = parser.parse_args(args)
+
+        # Track if any filter fails
+        filter_error = False
+
+        # Setup environment for filters
+        env = os.environ.copy()
+
+        # Helper function to run shell commands
+        def run_filter(cmd, input_data=None, cwd=None, extra_env=None):
+            nonlocal filter_error
+            filter_env = env.copy()
+            if extra_env:
+                filter_env.update(extra_env)
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                input=input_data,
+                cwd=cwd,
+                env=filter_env,
+                capture_output=True,
+            )
+            if result.returncode != 0:
+                filter_error = True
+                return None
+            return result.stdout
+
+        # Create filter functions based on arguments
         filter_message = None
-        
-        if args.env_filter:
-            # env-filter can modify GIT_AUTHOR_* and GIT_COMMITTER_* env vars
-            # Note: This is a simplified implementation. The real git filter-branch
-            # would execute the command and read back environment variables.
-            # Since dulwich only supports simple author/committer filters,
-            # we warn about this limitation.
-            print("Warning: --env-filter support is limited. Only simple text")
-            print("replacements in author/committer fields are supported.")
-            print("")
-            
-            # For now, we don't implement env-filter since it would require
-            # executing shell commands and parsing environment changes
-            return 1
-        
         if args.msg_filter:
-            # msg-filter receives the commit message on stdin
+
             def filter_message(message):
-                result = subprocess.run(
-                    ["sh", "-c", args.msg_filter],
-                    input=message,
-                    capture_output=True,
+                result = run_filter(args.msg_filter, input_data=message)
+                return result if result is not None else message
+
+        tree_filter = None
+        if args.tree_filter:
+
+            def tree_filter(tree_sha, tmpdir):
+                from dulwich.objects import Blob, Tree
+
+                # Export tree to tmpdir
+                with Repo(".") as r:
+                    tree = r.object_store[tree_sha]
+                    for entry in tree.items():
+                        path = Path(tmpdir) / entry.path.decode()
+                        if entry.mode & 0o040000:  # Directory
+                            path.mkdir(exist_ok=True)
+                        else:
+                            obj = r.object_store[entry.sha]
+                            path.write_bytes(obj.data)
+
+                    # Run the filter command in the temp directory
+                    run_filter(args.tree_filter, cwd=tmpdir)
+
+                    # Rebuild tree from modified temp directory
+                    def build_tree_from_dir(dir_path):
+                        tree = Tree()
+                        for name in sorted(os.listdir(dir_path)):
+                            if name.startswith("."):
+                                continue
+                            path = os.path.join(dir_path, name)
+                            if os.path.isdir(path):
+                                subtree_sha = build_tree_from_dir(path)
+                                tree.add(name.encode(), 0o040000, subtree_sha)
+                            else:
+                                with open(path, "rb") as f:
+                                    data = f.read()
+                                blob = Blob.from_string(data)
+                                r.object_store.add_object(blob)
+                                # Use appropriate file mode
+                                mode = os.stat(path).st_mode
+                                if mode & 0o100:
+                                    file_mode = 0o100755
+                                else:
+                                    file_mode = 0o100644
+                                tree.add(name.encode(), file_mode, blob.id)
+                        r.object_store.add_object(tree)
+                        return tree.id
+
+                    return build_tree_from_dir(tmpdir)
+
+        index_filter = None
+        if args.index_filter:
+
+            def index_filter(tree_sha, index_path):
+                run_filter(args.index_filter, extra_env={"GIT_INDEX_FILE": index_path})
+                return None  # Read back from index
+
+        parent_filter = None
+        if args.parent_filter:
+
+            def parent_filter(parents):
+                parent_str = " ".join(p.hex() for p in parents)
+                result = run_filter(args.parent_filter, input_data=parent_str.encode())
+                if result is None:
+                    return parents
+
+                output = result.decode().strip()
+                if not output:
+                    return []
+                new_parents = []
+                for sha in output.split():
+                    if valid_hexsha(sha):
+                        new_parents.append(sha)
+                return new_parents
+
+        commit_filter = None
+        if args.commit_filter:
+
+            def commit_filter(commit_obj, tree_sha):
+                # The filter receives: tree parent1 parent2...
+                cmd_input = tree_sha.hex()
+                for parent in commit_obj.parents:
+                    cmd_input += " " + parent.hex()
+
+                result = run_filter(
+                    args.commit_filter,
+                    input_data=cmd_input.encode(),
+                    extra_env={"GIT_COMMIT": commit_obj.id.hex()},
                 )
-                if result.returncode != 0:
-                    print(f"msg-filter failed: {result.stderr.decode()}")
-                    return message
-                return result.stdout
-        
+                if result is None:
+                    return None
+
+                output = result.decode().strip()
+                if not output:
+                    return None  # Skip commit
+
+                if valid_hexsha(output):
+                    return output
+                return None
+
+        tag_name_filter = None
+        if args.tag_name_filter:
+
+            def tag_name_filter(tag_name):
+                result = run_filter(args.tag_name_filter, input_data=tag_name)
+                return result.strip() if result is not None else tag_name
+
         # Open repo once
         with Repo(".") as r:
             # Check for refs/original if not forcing
@@ -1631,30 +1679,43 @@ class cmd_filter_branch(Command):
                         print(f"A previous backup already exists in {args.original}/")
                         print("Force overwriting the backup with -f")
                         return 1
-            
+
             try:
                 # Call porcelain.filter_branch with the repo object
                 result = porcelain.filter_branch(
                     r,
-                    branch,
-                    filter_author=filter_author,
-                    filter_committer=filter_committer,
+                    args.branch,
                     filter_message=filter_message,
+                    tree_filter=tree_filter if args.tree_filter else None,
+                    index_filter=index_filter if args.index_filter else None,
+                    parent_filter=parent_filter if args.parent_filter else None,
+                    commit_filter=commit_filter if args.commit_filter else None,
+                    subdirectory_filter=args.subdirectory_filter,
+                    prune_empty=args.prune_empty,
+                    tag_name_filter=tag_name_filter if args.tag_name_filter else None,
                     force=args.force,
                     keep_original=True,  # Always keep original with git
-                    refs=refs,
                 )
-                
+
+                # Check if any filter failed
+                if filter_error:
+                    print("Error: Filter command failed", file=sys.stderr)
+                    return 1
+
                 # Git filter-branch shows progress
                 if result:
-                    print(f"Rewrite {branch} ({len(result)} commits)")
+                    print(f"Rewrite {args.branch} ({len(result)} commits)")
                     # Git shows: Ref 'refs/heads/branch' was rewritten
-                    if branch != "HEAD":
-                        ref_name = branch if branch.startswith("refs/") else f"refs/heads/{branch}"
+                    if args.branch != "HEAD":
+                        ref_name = (
+                            args.branch
+                            if args.branch.startswith("refs/")
+                            else f"refs/heads/{args.branch}"
+                        )
                         print(f"Ref '{ref_name}' was rewritten")
-                
+
                 return 0
-                
+
             except porcelain.Error as e:
                 print(f"Error: {e}", file=sys.stderr)
                 return 1

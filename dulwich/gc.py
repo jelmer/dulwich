@@ -285,6 +285,12 @@ def garbage_collect(
             # Normal repack
             object_store.repack()
 
+    # Prune orphaned temporary files
+    if progress:
+        progress("Pruning temporary files")
+    if not dry_run:
+        object_store.prune(grace_period=grace_period)
+
     # Count final state
     stats.packs_after = len(list(object_store.packs))
     # TODO: Count loose objects when we have a method for it

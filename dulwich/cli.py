@@ -761,6 +761,68 @@ class cmd_unpack_objects(Command):
         print(f"Unpacked {count} objects")
 
 
+class cmd_prune(Command):
+    def run(self, args) -> Optional[int]:
+        import datetime
+        import time
+
+        from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
+
+        parser = argparse.ArgumentParser(
+            description="Remove temporary pack files left behind by interrupted operations"
+        )
+        parser.add_argument(
+            "--expire",
+            nargs="?",
+            const="2.weeks.ago",
+            help="Only prune files older than the specified date (default: 2.weeks.ago)",
+        )
+        parser.add_argument(
+            "--dry-run",
+            "-n",
+            action="store_true",
+            help="Only report what would be removed",
+        )
+        parser.add_argument(
+            "--verbose",
+            "-v",
+            action="store_true",
+            help="Report all actions",
+        )
+        args = parser.parse_args(args)
+
+        # Parse expire grace period
+        grace_period = DEFAULT_TEMPFILE_GRACE_PERIOD
+        if args.expire:
+            try:
+                grace_period = parse_relative_time(args.expire)
+            except ValueError:
+                # Try to parse as absolute date
+                try:
+                    date = datetime.datetime.strptime(args.expire, "%Y-%m-%d")
+                    grace_period = int(time.time() - date.timestamp())
+                except ValueError:
+                    print(f"Error: Invalid expire date: {args.expire}", file=sys.stderr)
+                    return 1
+
+        # Progress callback
+        def progress(msg):
+            if args.verbose:
+                print(msg)
+
+        try:
+            porcelain.prune(
+                ".",
+                grace_period=grace_period,
+                dry_run=args.dry_run,
+                progress=progress if args.verbose else None,
+            )
+            return None
+        except porcelain.Error as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+
 class cmd_pull(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1491,6 +1553,7 @@ commands = {
     "notes": cmd_notes,
     "pack-objects": cmd_pack_objects,
     "pack-refs": cmd_pack_refs,
+    "prune": cmd_prune,
     "pull": cmd_pull,
     "push": cmd_push,
     "rebase": cmd_rebase,

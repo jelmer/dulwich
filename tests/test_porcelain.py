@@ -39,6 +39,7 @@ from unittest import skipIf
 from dulwich import porcelain
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError
+from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
 from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
 from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
@@ -5502,3 +5503,79 @@ class CountObjectsTests(PorcelainTestCase):
 
         # Verify it's the correct dataclass type
         self.assertIsInstance(stats, CountObjectsResult)
+
+
+class PruneTests(PorcelainTestCase):
+    def test_prune_removes_old_tempfiles(self):
+        """Test that prune removes old temporary files."""
+        # Create an old temporary file in the objects directory
+        objects_dir = os.path.join(self.repo.path, ".git", "objects")
+        tmp_pack_path = os.path.join(objects_dir, "tmp_pack_test")
+        with open(tmp_pack_path, "wb") as f:
+            f.write(b"old temporary data")
+
+        # Make it old
+        old_time = time.time() - (DEFAULT_TEMPFILE_GRACE_PERIOD + 3600)
+        os.utime(tmp_pack_path, (old_time, old_time))
+
+        # Run prune
+        porcelain.prune(self.repo.path)
+
+        # Verify the file was removed
+        self.assertFalse(os.path.exists(tmp_pack_path))
+
+    def test_prune_keeps_recent_tempfiles(self):
+        """Test that prune keeps recent temporary files."""
+        # Create a recent temporary file
+        objects_dir = os.path.join(self.repo.path, ".git", "objects")
+        tmp_pack_path = os.path.join(objects_dir, "tmp_pack_recent")
+        with open(tmp_pack_path, "wb") as f:
+            f.write(b"recent temporary data")
+
+        # Run prune
+        porcelain.prune(self.repo.path)
+
+        # Verify the file was NOT removed
+        self.assertTrue(os.path.exists(tmp_pack_path))
+
+        # Clean up
+        os.remove(tmp_pack_path)
+
+    def test_prune_with_custom_grace_period(self):
+        """Test prune with custom grace period."""
+        # Create a 1-hour-old temporary file
+        objects_dir = os.path.join(self.repo.path, ".git", "objects")
+        tmp_pack_path = os.path.join(objects_dir, "tmp_pack_1hour")
+        with open(tmp_pack_path, "wb") as f:
+            f.write(b"1 hour old data")
+
+        # Make it 1 hour old
+        old_time = time.time() - 3600
+        os.utime(tmp_pack_path, (old_time, old_time))
+
+        # Prune with 30-minute grace period should remove it
+        porcelain.prune(self.repo.path, grace_period=1800)
+
+        # Verify the file was removed
+        self.assertFalse(os.path.exists(tmp_pack_path))
+
+    def test_prune_dry_run(self):
+        """Test prune in dry-run mode."""
+        # Create an old temporary file
+        objects_dir = os.path.join(self.repo.path, ".git", "objects")
+        tmp_pack_path = os.path.join(objects_dir, "tmp_pack_dryrun")
+        with open(tmp_pack_path, "wb") as f:
+            f.write(b"old temporary data")
+
+        # Make it old
+        old_time = time.time() - (DEFAULT_TEMPFILE_GRACE_PERIOD + 3600)
+        os.utime(tmp_pack_path, (old_time, old_time))
+
+        # Run prune in dry-run mode
+        porcelain.prune(self.repo.path, dry_run=True)
+
+        # Verify the file was NOT removed (dry run)
+        self.assertTrue(os.path.exists(tmp_pack_path))
+
+        # Clean up
+        os.remove(tmp_pack_path)

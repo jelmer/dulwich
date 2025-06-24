@@ -501,6 +501,174 @@ who\"
             cf = ConfigFile.from_path(main_path, repo_dir=work_dir)
             self.assertEqual(b"work@company.com", cf.get((b"user",), b"email"))
 
+    def test_includeif_hasconfig(self) -> None:
+        """Test includeIf with hasconfig conditions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create included config file
+            work_included_path = os.path.join(tmpdir, "work.config")
+            with open(work_included_path, "wb") as f:
+                f.write(b"[user]\n    email = work@company.com\n")
+
+            personal_included_path = os.path.join(tmpdir, "personal.config")
+            with open(personal_included_path, "wb") as f:
+                f.write(b"[user]\n    email = personal@example.com\n")
+
+            # Create main config with hasconfig conditions
+            main_path = os.path.join(tmpdir, "main.config")
+            with open(main_path, "wb") as f:
+                f.write(
+                    b'[remote "origin"]\n'
+                    b"    url = ssh://org-work@github.com/company/project\n"
+                    b'[includeIf "hasconfig:remote.*.url:ssh://org-*@github.com/**"]\n'
+                    b"    path = work.config\n"
+                    b'[includeIf "hasconfig:remote.*.url:https://github.com/opensource/**"]\n'
+                    b"    path = personal.config\n"
+                )
+
+            # Load config - should match the work config due to org-work remote
+            # The second condition won't match since url doesn't have /opensource/ path
+            cf = ConfigFile.from_path(main_path)
+            self.assertEqual(b"work@company.com", cf.get((b"user",), b"email"))
+
+    def test_includeif_hasconfig_wildcard(self) -> None:
+        """Test includeIf hasconfig with wildcard patterns."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create included config
+            included_path = os.path.join(tmpdir, "included.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    name = IncludedUser\n")
+
+            # Create main config with hasconfig condition using wildcards
+            main_path = os.path.join(tmpdir, "main.config")
+            with open(main_path, "wb") as f:
+                f.write(
+                    b"[core]\n"
+                    b"    autocrlf = true\n"
+                    b'[includeIf "hasconfig:core.autocrlf:true"]\n'
+                    b"    path = included.config\n"
+                )
+
+            # Load config - should include based on core.autocrlf value
+            cf = ConfigFile.from_path(main_path)
+            self.assertEqual(b"IncludedUser", cf.get((b"user",), b"name"))
+
+    def test_includeif_hasconfig_no_match(self) -> None:
+        """Test includeIf hasconfig when condition doesn't match."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create included config
+            included_path = os.path.join(tmpdir, "included.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    name = IncludedUser\n")
+
+            # Create main config with non-matching hasconfig condition
+            main_path = os.path.join(tmpdir, "main.config")
+            with open(main_path, "wb") as f:
+                f.write(
+                    b"[core]\n"
+                    b"    autocrlf = false\n"
+                    b'[includeIf "hasconfig:core.autocrlf:true"]\n'
+                    b"    path = included.config\n"
+                )
+
+            # Load config - should NOT include since condition doesn't match
+            cf = ConfigFile.from_path(main_path)
+            with self.assertRaises(KeyError):
+                cf.get((b"user",), b"name")
+
+    def test_includeif_gitdir_relative(self) -> None:
+        """Test includeIf with relative gitdir patterns."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a directory structure
+            config_dir = os.path.join(tmpdir, "config")
+            repo_dir = os.path.join(tmpdir, "repo")
+            os.makedirs(config_dir)
+            os.makedirs(repo_dir)
+
+            # Create included config
+            included_path = os.path.join(config_dir, "work.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    email = relative@example.com\n")
+
+            # Create main config with relative gitdir pattern
+            main_path = os.path.join(config_dir, "main.config")
+            with open(main_path, "wb") as f:
+                # Pattern ./../repo/** should match when config is in config/ and repo is in repo/
+                f.write(b'[includeIf "gitdir:./../repo/**"]\n    path = work.config\n')
+
+            # Load config with repo_dir that matches the relative pattern
+            cf = ConfigFile.from_path(main_path, repo_dir=repo_dir)
+            self.assertEqual(b"relative@example.com", cf.get((b"user",), b"email"))
+
+    def test_includeif_onbranch(self) -> None:
+        """Test includeIf with onbranch conditions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a mock git repository
+            repo_dir = os.path.join(tmpdir, "repo")
+            git_dir = os.path.join(repo_dir, ".git")
+            os.makedirs(git_dir)
+
+            # Create HEAD file pointing to main branch
+            head_path = os.path.join(git_dir, "HEAD")
+            with open(head_path, "wb") as f:
+                f.write(b"ref: refs/heads/main\n")
+
+            # Create included configs for different branches
+            main_config_path = os.path.join(tmpdir, "main.config")
+            with open(main_config_path, "wb") as f:
+                f.write(b"[user]\n    email = main@example.com\n")
+
+            feature_config_path = os.path.join(tmpdir, "feature.config")
+            with open(feature_config_path, "wb") as f:
+                f.write(b"[user]\n    email = feature@example.com\n")
+
+            # Create main config with onbranch conditions
+            config_path = os.path.join(tmpdir, "config")
+            with open(config_path, "wb") as f:
+                f.write(
+                    b'[includeIf "onbranch:main"]\n'
+                    b"    path = main.config\n"
+                    b'[includeIf "onbranch:feature/*"]\n'
+                    b"    path = feature.config\n"
+                )
+
+            # Load config - should match main branch
+            cf = ConfigFile.from_path(config_path, repo_dir=repo_dir)
+            self.assertEqual(b"main@example.com", cf.get((b"user",), b"email"))
+
+            # Change branch to feature/test
+            with open(head_path, "wb") as f:
+                f.write(b"ref: refs/heads/feature/test\n")
+
+            # Reload config - should match feature branch pattern
+            cf = ConfigFile.from_path(config_path, repo_dir=repo_dir)
+            self.assertEqual(b"feature@example.com", cf.get((b"user",), b"email"))
+
+    def test_includeif_onbranch_gitdir(self) -> None:
+        """Test includeIf onbranch when repo_dir points to .git directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a mock git repository
+            git_dir = os.path.join(tmpdir, ".git")
+            os.makedirs(git_dir)
+
+            # Create HEAD file
+            head_path = os.path.join(git_dir, "HEAD")
+            with open(head_path, "wb") as f:
+                f.write(b"ref: refs/heads/develop\n")
+
+            # Create included config
+            included_path = os.path.join(tmpdir, "develop.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[core]\n    autocrlf = false\n")
+
+            # Create main config
+            config_path = os.path.join(tmpdir, "config")
+            with open(config_path, "wb") as f:
+                f.write(b'[includeIf "onbranch:develop"]\n    path = develop.config\n')
+
+            # Load config with repo_dir pointing to .git
+            cf = ConfigFile.from_path(config_path, repo_dir=git_dir)
+            self.assertEqual(b"false", cf.get((b"core",), b"autocrlf"))
+
     def test_include_circular(self) -> None:
         """Test that circular includes are handled properly."""
         with tempfile.TemporaryDirectory() as tmpdir:

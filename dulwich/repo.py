@@ -1131,6 +1131,11 @@ class BaseRepo:
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
+        # Trigger auto GC if needed
+        from .gc import maybe_auto_gc
+
+        maybe_auto_gc(self)
+
         return c.id
 
 

@@ -603,6 +603,20 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         """List with pack objects."""
         return list(self._iter_cached_packs()) + list(self._update_pack_cache())
 
+    def count_pack_files(self) -> int:
+        """Count the number of pack files.
+
+        Returns:
+            Number of pack files (excluding those with .keep files)
+        """
+        count = 0
+        for pack in self.packs:
+            # Check if there's a .keep file for this pack
+            keep_path = pack._basename + ".keep"
+            if not os.path.exists(keep_path):
+                count += 1
+        return count
+
     def _iter_alternate_objects(self):
         """Iterate over the SHAs of all the objects in alternate stores."""
         for alternate in self.alternates:
@@ -1020,6 +1034,32 @@ class DiskObjectStore(PackBasedObjectStore):
                     continue
                 yield sha
 
+    def count_loose_objects(self) -> int:
+        """Count the number of loose objects in the object store.
+
+        Returns:
+            Number of loose objects
+        """
+        count = 0
+        if not os.path.exists(self.path):
+            return 0
+
+        for i in range(256):
+            subdir = os.path.join(self.path, f"{i:02x}")
+            try:
+                count += len(
+                    [
+                        name
+                        for name in os.listdir(subdir)
+                        if len(name) == 38  # 40 - 2 for the prefix
+                    ]
+                )
+            except FileNotFoundError:
+                # Directory may have been removed or is inaccessible
+                continue
+
+        return count
+
     def _get_loose_object(self, sha):
         path = self._get_shafile_path(sha)
         try:
@@ -1047,7 +1087,7 @@ class DiskObjectStore(PackBasedObjectStore):
             path = self._get_shafile_path(sha)
             try:
                 return os.path.getmtime(path)
-            except (OSError, FileNotFoundError):
+            except FileNotFoundError:
                 pass
 
         # Check if it's in a pack file
@@ -1058,7 +1098,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     pack_path = pack._data_path
                     try:
                         return os.path.getmtime(pack_path)
-                    except (OSError, FileNotFoundError, AttributeError):
+                    except (FileNotFoundError, AttributeError):
                         pass
             except PackFileDisappeared:
                 pass
@@ -1365,13 +1405,10 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Clean up tmp_pack_* files in the repository directory
         for tmp_file in glob.glob(os.path.join(self.path, "tmp_pack_*")):
-            try:
-                # Check if file is old enough (more than grace period)
-                mtime = os.path.getmtime(tmp_file)
-                if time.time() - mtime > grace_period:
-                    os.remove(tmp_file)
-            except OSError:
-                pass
+            # Check if file is old enough (more than grace period)
+            mtime = os.path.getmtime(tmp_file)
+            if time.time() - mtime > grace_period:
+                os.remove(tmp_file)
 
         # Clean up orphaned .pack files without corresponding .idx files
         try:
@@ -1394,13 +1431,10 @@ class DiskObjectStore(PackBasedObjectStore):
         for base_name, pack_name in pack_files.items():
             if base_name not in idx_files:
                 pack_path = os.path.join(self.pack_dir, pack_name)
-                try:
-                    # Check if file is old enough (more than grace period)
-                    mtime = os.path.getmtime(pack_path)
-                    if time.time() - mtime > grace_period:
-                        os.remove(pack_path)
-                except OSError:
-                    pass
+                # Check if file is old enough (more than grace period)
+                mtime = os.path.getmtime(pack_path)
+                if time.time() - mtime > grace_period:
+                    os.remove(pack_path)
 
 
 class MemoryObjectStore(BaseObjectStore):

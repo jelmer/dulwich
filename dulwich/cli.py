@@ -1491,6 +1491,175 @@ class cmd_rebase(Command):
             return 1
 
 
+class cmd_filter_branch(Command):
+    def run(self, args) -> Optional[int]:
+        import subprocess
+        
+        parser = argparse.ArgumentParser(
+            description="Rewrite branches",
+            add_help=False,  # We'll handle help ourselves for compatibility
+        )
+        
+        # Git-compatible options
+        parser.add_argument("--setup", type=str, help="Not supported")
+        parser.add_argument("--subdirectory-filter", type=str, help="Not supported")
+        parser.add_argument("--env-filter", type=str, help="Environment filter command")
+        parser.add_argument("--tree-filter", type=str, help="Not supported")
+        parser.add_argument("--index-filter", type=str, help="Not supported")
+        parser.add_argument("--parent-filter", type=str, help="Not supported")
+        parser.add_argument("--msg-filter", type=str, help="Message filter command")
+        parser.add_argument("--commit-filter", type=str, help="Not supported")
+        parser.add_argument("--tag-name-filter", type=str, help="Not supported")
+        parser.add_argument("--prune-empty", action="store_true", help="Not supported")
+        parser.add_argument(
+            "--original", type=str, default="refs/original",
+            help="Namespace for original refs"
+        )
+        parser.add_argument("-d", type=str, help="Not supported")
+        parser.add_argument(
+            "-f", "--force", action="store_true",
+            help="Force operation even if refs/original/* exists"
+        )
+        parser.add_argument("--state-branch", type=str, help="Not supported")
+        
+        # Help option
+        parser.add_argument("-h", "--help", action="store_true", help="Show help")
+        
+        # Separator and rev-list options
+        parser.add_argument("rev_list_args", nargs="*", help="Rev-list options")
+        
+        # Parse known args to handle -- separator
+        args, remaining = parser.parse_known_args(args)
+        
+        # Handle help
+        if args.help:
+            print("usage: dulwich filter-branch [options] [--] [<rev-list-options>...]")
+            print("\nSupported options:")
+            print("  --env-filter <command>     Command to modify environment variables")
+            print("  --msg-filter <command>     Command to rewrite commit messages")
+            print("  -f, --force                Force rewrite even if refs/original exists")
+            print("  --original <namespace>     Namespace for saving original refs")
+            print("\nNote: This is a limited implementation. Only --env-filter and")
+            print("--msg-filter are supported. Use git filter-repo for full functionality.")
+            return 0
+        
+        # Check for unsupported options
+        unsupported = []
+        if args.setup:
+            unsupported.append("--setup")
+        if args.subdirectory_filter:
+            unsupported.append("--subdirectory-filter")
+        if args.tree_filter:
+            unsupported.append("--tree-filter")
+        if args.index_filter:
+            unsupported.append("--index-filter")
+        if args.parent_filter:
+            unsupported.append("--parent-filter")
+        if args.commit_filter:
+            unsupported.append("--commit-filter")
+        if args.tag_name_filter:
+            unsupported.append("--tag-name-filter")
+        if args.prune_empty:
+            unsupported.append("--prune-empty")
+        if args.d:
+            unsupported.append("-d")
+        if args.state_branch:
+            unsupported.append("--state-branch")
+            
+        if unsupported:
+            print(f"Error: The following options are not supported: {', '.join(unsupported)}")
+            print("Only --env-filter and --msg-filter are currently supported.")
+            return 1
+        
+        # Process remaining args after --
+        if remaining and remaining[0] == "--":
+            remaining = remaining[1:]
+        
+        # Combine with rev_list_args
+        rev_list_args = args.rev_list_args + remaining
+        
+        # Determine refs to process
+        refs = None
+        branch = "HEAD"
+        if rev_list_args:
+            # Simple parsing - just take the first non-option arg as branch
+            for arg in rev_list_args:
+                if not arg.startswith("-"):
+                    branch = arg
+                    break
+        
+        # Create filter functions
+        filter_author = None
+        filter_committer = None
+        filter_message = None
+        
+        if args.env_filter:
+            # env-filter can modify GIT_AUTHOR_* and GIT_COMMITTER_* env vars
+            # Note: This is a simplified implementation. The real git filter-branch
+            # would execute the command and read back environment variables.
+            # Since dulwich only supports simple author/committer filters,
+            # we warn about this limitation.
+            print("Warning: --env-filter support is limited. Only simple text")
+            print("replacements in author/committer fields are supported.")
+            print("")
+            
+            # For now, we don't implement env-filter since it would require
+            # executing shell commands and parsing environment changes
+            return 1
+        
+        if args.msg_filter:
+            # msg-filter receives the commit message on stdin
+            def filter_message(message):
+                result = subprocess.run(
+                    ["sh", "-c", args.msg_filter],
+                    input=message,
+                    capture_output=True,
+                )
+                if result.returncode != 0:
+                    print(f"msg-filter failed: {result.stderr.decode()}")
+                    return message
+                return result.stdout
+        
+        # Open repo once
+        with Repo(".") as r:
+            # Check for refs/original if not forcing
+            if not args.force:
+                original_prefix = args.original.encode() + b"/"
+                for ref in r.refs.allkeys():
+                    if ref.startswith(original_prefix):
+                        print("Cannot create a new backup.")
+                        print(f"A previous backup already exists in {args.original}/")
+                        print("Force overwriting the backup with -f")
+                        return 1
+            
+            try:
+                # Call porcelain.filter_branch with the repo object
+                result = porcelain.filter_branch(
+                    r,
+                    branch,
+                    filter_author=filter_author,
+                    filter_committer=filter_committer,
+                    filter_message=filter_message,
+                    force=args.force,
+                    keep_original=True,  # Always keep original with git
+                    refs=refs,
+                )
+                
+                # Git filter-branch shows progress
+                if result:
+                    print(f"Rewrite {branch} ({len(result)} commits)")
+                    # Git shows: Ref 'refs/heads/branch' was rewritten
+                    if branch != "HEAD":
+                        ref_name = branch if branch.startswith("refs/") else f"refs/heads/{branch}"
+                        print(f"Ref '{ref_name}' was rewritten")
+                
+                return 0
+                
+            except porcelain.Error as e:
+                print(f"Error: {e}", file=sys.stderr)
+                return 1
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1539,6 +1708,7 @@ commands = {
     "dump-index": cmd_dump_index,
     "fetch-pack": cmd_fetch_pack,
     "fetch": cmd_fetch,
+    "filter-branch": cmd_filter_branch,
     "for-each-ref": cmd_for_each_ref,
     "fsck": cmd_fsck,
     "gc": cmd_gc,

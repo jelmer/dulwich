@@ -652,9 +652,11 @@ def add(repo: Union[str, os.PathLike, BaseRepo] = ".", paths=None):
 
             try:
                 relpath = str(resolved_path.relative_to(repo_path)).replace(os.sep, "/")
-            except ValueError:
+            except ValueError as e:
                 # Path is not within the repository
-                raise ValueError(f"Path {p} is not within repository {repo_path}")
+                raise ValueError(
+                    f"Path {p} is not within repository {repo_path}"
+                ) from e
 
             # Handle directories by scanning their contents
             if resolved_path.is_dir():
@@ -1537,6 +1539,12 @@ def push(
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)
 
+    # Trigger auto GC if needed
+    from .gc import maybe_auto_gc
+
+    with open_repo_closing(repo) as r:
+        maybe_auto_gc(r)
+
 
 def pull(
     repo,
@@ -1640,6 +1648,12 @@ def pull(
             update_working_tree(r, old_tree_id, new_tree_id)
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
+
+    # Trigger auto GC if needed
+    from .gc import maybe_auto_gc
+
+    with open_repo_closing(repo) as r:
+        maybe_auto_gc(r)
 
 
 def status(repo=".", ignored=False, untracked_files="normal"):
@@ -2100,6 +2114,12 @@ def fetch(
                 prune=prune,
                 prune_tags=prune_tags,
             )
+
+    # Trigger auto GC if needed
+    from .gc import maybe_auto_gc
+
+    with open_repo_closing(repo) as r:
+        maybe_auto_gc(r)
 
     return fetch_result
 
@@ -3040,9 +3060,16 @@ def merge(
         except KeyError:
             raise Error(f"Cannot find commit '{committish}'")
 
-        return _do_merge(
+        result = _do_merge(
             r, merge_commit_id, no_commit, no_ff, message, author, committer
         )
+
+        # Trigger auto GC if needed
+        from .gc import maybe_auto_gc
+
+        maybe_auto_gc(r)
+
+        return result
 
 
 def unpack_objects(pack_path, target="."):

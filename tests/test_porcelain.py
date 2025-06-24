@@ -5582,11 +5582,11 @@ class FilterBranchTests(PorcelainTestCase):
         super().setUp()
         # Create initial commits with different authors
         from dulwich.objects import Commit, Tree
-        
+
         # Create actual tree and blob objects
         tree = Tree()
         self.repo.object_store.add_object(tree)
-        
+
         c1 = Commit()
         c1.tree = tree.id
         c1.parents = []
@@ -5598,7 +5598,7 @@ class FilterBranchTests(PorcelainTestCase):
         c1.commit_timezone = 0
         c1.message = b"Initial commit"
         self.repo.object_store.add_object(c1)
-        
+
         c2 = Commit()
         c2.tree = tree.id
         c2.parents = [c1.id]
@@ -5610,7 +5610,7 @@ class FilterBranchTests(PorcelainTestCase):
         c2.commit_timezone = 0
         c2.message = b"Second commit\n\nWith body"
         self.repo.object_store.add_object(c2)
-        
+
         c3 = Commit()
         c3.tree = tree.id
         c3.parents = [c2.id]
@@ -5622,120 +5622,109 @@ class FilterBranchTests(PorcelainTestCase):
         c3.commit_timezone = 0
         c3.message = b"Third commit"
         self.repo.object_store.add_object(c3)
-        
+
         self.repo.refs[b"refs/heads/master"] = c3.id
         self.repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
-        
+
         # Store IDs for test assertions
         self.c1_id = c1.id
         self.c2_id = c2.id
         self.c3_id = c3.id
-        
+
     def test_filter_branch_author(self):
         """Test filtering branch with author changes."""
+
         def filter_author(author):
             # Change all authors to "New Author"
             return b"New Author <new@example.com>"
-        
+
         result = porcelain.filter_branch(
-            self.repo_path,
-            "master",
-            filter_author=filter_author
+            self.repo_path, "master", filter_author=filter_author
         )
-        
+
         # Check that we have mappings for all commits
         self.assertEqual(len(result), 3)
-        
+
         # Verify the branch ref was updated
         new_head = self.repo.refs[b"refs/heads/master"]
         self.assertNotEqual(new_head, self.c3_id)
-        
+
         # Verify the original ref was saved
         original_ref = self.repo.refs[b"refs/original/refs/heads/master"]
         self.assertEqual(original_ref, self.c3_id)
-        
+
         # Check that authors were updated
         new_commit = self.repo[new_head]
         self.assertEqual(new_commit.author, b"New Author <new@example.com>")
-        
+
         # Check parent chain
         parent = self.repo[new_commit.parents[0]]
         self.assertEqual(parent.author, b"New Author <new@example.com>")
-        
+
     def test_filter_branch_message(self):
         """Test filtering branch with message changes."""
+
         def filter_message(message):
             # Add prefix to all messages
             return b"[FILTERED] " + message
-        
-        porcelain.filter_branch(
-            self.repo_path,
-            "master",
-            filter_message=filter_message
-        )
-        
+
+        porcelain.filter_branch(self.repo_path, "master", filter_message=filter_message)
+
         # Verify messages were updated
         new_head = self.repo.refs[b"refs/heads/master"]
         new_commit = self.repo[new_head]
         self.assertTrue(new_commit.message.startswith(b"[FILTERED] "))
-        
+
     def test_filter_branch_custom_filter(self):
         """Test filtering branch with custom filter function."""
+
         def custom_filter(commit):
             # Change both author and message
             return {
                 "author": b"Custom Author <custom@example.com>",
-                "message": b"Custom: " + commit.message
+                "message": b"Custom: " + commit.message,
             }
-        
-        porcelain.filter_branch(
-            self.repo_path,
-            "master", 
-            filter_fn=custom_filter
-        )
-        
+
+        porcelain.filter_branch(self.repo_path, "master", filter_fn=custom_filter)
+
         # Verify custom filter was applied
         new_head = self.repo.refs[b"refs/heads/master"]
         new_commit = self.repo[new_head]
         self.assertEqual(new_commit.author, b"Custom Author <custom@example.com>")
         self.assertTrue(new_commit.message.startswith(b"Custom: "))
-        
+
     def test_filter_branch_no_changes(self):
         """Test filtering branch with no changes."""
         result = porcelain.filter_branch(self.repo_path, "master")
-        
+
         # All commits should map to themselves
         for old_sha, new_sha in result.items():
             self.assertEqual(old_sha, new_sha)
-            
+
         # HEAD should be unchanged
         self.assertEqual(self.repo.refs[b"refs/heads/master"], self.c3_id)
-        
+
     def test_filter_branch_force(self):
         """Test force filtering a previously filtered branch."""
         # First filter
         porcelain.filter_branch(
-            self.repo_path,
-            "master",
-            filter_message=lambda m: b"First: " + m
+            self.repo_path, "master", filter_message=lambda m: b"First: " + m
         )
-        
+
         # Try again without force - should fail
         with self.assertRaises(porcelain.Error):
             porcelain.filter_branch(
-                self.repo_path,
-                "master",
-                filter_message=lambda m: b"Second: " + m
+                self.repo_path, "master", filter_message=lambda m: b"Second: " + m
             )
-            
+
         # Try again with force - should succeed
         porcelain.filter_branch(
             self.repo_path,
             "master",
             filter_message=lambda m: b"Second: " + m,
-            force=True
+            force=True,
         )
-        
+
         # Verify second filter was applied
         new_head = self.repo.refs[b"refs/heads/master"]
         new_commit = self.repo[new_head]

@@ -5513,17 +5513,17 @@ class PruneTests(PorcelainTestCase):
         tmp_pack_path = os.path.join(objects_dir, "tmp_pack_test")
         with open(tmp_pack_path, "wb") as f:
             f.write(b"old temporary data")
-        
+
         # Make it old
         old_time = time.time() - (DEFAULT_TEMPFILE_GRACE_PERIOD + 3600)
         os.utime(tmp_pack_path, (old_time, old_time))
-        
+
         # Run prune
         porcelain.prune(self.repo.path)
-        
+
         # Verify the file was removed
         self.assertFalse(os.path.exists(tmp_pack_path))
-    
+
     def test_prune_keeps_recent_tempfiles(self):
         """Test that prune keeps recent temporary files."""
         # Create a recent temporary file
@@ -5531,16 +5531,16 @@ class PruneTests(PorcelainTestCase):
         tmp_pack_path = os.path.join(objects_dir, "tmp_pack_recent")
         with open(tmp_pack_path, "wb") as f:
             f.write(b"recent temporary data")
-        
+
         # Run prune
         porcelain.prune(self.repo.path)
-        
+
         # Verify the file was NOT removed
         self.assertTrue(os.path.exists(tmp_pack_path))
-        
+
         # Clean up
         os.remove(tmp_pack_path)
-    
+
     def test_prune_with_custom_grace_period(self):
         """Test prune with custom grace period."""
         # Create a 1-hour-old temporary file
@@ -5548,17 +5548,17 @@ class PruneTests(PorcelainTestCase):
         tmp_pack_path = os.path.join(objects_dir, "tmp_pack_1hour")
         with open(tmp_pack_path, "wb") as f:
             f.write(b"1 hour old data")
-        
+
         # Make it 1 hour old
         old_time = time.time() - 3600
         os.utime(tmp_pack_path, (old_time, old_time))
-        
+
         # Prune with 30-minute grace period should remove it
         porcelain.prune(self.repo.path, grace_period=1800)
-        
+
         # Verify the file was removed
         self.assertFalse(os.path.exists(tmp_pack_path))
-    
+
     def test_prune_dry_run(self):
         """Test prune in dry-run mode."""
         # Create an old temporary file
@@ -5566,16 +5566,16 @@ class PruneTests(PorcelainTestCase):
         tmp_pack_path = os.path.join(objects_dir, "tmp_pack_dryrun")
         with open(tmp_pack_path, "wb") as f:
             f.write(b"old temporary data")
-        
+
         # Make it old
         old_time = time.time() - (DEFAULT_TEMPFILE_GRACE_PERIOD + 3600)
         os.utime(tmp_pack_path, (old_time, old_time))
-        
+
         # Run prune in dry-run mode
         porcelain.prune(self.repo.path, dry_run=True)
-        
+
         # Verify the file was NOT removed (dry run)
         self.assertTrue(os.path.exists(tmp_pack_path))
-        
+
         # Clean up
         os.remove(tmp_pack_path)

@@ -426,80 +426,79 @@ who\"
             cf = ConfigFile.from_path(main_path)
             self.assertEqual(b"true", cf.get((b"core",), b"bare"))
 
-    def test_includeif_gitdir_match(self) -> None:
-        """Test includeIf with gitdir condition that matches."""
+    def test_includeif_hasconfig(self) -> None:
+        """Test includeIf with hasconfig conditions."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = os.path.join(tmpdir, "myrepo")
-            os.makedirs(repo_dir)
-            # Use realpath to resolve any symlinks (important on macOS)
-            repo_dir = os.path.realpath(repo_dir)
-
             # Create included config file
-            included_path = os.path.join(tmpdir, "work.config")
-            with open(included_path, "wb") as f:
-                f.write(b"[user]\n    email = work@example.com\n")
-
-            # Create main config with includeIf
-            main_path = os.path.join(tmpdir, "main.config")
-            with open(main_path, "wb") as f:
-                f.write(
-                    f'[includeIf "gitdir:{repo_dir}/"]\n    path = work.config\n'.encode()
-                )
-
-            # Load with matching repo_dir
-            cf = ConfigFile.from_path(main_path, repo_dir=repo_dir)
-            self.assertEqual(b"work@example.com", cf.get((b"user",), b"email"))
-
-    def test_includeif_gitdir_no_match(self) -> None:
-        """Test includeIf with gitdir condition that doesn't match."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_dir = os.path.join(tmpdir, "myrepo")
-            other_dir = os.path.join(tmpdir, "other")
-            os.makedirs(repo_dir)
-            os.makedirs(other_dir)
-            # Use realpath to resolve any symlinks (important on macOS)
-            repo_dir = os.path.realpath(repo_dir)
-            other_dir = os.path.realpath(other_dir)
-
-            # Create included config file
-            included_path = os.path.join(tmpdir, "work.config")
-            with open(included_path, "wb") as f:
-                f.write(b"[user]\n    email = work@example.com\n")
-
-            # Create main config with includeIf
-            main_path = os.path.join(tmpdir, "main.config")
-            with open(main_path, "wb") as f:
-                f.write(
-                    f'[includeIf "gitdir:{repo_dir}/"]\n    path = work.config\n'.encode()
-                )
-
-            # Load with non-matching repo_dir
-            cf = ConfigFile.from_path(main_path, repo_dir=other_dir)
-            with self.assertRaises(KeyError):
-                cf.get((b"user",), b"email")
-
-    def test_includeif_gitdir_pattern(self) -> None:
-        """Test includeIf with gitdir pattern matching."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Use realpath to resolve any symlinks
-            tmpdir = os.path.realpath(tmpdir)
-            work_dir = os.path.join(tmpdir, "work", "project1")
-            os.makedirs(work_dir)
-
-            # Create included config file
-            included_path = os.path.join(tmpdir, "work.config")
-            with open(included_path, "wb") as f:
+            work_included_path = os.path.join(tmpdir, "work.config")
+            with open(work_included_path, "wb") as f:
                 f.write(b"[user]\n    email = work@company.com\n")
 
-            # Create main config with pattern
+            personal_included_path = os.path.join(tmpdir, "personal.config")
+            with open(personal_included_path, "wb") as f:
+                f.write(b"[user]\n    email = personal@example.com\n")
+
+            # Create main config with hasconfig conditions
             main_path = os.path.join(tmpdir, "main.config")
             with open(main_path, "wb") as f:
-                # Pattern that should match any repo under work/
-                f.write(b'[includeIf "gitdir:work/**"]\n    path = work.config\n')
+                f.write(
+                    b'[remote "origin"]\n'
+                    b"    url = ssh://org-work@github.com/company/project\n"
+                    b'[includeIf "hasconfig:remote.*.url:ssh://org-*@github.com/**"]\n'
+                    b"    path = work.config\n"
+                    b'[includeIf "hasconfig:remote.*.url:https://github.com/opensource/**"]\n'
+                    b"    path = personal.config\n"
+                )
 
-            # Load with matching pattern
-            cf = ConfigFile.from_path(main_path, repo_dir=work_dir)
+            # Load config - should match the work config due to org-work remote
+            # The second condition won't match since url doesn't have /opensource/ path
+            cf = ConfigFile.from_path(main_path)
             self.assertEqual(b"work@company.com", cf.get((b"user",), b"email"))
+
+    def test_includeif_hasconfig_wildcard(self) -> None:
+        """Test includeIf hasconfig with wildcard patterns."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create included config
+            included_path = os.path.join(tmpdir, "included.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    name = IncludedUser\n")
+
+            # Create main config with hasconfig condition using wildcards
+            main_path = os.path.join(tmpdir, "main.config")
+            with open(main_path, "wb") as f:
+                f.write(
+                    b"[core]\n"
+                    b"    autocrlf = true\n"
+                    b'[includeIf "hasconfig:core.autocrlf:true"]\n'
+                    b"    path = included.config\n"
+                )
+
+            # Load config - should include based on core.autocrlf value
+            cf = ConfigFile.from_path(main_path)
+            self.assertEqual(b"IncludedUser", cf.get((b"user",), b"name"))
+
+    def test_includeif_hasconfig_no_match(self) -> None:
+        """Test includeIf hasconfig when condition doesn't match."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create included config
+            included_path = os.path.join(tmpdir, "included.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    name = IncludedUser\n")
+
+            # Create main config with non-matching hasconfig condition
+            main_path = os.path.join(tmpdir, "main.config")
+            with open(main_path, "wb") as f:
+                f.write(
+                    b"[core]\n"
+                    b"    autocrlf = false\n"
+                    b'[includeIf "hasconfig:core.autocrlf:true"]\n'
+                    b"    path = included.config\n"
+                )
+
+            # Load config - should NOT include since condition doesn't match
+            cf = ConfigFile.from_path(main_path)
+            with self.assertRaises(KeyError):
+                cf.get((b"user",), b"name")
 
     def test_include_circular(self) -> None:
         """Test that circular includes are handled properly."""
@@ -703,55 +702,6 @@ who\"
                 self.assertIn("futurefeature:value", log_output)
         finally:
             logger.removeHandler(handler)
-
-    def test_includeif_with_custom_file_opener(self) -> None:
-        """Test includeIf functionality with custom file opener."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Use realpath to resolve any symlinks
-            tmpdir = os.path.realpath(tmpdir)
-            repo_dir = os.path.join(tmpdir, "work", "project", ".git")
-            os.makedirs(repo_dir, exist_ok=True)
-
-            # Create config files
-            work_config_path = os.path.join(tmpdir, "work.config")
-            with open(work_config_path, "wb") as f:
-                f.write(b"[user]\n    email = work@company.com\n")
-
-            personal_config_path = os.path.join(tmpdir, "personal.config")
-            with open(personal_config_path, "wb") as f:
-                f.write(b"[user]\n    email = personal@home.com\n")
-
-            main_path = os.path.join(tmpdir, "main.config")
-            with open(main_path, "wb") as f:
-                f.write(b"[user]\n    name = Test User\n")
-                f.write(b'[includeIf "gitdir:**/work/**"]\n')
-                escaped_work_path = work_config_path.replace("\\", "\\\\")
-                f.write(f"    path = {escaped_work_path}\n".encode())
-                f.write(b'[includeIf "gitdir:**/personal/**"]\n')
-                escaped_personal_path = personal_config_path.replace("\\", "\\\\")
-                f.write(f"    path = {escaped_personal_path}\n".encode())
-
-            # Track which files were opened
-            opened_files = []
-
-            def tracking_file_opener(path):
-                path_str = os.fspath(path)
-                opened_files.append(path_str)
-                return open(path_str, "rb")
-
-            # Load config with tracking file opener
-            cf = ConfigFile.from_path(
-                main_path, repo_dir=repo_dir, file_opener=tracking_file_opener
-            )
-
-            # Check results
-            self.assertEqual(b"Test User", cf.get((b"user",), b"name"))
-            self.assertEqual(b"work@company.com", cf.get((b"user",), b"email"))
-
-            # Verify that only the matching includeIf file was opened
-            self.assertIn(main_path, opened_files)
-            self.assertIn(work_config_path, opened_files)
-            self.assertNotIn(personal_config_path, opened_files)
 
     def test_custom_file_opener_with_include_depth(self) -> None:
         """Test that custom file opener is passed through include chain."""

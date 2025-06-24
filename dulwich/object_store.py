@@ -27,6 +27,7 @@ import binascii
 import os
 import stat
 import sys
+import time
 import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import suppress
@@ -88,6 +89,10 @@ PACKDIR = "pack"
 # TODO: should packs also be non-writable on Windows? if so, that
 # would requite some rather significant adjustments to the test suite
 PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
+
+# Grace period for cleaning up temporary pack files (in seconds)
+# Matches git's default of 2 weeks
+DEFAULT_TEMPFILE_GRACE_PERIOD = 14 * 24 * 60 * 60  # 2 weeks
 
 
 def find_shallow(store, heads, depth):
@@ -415,6 +420,18 @@ class BaseObjectStore:
 
     def close(self) -> None:
         """Close any files opened by this object store."""
+        # Default implementation is a NO-OP
+
+    def prune(self, grace_period: Optional[int] = None) -> None:
+        """Prune/clean up this object store.
+
+        This includes removing orphaned temporary files and other
+        housekeeping tasks. Default implementation is a NO-OP.
+
+        Args:
+          grace_period: Grace period in seconds for removing temporary files.
+                       If None, uses the default grace period.
+        """
         # Default implementation is a NO-OP
 
     def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
@@ -851,6 +868,9 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
+
+    path: Union[str, os.PathLike]
+    pack_dir: Union[str, os.PathLike]
 
     def __init__(
         self,
@@ -1325,6 +1345,62 @@ class DiskObjectStore(PackBasedObjectStore):
 
             # Clear cached commit graph so it gets reloaded
             self._commit_graph = None
+
+    def prune(self, grace_period: Optional[int] = None) -> None:
+        """Prune/clean up this object store.
+
+        This removes temporary files that were left behind by interrupted
+        pack operations. These are files that start with 'tmp_pack_' in the
+        repository directory or files with .pack extension but no corresponding
+        .idx file in the pack directory.
+
+        Args:
+          grace_period: Grace period in seconds for removing temporary files.
+                       If None, uses DEFAULT_TEMPFILE_GRACE_PERIOD.
+        """
+        import glob
+
+        if grace_period is None:
+            grace_period = DEFAULT_TEMPFILE_GRACE_PERIOD
+
+        # Clean up tmp_pack_* files in the repository directory
+        for tmp_file in glob.glob(os.path.join(self.path, "tmp_pack_*")):
+            try:
+                # Check if file is old enough (more than grace period)
+                mtime = os.path.getmtime(tmp_file)
+                if time.time() - mtime > grace_period:
+                    os.remove(tmp_file)
+            except OSError:
+                pass
+
+        # Clean up orphaned .pack files without corresponding .idx files
+        try:
+            pack_dir_contents = os.listdir(self.pack_dir)
+        except FileNotFoundError:
+            return
+
+        pack_files = {}
+        idx_files = set()
+
+        for name in pack_dir_contents:
+            if name.endswith(".pack"):
+                base_name = name[:-5]  # Remove .pack extension
+                pack_files[base_name] = name
+            elif name.endswith(".idx"):
+                base_name = name[:-4]  # Remove .idx extension
+                idx_files.add(base_name)
+
+        # Remove .pack files without corresponding .idx files
+        for base_name, pack_name in pack_files.items():
+            if base_name not in idx_files:
+                pack_path = os.path.join(self.pack_dir, pack_name)
+                try:
+                    # Check if file is old enough (more than grace period)
+                    mtime = os.path.getmtime(pack_path)
+                    if time.time() - mtime > grace_period:
+                        os.remove(pack_path)
+                except OSError:
+                    pass
 
 
 class MemoryObjectStore(BaseObjectStore):

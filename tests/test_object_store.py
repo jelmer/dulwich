@@ -415,6 +415,97 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         idx2 = load_pack_index(idx_path2)
         self.assertEqual(3, idx2.version)
 
+    def test_prune_orphaned_tempfiles(self) -> None:
+        import time
+
+        # Create an orphaned temporary pack file in the repository directory
+        tmp_pack_path = os.path.join(self.store_dir, "tmp_pack_test123")
+        with open(tmp_pack_path, "wb") as f:
+            f.write(b"temporary pack data")
+
+        # Create an orphaned .pack file without .idx in pack directory
+        pack_dir = os.path.join(self.store_dir, "pack")
+        orphaned_pack_path = os.path.join(pack_dir, "pack-orphaned.pack")
+        with open(orphaned_pack_path, "wb") as f:
+            f.write(b"orphaned pack data")
+
+        # Make files appear old by modifying mtime (older than grace period)
+        from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
+
+        old_time = time.time() - (
+            DEFAULT_TEMPFILE_GRACE_PERIOD + 3600
+        )  # grace period + 1 hour
+        os.utime(tmp_pack_path, (old_time, old_time))
+        os.utime(orphaned_pack_path, (old_time, old_time))
+
+        # Create a recent temporary file that should NOT be cleaned
+        recent_tmp_path = os.path.join(self.store_dir, "tmp_pack_recent")
+        with open(recent_tmp_path, "wb") as f:
+            f.write(b"recent temp data")
+
+        # Run prune
+        self.store.prune()
+
+        # Check that old orphaned files were removed
+        self.assertFalse(os.path.exists(tmp_pack_path))
+        self.assertFalse(os.path.exists(orphaned_pack_path))
+
+        # Check that recent file was NOT removed
+        self.assertTrue(os.path.exists(recent_tmp_path))
+
+        # Cleanup the recent file
+        os.remove(recent_tmp_path)
+
+    def test_prune_with_custom_grace_period(self) -> None:
+        """Test that prune respects custom grace period."""
+        import time
+
+        # Create a temporary file that's 1 hour old
+        tmp_pack_path = os.path.join(self.store_dir, "tmp_pack_1hour")
+        with open(tmp_pack_path, "wb") as f:
+            f.write(b"1 hour old data")
+
+        # Make it 1 hour old
+        old_time = time.time() - 3600  # 1 hour ago
+        os.utime(tmp_pack_path, (old_time, old_time))
+
+        # Prune with default grace period (2 weeks) - should NOT remove
+        self.store.prune()
+        self.assertTrue(os.path.exists(tmp_pack_path))
+
+        # Prune with 30 minute grace period - should remove
+        self.store.prune(grace_period=1800)  # 30 minutes
+        self.assertFalse(os.path.exists(tmp_pack_path))
+
+    def test_gc_prunes_tempfiles(self) -> None:
+        """Test that garbage collection prunes temporary files."""
+        import time
+
+        from dulwich.gc import garbage_collect
+        from dulwich.repo import Repo
+
+        # Create a repository with the store
+        repo = Repo.init(self.store_dir)
+
+        # Create an old orphaned temporary file in the objects directory
+        tmp_pack_path = os.path.join(repo.object_store.path, "tmp_pack_old")
+        with open(tmp_pack_path, "wb") as f:
+            f.write(b"old temporary data")
+
+        # Make it old (older than grace period)
+        from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
+
+        old_time = time.time() - (
+            DEFAULT_TEMPFILE_GRACE_PERIOD + 3600
+        )  # grace period + 1 hour
+        os.utime(tmp_pack_path, (old_time, old_time))
+
+        # Run garbage collection
+        garbage_collect(repo)
+
+        # Verify the orphaned file was cleaned up
+        self.assertFalse(os.path.exists(tmp_pack_path))
+
 
 class TreeLookupPathTests(TestCase):
     def setUp(self) -> None:

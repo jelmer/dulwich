@@ -1390,7 +1390,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """Prune/clean up this object store.
 
         This removes temporary files that were left behind by interrupted
-        pack operations. These are files that start with 'tmp_pack_' in the
+        pack operations. These are files that start with ``tmp_pack_`` in the
         repository directory or files with .pack extension but no corresponding
         .idx file in the pack directory.
 

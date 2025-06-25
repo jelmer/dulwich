@@ -3146,7 +3146,7 @@ def cherry_pick(
       repo: Repository to cherry-pick into
       committish: Commit to cherry-pick
       no_commit: If True, do not create a commit after applying changes
-      continue\\_: Continue an in-progress cherry-pick after resolving conflicts
+      continue\_: Continue an in-progress cherry-pick after resolving conflicts
       abort: Abort an in-progress cherry-pick
 
     Returns:

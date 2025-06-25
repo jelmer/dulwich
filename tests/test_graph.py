@@ -303,6 +303,189 @@ class CanFastForwardTests(TestCase):
         self.assertFalse(can_fast_forward(r, c2a.id, c2b.id))
         self.assertFalse(can_fast_forward(r, c2b.id, c2a.id))
 
+    def test_shallow_repository(self) -> None:
+        r = MemoryRepo()
+        # Create a shallow repository structure:
+        # base (missing) -> c1 -> c2
+        # We only have c1 and c2, base is missing (shallow boundary at c1)
+
+        # Create a fake base commit ID (won't exist in repo)
+        base_sha = b"1" * 20  # Valid SHA format but doesn't exist (20 bytes)
+
+        c1 = make_commit(parents=[base_sha], commit_time=2000)
+        c2 = make_commit(parents=[c1.id], commit_time=3000)
+
+        # Only add c1 and c2 to the repo (base is missing)
+        r.object_store.add_objects([(c1, None), (c2, None)])
+
+        # Mark c1 as shallow using the proper API
+        r.update_shallow([c1.id], [])
+
+        # Should be able to fast-forward from c1 to c2
+        self.assertTrue(can_fast_forward(r, c1.id, c2.id))
+
+        # Should return False when trying to check against missing parent
+        # (not raise KeyError)
+        self.assertFalse(can_fast_forward(r, base_sha, c1.id))
+        self.assertFalse(can_fast_forward(r, base_sha, c2.id))
+
+
+class FindLCAsTests(TestCase):
+    """Tests for _find_lcas function with shallow repository support."""
+
+    def test_find_lcas_normal(self) -> None:
+        """Test _find_lcas works normally without shallow commits."""
+        # Set up a simple repository structure:
+        #   base
+        #   /  \
+        #  c1  c2
+        commits = {
+            b"base": (1000, []),
+            b"c1": (2000, [b"base"]),
+            b"c2": (3000, [b"base"]),
+        }
+
+        def lookup_parents(sha):
+            return commits[sha][1]
+
+        def lookup_stamp(sha):
+            return commits[sha][0]
+
+        # Find LCA of c1 and c2, should be base
+        lcas = _find_lcas(lookup_parents, b"c1", [b"c2"], lookup_stamp)
+        self.assertEqual(lcas, [b"base"])
+
+    def test_find_lcas_with_shallow_missing_c1(self) -> None:
+        """Test _find_lcas when c1 doesn't exist in shallow clone."""
+        # Only have c2 and base, c1 is missing (shallow boundary)
+        commits = {
+            b"base": (1000, []),
+            b"c2": (3000, [b"base"]),
+        }
+        shallows = {b"c2"}  # c2 is at shallow boundary
+
+        def lookup_parents(sha):
+            return commits[sha][1]
+
+        def lookup_stamp(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][0]
+
+        # c1 doesn't exist, but we have shallow commits
+        lcas = _find_lcas(
+            lookup_parents, b"c1", [b"c2"], lookup_stamp, shallows=shallows
+        )
+        # Should handle gracefully
+        self.assertEqual(lcas, [])
+
+    def test_find_lcas_with_shallow_missing_parent(self) -> None:
+        """Test _find_lcas when parent commits are missing in shallow clone."""
+        # Have c1 and c2, but base is missing
+        commits = {
+            b"c1": (2000, [b"base"]),  # base doesn't exist
+            b"c2": (3000, [b"base"]),  # base doesn't exist
+        }
+        shallows = {b"c1", b"c2"}  # Both at shallow boundary
+
+        def lookup_parents(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][1]
+
+        def lookup_stamp(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][0]
+
+        # Should handle missing parent gracefully
+        lcas = _find_lcas(
+            lookup_parents, b"c1", [b"c2"], lookup_stamp, shallows=shallows
+        )
+        # Can't find LCA because parents are missing
+        self.assertEqual(lcas, [])
+
+    def test_find_lcas_with_shallow_partial_history(self) -> None:
+        """Test _find_lcas with partial history in shallow clone."""
+        # Complex structure where some history is missing:
+        #      base (missing)
+        #      /  \
+        #    c1    c2
+        #     |     |
+        #    c3    c4
+        commits = {
+            b"c1": (2000, [b"base"]),  # base missing
+            b"c2": (2500, [b"base"]),  # base missing
+            b"c3": (3000, [b"c1"]),
+            b"c4": (3500, [b"c2"]),
+        }
+        shallows = {b"c1", b"c2"}  # c1 and c2 are at shallow boundary
+
+        def lookup_parents(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][1]
+
+        def lookup_stamp(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][0]
+
+        # Find LCA of c3 and c4
+        lcas = _find_lcas(
+            lookup_parents, b"c3", [b"c4"], lookup_stamp, shallows=shallows
+        )
+        # Can't determine LCA because base is missing
+        self.assertEqual(lcas, [])
+
+    def test_find_lcas_without_shallows_raises_keyerror(self) -> None:
+        """Test _find_lcas raises KeyError when commit missing without shallows."""
+        commits = {
+            b"c2": (3000, [b"base"]),
+        }
+
+        def lookup_parents(sha):
+            return commits[sha][1]
+
+        def lookup_stamp(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][0]
+
+        # Without shallows parameter, should raise KeyError
+        with self.assertRaises(KeyError):
+            _find_lcas(lookup_parents, b"c1", [b"c2"], lookup_stamp)
+
+    def test_find_lcas_octopus_with_shallow(self) -> None:
+        """Test _find_lcas with multiple commits in shallow clone."""
+        # Structure:
+        #    base (missing)
+        #   / | \
+        #  c1 c2 c3
+        commits = {
+            b"c1": (2000, [b"base"]),
+            b"c2": (2100, [b"base"]),
+            b"c3": (2200, [b"base"]),
+        }
+        shallows = {b"c1", b"c2", b"c3"}
+
+        def lookup_parents(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][1]
+
+        def lookup_stamp(sha):
+            if sha not in commits:
+                raise KeyError(sha)
+            return commits[sha][0]
+
+        # Find LCA of c1 with c2 and c3
+        lcas = _find_lcas(
+            lookup_parents, b"c1", [b"c2", b"c3"], lookup_stamp, shallows=shallows
+        )
+        # Can't find LCA because base is missing
+        self.assertEqual(lcas, [])
+
 
 class WorkListTest(TestCase):
     def test_WorkList(self) -> None:

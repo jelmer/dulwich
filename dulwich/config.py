@@ -114,9 +114,9 @@ def _match_gitdir_pattern(
 
 
 def match_glob_pattern(value: str, pattern: str) -> bool:
-    """Match a value against a glob pattern.
+    r"""Match a value against a glob pattern.
 
-    Supports simple glob patterns like * and **.
+    Supports simple glob patterns like ``*`` and ``**``.
 
     Raises:
         ValueError: If the pattern is invalid
@@ -1004,7 +1004,7 @@ class ConfigFile(ConfigDict):
     def _match_hasconfig_pattern(self, value: bytes, pattern: str) -> bool:
         """Match a config value against a hasconfig pattern.
 
-        Supports simple glob patterns like * and **.
+        Supports simple glob patterns like ``*`` and ``**``.
         """
         value_str = value.decode(self.encoding, errors="replace")
         return match_glob_pattern(value_str, pattern)

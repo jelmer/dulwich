@@ -53,6 +53,11 @@
    behavior. Also added ``prune`` command to ``dulwich.porcelain``.
    (Jelmer Vernooĳ, #558)
 
+ * Fix ``porcelain.remove()`` to work correctly when called from a directory
+   other than the repository root. Relative paths are now interpreted as
+   relative to the repository root rather than the current working directory.
+   (Jelmer Vernooĳ, #821)
+
  * Add support for auto garbage collection, and invoke from
    some porcelain commands. (Jelmer Vernooĳ, #1600)
 

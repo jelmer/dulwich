@@ -1495,55 +1495,97 @@ def reset(repo, mode, treeish="HEAD") -> None:
       mode: Mode ("hard", "soft", "mixed")
       treeish: Treeish to reset to
     """
-    if mode != "hard":
-        raise Error("hard is the only mode currently supported")
-
     with open_repo_closing(repo) as r:
+        # Parse the target tree
         tree = parse_tree(r, treeish)
+        target_commit = parse_commit(r, treeish)
 
-        # Get current HEAD tree for comparison
-        try:
-            current_head = r.refs[b"HEAD"]
-            current_tree = r[current_head].tree
-        except KeyError:
-            current_tree = None
+        # Update HEAD to point to the target commit
+        r.refs[b"HEAD"] = target_commit.id
 
-        # Get configuration for working directory update
-        config = r.get_config()
-        honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
+        if mode == "soft":
+            # Soft reset: only update HEAD, leave index and working tree unchanged
+            return
 
-        # Import validation functions
-        from .index import validate_path_element_default, validate_path_element_ntfs
+        elif mode == "mixed":
+            # Mixed reset: update HEAD and index, but leave working tree unchanged
+            from .index import IndexEntry
+            from .object_store import iter_tree_contents
 
-        if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
-            validate_path_element = validate_path_element_ntfs
+            # Open the index
+            index = r.open_index()
+
+            # Clear the current index
+            index.clear()
+
+            # Populate index from the target tree
+            for entry in iter_tree_contents(r.object_store, tree.id):
+                # Create an IndexEntry from the tree entry
+                # Use zeros for filesystem-specific fields since we're not touching the working tree
+                index_entry = IndexEntry(
+                    ctime=(0, 0),
+                    mtime=(0, 0),
+                    dev=0,
+                    ino=0,
+                    mode=entry.mode,
+                    uid=0,
+                    gid=0,
+                    size=0,  # Size will be 0 since we're not reading from disk
+                    sha=entry.sha,
+                    flags=0,
+                )
+                index[entry.path] = index_entry
+
+            # Write the updated index
+            index.write()
+
+        elif mode == "hard":
+            # Hard reset: update HEAD, index, and working tree
+            # Get current HEAD tree for comparison
+            try:
+                current_head = r.refs[b"HEAD"]
+                current_tree = r[current_head].tree
+            except KeyError:
+                current_tree = None
+
+            # Get configuration for working directory update
+            config = r.get_config()
+            honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
+
+            # Import validation functions
+            from .index import validate_path_element_default, validate_path_element_ntfs
+
+            if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
+                validate_path_element = validate_path_element_ntfs
+            else:
+                validate_path_element = validate_path_element_default
+
+            if config.get_boolean(b"core", b"symlinks", True):
+                # Import symlink function
+                from .index import symlink
+
+                symlink_fn = symlink
+            else:
+
+                def symlink_fn(  # type: ignore
+                    source, target, target_is_directory=False, *, dir_fd=None
+                ) -> None:
+                    mode = "w" + ("b" if isinstance(source, bytes) else "")
+                    with open(target, mode) as f:
+                        f.write(source)
+
+            # Update working tree and index
+            update_working_tree(
+                r,
+                current_tree,
+                tree.id,
+                honor_filemode=honor_filemode,
+                validate_path_element=validate_path_element,
+                symlink_fn=symlink_fn,
+                force_remove_untracked=True,
+            )
         else:
-            validate_path_element = validate_path_element_default
-
-        if config.get_boolean(b"core", b"symlinks", True):
-            # Import symlink function
-            from .index import symlink
-
-            symlink_fn = symlink
-        else:
-
-            def symlink_fn(  # type: ignore
-                source, target, target_is_directory=False, *, dir_fd=None
-            ) -> None:
-                mode = "w" + ("b" if isinstance(source, bytes) else "")
-                with open(target, mode) as f:
-                    f.write(source)
-
-        # Update working tree and index
-        update_working_tree(
-            r,
-            current_tree,
-            tree.id,
-            honor_filemode=honor_filemode,
-            validate_path_element=validate_path_element,
-            symlink_fn=symlink_fn,
-            force_remove_untracked=True,
-        )
+            raise Error(f"Invalid reset mode: {mode}")
 
 
 def get_remote_repo(

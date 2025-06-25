@@ -1676,19 +1676,23 @@ class TCPGitClient(TraditionalGitClient):
                 s = None
         if s is None:
             raise err
-        # -1 means system default buffering
-        rfile = s.makefile("rb", -1)
-        # 0 means unbuffered
-        wfile = s.makefile("wb", 0)
+
+        def recv_full(n):
+            """Read exactly n bytes from socket, handling partial reads."""
+            data = b""
+            while len(data) < n:
+                chunk = s.recv(n - len(data))
+                if not chunk:
+                    break
+                data += chunk
+            return data
 
         def close() -> None:
-            rfile.close()
-            wfile.close()
             s.close()
 
         proto = Protocol(
-            rfile.read,
-            wfile.write,
+            recv_full,
+            s.send,
             close,
             report_activity=self._report_activity,
         )

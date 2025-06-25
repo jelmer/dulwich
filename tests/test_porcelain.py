@@ -2334,6 +2334,99 @@ class ResetTests(PorcelainTestCase):
         self.assertTrue(os.path.exists(file1))
         self.assertFalse(os.path.exists(file2))
 
+    def test_mixed_reset(self) -> None:
+        # Create initial commit
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        first_sha = porcelain.commit(
+            self.repo.path,
+            message=b"First commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Make second commit with modified content
+        with open(fullpath, "w") as f:
+            f.write("BAZ")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Second commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Modify working tree without staging
+        with open(fullpath, "w") as f:
+            f.write("MODIFIED")
+
+        # Mixed reset to first commit
+        porcelain.reset(self.repo, "mixed", first_sha)
+
+        # Check that HEAD points to first commit
+        self.assertEqual(self.repo.head(), first_sha)
+
+        # Check that index matches first commit
+        index = self.repo.open_index()
+        changes = list(
+            tree_changes(
+                self.repo,
+                index.commit(self.repo.object_store),
+                self.repo[first_sha].tree,
+            )
+        )
+        self.assertEqual([], changes)
+
+        # Check that working tree is unchanged (still has "MODIFIED")
+        with open(fullpath) as f:
+            self.assertEqual(f.read(), "MODIFIED")
+
+    def test_soft_reset(self) -> None:
+        # Create initial commit
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        first_sha = porcelain.commit(
+            self.repo.path,
+            message=b"First commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Make second commit with modified content
+        with open(fullpath, "w") as f:
+            f.write("BAZ")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Second commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Stage a new change
+        with open(fullpath, "w") as f:
+            f.write("STAGED")
+        porcelain.add(self.repo.path, paths=[fullpath])
+
+        # Soft reset to first commit
+        porcelain.reset(self.repo, "soft", first_sha)
+
+        # Check that HEAD points to first commit
+        self.assertEqual(self.repo.head(), first_sha)
+
+        # Check that index still has the staged change (not reset)
+        index = self.repo.open_index()
+        # The index should still contain the staged content, not the first commit's content
+        self.assertIn(b"foo", index)
+
+        # Check that working tree is unchanged
+        with open(fullpath) as f:
+            self.assertEqual(f.read(), "STAGED")
+
 
 class ResetFileTests(PorcelainTestCase):
     def test_reset_modify_file_to_commit(self) -> None:

@@ -44,6 +44,7 @@ Currently implemented:
  * ls_tree
  * merge
  * merge_tree
+ * mv/move
  * prune
  * pull
  * push
@@ -830,6 +831,108 @@ def remove(repo=".", paths=None, cached=False) -> None:
 
 
 rm = remove
+
+
+def mv(
+    repo: Union[str, os.PathLike, BaseRepo],
+    source: Union[str, bytes, os.PathLike],
+    destination: Union[str, bytes, os.PathLike],
+    force: bool = False,
+) -> None:
+    """Move or rename a file, directory, or symlink.
+
+    Args:
+      repo: Path to the repository
+      source: Path to move from
+      destination: Path to move to
+      force: Force move even if destination exists
+
+    Raises:
+      Error: If source doesn't exist, is not tracked, or destination already exists (without force)
+    """
+    with open_repo_closing(repo) as r:
+        index = r.open_index()
+
+        # Handle paths - convert to string if necessary
+        if isinstance(source, bytes):
+            source = source.decode(sys.getfilesystemencoding())
+        elif hasattr(source, "__fspath__"):
+            source = os.fspath(source)
+        else:
+            source = str(source)
+
+        if isinstance(destination, bytes):
+            destination = destination.decode(sys.getfilesystemencoding())
+        elif hasattr(destination, "__fspath__"):
+            destination = os.fspath(destination)
+        else:
+            destination = str(destination)
+
+        # Get full paths
+        if os.path.isabs(source):
+            source_full_path = source
+        else:
+            # Treat relative paths as relative to the repository root
+            source_full_path = os.path.join(r.path, source)
+
+        if os.path.isabs(destination):
+            destination_full_path = destination
+        else:
+            # Treat relative paths as relative to the repository root
+            destination_full_path = os.path.join(r.path, destination)
+
+        # Check if destination is a directory
+        if os.path.isdir(destination_full_path):
+            # Move source into destination directory
+            basename = os.path.basename(source_full_path)
+            destination_full_path = os.path.join(destination_full_path, basename)
+
+        # Convert to tree paths for index
+        source_tree_path = path_to_tree_path(r.path, source_full_path)
+        destination_tree_path = path_to_tree_path(r.path, destination_full_path)
+
+        # Check if source exists in index
+        if source_tree_path not in index:
+            raise Error(f"source '{source}' is not under version control")
+
+        # Check if source exists in filesystem
+        if not os.path.exists(source_full_path):
+            raise Error(f"source '{source}' does not exist")
+
+        # Check if destination already exists
+        if os.path.exists(destination_full_path) and not force:
+            raise Error(f"destination '{destination}' already exists (use -f to force)")
+
+        # Check if destination is already in index
+        if destination_tree_path in index and not force:
+            raise Error(
+                f"destination '{destination}' already exists in index (use -f to force)"
+            )
+
+        # Get the index entry for the source
+        source_entry = index[source_tree_path]
+
+        # Convert to bytes for file operations
+        source_full_path_bytes = os.fsencode(source_full_path)
+        destination_full_path_bytes = os.fsencode(destination_full_path)
+
+        # Create parent directory for destination if needed
+        dest_dir = os.path.dirname(destination_full_path_bytes)
+        if dest_dir and not os.path.exists(dest_dir):
+            os.makedirs(dest_dir)
+
+        # Move the file in the filesystem
+        if os.path.exists(destination_full_path_bytes) and force:
+            os.remove(destination_full_path_bytes)
+        os.rename(source_full_path_bytes, destination_full_path_bytes)
+
+        # Update the index
+        del index[source_tree_path]
+        index[destination_tree_path] = source_entry
+        index.write()
+
+
+move = mv
 
 
 def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):

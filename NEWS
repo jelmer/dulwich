@@ -48,6 +48,11 @@
 
  * Support timeouts for HTTP client operations.  (Jelmer Vernooĳ)
 
+ * Add support for ``reset --mixed`` and ``reset --soft`` modes in
+   ``porcelain.reset()`` and the CLI. Mixed reset updates HEAD and index
+   but leaves working tree unchanged. Soft reset only updates HEAD.
+   (Jelmer Vernooĳ)
+
  * Add ``prune`` method to object stores for cleaning up orphaned temporary
    pack files. This is now called by ``garbage_collect()`` to match Git's
    behavior. Also added ``prune`` command to ``dulwich.porcelain``.

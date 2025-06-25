@@ -542,20 +542,17 @@ class cmd_reset(Command):
         args = parser.parse_args(args)
 
         if args.hard:
-            porcelain.reset(".", mode="hard", treeish=args.treeish)
+            mode = "hard"
         elif args.soft:
-            # Soft reset: only change HEAD
-            if args.treeish:
-                from .repo import Repo
-
-                with Repo(".") as repo:
-                    repo.refs[b"HEAD"] = args.treeish.encode()
+            mode = "soft"
         elif args.mixed:
-            # Mixed reset is not implemented yet
-            raise NotImplementedError("Mixed reset not yet implemented")
+            mode = "mixed"
         else:
-            # Default to mixed behavior (not implemented)
-            raise NotImplementedError("Mixed reset not yet implemented")
+            # Default to mixed behavior
+            mode = "mixed"
+
+        # Use the porcelain.reset function for all modes
+        porcelain.reset(".", mode=mode, treeish=args.treeish)
 
 
 class cmd_revert(Command):

@@ -1720,6 +1720,7 @@ class Repo(BaseRepo):
                 ) as f:
                     f.write(source)
 
+        blob_normalizer = self.get_blob_normalizer()
         return build_index_from_tree(
             self.path,
             self.index_path(),
@@ -1728,6 +1729,7 @@ class Repo(BaseRepo):
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
             symlink_fn=symlink_fn,
+            blob_normalizer=blob_normalizer,
         )
 
     def _get_config_condition_matchers(self) -> dict[str, "ConditionMatcher"]:

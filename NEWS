@@ -53,6 +53,10 @@
    but leaves working tree unchanged. Soft reset only updates HEAD.
    (Jelmer Vernooĳ)
 
+ * Apply line-ending normalization in ``build_index_from_tree`` to respect
+   ``core.autocrlf`` configuration during checkout operations.
+   (Jelmer Vernooĳ, #663)
+
  * Add ``prune`` method to object stores for cleaning up orphaned temporary
    pack files. This is now called by ``garbage_collect()`` to match Git's
    behavior. Also added ``prune`` command to ``dulwich.porcelain``.

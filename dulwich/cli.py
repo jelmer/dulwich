@@ -201,6 +201,22 @@ class cmd_rm(Command):
         porcelain.remove(".", paths=args.path, cached=args.cached)
 
 
+class cmd_mv(Command):
+    def run(self, argv) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force move even if destination exists",
+        )
+        parser.add_argument("source", type=Path)
+        parser.add_argument("destination", type=Path)
+        args = parser.parse_args(argv)
+
+        porcelain.mv(".", args.source, args.destination, force=args.force)
+
+
 class cmd_fetch_pack(Command):
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
@@ -1795,6 +1811,7 @@ commands = {
     "revert": cmd_revert,
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
+    "mv": cmd_mv,
     "show": cmd_show,
     "stash": cmd_stash,
     "status": cmd_status,

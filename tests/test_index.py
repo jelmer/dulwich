@@ -1644,3 +1644,87 @@ class TestPathPrefixCompression(TestCase):
         compressed = _compress_path(b"short", b"very/long/path/file.txt")
         decompressed, _ = _decompress_path(compressed, 0, b"very/long/path/file.txt")
         self.assertEqual(b"short", decompressed)
+
+
+class TestUpdateWorkingTree(TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+        from dulwich.repo import Repo
+
+        self.repo = Repo.init(self.tempdir)
+
+    def test_update_working_tree_with_blob_normalizer(self):
+        """Test update_working_tree with a blob normalizer."""
+        from dulwich.index import update_working_tree
+        from dulwich.objects import Blob, Tree
+
+        # Create a simple blob normalizer that converts CRLF to LF
+        class TestBlobNormalizer:
+            def checkout_normalize(self, blob, path):
+                # Convert CRLF to LF during checkout
+                new_blob = Blob()
+                new_blob.data = blob.data.replace(b"\r\n", b"\n")
+                return new_blob
+
+        # Create a tree with a file containing CRLF
+        blob = Blob()
+        blob.data = b"Hello\r\nWorld\r\n"
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree[b"test.txt"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        # Update working tree with normalizer
+        normalizer = TestBlobNormalizer()
+        update_working_tree(
+            self.repo,
+            None,  # old_tree_id
+            tree.id,  # new_tree_id
+            blob_normalizer=normalizer,
+        )
+
+        # Check that the file was written with LF line endings
+        test_file = os.path.join(self.tempdir, "test.txt")
+        with open(test_file, "rb") as f:
+            content = f.read()
+
+        self.assertEqual(b"Hello\nWorld\n", content)
+
+        # Check that the index has the original blob SHA
+        index = self.repo.open_index()
+        self.assertEqual(blob.id, index[b"test.txt"].sha)
+
+    def test_update_working_tree_without_blob_normalizer(self):
+        """Test update_working_tree without a blob normalizer."""
+        from dulwich.index import update_working_tree
+        from dulwich.objects import Blob, Tree
+
+        # Create a tree with a file containing CRLF
+        blob = Blob()
+        blob.data = b"Hello\r\nWorld\r\n"
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree[b"test.txt"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        # Update working tree without normalizer
+        update_working_tree(
+            self.repo,
+            None,  # old_tree_id
+            tree.id,  # new_tree_id
+            blob_normalizer=None,
+        )
+
+        # Check that the file was written with original CRLF line endings
+        test_file = os.path.join(self.tempdir, "test.txt")
+        with open(test_file, "rb") as f:
+            content = f.read()
+
+        self.assertEqual(b"Hello\r\nWorld\r\n", content)
+
+        # Check that the index has the blob SHA
+        index = self.repo.open_index()
+        self.assertEqual(blob.id, index[b"test.txt"].sha)

@@ -1492,6 +1492,7 @@ def update_working_tree(
     validate_path_element: Optional[Callable[[bytes], bool]] = None,
     symlink_fn: Optional[Callable] = None,
     force_remove_untracked: bool = False,
+    blob_normalizer: Optional["BlobNormalizer"] = None,
 ) -> None:
     """Update the working tree and index to match a new tree.
 
@@ -1510,6 +1511,8 @@ def update_working_tree(
       symlink_fn: Function to use for creating symlinks
       force_remove_untracked: If True, remove files that exist in working
         directory but not in target tree, even if old_tree_id is None
+      blob_normalizer: An optional BlobNormalizer to use for converting line
+        endings when writing blobs to the working directory.
     """
     import os
 
@@ -1551,6 +1554,10 @@ def update_working_tree(
         blob_obj = repo.object_store[entry.sha]
         if not isinstance(blob_obj, Blob):
             raise ValueError(f"Object {entry.sha!r} is not a blob")
+
+        # Apply blob normalization for checkout if normalizer is provided
+        if blob_normalizer is not None:
+            blob_obj = blob_normalizer.checkout_normalize(blob_obj, entry.path)
 
         # Ensure parent directory exists
         parent_dir = os.path.dirname(full_path)

@@ -2039,7 +2039,10 @@ class Repo(BaseRepo):
         git_attributes = {}
         config_stack = self.get_config_stack()
         try:
-            tree = self.object_store[self.refs[b"HEAD"]].tree
+            head_sha = self.refs[b"HEAD"]
+            # Peel tags to get the underlying commit
+            _, obj = peel_sha(self.object_store, head_sha)
+            tree = obj.tree
             return TreeBlobNormalizer(
                 config_stack,
                 git_attributes,

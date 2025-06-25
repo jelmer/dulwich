@@ -691,6 +691,49 @@ class BuildIndexTests(TestCase):
             self.assertEqual(index[b"c"].mode, S_IFGITLINK)  # mode
             self.assertEqual(index[b"c"].sha, c.id)  # sha
 
+    def test_with_line_ending_normalization(self) -> None:
+        """Test that build_index_from_tree applies line-ending normalization."""
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        from dulwich.line_ending import BlobNormalizer
+
+        with Repo.init(repo_dir) as repo:
+            # Set up autocrlf config
+            config = repo.get_config()
+            config.set((b"core",), b"autocrlf", b"true")
+            config.write_to_path()
+
+            # Create blob with LF line endings
+            content_lf = b"line1\nline2\nline3\n"
+            blob = Blob.from_string(content_lf)
+
+            tree = Tree()
+            tree[b"test.txt"] = (stat.S_IFREG | 0o644, blob.id)
+
+            repo.object_store.add_objects([(blob, None), (tree, None)])
+
+            # Create blob normalizer
+            blob_normalizer = BlobNormalizer(config, {})
+
+            # Build index with normalization
+            build_index_from_tree(
+                repo.path,
+                repo.index_path(),
+                repo.object_store,
+                tree.id,
+                blob_normalizer=blob_normalizer,
+            )
+
+            # On Windows with autocrlf=true, file should have CRLF line endings
+            test_file = os.path.join(repo.path, "test.txt")
+            with open(test_file, "rb") as f:
+                content = f.read()
+
+            # autocrlf=true means LF -> CRLF on checkout (on all platforms for testing)
+            expected_content = b"line1\r\nline2\r\nline3\r\n"
+            self.assertEqual(content, expected_content)
+
 
 class GetUnstagedChangesTests(TestCase):
     def test_get_unstaged_changes(self) -> None:

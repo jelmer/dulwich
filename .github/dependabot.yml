@@ -8,11 +8,20 @@ updates:
     schedule:
       interval: "weekly"
     rebase-strategy: "disabled"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "ci"
+      include: "scope"
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: weekly    
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+      include: "scope"    

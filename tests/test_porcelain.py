@@ -1610,6 +1610,167 @@ class RemoveTests(PorcelainTestCase):
         self.assertFalse(os.path.exists(fullpath))
 
 
+class MvTests(PorcelainTestCase):
+    def test_mv_file(self) -> None:
+        # Create a file
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+
+        # Add and commit the file
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Move the file
+        porcelain.mv(self.repo.path, "foo", "bar")
+
+        # Verify old path doesn't exist and new path does
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "foo")))
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "bar")))
+
+        # Verify index was updated
+        index = self.repo.open_index()
+        self.assertNotIn(b"foo", index)
+        self.assertIn(b"bar", index)
+
+    def test_mv_file_to_existing_directory(self) -> None:
+        # Create a file and a directory
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+
+        dirpath = os.path.join(self.repo.path, "mydir")
+        os.makedirs(dirpath)
+
+        # Add and commit the file
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Move the file into the directory
+        porcelain.mv(self.repo.path, "foo", "mydir")
+
+        # Verify file moved into directory
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "foo")))
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "mydir", "foo")))
+
+        # Verify index was updated
+        index = self.repo.open_index()
+        self.assertNotIn(b"foo", index)
+        self.assertIn(b"mydir/foo", index)
+
+    def test_mv_file_force_overwrite(self) -> None:
+        # Create two files
+        fullpath1 = os.path.join(self.repo.path, "foo")
+        with open(fullpath1, "w") as f:
+            f.write("FOO")
+
+        fullpath2 = os.path.join(self.repo.path, "bar")
+        with open(fullpath2, "w") as f:
+            f.write("BAR")
+
+        # Add and commit both files
+        porcelain.add(self.repo.path, paths=[fullpath1, fullpath2])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Try to move without force (should fail)
+        self.assertRaises(porcelain.Error, porcelain.mv, self.repo.path, "foo", "bar")
+
+        # Move with force
+        porcelain.mv(self.repo.path, "foo", "bar", force=True)
+
+        # Verify foo doesn't exist and bar has foo's content
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "foo")))
+        with open(os.path.join(self.repo.path, "bar")) as f:
+            self.assertEqual(f.read(), "FOO")
+
+    def test_mv_file_not_tracked(self) -> None:
+        # Create an untracked file
+        fullpath = os.path.join(self.repo.path, "untracked")
+        with open(fullpath, "w") as f:
+            f.write("UNTRACKED")
+
+        # Try to move it (should fail)
+        self.assertRaises(
+            porcelain.Error, porcelain.mv, self.repo.path, "untracked", "tracked"
+        )
+
+    def test_mv_file_not_exists(self) -> None:
+        # Try to move a non-existent file
+        self.assertRaises(
+            porcelain.Error, porcelain.mv, self.repo.path, "nonexistent", "destination"
+        )
+
+    def test_mv_absolute_paths(self) -> None:
+        # Create a file
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+
+        # Add and commit the file
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Move using absolute paths
+        dest_path = os.path.join(self.repo.path, "bar")
+        porcelain.mv(self.repo.path, fullpath, dest_path)
+
+        # Verify file moved
+        self.assertFalse(os.path.exists(fullpath))
+        self.assertTrue(os.path.exists(dest_path))
+
+    def test_mv_from_different_directory(self) -> None:
+        # Create a subdirectory with a file
+        subdir = os.path.join(self.repo.path, "mydir")
+        os.makedirs(subdir)
+        fullpath = os.path.join(subdir, "myfile")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+
+        # Add and commit the file
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Change to a different directory and move the file
+        cwd = os.getcwd()
+        tempdir = tempfile.mkdtemp()
+        try:
+            os.chdir(tempdir)
+            # Move the file using relative path from repository root
+            porcelain.mv(self.repo.path, "mydir/myfile", "renamed")
+        finally:
+            os.chdir(cwd)
+            os.rmdir(tempdir)
+
+        # Verify file was moved
+        self.assertFalse(os.path.exists(fullpath))
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "renamed")))
+
+
 class LogTests(PorcelainTestCase):
     def test_simple(self) -> None:
         c1, c2, c3 = build_commit_graph(

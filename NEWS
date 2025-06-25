@@ -4,6 +4,10 @@
    and make this the default.
    (Jelmer Vernooĳ, #835)
 
+ * Fix ConnectionResetError when using TCPGitClient with git daemon on macOS/Windows.
+   Use socket recv() directly instead of buffered file objects to avoid losing data.
+   (Jelmer Vernooĳ, #1015)
+
  * Fix KeyError when pulling from a shallow clone. Handle missing commits
    gracefully in graph traversal operations for shallow repositories.
    (Jelmer Vernooĳ, #813)

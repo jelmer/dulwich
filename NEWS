@@ -66,6 +66,8 @@
    Supports filtering author, committer, and message fields.
    (#745, Jelmer Vernooĳ)
 
+ * Add ``mv`` porcelain command. (Jelmer Vernooĳ, #1633)
+
 0.23.0	2025-06-21
 
  * Add basic ``rebase`` subcommand. (Jelmer Vernooĳ)

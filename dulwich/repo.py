@@ -1720,6 +1720,7 @@ class Repo(BaseRepo):
                 ) as f:
                     f.write(source)
 
+        blob_normalizer = self.get_blob_normalizer()
         return build_index_from_tree(
             self.path,
             self.index_path(),
@@ -1728,6 +1729,7 @@ class Repo(BaseRepo):
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
             symlink_fn=symlink_fn,
+            blob_normalizer=blob_normalizer,
         )
 
     def _get_config_condition_matchers(self) -> dict[str, "ConditionMatcher"]:
@@ -2037,7 +2039,10 @@ class Repo(BaseRepo):
         git_attributes = {}
         config_stack = self.get_config_stack()
         try:
-            tree = self.object_store[self.refs[b"HEAD"]].tree
+            head_sha = self.refs[b"HEAD"]
+            # Peel tags to get the underlying commit
+            _, obj = peel_sha(self.object_store, head_sha)
+            tree = obj.tree
             return TreeBlobNormalizer(
                 config_stack,
                 git_attributes,

@@ -282,7 +282,7 @@ class UnpackedObject:
         return "{}({})".format(self.__class__.__name__, ", ".join(data))
 
 
-_ZLIB_BUFSIZE = 4096
+_ZLIB_BUFSIZE = 65536  # 64KB buffer for better I/O performance
 
 
 def read_zlib_chunks(

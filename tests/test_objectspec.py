@@ -23,7 +23,7 @@
 
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
-from dulwich.objects import Blob
+from dulwich.objects import Blob, Commit, Tag
 from dulwich.objectspec import (
     parse_commit,
     parse_commit_range,
@@ -83,6 +83,82 @@ class ParseCommitTests(TestCase):
         r = MemoryRepo()
         [c1] = build_commit_graph(r.object_store, [[1]])
         self.assertEqual(c1, parse_commit(r, c1.id[:10]))
+
+    def test_annotated_tag(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Create an annotated tag pointing to the commit
+        tag = Tag()
+        tag.name = b"v1.0"
+        tag.message = b"Test tag"
+        tag.tag_time = 1234567890
+        tag.tag_timezone = 0
+        tag.object = (Commit, c1.id)
+        tag.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag)
+        # parse_commit should follow the tag to the commit
+        self.assertEqual(c1, parse_commit(r, tag.id))
+
+    def test_nested_tags(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Create an annotated tag pointing to the commit
+        tag1 = Tag()
+        tag1.name = b"v1.0"
+        tag1.message = b"Test tag"
+        tag1.tag_time = 1234567890
+        tag1.tag_timezone = 0
+        tag1.object = (Commit, c1.id)
+        tag1.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag1)
+
+        # Create another tag pointing to the first tag
+        tag2 = Tag()
+        tag2.name = b"v1.0-release"
+        tag2.message = b"Release tag"
+        tag2.tag_time = 1234567900
+        tag2.tag_timezone = 0
+        tag2.object = (Tag, tag1.id)
+        tag2.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag2)
+
+        # parse_commit should follow both tags to the commit
+        self.assertEqual(c1, parse_commit(r, tag2.id))
+
+    def test_tag_to_missing_commit(self) -> None:
+        r = MemoryRepo()
+        # Create a tag pointing to a non-existent commit
+        missing_sha = b"1234567890123456789012345678901234567890"
+        tag = Tag()
+        tag.name = b"v1.0"
+        tag.message = b"Test tag"
+        tag.tag_time = 1234567890
+        tag.tag_timezone = 0
+        tag.object = (Commit, missing_sha)
+        tag.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag)
+
+        # Should raise KeyError for missing commit
+        self.assertRaises(KeyError, parse_commit, r, tag.id)
+
+    def test_tag_to_blob(self) -> None:
+        r = MemoryRepo()
+        # Create a blob
+        blob = Blob.from_string(b"Test content")
+        r.object_store.add_object(blob)
+
+        # Create a tag pointing to the blob
+        tag = Tag()
+        tag.name = b"blob-tag"
+        tag.message = b"Tag pointing to blob"
+        tag.tag_time = 1234567890
+        tag.tag_timezone = 0
+        tag.object = (Blob, blob.id)
+        tag.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag)
+
+        # Should raise ValueError as it's not a commit
+        self.assertRaises(ValueError, parse_commit, r, tag.id)
 
 
 class ParseRefTests(TestCase):

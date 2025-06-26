@@ -41,6 +41,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from .file import _GitFile
+    from .line_ending import BlobNormalizer
     from .repo import BaseRepo
 
 from .file import GitFile
@@ -1321,6 +1322,7 @@ def build_index_from_tree(
     honor_filemode: bool = True,
     validate_path_element: Callable[[bytes], bool] = validate_path_element_default,
     symlink_fn: Optional[Callable] = None,
+    blob_normalizer: Optional["BlobNormalizer"] = None,
 ) -> None:
     """Generate and materialize index from a tree.
 
@@ -1333,6 +1335,8 @@ def build_index_from_tree(
         config file, default is core.filemode=True, change executable bit
       validate_path_element: Function to validate path elements to check
         out; default just refuses .git and .. directories.
+      blob_normalizer: An optional BlobNormalizer to use for converting line
+        endings when writing blobs to the working directory.
 
     Note: existing index is wiped and contents are not merged
         in a working dir. Suitable only for fresh clones.
@@ -1358,6 +1362,9 @@ def build_index_from_tree(
         else:
             obj = object_store[entry.sha]
             assert isinstance(obj, Blob)
+            # Apply blob normalization for checkout if normalizer is provided
+            if blob_normalizer is not None:
+                obj = blob_normalizer.checkout_normalize(obj, entry.path)
             st = build_file_from_blob(
                 obj,
                 entry.mode,
@@ -1485,6 +1492,7 @@ def update_working_tree(
     validate_path_element: Optional[Callable[[bytes], bool]] = None,
     symlink_fn: Optional[Callable] = None,
     force_remove_untracked: bool = False,
+    blob_normalizer: Optional["BlobNormalizer"] = None,
 ) -> None:
     """Update the working tree and index to match a new tree.
 
@@ -1503,6 +1511,8 @@ def update_working_tree(
       symlink_fn: Function to use for creating symlinks
       force_remove_untracked: If True, remove files that exist in working
         directory but not in target tree, even if old_tree_id is None
+      blob_normalizer: An optional BlobNormalizer to use for converting line
+        endings when writing blobs to the working directory.
     """
     import os
 
@@ -1544,6 +1554,10 @@ def update_working_tree(
         blob_obj = repo.object_store[entry.sha]
         if not isinstance(blob_obj, Blob):
             raise ValueError(f"Object {entry.sha!r} is not a blob")
+
+        # Apply blob normalization for checkout if normalizer is provided
+        if blob_normalizer is not None:
+            blob_obj = blob_normalizer.checkout_normalize(blob_obj, entry.path)
 
         # Ensure parent directory exists
         parent_dir = os.path.dirname(full_path)

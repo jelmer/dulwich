@@ -24,7 +24,7 @@
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Optional, Union
 
-from .objects import Commit, ShaFile, Tree
+from .objects import Commit, ShaFile, Tag, Tree
 
 if TYPE_CHECKING:
     from .refs import Ref, RefsContainer
@@ -245,15 +245,33 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
       KeyError: When the reference commits can not be found
       ValueError: If the range can not be parsed
     """
+
+    def dereference_tag(obj):
+        """Follow tag references until we reach a non-tag object."""
+        while isinstance(obj, Tag):
+            obj_type, obj_sha = obj.object
+            try:
+                obj = repo.object_store[obj_sha]
+            except KeyError:
+                # Tag points to a missing object
+                raise KeyError(obj_sha)
+        if not isinstance(obj, Commit):
+            raise ValueError(f"Expected commit, got {obj.type_name}")
+        return obj
+
     committish = to_bytes(committish)
     try:
-        return repo[committish]
+        obj = repo[committish]
     except KeyError:
         pass
+    else:
+        return dereference_tag(obj)
     try:
-        return repo[parse_ref(repo, committish)]
+        obj = repo[parse_ref(repo, committish)]
     except KeyError:
         pass
+    else:
+        return dereference_tag(obj)
     if len(committish) >= 4 and len(committish) < 40:
         try:
             int(committish, 16)
@@ -261,9 +279,11 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
             pass
         else:
             try:
-                return scan_for_short_id(repo.object_store, committish, Commit)
+                obj = scan_for_short_id(repo.object_store, committish, Commit)
             except KeyError:
                 pass
+            else:
+                return dereference_tag(obj)
     raise KeyError(committish)
 
 

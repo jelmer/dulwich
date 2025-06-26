@@ -168,9 +168,17 @@ def convert_lf_to_crlf(text_hunk: bytes) -> bytes:
       text_hunk: A bytes string representing a text hunk
     Returns: The text hunk with the same type, with LF replaced into CRLF
     """
-    # TODO find a more efficient way of doing it
-    intermediary = text_hunk.replace(CRLF, LF)
-    return intermediary.replace(LF, CRLF)
+    # Single-pass conversion: split on LF and join with CRLF
+    # This avoids the double replacement issue
+    parts = text_hunk.split(LF)
+    # Remove any trailing CR to avoid CRCRLF
+    cleaned_parts = []
+    for i, part in enumerate(parts):
+        if i < len(parts) - 1 and part.endswith(b"\r"):
+            cleaned_parts.append(part[:-1])
+        else:
+            cleaned_parts.append(part)
+    return CRLF.join(cleaned_parts)
 
 
 def get_checkout_filter(

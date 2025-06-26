@@ -1575,6 +1575,7 @@ def reset(repo, mode, treeish="HEAD") -> None:
                         f.write(source)
 
             # Update working tree and index
+            blob_normalizer = r.get_blob_normalizer()
             update_working_tree(
                 r,
                 current_tree,
@@ -1583,6 +1584,7 @@ def reset(repo, mode, treeish="HEAD") -> None:
                 validate_path_element=validate_path_element,
                 symlink_fn=symlink_fn,
                 force_remove_untracked=True,
+                blob_normalizer=blob_normalizer,
             )
         else:
             raise Error(f"Invalid reset mode: {mode}")
@@ -1799,7 +1801,10 @@ def pull(
         # Skip if merge was performed as merge already updates the working tree
         if not merged and old_tree_id is not None:
             new_tree_id = r[b"HEAD"].tree
-            update_working_tree(r, old_tree_id, new_tree_id)
+            blob_normalizer = r.get_blob_normalizer()
+            update_working_tree(
+                r, old_tree_id, new_tree_id, blob_normalizer=blob_normalizer
+            )
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 

@@ -4,6 +4,11 @@
    and make this the default.
    (Jelmer Vernooĳ, #835)
 
+ * Fix ``parse_commit`` to properly dereference annotated tags when
+   checking out tags. Previously, checking out an annotated tag would
+   fail with a KeyError.
+   (Jelmer Vernooĳ, #1638)
+
  * Fix KeyError when pulling from a shallow clone. Handle missing commits
    gracefully in graph traversal operations for shallow repositories.
    (Jelmer Vernooĳ, #813)

@@ -382,7 +382,7 @@ class Protocol:
         return parse_cmd_pkt(line)
 
 
-_RBUFSIZE = 8192  # Default read buffer size.
+_RBUFSIZE = 65536  # 64KB buffer for better network I/O performance
 
 
 class ReceivableProtocol(Protocol):

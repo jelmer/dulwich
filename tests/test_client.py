@@ -532,6 +532,12 @@ class TestGetTransportAndPath(TestCase):
         from dulwich.config import ConfigDict
 
         config = ConfigDict()
+        c, path = get_transport_and_path(
+            "ssh://git@github.com/user/repo.git", config=config
+        )
+        self.assertIsInstance(c, SSHGitClient)
+        self.assertIsNone(c.ssh_command)
+
         config.set((b"core",), b"sshCommand", b"custom-ssh -o CustomOption=yes")
 
         c, path = get_transport_and_path(

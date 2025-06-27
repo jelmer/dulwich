@@ -2233,10 +2233,14 @@ class SSHGitClient(TraditionalGitClient):
 
             # Fall back to config if no environment variable set
             if not self.ssh_command and config is not None:
-                config_ssh_command = config.get((b"core",), b"sshCommand")
-                self.ssh_command = (
-                    config_ssh_command.decode() if config_ssh_command else None
-                )
+                try:
+                    config_ssh_command = config.get((b"core",), b"sshCommand")
+                    self.ssh_command = (
+                        config_ssh_command.decode() if config_ssh_command else None
+                    )
+                except KeyError:
+                    pass
+
         super().__init__(**kwargs)
         self.alternative_paths: dict[bytes, bytes] = {}
         if vendor is not None:

@@ -33,6 +33,8 @@ from dulwich.index import (
     Index,
     IndexEntry,
     SerializedIndexEntry,
+    _compress_path,
+    _decompress_path,
     _fs_to_tree_path,
     _tree_to_fs_path,
     build_index_from_tree,
@@ -45,6 +47,7 @@ from dulwich.index import (
     iter_fresh_entries,
     read_index,
     read_index_dict,
+    update_working_tree,
     validate_path_element_default,
     validate_path_element_ntfs,
     write_cache_time,
@@ -1063,7 +1066,6 @@ class TestIndexEntryFromPath(TestCase):
     def test_read_submodule_head(self) -> None:
         """Test reading the HEAD of a submodule."""
         from dulwich.index import read_submodule_head
-        from dulwich.repo import Repo
 
         # Create a test repo that will be our "submodule"
         sub_repo_dir = os.path.join(self.tempdir, "subrepo")
@@ -1099,7 +1101,6 @@ class TestIndexEntryFromPath(TestCase):
     def test_has_directory_changed(self) -> None:
         """Test checking if a directory has changed."""
         from dulwich.index import IndexEntry, _has_directory_changed
-        from dulwich.repo import Repo
 
         # Setup mock IndexEntry
         mock_entry = IndexEntry(
@@ -1465,8 +1466,6 @@ class TestManyFilesRepoIntegration(TestCase):
 
     def test_repo_with_manyfiles_config(self):
         """Test that a repository with feature.manyFiles=true uses the right settings."""
-        from dulwich.repo import Repo
-
         # Create a new repository
         repo = Repo.init(self.tempdir)
 
@@ -1482,8 +1481,6 @@ class TestManyFilesRepoIntegration(TestCase):
 
     def test_repo_with_explicit_index_settings(self):
         """Test that explicit index.version and index.skipHash work."""
-        from dulwich.repo import Repo
-
         # Create a new repository
         repo = Repo.init(self.tempdir)
 
@@ -1519,8 +1516,6 @@ class TestPathPrefixCompression(TestCase):
 
     def test_path_compression_simple(self):
         """Test simple path compression cases."""
-        from dulwich.index import _compress_path, _decompress_path
-
         # Test case 1: No common prefix
         compressed = _compress_path(b"file1.txt", b"")
         decompressed, _ = _decompress_path(compressed, 0, b"")
@@ -1538,8 +1533,6 @@ class TestPathPrefixCompression(TestCase):
 
     def test_path_compression_deep_directories(self):
         """Test compression with deep directory structures."""
-        from dulwich.index import _compress_path, _decompress_path
-
         path1 = b"src/main/java/com/example/service/UserService.java"
         path2 = b"src/main/java/com/example/service/OrderService.java"
         path3 = b"src/main/java/com/example/model/User.java"
@@ -1628,8 +1621,6 @@ class TestPathPrefixCompression(TestCase):
 
     def test_path_compression_edge_cases(self):
         """Test edge cases in path compression."""
-        from dulwich.index import _compress_path, _decompress_path
-
         # Empty paths
         compressed = _compress_path(b"", b"")
         decompressed, _ = _decompress_path(compressed, 0, b"")
@@ -1650,14 +1641,11 @@ class TestUpdateWorkingTree(TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
-        from dulwich.repo import Repo
 
         self.repo = Repo.init(self.tempdir)
 
     def test_update_working_tree_with_blob_normalizer(self):
         """Test update_working_tree with a blob normalizer."""
-        from dulwich.index import update_working_tree
-        from dulwich.objects import Blob, Tree
 
         # Create a simple blob normalizer that converts CRLF to LF
         class TestBlobNormalizer:
@@ -1698,9 +1686,6 @@ class TestUpdateWorkingTree(TestCase):
 
     def test_update_working_tree_without_blob_normalizer(self):
         """Test update_working_tree without a blob normalizer."""
-        from dulwich.index import update_working_tree
-        from dulwich.objects import Blob, Tree
-
         # Create a tree with a file containing CRLF
         blob = Blob()
         blob.data = b"Hello\r\nWorld\r\n"
@@ -1728,3 +1713,680 @@ class TestUpdateWorkingTree(TestCase):
         # Check that the index has the blob SHA
         index = self.repo.open_index()
         self.assertEqual(blob.id, index[b"test.txt"].sha)
+
+    def test_update_working_tree_remove_directory(self):
+        """Test that update_working_tree properly removes directories."""
+        # Create initial tree with a directory containing files
+        blob1 = Blob()
+        blob1.data = b"content1"
+        self.repo.object_store.add_object(blob1)
+
+        blob2 = Blob()
+        blob2.data = b"content2"
+        self.repo.object_store.add_object(blob2)
+
+        tree1 = Tree()
+        tree1[b"dir/file1.txt"] = (0o100644, blob1.id)
+        tree1[b"dir/file2.txt"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1 (create directory with files)
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Verify directory and files exist
+        dir_path = os.path.join(self.tempdir, "dir")
+        self.assertTrue(os.path.isdir(dir_path))
+        self.assertTrue(os.path.exists(os.path.join(dir_path, "file1.txt")))
+        self.assertTrue(os.path.exists(os.path.join(dir_path, "file2.txt")))
+
+        # Create empty tree (remove everything)
+        tree2 = Tree()
+        self.repo.object_store.add_object(tree2)
+
+        # Update to empty tree
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Verify directory was removed
+        self.assertFalse(os.path.exists(dir_path))
+
+    def test_update_working_tree_submodule_to_file(self):
+        """Test replacing a submodule directory with a file."""
+        # Create tree with submodule
+        submodule_sha = b"a" * 40
+        tree1 = Tree()
+        tree1[b"submodule"] = (S_IFGITLINK, submodule_sha)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree with submodule
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Verify submodule directory exists with .git file
+        submodule_path = os.path.join(self.tempdir, "submodule")
+        self.assertTrue(os.path.isdir(submodule_path))
+        self.assertTrue(os.path.exists(os.path.join(submodule_path, ".git")))
+
+        # Create tree with file at same path
+        blob = Blob()
+        blob.data = b"file content"
+        self.repo.object_store.add_object(blob)
+
+        tree2 = Tree()
+        tree2[b"submodule"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree2)
+
+        # Update to tree with file (should remove submodule directory and create file)
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Verify it's now a file
+        self.assertTrue(os.path.isfile(submodule_path))
+        with open(submodule_path, "rb") as f:
+            self.assertEqual(b"file content", f.read())
+
+    def test_update_working_tree_directory_with_nested_subdir(self):
+        """Test removing directory with nested subdirectories."""
+        # Create tree with nested directories
+        blob = Blob()
+        blob.data = b"deep content"
+        self.repo.object_store.add_object(blob)
+
+        tree1 = Tree()
+        tree1[b"a/b/c/file.txt"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Verify nested structure exists
+        path_a = os.path.join(self.tempdir, "a")
+        path_b = os.path.join(path_a, "b")
+        path_c = os.path.join(path_b, "c")
+        file_path = os.path.join(path_c, "file.txt")
+
+        self.assertTrue(os.path.exists(file_path))
+
+        # Create empty tree
+        tree2 = Tree()
+        self.repo.object_store.add_object(tree2)
+
+        # Update to empty tree
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Verify all directories were removed
+        self.assertFalse(os.path.exists(path_a))
+
+    def test_update_working_tree_file_replaced_by_dir_not_removed(self):
+        """Test that a directory replacing a git file is left alone if not empty."""
+        # Create tree with a file
+        blob = Blob()
+        blob.data = b"file content"
+        self.repo.object_store.add_object(blob)
+
+        tree1 = Tree()
+        tree1[b"path"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Verify file exists
+        file_path = os.path.join(self.tempdir, "path")
+        self.assertTrue(os.path.isfile(file_path))
+
+        # Manually replace file with directory containing untracked file
+        os.remove(file_path)
+        os.mkdir(file_path)
+        with open(os.path.join(file_path, "untracked.txt"), "w") as f:
+            f.write("untracked content")
+
+        # Create empty tree
+        tree2 = Tree()
+        self.repo.object_store.add_object(tree2)
+
+        # Update should succeed but leave the directory alone
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Directory should still exist with its contents
+        self.assertTrue(os.path.isdir(file_path))
+        self.assertTrue(os.path.exists(os.path.join(file_path, "untracked.txt")))
+
+    def test_update_working_tree_file_replaced_by_empty_dir_removed(self):
+        """Test that an empty directory replacing a git file is removed."""
+        # Create tree with a file
+        blob = Blob()
+        blob.data = b"file content"
+        self.repo.object_store.add_object(blob)
+
+        tree1 = Tree()
+        tree1[b"path"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Verify file exists
+        file_path = os.path.join(self.tempdir, "path")
+        self.assertTrue(os.path.isfile(file_path))
+
+        # Manually replace file with empty directory
+        os.remove(file_path)
+        os.mkdir(file_path)
+
+        # Create empty tree
+        tree2 = Tree()
+        self.repo.object_store.add_object(tree2)
+
+        # Update should remove the empty directory
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Directory should be gone
+        self.assertFalse(os.path.exists(file_path))
+
+    def test_update_working_tree_symlink_transitions(self):
+        """Test transitions involving symlinks."""
+        # Skip on Windows where symlinks might not be supported
+        if sys.platform == "win32":
+            self.skipTest("Symlinks not fully supported on Windows")
+
+        # Create tree with symlink
+        blob1 = Blob()
+        blob1.data = b"target/path"
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1[b"link"] = (0o120000, blob1.id)  # Symlink mode
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree with symlink
+        update_working_tree(self.repo, None, tree1.id)
+
+        link_path = os.path.join(self.tempdir, "link")
+        self.assertTrue(os.path.islink(link_path))
+        self.assertEqual(b"target/path", os.readlink(link_path).encode())
+
+        # Test 1: Replace symlink with regular file
+        blob2 = Blob()
+        blob2.data = b"file content"
+        self.repo.object_store.add_object(blob2)
+
+        tree2 = Tree()
+        tree2[b"link"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree2)
+
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        self.assertFalse(os.path.islink(link_path))
+        self.assertTrue(os.path.isfile(link_path))
+        with open(link_path, "rb") as f:
+            self.assertEqual(b"file content", f.read())
+
+        # Test 2: Replace file with symlink
+        update_working_tree(self.repo, tree2.id, tree1.id)
+
+        self.assertTrue(os.path.islink(link_path))
+        self.assertEqual(b"target/path", os.readlink(link_path).encode())
+
+        # Test 3: Replace symlink with directory (manually)
+        os.unlink(link_path)
+        os.mkdir(link_path)
+
+        # Create empty tree
+        tree3 = Tree()
+        self.repo.object_store.add_object(tree3)
+
+        # Should remove empty directory
+        update_working_tree(self.repo, tree1.id, tree3.id)
+        self.assertFalse(os.path.exists(link_path))
+
+    def test_update_working_tree_modified_file_to_dir_transition(self):
+        """Test that modified files are not removed when they should be directories."""
+        # Create tree with file
+        blob1 = Blob()
+        blob1.data = b"original content"
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1[b"path"] = (0o100644, blob1.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        file_path = os.path.join(self.tempdir, "path")
+
+        # Modify the file locally
+        with open(file_path, "w") as f:
+            f.write("modified content")
+
+        # Create tree where path is a directory with file
+        blob2 = Blob()
+        blob2.data = b"subfile content"
+        self.repo.object_store.add_object(blob2)
+
+        tree2 = Tree()
+        tree2[b"path/subfile"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree2)
+
+        # Update should fail because can't create directory where modified file exists
+        with self.assertRaises(IOError):
+            update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # File should still exist with modifications
+        self.assertTrue(os.path.isfile(file_path))
+        with open(file_path) as f:
+            self.assertEqual("modified content", f.read())
+
+    def test_update_working_tree_executable_transitions(self):
+        """Test transitions involving executable bit changes."""
+        # Skip on Windows where executable bit is not supported
+        if sys.platform == "win32":
+            self.skipTest("Executable bit not supported on Windows")
+
+        # Create tree with non-executable file
+        blob = Blob()
+        blob.data = b"#!/bin/sh\necho hello"
+        self.repo.object_store.add_object(blob)
+
+        tree1 = Tree()
+        tree1[b"script.sh"] = (0o100644, blob.id)  # Non-executable
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        script_path = os.path.join(self.tempdir, "script.sh")
+        self.assertTrue(os.path.isfile(script_path))
+
+        # Check it's not executable
+        mode = os.stat(script_path).st_mode
+        self.assertFalse(mode & stat.S_IXUSR)
+
+        # Create tree with executable file (same content)
+        tree2 = Tree()
+        tree2[b"script.sh"] = (0o100755, blob.id)  # Executable
+        self.repo.object_store.add_object(tree2)
+
+        # Update to tree2
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Check it's now executable
+        mode = os.stat(script_path).st_mode
+        self.assertTrue(mode & stat.S_IXUSR)
+
+    def test_update_working_tree_submodule_with_untracked_files(self):
+        """Test that submodules with untracked files are not removed."""
+        from dulwich.objects import S_IFGITLINK, Tree
+
+        # Create tree with submodule
+        submodule_sha = b"a" * 40
+        tree1 = Tree()
+        tree1[b"submodule"] = (S_IFGITLINK, submodule_sha)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree with submodule
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Add untracked file to submodule directory
+        submodule_path = os.path.join(self.tempdir, "submodule")
+        untracked_path = os.path.join(submodule_path, "untracked.txt")
+        with open(untracked_path, "w") as f:
+            f.write("untracked content")
+
+        # Create empty tree
+        tree2 = Tree()
+        self.repo.object_store.add_object(tree2)
+
+        # Update should not remove submodule directory with untracked files
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Directory should still exist with untracked file
+        self.assertTrue(os.path.isdir(submodule_path))
+        self.assertTrue(os.path.exists(untracked_path))
+
+    def test_update_working_tree_dir_to_file_with_subdir(self):
+        """Test replacing directory structure with a file."""
+        # Create tree with nested directory structure
+        blob1 = Blob()
+        blob1.data = b"content1"
+        self.repo.object_store.add_object(blob1)
+
+        blob2 = Blob()
+        blob2.data = b"content2"
+        self.repo.object_store.add_object(blob2)
+
+        tree1 = Tree()
+        tree1[b"dir/subdir/file1"] = (0o100644, blob1.id)
+        tree1[b"dir/subdir/file2"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Verify structure exists
+        dir_path = os.path.join(self.tempdir, "dir")
+        self.assertTrue(os.path.isdir(dir_path))
+
+        # Create tree with file at "dir" path
+        blob3 = Blob()
+        blob3.data = b"replacement file"
+        self.repo.object_store.add_object(blob3)
+
+        tree2 = Tree()
+        tree2[b"dir"] = (0o100644, blob3.id)
+        self.repo.object_store.add_object(tree2)
+
+        # Update should fail because directory is not empty
+        with self.assertRaises(IsADirectoryError):
+            update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Directory should still exist
+        self.assertTrue(os.path.isdir(dir_path))
+
+    def test_update_working_tree_case_sensitivity(self):
+        """Test handling of case-sensitive filename changes."""
+        # Create tree with lowercase file
+        blob1 = Blob()
+        blob1.data = b"lowercase content"
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1[b"readme.txt"] = (0o100644, blob1.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Create tree with uppercase file (different content)
+        blob2 = Blob()
+        blob2.data = b"uppercase content"
+        self.repo.object_store.add_object(blob2)
+
+        tree2 = Tree()
+        tree2[b"README.txt"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree2)
+
+        # Update to tree2
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Check what exists (behavior depends on filesystem)
+        lowercase_path = os.path.join(self.tempdir, "readme.txt")
+        uppercase_path = os.path.join(self.tempdir, "README.txt")
+
+        # On case-insensitive filesystems, one will overwrite the other
+        # On case-sensitive filesystems, both may exist
+        self.assertTrue(
+            os.path.exists(lowercase_path) or os.path.exists(uppercase_path)
+        )
+
+    def test_update_working_tree_deeply_nested_removal(self):
+        """Test removal of deeply nested directory structures."""
+        # Create deeply nested structure
+        blob = Blob()
+        blob.data = b"deep content"
+        self.repo.object_store.add_object(blob)
+
+        tree1 = Tree()
+        # Create a very deep path
+        deep_path = b"/".join([b"level%d" % i for i in range(10)])
+        tree1[deep_path + b"/file.txt"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Verify deep structure exists
+        current_path = self.tempdir
+        for i in range(10):
+            current_path = os.path.join(current_path, f"level{i}")
+            self.assertTrue(os.path.isdir(current_path))
+
+        # Create empty tree
+        tree2 = Tree()
+        self.repo.object_store.add_object(tree2)
+
+        # Update should remove all empty directories
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Verify top level directory is gone
+        top_level = os.path.join(self.tempdir, "level0")
+        self.assertFalse(os.path.exists(top_level))
+
+    def test_update_working_tree_read_only_files(self):
+        """Test handling of read-only files during updates."""
+        # Create tree with file
+        blob1 = Blob()
+        blob1.data = b"original content"
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1[b"readonly.txt"] = (0o100644, blob1.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Make file read-only
+        file_path = os.path.join(self.tempdir, "readonly.txt")
+        os.chmod(file_path, 0o444)  # Read-only
+
+        # Create tree with modified file
+        blob2 = Blob()
+        blob2.data = b"new content"
+        self.repo.object_store.add_object(blob2)
+
+        tree2 = Tree()
+        tree2[b"readonly.txt"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree2)
+
+        # Update should handle read-only file
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        # Verify content was updated
+        with open(file_path, "rb") as f:
+            self.assertEqual(b"new content", f.read())
+
+    def test_update_working_tree_invalid_filenames(self):
+        """Test handling of invalid filenames for the platform."""
+        # Create tree with potentially problematic filenames
+        blob = Blob()
+        blob.data = b"content"
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        # Add files with names that might be invalid on some platforms
+        tree[b"valid.txt"] = (0o100644, blob.id)
+        if sys.platform != "win32":
+            # These are invalid on Windows but valid on Unix
+            tree[b"file:with:colons.txt"] = (0o100644, blob.id)
+            tree[b"file<with>brackets.txt"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        # Update should skip invalid files based on validation
+        update_working_tree(self.repo, None, tree.id)
+
+        # Valid file should exist
+        self.assertTrue(os.path.exists(os.path.join(self.tempdir, "valid.txt")))
+
+    def test_update_working_tree_symlink_to_directory(self):
+        """Test replacing a symlink pointing to a directory with a real directory."""
+        if sys.platform == "win32":
+            self.skipTest("Symlinks not fully supported on Windows")
+
+        # Create a target directory
+        target_dir = os.path.join(self.tempdir, "target")
+        os.mkdir(target_dir)
+        with open(os.path.join(target_dir, "file.txt"), "w") as f:
+            f.write("target file")
+
+        # Create tree with symlink pointing to directory
+        blob1 = Blob()
+        blob1.data = b"target"  # Relative path to target directory
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1[b"link"] = (0o120000, blob1.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        link_path = os.path.join(self.tempdir, "link")
+        self.assertTrue(os.path.islink(link_path))
+
+        # Create tree with actual directory at same path
+        blob2 = Blob()
+        blob2.data = b"new file content"
+        self.repo.object_store.add_object(blob2)
+
+        tree2 = Tree()
+        tree2[b"link/newfile.txt"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree2)
+
+        # Update should replace symlink with actual directory
+        update_working_tree(self.repo, tree1.id, tree2.id)
+
+        self.assertFalse(os.path.islink(link_path))
+        self.assertTrue(os.path.isdir(link_path))
+        self.assertTrue(os.path.exists(os.path.join(link_path, "newfile.txt")))
+
+    def test_update_working_tree_comprehensive_transitions(self):
+        """Test all possible file type transitions comprehensively."""
+        # Skip on Windows where symlinks might not be supported
+        if sys.platform == "win32":
+            self.skipTest("Symlinks not fully supported on Windows")
+
+        # Create blobs for different file types
+        file_blob = Blob()
+        file_blob.data = b"regular file content"
+        self.repo.object_store.add_object(file_blob)
+
+        exec_blob = Blob()
+        exec_blob.data = b"#!/bin/sh\necho executable"
+        self.repo.object_store.add_object(exec_blob)
+
+        link_blob = Blob()
+        link_blob.data = b"target/path"
+        self.repo.object_store.add_object(link_blob)
+
+        submodule_sha = b"a" * 40
+
+        # Test 1: Regular file → Submodule
+        tree1 = Tree()
+        tree1[b"item"] = (0o100644, file_blob.id)
+        self.repo.object_store.add_object(tree1)
+
+        tree2 = Tree()
+        tree2[b"item"] = (S_IFGITLINK, submodule_sha)
+        self.repo.object_store.add_object(tree2)
+
+        update_working_tree(self.repo, None, tree1.id)
+        self.assertTrue(os.path.isfile(os.path.join(self.tempdir, "item")))
+
+        update_working_tree(self.repo, tree1.id, tree2.id)
+        self.assertTrue(os.path.isdir(os.path.join(self.tempdir, "item")))
+
+        # Test 2: Submodule → Executable file
+        tree3 = Tree()
+        tree3[b"item"] = (0o100755, exec_blob.id)
+        self.repo.object_store.add_object(tree3)
+
+        update_working_tree(self.repo, tree2.id, tree3.id)
+        item_path = os.path.join(self.tempdir, "item")
+        self.assertTrue(os.path.isfile(item_path))
+        if sys.platform != "win32":
+            self.assertTrue(os.access(item_path, os.X_OK))
+
+        # Test 3: Executable file → Symlink
+        tree4 = Tree()
+        tree4[b"item"] = (0o120000, link_blob.id)
+        self.repo.object_store.add_object(tree4)
+
+        update_working_tree(self.repo, tree3.id, tree4.id)
+        self.assertTrue(os.path.islink(item_path))
+
+        # Test 4: Symlink → Submodule
+        tree5 = Tree()
+        tree5[b"item"] = (S_IFGITLINK, submodule_sha)
+        self.repo.object_store.add_object(tree5)
+
+        update_working_tree(self.repo, tree4.id, tree5.id)
+        self.assertTrue(os.path.isdir(item_path))
+
+        # Test 5: Clean up - Submodule → absent
+        tree6 = Tree()
+        self.repo.object_store.add_object(tree6)
+
+        update_working_tree(self.repo, tree5.id, tree6.id)
+        self.assertFalse(os.path.exists(item_path))
+
+        # Test 6: Symlink → Executable file
+        tree7 = Tree()
+        tree7[b"item2"] = (0o120000, link_blob.id)
+        self.repo.object_store.add_object(tree7)
+
+        update_working_tree(self.repo, tree6.id, tree7.id)
+        item2_path = os.path.join(self.tempdir, "item2")
+        self.assertTrue(os.path.islink(item2_path))
+
+        tree8 = Tree()
+        tree8[b"item2"] = (0o100755, exec_blob.id)
+        self.repo.object_store.add_object(tree8)
+
+        update_working_tree(self.repo, tree7.id, tree8.id)
+        self.assertTrue(os.path.isfile(item2_path))
+        if sys.platform != "win32":
+            self.assertTrue(os.access(item2_path, os.X_OK))
+
+    def test_update_working_tree_partial_update_failure(self):
+        """Test handling when update fails partway through."""
+        # Create initial tree
+        blob1 = Blob()
+        blob1.data = b"file1 content"
+        self.repo.object_store.add_object(blob1)
+
+        blob2 = Blob()
+        blob2.data = b"file2 content"
+        self.repo.object_store.add_object(blob2)
+
+        tree1 = Tree()
+        tree1[b"file1.txt"] = (0o100644, blob1.id)
+        tree1[b"file2.txt"] = (0o100644, blob2.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        update_working_tree(self.repo, None, tree1.id)
+
+        # Create a directory where file2.txt is, to cause a conflict
+        file2_path = os.path.join(self.tempdir, "file2.txt")
+        os.remove(file2_path)
+        os.mkdir(file2_path)
+        # Add untracked file to prevent removal
+        with open(os.path.join(file2_path, "blocker.txt"), "w") as f:
+            f.write("blocking content")
+
+        # Create tree with updates to both files
+        blob3 = Blob()
+        blob3.data = b"file1 updated"
+        self.repo.object_store.add_object(blob3)
+
+        blob4 = Blob()
+        blob4.data = b"file2 updated"
+        self.repo.object_store.add_object(blob4)
+
+        tree2 = Tree()
+        tree2[b"file1.txt"] = (0o100644, blob3.id)
+        tree2[b"file2.txt"] = (0o100644, blob4.id)
+        self.repo.object_store.add_object(tree2)
+
+        # Update should partially succeed - file1 updated, file2 blocked
+        try:
+            update_working_tree(self.repo, tree1.id, tree2.id)
+        except IsADirectoryError:
+            # Expected to fail on file2 because it's a directory
+            pass
+
+        # file1 should be updated
+        with open(os.path.join(self.tempdir, "file1.txt"), "rb") as f:
+            self.assertEqual(b"file1 updated", f.read())
+
+        # file2 should still be a directory
+        self.assertTrue(os.path.isdir(file2_path))

@@ -121,27 +121,27 @@ class SubmoduleTests(TestCase):
         # Create a repository
         repo_path = os.path.join(self.test_dir, "testrepo")
         repo = Repo.init(repo_path, mkdir=True)
-        
+
         # Test creating a simple submodule placeholder
         ensure_submodule_placeholder(repo, b"libs/mylib")
-        
+
         # Check that the directory was created
         submodule_path = os.path.join(repo_path, "libs", "mylib")
         self.assertTrue(os.path.isdir(submodule_path))
-        
+
         # Check that the .git file was created
         git_file_path = os.path.join(submodule_path, ".git")
         self.assertTrue(os.path.isfile(git_file_path))
-        
+
         # Check the content of the .git file
         with open(git_file_path, "rb") as f:
             content = f.read()
         self.assertEqual(b"gitdir: ../../.git/modules/libs/mylib\n", content)
-        
+
         # Test with string path
         ensure_submodule_placeholder(repo, "libs/another")
         another_path = os.path.join(repo_path, "libs", "another")
         self.assertTrue(os.path.isdir(another_path))
-        
+
         # Test idempotency - calling again should not fail
         ensure_submodule_placeholder(repo, b"libs/mylib")

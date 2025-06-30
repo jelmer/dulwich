@@ -21,14 +21,16 @@
 
 """Working with Git submodules."""
 
+import os
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK
 
 if TYPE_CHECKING:
     from .object_store import ObjectContainer
+    from .repo import Repo
 
 
 def iter_cached_submodules(
@@ -46,3 +48,45 @@ def iter_cached_submodules(
     for entry in iter_tree_contents(store, root_tree_id):
         if S_ISGITLINK(entry.mode):
             yield entry.path, entry.sha
+
+
+def ensure_submodule_placeholder(
+    repo: "Repo",
+    submodule_path: Union[str, bytes],
+) -> None:
+    """Create a submodule placeholder directory with .git file.
+
+    This creates the minimal structure needed for a submodule:
+    - The submodule directory
+    - A .git file pointing to the submodule's git directory
+
+    Args:
+      repo: Parent repository
+      submodule_path: Path to the submodule relative to repo root
+    """
+    # Ensure path is bytes
+    if isinstance(submodule_path, str):
+        submodule_path = submodule_path.encode()
+
+    # Get repo path as bytes
+    repo_path = repo.path if isinstance(repo.path, bytes) else repo.path.encode()
+
+    # Create full path to submodule
+    full_path = os.path.join(repo_path, submodule_path)
+
+    # Create submodule directory if it doesn't exist
+    if not os.path.exists(full_path):
+        os.makedirs(full_path)
+
+    # Create .git file pointing to the submodule's git directory
+    git_filename = b".git" if isinstance(full_path, bytes) else ".git"
+    git_file_path = os.path.join(full_path, git_filename)
+    if not os.path.exists(git_file_path):
+        # Submodule git directories are typically stored in .git/modules/<name>
+        # The relative path from the submodule to the parent's .git directory
+        # depends on the submodule's depth
+        depth = submodule_path.count(b"/") + 1
+        relative_git_dir = b"../" * depth + b".git/modules/" + submodule_path
+
+        with open(git_file_path, "wb") as f:
+            f.write(b"gitdir: " + relative_git_dir + b"\n")

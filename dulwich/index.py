@@ -1263,7 +1263,7 @@ def build_file_from_blob(
     contents = blob.as_raw_string()
     if stat.S_ISLNK(mode):
         if oldstat:
-            os.unlink(target_path)
+            _remove_file_with_readonly_handling(target_path)
         if sys.platform == "win32":
             # os.readlink on Python3 on Windows requires a unicode string.
             contents_str = contents.decode(tree_encoding)
@@ -1509,6 +1509,23 @@ def _ensure_parent_dir_exists(full_path: bytes) -> None:
         os.makedirs(parent_dir)
 
 
+def _remove_file_with_readonly_handling(path: bytes) -> None:
+    """Remove a file, handling read-only files on Windows.
+
+    Args:
+      path: Path to the file to remove
+    """
+    try:
+        os.unlink(path)
+    except PermissionError:
+        # On Windows, remove read-only attribute and retry
+        if sys.platform == "win32":
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+            os.unlink(path)
+        else:
+            raise
+
+
 def _remove_empty_parents(path: bytes, stop_at: bytes) -> None:
     """Remove empty parent directories up to stop_at."""
     parent = os.path.dirname(path)
@@ -1601,7 +1618,7 @@ def _transition_to_submodule(repo, path, full_path, current_stat, entry, index):
     else:
         # Remove whatever is there and create submodule
         if current_stat is not None:
-            os.unlink(full_path)
+            _remove_file_with_readonly_handling(full_path)
         ensure_submodule_placeholder(repo, path)
 
     st = os.lstat(full_path)
@@ -1674,7 +1691,7 @@ def _transition_to_file(
                     )
                 raise
     elif current_stat is not None:
-        os.unlink(full_path)
+        _remove_file_with_readonly_handling(full_path)
 
     # Ensure parent directory exists
     _ensure_parent_dir_exists(full_path)
@@ -1713,7 +1730,7 @@ def _transition_to_absent(repo, path, full_path, current_stat, index):
                 if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
                     raise
     else:
-        os.unlink(full_path)
+        _remove_file_with_readonly_handling(full_path)
 
     try:
         del index[path]
@@ -1822,7 +1839,19 @@ def update_working_tree(
                         f"Cannot replace modified file with directory: {path!r}"
                     )
 
+    # Process in two passes: deletions first, then additions/updates
+    # This handles case-only renames on case-insensitive filesystems correctly
+    paths_to_remove = []
+    paths_to_update = []
+
     for path in sorted(all_paths):
+        if path in new_paths:
+            paths_to_update.append(path)
+        else:
+            paths_to_remove.append(path)
+
+    # First process removals
+    for path in paths_to_remove:
         full_path = _tree_to_fs_path(repo_path, path)
 
         # Determine current state - use cache if available
@@ -1834,30 +1863,40 @@ def update_working_tree(
             except FileNotFoundError:
                 current_stat = None
 
-        # Determine transitions
-        new_entry = new_paths.get(path)
+        _transition_to_absent(repo, path, full_path, current_stat, index)
 
-        if new_entry:
-            # Path should exist
-            if S_ISGITLINK(new_entry.mode):
-                _transition_to_submodule(
-                    repo, path, full_path, current_stat, new_entry, index
-                )
-            else:
-                _transition_to_file(
-                    repo.object_store,
-                    path,
-                    full_path,
-                    current_stat,
-                    new_entry,
-                    index,
-                    honor_filemode,
-                    symlink_fn,
-                    blob_normalizer,
-                )
+    # Then process additions/updates
+    for path in paths_to_update:
+        full_path = _tree_to_fs_path(repo_path, path)
+
+        # Determine current state - use cache if available
+        try:
+            current_stat = stat_cache[full_path]
+        except KeyError:
+            try:
+                current_stat = os.lstat(full_path)
+            except FileNotFoundError:
+                current_stat = None
+
+        new_entry = new_paths[path]
+
+        # Path should exist
+        if S_ISGITLINK(new_entry.mode):
+            _transition_to_submodule(
+                repo, path, full_path, current_stat, new_entry, index
+            )
         else:
-            # Path should not exist
-            _transition_to_absent(repo, path, full_path, current_stat, index)
+            _transition_to_file(
+                repo.object_store,
+                path,
+                full_path,
+                current_stat,
+                new_entry,
+                index,
+                honor_filemode,
+                symlink_fn,
+                blob_normalizer,
+            )
 
     # Handle force_remove_untracked
     if force_remove_untracked:
@@ -1872,7 +1911,7 @@ def update_working_tree(
                     tree_path = tree_path.replace(os.sep.encode(), b"/")
 
                 if tree_path not in new_paths:
-                    os.unlink(full_path)
+                    _remove_file_with_readonly_handling(full_path)
                     if tree_path in index:
                         del index[tree_path]
 

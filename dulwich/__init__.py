@@ -25,7 +25,7 @@
 
 from typing import Any, Callable, Optional, TypeVar
 
-__version__ = (0, 23, 0)
+__version__ = (0, 23, 1)
 
 __all__ = ["replace_me"]
 

@@ -901,24 +901,24 @@ class ParseRemoteRefTests(TestCase):
         remote, branch = parse_remote_ref(b"refs/remotes/origin/main")
         self.assertEqual(b"origin", remote)
         self.assertEqual(b"main", branch)
-        
+
         # Test with branch containing slashes
         remote, branch = parse_remote_ref(b"refs/remotes/upstream/feature/new-ui")
         self.assertEqual(b"upstream", remote)
         self.assertEqual(b"feature/new-ui", branch)
-    
+
     def test_invalid_not_remote_ref(self) -> None:
         # Not a remote ref
         with self.assertRaises(ValueError) as cm:
             parse_remote_ref(b"refs/heads/main")
         self.assertIn("Not a remote ref", str(cm.exception))
-    
+
     def test_invalid_format(self) -> None:
         # Missing branch name
         with self.assertRaises(ValueError) as cm:
             parse_remote_ref(b"refs/remotes/origin")
         self.assertIn("Invalid remote ref format", str(cm.exception))
-        
+
         # Just the prefix
         with self.assertRaises(ValueError) as cm:
             parse_remote_ref(b"refs/remotes/")

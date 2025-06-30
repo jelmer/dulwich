@@ -21,7 +21,9 @@
 
 """Parser for the git index file format."""
 
+import errno
 import os
+import shutil
 import stat
 import struct
 import sys
@@ -42,7 +44,7 @@ from typing import (
 if TYPE_CHECKING:
     from .file import _GitFile
     from .line_ending import BlobNormalizer
-    from .repo import BaseRepo
+    from .repo import Repo
 
 from .file import GitFile
 from .object_store import iter_tree_contents
@@ -1261,7 +1263,7 @@ def build_file_from_blob(
     contents = blob.as_raw_string()
     if stat.S_ISLNK(mode):
         if oldstat:
-            os.unlink(target_path)
+            _remove_file_with_readonly_handling(target_path)
         if sys.platform == "win32":
             # os.readlink on Python3 on Windows requires a unicode string.
             contents_str = contents.decode(tree_encoding)
@@ -1484,8 +1486,265 @@ def _has_directory_changed(tree_path: bytes, entry: IndexEntry) -> bool:
     return False
 
 
+os_sep_bytes = os.sep.encode("ascii")
+
+
+def _ensure_parent_dir_exists(full_path: bytes) -> None:
+    """Ensure parent directory exists, checking no parent is a file."""
+    parent_dir = os.path.dirname(full_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        # Check if any parent in the path is a file
+        parts = parent_dir.split(os_sep_bytes)
+        for i in range(len(parts)):
+            partial_path = os_sep_bytes.join(parts[: i + 1])
+            if (
+                partial_path
+                and os.path.exists(partial_path)
+                and not os.path.isdir(partial_path)
+            ):
+                # Parent path is a file, this is an error
+                raise OSError(
+                    f"Cannot create directory, parent path is a file: {partial_path!r}"
+                )
+        os.makedirs(parent_dir)
+
+
+def _remove_file_with_readonly_handling(path: bytes) -> None:
+    """Remove a file, handling read-only files on Windows.
+
+    Args:
+      path: Path to the file to remove
+    """
+    try:
+        os.unlink(path)
+    except PermissionError:
+        # On Windows, remove read-only attribute and retry
+        if sys.platform == "win32":
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+            os.unlink(path)
+        else:
+            raise
+
+
+def _remove_empty_parents(path: bytes, stop_at: bytes) -> None:
+    """Remove empty parent directories up to stop_at."""
+    parent = os.path.dirname(path)
+    while parent and parent != stop_at:
+        try:
+            os.rmdir(parent)
+            parent = os.path.dirname(parent)
+        except FileNotFoundError:
+            # Directory doesn't exist - stop trying
+            break
+        except OSError as e:
+            if e.errno == errno.ENOTEMPTY:
+                # Directory not empty - stop trying
+                break
+            raise
+
+
+def _check_symlink_matches(
+    full_path: bytes, repo_object_store, entry_sha: bytes
+) -> bool:
+    """Check if symlink target matches expected target.
+
+    Returns True if symlink needs to be written, False if it matches.
+    """
+    try:
+        current_target = os.readlink(full_path)
+        blob_obj = repo_object_store[entry_sha]
+        expected_target = blob_obj.as_raw_string()
+        if isinstance(current_target, str):
+            current_target = current_target.encode()
+        return current_target != expected_target
+    except FileNotFoundError:
+        # Symlink doesn't exist
+        return True
+    except OSError as e:
+        if e.errno == errno.EINVAL:
+            # Not a symlink
+            return True
+        raise
+
+
+def _check_file_matches(
+    repo_object_store,
+    full_path: bytes,
+    entry_sha: bytes,
+    entry_mode: int,
+    current_stat: os.stat_result,
+    honor_filemode: bool,
+    blob_normalizer: Optional["BlobNormalizer"] = None,
+    tree_path: Optional[bytes] = None,
+) -> bool:
+    """Check if a file on disk matches the expected git object.
+
+    Returns True if file needs to be written, False if it matches.
+    """
+    # Check mode first (if honor_filemode is True)
+    if honor_filemode:
+        current_mode = stat.S_IMODE(current_stat.st_mode)
+        expected_mode = stat.S_IMODE(entry_mode)
+        if current_mode != expected_mode:
+            return True
+
+    # If mode matches (or we don't care), check content via size first
+    blob_obj = repo_object_store[entry_sha]
+    if current_stat.st_size != blob_obj.raw_length():
+        return True
+
+    # Size matches, check actual content
+    try:
+        with open(full_path, "rb") as f:
+            current_content = f.read()
+            expected_content = blob_obj.as_raw_string()
+            if blob_normalizer and tree_path is not None:
+                normalized_blob = blob_normalizer.checkout_normalize(
+                    blob_obj, tree_path
+                )
+                expected_content = normalized_blob.as_raw_string()
+            return current_content != expected_content
+    except (FileNotFoundError, PermissionError, IsADirectoryError):
+        return True
+
+
+def _transition_to_submodule(repo, path, full_path, current_stat, entry, index):
+    """Transition any type to submodule."""
+    from .submodule import ensure_submodule_placeholder
+
+    if current_stat is not None and stat.S_ISDIR(current_stat.st_mode):
+        # Already a directory, just ensure .git file exists
+        ensure_submodule_placeholder(repo, path)
+    else:
+        # Remove whatever is there and create submodule
+        if current_stat is not None:
+            _remove_file_with_readonly_handling(full_path)
+        ensure_submodule_placeholder(repo, path)
+
+    st = os.lstat(full_path)
+    index[path] = index_entry_from_stat(st, entry.sha)
+
+
+def _transition_to_file(
+    object_store,
+    path,
+    full_path,
+    current_stat,
+    entry,
+    index,
+    honor_filemode,
+    symlink_fn,
+    blob_normalizer,
+):
+    """Transition any type to regular file or symlink."""
+    # Check if we need to update
+    if (
+        current_stat is not None
+        and stat.S_ISREG(current_stat.st_mode)
+        and not stat.S_ISLNK(entry.mode)
+    ):
+        # File to file - check if update needed
+        needs_update = _check_file_matches(
+            object_store,
+            full_path,
+            entry.sha,
+            entry.mode,
+            current_stat,
+            honor_filemode,
+            blob_normalizer,
+            path,
+        )
+    elif (
+        current_stat is not None
+        and stat.S_ISLNK(current_stat.st_mode)
+        and stat.S_ISLNK(entry.mode)
+    ):
+        # Symlink to symlink - check if update needed
+        needs_update = _check_symlink_matches(full_path, object_store, entry.sha)
+    else:
+        needs_update = True
+
+    if not needs_update:
+        # Just update index - current_stat should always be valid here since we're not updating
+        index[path] = index_entry_from_stat(current_stat, entry.sha)
+        return
+
+    # Remove existing entry if needed
+    if current_stat is not None and stat.S_ISDIR(current_stat.st_mode):
+        # Remove directory
+        dir_contents = set(os.listdir(full_path))
+        git_file_name = b".git" if isinstance(full_path, bytes) else ".git"
+
+        if git_file_name in dir_contents:
+            if dir_contents != {git_file_name}:
+                raise IsADirectoryError(
+                    f"Cannot replace submodule with untracked files: {full_path!r}"
+                )
+            shutil.rmtree(full_path)
+        else:
+            try:
+                os.rmdir(full_path)
+            except OSError as e:
+                if e.errno == errno.ENOTEMPTY:
+                    raise IsADirectoryError(
+                        f"Cannot replace non-empty directory with file: {full_path!r}"
+                    )
+                raise
+    elif current_stat is not None:
+        _remove_file_with_readonly_handling(full_path)
+
+    # Ensure parent directory exists
+    _ensure_parent_dir_exists(full_path)
+
+    # Write the file
+    blob_obj = object_store[entry.sha]
+    assert isinstance(blob_obj, Blob)
+    if blob_normalizer:
+        blob_obj = blob_normalizer.checkout_normalize(blob_obj, path)
+    st = build_file_from_blob(
+        blob_obj,
+        entry.mode,
+        full_path,
+        honor_filemode=honor_filemode,
+        symlink_fn=symlink_fn,
+    )
+    index[path] = index_entry_from_stat(st, entry.sha)
+
+
+def _transition_to_absent(repo, path, full_path, current_stat, index):
+    """Remove any type of entry."""
+    if current_stat is None:
+        return
+
+    if stat.S_ISDIR(current_stat.st_mode):
+        # Check if it's a submodule directory
+        dir_contents = set(os.listdir(full_path))
+        git_file_name = b".git" if isinstance(full_path, bytes) else ".git"
+
+        if git_file_name in dir_contents and dir_contents == {git_file_name}:
+            shutil.rmtree(full_path)
+        else:
+            try:
+                os.rmdir(full_path)
+            except OSError as e:
+                if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
+                    raise
+    else:
+        _remove_file_with_readonly_handling(full_path)
+
+    try:
+        del index[path]
+    except KeyError:
+        pass
+
+    # Try to remove empty parent directories
+    _remove_empty_parents(
+        full_path, repo.path if isinstance(repo.path, bytes) else repo.path.encode()
+    )
+
+
 def update_working_tree(
-    repo: "BaseRepo",
+    repo: "Repo",
     old_tree_id: Optional[bytes],
     new_tree_id: bytes,
     honor_filemode: bool = True,
@@ -1514,137 +1773,162 @@ def update_working_tree(
       blob_normalizer: An optional BlobNormalizer to use for converting line
         endings when writing blobs to the working directory.
     """
-    import os
-
-    # Set default validate_path_element if not provided
     if validate_path_element is None:
         validate_path_element = validate_path_element_default
 
-    # Get the trees
-    old_tree = repo[old_tree_id] if old_tree_id else None
-    repo[new_tree_id]
-
-    # Open the index
+    repo_path = repo.path if isinstance(repo.path, bytes) else repo.path.encode()
     index = repo.open_index()
 
-    # Track which paths we've dealt with
-    handled_paths = set()
-
-    # Get repo path as string for comparisons
-    if not hasattr(repo, "path"):
-        raise ValueError("Repository must have a path attribute")
-    repo_path_str = repo.path if isinstance(repo.path, str) else repo.path.decode()
-
-    # First, update/add all files in the new tree
+    # Build sets of paths for efficient lookup
+    new_paths = {}
     for entry in iter_tree_contents(repo.object_store, new_tree_id):
-        handled_paths.add(entry.path)
-
-        # Skip .git directory
-        if entry.path.startswith(b".git"):
+        if entry.path.startswith(b".git") or not validate_path(
+            entry.path, validate_path_element
+        ):
             continue
+        new_paths[entry.path] = entry
 
-        # Validate path element
-        if not validate_path(entry.path, validate_path_element):
-            continue
-
-        # Build full path
-        full_path = os.path.join(repo_path_str, entry.path.decode())
-
-        # Get the blob
-        blob_obj = repo.object_store[entry.sha]
-        if not isinstance(blob_obj, Blob):
-            raise ValueError(f"Object {entry.sha!r} is not a blob")
-
-        # Apply blob normalization for checkout if normalizer is provided
-        if blob_normalizer is not None:
-            blob_obj = blob_normalizer.checkout_normalize(blob_obj, entry.path)
-
-        # Ensure parent directory exists
-        parent_dir = os.path.dirname(full_path)
-        if parent_dir and not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
-
-        # Write the file
-        st = build_file_from_blob(
-            blob_obj,
-            entry.mode,
-            full_path.encode(),
-            honor_filemode=honor_filemode,
-            symlink_fn=symlink_fn,
-        )
-
-        # Update index
-        index[entry.path] = index_entry_from_stat(st, entry.sha)
-
-    # Remove files that existed in old tree but not in new tree
-    if old_tree:
+    old_paths = {}
+    if old_tree_id:
         for entry in iter_tree_contents(repo.object_store, old_tree_id):
-            if entry.path not in handled_paths:
-                # Skip .git directory
-                if entry.path.startswith(b".git"):
-                    continue
+            if not entry.path.startswith(b".git"):
+                old_paths[entry.path] = entry
 
-                # File was deleted
-                full_path = os.path.join(repo_path_str, entry.path.decode())
+    # Process all paths
+    all_paths = set(new_paths.keys()) | set(old_paths.keys())
 
-                # Remove from working tree
-                if os.path.exists(full_path):
-                    os.remove(full_path)
+    # Check for paths that need to become directories
+    paths_needing_dir = set()
+    for path in new_paths:
+        parts = path.split(b"/")
+        for i in range(1, len(parts)):
+            parent = b"/".join(parts[:i])
+            if parent in old_paths and parent not in new_paths:
+                paths_needing_dir.add(parent)
 
-                # Remove from index
-                if entry.path in index:
-                    del index[entry.path]
-
-                # Clean up empty directories
-                dir_path = os.path.dirname(full_path)
-                while (
-                    dir_path and dir_path != repo_path_str and os.path.exists(dir_path)
+    # Check if any path that needs to become a directory has been modified
+    current_stat: Optional[os.stat_result]
+    stat_cache: dict[bytes, Optional[os.stat_result]] = {}
+    for path in paths_needing_dir:
+        full_path = _tree_to_fs_path(repo_path, path)
+        try:
+            current_stat = os.lstat(full_path)
+        except FileNotFoundError:
+            # File doesn't exist, proceed
+            stat_cache[full_path] = None
+        except PermissionError:
+            # Can't read file, proceed
+            pass
+        else:
+            stat_cache[full_path] = current_stat
+            if stat.S_ISREG(current_stat.st_mode):
+                # Check if file has been modified
+                old_entry = old_paths[path]
+                if _check_file_matches(
+                    repo.object_store,
+                    full_path,
+                    old_entry.sha,
+                    old_entry.mode,
+                    current_stat,
+                    honor_filemode,
+                    blob_normalizer,
+                    path,
                 ):
-                    try:
-                        if not os.listdir(dir_path):
-                            os.rmdir(dir_path)
-                            dir_path = os.path.dirname(dir_path)
-                        else:
-                            break
-                    except OSError:
-                        break
+                    # File has been modified, can't replace with directory
+                    raise OSError(
+                        f"Cannot replace modified file with directory: {path!r}"
+                    )
 
-    # If force_remove_untracked is True, remove any files in working directory
-    # that are not in the target tree (useful for reset --hard)
+    # Process in two passes: deletions first, then additions/updates
+    # This handles case-only renames on case-insensitive filesystems correctly
+    paths_to_remove = []
+    paths_to_update = []
+
+    for path in sorted(all_paths):
+        if path in new_paths:
+            paths_to_update.append(path)
+        else:
+            paths_to_remove.append(path)
+
+    # First process removals
+    for path in paths_to_remove:
+        full_path = _tree_to_fs_path(repo_path, path)
+
+        # Determine current state - use cache if available
+        try:
+            current_stat = stat_cache[full_path]
+        except KeyError:
+            try:
+                current_stat = os.lstat(full_path)
+            except FileNotFoundError:
+                current_stat = None
+
+        _transition_to_absent(repo, path, full_path, current_stat, index)
+
+    # Then process additions/updates
+    for path in paths_to_update:
+        full_path = _tree_to_fs_path(repo_path, path)
+
+        # Determine current state - use cache if available
+        try:
+            current_stat = stat_cache[full_path]
+        except KeyError:
+            try:
+                current_stat = os.lstat(full_path)
+            except FileNotFoundError:
+                current_stat = None
+
+        new_entry = new_paths[path]
+
+        # Path should exist
+        if S_ISGITLINK(new_entry.mode):
+            _transition_to_submodule(
+                repo, path, full_path, current_stat, new_entry, index
+            )
+        else:
+            _transition_to_file(
+                repo.object_store,
+                path,
+                full_path,
+                current_stat,
+                new_entry,
+                index,
+                honor_filemode,
+                symlink_fn,
+                blob_normalizer,
+            )
+
+    # Handle force_remove_untracked
     if force_remove_untracked:
-        # Walk through all files in the working directory
-        for root, dirs, files in os.walk(repo_path_str):
-            # Skip .git directory
-            if ".git" in dirs:
-                dirs.remove(".git")
-
+        for root, dirs, files in os.walk(repo_path):
+            if b".git" in os.fsencode(root):
+                continue
+            root_bytes = os.fsencode(root)
             for file in files:
-                full_path = os.path.join(root, file)
-                # Get relative path from repo root
-                rel_path = os.path.relpath(full_path, repo_path_str)
-                # Normalize to use forward slashes like Git does internally
-                rel_path = rel_path.replace(os.sep, "/")
-                rel_path_bytes = rel_path.encode()
+                full_path = os.path.join(root_bytes, os.fsencode(file))
+                tree_path = os.path.relpath(full_path, repo_path)
+                if os.sep != "/":
+                    tree_path = tree_path.replace(os.sep.encode(), b"/")
 
-                # If this file is not in the target tree, remove it
-                if rel_path_bytes not in handled_paths:
-                    os.remove(full_path)
-
-                    # Remove from index if present
-                    if rel_path_bytes in index:
-                        del index[rel_path_bytes]
+                if tree_path not in new_paths:
+                    _remove_file_with_readonly_handling(full_path)
+                    if tree_path in index:
+                        del index[tree_path]
 
         # Clean up empty directories
-        for root, dirs, files in os.walk(repo_path_str, topdown=False):
-            if ".git" in root:
-                continue
-            if root != repo_path_str and not files and not dirs:
+        for root, dirs, files in os.walk(repo_path, topdown=False):
+            root_bytes = os.fsencode(root)
+            if (
+                b".git" not in root_bytes
+                and root_bytes != repo_path
+                and not files
+                and not dirs
+            ):
                 try:
                     os.rmdir(root)
                 except OSError:
                     pass
 
-    # Write the updated index
     index.write()
 
 
@@ -1692,9 +1976,6 @@ def get_unstaged_changes(
         else:
             if blob.id != entry.sha:
                 yield tree_path
-
-
-os_sep_bytes = os.sep.encode("ascii")
 
 
 def _tree_to_fs_path(root_path: bytes, tree_path: bytes) -> bytes:

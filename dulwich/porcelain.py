@@ -530,6 +530,7 @@ def clone(
     config: Optional[Config] = None,
     filter_spec=None,
     protocol_version: Optional[int] = None,
+    recurse_submodules: bool = False,
     **kwargs,
 ):
     """Clone a local or remote git repository.
@@ -551,6 +552,7 @@ def clone(
         feature, and ignored otherwise.
       protocol_version: desired Git protocol version. By default the highest
         mutually supported protocol version will be used.
+      recurse_submodules: Whether to initialize and clone submodules
 
     Keyword Args:
       refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
@@ -589,7 +591,7 @@ def clone(
     if filter_spec:
         filter_spec = filter_spec.encode("ascii")
 
-    return client.clone(
+    repo = client.clone(
         path,
         target,
         mkdir=mkdir,
@@ -602,6 +604,28 @@ def clone(
         filter_spec=filter_spec,
         protocol_version=protocol_version,
     )
+
+    # Initialize and update submodules if requested
+    if recurse_submodules and not bare:
+        try:
+            submodule_init(repo)
+            submodule_update(repo, init=True)
+        except FileNotFoundError as e:
+            # .gitmodules file doesn't exist - no submodules to process
+            import logging
+
+            logging.debug("No .gitmodules file found: %s", e)
+        except KeyError as e:
+            # Submodule configuration missing
+            import logging
+
+            logging.warning("Submodule configuration error: %s", e)
+            if errstream:
+                errstream.write(
+                    f"Warning: Submodule configuration error: {e}\n".encode()
+                )
+
+    return repo
 
 
 def add(repo: Union[str, os.PathLike, BaseRepo] = ".", paths=None):
@@ -1209,6 +1233,7 @@ def submodule_add(repo, url, path=None, name=None) -> None:
       repo: Path to repository
       url: URL of repository to add as submodule
       path: Path where submodule should live
+      name: Name for the submodule
     """
     with open_repo_closing(repo) as r:
         if path is None:
@@ -1254,6 +1279,129 @@ def submodule_list(repo):
     with open_repo_closing(repo) as r:
         for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
             yield path, sha.decode(DEFAULT_ENCODING)
+
+
+def submodule_update(repo, paths=None, init=False, force=False, errstream=None) -> None:
+    """Update submodules.
+
+    Args:
+      repo: Path to repository
+      paths: Optional list of specific submodule paths to update. If None, updates all.
+      init: If True, initialize submodules first
+      force: Force update even if local changes exist
+    """
+    from .client import get_transport_and_path
+    from .index import build_index_from_tree
+    from .submodule import iter_cached_submodules
+
+    with open_repo_closing(repo) as r:
+        if init:
+            submodule_init(r)
+
+        config = r.get_config()
+        gitmodules_path = os.path.join(r.path, ".gitmodules")
+
+        # Get list of submodules to update
+        submodules_to_update = []
+        for path, sha in iter_cached_submodules(r.object_store, r[r.head()].tree):
+            path_str = (
+                path.decode(DEFAULT_ENCODING) if isinstance(path, bytes) else path
+            )
+            if paths is None or path_str in paths:
+                submodules_to_update.append((path, sha))
+
+        # Read submodule configuration
+        for path, target_sha in submodules_to_update:
+            path_str = (
+                path.decode(DEFAULT_ENCODING) if isinstance(path, bytes) else path
+            )
+
+            # Find the submodule name from .gitmodules
+            submodule_name = None
+            for sm_path, sm_url, sm_name in read_submodules(gitmodules_path):
+                if sm_path == path:
+                    submodule_name = sm_name
+                    break
+
+            if not submodule_name:
+                continue
+
+            # Get the URL from config
+            section = (
+                b"submodule",
+                submodule_name
+                if isinstance(submodule_name, bytes)
+                else submodule_name.encode(),
+            )
+            try:
+                url = config.get(section, b"url")
+                if isinstance(url, bytes):
+                    url = url.decode(DEFAULT_ENCODING)
+            except KeyError:
+                # URL not in config, skip this submodule
+                continue
+
+            # Get or create the submodule repository paths
+            submodule_path = os.path.join(r.path, path_str)
+            submodule_git_dir = os.path.join(r.path, ".git", "modules", path_str)
+
+            # Clone or fetch the submodule
+            if not os.path.exists(submodule_git_dir):
+                # Clone the submodule as bare repository
+                os.makedirs(os.path.dirname(submodule_git_dir), exist_ok=True)
+
+                # Clone to the git directory
+                clone(url, submodule_git_dir, bare=True, checkout=False)
+
+                # Create the submodule directory if it doesn't exist
+                if not os.path.exists(submodule_path):
+                    os.makedirs(submodule_path)
+
+                # Create .git file in the submodule directory
+                depth = path_str.count("/") + 1
+                relative_git_dir = "../" * depth + ".git/modules/" + path_str
+                git_file_path = os.path.join(submodule_path, ".git")
+                with open(git_file_path, "w") as f:
+                    f.write(f"gitdir: {relative_git_dir}\n")
+
+                # Set up working directory configuration
+                with open_repo_closing(submodule_git_dir) as sub_repo:
+                    sub_config = sub_repo.get_config()
+                    sub_config.set(
+                        (b"core",),
+                        b"worktree",
+                        os.path.abspath(submodule_path).encode(),
+                    )
+                    sub_config.write_to_path()
+
+                    # Checkout the target commit
+                    sub_repo.refs[b"HEAD"] = target_sha
+
+                    # Build the index and checkout files
+                    tree = sub_repo[target_sha]
+                    if hasattr(tree, "tree"):  # If it's a commit, get the tree
+                        tree_id = tree.tree
+                    else:
+                        tree_id = target_sha
+
+                    build_index_from_tree(
+                        submodule_path,
+                        sub_repo.index_path(),
+                        sub_repo.object_store,
+                        tree_id,
+                    )
+            else:
+                # Fetch and checkout in existing submodule
+                with open_repo_closing(submodule_git_dir) as sub_repo:
+                    # Fetch from remote
+                    client, path_segments = get_transport_and_path(url)
+                    client.fetch(path_segments, sub_repo)
+
+                    # Update to the target commit
+                    sub_repo.refs[b"HEAD"] = target_sha
+
+                    # Reset the working directory
+                    reset(sub_repo, "hard", target_sha)
 
 
 def tag_create(

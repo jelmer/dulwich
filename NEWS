@@ -5,6 +5,11 @@
    causing unnecessary bloat.
    (Jelmer Vernooĳ, #1643)
 
+ * Document that ``porcelain.push`` returns per-ref status information
+   in the ``SendPackResult`` object. Added test coverage to verify this
+   functionality works as expected.
+   (Jelmer Vernooĳ, #780)
+
 0.23.1	2025-06-30
 
  * Support ``untracked_files="normal"`` argument to ``porcelain.status``,

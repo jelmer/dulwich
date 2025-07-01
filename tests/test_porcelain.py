@@ -37,6 +37,7 @@ from io import BytesIO, StringIO
 from unittest import skipIf
 
 from dulwich import porcelain
+from dulwich.client import SendPackResult
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError
 from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
@@ -3763,6 +3764,58 @@ class PushTests(PorcelainTestCase):
 
         self.assertEqual(b"", outstream.getvalue())
         self.assertTrue(re.match(b"Push to .* successful.\n", errstream.getvalue()))
+
+    def test_push_returns_sendpackresult(self) -> None:
+        """Test that push returns a SendPackResult with per-ref information."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create initial commit
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(
+            self.repo.path, target=clone_path, errstream=errstream
+        )
+        target_repo.close()
+
+        # Create a commit in the clone
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
+        porcelain.add(repo=clone_path, paths=[fullpath])
+        porcelain.commit(
+            repo=clone_path,
+            message=b"push",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Push and check the return value
+        result = porcelain.push(
+            clone_path,
+            "origin",
+            b"HEAD:refs/heads/new-branch",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # Verify that we get a SendPackResult
+        self.assertIsInstance(result, SendPackResult)
+
+        # Verify that it contains refs
+        self.assertIsNotNone(result.refs)
+        self.assertIn(b"refs/heads/new-branch", result.refs)
+
+        # Verify ref_status - should be None for successful updates
+        if result.ref_status:
+            self.assertIsNone(result.ref_status.get(b"refs/heads/new-branch"))
 
 
 class PullTests(PorcelainTestCase):

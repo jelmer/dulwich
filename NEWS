@@ -1,3 +1,10 @@
+0.23.2	UNRELEASED
+
+ * Only write Git index extensions when they contain meaningful data.
+   Previously, dulwich would write empty extensions to the index file,
+   causing unnecessary bloat.
+   (Jelmer Vernooĳ, #1643)
+
 0.23.1	2025-06-30
 
  * Support ``untracked_files="normal"`` argument to ``porcelain.status``,

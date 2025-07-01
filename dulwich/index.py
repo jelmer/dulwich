@@ -897,13 +897,21 @@ class Index:
 
         f = GitFile(self._filename, "wb")
         try:
+            # Filter out extensions with no meaningful data
+            meaningful_extensions = []
+            for ext in self._extensions:
+                # Skip extensions that have empty data
+                ext_data = ext.to_bytes()
+                if ext_data:
+                    meaningful_extensions.append(ext)
+
             if self._skip_hash:
                 # When skipHash is enabled, write the index without computing SHA1
                 write_index_dict(
                     cast(BinaryIO, f),
                     self._byname,
                     version=self._version,
-                    extensions=self._extensions,
+                    extensions=meaningful_extensions,
                 )
                 # Write 20 zero bytes instead of SHA1
                 f.write(b"\x00" * 20)
@@ -914,7 +922,7 @@ class Index:
                     cast(BinaryIO, sha1_writer),
                     self._byname,
                     version=self._version,
-                    extensions=self._extensions,
+                    extensions=meaningful_extensions,
                 )
                 sha1_writer.close()
         except:

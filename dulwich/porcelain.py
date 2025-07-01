@@ -1784,9 +1784,25 @@ def push(
     """
     # Open the repo
     with open_repo_closing(repo) as r:
-        if refspecs is None:
-            refspecs = [active_branch(r)]
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
+        # Check if mirror mode is enabled
+        mirror_mode = False
+        if remote_name:
+            try:
+                mirror_mode = r.get_config_stack().get_boolean(
+                    (b"remote", remote_name.encode()), b"mirror"
+                )
+            except KeyError:
+                pass
+
+        if mirror_mode:
+            # Mirror mode: push all refs and delete non-existent ones
+            refspecs = []
+            for ref in r.refs.keys():
+                # Push all refs to the same name on remote
+                refspecs.append(ref + b":" + ref)
+        elif refspecs is None:
+            refspecs = [active_branch(r)]
 
         # Get the client and path
         client, path = get_transport_and_path(
@@ -1799,6 +1815,15 @@ def push(
         def update_refs(refs):
             selected_refs.extend(parse_reftuples(r.refs, refs, refspecs, force=force))
             new_refs = {}
+
+            # In mirror mode, delete remote refs that don't exist locally
+            if mirror_mode:
+                local_refs = set(r.refs.keys())
+                for remote_ref in refs.keys():
+                    if remote_ref not in local_refs:
+                        new_refs[remote_ref] = ZERO_SHA
+                        remote_changed_refs[remote_ref] = None
+
             # TODO: Handle selected_refs == {None: None}
             for lh, rh, force_ref in selected_refs:
                 if lh is None:

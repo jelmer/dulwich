@@ -1305,6 +1305,7 @@ class HttpGitClientTests(TestCase):
         info_refs_content = (
             b"0123456789abcdef0123456789abcdef01234567\trefs/heads/master\n"
         )
+        head_content = b"ref: refs/heads/master"
 
         # Create a blob object for testing
         blob_content = b"Hello, dumb HTTP!"
@@ -1316,6 +1317,11 @@ class HttpGitClientTests(TestCase):
         blob_compressed = zlib.compress(blob_obj_data)
 
         responses = {
+            "/HEAD": {
+                "status": 200,
+                "content": head_content,
+                "content_type": "text/plain",
+            },
             "/git-upload-pack": {
                 "status": 404,
                 "content": b"Not Found",

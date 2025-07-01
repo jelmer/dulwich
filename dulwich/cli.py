@@ -393,6 +393,11 @@ class cmd_clone(Command):
             type=int,
             help="Git protocol version to use",
         )
+        parser.add_argument(
+            "--recurse-submodules",
+            action="store_true",
+            help="Initialize and clone submodules",
+        )
         parser.add_argument("source", help="Repository to clone from")
         parser.add_argument("target", nargs="?", help="Directory to clone into")
         args = parser.parse_args(args)
@@ -407,6 +412,7 @@ class cmd_clone(Command):
                 refspec=args.refspec,
                 filter_spec=args.filter_spec,
                 protocol_version=args.protocol,
+                recurse_submodules=args.recurse_submodules,
             )
         except GitProtocolError as e:
             print(f"{e}")
@@ -921,10 +927,41 @@ class cmd_submodule_init(Command):
         porcelain.submodule_init(".")
 
 
+class cmd_submodule_add(Command):
+    def run(self, argv) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("url", help="URL of repository to add as submodule")
+        parser.add_argument("path", nargs="?", help="Path where submodule should live")
+        parser.add_argument("--name", help="Name for the submodule")
+        args = parser.parse_args(argv)
+        porcelain.submodule_add(".", args.url, args.path, args.name)
+
+
+class cmd_submodule_update(Command):
+    def run(self, argv) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--init", action="store_true", help="Initialize submodules first"
+        )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force update even if local changes exist",
+        )
+        parser.add_argument(
+            "paths", nargs="*", help="Specific submodule paths to update"
+        )
+        args = parser.parse_args(argv)
+        paths = args.paths if args.paths else None
+        porcelain.submodule_update(".", paths=paths, init=args.init, force=args.force)
+
+
 class cmd_submodule(SuperCommand):
     subcommands: ClassVar[dict[str, type[Command]]] = {
+        "add": cmd_submodule_add,
         "init": cmd_submodule_init,
         "list": cmd_submodule_list,
+        "update": cmd_submodule_update,
     }
 
     default_command = cmd_submodule_list

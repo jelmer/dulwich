@@ -461,4 +461,4 @@ class DumbRemoteHTTPRepo(BaseRepo):
                     to_fetch.add(item_sha)
 
             if progress:
-                progress(f"Fetching objects: {len(seen)} done")
+                progress(f"Fetching objects: {len(seen)} done\n".encode())

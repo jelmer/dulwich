@@ -3998,6 +3998,114 @@ class PushTests(PorcelainTestCase):
         if result.ref_status:
             self.assertIsNone(result.ref_status.get(b"refs/heads/new-branch"))
 
+    def test_mirror_mode(self) -> None:
+        """Test push with remote.<name>.mirror configuration."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create initial commit
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(
+            self.repo.path, target=clone_path, errstream=errstream
+        )
+        target_repo.close()
+
+        # Create multiple refs in the clone
+        with Repo(clone_path) as r_clone:
+            # Create a new branch
+            r_clone.refs[b"refs/heads/feature"] = r_clone[b"HEAD"].id
+            # Create a tag
+            r_clone.refs[b"refs/tags/v1.0"] = r_clone[b"HEAD"].id
+            # Create a remote tracking branch
+            r_clone.refs[b"refs/remotes/upstream/main"] = r_clone[b"HEAD"].id
+
+        # Create a branch in the remote that doesn't exist in clone
+        self.repo.refs[b"refs/heads/to-be-deleted"] = self.repo[b"HEAD"].id
+
+        # Configure mirror mode
+        with Repo(clone_path) as r_clone:
+            config = r_clone.get_config()
+            config.set((b"remote", b"origin"), b"mirror", True)
+            config.write_to_path()
+
+        # Push with mirror mode
+        porcelain.push(
+            clone_path,
+            "origin",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # Verify refs were properly mirrored
+        with Repo(clone_path) as r_clone:
+            # All local branches should be pushed
+            self.assertEqual(
+                r_clone.refs[b"refs/heads/feature"],
+                self.repo.refs[b"refs/heads/feature"],
+            )
+            # All tags should be pushed
+            self.assertEqual(
+                r_clone.refs[b"refs/tags/v1.0"], self.repo.refs[b"refs/tags/v1.0"]
+            )
+            # Remote tracking branches should be pushed
+            self.assertEqual(
+                r_clone.refs[b"refs/remotes/upstream/main"],
+                self.repo.refs[b"refs/remotes/upstream/main"],
+            )
+
+        # Verify the extra branch was deleted
+        self.assertNotIn(b"refs/heads/to-be-deleted", self.repo.refs)
+
+    def test_mirror_mode_disabled(self) -> None:
+        """Test that mirror mode is properly disabled when set to false."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create initial commit
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Setup target repo cloned from temp test repo
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(
+            self.repo.path, target=clone_path, errstream=errstream
+        )
+        target_repo.close()
+
+        # Create a branch in the remote that doesn't exist in clone
+        self.repo.refs[b"refs/heads/should-not-be-deleted"] = self.repo[b"HEAD"].id
+
+        # Explicitly set mirror mode to false
+        with Repo(clone_path) as r_clone:
+            config = r_clone.get_config()
+            config.set((b"remote", b"origin"), b"mirror", False)
+            config.write_to_path()
+
+        # Push normally (not mirror mode)
+        porcelain.push(
+            clone_path,
+            "origin",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # Verify the extra branch was NOT deleted
+        self.assertIn(b"refs/heads/should-not-be-deleted", self.repo.refs)
+
 
 class PullTests(PorcelainTestCase):
     def setUp(self) -> None:

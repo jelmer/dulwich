@@ -42,7 +42,7 @@ from .objects import (
     hex_to_sha,
     sha_to_hex,
 )
-from .pack import Pack, PackIndex, UnpackedObject, load_pack_index_file
+from .pack import Pack, PackData, PackIndex, UnpackedObject, load_pack_index_file
 from .refs import Ref, read_info_refs, split_peeled_refs
 from .repo import BaseRepo
 
@@ -212,13 +212,13 @@ class DumbHTTPObjectStore(BaseObjectStore):
         # Convert hex to binary for pack operations
         binsha = hex_to_sha(sha)
 
-        for pack_name, idx in self._packs or []:
-            if idx is None:
-                idx = self._get_pack_index(pack_name)
+        for pack_name, pack_idx in self._packs or []:
+            if pack_idx is None:
+                pack_idx = self._get_pack_index(pack_name)
 
             try:
                 # Check if object is in this pack
-                idx.object_offset(binsha)
+                pack_idx.object_offset(binsha)
             except KeyError:
                 continue
 
@@ -232,12 +232,13 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
             if not os.path.exists(pack_path):
                 # Download the pack file
-                pack_data = self._fetch_url(f"objects/pack/{pack_name}.pack")
+                data = self._fetch_url(f"objects/pack/{pack_name}.pack")
                 with open(pack_path, "wb") as f:
-                    f.write(pack_data)
+                    f.write(data)
 
             # Open the pack and get the object
-            pack = Pack(pack_path[:-5])  # Remove .pack extension
+            pack_data = PackData(pack_path)
+            pack = Pack.from_objects(pack_data, pack_idx)
             try:
                 return pack.get_raw(binsha)
             finally:

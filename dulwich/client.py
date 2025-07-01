@@ -40,6 +40,7 @@ Known capabilities that are not supported:
 """
 
 import copy
+import functools
 import logging
 import os
 import select
@@ -2506,7 +2507,7 @@ class AbstractHttpGitClient(GitClient):
         self.dumb = dumb
         GitClient.__init__(self, **kwargs)
 
-    def _http_request(self, url, headers=None, data=None):
+    def _http_request(self, url, headers=None, data=None, raise_for_status=True):
         """Perform HTTP request.
 
         Args:
@@ -2820,7 +2821,9 @@ class AbstractHttpGitClient(GitClient):
             from .dumb import DumbRemoteHTTPRepo
 
             # Pass http_request function
-            dumb_repo = DumbRemoteHTTPRepo(url, self._http_request)
+            dumb_repo = DumbRemoteHTTPRepo(
+                url, functools.partial(self._http_request, raise_for_status=False)
+            )
 
             # Fetch pack data from dumb remote
             pack_data_list = list(
@@ -2985,7 +2988,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             path = path.decode("utf-8")
         return urljoin(self._base_url, path).rstrip("/") + "/"
 
-    def _http_request(self, url, headers=None, data=None):
+    def _http_request(self, url, headers=None, data=None, raise_for_status=True):
         import urllib3.exceptions
 
         req_headers = self.pool_manager.headers.copy()
@@ -3009,14 +3012,15 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         except urllib3.exceptions.HTTPError as e:
             raise GitProtocolError(str(e)) from e
 
-        if resp.status == 404:
-            raise NotGitRepository
-        if resp.status == 401:
-            raise HTTPUnauthorized(resp.headers.get("WWW-Authenticate"), url)
-        if resp.status == 407:
-            raise HTTPProxyUnauthorized(resp.headers.get("Proxy-Authenticate"), url)
-        if resp.status != 200:
-            raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
+        if raise_for_status:
+            if resp.status == 404:
+                raise NotGitRepository
+            if resp.status == 401:
+                raise HTTPUnauthorized(resp.headers.get("WWW-Authenticate"), url)
+            if resp.status == 407:
+                raise HTTPProxyUnauthorized(resp.headers.get("Proxy-Authenticate"), url)
+            if resp.status != 200:
+                raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
 
         resp.content_type = resp.headers.get("Content-Type")
         # Check if geturl() is available (urllib3 version >= 1.23)

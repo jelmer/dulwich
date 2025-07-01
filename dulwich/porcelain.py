@@ -1622,7 +1622,7 @@ def push(
     errstream=default_bytes_err_stream,
     force=False,
     **kwargs,
-) -> None:
+):
     """Remote push with dulwich via dulwich.client.
 
     Args:
@@ -1694,6 +1694,8 @@ def push(
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)
+
+        return result
 
     # Trigger auto GC if needed
     from .gc import maybe_auto_gc

@@ -29,6 +29,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from unittest import skipUnless
 
 from dulwich.client import HttpGitClient
+from dulwich.porcelain import clone
 from dulwich.repo import Repo
 from tests.compat.utils import (
     CompatTestCase,
@@ -100,8 +101,10 @@ class DumbHTTPGitServer:
         return f"http://127.0.0.1:{self.port}"
 
 
-class DumbHTTPClientTests(CompatTestCase):
+class DumbHTTPClientNoPackTests(CompatTestCase):
     """Tests for dumb HTTP client against real git repositories."""
+
+    with_pack = False
 
     def setUp(self):
         super().setUp()
@@ -123,12 +126,17 @@ class DumbHTTPClientTests(CompatTestCase):
         )
         run_git_or_fail(["config", "user.name", "Test User"], cwd=self.work_path)
 
-        # Create initial commit
-        test_file = os.path.join(self.work_path, "test.txt")
-        with open(test_file, "w") as f:
-            f.write("Hello, world!\n")
-        run_git_or_fail(["add", "test.txt"], cwd=self.work_path)
-        run_git_or_fail(["commit", "-m", "Initial commit"], cwd=self.work_path)
+        nb_files = 10
+        if self.with_pack:
+            # adding more files will create a pack file in the repository
+            nb_files = 50
+
+        for i in range(nb_files):
+            test_file = os.path.join(self.work_path, f"test{i}.txt")
+            with open(test_file, "w") as f:
+                f.write(f"Hello, world {i}!\n")
+            run_git_or_fail(["add", f"test{i}.txt"], cwd=self.work_path)
+            run_git_or_fail(["commit", "-m", f"Commit {i}"], cwd=self.work_path)
 
         # Push to origin
         run_git_or_fail(
@@ -143,6 +151,20 @@ class DumbHTTPClientTests(CompatTestCase):
         self.server = DumbHTTPGitServer(self.origin_path)
         self.server.start()
         self.addCleanup(self.server.stop)
+
+        pack_dir = os.path.join(self.origin_path, "objects", "pack")
+        if self.with_pack:
+            assert os.listdir(pack_dir)
+        else:
+            assert not os.listdir(pack_dir)
+
+    @skipUnless(
+        sys.platform != "win32", "git clone from Python HTTPServer fails on Windows"
+    )
+    def test_clone_dumb(self):
+        dest_path = os.path.join(self.temp_dir, "cloned")
+        repo = clone(self.server.url, dest_path)
+        assert b"HEAD" in repo
 
     def test_clone_from_dumb_http(self):
         """Test cloning from a dumb HTTP server."""
@@ -172,10 +194,10 @@ class DumbHTTPClientTests(CompatTestCase):
             dest_repo.reset_index()
 
             # Verify the clone
-            test_file = os.path.join(dest_path, "test.txt")
+            test_file = os.path.join(dest_path, "test0.txt")
             self.assertTrue(os.path.exists(test_file))
             with open(test_file) as f:
-                self.assertEqual("Hello, world!\n", f.read())
+                self.assertEqual("Hello, world 0!\n", f.read())
         finally:
             # Ensure repo is closed before cleanup
             dest_repo.close()
@@ -276,3 +298,7 @@ class DumbHTTPClientTests(CompatTestCase):
         finally:
             # Ensure repo is closed before cleanup
             dest_repo.close()
+
+
+class DumbHTTPClientWithPackTests(DumbHTTPClientNoPackTests):
+    with_pack = True

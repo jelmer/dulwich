@@ -280,7 +280,12 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         def determine_wants(refs):
             return [blob_sha]
 
-        result = list(self.repo.fetch_pack_data(graph_walker, determine_wants))
+        def progress(msg):
+            assert isinstance(msg, bytes)
+
+        result = list(
+            self.repo.fetch_pack_data(graph_walker, determine_wants, progress)
+        )
         self.assertEqual(1, len(result))
         self.assertEqual(Blob.type_num, result[0].pack_type_num)
         self.assertEqual([blob.as_raw_string()], result[0].obj_chunks)

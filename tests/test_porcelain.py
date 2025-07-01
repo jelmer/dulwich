@@ -908,6 +908,84 @@ class CloneTests(PorcelainTestCase):
         self.assertEqual(r.path, str(target_path))
         self.assertTrue(os.path.exists(str(target_path)))
 
+    def test_clone_with_recurse_submodules(self) -> None:
+        # Create a submodule repository
+        sub_repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sub_repo_path)
+        sub_repo = Repo.init(sub_repo_path)
+
+        # Add a file to the submodule repo
+        sub_file = os.path.join(sub_repo_path, "subfile.txt")
+        with open(sub_file, "w") as f:
+            f.write("submodule content")
+
+        porcelain.add(sub_repo, paths=[sub_file])
+        sub_commit = porcelain.commit(
+            sub_repo,
+            message=b"Initial submodule commit",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Create main repository with submodule
+        main_file = os.path.join(self.repo.path, "main.txt")
+        with open(main_file, "w") as f:
+            f.write("main content")
+
+        porcelain.add(self.repo, paths=[main_file])
+        porcelain.submodule_add(self.repo, sub_repo_path, "sub")
+
+        # Manually add the submodule to the index since submodule_add doesn't do it
+        # when the repository is local (to maintain backward compatibility)
+        from dulwich.index import IndexEntry
+        from dulwich.objects import S_IFGITLINK
+
+        index = self.repo.open_index()
+        index[b"sub"] = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=S_IFGITLINK,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=sub_commit,
+            flags=0,
+        )
+        index.write()
+
+        porcelain.add(self.repo, paths=[".gitmodules"])
+        porcelain.commit(
+            self.repo,
+            message=b"Add submodule",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Clone with recurse_submodules
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+
+        cloned = porcelain.clone(
+            self.repo.path,
+            target_path,
+            recurse_submodules=True,
+        )
+        self.addCleanup(cloned.close)
+
+        # Check main file exists
+        cloned_main = os.path.join(target_path, "main.txt")
+        self.assertTrue(os.path.exists(cloned_main))
+        with open(cloned_main) as f:
+            self.assertEqual(f.read(), "main content")
+
+        # Check submodule file exists
+        cloned_sub_file = os.path.join(target_path, "sub", "subfile.txt")
+        self.assertTrue(os.path.exists(cloned_sub_file))
+        with open(cloned_sub_file) as f:
+            self.assertEqual(f.read(), "submodule content")
+
 
 class InitTests(TestCase):
     def test_non_bare(self) -> None:
@@ -3492,6 +3570,69 @@ class SubmoduleTests(PorcelainTestCase):
     def test_init(self) -> None:
         porcelain.submodule_add(self.repo, "../bar.git", "bar")
         porcelain.submodule_init(self.repo)
+
+    def test_update(self) -> None:
+        # Create a submodule repository
+        sub_repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sub_repo_path)
+        sub_repo = Repo.init(sub_repo_path)
+
+        # Add a file to the submodule repo
+        sub_file = os.path.join(sub_repo_path, "test.txt")
+        with open(sub_file, "w") as f:
+            f.write("submodule content")
+
+        porcelain.add(sub_repo, paths=[sub_file])
+        sub_commit = porcelain.commit(
+            sub_repo,
+            message=b"Initial submodule commit",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Add the submodule to the main repository
+        porcelain.submodule_add(self.repo, sub_repo_path, "test_submodule")
+
+        # Manually add the submodule to the index
+        from dulwich.index import IndexEntry
+        from dulwich.objects import S_IFGITLINK
+
+        index = self.repo.open_index()
+        index[b"test_submodule"] = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=S_IFGITLINK,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=sub_commit,
+            flags=0,
+        )
+        index.write()
+
+        porcelain.add(self.repo, paths=[".gitmodules"])
+        porcelain.commit(
+            self.repo,
+            message=b"Add submodule",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Initialize and update the submodule
+        porcelain.submodule_init(self.repo)
+        porcelain.submodule_update(self.repo)
+
+        # Check that the submodule directory exists
+        submodule_path = os.path.join(self.repo.path, "test_submodule")
+        self.assertTrue(os.path.exists(submodule_path))
+
+        # Check that the submodule file exists
+        submodule_file = os.path.join(submodule_path, "test.txt")
+        self.assertTrue(os.path.exists(submodule_file))
+        with open(submodule_file) as f:
+            self.assertEqual(f.read(), "submodule content")
 
 
 class PushTests(PorcelainTestCase):

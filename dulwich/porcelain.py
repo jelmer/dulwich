@@ -1823,7 +1823,6 @@ def push(
                     if remote_ref not in local_refs:
                         new_refs[remote_ref] = ZERO_SHA
                         remote_changed_refs[remote_ref] = None
-
             # TODO: Handle selected_refs == {None: None}
             for lh, rh, force_ref in selected_refs:
                 if lh is None:
@@ -2348,14 +2347,83 @@ def branch_create(repo, name, objectish=None, force=False) -> None:
     with open_repo_closing(repo) as r:
         if objectish is None:
             objectish = "HEAD"
+
+        # Try to expand branch shorthand before parsing
+        original_objectish = objectish
+        objectish_bytes = (
+            objectish.encode(DEFAULT_ENCODING)
+            if isinstance(objectish, str)
+            else objectish
+        )
+        if b"refs/remotes/" + objectish_bytes in r.refs:
+            objectish = b"refs/remotes/" + objectish_bytes
+        elif b"refs/heads/" + objectish_bytes in r.refs:
+            objectish = b"refs/heads/" + objectish_bytes
+
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
-        ref_message = b"branch: Created from " + objectish.encode(DEFAULT_ENCODING)
+        ref_message = (
+            b"branch: Created from " + original_objectish.encode(DEFAULT_ENCODING)
+            if isinstance(original_objectish, str)
+            else b"branch: Created from " + original_objectish
+        )
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
             if not r.refs.add_if_new(refname, object.id, message=ref_message):
                 raise Error(f"Branch with name {name} already exists.")
+
+        # Check if we should set up tracking
+        config = r.get_config_stack()
+        try:
+            auto_setup_merge = config.get((b"branch",), b"autoSetupMerge").decode()
+        except KeyError:
+            auto_setup_merge = "true"  # Default value
+
+        # Determine if the objectish refers to a remote-tracking branch
+        objectish_ref = None
+        if original_objectish != "HEAD":
+            # Try to resolve objectish as a ref
+            objectish_bytes = (
+                original_objectish.encode(DEFAULT_ENCODING)
+                if isinstance(original_objectish, str)
+                else original_objectish
+            )
+            if objectish_bytes in r.refs:
+                objectish_ref = objectish_bytes
+            elif b"refs/remotes/" + objectish_bytes in r.refs:
+                objectish_ref = b"refs/remotes/" + objectish_bytes
+            elif b"refs/heads/" + objectish_bytes in r.refs:
+                objectish_ref = b"refs/heads/" + objectish_bytes
+        else:
+            # HEAD might point to a remote-tracking branch
+            head_ref = r.refs.follow(b"HEAD")[0][1]
+            if head_ref.startswith(b"refs/remotes/"):
+                objectish_ref = head_ref
+
+        # Set up tracking if appropriate
+        if objectish_ref and (
+            (auto_setup_merge == "always")
+            or (
+                auto_setup_merge == "true"
+                and objectish_ref.startswith(b"refs/remotes/")
+            )
+        ):
+            # Extract remote name and branch from the ref
+            if objectish_ref.startswith(b"refs/remotes/"):
+                parts = objectish_ref[len(b"refs/remotes/") :].split(b"/", 1)
+                if len(parts) == 2:
+                    remote_name = parts[0]
+                    remote_branch = b"refs/heads/" + parts[1]
+
+                    # Set up tracking
+                    config = r.get_config()
+                    branch_name_bytes = (
+                        name.encode(DEFAULT_ENCODING) if isinstance(name, str) else name
+                    )
+                    config.set((b"branch", branch_name_bytes), b"remote", remote_name)
+                    config.set((b"branch", branch_name_bytes), b"merge", remote_branch)
+                    config.write_to_path()
 
 
 def branch_list(repo):

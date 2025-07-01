@@ -398,6 +398,17 @@ class DumbRemoteHTTPRepo(BaseRepo):
 
         return dict(self._refs)
 
+    def get_head(self) -> Ref:
+        head_resp_bytes = self._fetch_url("HEAD")
+        head_split = head_resp_bytes.replace(b"\n", b"").split(b" ")
+        head_target = head_split[1] if len(head_split) > 1 else head_split[0]
+        # handle HEAD legacy format containing a commit id instead of a ref name
+        for ref_name, ret_target in self.get_refs().items():
+            if ret_target == head_target:
+                head_target = ref_name
+                break
+        return head_target
+
     def get_peeled(self, ref: Ref) -> ObjectID:
         """Get the peeled value of a ref."""
         # For dumb HTTP, we don't have peeled refs readily available

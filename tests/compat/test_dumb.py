@@ -29,6 +29,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from unittest import skipUnless
 
 from dulwich.client import HttpGitClient
+from dulwich.porcelain import clone
 from dulwich.repo import Repo
 from tests.compat.utils import (
     CompatTestCase,
@@ -143,6 +144,14 @@ class DumbHTTPClientTests(CompatTestCase):
         self.server = DumbHTTPGitServer(self.origin_path)
         self.server.start()
         self.addCleanup(self.server.stop)
+
+    @skipUnless(
+        sys.platform != "win32", "git clone from Python HTTPServer fails on Windows"
+    )
+    def test_clone_dumb(self):
+        dest_path = os.path.join(self.temp_dir, "cloned")
+        repo = clone(self.server.url, dest_path)
+        assert b"HEAD" in repo
 
     def test_clone_from_dumb_http(self):
         """Test cloning from a dumb HTTP server."""

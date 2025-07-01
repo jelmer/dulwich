@@ -2813,9 +2813,9 @@ class AbstractHttpGitClient(GitClient):
             wants = determine_wants(refs)
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]
-        if not wants:
+        if not wants and not self.dumb:
             return FetchPackResult(refs, symrefs, agent)
-        if self.dumb:
+        elif self.dumb:
             # Use dumb HTTP protocol
             from .dumb import DumbRemoteHTTPRepo
 
@@ -2828,6 +2828,8 @@ class AbstractHttpGitClient(GitClient):
                     graph_walker, lambda refs: wants, progress=progress, depth=depth
                 )
             )
+
+            symrefs[b"HEAD"] = dumb_repo.get_head()
 
             # Write pack data
             if pack_data:

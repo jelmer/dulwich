@@ -2232,6 +2232,42 @@ def get_branch_remote(repo):
     return remote_name
 
 
+def get_branch_merge(repo, branch_name=None):
+    """Return the branch's merge reference (upstream branch), if any.
+
+    Args:
+      repo: Repository to open
+      branch_name: Name of the branch (defaults to active branch)
+
+    Returns:
+      merge reference name (e.g. b"refs/heads/main")
+
+    Raises:
+      KeyError: if the branch does not have a merge configuration
+    """
+    with open_repo_closing(repo) as r:
+        if branch_name is None:
+            branch_name = active_branch(r.path)
+        config = r.get_config()
+        return config.get((b"branch", branch_name), b"merge")
+
+
+def set_branch_tracking(repo, branch_name, remote_name, remote_ref):
+    """Set up branch tracking configuration.
+
+    Args:
+      repo: Repository to open
+      branch_name: Name of the local branch
+      remote_name: Name of the remote (e.g. b"origin")
+      remote_ref: Remote reference to track (e.g. b"refs/heads/main")
+    """
+    with open_repo_closing(repo) as r:
+        config = r.get_config()
+        config.set((b"branch", branch_name), b"remote", remote_name)
+        config.set((b"branch", branch_name), b"merge", remote_ref)
+        config.write_to_path()
+
+
 def fetch(
     repo,
     remote_location=None,
@@ -2698,6 +2734,20 @@ def checkout(
             # Create new branch and switch to it
             branch_create(r, new_branch, objectish=target_commit.id.decode("ascii"))
             update_head(r, new_branch)
+
+            # Set up tracking if creating from a remote branch
+            from .refs import LOCAL_REMOTE_PREFIX, parse_remote_ref
+
+            if target.startswith(LOCAL_REMOTE_PREFIX):
+                try:
+                    remote_name, branch_name = parse_remote_ref(target)
+                    # Set tracking to refs/heads/<branch> on the remote
+                    set_branch_tracking(
+                        r, new_branch, remote_name, b"refs/heads/" + branch_name
+                    )
+                except ValueError:
+                    # Invalid remote ref format, skip tracking setup
+                    pass
         else:
             # Check if target is a branch name (with or without refs/heads/ prefix)
             branch_ref = None

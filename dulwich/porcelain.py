@@ -1351,7 +1351,8 @@ def submodule_update(repo, paths=None, init=False, force=False, errstream=None) 
                 os.makedirs(os.path.dirname(submodule_git_dir), exist_ok=True)
 
                 # Clone to the git directory
-                clone(url, submodule_git_dir, bare=True, checkout=False)
+                sub_repo = clone(url, submodule_git_dir, bare=True, checkout=False)
+                sub_repo.close()
 
                 # Create the submodule directory if it doesn't exist
                 if not os.path.exists(submodule_path):

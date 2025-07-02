@@ -913,6 +913,7 @@ class CloneTests(PorcelainTestCase):
         sub_repo_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, sub_repo_path)
         sub_repo = Repo.init(sub_repo_path)
+        self.addCleanup(sub_repo.close)
 
         # Add a file to the submodule repo
         sub_file = os.path.join(sub_repo_path, "subfile.txt")
@@ -3576,6 +3577,7 @@ class SubmoduleTests(PorcelainTestCase):
         sub_repo_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, sub_repo_path)
         sub_repo = Repo.init(sub_repo_path)
+        self.addCleanup(sub_repo.close)
 
         # Add a file to the submodule repo
         sub_file = os.path.join(sub_repo_path, "test.txt")

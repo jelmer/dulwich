@@ -102,6 +102,33 @@ def check_ref_format(refname: Ref) -> bool:
     return True
 
 
+def parse_remote_ref(ref: bytes) -> tuple[bytes, bytes]:
+    """Parse a remote ref into remote name and branch name.
+
+    Args:
+      ref: Remote ref like b"refs/remotes/origin/main"
+
+    Returns:
+      Tuple of (remote_name, branch_name)
+
+    Raises:
+      ValueError: If ref is not a valid remote ref
+    """
+    if not ref.startswith(LOCAL_REMOTE_PREFIX):
+        raise ValueError(f"Not a remote ref: {ref!r}")
+
+    # Remove the prefix
+    remainder = ref[len(LOCAL_REMOTE_PREFIX) :]
+
+    # Split into remote name and branch name
+    parts = remainder.split(b"/", 1)
+    if len(parts) != 2:
+        raise ValueError(f"Invalid remote ref format: {ref!r}")
+
+    remote_name, branch_name = parts
+    return (remote_name, branch_name)
+
+
 class RefsContainer:
     """A container for refs."""
 

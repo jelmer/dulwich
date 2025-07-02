@@ -36,6 +36,7 @@ from dulwich.refs import (
     SymrefLoop,
     _split_ref_line,
     check_ref_format,
+    parse_remote_ref,
     parse_symref_value,
     read_packed_refs,
     read_packed_refs_with_peeled,
@@ -892,6 +893,36 @@ class ParseSymrefValueTests(TestCase):
 
     def test_invalid(self) -> None:
         self.assertRaises(ValueError, parse_symref_value, b"foobar")
+
+
+class ParseRemoteRefTests(TestCase):
+    def test_valid(self) -> None:
+        # Test simple case
+        remote, branch = parse_remote_ref(b"refs/remotes/origin/main")
+        self.assertEqual(b"origin", remote)
+        self.assertEqual(b"main", branch)
+
+        # Test with branch containing slashes
+        remote, branch = parse_remote_ref(b"refs/remotes/upstream/feature/new-ui")
+        self.assertEqual(b"upstream", remote)
+        self.assertEqual(b"feature/new-ui", branch)
+
+    def test_invalid_not_remote_ref(self) -> None:
+        # Not a remote ref
+        with self.assertRaises(ValueError) as cm:
+            parse_remote_ref(b"refs/heads/main")
+        self.assertIn("Not a remote ref", str(cm.exception))
+
+    def test_invalid_format(self) -> None:
+        # Missing branch name
+        with self.assertRaises(ValueError) as cm:
+            parse_remote_ref(b"refs/remotes/origin")
+        self.assertIn("Invalid remote ref format", str(cm.exception))
+
+        # Just the prefix
+        with self.assertRaises(ValueError) as cm:
+            parse_remote_ref(b"refs/remotes/")
+        self.assertIn("Invalid remote ref format", str(cm.exception))
 
 
 class StripPeeledRefsTests(TestCase):

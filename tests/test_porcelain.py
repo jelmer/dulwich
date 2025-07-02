@@ -3229,6 +3229,44 @@ class CheckoutTests(PorcelainTestCase):
 
         target_repo.close()
 
+    def test_checkout_new_branch_from_remote_sets_tracking(self) -> None:
+        # Create a "remote" repository
+        remote_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, remote_path)
+        remote_repo = porcelain.init(remote_path)
+
+        # Add a commit to the remote
+        remote_sha, _ = _commit_file_with_content(
+            remote_repo, "bar", "remote content\n"
+        )
+
+        # Clone the remote repository
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        target_repo = porcelain.clone(remote_path, target_path)
+
+        # Create a remote tracking branch reference
+        remote_branch_ref = b"refs/remotes/origin/feature"
+        target_repo.refs[remote_branch_ref] = remote_sha
+
+        # Checkout a new branch from the remote branch
+        porcelain.checkout(target_repo, remote_branch_ref, new_branch=b"local-feature")
+
+        # Verify the branch was created and is active
+        self.assertEqual(b"local-feature", porcelain.active_branch(target_repo))
+
+        # Verify tracking configuration was set
+        config = target_repo.get_config()
+        self.assertEqual(
+            b"origin", config.get((b"branch", b"local-feature"), b"remote")
+        )
+        self.assertEqual(
+            b"refs/heads/feature", config.get((b"branch", b"local-feature"), b"merge")
+        )
+
+        target_repo.close()
+        remote_repo.close()
+
 
 class GeneralCheckoutTests(PorcelainTestCase):
     """Tests for the general checkout function that handles branches, tags, and commits."""
@@ -5202,6 +5240,44 @@ class WriteTreeTests(PorcelainTestCase):
 class ActiveBranchTests(PorcelainTestCase):
     def test_simple(self) -> None:
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+
+class BranchTrackingTests(PorcelainTestCase):
+    def test_get_branch_merge(self) -> None:
+        # Set up branch tracking configuration
+        config = self.repo.get_config()
+        config.set((b"branch", b"master"), b"remote", b"origin")
+        config.set((b"branch", b"master"), b"merge", b"refs/heads/main")
+        config.write_to_path()
+
+        # Test getting merge ref for current branch
+        merge_ref = porcelain.get_branch_merge(self.repo)
+        self.assertEqual(b"refs/heads/main", merge_ref)
+
+        # Test getting merge ref for specific branch
+        merge_ref = porcelain.get_branch_merge(self.repo, b"master")
+        self.assertEqual(b"refs/heads/main", merge_ref)
+
+        # Test branch without merge config
+        with self.assertRaises(KeyError):
+            porcelain.get_branch_merge(self.repo, b"nonexistent")
+
+    def test_set_branch_tracking(self) -> None:
+        # Create a new branch
+        sha, _ = _commit_file_with_content(self.repo, "foo", "content\n")
+        porcelain.branch_create(self.repo, "feature")
+
+        # Set up tracking
+        porcelain.set_branch_tracking(
+            self.repo, b"feature", b"upstream", b"refs/heads/main"
+        )
+
+        # Verify configuration was written
+        config = self.repo.get_config()
+        self.assertEqual(b"upstream", config.get((b"branch", b"feature"), b"remote"))
+        self.assertEqual(
+            b"refs/heads/main", config.get((b"branch", b"feature"), b"merge")
+        )
 
 
 class FindUniqueAbbrevTests(PorcelainTestCase):

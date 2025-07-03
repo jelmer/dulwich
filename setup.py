@@ -40,7 +40,7 @@ if "PURE" in os.environ or "--pure" in sys.argv:
     if "--pure" in sys.argv:
         sys.argv.remove("--pure")
     setup_requires = []
-    rust_extensions = []
+    rust_extensions = []  # type: list["RustExtension"]
 else:
     setup_requires = ["setuptools_rust"]
     # We check for egg_info since that indicates we are running prepare_metadata_for_build_*

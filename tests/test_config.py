@@ -1102,8 +1102,11 @@ class CaseInsensitiveConfigTests(TestCase):
         self.assertEqual("value", config.get(("core",)))
         self.assertEqual("value", config.get(("CORE",)))
         self.assertEqual("default", config.get(("missing",), "default"))
-        # Test SENTINEL behavior
-        result = config.get(("missing",))
+        # Test default_factory behavior
+        config_with_factory = CaseInsensitiveOrderedMultiDict(
+            default_factory=CaseInsensitiveOrderedMultiDict
+        )
+        result = config_with_factory.get(("missing",))
         self.assertIsInstance(result, CaseInsensitiveOrderedMultiDict)
         self.assertEqual(0, len(result))
 

@@ -317,14 +317,8 @@ def read_pkt_refs_v1(pkt_seq) -> tuple[dict[bytes, bytes], set[bytes]]:
     return refs, set(server_capabilities)
 
 
-class FetchPackResult:
-    """Result of a fetch-pack operation.
-
-    Attributes:
-      refs: Dictionary with all remote refs
-      symrefs: Dictionary with remote symrefs
-      agent: User agent string
-    """
+class _DeprecatedDictProxy:
+    """Base class for result objects that provide deprecated dict-like interface."""
 
     _FORWARDED_ATTRS: ClassVar[set[str]] = {
         "clear",
@@ -343,32 +337,13 @@ class FetchPackResult:
         "viewvalues",
     }
 
-    def __init__(
-        self, refs, symrefs, agent, new_shallow=None, new_unshallow=None
-    ) -> None:
-        self.refs = refs
-        self.symrefs = symrefs
-        self.agent = agent
-        self.new_shallow = new_shallow
-        self.new_unshallow = new_unshallow
-
     def _warn_deprecated(self) -> None:
         import warnings
 
         warnings.warn(
-            "Use FetchPackResult.refs instead.",
+            f"Use {self.__class__.__name__}.refs instead.",
             DeprecationWarning,
             stacklevel=3,
-        )
-
-    def __eq__(self, other):
-        if isinstance(other, dict):
-            self._warn_deprecated()
-            return self.refs == other
-        return (
-            self.refs == other.refs
-            and self.symrefs == other.symrefs
-            and self.agent == other.agent
         )
 
     def __contains__(self, name) -> bool:
@@ -388,39 +363,54 @@ class FetchPackResult:
         return iter(self.refs)
 
     def __getattribute__(self, name):
-        if name in type(self)._FORWARDED_ATTRS:
+        # Avoid infinite recursion by checking against class variable directly
+        if name != "_FORWARDED_ATTRS" and name in type(self)._FORWARDED_ATTRS:
             self._warn_deprecated()
-            return getattr(self.refs, name)
+            # Direct attribute access to avoid recursion
+            refs = object.__getattribute__(self, "refs")
+            return getattr(refs, name)
         return super().__getattribute__(name)
+
+
+class FetchPackResult(_DeprecatedDictProxy):
+    """Result of a fetch-pack operation.
+
+    Attributes:
+      refs: Dictionary with all remote refs
+      symrefs: Dictionary with remote symrefs
+      agent: User agent string
+    """
+
+    def __init__(
+        self, refs, symrefs, agent, new_shallow=None, new_unshallow=None
+    ) -> None:
+        self.refs = refs
+        self.symrefs = symrefs
+        self.agent = agent
+        self.new_shallow = new_shallow
+        self.new_unshallow = new_unshallow
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            self._warn_deprecated()
+            return self.refs == other
+        return (
+            self.refs == other.refs
+            and self.symrefs == other.symrefs
+            and self.agent == other.agent
+        )
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.refs!r}, {self.symrefs!r}, {self.agent!r})"
 
 
-class LsRemoteResult:
+class LsRemoteResult(_DeprecatedDictProxy):
     """Result of a ls-remote operation.
 
     Attributes:
       refs: Dictionary with all remote refs
       symrefs: Dictionary with remote symrefs
     """
-
-    _FORWARDED_ATTRS: ClassVar[set[str]] = {
-        "clear",
-        "copy",
-        "fromkeys",
-        "get",
-        "items",
-        "keys",
-        "pop",
-        "popitem",
-        "setdefault",
-        "update",
-        "values",
-        "viewitems",
-        "viewkeys",
-        "viewvalues",
-    }
 
     def __init__(self, refs, symrefs) -> None:
         self.refs = refs
@@ -442,33 +432,11 @@ class LsRemoteResult:
             return self.refs == other
         return self.refs == other.refs and self.symrefs == other.symrefs
 
-    def __contains__(self, name) -> bool:
-        self._warn_deprecated()
-        return name in self.refs
-
-    def __getitem__(self, name):
-        self._warn_deprecated()
-        return self.refs[name]
-
-    def __len__(self) -> int:
-        self._warn_deprecated()
-        return len(self.refs)
-
-    def __iter__(self):
-        self._warn_deprecated()
-        return iter(self.refs)
-
-    def __getattribute__(self, name):
-        if name in type(self)._FORWARDED_ATTRS:
-            self._warn_deprecated()
-            return getattr(self.refs, name)
-        return super().__getattribute__(name)
-
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.refs!r}, {self.symrefs!r})"
 
 
-class SendPackResult:
+class SendPackResult(_DeprecatedDictProxy):
     """Result of a upload-pack operation.
 
     Attributes:
@@ -478,64 +446,16 @@ class SendPackResult:
         failed to update), or None if it was updated successfully
     """
 
-    _FORWARDED_ATTRS: ClassVar[set[str]] = {
-        "clear",
-        "copy",
-        "fromkeys",
-        "get",
-        "items",
-        "keys",
-        "pop",
-        "popitem",
-        "setdefault",
-        "update",
-        "values",
-        "viewitems",
-        "viewkeys",
-        "viewvalues",
-    }
-
     def __init__(self, refs, agent=None, ref_status=None) -> None:
         self.refs = refs
         self.agent = agent
         self.ref_status = ref_status
-
-    def _warn_deprecated(self) -> None:
-        import warnings
-
-        warnings.warn(
-            "Use SendPackResult.refs instead.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
 
     def __eq__(self, other):
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
         return self.refs == other.refs and self.agent == other.agent
-
-    def __contains__(self, name) -> bool:
-        self._warn_deprecated()
-        return name in self.refs
-
-    def __getitem__(self, name):
-        self._warn_deprecated()
-        return self.refs[name]
-
-    def __len__(self) -> int:
-        self._warn_deprecated()
-        return len(self.refs)
-
-    def __iter__(self):
-        self._warn_deprecated()
-        return iter(self.refs)
-
-    def __getattribute__(self, name):
-        if name in type(self)._FORWARDED_ATTRS:
-            self._warn_deprecated()
-            return getattr(self.refs, name)
-        return super().__getattribute__(name)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.refs!r}, {self.agent!r})"
@@ -673,7 +593,7 @@ def _handle_upload_pack_head(
     proto.write_pkt_line(wantcmd)
     for want in wants[1:]:
         proto.write_pkt_line(COMMAND_WANT + b" " + want + b"\n")
-    if depth not in (0, None) or getattr(graph_walker, "shallow", None):
+    if depth not in (0, None) or graph_walker.shallow:
         if protocol_version == 2:
             if not find_capability(capabilities, CAPABILITY_FETCH, CAPABILITY_SHALLOW):
                 raise GitProtocolError(

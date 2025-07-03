@@ -55,6 +55,8 @@ by the server. Here in the tutorial we'll just use a dummy graph walker
 which claims that the client doesn't have any objects::
 
    >>> class DummyGraphWalker(object):
+   ...     def __init__(self):
+   ...         self.shallow = set()
    ...     def ack(self, sha): pass
    ...     def nak(self): pass
    ...     def next(self): pass

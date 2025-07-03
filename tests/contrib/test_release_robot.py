@@ -33,6 +33,7 @@ from typing import ClassVar, Optional
 from unittest.mock import MagicMock, patch
 
 from dulwich.contrib import release_robot
+from dulwich.objects import Commit, Tag
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit, make_tag
 
@@ -63,6 +64,7 @@ class TagPatternTests(unittest.TestCase):
         }
         for testcase, version in test_cases.items():
             matches = re.match(release_robot.PATTERN, testcase)
+            assert matches is not None
             self.assertEqual(matches.group(1), version)
 
     def test_pattern_no_match(self) -> None:
@@ -93,6 +95,14 @@ class GetRecentTagsTest(unittest.TestCase):
         test_tags[1]: (1484788314, b"1" * 40, (1484788401, b"2" * 40)),
     }
 
+    # Class attributes set in setUpClass
+    projdir: ClassVar[str]
+    repo: ClassVar[Repo]
+    c1: ClassVar[Commit]
+    c2: ClassVar[Commit]
+    t1: ClassVar[bytes]
+    t2: ClassVar[Tag]
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.projdir = tempfile.mkdtemp()  # temporary project directory
@@ -119,11 +129,14 @@ class GetRecentTagsTest(unittest.TestCase):
         )
         obj_store.add_object(cls.c2)
         # tag 2: annotated ('2017-01-19T01:13:21')
+        tag_data = cls.tag_test_data[cls.test_tags[1]][2]
+        if tag_data is None:
+            raise AssertionError("test_tags[1] should have annotated tag data")
         cls.t2 = make_tag(
             cls.c2,
-            id=cls.tag_test_data[cls.test_tags[1]][2][1],
+            id=tag_data[1],
             name=cls.test_tags[1],
-            tag_time=cls.tag_test_data[cls.test_tags[1]][2][0],
+            tag_time=tag_data[0],
         )
         obj_store.add_object(cls.t2)
         cls.repo[b"refs/heads/master"] = cls.c2.id
@@ -138,8 +151,8 @@ class GetRecentTagsTest(unittest.TestCase):
         """Test get recent tags."""
         tags = release_robot.get_recent_tags(self.projdir)  # get test tags
         for tag, metadata in tags:
-            tag = tag.encode("utf-8")
-            test_data = self.tag_test_data[tag]  # test data tag
+            tag_bytes = tag.encode("utf-8")
+            test_data = self.tag_test_data[tag_bytes]  # test data tag
             # test commit date, id and author name
             self.assertEqual(metadata[0], gmtime_to_datetime(test_data[0]))
             self.assertEqual(metadata[1].encode("utf-8"), test_data[1])
@@ -151,7 +164,7 @@ class GetRecentTagsTest(unittest.TestCase):
             # tag date, id and name
             self.assertEqual(metadata[3][0], gmtime_to_datetime(tag_obj[0]))
             self.assertEqual(metadata[3][1].encode("utf-8"), tag_obj[1])
-            self.assertEqual(metadata[3][2].encode("utf-8"), tag)
+            self.assertEqual(metadata[3][2], tag)
 
     def test_get_recent_tags_sorting(self) -> None:
         """Test that tags are sorted by commit time from newest to oldest."""

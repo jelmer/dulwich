@@ -4739,6 +4739,118 @@ class BranchListTests(PorcelainTestCase):
         porcelain.branch_create(self.repo, b"foo")
         self.assertEqual({b"master", b"foo"}, set(porcelain.branch_list(self.repo)))
 
+    def test_sort_by_refname(self) -> None:
+        """Test branch.sort=refname (default alphabetical)."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create branches in non-alphabetical order
+        porcelain.branch_create(self.repo, b"zebra")
+        porcelain.branch_create(self.repo, b"alpha")
+        porcelain.branch_create(self.repo, b"beta")
+
+        # Set branch.sort to refname (though it's the default)
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"refname")
+        config.write_to_path()
+
+        # Should be sorted alphabetically
+        branches = porcelain.branch_list(self.repo)
+        self.assertEqual([b"alpha", b"beta", b"master", b"zebra"], branches)
+
+    def test_sort_by_refname_reverse(self) -> None:
+        """Test branch.sort=-refname (reverse alphabetical)."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create branches
+        porcelain.branch_create(self.repo, b"zebra")
+        porcelain.branch_create(self.repo, b"alpha")
+        porcelain.branch_create(self.repo, b"beta")
+
+        # Set branch.sort to -refname
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"-refname")
+        config.write_to_path()
+
+        # Should be sorted reverse alphabetically
+        branches = porcelain.branch_list(self.repo)
+        self.assertEqual([b"zebra", b"master", b"beta", b"alpha"], branches)
+
+    def test_sort_by_committerdate(self) -> None:
+        """Test branch.sort=committerdate."""
+        # Use build_commit_graph to create proper commits with specific times
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2], [3]],
+            attrs={
+                1: {"commit_time": 1000},  # oldest
+                2: {"commit_time": 2000},  # newest
+                3: {"commit_time": 1500},  # middle
+            },
+        )
+
+        self.repo[b"HEAD"] = c1.id
+
+        # Create branches pointing to different commits
+        self.repo.refs[b"refs/heads/master"] = c1.id  # master points to oldest
+        self.repo.refs[b"refs/heads/oldest"] = c1.id
+        self.repo.refs[b"refs/heads/newest"] = c2.id
+        self.repo.refs[b"refs/heads/middle"] = c3.id
+
+        # Set branch.sort to committerdate
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"committerdate")
+        config.write_to_path()
+
+        # Should be sorted by commit time (oldest first)
+        branches = porcelain.branch_list(self.repo)
+        self.assertEqual([b"master", b"oldest", b"middle", b"newest"], branches)
+
+    def test_sort_by_committerdate_reverse(self) -> None:
+        """Test branch.sort=-committerdate."""
+        # Use build_commit_graph to create proper commits with specific times
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2], [3]],
+            attrs={
+                1: {"commit_time": 1000},  # oldest
+                2: {"commit_time": 2000},  # newest
+                3: {"commit_time": 1500},  # middle
+            },
+        )
+
+        self.repo[b"HEAD"] = c1.id
+
+        # Create branches pointing to different commits
+        self.repo.refs[b"refs/heads/master"] = c1.id  # master points to oldest
+        self.repo.refs[b"refs/heads/oldest"] = c1.id
+        self.repo.refs[b"refs/heads/newest"] = c2.id
+        self.repo.refs[b"refs/heads/middle"] = c3.id
+
+        # Set branch.sort to -committerdate
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"-committerdate")
+        config.write_to_path()
+
+        # Should be sorted by commit time (newest first)
+        branches = porcelain.branch_list(self.repo)
+        self.assertEqual([b"newest", b"middle", b"master", b"oldest"], branches)
+
+    def test_sort_default(self) -> None:
+        """Test default sorting (no config)."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create branches in non-alphabetical order
+        porcelain.branch_create(self.repo, b"zebra")
+        porcelain.branch_create(self.repo, b"alpha")
+        porcelain.branch_create(self.repo, b"beta")
+
+        # No config set - should default to alphabetical
+        branches = porcelain.branch_list(self.repo)
+        self.assertEqual([b"alpha", b"beta", b"master", b"zebra"], branches)
+
 
 class BranchCreateTests(PorcelainTestCase):
     def test_branch_exists(self) -> None:

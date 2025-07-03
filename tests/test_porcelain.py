@@ -5360,6 +5360,109 @@ class BranchCreateTests(PorcelainTestCase):
         porcelain.branch_create(self.repo, b"foo")
         self.assertEqual({b"master", b"foo"}, set(porcelain.branch_list(self.repo)))
 
+    def test_auto_setup_merge_true_from_remote_tracking(self) -> None:
+        """Test branch.autoSetupMerge=true sets up tracking from remote-tracking branch."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+        # Create a remote-tracking branch
+        self.repo.refs[b"refs/remotes/origin/feature"] = c1.id
+
+        # Set branch.autoSetupMerge to true (default)
+        config = self.repo.get_config()
+        config.set((b"branch",), b"autoSetupMerge", b"true")
+        config.write_to_path()
+
+        # Create branch from remote-tracking branch
+        porcelain.branch_create(self.repo, "myfeature", "origin/feature")
+
+        # Verify tracking was set up
+        config = self.repo.get_config()
+        self.assertEqual(config.get((b"branch", b"myfeature"), b"remote"), b"origin")
+        self.assertEqual(
+            config.get((b"branch", b"myfeature"), b"merge"), b"refs/heads/feature"
+        )
+
+    def test_auto_setup_merge_false(self) -> None:
+        """Test branch.autoSetupMerge=false disables tracking setup."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+        # Create a remote-tracking branch
+        self.repo.refs[b"refs/remotes/origin/feature"] = c1.id
+
+        # Set branch.autoSetupMerge to false
+        config = self.repo.get_config()
+        config.set((b"branch",), b"autoSetupMerge", b"false")
+        config.write_to_path()
+
+        # Create branch from remote-tracking branch
+        porcelain.branch_create(self.repo, "myfeature", "origin/feature")
+
+        # Verify tracking was NOT set up
+        config = self.repo.get_config()
+        self.assertRaises(KeyError, config.get, (b"branch", b"myfeature"), b"remote")
+        self.assertRaises(KeyError, config.get, (b"branch", b"myfeature"), b"merge")
+
+    def test_auto_setup_merge_always(self) -> None:
+        """Test branch.autoSetupMerge=always sets up tracking even from local branches."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+        self.repo.refs[b"refs/heads/main"] = c1.id
+
+        # Set branch.autoSetupMerge to always
+        config = self.repo.get_config()
+        config.set((b"branch",), b"autoSetupMerge", b"always")
+        config.write_to_path()
+
+        # Create branch from local branch - normally wouldn't set up tracking
+        porcelain.branch_create(self.repo, "feature", "main")
+
+        # With always, tracking should NOT be set up from local branches
+        # (Git only sets up tracking from remote-tracking branches even with always)
+        config = self.repo.get_config()
+        self.assertRaises(KeyError, config.get, (b"branch", b"feature"), b"remote")
+        self.assertRaises(KeyError, config.get, (b"branch", b"feature"), b"merge")
+
+    def test_auto_setup_merge_always_from_remote(self) -> None:
+        """Test branch.autoSetupMerge=always still sets up tracking from remote branches."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+        # Create a remote-tracking branch
+        self.repo.refs[b"refs/remotes/origin/feature"] = c1.id
+
+        # Set branch.autoSetupMerge to always
+        config = self.repo.get_config()
+        config.set((b"branch",), b"autoSetupMerge", b"always")
+        config.write_to_path()
+
+        # Create branch from remote-tracking branch
+        porcelain.branch_create(self.repo, "myfeature", "origin/feature")
+
+        # Verify tracking was set up
+        config = self.repo.get_config()
+        self.assertEqual(config.get((b"branch", b"myfeature"), b"remote"), b"origin")
+        self.assertEqual(
+            config.get((b"branch", b"myfeature"), b"merge"), b"refs/heads/feature"
+        )
+
+    def test_auto_setup_merge_default(self) -> None:
+        """Test default behavior (no config) is same as true."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+        # Create a remote-tracking branch
+        self.repo.refs[b"refs/remotes/origin/feature"] = c1.id
+
+        # Don't set any config - should default to true
+
+        # Create branch from remote-tracking branch
+        porcelain.branch_create(self.repo, "myfeature", "origin/feature")
+
+        # Verify tracking was set up
+        config = self.repo.get_config()
+        self.assertEqual(config.get((b"branch", b"myfeature"), b"remote"), b"origin")
+        self.assertEqual(
+            config.get((b"branch", b"myfeature"), b"merge"), b"refs/heads/feature"
+        )
+
 
 class BranchDeleteTests(PorcelainTestCase):
     def test_simple(self) -> None:

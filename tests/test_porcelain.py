@@ -1876,6 +1876,45 @@ class RemoveTests(PorcelainTestCase):
         # Verify file was removed
         self.assertFalse(os.path.exists(fullpath))
 
+    def test_remove_with_filter_normalization(self) -> None:
+        # Enable autocrlf to normalize line endings
+        config = self.repo.get_config()
+        config.set(("core",), "autocrlf", b"true")
+        config.write_to_path()
+
+        # Create a file with LF line endings (will be stored with LF in index)
+        fullpath = os.path.join(self.repo.path, "foo.txt")
+        with open(fullpath, "wb") as f:
+            f.write(b"line1\nline2\nline3")
+
+        # Add and commit the file (stored with LF in index)
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"Add file with LF",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Simulate checkout with CRLF conversion (as would happen on Windows)
+        with open(fullpath, "wb") as f:
+            f.write(b"line1\r\nline2\r\nline3")
+
+        # Verify file exists
+        self.assertTrue(os.path.exists(fullpath))
+
+        # Remove the file - this should not fail even though working tree has CRLF
+        # and index has LF (thanks to the normalization in the commit)
+        cwd = os.getcwd()
+        try:
+            os.chdir(self.repo.path)
+            porcelain.remove(self.repo.path, paths=["foo.txt"])
+        finally:
+            os.chdir(cwd)
+
+        # Verify file was removed
+        self.assertFalse(os.path.exists(fullpath))
+
 
 class MvTests(PorcelainTestCase):
     def test_mv_file(self) -> None:

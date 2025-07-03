@@ -808,6 +808,8 @@ def remove(repo=".", paths=None, cached=False) -> None:
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
+        blob_normalizer = r.get_blob_normalizer()
+
         for p in paths:
             # If path is absolute, use it as-is. Otherwise, treat it as relative to repo
             if os.path.isabs(p):
@@ -831,6 +833,9 @@ def remove(repo=".", paths=None, cached=False) -> None:
                 else:
                     try:
                         blob = blob_from_path_and_stat(full_path_bytes, st)
+                        # Apply checkin normalization to compare apples to apples
+                        if blob_normalizer is not None:
+                            blob = blob_normalizer.checkin_normalize(blob, tree_path)
                     except OSError:
                         pass
                     else:

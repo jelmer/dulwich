@@ -146,7 +146,7 @@ def hex_to_filename(
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
     # as path.
-    if type(path) is not type(hex) and getattr(path, "encode", None) is not None:
+    if type(path) is not type(hex) and isinstance(path, str):
         hex = hex.decode("ascii")  # type: ignore
     dir = hex[:2]
     file = hex[2:]
@@ -263,7 +263,7 @@ class FixedSha:
     __slots__ = ("_hexsha", "_sha")
 
     def __init__(self, hexsha: Union[str, bytes]) -> None:
-        if getattr(hexsha, "encode", None) is not None:
+        if isinstance(hexsha, str):
             hexsha = hexsha.encode("ascii")  # type: ignore
         if not isinstance(hexsha, bytes):
             raise TypeError(f"Expected bytes for hexsha, got {hexsha!r}")

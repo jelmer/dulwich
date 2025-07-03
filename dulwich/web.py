@@ -258,6 +258,8 @@ def _chunk_iter(f):
 
 
 class ChunkReader:
+    """Reader for chunked transfer encoding streams."""
+
     def __init__(self, f) -> None:
         self._iter = _chunk_iter(f)
         self._buffer: list[bytes] = []
@@ -557,6 +559,8 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
 
 
 class WSGIServerLogger(WSGIServer):
+    """WSGIServer that uses dulwich's logger for error handling."""
+
     def handle_error(self, request, client_address) -> None:
         """Handle an error."""
         logger.exception(

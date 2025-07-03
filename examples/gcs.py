@@ -3,7 +3,7 @@
 
 import tempfile
 
-from google.cloud import storage
+from google.cloud import storage  # type: ignore[attr-defined]
 
 from dulwich.cloud.gcs import GcsObjectStore
 from dulwich.repo import Repo

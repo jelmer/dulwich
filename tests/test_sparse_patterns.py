@@ -27,7 +27,9 @@ import shutil
 import tempfile
 import time
 
+from dulwich.filters import FilterBlobNormalizer, FilterRegistry
 from dulwich.index import IndexEntry
+from dulwich.objects import Blob
 from dulwich.repo import Repo
 from dulwich.sparse_patterns import (
     BlobNotFoundError,
@@ -535,3 +537,116 @@ class ApplyIncludedPathsTests(TestCase):
         self.assertFalse(os.path.exists(file_path))
         idx = self.repo.open_index()
         self.assertTrue(idx[b"special_file.txt"].skip_worktree)
+
+    def test_checkout_normalization_applied(self):
+        """Test that checkout normalization is applied when materializing files during sparse checkout."""
+
+        # Create a simple filter that converts content to uppercase
+        class UppercaseFilter:
+            def smudge(self, input_bytes):
+                return input_bytes.upper()
+
+            def clean(self, input_bytes):
+                return input_bytes.lower()
+
+        # Set up filter registry and normalizer
+        filter_registry = FilterRegistry()
+        filter_registry.register_driver("uppercase", UppercaseFilter())
+
+        # Create gitattributes dict
+        gitattributes = {b"*.txt": {b"filter": b"uppercase"}}
+
+        # Monkey patch the repo to use our filter registry
+        original_get_blob_normalizer = self.repo.get_blob_normalizer
+
+        def get_blob_normalizer_with_filters():
+            return FilterBlobNormalizer(None, gitattributes, filter_registry)
+
+        self.repo.get_blob_normalizer = get_blob_normalizer_with_filters
+
+        # Commit a file with lowercase content
+        self._commit_blob("test.txt", b"hello world")
+
+        # Remove the file from working tree to force materialization
+        os.remove(os.path.join(self.temp_dir, "test.txt"))
+
+        # Apply sparse checkout
+        apply_included_paths(self.repo, included_paths={"test.txt"}, force=False)
+
+        # Verify file was materialized with uppercase content (checkout normalization applied)
+        with open(os.path.join(self.temp_dir, "test.txt"), "rb") as f:
+            content = f.read()
+            self.assertEqual(content, b"HELLO WORLD")
+
+        # Restore original method
+        self.repo.get_blob_normalizer = original_get_blob_normalizer
+
+    def test_checkout_normalization_with_lf_to_crlf(self):
+        """Test that line ending normalization is applied during sparse checkout."""
+        # Commit a file with LF line endings
+        self._commit_blob("unix_file.txt", b"line1\nline2\nline3\n")
+
+        # Remove the file from working tree
+        os.remove(os.path.join(self.temp_dir, "unix_file.txt"))
+
+        # Create a normalizer that converts LF to CRLF on checkout
+        class CRLFNormalizer:
+            def checkin_normalize(self, data, path):
+                # For checkin, return unchanged
+                return data
+
+            def checkout_normalize(self, blob, path):
+                if isinstance(blob, Blob):
+                    # Convert LF to CRLF
+                    new_blob = Blob()
+                    new_blob.data = blob.data.replace(b"\n", b"\r\n")
+                    return new_blob
+                return blob
+
+        # Monkey patch the repo to use our normalizer
+        original_get_blob_normalizer = self.repo.get_blob_normalizer
+        self.repo.get_blob_normalizer = lambda: CRLFNormalizer()
+
+        # Apply sparse checkout
+        apply_included_paths(self.repo, included_paths={"unix_file.txt"}, force=False)
+
+        # Verify file was materialized with CRLF line endings
+        with open(os.path.join(self.temp_dir, "unix_file.txt"), "rb") as f:
+            content = f.read()
+            self.assertEqual(content, b"line1\r\nline2\r\nline3\r\n")
+
+        # Restore original method
+        self.repo.get_blob_normalizer = original_get_blob_normalizer
+
+    def test_checkout_normalization_not_applied_without_normalizer(self):
+        """Test that when normalizer returns original blob, no transformation occurs."""
+        # Commit a file with specific content
+        original_content = b"original content\nwith newlines\n"
+        self._commit_blob("no_norm.txt", original_content)
+
+        # Remove the file from working tree
+        os.remove(os.path.join(self.temp_dir, "no_norm.txt"))
+
+        # Create a normalizer that returns blob unchanged
+        class NoOpNormalizer:
+            def checkin_normalize(self, data, path):
+                return data
+
+            def checkout_normalize(self, blob, path):
+                # Return the blob unchanged
+                return blob
+
+        # Monkey patch the repo to use our no-op normalizer
+        original_get_blob_normalizer = self.repo.get_blob_normalizer
+        self.repo.get_blob_normalizer = lambda: NoOpNormalizer()
+
+        # Apply sparse checkout
+        apply_included_paths(self.repo, included_paths={"no_norm.txt"}, force=False)
+
+        # Verify file was materialized with original content (no normalization)
+        with open(os.path.join(self.temp_dir, "no_norm.txt"), "rb") as f:
+            content = f.read()
+            self.assertEqual(content, original_content)
+
+        # Restore original method
+        self.repo.get_blob_normalizer = original_get_blob_normalizer

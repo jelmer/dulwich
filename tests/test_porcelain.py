@@ -525,6 +525,193 @@ class CommitSignTests(PorcelainGpgTestCase):
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         commit.verify()
 
+    def test_sign_uses_config_signingkey(self) -> None:
+        """Test that sign=True uses user.signingKey from config."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up user.signingKey in config
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create commit with sign=True (should use signingKey from config)
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Signed with configured key",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=True,  # This should read user.signingKey from config
+        )
+
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # Verify the commit is signed with the configured key
+        commit.verify()
+        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+    def test_commit_gpg_sign_config_enabled(self) -> None:
+        """Test that commit.gpgSign=true automatically signs commits."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up user.signingKey and commit.gpgSign in config
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("commit",), "gpgSign", True)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create commit without explicit signoff parameter (should auto-sign due to config)
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Auto-signed commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            # No signoff parameter - should use commit.gpgSign config
+        )
+
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # Verify the commit is signed due to config
+        commit.verify()
+        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+    def test_commit_gpg_sign_config_disabled(self) -> None:
+        """Test that commit.gpgSign=false does not sign commits."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up user.signingKey and commit.gpgSign=false in config
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("commit",), "gpgSign", False)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create commit without explicit signoff parameter (should not sign)
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Unsigned commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            # No signoff parameter - should use commit.gpgSign=false config
+        )
+
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # Verify the commit is not signed
+        self.assertIsNone(commit._gpgsig)
+
+    def test_commit_gpg_sign_config_no_signing_key(self) -> None:
+        """Test that commit.gpgSign=true works without user.signingKey (uses default)."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up commit.gpgSign but no user.signingKey
+        cfg = self.repo.get_config()
+        cfg.set(("commit",), "gpgSign", True)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create commit without explicit signoff parameter (should auto-sign with default key)
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Default signed commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            # No signoff parameter - should use commit.gpgSign config with default key
+        )
+
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # Verify the commit is signed with default key
+        commit.verify()
+
+    def test_explicit_signoff_overrides_config(self) -> None:
+        """Test that explicit signoff parameter overrides commit.gpgSign config."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up commit.gpgSign=false but explicitly pass signoff=True
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("commit",), "gpgSign", False)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create commit with explicit signoff=True (should override config)
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Explicitly signed commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=True,  # This should override commit.gpgSign=false
+        )
+
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # Verify the commit is signed despite config=false
+        commit.verify()
+        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+    def test_explicit_false_disables_signing(self) -> None:
+        """Test that explicit signoff=False disables signing even with config=true."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up commit.gpgSign=true but explicitly pass signoff=False
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("commit",), "gpgSign", True)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create commit with explicit signoff=False (should disable signing)
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Explicitly unsigned commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            signoff=False,  # This should override commit.gpgSign=true
+        )
+
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo.get_object(sha)
+        # Verify the commit is NOT signed despite config=true
+        self.assertIsNone(commit._gpgsig)
+
 
 class TimezoneTests(PorcelainTestCase):
     def put_envs(self, value) -> None:
@@ -2281,6 +2468,205 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tag = self.repo[b"refs/tags/tryme"]
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
+
+    def test_sign_uses_config_signingkey(self) -> None:
+        """Test that sign=True uses user.signingKey from config."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up user.signingKey in config
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create tag with sign=True (should use signingKey from config)
+        porcelain.tag_create(
+            self.repo.path,
+            b"signed-tag",
+            b"foo <foo@bar.com>",
+            b"Tag with configured key",
+            annotated=True,
+            sign=True,  # This should read user.signingKey from config
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"signed-tag"])
+        tag = self.repo[b"refs/tags/signed-tag"]
+        self.assertIsInstance(tag, Tag)
+
+        # Verify the tag is signed with the configured key
+        tag.verify()
+        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+    def test_tag_gpg_sign_config_enabled(self) -> None:
+        """Test that tag.gpgSign=true automatically signs tags."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up user.signingKey and tag.gpgSign in config
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("tag",), "gpgSign", True)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create tag without explicit sign parameter (should auto-sign due to config)
+        porcelain.tag_create(
+            self.repo.path,
+            b"auto-signed-tag",
+            b"foo <foo@bar.com>",
+            b"Auto-signed tag",
+            annotated=True,
+            # No sign parameter - should use tag.gpgSign config
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"auto-signed-tag"])
+        tag = self.repo[b"refs/tags/auto-signed-tag"]
+        self.assertIsInstance(tag, Tag)
+
+        # Verify the tag is signed due to config
+        tag.verify()
+        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+    def test_tag_gpg_sign_config_disabled(self) -> None:
+        """Test that tag.gpgSign=false does not sign tags."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up user.signingKey and tag.gpgSign=false in config
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("tag",), "gpgSign", False)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create tag without explicit sign parameter (should not sign)
+        porcelain.tag_create(
+            self.repo.path,
+            b"unsigned-tag",
+            b"foo <foo@bar.com>",
+            b"Unsigned tag",
+            annotated=True,
+            # No sign parameter - should use tag.gpgSign=false config
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"unsigned-tag"])
+        tag = self.repo[b"refs/tags/unsigned-tag"]
+        self.assertIsInstance(tag, Tag)
+
+        # Verify the tag is not signed
+        self.assertIsNone(tag._signature)
+
+    def test_tag_gpg_sign_config_no_signing_key(self) -> None:
+        """Test that tag.gpgSign=true works without user.signingKey (uses default)."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up tag.gpgSign but no user.signingKey
+        cfg = self.repo.get_config()
+        cfg.set(("tag",), "gpgSign", True)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create tag without explicit sign parameter (should auto-sign with default key)
+        porcelain.tag_create(
+            self.repo.path,
+            b"default-signed-tag",
+            b"foo <foo@bar.com>",
+            b"Default signed tag",
+            annotated=True,
+            # No sign parameter - should use tag.gpgSign config with default key
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"default-signed-tag"])
+        tag = self.repo[b"refs/tags/default-signed-tag"]
+        self.assertIsInstance(tag, Tag)
+
+        # Verify the tag is signed with default key
+        tag.verify()
+
+    def test_explicit_sign_overrides_config(self) -> None:
+        """Test that explicit sign parameter overrides tag.gpgSign config."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up tag.gpgSign=false but explicitly pass sign=True
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("tag",), "gpgSign", False)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create tag with explicit sign=True (should override config)
+        porcelain.tag_create(
+            self.repo.path,
+            b"explicit-signed-tag",
+            b"foo <foo@bar.com>",
+            b"Explicitly signed tag",
+            annotated=True,
+            sign=True,  # This should override tag.gpgSign=false
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"explicit-signed-tag"])
+        tag = self.repo[b"refs/tags/explicit-signed-tag"]
+        self.assertIsInstance(tag, Tag)
+
+        # Verify the tag is signed despite config=false
+        tag.verify()
+        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+
+    def test_explicit_false_disables_tag_signing(self) -> None:
+        """Test that explicit sign=False disables signing even with config=true."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Set up tag.gpgSign=true but explicitly pass sign=False
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.set(("tag",), "gpgSign", True)
+        cfg.write_to_path()
+
+        self.import_default_key()
+
+        # Create tag with explicit sign=False (should disable signing)
+        porcelain.tag_create(
+            self.repo.path,
+            b"explicit-unsigned-tag",
+            b"foo <foo@bar.com>",
+            b"Explicitly unsigned tag",
+            annotated=True,
+            sign=False,  # This should override tag.gpgSign=true
+        )
+
+        tags = self.repo.refs.as_dict(b"refs/tags")
+        self.assertEqual(list(tags.keys()), [b"explicit-unsigned-tag"])
+        tag = self.repo[b"refs/tags/explicit-unsigned-tag"]
+        self.assertIsInstance(tag, Tag)
+
+        # Verify the tag is NOT signed despite config=true
+        self.assertIsNone(tag._signature)
 
 
 class TagCreateTests(PorcelainTestCase):

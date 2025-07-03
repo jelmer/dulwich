@@ -1465,8 +1465,27 @@ def tag_create(
             elif isinstance(tag_timezone, str):
                 tag_timezone = parse_timezone(tag_timezone.encode())
             tag_obj.tag_timezone = tag_timezone
-            if sign:
-                tag_obj.sign(sign if isinstance(sign, str) else None)
+
+            # Check if we should sign the tag
+            should_sign = sign
+            if sign is None:
+                # Check tag.gpgSign configuration when sign is not explicitly set
+                config = r.get_config_stack()
+                try:
+                    should_sign = config.get_boolean((b"tag",), b"gpgSign")
+                except KeyError:
+                    should_sign = False  # Default to not signing if no config
+            if should_sign:
+                keyid = sign if isinstance(sign, str) else None
+                # If sign is True but no keyid specified, check user.signingKey config
+                if should_sign is True and keyid is None:
+                    config = r.get_config_stack()
+                    try:
+                        keyid = config.get((b"user",), b"signingKey").decode("ascii")
+                    except KeyError:
+                        # No user.signingKey configured, will use default GPG key
+                        pass
+                tag_obj.sign(keyid)
 
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id

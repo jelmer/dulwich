@@ -1080,19 +1080,28 @@ class BaseRepo:
         except KeyError:  # no hook defined, message not modified
             c.message = message
 
+        # Check if we should sign the commit
+        should_sign = sign
+        if sign is None:
+            # Check commit.gpgSign configuration when sign is not explicitly set
+            config = self.get_config_stack()
+            try:
+                should_sign = config.get_boolean((b"commit",), b"gpgSign")
+            except KeyError:
+                should_sign = False  # Default to not signing if no config
         keyid = sign if isinstance(sign, str) else None
 
         if ref is None:
             # Create a dangling commit
             c.parents = merge_heads
-            if sign:
+            if should_sign:
                 c.sign(keyid)
             self.object_store.add_object(c)
         else:
             try:
                 old_head = self.refs[ref]
                 c.parents = [old_head, *merge_heads]
-                if sign:
+                if should_sign:
                     c.sign(keyid)
                 self.object_store.add_object(c)
                 ok = self.refs.set_if_equals(
@@ -1106,7 +1115,7 @@ class BaseRepo:
                 )
             except KeyError:
                 c.parents = merge_heads
-                if sign:
+                if should_sign:
                     c.sign(keyid)
                 self.object_store.add_object(c)
                 ok = self.refs.add_if_new(

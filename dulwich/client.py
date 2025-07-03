@@ -114,15 +114,21 @@ if TYPE_CHECKING:
     from .pack import UnpackedObject
     from .refs import Ref
 
+    from collections.abc import Mapping
+
     class HTTPResponse(TypingProtocol):
-        """Protocol for HTTP response objects."""
+        """Protocol for HTTP response objects (matches urllib3.response.HTTPResponse)."""
 
-        redirect_location: str | None
+        status: int
+        headers: Mapping[str, str]
         content_type: str | None
+        redirect_location: str
 
-        def close(self) -> None:
-            """Close the response."""
-            ...
+        def close(self) -> None: ...
+
+        def read(self, amt: int | None = None) -> bytes: ...
+
+        def geturl(self) -> str | None: ...
 
     class GeneratePackDataFunc(TypingProtocol):
         """Protocol for generate_pack_data functions."""
@@ -3466,6 +3472,88 @@ def _urlmatch_http_sections(
         yield section
 
 
+class AuthCallbackPoolManager:
+    """Pool manager wrapper that handles authentication callbacks."""
+
+    def __init__(
+        self,
+        pool_manager: "urllib3.PoolManager | urllib3.ProxyManager",
+        auth_callback: Callable[[str, str, int], dict[str, str] | None] | None = None,
+        proxy_auth_callback: Callable[[str, str, int], dict[str, str] | None]
+        | None = None,
+    ) -> None:
+        self._pool_manager = pool_manager
+        self._auth_callback = auth_callback
+        self._proxy_auth_callback = proxy_auth_callback
+        self._auth_attempts: dict[str, int] = {}
+
+    def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
+        # Delegate all other attributes to the wrapped pool manager
+        return getattr(self._pool_manager, name)
+
+    def request(self, method: str, url: str, *args, **kwargs):  # type: ignore[no-untyped-def]
+        """Make HTTP request with authentication callback support."""
+        max_attempts = 3
+        attempts = self._auth_attempts.get(url, 0)
+
+        while attempts < max_attempts:
+            response = self._pool_manager.request(method, url, *args, **kwargs)
+
+            if response.status == 401 and self._auth_callback:
+                # HTTP authentication required
+                www_authenticate = response.headers.get("WWW-Authenticate", "")
+                attempts += 1
+                self._auth_attempts[url] = attempts
+
+                # Call the authentication callback
+                credentials = self._auth_callback(url, www_authenticate, attempts)
+                if credentials:
+                    # Update request with new credentials
+                    import urllib3.util
+
+                    auth_header = urllib3.util.make_headers(
+                        basic_auth=f"{credentials['username']}:{credentials.get('password', '')}"
+                    )
+                    if "headers" in kwargs:
+                        kwargs["headers"].update(auth_header)
+                    else:
+                        kwargs["headers"] = auth_header
+                    # Retry the request
+                    continue
+
+            elif response.status == 407 and self._proxy_auth_callback:
+                # Proxy authentication required
+                proxy_authenticate = response.headers.get("Proxy-Authenticate", "")
+                attempts += 1
+                self._auth_attempts[url] = attempts
+
+                # Call the proxy authentication callback
+                credentials = self._proxy_auth_callback(
+                    url, proxy_authenticate, attempts
+                )
+                if credentials:
+                    # Update request with new proxy credentials
+                    import urllib3.util
+
+                    proxy_auth_header = urllib3.util.make_headers(
+                        proxy_basic_auth=f"{credentials['username']}:{credentials.get('password', '')}"
+                    )
+                    if "headers" in kwargs:
+                        kwargs["headers"].update(proxy_auth_header)
+                    else:
+                        kwargs["headers"] = proxy_auth_header
+                    # Retry the request
+                    continue
+
+            # Clear attempts on success or non-auth failure
+            if url in self._auth_attempts:
+                del self._auth_attempts[url]
+            return response
+
+        # Max attempts reached
+        return response
+
+
 def default_urllib3_manager(
     config: Config | None,
     pool_manager_cls: type | None = None,
@@ -3489,7 +3577,7 @@ def default_urllib3_manager(
     Returns:
       Either pool_manager_cls (defaults to ``urllib3.ProxyManager``) instance for
       proxy configurations, proxy_manager_cls
-      (defaults to ``urllib3.PoolManager``) instance otherwise
+      (defaults to ``urllib3.PoolManager``) instance otherwise.
 
     """
     proxy_server: str | None = None
@@ -3611,6 +3699,21 @@ def default_urllib3_manager(
 
     import urllib3
 
+    # Check for proxy authentication method configuration
+    proxy_auth_method: str | None = None
+    if config is not None:
+        try:
+            proxy_auth_method_bytes = config.get(b"http", b"proxyAuthMethod")
+            if proxy_auth_method_bytes and isinstance(proxy_auth_method_bytes, bytes):
+                proxy_auth_method = proxy_auth_method_bytes.decode().lower()
+        except KeyError:
+            pass
+
+    # Check environment variable override
+    env_proxy_auth = os.environ.get("GIT_HTTP_PROXY_AUTHMETHOD")
+    if env_proxy_auth:
+        proxy_auth_method = env_proxy_auth.lower()
+
     manager: urllib3.ProxyManager | urllib3.PoolManager
     if proxy_server is not None:
         if proxy_manager_cls is None:
@@ -3618,6 +3721,16 @@ def default_urllib3_manager(
         if not isinstance(proxy_server, str):
             proxy_server = proxy_server.decode()
         proxy_server_url = urlparse(proxy_server)
+
+        # Validate proxy auth method if specified
+        if proxy_auth_method and proxy_auth_method not in ("anyauth", "basic"):
+            # Only basic and anyauth are currently supported
+            # Other methods like digest, negotiate, ntlm would require additional libraries
+            raise NotImplementedError(
+                f"Proxy authentication method '{proxy_auth_method}' is not supported. "
+                "Only 'basic' and 'anyauth' are currently supported."
+            )
+
         if proxy_server_url.username is not None:
             proxy_headers = urllib3.make_headers(
                 proxy_basic_auth=f"{proxy_server_url.username}:{proxy_server_url.password or ''}"
@@ -4345,7 +4458,24 @@ def _wrap_urllib3_exceptions(
 
 
 class Urllib3HttpGitClient(AbstractHttpGitClient):
-    """Git client that uses urllib3 for HTTP(S) connections."""
+    """HTTP Git client using urllib3.
+
+    Supports callback-based authentication for both HTTP and proxy authentication,
+    allowing dynamic credential handling without intercepting exceptions.
+
+    Example:
+        >>> def auth_callback(url, www_authenticate, attempt):
+        ...     # Parse www_authenticate header to determine auth scheme
+        ...     # Return credentials or None to cancel
+        ...     return {"username": "user", "password": "pass"}
+        >>>
+        >>> client = Urllib3HttpGitClient(
+        ...     "https://github.com/private/repo.git",
+        ...     auth_callback=auth_callback
+        ... )
+    """
+
+    pool_manager: "urllib3.PoolManager | urllib3.ProxyManager | AuthCallbackPoolManager"
 
     def __init__(
         self,
@@ -4361,14 +4491,27 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         report_activity: Callable[[int, str], None] | None = None,
         quiet: bool = False,
         include_tags: bool = False,
+        auth_callback: Callable[[str, str, int], dict[str, str] | None] | None = None,
+        proxy_auth_callback: Callable[[str, str, int], dict[str, str] | None]
+        | None = None,
     ) -> None:
         """Initialize Urllib3HttpGitClient."""
         self._timeout = timeout
         self._extra_headers = extra_headers or {}
+        self._auth_callback = auth_callback
+        self._proxy_auth_callback = proxy_auth_callback
 
         if pool_manager is None:
-            self.pool_manager = default_urllib3_manager(
-                config, base_url=base_url, timeout=timeout
+            pool_manager = default_urllib3_manager(
+                config,
+                base_url=base_url,
+                timeout=timeout,
+            )
+
+        # Wrap with auth callback support if callbacks are provided
+        if auth_callback or proxy_auth_callback:
+            self.pool_manager = AuthCallbackPoolManager(
+                pool_manager, auth_callback, proxy_auth_callback
             )
         else:
             self.pool_manager = pool_manager
@@ -4442,15 +4585,10 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             if resp.status != 200:
                 raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
 
-        resp.content_type = resp.headers.get("Content-Type")  # type: ignore[attr-defined]
-        # Check if geturl() is available (urllib3 version >= 1.23)
-        try:
-            resp_url = resp.geturl()
-        except AttributeError:
-            # get_redirect_location() is available for urllib3 >= 1.1
-            resp.redirect_location = resp.get_redirect_location()  # type: ignore[attr-defined]
-        else:
-            resp.redirect_location = resp_url if resp_url != url else ""  # type: ignore[attr-defined]
+        # With urllib3 >= 2.2, geturl() is always available
+        resp.content_type = resp.headers.get("Content-Type")  # type: ignore[union-attr]
+        resp_url = resp.geturl()
+        resp.redirect_location = resp_url if resp_url != url else ""  # type: ignore[union-attr]
         return resp, _wrap_urllib3_exceptions(resp.read)  # type: ignore[return-value]
 
 

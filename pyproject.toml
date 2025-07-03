@@ -47,11 +47,16 @@ dev = [
     "dissolve>=0.1.1"
 ]
 merge = ["merge3"]
+fuzzing = ["atheris"]
 
 [project.scripts]
 dulwich = "dulwich.cli:main"
 
 [tool.mypy]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "atheris"
 ignore_missing_imports = true
 
 [tool.setuptools]

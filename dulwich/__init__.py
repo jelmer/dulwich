@@ -40,6 +40,7 @@ except ImportError:
         since: Optional[str] = None, remove_in: Optional[str] = None
     ) -> Callable[[F], F]:
         def decorator(func: F) -> F:
+            import functools
             import warnings
 
             m = f"{func.__name__} is deprecated"
@@ -52,11 +53,14 @@ except ImportError:
             else:
                 m += " and will be removed in a future version"
 
-            warnings.warn(
-                m,
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return func
+            @functools.wraps(func)
+            def _wrapped_func(*args, **kwds):
+                warnings.warn(
+                    m,
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                func(*args, **kwds)
+            return _wrapped_func
 
         return decorator

@@ -10,6 +10,13 @@
    functionality works as expected.
    (Jelmer Vernooĳ, #780)
 
+ * Add callback-based authentication support for HTTP and proxy authentication
+   in ``Urllib3HttpGitClient``. This allows applications to handle
+   authentication dynamically without intercepting exceptions. Callbacks
+   receive the authentication scheme information (via WWW-Authenticate or
+   Proxy-Authenticate headers) and can provide credentials or cancel.
+   (Jelmer Vernooĳ, #822)
+
 0.23.1	2025-06-30
 
  * Support ``untracked_files="normal"`` argument to ``porcelain.status``,

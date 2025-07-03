@@ -27,13 +27,14 @@ import tempfile
 import warnings
 from io import BytesIO
 from typing import NoReturn
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 from urllib.parse import quote as urlquote
 from urllib.parse import urlparse
 
 import dulwich
 from dulwich import client
 from dulwich.client import (
+    AuthCallbackPoolManager,
     FetchPackResult,
     GitProtocolError,
     HangupException,
@@ -529,7 +530,6 @@ class TestGetTransportAndPath(TestCase):
 
     def test_ssh_with_config(self) -> None:
         # Test that core.sshCommand from config is passed to SSHGitClient
-        from dulwich.config import ConfigDict
 
         config = ConfigDict()
         c, path = get_transport_and_path(
@@ -844,7 +844,6 @@ class SSHGitClientTests(TestCase):
 
     def test_ssh_command_config(self) -> None:
         # Test core.sshCommand config setting
-        from dulwich.config import ConfigDict
 
         # No config, no environment - should be None
         self.overrideEnv("GIT_SSH", None)
@@ -1433,7 +1432,6 @@ class HttpGitClientTests(TestCase):
 
     def test_timeout_from_config(self) -> None:
         """Test that timeout can be configured via git config."""
-        from dulwich.config import ConfigDict
 
         url = "https://github.com/jelmer/dulwich"
         config = ConfigDict()
@@ -1447,7 +1445,6 @@ class HttpGitClientTests(TestCase):
 
     def test_timeout_parameter_precedence(self) -> None:
         """Test that explicit timeout parameter takes precedence over config."""
-        from dulwich.config import ConfigDict
 
         url = "https://github.com/jelmer/dulwich"
         config = ConfigDict()
@@ -1455,6 +1452,24 @@ class HttpGitClientTests(TestCase):
 
         c = HttpGitClient(url, config=config, timeout=15)
         self.assertEqual(c._timeout, 15)
+
+    def test_auth_callbacks(self) -> None:
+        url = "https://github.com/jelmer/dulwich"
+
+        def auth_callback(url, www_authenticate, attempt):
+            return {"username": "user", "password": "pass"}
+
+        def proxy_auth_callback(url, proxy_authenticate, attempt):
+            return {"username": "proxy_user", "password": "proxy_pass"}
+
+        c = HttpGitClient(
+            url, auth_callback=auth_callback, proxy_auth_callback=proxy_auth_callback
+        )
+
+        # Check that the pool manager is wrapped with AuthCallbackPoolManager
+        self.assertIsInstance(c.pool_manager, AuthCallbackPoolManager)
+        self.assertEqual(c._auth_callback, auth_callback)
+        self.assertEqual(c._proxy_auth_callback, proxy_auth_callback)
 
 
 class TCPGitClientTests(TestCase):
@@ -1476,10 +1491,191 @@ class TCPGitClientTests(TestCase):
         self.assertEqual("git://github.com:9090/jelmer/dulwich", url)
 
 
+class AuthCallbackPoolManagerTest(TestCase):
+    def test_http_auth_callback(self) -> None:
+        # Create a mock pool manager
+        mock_pool_manager = Mock()
+        mock_response = Mock()
+
+        # First request returns 401
+        mock_response.status = 401
+        mock_response.headers = {"WWW-Authenticate": 'Basic realm="test"'}
+
+        # Second request (after auth) returns 200
+        mock_response_success = Mock()
+        mock_response_success.status = 200
+        mock_response_success.headers = {}
+
+        mock_pool_manager.request = MagicMock(
+            side_effect=[mock_response, mock_response_success]
+        )
+
+        # Auth callback that returns credentials
+        def auth_callback(url, www_authenticate, attempt):
+            if attempt == 1:
+                return {"username": "testuser", "password": "testpass"}
+            return None
+
+        # Create the wrapper
+        auth_manager = AuthCallbackPoolManager(
+            mock_pool_manager, auth_callback=auth_callback
+        )
+
+        # Make request
+        result = auth_manager.request("GET", "https://example.com/test")
+
+        # Verify two requests were made
+        self.assertEqual(mock_pool_manager.request.call_count, 2)
+
+        # Verify auth headers were added on second request
+        second_call_kwargs = mock_pool_manager.request.call_args_list[1][1]
+        self.assertIn("headers", second_call_kwargs)
+        # urllib3 returns lowercase header names
+        self.assertIn("authorization", second_call_kwargs["headers"])
+
+        # Result should be the successful response
+        self.assertEqual(result, mock_response_success)
+
+    def test_proxy_auth_callback(self) -> None:
+        # Create a mock pool manager
+        mock_pool_manager = Mock()
+        mock_response = Mock()
+
+        # First request returns 407
+        mock_response.status = 407
+        mock_response.headers = {"Proxy-Authenticate": 'Basic realm="proxy"'}
+
+        # Second request (after auth) returns 200
+        mock_response_success = Mock()
+        mock_response_success.status = 200
+        mock_response_success.headers = {}
+
+        mock_pool_manager.request = MagicMock(
+            side_effect=[mock_response, mock_response_success]
+        )
+
+        # Proxy auth callback that returns credentials
+        def proxy_auth_callback(url, proxy_authenticate, attempt):
+            if attempt == 1:
+                return {"username": "proxyuser", "password": "proxypass"}
+            return None
+
+        # Create the wrapper
+        auth_manager = AuthCallbackPoolManager(
+            mock_pool_manager, proxy_auth_callback=proxy_auth_callback
+        )
+
+        # Make request
+        result = auth_manager.request("GET", "https://example.com/test")
+
+        # Verify two requests were made
+        self.assertEqual(mock_pool_manager.request.call_count, 2)
+
+        # Verify proxy auth headers were added on second request
+        second_call_kwargs = mock_pool_manager.request.call_args_list[1][1]
+        self.assertIn("headers", second_call_kwargs)
+        # urllib3 returns lowercase header names
+        self.assertIn("proxy-authorization", second_call_kwargs["headers"])
+
+        # Result should be the successful response
+        self.assertEqual(result, mock_response_success)
+
+    def test_max_attempts(self) -> None:
+        # Create a mock pool manager that always returns 401
+        mock_pool_manager = Mock()
+        mock_response = Mock()
+        mock_response.status = 401
+        mock_response.headers = {"WWW-Authenticate": 'Basic realm="test"'}
+        mock_pool_manager.request.return_value = mock_response
+
+        # Auth callback that always returns credentials
+        def auth_callback(url, www_authenticate, attempt):
+            return {"username": "user", "password": "pass"}
+
+        # Create the wrapper
+        auth_manager = AuthCallbackPoolManager(
+            mock_pool_manager, auth_callback=auth_callback
+        )
+
+        # Make request
+        result = auth_manager.request("GET", "https://example.com/test")
+
+        # Should have made 3 attempts (initial + 2 retries)
+        self.assertEqual(mock_pool_manager.request.call_count, 3)
+
+        # Result should be the last 401 response
+        self.assertEqual(result.status, 401)
+
+
 class DefaultUrllib3ManagerTest(TestCase):
     def test_no_config(self) -> None:
         manager = default_urllib3_manager(config=None)
         self.assertEqual(manager.connection_pool_kw["cert_reqs"], "CERT_REQUIRED")
+
+    def test_auth_callbacks(self) -> None:
+        def auth_callback(url, www_authenticate, attempt):
+            return {"username": "user", "password": "pass"}
+
+        def proxy_auth_callback(url, proxy_authenticate, attempt):
+            return {"username": "proxy_user", "password": "proxy_pass"}
+
+        manager = default_urllib3_manager(
+            config=None,
+            auth_callback=auth_callback,
+            proxy_auth_callback=proxy_auth_callback,
+        )
+        self.assertIsInstance(manager, AuthCallbackPoolManager)
+        self.assertEqual(manager._auth_callback, auth_callback)
+        self.assertEqual(manager._proxy_auth_callback, proxy_auth_callback)
+
+    def test_proxy_auth_method_unsupported(self) -> None:
+        import os
+
+
+        # Test with config
+        config = ConfigDict()
+        config.set((b"http",), b"proxy", b"http://user@proxy.example.com:8080")
+        config.set((b"http",), b"proxyAuthMethod", b"digest")
+
+        with self.assertRaises(NotImplementedError) as cm:
+            default_urllib3_manager(config=config)
+
+        self.assertIn("digest", str(cm.exception))
+        self.assertIn("not supported", str(cm.exception))
+
+        # Test with environment variable
+        config = ConfigDict()
+        config.set((b"http",), b"proxy", b"http://user@proxy.example.com:8080")
+
+        old_env = os.environ.get("GIT_HTTP_PROXY_AUTHMETHOD")
+        try:
+            os.environ["GIT_HTTP_PROXY_AUTHMETHOD"] = "ntlm"
+            with self.assertRaises(NotImplementedError) as cm:
+                default_urllib3_manager(config=config)
+
+            self.assertIn("ntlm", str(cm.exception))
+            self.assertIn("not supported", str(cm.exception))
+        finally:
+            if old_env is None:
+                os.environ.pop("GIT_HTTP_PROXY_AUTHMETHOD", None)
+            else:
+                os.environ["GIT_HTTP_PROXY_AUTHMETHOD"] = old_env
+
+    def test_proxy_auth_method_supported(self) -> None:
+
+        # Test basic auth method
+        config = ConfigDict()
+        config.set((b"http",), b"proxy", b"http://user@proxy.example.com:8080")
+        config.set((b"http",), b"proxyAuthMethod", b"basic")
+
+        # Should not raise
+        manager = default_urllib3_manager(config=config)
+        self.assertIsNotNone(manager)
+
+        # Test anyauth (default)
+        config.set((b"http",), b"proxyAuthMethod", b"anyauth")
+        manager = default_urllib3_manager(config=config)
+        self.assertIsNotNone(manager)
 
     def test_config_no_proxy(self) -> None:
         import urllib3
@@ -1723,7 +1919,6 @@ class DefaultUrllib3ManagerTest(TestCase):
 
     def test_timeout_from_config(self) -> None:
         """Test that timeout can be configured via git config."""
-        from dulwich.config import ConfigDict
 
         config = ConfigDict()
         config.set((b"http",), b"timeout", b"25")
@@ -1733,7 +1928,6 @@ class DefaultUrllib3ManagerTest(TestCase):
 
     def test_timeout_parameter_precedence(self) -> None:
         """Test that explicit timeout parameter takes precedence over config."""
-        from dulwich.config import ConfigDict
 
         config = ConfigDict()
         config.set((b"http",), b"timeout", b"25")

@@ -62,6 +62,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     import urllib3
 
+    from .client import AuthCallbackPoolManager
     from .config import Config
     from .repo import Repo
 
@@ -511,9 +512,13 @@ class HTTPLFSClient(LFSClient):
             config: Optional git config for authentication/proxy settings
         """
         super().__init__(url, config)
-        self._pool_manager: urllib3.PoolManager | None = None
+        self._pool_manager: (
+            urllib3.PoolManager | urllib3.ProxyManager | AuthCallbackPoolManager | None
+        ) = None
 
-    def _get_pool_manager(self) -> "urllib3.PoolManager":
+    def _get_pool_manager(
+        self,
+    ) -> "urllib3.PoolManager | urllib3.ProxyManager | AuthCallbackPoolManager":
         """Get urllib3 pool manager with git config applied."""
         if self._pool_manager is None:
             from dulwich.client import default_urllib3_manager

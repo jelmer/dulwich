@@ -9,6 +9,13 @@
  * Add basic ``dulwich.aiohttp`` module that provides
    server support. (Jelmer Vernooĳ)
 
+ * Add callback-based authentication support for HTTP and proxy authentication
+   in ``Urllib3HttpGitClient``. This allows applications to handle
+   authentication dynamically without intercepting exceptions. Callbacks
+   receive the authentication scheme information (via WWW-Authenticate or
+   Proxy-Authenticate headers) and can provide credentials or cancel.
+   (Jelmer Vernooĳ, #822)
+
 0.25.0	2025-12-17
 
 **PLEASE NOTE**: This release makes quite a lot of changes to public APIs. This

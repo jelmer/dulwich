@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
     # as possible to reduce start-up time for anything that doesn't need
     # these imports.
+    from .attrs import GitAttributes
     from .config import ConditionMatcher, ConfigFile, StackedConfig
     from .index import Index
     from .notes import Notes
@@ -2073,6 +2074,63 @@ class Repo(BaseRepo):
             )
         except KeyError:
             return BlobNormalizer(config_stack, git_attributes)
+
+    def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
+        """Read gitattributes for the repository.
+
+        Args:
+            tree: Tree SHA to read .gitattributes from (defaults to HEAD)
+
+        Returns:
+            GitAttributes object that can be used to match paths
+        """
+        from .attrs import (
+            GitAttributes,
+            Pattern,
+            parse_git_attributes,
+        )
+
+        patterns = []
+
+        # Read system gitattributes (TODO: implement this)
+        # Read global gitattributes (TODO: implement this)
+
+        # Read repository .gitattributes from index/tree
+        if tree is None:
+            try:
+                # Try to get from HEAD
+                head = self[b"HEAD"]
+                if isinstance(head, Tag):
+                    _cls, obj = head.object
+                    head = self.get_object(obj)
+                tree = head.tree
+            except KeyError:
+                # No HEAD, no attributes from tree
+                pass
+
+        if tree is not None:
+            try:
+                tree_obj = self[tree]
+                if b".gitattributes" in tree_obj:
+                    _, attrs_sha = tree_obj[b".gitattributes"]
+                    attrs_blob = self[attrs_sha]
+                    if isinstance(attrs_blob, Blob):
+                        attrs_data = BytesIO(attrs_blob.data)
+                        for pattern_bytes, attrs in parse_git_attributes(attrs_data):
+                            pattern = Pattern(pattern_bytes)
+                            patterns.append((pattern, attrs))
+            except (KeyError, NotTreeError):
+                pass
+
+        # Read .git/info/attributes
+        info_attrs_path = os.path.join(self.controldir(), "info", "attributes")
+        if os.path.exists(info_attrs_path):
+            with open(info_attrs_path, "rb") as f:
+                for pattern_bytes, attrs in parse_git_attributes(f):
+                    pattern = Pattern(pattern_bytes)
+                    patterns.append((pattern, attrs))
+
+        return GitAttributes(patterns)
 
     def _sparse_checkout_file_path(self) -> str:
         """Return the path of the sparse-checkout file in this repo's control dir."""

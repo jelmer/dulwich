@@ -341,6 +341,35 @@ class RepositoryRootTests(TestCase):
         r.set_description(description)
         self.assertEqual(description, r.get_description())
 
+    def test_get_gitattributes(self) -> None:
+        # Test when no .gitattributes file exists
+        r = self.open_repo("a.git")
+        attrs = r.get_gitattributes()
+        from dulwich.attrs import GitAttributes
+
+        self.assertIsInstance(attrs, GitAttributes)
+        self.assertEqual(len(attrs), 0)
+
+        # Create .git/info/attributes file (which is read by get_gitattributes)
+        info_dir = os.path.join(r.controldir(), "info")
+        if not os.path.exists(info_dir):
+            os.makedirs(info_dir)
+        attrs_path = os.path.join(info_dir, "attributes")
+        with open(attrs_path, "wb") as f:
+            f.write(b"*.txt text\n")
+            f.write(b"*.jpg -text binary\n")
+
+        # Test with attributes file
+        attrs = r.get_gitattributes()
+        self.assertEqual(len(attrs), 2)
+
+        # Test matching
+        txt_attrs = attrs.match_path(b"file.txt")
+        self.assertEqual(txt_attrs, {b"text": True})
+
+        jpg_attrs = attrs.match_path(b"image.jpg")
+        self.assertEqual(jpg_attrs, {b"text": False, b"binary": True})
+
     def test_contains_missing(self) -> None:
         r = self.open_repo("a.git")
         self.assertNotIn(b"bar", r)

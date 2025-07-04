@@ -22,8 +22,10 @@
 """Implementation of Git filter drivers (clean/smudge filters)."""
 
 import subprocess
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Callable, Optional, Protocol
 
+from .attrs import AttributeValue, Pattern, match_path
 from .objects import Blob
 
 if TYPE_CHECKING:
@@ -175,7 +177,7 @@ class FilterRegistry:
 
 def get_filter_for_path(
     path: bytes,
-    gitattributes: dict[bytes, dict[bytes, bytes]],
+    gitattributes: dict[bytes, dict[bytes, AttributeValue]],
     filter_registry: FilterRegistry,
 ) -> Optional[FilterDriver]:
     """Get the appropriate filter driver for a given path.
@@ -188,21 +190,24 @@ def get_filter_for_path(
     Returns:
         FilterDriver instance or None
     """
-    # For now, this is a simple implementation that does exact path matching
-    # In a real implementation, we'd need to handle glob patterns
+    # Convert gitattributes dict to list of (Pattern, attrs) tuples
+    patterns: list[tuple[Pattern, Mapping[bytes, AttributeValue]]] = []
+    for pattern_bytes, attrs in gitattributes.items():
+        pattern = Pattern(pattern_bytes)
+        patterns.append((pattern, attrs))
 
-    # Check each pattern in gitattributes
-    for pattern, attrs in gitattributes.items():
-        # Simple implementation: just check if path matches pattern exactly
-        # TODO: Implement proper gitattributes pattern matching
-        if pattern == path or (pattern.startswith(b"*") and path.endswith(pattern[1:])):
-            filter_name_bytes = attrs.get(b"filter")
-            if filter_name_bytes is not None:
-                if isinstance(filter_name_bytes, bytes):
-                    filter_name_str = filter_name_bytes.decode("utf-8")
-                else:
-                    filter_name_str = filter_name_bytes
-                return filter_registry.get_driver(filter_name_str)
+    # Get all attributes for this path
+    attributes = match_path(patterns, path)
+
+    # Check if there's a filter attribute
+    filter_name = attributes.get(b"filter")
+    if filter_name is not None:
+        if isinstance(filter_name, bool):
+            return None
+        if isinstance(filter_name, bytes):
+            filter_name_str = filter_name.decode("utf-8")
+            return filter_registry.get_driver(filter_name_str)
+        return None
 
     return None
 
@@ -216,7 +221,7 @@ class FilterBlobNormalizer:
     def __init__(
         self,
         config_stack: Optional["StackedConfig"],
-        gitattributes: dict[bytes, dict[bytes, bytes]],
+        gitattributes: dict[bytes, dict[bytes, AttributeValue]],
         filter_registry: Optional[FilterRegistry] = None,
         repo=None,
     ) -> None:

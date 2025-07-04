@@ -34,6 +34,7 @@ def test_suite():
         "pack",
         "patch",
         "porcelain",
+        "reftable",
         "repository",
         "server",
         "utils",

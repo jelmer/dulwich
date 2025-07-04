@@ -808,6 +808,8 @@ def remove(repo=".", paths=None, cached=False) -> None:
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
+        blob_normalizer = r.get_blob_normalizer()
+
         for p in paths:
             # If path is absolute, use it as-is. Otherwise, treat it as relative to repo
             if os.path.isabs(p):
@@ -831,6 +833,9 @@ def remove(repo=".", paths=None, cached=False) -> None:
                 else:
                     try:
                         blob = blob_from_path_and_stat(full_path_bytes, st)
+                        # Apply checkin normalization to compare apples to apples
+                        if blob_normalizer is not None:
+                            blob = blob_normalizer.checkin_normalize(blob, tree_path)
                     except OSError:
                         pass
                     else:
@@ -1465,8 +1470,27 @@ def tag_create(
             elif isinstance(tag_timezone, str):
                 tag_timezone = parse_timezone(tag_timezone.encode())
             tag_obj.tag_timezone = tag_timezone
-            if sign:
-                tag_obj.sign(sign if isinstance(sign, str) else None)
+
+            # Check if we should sign the tag
+            should_sign = sign
+            if sign is None:
+                # Check tag.gpgSign configuration when sign is not explicitly set
+                config = r.get_config_stack()
+                try:
+                    should_sign = config.get_boolean((b"tag",), b"gpgSign")
+                except KeyError:
+                    should_sign = False  # Default to not signing if no config
+            if should_sign:
+                keyid = sign if isinstance(sign, str) else None
+                # If sign is True but no keyid specified, check user.signingKey config
+                if should_sign is True and keyid is None:
+                    config = r.get_config_stack()
+                    try:
+                        keyid = config.get((b"user",), b"signingKey").decode("ascii")
+                    except KeyError:
+                        # No user.signingKey configured, will use default GPG key
+                        pass
+                tag_obj.sign(keyid)
 
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id
@@ -1784,9 +1808,25 @@ def push(
     """
     # Open the repo
     with open_repo_closing(repo) as r:
-        if refspecs is None:
-            refspecs = [active_branch(r)]
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
+        # Check if mirror mode is enabled
+        mirror_mode = False
+        if remote_name:
+            try:
+                mirror_mode = r.get_config_stack().get_boolean(
+                    (b"remote", remote_name.encode()), b"mirror"
+                )
+            except KeyError:
+                pass
+
+        if mirror_mode:
+            # Mirror mode: push all refs and delete non-existent ones
+            refspecs = []
+            for ref in r.refs.keys():
+                # Push all refs to the same name on remote
+                refspecs.append(ref + b":" + ref)
+        elif refspecs is None:
+            refspecs = [active_branch(r)]
 
         # Get the client and path
         client, path = get_transport_and_path(
@@ -1799,6 +1839,14 @@ def push(
         def update_refs(refs):
             selected_refs.extend(parse_reftuples(r.refs, refs, refspecs, force=force))
             new_refs = {}
+
+            # In mirror mode, delete remote refs that don't exist locally
+            if mirror_mode:
+                local_refs = set(r.refs.keys())
+                for remote_ref in refs.keys():
+                    if remote_ref not in local_refs:
+                        new_refs[remote_ref] = ZERO_SHA
+                        remote_changed_refs[remote_ref] = None
             # TODO: Handle selected_refs == {None: None}
             for lh, rh, force_ref in selected_refs:
                 if lh is None:
@@ -2323,14 +2371,83 @@ def branch_create(repo, name, objectish=None, force=False) -> None:
     with open_repo_closing(repo) as r:
         if objectish is None:
             objectish = "HEAD"
+
+        # Try to expand branch shorthand before parsing
+        original_objectish = objectish
+        objectish_bytes = (
+            objectish.encode(DEFAULT_ENCODING)
+            if isinstance(objectish, str)
+            else objectish
+        )
+        if b"refs/remotes/" + objectish_bytes in r.refs:
+            objectish = b"refs/remotes/" + objectish_bytes
+        elif b"refs/heads/" + objectish_bytes in r.refs:
+            objectish = b"refs/heads/" + objectish_bytes
+
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
-        ref_message = b"branch: Created from " + objectish.encode(DEFAULT_ENCODING)
+        ref_message = (
+            b"branch: Created from " + original_objectish.encode(DEFAULT_ENCODING)
+            if isinstance(original_objectish, str)
+            else b"branch: Created from " + original_objectish
+        )
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
             if not r.refs.add_if_new(refname, object.id, message=ref_message):
                 raise Error(f"Branch with name {name} already exists.")
+
+        # Check if we should set up tracking
+        config = r.get_config_stack()
+        try:
+            auto_setup_merge = config.get((b"branch",), b"autoSetupMerge").decode()
+        except KeyError:
+            auto_setup_merge = "true"  # Default value
+
+        # Determine if the objectish refers to a remote-tracking branch
+        objectish_ref = None
+        if original_objectish != "HEAD":
+            # Try to resolve objectish as a ref
+            objectish_bytes = (
+                original_objectish.encode(DEFAULT_ENCODING)
+                if isinstance(original_objectish, str)
+                else original_objectish
+            )
+            if objectish_bytes in r.refs:
+                objectish_ref = objectish_bytes
+            elif b"refs/remotes/" + objectish_bytes in r.refs:
+                objectish_ref = b"refs/remotes/" + objectish_bytes
+            elif b"refs/heads/" + objectish_bytes in r.refs:
+                objectish_ref = b"refs/heads/" + objectish_bytes
+        else:
+            # HEAD might point to a remote-tracking branch
+            head_ref = r.refs.follow(b"HEAD")[0][1]
+            if head_ref.startswith(b"refs/remotes/"):
+                objectish_ref = head_ref
+
+        # Set up tracking if appropriate
+        if objectish_ref and (
+            (auto_setup_merge == "always")
+            or (
+                auto_setup_merge == "true"
+                and objectish_ref.startswith(b"refs/remotes/")
+            )
+        ):
+            # Extract remote name and branch from the ref
+            if objectish_ref.startswith(b"refs/remotes/"):
+                parts = objectish_ref[len(b"refs/remotes/") :].split(b"/", 1)
+                if len(parts) == 2:
+                    remote_name = parts[0]
+                    remote_branch = b"refs/heads/" + parts[1]
+
+                    # Set up tracking
+                    config = r.get_config()
+                    branch_name_bytes = (
+                        name.encode(DEFAULT_ENCODING) if isinstance(name, str) else name
+                    )
+                    config.set((b"branch", branch_name_bytes), b"remote", remote_name)
+                    config.set((b"branch", branch_name_bytes), b"merge", remote_branch)
+                    config.write_to_path()
 
 
 def branch_list(repo):
@@ -2338,9 +2455,55 @@ def branch_list(repo):
 
     Args:
       repo: Path to the repository
+    Returns:
+      List of branch names (without refs/heads/ prefix)
     """
     with open_repo_closing(repo) as r:
-        return r.refs.keys(base=LOCAL_BRANCH_PREFIX)
+        branches = list(r.refs.keys(base=LOCAL_BRANCH_PREFIX))
+
+        # Check for branch.sort configuration
+        config = r.get_config_stack()
+        try:
+            sort_key = config.get((b"branch",), b"sort").decode()
+        except KeyError:
+            # Default is refname (alphabetical)
+            sort_key = "refname"
+
+        # Parse sort key
+        reverse = False
+        if sort_key.startswith("-"):
+            reverse = True
+            sort_key = sort_key[1:]
+
+        # Apply sorting
+        if sort_key == "refname":
+            # Simple alphabetical sort (default)
+            branches.sort(reverse=reverse)
+        elif sort_key in ("committerdate", "authordate"):
+            # Sort by date
+            def get_commit_date(branch_name):
+                ref = LOCAL_BRANCH_PREFIX + branch_name
+                sha = r.refs[ref]
+                commit = r.object_store[sha]
+                if sort_key == "committerdate":
+                    return commit.commit_time
+                else:  # authordate
+                    return commit.author_time
+
+            # Sort branches by date
+            # Note: Python's sort naturally orders smaller values first (ascending)
+            # For dates, this means oldest first by default
+            # Use a stable sort with branch name as secondary key for consistent ordering
+            if reverse:
+                # For reverse sort, we want newest dates first but alphabetical names second
+                branches.sort(key=lambda b: (-get_commit_date(b), b))
+            else:
+                branches.sort(key=lambda b: (get_commit_date(b), b))
+        else:
+            # Unknown sort key, fall back to default
+            branches.sort()
+
+        return branches
 
 
 def active_branch(repo):
@@ -2867,6 +3030,9 @@ def checkout(
                 with open(target, mode) as f:
                     f.write(source)
 
+        # Get blob normalizer for line ending conversion
+        blob_normalizer = r.get_blob_normalizer()
+
         # Update working tree
         update_working_tree(
             r,
@@ -2876,6 +3042,7 @@ def checkout(
             validate_path_element=validate_path_element,
             symlink_fn=symlink_fn,
             force_remove_untracked=force,
+            blob_normalizer=blob_normalizer,
         )
 
         # Update HEAD

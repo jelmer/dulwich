@@ -246,6 +246,10 @@ def apply_included_paths(
                 ensure_dir_exists(os.path.dirname(full_path))
                 from .objects import Blob
 
+                # Apply checkout normalization if normalizer is available
+                if normalizer and isinstance(blob, Blob):
+                    blob = normalizer.checkout_normalize(blob, path_bytes)
+
                 with open(full_path, "wb") as f:
                     if isinstance(blob, Blob):
                         f.write(blob.data)

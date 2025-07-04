@@ -61,6 +61,7 @@ except ImportError:
                     stacklevel=2,
                 )
                 func(*args, **kwds)
+
             return _wrapped_func
 
         return decorator

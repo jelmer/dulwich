@@ -3030,6 +3030,9 @@ def checkout(
                 with open(target, mode) as f:
                     f.write(source)
 
+        # Get blob normalizer for line ending conversion
+        blob_normalizer = r.get_blob_normalizer()
+
         # Update working tree
         update_working_tree(
             r,
@@ -3039,6 +3042,7 @@ def checkout(
             validate_path_element=validate_path_element,
             symlink_fn=symlink_fn,
             force_remove_untracked=force,
+            blob_normalizer=blob_normalizer,
         )
 
         # Update HEAD

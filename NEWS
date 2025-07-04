@@ -237,6 +237,9 @@
  * Port remaining ``dulwich.cli`` commands from getopt to argparse.
    (Jelmer Vernooĳ)
 
+ * Add basic support for reftables.
+   (Jelmer Vernooĳ, #1366)
+
 0.22.8	2025-03-02
 
  * Allow passing in plain strings to ``dulwich.porcelain.tag_create``

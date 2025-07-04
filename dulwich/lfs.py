@@ -23,7 +23,7 @@ import hashlib
 import os
 import tempfile
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, BinaryIO, Optional
 
 if TYPE_CHECKING:
     from .repo import Repo
@@ -78,3 +78,108 @@ class LFSStore:
             os.makedirs(os.path.dirname(path))
         os.rename(tmppath, path)
         return sha.hexdigest()
+
+
+class LFSPointer:
+    """Represents an LFS pointer file."""
+
+    def __init__(self, oid: str, size: int) -> None:
+        self.oid = oid
+        self.size = size
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Optional["LFSPointer"]:
+        """Parse LFS pointer from bytes.
+
+        Returns None if data is not a valid LFS pointer.
+        """
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+
+        # LFS pointer files have a specific format
+        lines = text.strip().split("\n")
+        if len(lines) < 3:
+            return None
+
+        # Must start with version
+        if not lines[0].startswith("version https://git-lfs.github.com/spec/v1"):
+            return None
+
+        oid = None
+        size = None
+
+        for line in lines[1:]:
+            if line.startswith("oid sha256:"):
+                oid = line[11:].strip()
+            elif line.startswith("size "):
+                try:
+                    size = int(line[5:].strip())
+                except ValueError:
+                    return None
+
+        if oid is None or size is None:
+            return None
+
+        return cls(oid, size)
+
+    def to_bytes(self) -> bytes:
+        """Convert LFS pointer to bytes."""
+        return (
+            f"version https://git-lfs.github.com/spec/v1\n"
+            f"oid sha256:{self.oid}\n"
+            f"size {self.size}\n"
+        ).encode()
+
+    def is_valid_oid(self) -> bool:
+        """Check if the OID is valid SHA256."""
+        if len(self.oid) != 64:
+            return False
+        try:
+            int(self.oid, 16)
+            return True
+        except ValueError:
+            return False
+
+
+class LFSFilterDriver:
+    """LFS filter driver implementation."""
+
+    def __init__(self, lfs_store: "LFSStore") -> None:
+        self.lfs_store = lfs_store
+
+    def clean(self, data: bytes) -> bytes:
+        """Convert file content to LFS pointer (clean filter)."""
+        # Check if data is already an LFS pointer
+        pointer = LFSPointer.from_bytes(data)
+        if pointer is not None:
+            return data
+
+        # Store the file content in LFS
+        sha = self.lfs_store.write_object([data])
+
+        # Create and return LFS pointer
+        pointer = LFSPointer(sha, len(data))
+        return pointer.to_bytes()
+
+    def smudge(self, data: bytes) -> bytes:
+        """Convert LFS pointer to file content (smudge filter)."""
+        # Try to parse as LFS pointer
+        pointer = LFSPointer.from_bytes(data)
+        if pointer is None:
+            # Not an LFS pointer, return as-is
+            return data
+
+        # Validate the pointer
+        if not pointer.is_valid_oid():
+            return data
+
+        try:
+            # Read the actual content from LFS store
+            with self.lfs_store.open_object(pointer.oid) as f:
+                return f.read()
+        except KeyError:
+            # Object not found in LFS store, return pointer as-is
+            # This matches Git LFS behavior when object is missing
+            return data

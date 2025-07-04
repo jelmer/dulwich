@@ -89,6 +89,9 @@ class FilterRegistry:
         self._drivers: dict[str, FilterDriver] = {}
         self._factories: dict[str, Callable[[FilterRegistry], FilterDriver]] = {}
 
+        # Register built-in filter factories
+        self.register_factory("lfs", self._create_lfs_filter)
+
     def register_factory(
         self, name: str, factory: Callable[["FilterRegistry"], FilterDriver]
     ) -> None:
@@ -152,6 +155,22 @@ class FilterRegistry:
             return ProcessFilterDriver(clean_cmd, smudge_cmd)
 
         return None
+
+    def _create_lfs_filter(self, registry: "FilterRegistry") -> FilterDriver:
+        """Create LFS filter driver."""
+        from .lfs import LFSFilterDriver, LFSStore
+
+        # If we have a repo, use its LFS store
+        if registry.repo is not None:
+            lfs_store = LFSStore.from_repo(registry.repo, create=True)
+        else:
+            # Fall back to creating a temporary LFS store
+            import tempfile
+
+            lfs_dir = tempfile.mkdtemp(prefix="dulwich-lfs-")
+            lfs_store = LFSStore.create(lfs_dir)
+
+        return LFSFilterDriver(lfs_store)
 
 
 def get_filter_for_path(

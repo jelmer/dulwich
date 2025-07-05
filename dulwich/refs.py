@@ -928,24 +928,29 @@ class DiskRefsContainer(RefsContainer):
             probe_ref = os.path.dirname(probe_ref)
 
         ensure_dir_exists(os.path.dirname(filename))
-        with GitFile(filename, "wb") as f:
-            if old_ref is not None:
-                try:
-                    # read again while holding the lock
-                    orig_ref = self.read_loose_ref(realname)
-                    if orig_ref is None:
-                        orig_ref = self.get_packed_refs().get(realname, ZERO_SHA)
-                    if orig_ref != old_ref:
+
+        # first, check if we need to write anything at all without
+        # acquiring the lock, which triggers a fs write, close and
+        # thus fsync()
+        if self.read_loose_ref(realname) != new_ref:
+            with GitFile(filename, "wb") as f:
+                if old_ref is not None:
+                    try:
+                        # read again while holding the lock
+                        orig_ref = self.read_loose_ref(realname)
+                        if orig_ref is None:
+                            orig_ref = self.get_packed_refs().get(realname, ZERO_SHA)
+                        if orig_ref != old_ref:
+                            f.abort()
+                            return False
+                    except OSError:
                         f.abort()
-                        return False
+                        raise
+                try:
+                    f.write(new_ref + b"\n")
                 except OSError:
                     f.abort()
                     raise
-            try:
-                f.write(new_ref + b"\n")
-            except OSError:
-                f.abort()
-                raise
             self._log(
                 realname,
                 old_ref,

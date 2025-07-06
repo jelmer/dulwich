@@ -1232,18 +1232,16 @@ class AddTests(PorcelainTestCase):
         with open(os.path.join(self.repo.path, "adir", "afile"), "w") as f:
             f.write("\n")
         cwd = os.getcwd()
-        try:
-            os.chdir(self.repo.path)
-            self.assertEqual({"foo", "blah", "adir", ".git"}, set(os.listdir(".")))
-            added, ignored = porcelain.add(self.repo.path)
-            # Normalize paths to use forward slashes for comparison
-            added_normalized = [path.replace(os.sep, "/") for path in added]
-            self.assertEqual(
-                (added_normalized, ignored),
-                (["foo", "adir/afile"], set()),
-            )
-        finally:
-            os.chdir(cwd)
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(self.repo.path)
+        self.assertEqual({"foo", "blah", "adir", ".git"}, set(os.listdir(".")))
+        added, ignored = porcelain.add(self.repo.path)
+        # Normalize paths to use forward slashes for comparison
+        added_normalized = [path.replace(os.sep, "/") for path in added]
+        self.assertEqual(
+            (added_normalized, ignored),
+            (["foo", "adir/afile"], set()),
+        )
 
         # Check that foo was added and nothing in .git was modified
         index = self.repo.open_index()
@@ -1257,17 +1255,15 @@ class AddTests(PorcelainTestCase):
             f.write("\n")
 
         cwd = os.getcwd()
-        try:
-            os.chdir(os.path.join(self.repo.path, "foo"))
-            porcelain.add(repo=self.repo.path)
-            porcelain.commit(
-                repo=self.repo.path,
-                message=b"test",
-                author=b"test <email>",
-                committer=b"test <email>",
-            )
-        finally:
-            os.chdir(cwd)
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(os.path.join(self.repo.path, "foo"))
+        porcelain.add(repo=self.repo.path)
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"test",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
 
         index = self.repo.open_index()
         # After fix: add() with no paths should behave like git add -A (add everything)
@@ -1783,11 +1779,9 @@ class RemoveTests(PorcelainTestCase):
         )
         self.assertTrue(os.path.exists(os.path.join(self.repo.path, "foo")))
         cwd = os.getcwd()
-        try:
-            os.chdir(self.repo.path)
-            porcelain.remove(self.repo.path, paths=["foo"])
-        finally:
-            os.chdir(cwd)
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(self.repo.path)
+        porcelain.remove(self.repo.path, paths=["foo"])
         self.assertFalse(os.path.exists(os.path.join(self.repo.path, "foo")))
 
     def test_remove_file_staged(self) -> None:
@@ -1795,12 +1789,10 @@ class RemoveTests(PorcelainTestCase):
         with open(fullpath, "w") as f:
             f.write("BAR")
         cwd = os.getcwd()
-        try:
-            os.chdir(self.repo.path)
-            porcelain.add(self.repo.path, paths=[fullpath])
-            self.assertRaises(Exception, porcelain.rm, self.repo.path, paths=["foo"])
-        finally:
-            os.chdir(cwd)
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(self.repo.path)
+        porcelain.add(self.repo.path, paths=[fullpath])
+        self.assertRaises(Exception, porcelain.rm, self.repo.path, paths=["foo"])
 
     def test_remove_file_removed_on_disk(self) -> None:
         fullpath = os.path.join(self.repo.path, "foo")
@@ -1808,12 +1800,10 @@ class RemoveTests(PorcelainTestCase):
             f.write("BAR")
         porcelain.add(self.repo.path, paths=[fullpath])
         cwd = os.getcwd()
-        try:
-            os.chdir(self.repo.path)
-            os.remove(fullpath)
-            porcelain.remove(self.repo.path, paths=["foo"])
-        finally:
-            os.chdir(cwd)
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(self.repo.path)
+        os.remove(fullpath)
+        porcelain.remove(self.repo.path, paths=["foo"])
         self.assertFalse(os.path.exists(os.path.join(self.repo.path, "foo")))
 
     def test_remove_from_different_directory(self) -> None:
@@ -1840,12 +1830,12 @@ class RemoveTests(PorcelainTestCase):
             os.chdir(tempdir)
             # Remove the file using relative path from repository root
             porcelain.remove(self.repo.path, paths=["mydir/myfile"])
+
+            # Verify file was removed
+            self.assertFalse(os.path.exists(fullpath))
         finally:
             os.chdir(cwd)
-            os.rmdir(tempdir)
-
-        # Verify file was removed
-        self.assertFalse(os.path.exists(fullpath))
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     def test_remove_with_absolute_path(self) -> None:
         # Create a file
@@ -1869,12 +1859,12 @@ class RemoveTests(PorcelainTestCase):
             os.chdir(tempdir)
             # Remove the file using absolute path
             porcelain.remove(self.repo.path, paths=[fullpath])
+
+            # Verify file was removed
+            self.assertFalse(os.path.exists(fullpath))
         finally:
             os.chdir(cwd)
-            os.rmdir(tempdir)
-
-        # Verify file was removed
-        self.assertFalse(os.path.exists(fullpath))
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     def test_remove_with_filter_normalization(self) -> None:
         # Enable autocrlf to normalize line endings
@@ -2068,13 +2058,13 @@ class MvTests(PorcelainTestCase):
             os.chdir(tempdir)
             # Move the file using relative path from repository root
             porcelain.mv(self.repo.path, "mydir/myfile", "renamed")
+
+            # Verify file was moved
+            self.assertFalse(os.path.exists(fullpath))
+            self.assertTrue(os.path.exists(os.path.join(self.repo.path, "renamed")))
         finally:
             os.chdir(cwd)
-            os.rmdir(tempdir)
-
-        # Verify file was moved
-        self.assertFalse(os.path.exists(fullpath))
-        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "renamed")))
+            shutil.rmtree(tempdir, ignore_errors=True)
 
 
 class LogTests(PorcelainTestCase):

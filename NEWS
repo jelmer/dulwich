@@ -29,6 +29,11 @@
    bisect_reset, bisect_log, bisect_replay), and CLI support.
    (Jelmer Vernooĳ, #1631)
 
+ * Fix ``porcelain.describe()`` to dynamically determine hash length
+   based on uniqueness, matching git describe behavior more closely.
+   Previously used a hardcoded 7-character hash length.
+   (Jelmer Vernooĳ, #824)
+
 0.23.1	2025-06-30
 
  * Support ``untracked_files="normal"`` argument to ``porcelain.status``,

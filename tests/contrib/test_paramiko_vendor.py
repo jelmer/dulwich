@@ -20,11 +20,14 @@
 
 """Tests for paramiko_vendor."""
 
+import os
 import socket
+import tempfile
 import threading
 from io import StringIO
 from typing import Optional
 from unittest import skipIf
+from unittest.mock import patch
 
 from .. import TestCase
 
@@ -221,3 +224,46 @@ class ParamikoSSHVendorTests(TestCase):
 
         # Fixme: it's return empty string
         # self.assertEqual(b'stderr\n', con.read_stderr(4096))
+
+    def test_ssh_config_parsing(self) -> None:
+        """Test that SSH config is properly parsed and used by ParamikoSSHVendor."""
+        # Create a temporary SSH config file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".config", delete=False) as f:
+            f.write(
+                f"""
+Host testserver
+    HostName 127.0.0.1
+    User testuser
+    Port {self.port}
+    IdentityFile /path/to/key
+"""
+            )
+            config_path = f.name
+
+        try:
+            # Mock the config path
+            with patch(
+                "dulwich.contrib.paramiko_vendor.os.path.expanduser"
+            ) as mock_expanduser:
+
+                def side_effect(path):
+                    if path == "~/.ssh/config":
+                        return config_path
+                    return path
+
+                mock_expanduser.side_effect = side_effect
+
+                vendor = ParamikoSSHVendor(
+                    allow_agent=False,
+                    look_for_keys=False,
+                )
+
+                # Test that SSH config values are loaded
+                host_config = vendor.ssh_config.lookup("testserver")
+                self.assertEqual(host_config["hostname"], "127.0.0.1")
+                self.assertEqual(host_config["user"], "testuser")
+                self.assertEqual(host_config["port"], str(self.port))
+                self.assertIn("/path/to/key", host_config["identityfile"])
+
+        finally:
+            os.unlink(config_path)

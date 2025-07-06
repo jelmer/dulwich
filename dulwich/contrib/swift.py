@@ -429,7 +429,7 @@ class SwiftConnector:
         try:
             # Sometime got Broken Pipe - Dirty workaround
             ret = _send()
-        except Exception:
+        except (BrokenPipeError, ConnectionError):
             # Second attempt work
             ret = _send()
 

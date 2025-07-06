@@ -444,7 +444,7 @@ class CommitGraphCompatTests(CompatTestCase):
         # Try to write commit graph (should succeed but create empty graph)
         try:
             run_git_or_fail(["commit-graph", "write", "--reachable"], cwd=self.test_dir)
-        except Exception:
+        except AssertionError:
             # Some Git versions might fail on empty repos, which is fine
             pass
 

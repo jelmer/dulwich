@@ -7063,3 +7063,147 @@ class FilterBranchTests(PorcelainTestCase):
         new_head = self.repo.refs[b"refs/heads/master"]
         new_commit = self.repo[new_head]
         self.assertTrue(new_commit.message.startswith(b"Second: First: "))
+
+
+class StashTests(PorcelainTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        # Create initial commit
+        with open(os.path.join(self.repo.path, "initial.txt"), "wb") as f:
+            f.write(b"initial content")
+        porcelain.add(repo=self.repo.path, paths=["initial.txt"])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Initial commit",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+    def test_stash_push_and_pop(self) -> None:
+        # Create a new file and stage it
+        new_file = os.path.join(self.repo.path, "new.txt")
+        with open(new_file, "wb") as f:
+            f.write(b"new file content")
+        porcelain.add(repo=self.repo.path, paths=["new.txt"])
+
+        # Modify existing file
+        with open(os.path.join(self.repo.path, "initial.txt"), "wb") as f:
+            f.write(b"modified content")
+
+        # Push to stash
+        porcelain.stash_push(self.repo.path)
+
+        # Verify files are reset
+        self.assertFalse(os.path.exists(new_file))
+        with open(os.path.join(self.repo.path, "initial.txt"), "rb") as f:
+            self.assertEqual(b"initial content", f.read())
+
+        # Pop the stash
+        porcelain.stash_pop(self.repo.path)
+
+        # Verify files are restored
+        self.assertTrue(os.path.exists(new_file))
+        with open(new_file, "rb") as f:
+            self.assertEqual(b"new file content", f.read())
+        with open(os.path.join(self.repo.path, "initial.txt"), "rb") as f:
+            self.assertEqual(b"modified content", f.read())
+
+        # Verify new file is in the index
+        from dulwich.index import Index
+
+        index = Index(os.path.join(self.repo.path, ".git", "index"))
+        self.assertIn(b"new.txt", index)
+
+    def test_stash_list(self) -> None:
+        # Initially no stashes
+        stashes = list(porcelain.stash_list(self.repo.path))
+        self.assertEqual(0, len(stashes))
+
+        # Create a file and stash it
+        test_file = os.path.join(self.repo.path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content")
+        porcelain.add(repo=self.repo.path, paths=["test.txt"])
+
+        # Push first stash
+        porcelain.stash_push(self.repo.path)
+
+        # Create another file and stash it
+        test_file2 = os.path.join(self.repo.path, "test2.txt")
+        with open(test_file2, "wb") as f:
+            f.write(b"test content 2")
+        porcelain.add(repo=self.repo.path, paths=["test2.txt"])
+
+        # Push second stash
+        porcelain.stash_push(self.repo.path)
+
+        # Check stash list
+        stashes = list(porcelain.stash_list(self.repo.path))
+        self.assertEqual(2, len(stashes))
+
+        # Stashes are returned in order (most recent first)
+        self.assertEqual(0, stashes[0][0])
+        self.assertEqual(1, stashes[1][0])
+
+    def test_stash_drop(self) -> None:
+        # Create and stash some changes
+        test_file = os.path.join(self.repo.path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content")
+        porcelain.add(repo=self.repo.path, paths=["test.txt"])
+        porcelain.stash_push(self.repo.path)
+
+        # Create another stash
+        test_file2 = os.path.join(self.repo.path, "test2.txt")
+        with open(test_file2, "wb") as f:
+            f.write(b"test content 2")
+        porcelain.add(repo=self.repo.path, paths=["test2.txt"])
+        porcelain.stash_push(self.repo.path)
+
+        # Verify we have 2 stashes
+        stashes = list(porcelain.stash_list(self.repo.path))
+        self.assertEqual(2, len(stashes))
+
+        # Drop the first stash (index 0)
+        porcelain.stash_drop(self.repo.path, 0)
+
+        # Verify we have 1 stash left
+        stashes = list(porcelain.stash_list(self.repo.path))
+        self.assertEqual(1, len(stashes))
+
+        # The remaining stash should be the one we created first
+        # Pop it and verify it's the first file
+        porcelain.stash_pop(self.repo.path)
+        self.assertTrue(os.path.exists(test_file))
+        self.assertFalse(os.path.exists(test_file2))
+
+    def test_stash_pop_empty(self) -> None:
+        # Attempting to pop from empty stash should raise an error
+        with self.assertRaises(IndexError):
+            porcelain.stash_pop(self.repo.path)
+
+    def test_stash_with_untracked_files(self) -> None:
+        # Create an untracked file
+        untracked_file = os.path.join(self.repo.path, "untracked.txt")
+        with open(untracked_file, "wb") as f:
+            f.write(b"untracked content")
+
+        # Create a tracked change
+        tracked_file = os.path.join(self.repo.path, "tracked.txt")
+        with open(tracked_file, "wb") as f:
+            f.write(b"tracked content")
+        porcelain.add(repo=self.repo.path, paths=["tracked.txt"])
+
+        # Stash (by default, untracked files are not included)
+        porcelain.stash_push(self.repo.path)
+
+        # Untracked file should still exist
+        self.assertTrue(os.path.exists(untracked_file))
+        # Tracked file should be gone
+        self.assertFalse(os.path.exists(tracked_file))
+
+        # Pop the stash
+        porcelain.stash_pop(self.repo.path)
+
+        # Tracked file should be restored
+        self.assertTrue(os.path.exists(tracked_file))

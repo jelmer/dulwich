@@ -980,7 +980,7 @@ class BaseRepo:
         author_timezone=None,
         tree: Optional[ObjectID] = None,
         encoding: Optional[bytes] = None,
-        ref: Ref = b"HEAD",
+        ref: Optional[Ref] = b"HEAD",
         merge_heads: Optional[list[ObjectID]] = None,
         no_verify: bool = False,
         sign: bool = False,
@@ -1004,7 +1004,8 @@ class BaseRepo:
           tree: SHA1 of the tree root to use (if not specified the
             current index will be committed).
           encoding: Encoding
-          ref: Optional ref to commit to (defaults to current branch)
+          ref: Optional ref to commit to (defaults to current branch).
+            If None, creates a dangling commit without updating any ref.
           merge_heads: Merge heads (defaults to .git/MERGE_HEAD)
           no_verify: Skip pre-commit and commit-msg hooks
           sign: GPG Sign the commit (bool, defaults to False,

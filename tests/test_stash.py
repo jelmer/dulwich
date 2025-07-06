@@ -127,3 +127,92 @@ class StashTests(TestCase):
         custom_ref = b"refs/custom_stash"
         stash = Stash(self.repo, ref=custom_ref)
         self.assertEqual(custom_ref, stash._ref)
+
+    def test_pop_stash(self) -> None:
+        stash = Stash.from_repo(self.repo)
+
+        # Make sure logs directory exists for reflog
+        os.makedirs(os.path.join(self.repo.commondir(), "logs"), exist_ok=True)
+
+        # Create a file and add it to the index
+        file_path = os.path.join(self.repo_dir, "testfile.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"test data")
+        self.repo.stage(["testfile.txt"])
+
+        # Push to stash
+        stash.push(message=b"Test stash message")
+        self.assertEqual(1, len(stash))
+
+        # After stash push, the file should be removed from working tree
+        # (matching git's behavior)
+        self.assertFalse(os.path.exists(file_path))
+
+        # Pop the stash
+        stash.pop(0)
+
+        # Verify file is restored
+        self.assertTrue(os.path.exists(file_path))
+        with open(file_path, "rb") as f:
+            self.assertEqual(b"test data", f.read())
+
+        # Verify stash is empty
+        self.assertEqual(0, len(stash))
+
+        # Verify the file is in the index
+        index = self.repo.open_index()
+        self.assertIn(b"testfile.txt", index)
+
+    def test_pop_stash_with_index_changes(self) -> None:
+        stash = Stash.from_repo(self.repo)
+
+        # Make sure logs directory exists for reflog
+        os.makedirs(os.path.join(self.repo.commondir(), "logs"), exist_ok=True)
+
+        # First commit a file so we have tracked files
+        tracked_path = os.path.join(self.repo_dir, "tracked.txt")
+        with open(tracked_path, "wb") as f:
+            f.write(b"original content")
+        self.repo.stage(["tracked.txt"])
+        self.repo.do_commit(b"Add tracked file")
+
+        # Modify the tracked file and stage it
+        with open(tracked_path, "wb") as f:
+            f.write(b"staged changes")
+        self.repo.stage(["tracked.txt"])
+
+        # Modify it again but don't stage
+        with open(tracked_path, "wb") as f:
+            f.write(b"working tree changes")
+
+        # Create a new file and stage it
+        new_file_path = os.path.join(self.repo_dir, "new.txt")
+        with open(new_file_path, "wb") as f:
+            f.write(b"new file content")
+        self.repo.stage(["new.txt"])
+
+        # Push to stash
+        stash.push(message=b"Test stash with index")
+        self.assertEqual(1, len(stash))
+
+        # After stash push, new file should be removed and tracked file reset
+        self.assertFalse(os.path.exists(new_file_path))
+        with open(tracked_path, "rb") as f:
+            self.assertEqual(b"original content", f.read())
+
+        # Pop the stash
+        stash.pop(0)
+
+        # Verify tracked file has working tree changes
+        self.assertTrue(os.path.exists(tracked_path))
+        with open(tracked_path, "rb") as f:
+            self.assertEqual(b"working tree changes", f.read())
+
+        # Verify new file is restored
+        self.assertTrue(os.path.exists(new_file_path))
+        with open(new_file_path, "rb") as f:
+            self.assertEqual(b"new file content", f.read())
+
+        # Verify index has the staged changes
+        index = self.repo.open_index()
+        self.assertIn(b"new.txt", index)

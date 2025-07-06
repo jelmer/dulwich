@@ -118,6 +118,7 @@ def self_test_suite():
         "annotate",
         "archive",
         "attrs",
+        "bisect",
         "blackbox",
         "bundle",
         "cli",

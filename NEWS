@@ -3,7 +3,7 @@
  * Only write Git index extensions when they contain meaningful data.
    Previously, dulwich would write empty extensions to the index file,
    causing unnecessary bloat.
-   (Jelmer Vernooĳ, #1643)
+   (Andrew Shadura, Jelmer Vernooĳ, #1643)
 
  * Document that ``porcelain.push`` returns per-ref status information
    in the ``SendPackResult`` object. Added test coverage to verify this
@@ -15,6 +15,11 @@
    option to ``clone`` command. (#506, Jelmer Vernooĳ)
 
  * Support popping stashes. (Jelmer Vernooĳ)
+
+ * Add support for parsing Git attributes from .gitattributes files.
+   This enables proper handling of text/binary detection, line ending
+   normalization, and filter specifications for files.
+   (Jelmer Vernooĳ, #1211)
 
 0.23.1	2025-06-30
 

@@ -341,14 +341,12 @@ who\"
             f.write("[core]\n    filemode = true\n")
             temp_path = f.name
 
-        try:
-            # Test with pathlib.Path
-            path_obj = Path(temp_path)
-            cf = ConfigFile.from_path(path_obj)
-            self.assertEqual(cf.get((b"core",), b"filemode"), b"true")
-        finally:
-            # Clean up
-            os.unlink(temp_path)
+        self.addCleanup(os.unlink, temp_path)
+
+        # Test with pathlib.Path
+        path_obj = Path(temp_path)
+        cf = ConfigFile.from_path(path_obj)
+        self.assertEqual(cf.get((b"core",), b"filemode"), b"true")
 
     def test_write_to_path_pathlib(self) -> None:
         import tempfile

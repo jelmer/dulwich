@@ -1719,6 +1719,7 @@ class Repo(BaseRepo):
             build_index_from_tree,
             symlink,
             validate_path_element_default,
+            validate_path_element_hfs,
             validate_path_element_ntfs,
         )
 
@@ -1732,6 +1733,8 @@ class Repo(BaseRepo):
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
         if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
+        elif config.get_boolean(b"core", b"core.protectHFS", sys.platform == "darwin"):
+            validate_path_element = validate_path_element_hfs
         else:
             validate_path_element = validate_path_element_default
         if config.get_boolean(b"core", b"symlinks", True):

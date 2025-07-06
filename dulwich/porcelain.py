@@ -1728,10 +1728,18 @@ def reset(repo, mode, treeish="HEAD") -> None:
             honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
 
             # Import validation functions
-            from .index import validate_path_element_default, validate_path_element_ntfs
+            from .index import (
+                validate_path_element_default,
+                validate_path_element_hfs,
+                validate_path_element_ntfs,
+            )
 
             if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
                 validate_path_element = validate_path_element_ntfs
+            elif config.get_boolean(
+                b"core", b"core.protectHFS", sys.platform == "darwin"
+            ):
+                validate_path_element = validate_path_element_hfs
             else:
                 validate_path_element = validate_path_element_default
 
@@ -3328,11 +3336,41 @@ def ls_files(repo):
         return sorted(r.open_index())
 
 
-def find_unique_abbrev(object_store, object_id):
-    """For now, just return 7 characters."""
-    # TODO(jelmer): Add some logic here to return a number of characters that
-    # scales relative with the size of the repository
-    return object_id.decode("ascii")[:7]
+def find_unique_abbrev(object_store, object_id, min_length=7):
+    """Find the shortest unique abbreviation for an object ID.
+
+    Args:
+      object_store: Object store to search in
+      object_id: The full object ID to abbreviate
+      min_length: Minimum length of abbreviation (default 7)
+
+    Returns:
+      The shortest unique prefix of the object ID (at least min_length chars)
+    """
+    if isinstance(object_id, bytes):
+        hex_id = object_id.decode("ascii")
+    else:
+        hex_id = object_id
+
+    # Start with minimum length
+    for length in range(min_length, len(hex_id) + 1):
+        prefix = hex_id[:length]
+        matches = 0
+
+        # Check if this prefix is unique
+        for obj_id in object_store:
+            if obj_id.decode("ascii").startswith(prefix):
+                matches += 1
+                if matches > 1:
+                    # Not unique, need more characters
+                    break
+
+        if matches == 1:
+            # Found unique prefix
+            return prefix
+
+    # If we get here, return the full ID
+    return hex_id
 
 
 def describe(repo, abbrev=None):
@@ -3397,16 +3435,20 @@ def describe(repo, abbrev=None):
                     if commit_count == 0:
                         return tag_name
                     else:
-                        return "{}-{}-g{}".format(
-                            tag_name,
-                            commit_count,
-                            latest_commit.id.decode("ascii")[abbrev_slice],
-                        )
+                        if abbrev is not None:
+                            abbrev_hash = latest_commit.id.decode("ascii")[abbrev_slice]
+                        else:
+                            abbrev_hash = find_unique_abbrev(
+                                r.object_store, latest_commit.id
+                            )
+                        return f"{tag_name}-{commit_count}-g{abbrev_hash}"
 
             commit_count += 1
 
         # Return plain commit if no parent tag can be found
-        return "g{}".format(latest_commit.id.decode("ascii")[abbrev_slice])
+        if abbrev is not None:
+            return "g{}".format(latest_commit.id.decode("ascii")[abbrev_slice])
+        return f"g{find_unique_abbrev(r.object_store, latest_commit.id)}"
 
 
 def get_object_by_path(repo, path, committish=None):

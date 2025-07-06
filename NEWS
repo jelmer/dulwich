@@ -14,6 +14,8 @@
    CLI command, and ``submodule_update`` CLI command. Add ``--recurse-submodules``
    option to ``clone`` command. (#506, Jelmer Vernooĳ)
 
+ * Support popping stashes. (Jelmer Vernooĳ)
+
  * Add support for parsing Git attributes from .gitattributes files.
    This enables proper handling of text/binary detection, line ending
    normalization, and filter specifications for files.

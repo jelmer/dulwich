@@ -1311,6 +1311,60 @@ def validate_path_element_ntfs(element: bytes) -> bool:
     return True
 
 
+# HFS+ ignorable Unicode codepoints (from Git's utf8.c)
+HFS_IGNORABLE_CHARS = {
+    0x200C,  # ZERO WIDTH NON-JOINER
+    0x200D,  # ZERO WIDTH JOINER
+    0x200E,  # LEFT-TO-RIGHT MARK
+    0x200F,  # RIGHT-TO-LEFT MARK
+    0x202A,  # LEFT-TO-RIGHT EMBEDDING
+    0x202B,  # RIGHT-TO-LEFT EMBEDDING
+    0x202C,  # POP DIRECTIONAL FORMATTING
+    0x202D,  # LEFT-TO-RIGHT OVERRIDE
+    0x202E,  # RIGHT-TO-LEFT OVERRIDE
+    0x206A,  # INHIBIT SYMMETRIC SWAPPING
+    0x206B,  # ACTIVATE SYMMETRIC SWAPPING
+    0x206C,  # INHIBIT ARABIC FORM SHAPING
+    0x206D,  # ACTIVATE ARABIC FORM SHAPING
+    0x206E,  # NATIONAL DIGIT SHAPES
+    0x206F,  # NOMINAL DIGIT SHAPES
+    0xFEFF,  # ZERO WIDTH NO-BREAK SPACE
+}
+
+
+def validate_path_element_hfs(element: bytes) -> bool:
+    """Validate path element for HFS+ filesystem.
+
+    Equivalent to Git's is_hfs_dotgit and related checks.
+    Uses NFD normalization and ignores HFS+ ignorable characters.
+    """
+    import unicodedata
+
+    try:
+        # Decode to Unicode
+        element_str = element.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        # Malformed UTF-8 - be conservative and reject
+        return False
+
+    # Remove HFS+ ignorable characters (like Git's next_hfs_char)
+    filtered = "".join(c for c in element_str if ord(c) not in HFS_IGNORABLE_CHARS)
+
+    # Normalize to NFD (HFS+ uses a variant of NFD)
+    normalized = unicodedata.normalize("NFD", filtered)
+
+    # Check against invalid names (case-insensitive)
+    normalized_bytes = normalized.encode("utf-8", errors="strict")
+    if normalized_bytes.lower() in INVALID_DOTNAMES:
+        return False
+
+    # Also check for 8.3 short name
+    if normalized_bytes.lower() == b"git~1":
+        return False
+
+    return True
+
+
 def validate_path(
     path: bytes,
     element_validator: Callable[[bytes], bool] = validate_path_element_default,

@@ -24,6 +24,7 @@
 Currently implemented:
  * archive
  * add
+ * bisect{_start,_bad,_good,_skip,_reset,_log,_replay}
  * branch{_create,_delete,_list}
  * check_ignore
  * checkout
@@ -90,6 +91,7 @@ from typing import Optional, Union
 
 from . import replace_me
 from .archive import tar_stream
+from .bisect import BisectState
 from .client import get_transport_and_path
 from .config import Config, ConfigFile, StackedConfig, read_submodules
 from .diff_tree import (
@@ -4310,3 +4312,193 @@ def filter_branch(
             )
         except ValueError as e:
             raise Error(str(e)) from e
+
+
+def bisect_start(
+    repo=".",
+    bad=None,
+    good=None,
+    paths=None,
+    no_checkout=False,
+    term_bad="bad",
+    term_good="good",
+):
+    """Start a new bisect session.
+
+    Args:
+        repo: Path to repository or a Repo object
+        bad: The bad commit (defaults to HEAD)
+        good: List of good commits or a single good commit
+        paths: Optional paths to limit bisect to
+        no_checkout: If True, don't checkout commits during bisect
+        term_bad: Term to use for bad commits (default: "bad")
+        term_good: Term to use for good commits (default: "good")
+    """
+    with open_repo_closing(repo) as r:
+        state = BisectState(r)
+
+        # Convert single good commit to list
+        if good is not None and not isinstance(good, list):
+            good = [good]
+
+        # Parse commits
+        bad_sha = parse_commit(r, bad).id if bad else None
+        good_shas = [parse_commit(r, g).id for g in good] if good else None
+
+        state.start(bad_sha, good_shas, paths, no_checkout, term_bad, term_good)
+
+        # Return the next commit to test if we have both good and bad
+        if bad_sha and good_shas:
+            next_sha = state._find_next_commit()
+            if next_sha and not no_checkout:
+                # Checkout the next commit
+                old_tree = r[r.head()].tree if r.head() else None
+                r.refs[b"HEAD"] = next_sha
+                commit = r[next_sha]
+                update_working_tree(r, old_tree, commit.tree)
+            return next_sha
+
+
+def bisect_bad(repo=".", rev=None):
+    """Mark a commit as bad.
+
+    Args:
+        repo: Path to repository or a Repo object
+        rev: Commit to mark as bad (defaults to HEAD)
+
+    Returns:
+        The SHA of the next commit to test, or None if bisect is complete
+    """
+    with open_repo_closing(repo) as r:
+        state = BisectState(r)
+        rev_sha = parse_commit(r, rev).id if rev else None
+        next_sha = state.mark_bad(rev_sha)
+
+        if next_sha:
+            # Checkout the next commit
+            old_tree = r[r.head()].tree if r.head() else None
+            r.refs[b"HEAD"] = next_sha
+            commit = r[next_sha]
+            update_working_tree(r, old_tree, commit.tree)
+
+        return next_sha
+
+
+def bisect_good(repo=".", rev=None):
+    """Mark a commit as good.
+
+    Args:
+        repo: Path to repository or a Repo object
+        rev: Commit to mark as good (defaults to HEAD)
+
+    Returns:
+        The SHA of the next commit to test, or None if bisect is complete
+    """
+    with open_repo_closing(repo) as r:
+        state = BisectState(r)
+        rev_sha = parse_commit(r, rev).id if rev else None
+        next_sha = state.mark_good(rev_sha)
+
+        if next_sha:
+            # Checkout the next commit
+            old_tree = r[r.head()].tree if r.head() else None
+            r.refs[b"HEAD"] = next_sha
+            commit = r[next_sha]
+            update_working_tree(r, old_tree, commit.tree)
+
+        return next_sha
+
+
+def bisect_skip(repo=".", revs=None):
+    """Skip one or more commits.
+
+    Args:
+        repo: Path to repository or a Repo object
+        revs: List of commits to skip (defaults to [HEAD])
+
+    Returns:
+        The SHA of the next commit to test, or None if bisect is complete
+    """
+    with open_repo_closing(repo) as r:
+        state = BisectState(r)
+
+        if revs is None:
+            rev_shas = None
+        else:
+            # Convert single rev to list
+            if not isinstance(revs, list):
+                revs = [revs]
+            rev_shas = [parse_commit(r, rev).id for rev in revs]
+
+        next_sha = state.skip(rev_shas)
+
+        if next_sha:
+            # Checkout the next commit
+            old_tree = r[r.head()].tree if r.head() else None
+            r.refs[b"HEAD"] = next_sha
+            commit = r[next_sha]
+            update_working_tree(r, old_tree, commit.tree)
+
+        return next_sha
+
+
+def bisect_reset(repo=".", commit=None):
+    """Reset bisect state and return to original branch/commit.
+
+    Args:
+        repo: Path to repository or a Repo object
+        commit: Optional commit to reset to (defaults to original branch/commit)
+    """
+    with open_repo_closing(repo) as r:
+        state = BisectState(r)
+        # Get old tree before reset
+        try:
+            old_tree = r[r.head()].tree
+        except KeyError:
+            old_tree = None
+
+        commit_sha = parse_commit(r, commit).id if commit else None
+        state.reset(commit_sha)
+
+        # Update working tree to new HEAD
+        try:
+            new_head = r.head()
+            if new_head:
+                new_commit = r[new_head]
+                update_working_tree(r, old_tree, new_commit.tree)
+        except KeyError:
+            # No HEAD after reset
+            pass
+
+
+def bisect_log(repo="."):
+    """Get the bisect log.
+
+    Args:
+        repo: Path to repository or a Repo object
+
+    Returns:
+        The bisect log as a string
+    """
+    with open_repo_closing(repo) as r:
+        state = BisectState(r)
+        return state.get_log()
+
+
+def bisect_replay(repo, log_file):
+    """Replay a bisect log.
+
+    Args:
+        repo: Path to repository or a Repo object
+        log_file: Path to the log file or file-like object
+    """
+    with open_repo_closing(repo) as r:
+        state = BisectState(r)
+
+        if isinstance(log_file, str):
+            with open(log_file) as f:
+                log_content = f.read()
+        else:
+            log_content = log_file.read()
+
+        state.replay(log_content)

@@ -24,6 +24,11 @@
    normalization, and filter specifications for files.
    (Jelmer Vernooĳ, #1211)
 
+ * Add git bisect functionality including core bisect logic, porcelain
+   commands (bisect_start, bisect_bad, bisect_good, bisect_skip,
+   bisect_reset, bisect_log, bisect_replay), and CLI support.
+   (Jelmer Vernooĳ, #1631)
+
 0.23.1	2025-06-30
 
  * Support ``untracked_files="normal"`` argument to ``porcelain.status``,

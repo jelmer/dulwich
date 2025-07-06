@@ -1078,6 +1078,134 @@ class cmd_stash_pop(Command):
         print("Restored working directory and index state")
 
 
+class cmd_bisect(SuperCommand):
+    """Git bisect command implementation."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {}
+
+    def run(self, args):
+        parser = argparse.ArgumentParser(prog="dulwich bisect")
+        subparsers = parser.add_subparsers(dest="subcommand", help="bisect subcommands")
+
+        # bisect start
+        start_parser = subparsers.add_parser("start", help="Start a new bisect session")
+        start_parser.add_argument("bad", nargs="?", help="Bad commit")
+        start_parser.add_argument("good", nargs="*", help="Good commit(s)")
+        start_parser.add_argument(
+            "--no-checkout",
+            action="store_true",
+            help="Don't checkout commits during bisect",
+        )
+        start_parser.add_argument(
+            "--term-bad", default="bad", help="Term to use for bad commits"
+        )
+        start_parser.add_argument(
+            "--term-good", default="good", help="Term to use for good commits"
+        )
+        start_parser.add_argument(
+            "--", dest="paths", nargs="*", help="Paths to limit bisect to"
+        )
+
+        # bisect bad
+        bad_parser = subparsers.add_parser("bad", help="Mark a commit as bad")
+        bad_parser.add_argument("rev", nargs="?", help="Commit to mark as bad")
+
+        # bisect good
+        good_parser = subparsers.add_parser("good", help="Mark a commit as good")
+        good_parser.add_argument("rev", nargs="?", help="Commit to mark as good")
+
+        # bisect skip
+        skip_parser = subparsers.add_parser("skip", help="Skip commits")
+        skip_parser.add_argument("revs", nargs="*", help="Commits to skip")
+
+        # bisect reset
+        reset_parser = subparsers.add_parser("reset", help="Reset bisect state")
+        reset_parser.add_argument("commit", nargs="?", help="Commit to reset to")
+
+        # bisect log
+        subparsers.add_parser("log", help="Show bisect log")
+
+        # bisect replay
+        replay_parser = subparsers.add_parser("replay", help="Replay bisect log")
+        replay_parser.add_argument("logfile", help="Log file to replay")
+
+        # bisect help
+        subparsers.add_parser("help", help="Show help")
+
+        parsed_args = parser.parse_args(args)
+
+        if not parsed_args.subcommand:
+            parser.print_help()
+            return 1
+
+        try:
+            if parsed_args.subcommand == "start":
+                next_sha = porcelain.bisect_start(
+                    bad=parsed_args.bad,
+                    good=parsed_args.good if parsed_args.good else None,
+                    paths=parsed_args.paths,
+                    no_checkout=parsed_args.no_checkout,
+                    term_bad=parsed_args.term_bad,
+                    term_good=parsed_args.term_good,
+                )
+                if next_sha:
+                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+
+            elif parsed_args.subcommand == "bad":
+                next_sha = porcelain.bisect_bad(rev=parsed_args.rev)
+                if next_sha:
+                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+                else:
+                    # Bisect complete - find the first bad commit
+                    with porcelain.open_repo_closing(".") as r:
+                        bad_ref = os.path.join(r.controldir(), "refs", "bisect", "bad")
+                        with open(bad_ref, "rb") as f:
+                            bad_sha = f.read().strip()
+                        commit = r.object_store[bad_sha]
+                        message = commit.message.decode(
+                            "utf-8", errors="replace"
+                        ).split("\n")[0]
+                        print(f"{bad_sha.decode('ascii')} is the first bad commit")
+                        print(f"commit {bad_sha.decode('ascii')}")
+                        print(f"    {message}")
+
+            elif parsed_args.subcommand == "good":
+                next_sha = porcelain.bisect_good(rev=parsed_args.rev)
+                if next_sha:
+                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+
+            elif parsed_args.subcommand == "skip":
+                next_sha = porcelain.bisect_skip(
+                    revs=parsed_args.revs if parsed_args.revs else None
+                )
+                if next_sha:
+                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+
+            elif parsed_args.subcommand == "reset":
+                porcelain.bisect_reset(commit=parsed_args.commit)
+                print("Bisect reset")
+
+            elif parsed_args.subcommand == "log":
+                log = porcelain.bisect_log()
+                print(log, end="")
+
+            elif parsed_args.subcommand == "replay":
+                porcelain.bisect_replay(log_file=parsed_args.logfile)
+                print(f"Replayed bisect log from {parsed_args.logfile}")
+
+            elif parsed_args.subcommand == "help":
+                parser.print_help()
+
+        except porcelain.Error as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+        return 0
+
+
 class cmd_stash(SuperCommand):
     subcommands: ClassVar[dict[str, type[Command]]] = {
         "list": cmd_stash_list,
@@ -1801,6 +1929,7 @@ commands = {
     "add": cmd_add,
     "annotate": cmd_annotate,
     "archive": cmd_archive,
+    "bisect": cmd_bisect,
     "blame": cmd_blame,
     "branch": cmd_branch,
     "check-ignore": cmd_check_ignore,

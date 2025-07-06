@@ -117,6 +117,7 @@ def self_test_suite():
     names = [
         "annotate",
         "archive",
+        "attrs",
         "blackbox",
         "bundle",
         "cli",

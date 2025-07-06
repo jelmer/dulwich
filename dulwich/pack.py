@@ -389,8 +389,8 @@ def _load_file_contents(f, size=None):
         if has_mmap:
             try:
                 contents = mmap.mmap(fd, size, access=mmap.ACCESS_READ)
-            except OSError:
-                # Perhaps a socket?
+            except (OSError, ValueError):
+                # Can't mmap - perhaps a socket or invalid file descriptor
                 pass
             else:
                 return contents, size

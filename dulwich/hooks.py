@@ -105,7 +105,7 @@ class ShellHook(Hook):
                 raise HookError(f"Hook {self.name} exited with non-zero status {ret}")
             if self.post_exec_callback is not None:
                 return self.post_exec_callback(1, *args)
-        except OSError:  # no file. silent failure.
+        except FileNotFoundError:  # no file. silent failure.
             if self.post_exec_callback is not None:
                 self.post_exec_callback(0, *args)
 

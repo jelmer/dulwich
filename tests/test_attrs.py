@@ -456,3 +456,183 @@ class GitAttributesTests(TestCase):
 
             attrs = ga.match_path(b"lib.rs")
             self.assertEqual(attrs, {b"diff": b"rust"})
+
+    def test_set_attribute(self):
+        """Test setting attributes."""
+        ga = GitAttributes()
+
+        # Set attribute for a new pattern
+        ga.set_attribute(b"*.txt", b"text", True)
+        attrs = ga.match_path(b"file.txt")
+        self.assertEqual(attrs, {b"text": True})
+
+        # Update existing pattern
+        ga.set_attribute(b"*.txt", b"diff", b"plain")
+        attrs = ga.match_path(b"file.txt")
+        self.assertEqual(attrs, {b"text": True, b"diff": b"plain"})
+
+        # Unset attribute
+        ga.set_attribute(b"*.txt", b"binary", False)
+        attrs = ga.match_path(b"file.txt")
+        self.assertEqual(attrs, {b"text": True, b"diff": b"plain", b"binary": False})
+
+        # Remove attribute (unspecified)
+        ga.set_attribute(b"*.txt", b"text", None)
+        attrs = ga.match_path(b"file.txt")
+        self.assertEqual(attrs, {b"diff": b"plain", b"binary": False})
+
+    def test_remove_pattern(self):
+        """Test removing patterns."""
+        patterns = [
+            (Pattern(b"*.txt"), {b"text": True}),
+            (Pattern(b"*.jpg"), {b"binary": True}),
+            (Pattern(b"*.py"), {b"diff": b"python"}),
+        ]
+        ga = GitAttributes(patterns)
+        self.assertEqual(len(ga), 3)
+
+        # Remove middle pattern
+        ga.remove_pattern(b"*.jpg")
+        self.assertEqual(len(ga), 2)
+
+        # Check remaining patterns
+        attrs = ga.match_path(b"file.txt")
+        self.assertEqual(attrs, {b"text": True})
+
+        attrs = ga.match_path(b"image.jpg")
+        self.assertEqual(attrs, {})  # No match anymore
+
+        attrs = ga.match_path(b"script.py")
+        self.assertEqual(attrs, {b"diff": b"python"})
+
+    def test_to_bytes_empty(self):
+        """Test converting empty GitAttributes to bytes."""
+        ga = GitAttributes()
+        content = ga.to_bytes()
+        self.assertEqual(content, b"")
+
+    def test_to_bytes_single_pattern(self):
+        """Test converting single pattern to bytes."""
+        ga = GitAttributes()
+        ga.set_attribute(b"*.txt", b"text", True)
+        content = ga.to_bytes()
+        self.assertEqual(content, b"*.txt text\n")
+
+    def test_to_bytes_multiple_attributes(self):
+        """Test converting pattern with multiple attributes to bytes."""
+        ga = GitAttributes()
+        ga.set_attribute(b"*.jpg", b"text", False)
+        ga.set_attribute(b"*.jpg", b"diff", False)
+        ga.set_attribute(b"*.jpg", b"binary", True)
+        content = ga.to_bytes()
+        # Attributes should be sorted
+        self.assertEqual(content, b"*.jpg binary -diff -text\n")
+
+    def test_to_bytes_multiple_patterns(self):
+        """Test converting multiple patterns to bytes."""
+        ga = GitAttributes()
+        ga.set_attribute(b"*.txt", b"text", True)
+        ga.set_attribute(b"*.jpg", b"binary", True)
+        ga.set_attribute(b"*.jpg", b"text", False)
+        content = ga.to_bytes()
+        expected = b"*.txt text\n*.jpg binary -text\n"
+        self.assertEqual(content, expected)
+
+    def test_to_bytes_with_values(self):
+        """Test converting attributes with values to bytes."""
+        ga = GitAttributes()
+        ga.set_attribute(b"*.c", b"filter", b"indent")
+        ga.set_attribute(b"*.c", b"diff", b"cpp")
+        ga.set_attribute(b"*.c", b"text", True)
+        content = ga.to_bytes()
+        # Attributes should be sorted
+        self.assertEqual(content, b"*.c diff=cpp filter=indent text\n")
+
+    def test_to_bytes_unspecified(self):
+        """Test converting unspecified attributes to bytes."""
+        ga = GitAttributes()
+        ga.set_attribute(b"*.bin", b"text", None)
+        ga.set_attribute(b"*.bin", b"diff", None)
+        content = ga.to_bytes()
+        # Unspecified attributes use !
+        self.assertEqual(content, b"*.bin !diff !text\n")
+
+    def test_write_to_file(self):
+        """Test writing GitAttributes to file."""
+        ga = GitAttributes()
+        ga.set_attribute(b"*.txt", b"text", True)
+        ga.set_attribute(b"*.jpg", b"binary", True)
+        ga.set_attribute(b"*.jpg", b"text", False)
+
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            temp_path = f.name
+
+        try:
+            ga.write_to_file(temp_path)
+
+            # Read back the file
+            with open(temp_path, "rb") as f:
+                content = f.read()
+
+            expected = b"*.txt text\n*.jpg binary -text\n"
+            self.assertEqual(content, expected)
+        finally:
+            os.unlink(temp_path)
+
+    def test_write_to_file_string_path(self):
+        """Test writing GitAttributes to file with string path."""
+        ga = GitAttributes()
+        ga.set_attribute(b"*.py", b"diff", b"python")
+
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            temp_path = f.name
+
+        try:
+            # Pass string path instead of bytes
+            ga.write_to_file(temp_path)
+
+            # Read back the file
+            with open(temp_path, "rb") as f:
+                content = f.read()
+
+            self.assertEqual(content, b"*.py diff=python\n")
+        finally:
+            os.unlink(temp_path)
+
+    def test_roundtrip_gitattributes(self):
+        """Test reading and writing gitattributes preserves content."""
+        original_content = b"""*.txt text
+*.jpg -text binary
+*.c filter=indent diff=cpp
+*.bin !text !diff
+"""
+
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
+            f.write(original_content)
+            temp_path = f.name
+
+        try:
+            # Read the file
+            ga = GitAttributes.from_file(temp_path)
+
+            # Write to a new file
+            with tempfile.NamedTemporaryFile(delete=False) as f2:
+                temp_path2 = f2.name
+
+            ga.write_to_file(temp_path2)
+
+            # The content should be equivalent (though order might differ for attributes)
+            ga2 = GitAttributes.from_file(temp_path2)
+
+            # Compare patterns
+            patterns1 = list(ga)
+            patterns2 = list(ga2)
+            self.assertEqual(len(patterns1), len(patterns2))
+
+            for (p1, attrs1), (p2, attrs2) in zip(patterns1, patterns2):
+                self.assertEqual(p1.pattern, p2.pattern)
+                self.assertEqual(attrs1, attrs2)
+
+            os.unlink(temp_path2)
+        finally:
+            os.unlink(temp_path)

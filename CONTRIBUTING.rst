@@ -17,18 +17,8 @@ Public methods, functions and classes should all have doc strings. Please use
 Google style docstrings to document parameters and return values.
 You can generate the documentation by running "make doc".
 
-Running the tests
------------------
-To run the testsuite, you should be able to simply run "make check". This
-will run the tests using unittest.
-
-::
-   $ make check
-
-Tox configuration is also present.
-
 String Types
-------------
+~~~~~~~~~~~~
 Like Linux, Git treats filenames as arbitrary bytestrings. There is no prescribed
 encoding for these strings, and although it is fairly common to use UTF-8, any
 raw byte strings are supported.
@@ -44,13 +34,21 @@ bytestrings as necessary on the fly (using 'utf-8').
 * object sha1 hexdigests (40 bytes long): str (bytestrings on python2, strings
   on python3)
 
-Merge requests
---------------
-Please either send pull requests to the maintainer (jelmer@jelmer.uk) or create
-new pull requests on GitHub.
+Exceptions
+~~~~~~~~~~
+When catching exceptions, please catch the specific exception type rather than
+a more generic type (like OSError, IOError, Exception, etc.). This will
+ensure that you do not accidentally catch unrelated exceptions.
+The only exception is when you are reraising an exception, e.g. when
+re-raising an exception after logging it.
+
+Do not catch bare except, although ruff will warn you about this.
+
+Keep the code within a try/except block as small as possible, so
+that you do not accidentally catch unrelated exceptions.
 
 Deprecating functionality
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 Dulwich uses the `dissolve` package to manage deprecations. If you want to deprecate
 functionality, please use the `@replace_me` decorator from the root of the
 dulwich package. This will ensure that the deprecation is handled correctly:
@@ -59,6 +57,27 @@ dulwich package. This will ensure that the deprecation is handled correctly:
 * When the version of Dulwich is bumped, the deprecation will be removed
 * Users can use `dissolve migrate` to automatically replace deprecated
   functionality in their code
+
+Running the tests
+-----------------
+To run the testsuite, you should be able to simply run "make check". This
+will run the tests using unittest.
+
+::
+   $ make check
+
+The compatibility tests that verify Dulwich behaves in a way that is compatible
+with C Git are the slowest, so you may want to avoid them while developing:
+
+::
+   $ make check-nocompat
+
+testr and tox configuration is also present.
+
+Merge requests
+--------------
+Please either send pull requests to the maintainer (jelmer@jelmer.uk) or create
+new pull requests on GitHub.
 
 Licensing
 ---------

@@ -334,3 +334,89 @@ class GitAttributes:
         """
         patterns = read_gitattributes(path)
         return cls(patterns)
+
+    def set_attribute(self, pattern: bytes, name: bytes, value: AttributeValue) -> None:
+        """Set an attribute for a pattern.
+
+        Args:
+            pattern: The file pattern
+            name: Attribute name
+            value: Attribute value (bytes, True, False, or None)
+        """
+        # Find existing pattern
+        pattern_obj = None
+        attrs_dict: Optional[dict[bytes, AttributeValue]] = None
+        for i, (p, attrs) in enumerate(self._patterns):
+            if p.pattern == pattern:
+                pattern_obj = p
+                # Convert to mutable dict
+                attrs_dict = dict(attrs)
+                break
+
+        if pattern_obj is None:
+            # Create new pattern
+            pattern_obj = Pattern(pattern)
+            attrs_dict = {}
+            self._patterns.append((pattern_obj, attrs_dict))
+
+        # Update the attribute
+        if attrs_dict is None:
+            raise AssertionError("attrs_dict should not be None at this point")
+        attrs_dict[name] = value
+
+        # Update the pattern in the list
+        for i, (p, _) in enumerate(self._patterns):
+            if p.pattern == pattern:
+                self._patterns[i] = (p, attrs_dict)
+                break
+
+    def remove_pattern(self, pattern: bytes) -> None:
+        """Remove all attributes for a pattern.
+
+        Args:
+            pattern: The file pattern to remove
+        """
+        self._patterns = [
+            (p, attrs) for p, attrs in self._patterns if p.pattern != pattern
+        ]
+
+    def to_bytes(self) -> bytes:
+        """Convert GitAttributes to bytes format suitable for writing to file.
+
+        Returns:
+            Bytes representation of the gitattributes file
+        """
+        lines = []
+        for pattern_obj, attrs in self._patterns:
+            pattern = pattern_obj.pattern
+            attr_strs = []
+
+            for name, value in sorted(attrs.items()):
+                if value is True:
+                    attr_strs.append(name)
+                elif value is False:
+                    attr_strs.append(b"-" + name)
+                elif value is None:
+                    attr_strs.append(b"!" + name)
+                else:
+                    # value is bytes
+                    attr_strs.append(name + b"=" + value)
+
+            if attr_strs:
+                line = pattern + b" " + b" ".join(attr_strs)
+                lines.append(line)
+
+        return b"\n".join(lines) + b"\n" if lines else b""
+
+    def write_to_file(self, filename: Union[str, bytes]) -> None:
+        """Write GitAttributes to a file.
+
+        Args:
+            filename: Path to write the .gitattributes file
+        """
+        if isinstance(filename, str):
+            filename = filename.encode("utf-8")
+
+        content = self.to_bytes()
+        with open(filename, "wb") as f:
+            f.write(content)

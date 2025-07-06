@@ -3,6 +3,10 @@
  * Print deprecations on usage, not import.
    (Alyssa Coghlan, #1650)
 
+ * Add support for ``core.protectHFS`` configuration setting to protect
+   against paths that could be misinterpreted on HFS+ filesystems.
+   (Jelmer Vernooĳ, #246)
+
  * Only write Git index extensions when they contain meaningful data.
    Previously, dulwich would write empty extensions to the index file,
    causing unnecessary bloat.

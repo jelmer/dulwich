@@ -38,28 +38,17 @@ def ensure_dir_exists(dirname) -> None:
 def _fancy_rename(oldname, newname) -> None:
     """Rename file with temporary backup file to rollback if rename fails."""
     if not os.path.exists(newname):
-        try:
-            os.rename(oldname, newname)
-        except OSError:
-            raise
+        os.rename(oldname, newname)
         return
 
     # Defer the tempfile import since it pulls in a lot of other things.
     import tempfile
 
     # destination file exists
-    try:
-        (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")
-        os.close(fd)
-        os.remove(tmpfile)
-    except OSError:
-        # either file could not be created (e.g. permission problem)
-        # or could not be deleted (e.g. rude virus scanner)
-        raise
-    try:
-        os.rename(newname, tmpfile)
-    except OSError:
-        raise  # no rename occurred
+    (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")
+    os.close(fd)
+    os.remove(tmpfile)
+    os.rename(newname, tmpfile)
     try:
         os.rename(oldname, newname)
     except OSError:

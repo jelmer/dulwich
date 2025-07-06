@@ -6031,6 +6031,27 @@ class DescribeTests(PorcelainTestCase):
             complete_description,
         )
 
+    def test_hash_length_dynamic(self) -> None:
+        """Test that hash length adjusts based on uniqueness."""
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("content")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        sha = porcelain.commit(
+            self.repo.path,
+            message=b"commit",
+            author=b"Joe <joe@example.com>",
+            committer=b"Bob <bob@example.com>",
+        )
+
+        # When abbrev is None, it should use find_unique_abbrev
+        result = porcelain.describe(self.repo.path)
+        # Should start with 'g' and have at least 7 characters
+        self.assertTrue(result.startswith("g"))
+        self.assertGreaterEqual(len(result[1:]), 7)
+        # Should be a prefix of the full SHA
+        self.assertTrue(sha.decode("ascii").startswith(result[1:]))
+
 
 class PathToTreeTests(PorcelainTestCase):
     def setUp(self) -> None:

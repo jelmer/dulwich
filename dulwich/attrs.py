@@ -345,30 +345,28 @@ class GitAttributes:
         """
         # Find existing pattern
         pattern_obj = None
-        attrs_dict: Optional[dict[bytes, AttributeValue]] = None
+        pattern_index = None
         for i, (p, attrs) in enumerate(self._patterns):
             if p.pattern == pattern:
                 pattern_obj = p
-                # Convert to mutable dict
-                attrs_dict = dict(attrs)
+                pattern_index = i
                 break
 
         if pattern_obj is None:
             # Create new pattern
             pattern_obj = Pattern(pattern)
-            attrs_dict = {}
+            attrs_dict: dict[bytes, AttributeValue] = {name: value}
             self._patterns.append((pattern_obj, attrs_dict))
-
-        # Update the attribute
-        if attrs_dict is None:
-            raise AssertionError("attrs_dict should not be None at this point")
-        attrs_dict[name] = value
-
-        # Update the pattern in the list
-        for i, (p, _) in enumerate(self._patterns):
-            if p.pattern == pattern:
-                self._patterns[i] = (p, attrs_dict)
-                break
+        else:
+            # Update existing pattern
+            # Create a new dict with updated attributes
+            assert (
+                pattern_index is not None
+            )  # pattern_index is set when pattern_obj is found
+            old_attrs = self._patterns[pattern_index][1]
+            new_attrs = dict(old_attrs)
+            new_attrs[name] = value
+            self._patterns[pattern_index] = (pattern_obj, new_attrs)
 
     def remove_pattern(self, pattern: bytes) -> None:
         """Remove all attributes for a pattern.

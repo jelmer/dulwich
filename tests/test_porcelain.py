@@ -41,7 +41,7 @@ from dulwich.client import SendPackResult
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError
 from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
-from dulwich.objects import ZERO_SHA, Blob, Tag, Tree
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tag, Tree
 from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
     CountObjectsResult,
@@ -422,6 +422,7 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         self.assertEqual(commit._author_timezone, 18000)
         self.assertEqual(commit._commit_timezone, 18000)
 
@@ -438,6 +439,7 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         self.assertEqual(commit._author_timezone, -18060)
         self.assertEqual(commit._commit_timezone, -18060)
 
@@ -456,6 +458,7 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         self.assertEqual(commit._author_timezone, local_timezone)
         self.assertEqual(commit._commit_timezone, local_timezone)
 
@@ -485,6 +488,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         commit.verify()
         commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
@@ -496,6 +500,7 @@ class CommitSignTests(PorcelainGpgTestCase):
             keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
         )
 
+        assert isinstance(commit, Commit)
         commit.committer = b"Alice <alice@example.com>"
         self.assertRaises(
             gpg.errors.BadSignatures,
@@ -522,6 +527,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         commit.verify()
 
@@ -552,6 +558,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # Verify the commit is signed with the configured key
         commit.verify()
         commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
@@ -584,6 +591,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # Verify the commit is signed due to config
         commit.verify()
         commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
@@ -616,6 +624,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # Verify the commit is not signed
         self.assertIsNone(commit._gpgsig)
 
@@ -646,6 +655,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # Verify the commit is signed with default key
         commit.verify()
 
@@ -677,6 +687,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # Verify the commit is signed despite config=false
         commit.verify()
         commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
@@ -709,6 +720,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertEqual(len(sha), 40)
 
         commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
         # Verify the commit is NOT signed despite config=true
         self.assertIsNone(commit._gpgsig)
 
@@ -913,8 +925,10 @@ class CloneTests(PorcelainTestCase):
         c = r.get_config()
         encoded_path = self.repo.path
         if not isinstance(encoded_path, bytes):
-            encoded_path = encoded_path.encode("utf-8")
-        self.assertEqual(encoded_path, c.get((b"remote", b"origin"), b"url"))
+            encoded_path_bytes = encoded_path.encode("utf-8")
+        else:
+            encoded_path_bytes = encoded_path
+        self.assertEqual(encoded_path_bytes, c.get((b"remote", b"origin"), b"url"))
         self.assertEqual(
             b"+refs/heads/*:refs/remotes/origin/*",
             c.get((b"remote", b"origin"), b"fetch"),
@@ -1323,6 +1337,8 @@ class AddTests(PorcelainTestCase):
         self.assertEqual([], list(self.repo.open_index()))
 
     def test_add_file_clrf_conversion(self) -> None:
+        from dulwich.index import IndexEntry
+
         # Set the right configuration to the repo
         c = self.repo.get_config()
         c.set("core", "autocrlf", "input")
@@ -1339,6 +1355,7 @@ class AddTests(PorcelainTestCase):
         self.assertIn(b"foo", index)
 
         entry = index[b"foo"]
+        assert isinstance(entry, IndexEntry)
         blob = self.repo[entry.sha]
         self.assertEqual(blob.data, b"line1\nline2")
 
@@ -2456,6 +2473,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertEqual(b"bar\n", tag.message)
         self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b"refs/tags/tryme"]
+        assert isinstance(tag, Tag)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
         tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
@@ -2467,7 +2485,8 @@ class TagCreateSignTests(PorcelainGpgTestCase):
             keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
         )
 
-        tag._chunked_text = [b"bad data", tag._signature]
+        assert tag.signature is not None
+        tag._chunked_text = [b"bad data", tag.signature]
         self.assertRaises(
             gpg.errors.BadSignatures,
             tag.verify,
@@ -2488,7 +2507,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
             b"foo <foo@bar.com>",
             b"bar",
             annotated=True,
-            sign=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID,
+            sign=True,
         )
 
         tags = self.repo.refs.as_dict(b"refs/tags")
@@ -2499,6 +2518,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertEqual(b"bar\n", tag.message)
         self.assertRecentTimestamp(tag.tag_time)
         tag = self.repo[b"refs/tags/tryme"]
+        assert isinstance(tag, Tag)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
         tag.verify()
 
@@ -2796,7 +2816,7 @@ class ResetTests(PorcelainTestCase):
         index = self.repo.open_index()
         changes = list(
             tree_changes(
-                self.repo,
+                self.repo.object_store,
                 index.commit(self.repo.object_store),
                 self.repo[b"HEAD"].tree,
             )
@@ -2831,7 +2851,7 @@ class ResetTests(PorcelainTestCase):
         index = self.repo.open_index()
         changes = list(
             tree_changes(
-                self.repo,
+                self.repo.object_store,
                 index.commit(self.repo.object_store),
                 self.repo[sha].tree,
             )
@@ -2868,7 +2888,7 @@ class ResetTests(PorcelainTestCase):
         index = self.repo.open_index()
         changes = list(
             tree_changes(
-                self.repo,
+                self.repo.object_store,
                 index.commit(self.repo.object_store),
                 self.repo[sha].tree,
             )
@@ -3032,7 +3052,7 @@ class ResetTests(PorcelainTestCase):
         index = self.repo.open_index()
         changes = list(
             tree_changes(
-                self.repo,
+                self.repo.object_store,
                 index.commit(self.repo.object_store),
                 self.repo[first_sha].tree,
             )
@@ -4165,7 +4185,7 @@ class PushTests(PorcelainTestCase):
             change = next(
                 iter(
                     tree_changes(
-                        self.repo,
+                        self.repo.object_store,
                         self.repo[b"HEAD"].tree,
                         self.repo[b"refs/heads/foo"].tree,
                     )
@@ -5677,10 +5697,10 @@ class LsTreeTests(PorcelainTestCase):
             committer=b"committer <email>",
         )
 
-        f = StringIO()
-        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
+        output = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=output)
         self.assertEqual(
-            f.getvalue(),
+            output.getvalue(),
             "100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tfoo\n",
         )
 
@@ -5698,16 +5718,16 @@ class LsTreeTests(PorcelainTestCase):
             author=b"author <email>",
             committer=b"committer <email>",
         )
-        f = StringIO()
-        porcelain.ls_tree(self.repo, b"HEAD", outstream=f)
+        output = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=output)
         self.assertEqual(
-            f.getvalue(),
+            output.getvalue(),
             "40000 tree b145cc69a5e17693e24d8a7be0016ed8075de66d\tadir\n",
         )
-        f = StringIO()
-        porcelain.ls_tree(self.repo, b"HEAD", outstream=f, recursive=True)
+        output2 = StringIO()
+        porcelain.ls_tree(self.repo, b"HEAD", outstream=output2, recursive=True)
         self.assertEqual(
-            f.getvalue(),
+            output2.getvalue(),
             "40000 tree b145cc69a5e17693e24d8a7be0016ed8075de66d\tadir\n"
             "100644 blob 8b82634d7eae019850bb883f06abf428c58bc9aa\tadir"
             "/afile\n",
@@ -7191,3 +7211,165 @@ class StashTests(PorcelainTestCase):
 
         # Tracked file should be restored
         self.assertTrue(os.path.exists(tracked_file))
+
+
+class BisectTests(PorcelainTestCase):
+    """Tests for bisect porcelain functions."""
+
+    def test_bisect_start(self):
+        """Test starting a bisect session."""
+        # Create some commits
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 2]],
+            attrs={
+                1: {"message": b"initial"},
+                2: {"message": b"second"},
+                3: {"message": b"third"},
+            },
+        )
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Start bisect
+        porcelain.bisect_start(self.repo_path)
+
+        # Check that bisect state files exist
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "BISECT_START"))
+        )
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "BISECT_TERMS"))
+        )
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "BISECT_NAMES"))
+        )
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "BISECT_LOG"))
+        )
+
+    def test_bisect_workflow(self):
+        """Test a complete bisect workflow."""
+        # Create some commits
+        c1, c2, c3, c4 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 2], [4, 3]],
+            attrs={
+                1: {"message": b"good commit 1"},
+                2: {"message": b"good commit 2"},
+                3: {"message": b"bad commit"},
+                4: {"message": b"bad commit 2"},
+            },
+        )
+        self.repo.refs[b"refs/heads/master"] = c4.id
+        self.repo.refs[b"HEAD"] = c4.id
+
+        # Start bisect with bad and good
+        next_sha = porcelain.bisect_start(self.repo_path, bad=c4.id, good=c1.id)
+
+        # Should return the middle commit
+        self.assertIsNotNone(next_sha)
+        self.assertIn(next_sha, [c2.id, c3.id])
+
+        # Mark the middle commit as good or bad
+        if next_sha == c2.id:
+            # c2 is good, next should be c3
+            next_sha = porcelain.bisect_good(self.repo_path)
+            self.assertEqual(next_sha, c3.id)
+            # Mark c3 as bad - bisect complete
+            next_sha = porcelain.bisect_bad(self.repo_path)
+            self.assertIsNone(next_sha)
+        else:
+            # c3 is bad, next should be c2
+            next_sha = porcelain.bisect_bad(self.repo_path)
+            self.assertEqual(next_sha, c2.id)
+            # Mark c2 as good - bisect complete
+            next_sha = porcelain.bisect_good(self.repo_path)
+            self.assertIsNone(next_sha)
+
+    def test_bisect_log(self):
+        """Test getting bisect log."""
+        # Create some commits
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 2]],
+            attrs={
+                1: {"message": b"initial"},
+                2: {"message": b"second"},
+                3: {"message": b"third"},
+            },
+        )
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"HEAD"] = c3.id
+
+        # Start bisect and mark commits
+        porcelain.bisect_start(self.repo_path)
+        porcelain.bisect_bad(self.repo_path, c3.id)
+        porcelain.bisect_good(self.repo_path, c1.id)
+
+        # Get log
+        log = porcelain.bisect_log(self.repo_path)
+
+        self.assertIn("git bisect start", log)
+        self.assertIn("git bisect bad", log)
+        self.assertIn("git bisect good", log)
+
+    def test_bisect_reset(self):
+        """Test resetting bisect state."""
+        # Create some commits
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 2]],
+            attrs={
+                1: {"message": b"initial"},
+                2: {"message": b"second"},
+                3: {"message": b"third"},
+            },
+        )
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
+
+        # Start bisect
+        porcelain.bisect_start(self.repo_path)
+        porcelain.bisect_bad(self.repo_path)
+        porcelain.bisect_good(self.repo_path, c1.id)
+
+        # Reset
+        porcelain.bisect_reset(self.repo_path)
+
+        # Check that bisect state files are removed
+        self.assertFalse(
+            os.path.exists(os.path.join(self.repo.controldir(), "BISECT_START"))
+        )
+        self.assertFalse(
+            os.path.exists(os.path.join(self.repo.controldir(), "refs", "bisect"))
+        )
+
+        # HEAD should be back to being a symbolic ref to master
+        head_target, _ = self.repo.refs.follow(b"HEAD")
+        self.assertEqual(head_target[-1], b"refs/heads/master")
+
+    def test_bisect_skip(self):
+        """Test skipping commits during bisect."""
+        # Create some commits
+        c1, c2, c3, c4, c5 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 2], [4, 3], [5, 4]],
+            attrs={
+                1: {"message": b"good"},
+                2: {"message": b"skip this"},
+                3: {"message": b"bad"},
+                4: {"message": b"bad"},
+                5: {"message": b"bad"},
+            },
+        )
+        self.repo.refs[b"refs/heads/master"] = c5.id
+        self.repo.refs[b"HEAD"] = c5.id
+
+        # Start bisect
+        porcelain.bisect_start(self.repo_path, bad=c5.id, good=c1.id)
+
+        # Skip c2 if it's selected
+        next_sha = porcelain.bisect_skip(self.repo_path, [c2.id])
+        self.assertIsNotNone(next_sha)
+        self.assertNotEqual(next_sha, c2.id)

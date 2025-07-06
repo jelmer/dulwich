@@ -1934,8 +1934,13 @@ def update_working_tree(
             ):
                 try:
                     os.rmdir(root)
-                except OSError:
+                except FileNotFoundError:
+                    # Directory was already removed
                     pass
+                except OSError as e:
+                    if e.errno != errno.ENOTEMPTY:
+                        # Only ignore "directory not empty" errors
+                        raise
 
     index.write()
 

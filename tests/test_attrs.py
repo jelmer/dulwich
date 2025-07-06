@@ -320,21 +320,20 @@ class FileOperationsTests(TestCase):
             f.write(b"*.jpg -text binary\n")
             temp_path = f.name
 
-        try:
-            patterns = parse_gitattributes_file(temp_path)
-            self.assertEqual(len(patterns), 2)
+        self.addCleanup(os.unlink, temp_path)
 
-            # Check first pattern
-            pattern, attrs = patterns[0]
-            self.assertEqual(pattern.pattern, b"*.txt")
-            self.assertEqual(attrs, {b"text": True})
+        patterns = parse_gitattributes_file(temp_path)
+        self.assertEqual(len(patterns), 2)
 
-            # Check second pattern
-            pattern, attrs = patterns[1]
-            self.assertEqual(pattern.pattern, b"*.jpg")
-            self.assertEqual(attrs, {b"text": False, b"binary": True})
-        finally:
-            os.unlink(temp_path)
+        # Check first pattern
+        pattern, attrs = patterns[0]
+        self.assertEqual(pattern.pattern, b"*.txt")
+        self.assertEqual(attrs, {b"text": True})
+
+        # Check second pattern
+        pattern, attrs = patterns[1]
+        self.assertEqual(pattern.pattern, b"*.jpg")
+        self.assertEqual(attrs, {b"text": False, b"binary": True})
 
     def test_read_gitattributes(self):
         """Test reading gitattributes from a directory."""
@@ -427,17 +426,16 @@ class GitAttributesTests(TestCase):
             f.write(b"*.bin -text binary\n")
             temp_path = f.name
 
-        try:
-            ga = GitAttributes.from_file(temp_path)
-            self.assertEqual(len(ga), 2)
+        self.addCleanup(os.unlink, temp_path)
 
-            attrs = ga.match_path(b"file.txt")
-            self.assertEqual(attrs, {b"text": True})
+        ga = GitAttributes.from_file(temp_path)
+        self.assertEqual(len(ga), 2)
 
-            attrs = ga.match_path(b"file.bin")
-            self.assertEqual(attrs, {b"text": False, b"binary": True})
-        finally:
-            os.unlink(temp_path)
+        attrs = ga.match_path(b"file.txt")
+        self.assertEqual(attrs, {b"text": True})
+
+        attrs = ga.match_path(b"file.bin")
+        self.assertEqual(attrs, {b"text": False, b"binary": True})
 
     def test_from_path(self):
         """Test creating GitAttributes from directory path."""

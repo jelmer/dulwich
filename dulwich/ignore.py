@@ -518,8 +518,15 @@ class IgnoreFilterManager:
         p = os.path.join(self._top_path, path, ".gitignore")
         try:
             self._path_filters[path] = IgnoreFilter.from_path(p, self._ignorecase)
-        except OSError:
+        except (FileNotFoundError, NotADirectoryError):
             self._path_filters[path] = None
+        except OSError as e:
+            # On Windows, opening a path that contains a symlink can fail with
+            # errno 22 (Invalid argument) when the symlink points outside the repo
+            if e.errno == 22:
+                self._path_filters[path] = None
+            else:
+                raise
         return self._path_filters[path]
 
     def find_matching(self, path: str) -> Iterable[Pattern]:

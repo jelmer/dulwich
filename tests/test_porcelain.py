@@ -1826,16 +1826,18 @@ class RemoveTests(PorcelainTestCase):
         # Change to a different directory
         cwd = os.getcwd()
         tempdir = tempfile.mkdtemp()
-        try:
-            os.chdir(tempdir)
-            # Remove the file using relative path from repository root
-            porcelain.remove(self.repo.path, paths=["mydir/myfile"])
 
-            # Verify file was removed
-            self.assertFalse(os.path.exists(fullpath))
-        finally:
+        def cleanup():
             os.chdir(cwd)
-            shutil.rmtree(tempdir, ignore_errors=True)
+            shutil.rmtree(tempdir)
+
+        self.addCleanup(cleanup)
+        os.chdir(tempdir)
+        # Remove the file using relative path from repository root
+        porcelain.remove(self.repo.path, paths=["mydir/myfile"])
+
+        # Verify file was removed
+        self.assertFalse(os.path.exists(fullpath))
 
     def test_remove_with_absolute_path(self) -> None:
         # Create a file
@@ -1855,16 +1857,18 @@ class RemoveTests(PorcelainTestCase):
         # Change to a different directory
         cwd = os.getcwd()
         tempdir = tempfile.mkdtemp()
-        try:
-            os.chdir(tempdir)
-            # Remove the file using absolute path
-            porcelain.remove(self.repo.path, paths=[fullpath])
 
-            # Verify file was removed
-            self.assertFalse(os.path.exists(fullpath))
-        finally:
+        def cleanup():
             os.chdir(cwd)
-            shutil.rmtree(tempdir, ignore_errors=True)
+            shutil.rmtree(tempdir)
+
+        self.addCleanup(cleanup)
+        os.chdir(tempdir)
+        # Remove the file using absolute path
+        porcelain.remove(self.repo.path, paths=[fullpath])
+
+        # Verify file was removed
+        self.assertFalse(os.path.exists(fullpath))
 
     def test_remove_with_filter_normalization(self) -> None:
         # Enable autocrlf to normalize line endings
@@ -1896,11 +1900,9 @@ class RemoveTests(PorcelainTestCase):
         # Remove the file - this should not fail even though working tree has CRLF
         # and index has LF (thanks to the normalization in the commit)
         cwd = os.getcwd()
-        try:
-            os.chdir(self.repo.path)
-            porcelain.remove(self.repo.path, paths=["foo.txt"])
-        finally:
-            os.chdir(cwd)
+        os.chdir(self.repo.path)
+        self.addCleanup(os.chdir, cwd)
+        porcelain.remove(self.repo.path, paths=["foo.txt"])
 
         # Verify file was removed
         self.assertFalse(os.path.exists(fullpath))
@@ -2054,17 +2056,19 @@ class MvTests(PorcelainTestCase):
         # Change to a different directory and move the file
         cwd = os.getcwd()
         tempdir = tempfile.mkdtemp()
-        try:
-            os.chdir(tempdir)
-            # Move the file using relative path from repository root
-            porcelain.mv(self.repo.path, "mydir/myfile", "renamed")
 
-            # Verify file was moved
-            self.assertFalse(os.path.exists(fullpath))
-            self.assertTrue(os.path.exists(os.path.join(self.repo.path, "renamed")))
-        finally:
+        def cleanup():
             os.chdir(cwd)
-            shutil.rmtree(tempdir, ignore_errors=True)
+            shutil.rmtree(tempdir)
+
+        self.addCleanup(cleanup)
+        os.chdir(tempdir)
+        # Move the file using relative path from repository root
+        porcelain.mv(self.repo.path, "mydir/myfile", "renamed")
+
+        # Verify file was moved
+        self.assertFalse(os.path.exists(fullpath))
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "renamed")))
 
 
 class LogTests(PorcelainTestCase):
@@ -3629,10 +3633,8 @@ class CheckoutTests(PorcelainTestCase):
         target_repo = porcelain.clone(
             self.repo.path, target=clone_path, errstream=errstream
         )
-        try:
-            self.assertEqual(target_repo[b"HEAD"], self.repo[b"HEAD"])
-        finally:
-            target_repo.close()
+        self.addCleanup(target_repo.close)
+        self.assertEqual(target_repo[b"HEAD"], self.repo[b"HEAD"])
 
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
@@ -4112,10 +4114,8 @@ class PushTests(PorcelainTestCase):
         target_repo = porcelain.clone(
             self.repo.path, target=clone_path, errstream=errstream
         )
-        try:
-            self.assertEqual(target_repo[b"HEAD"], self.repo[b"HEAD"])
-        finally:
-            target_repo.close()
+        self.addCleanup(target_repo.close)
+        self.assertEqual(target_repo[b"HEAD"], self.repo[b"HEAD"])
 
         # create a second file to be pushed back to origin
         handle, fullpath = tempfile.mkstemp(dir=clone_path)
@@ -5007,11 +5007,9 @@ class StatusTests(PorcelainTestCase):
             committer=b"committer <email>",
         )
         cwd = os.getcwd()
-        try:
-            os.chdir(self.repo.path)
-            porcelain.remove(repo=self.repo.path, paths=[filename])
-        finally:
-            os.chdir(cwd)
+        self.addCleanup(os.chdir, cwd)
+        os.chdir(self.repo.path)
+        porcelain.remove(repo=self.repo.path, paths=[filename])
         changes = porcelain.get_tree_changes(self.repo.path)
 
         self.assertEqual(changes["delete"][0], filename.encode("ascii"))
@@ -5820,16 +5818,14 @@ class CheckIgnoreTests(PorcelainTestCase):
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
             f.write("foo\n")
         cwd = os.getcwd()
+        self.addCleanup(os.chdir, cwd)
         os.mkdir(os.path.join(self.repo.path, "bar"))
         os.chdir(os.path.join(self.repo.path, "bar"))
-        try:
-            self.assertEqual(list(porcelain.check_ignore(self.repo, ["../foo"])), [])
-            self.assertEqual(
-                ["../foo"],
-                list(porcelain.check_ignore(self.repo, ["../foo"], no_index=True)),
-            )
-        finally:
-            os.chdir(cwd)
+        self.assertEqual(list(porcelain.check_ignore(self.repo, ["../foo"])), [])
+        self.assertEqual(
+            ["../foo"],
+            list(porcelain.check_ignore(self.repo, ["../foo"], no_index=True)),
+        )
 
 
 class UpdateHeadTests(PorcelainTestCase):
@@ -6046,30 +6042,28 @@ class PathToTreeTests(PorcelainTestCase):
 
     def test_path_to_tree_path_rel(self) -> None:
         cwd = os.getcwd()
+        self.addCleanup(os.chdir, cwd)
         os.mkdir(os.path.join(self.repo.path, "foo"))
         os.mkdir(os.path.join(self.repo.path, "foo/bar"))
-        try:
-            os.chdir(os.path.join(self.repo.path, "foo/bar"))
-            with open("baz", "w") as f:
-                f.write("contents")
-            self.assertEqual(b"bar/baz", porcelain.path_to_tree_path("..", "baz"))
-            self.assertEqual(
-                b"bar/baz",
-                porcelain.path_to_tree_path(
-                    os.path.join(os.getcwd(), ".."),
-                    os.path.join(os.getcwd(), "baz"),
-                ),
-            )
-            self.assertEqual(
-                b"bar/baz",
-                porcelain.path_to_tree_path("..", os.path.join(os.getcwd(), "baz")),
-            )
-            self.assertEqual(
-                b"bar/baz",
-                porcelain.path_to_tree_path(os.path.join(os.getcwd(), ".."), "baz"),
-            )
-        finally:
-            os.chdir(cwd)
+        os.chdir(os.path.join(self.repo.path, "foo/bar"))
+        with open("baz", "w") as f:
+            f.write("contents")
+        self.assertEqual(b"bar/baz", porcelain.path_to_tree_path("..", "baz"))
+        self.assertEqual(
+            b"bar/baz",
+            porcelain.path_to_tree_path(
+                os.path.join(os.getcwd(), ".."),
+                os.path.join(os.getcwd(), "baz"),
+            ),
+        )
+        self.assertEqual(
+            b"bar/baz",
+            porcelain.path_to_tree_path("..", os.path.join(os.getcwd(), "baz")),
+        )
+        self.assertEqual(
+            b"bar/baz",
+            porcelain.path_to_tree_path(os.path.join(os.getcwd(), ".."), "baz"),
+        )
 
 
 class GetObjectByPathTests(PorcelainTestCase):

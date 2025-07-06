@@ -635,6 +635,35 @@ class RepositoryRootTests(TestCase):
 
         t.close()
 
+    def test_reset_index_protect_hfs(self) -> None:
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        repo = Repo.init(tmp_dir)
+        self.addCleanup(repo.close)
+        config = repo.get_config()
+
+        # Test with protectHFS enabled
+        config.set(b"core", b"core.protectHFS", b"true")
+        config.write_to_path()
+
+        # Create a file with HFS+ Unicode attack vector
+        # This uses a zero-width non-joiner to create ".g\u200cit"
+        attack_name = b".g\xe2\x80\x8cit"
+        attack_path = os.path.join(tmp_dir, attack_name.decode("utf-8"))
+        os.mkdir(attack_path)
+
+        # Try to stage the malicious path - should be rejected
+        with self.assertRaises(ValueError):
+            repo.stage([attack_name])
+
+        # Test with protectHFS disabled
+        config.set(b"core", b"core.protectHFS", b"false")
+        config.write_to_path()
+
+        # Now it should work (though still dangerous!)
+        # We're not actually staging it to avoid creating a dangerous repo
+
     def test_clone_bare(self) -> None:
         r = self.open_repo("a.git")
         tmp_dir = self.mkdtemp()

@@ -22,6 +22,7 @@
 """Stash handling."""
 
 import os
+import sys
 from typing import TYPE_CHECKING, Optional, TypedDict
 
 from .file import GitFile
@@ -37,6 +38,7 @@ from .index import (
     update_working_tree,
     validate_path,
     validate_path_element_default,
+    validate_path_element_hfs,
     validate_path_element_ntfs,
 )
 from .objects import S_IFGITLINK, Blob, Commit, ObjectID
@@ -139,6 +141,8 @@ class Stash:
 
         if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
+        elif config.get_boolean(b"core", b"core.protectHFS", sys.platform == "darwin"):
+            validate_path_element = validate_path_element_hfs
         else:
             validate_path_element = validate_path_element_default
 

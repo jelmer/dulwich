@@ -51,6 +51,7 @@ from dulwich.index import (
     read_index_dict,
     update_working_tree,
     validate_path_element_default,
+    validate_path_element_hfs,
     validate_path_element_ntfs,
     write_cache_time,
     write_index,
@@ -859,6 +860,35 @@ class TestValidatePathElement(TestCase):
         self.assertFalse(validate_path_element_ntfs(b".giT"))
         self.assertFalse(validate_path_element_ntfs(b".."))
         self.assertFalse(validate_path_element_ntfs(b"git~1"))
+
+    def test_hfs(self) -> None:
+        # Normal paths should pass
+        self.assertTrue(validate_path_element_hfs(b"bla"))
+        self.assertTrue(validate_path_element_hfs(b".bla"))
+
+        # Basic .git variations should fail
+        self.assertFalse(validate_path_element_hfs(b".git"))
+        self.assertFalse(validate_path_element_hfs(b".giT"))
+        self.assertFalse(validate_path_element_hfs(b".GIT"))
+        self.assertFalse(validate_path_element_hfs(b".."))
+
+        # git~1 should also fail on HFS+
+        self.assertFalse(validate_path_element_hfs(b"git~1"))
+
+        # Test HFS+ Unicode normalization attacks
+        # .g\u200cit (zero-width non-joiner)
+        self.assertFalse(validate_path_element_hfs(b".g\xe2\x80\x8cit"))
+
+        # .gi\u200dt (zero-width joiner)
+        self.assertFalse(validate_path_element_hfs(b".gi\xe2\x80\x8dt"))
+
+        # Test other ignorable characters
+        # .g\ufeffit (zero-width no-break space)
+        self.assertFalse(validate_path_element_hfs(b".g\xef\xbb\xbfit"))
+
+        # Valid Unicode that shouldn't be confused with .git
+        self.assertTrue(validate_path_element_hfs(b".g\xc3\xaft"))  # .gït
+        self.assertTrue(validate_path_element_hfs(b"git"))  # git without dot
 
 
 class TestTreeFSPathConversion(TestCase):

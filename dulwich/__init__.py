@@ -23,12 +23,20 @@
 
 """Python implementation of the Git file formats and protocols."""
 
+import sys
 from typing import Any, Callable, Optional, TypeVar
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
 
 __version__ = (0, 23, 1)
 
 __all__ = ["replace_me"]
 
+P = ParamSpec("P")
+R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Any])
 
 try:
@@ -38,8 +46,9 @@ except ImportError:
     # of its replace_me decorator
     def replace_me(
         since: Optional[str] = None, remove_in: Optional[str] = None
-    ) -> Callable[[F], F]:
-        def decorator(func: F) -> F:
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+        def decorator(func: Callable[P, R]) -> Callable[P, R]:
+            import functools
             import warnings
 
             m = f"{func.__name__} is deprecated"
@@ -52,11 +61,15 @@ except ImportError:
             else:
                 m += " and will be removed in a future version"
 
-            warnings.warn(
-                m,
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return func
+            @functools.wraps(func)
+            def _wrapped_func(*args: P.args, **kwargs: P.kwargs) -> R:
+                warnings.warn(
+                    m,
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                return func(*args, **kwargs)
+
+            return _wrapped_func
 
         return decorator

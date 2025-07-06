@@ -1,5 +1,8 @@
 0.23.2	UNRELEASED
 
+ * Print deprecations on usage, not import.
+   (Alyssa Coghlan, #1650)
+
  * Only write Git index extensions when they contain meaningful data.
    Previously, dulwich would write empty extensions to the index file,
    causing unnecessary bloat.

@@ -160,6 +160,12 @@ class ParseCommitTests(TestCase):
         # Should raise ValueError as it's not a commit
         self.assertRaises(ValueError, parse_commit, r, tag.id)
 
+    def test_commit_object(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Test that passing a Commit object directly returns the same object
+        self.assertEqual(c1, parse_commit(r, c1))
+
 
 class ParseRefTests(TestCase):
     def test_nonexistent(self) -> None:

@@ -38,6 +38,10 @@
    Previously used a hardcoded 7-character hash length.
    (Jelmer Vernooĳ, #824)
 
+ * Add test for ``porcelain.add()`` to verify files can be added when
+   the current working directory is within a gitignored directory.
+   (Jelmer Vernooĳ, #550)
+
  * ParamikoSSHVendor now reads SSH configuration from ~/.ssh/config.
    Host settings including hostname, user, port, and identity file are
    now respected when establishing SSH connections.

@@ -38,6 +38,10 @@
    Previously used a hardcoded 7-character hash length.
    (Jelmer Vernooĳ, #824)
 
+ * Add test for ``porcelain.add()`` to verify files can be added when
+   the current working directory is within a gitignored directory.
+   (Jelmer Vernooĳ, #550)
+
 0.23.1	2025-06-30
 
  * Support ``untracked_files="normal"`` argument to ``porcelain.status``,

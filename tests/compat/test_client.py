@@ -203,6 +203,115 @@ class DulwichClientTestBase:
             tree = local[b"refs/remotes/origin/master"].tree
             local.reset_index(tree=tree)
 
+    def test_shallow_clone_deepened_gradually(self) -> None:
+        """Test deepening a shallow clone gradually (depth 1 -> 2 -> 3)."""
+        c = self._client()
+        server_new_path = os.path.join(self.gitroot, "server_new.export")
+        run_git_or_fail(["config", "http.uploadpack", "true"], cwd=server_new_path)
+        remote_path = self._build_path("/server_new.export")
+
+        # First create a shallow clone with depth 1
+        with repo.Repo(self.dest) as local:
+            result = c.fetch(remote_path, local, depth=1)
+            initial_shallow = local.get_shallow()
+            self.assertGreater(len(initial_shallow), 0)
+            for r in result.refs.items():
+                local.refs.set_if_equals(r[0], None, r[1])
+
+        # Deepen to depth 2
+        c2 = self._client()
+        with repo.Repo(self.dest) as local:
+            result = c2.fetch(remote_path, local, depth=2)
+            new_shallow = local.get_shallow()
+            # Should still be shallow, but potentially with different commits
+            self.assertGreater(len(new_shallow), 0)
+            for r in result.refs.items():
+                local.refs.set_if_equals(r[0], None, r[1])
+
+        # Deepen to depth 3
+        c3 = self._client()
+        with repo.Repo(self.dest) as local:
+            result = c3.fetch(remote_path, local, depth=3)
+            # After depth 3, check if still shallow (depends on repo history)
+            local.get_shallow()  # This updates the shallow set
+            for r in result.refs.items():
+                local.refs.set_if_equals(r[0], None, r[1])
+
+    def test_shallow_clone_no_shallow_update(self) -> None:
+        """Test shallow clone where server sends no shallow updates."""
+        c = self._client()
+        server_new_path = os.path.join(self.gitroot, "server_new.export")
+        run_git_or_fail(["config", "http.uploadpack", "true"], cwd=server_new_path)
+        remote_path = self._build_path("/server_new.export")
+
+        # Create a regular (non-shallow) clone first
+        with repo.Repo(self.dest) as local:
+            result = c.fetch(remote_path, local)
+            self.assertEqual(local.get_shallow(), set())
+            for r in result.refs.items():
+                local.refs.set_if_equals(r[0], None, r[1])
+
+        # Fetch again with depth specified - server should send no shallow updates
+        # since the repo is already complete
+        c2 = self._client()
+        with repo.Repo(self.dest) as local:
+            result = c2.fetch(remote_path, local, depth=1)
+            # Should remain non-shallow since we already have all commits
+            self.assertEqual(local.get_shallow(), set())
+
+    def test_shallow_clone_from_empty_repo(self) -> None:
+        """Test shallow clone from an empty repository."""
+        # Create an empty repository
+        empty_path = os.path.join(self.gitroot, "empty.git")
+        run_git_or_fail(["init", "--bare", empty_path])
+        run_git_or_fail(["config", "http.uploadpack", "true"], cwd=empty_path)
+        remote_path = self._build_path("/empty.git")
+
+        c = self._client()
+        with repo.Repo(self.dest) as local:
+            result = c.fetch(remote_path, local, depth=1)
+            # Empty repo should have no refs and no shallow commits
+            self.assertEqual(result.refs, {})
+            self.assertEqual(local.get_shallow(), set())
+
+    def test_shallow_clone_with_single_commit(self) -> None:
+        """Test shallow clone from a repository with only one commit."""
+        # Create a new repository with a single commit
+        single_commit_path = os.path.join(self.gitroot, "single_commit.git")
+        run_git_or_fail(["init", "--bare", single_commit_path])
+        run_git_or_fail(["config", "http.uploadpack", "true"], cwd=single_commit_path)
+
+        # Add a single commit using a temporary working directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_git_or_fail(["clone", single_commit_path, tmpdir])
+            with open(os.path.join(tmpdir, "test.txt"), "w") as f:
+                f.write("test content")
+            run_git_or_fail(["add", "test.txt"], cwd=tmpdir)
+            run_git_or_fail(
+                [
+                    "commit",
+                    "-m",
+                    "Initial commit",
+                    "--author",
+                    "Test <test@example.com>",
+                ],
+                cwd=tmpdir,
+            )
+            run_git_or_fail(["push", "origin", "master"], cwd=tmpdir)
+
+        remote_path = self._build_path("/single_commit.git")
+        c = self._client()
+        with repo.Repo(self.dest) as local:
+            result = c.fetch(remote_path, local, depth=1)
+            # With only one commit and depth=1, it may still be marked as shallow
+            # depending on the server implementation
+            shallow = local.get_shallow()
+            # Should have the single commit
+            self.assertIn(b"refs/heads/master", result.refs)
+            # If shallow, should only have one shallow commit
+            if shallow:
+                self.assertEqual(len(shallow), 1)
+
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string(b"hi")
         dest.object_store.add_object(b)

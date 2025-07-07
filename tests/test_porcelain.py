@@ -1312,6 +1312,32 @@ class AddTests(PorcelainTestCase):
         self.assertEqual({"bar"}, set(added))
         self.assertEqual({"foo", "subdir/"}, ignored)
 
+    def test_add_from_ignored_directory(self) -> None:
+        # Test for issue #550 - adding files when cwd is in ignored directory
+        # Create .gitignore that ignores build/
+        with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
+            f.write("build/\n")
+
+        # Create ignored directory
+        build_dir = os.path.join(self.repo.path, "build")
+        os.mkdir(build_dir)
+
+        # Create a file in the repo (not in ignored directory)
+        src_file = os.path.join(self.repo.path, "source.py")
+        with open(src_file, "w") as f:
+            f.write("print('hello')\n")
+
+        # Save current directory and change to ignored directory
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(build_dir)
+            # Add file using absolute path from within ignored directory
+            (added, ignored) = porcelain.add(self.repo.path, paths=[src_file])
+            self.assertIn(b"source.py", self.repo.open_index())
+            self.assertEqual({"source.py"}, set(added))
+        finally:
+            os.chdir(original_cwd)
+
     def test_add_file_absolute_path(self) -> None:
         # Absolute paths are (not yet) supported
         with open(os.path.join(self.repo.path, "foo"), "w") as f:

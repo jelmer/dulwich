@@ -1338,6 +1338,24 @@ class Repo(BaseRepo):
                 + b"\n"
             )
 
+    def read_reflog(self, ref):
+        """Read reflog entries for a reference.
+
+        Args:
+          ref: Reference name (e.g. b'HEAD', b'refs/heads/master')
+
+        Yields:
+          reflog.Entry objects in chronological order (oldest first)
+        """
+        from .reflog import read_reflog
+
+        path = os.path.join(self.controldir(), "logs", os.fsdecode(ref))
+        try:
+            with open(path, "rb") as f:
+                yield from read_reflog(f)
+        except FileNotFoundError:
+            return
+
     @classmethod
     def discover(cls, start="."):
         """Iterate parent directories to discover a repository.

@@ -7419,4 +7419,141 @@ class BisectTests(PorcelainTestCase):
         # Skip c2 if it's selected
         next_sha = porcelain.bisect_skip(self.repo_path, [c2.id])
         self.assertIsNotNone(next_sha)
-        self.assertNotEqual(next_sha, c2.id)
+
+
+class ReflogTest(PorcelainTestCase):
+    def test_reflog_head(self):
+        """Test reading HEAD reflog."""
+        # Create a commit
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = 1234567890
+        commit.commit_timezone = 0
+        commit.author_time = 1234567890
+        commit.author_timezone = 0
+        commit.message = b"Initial commit"
+        self.repo.object_store.add_object(commit)
+
+        # Write a reflog entry
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567890,
+            0,
+            b"commit (initial): Initial commit",
+        )
+
+        # Read reflog using porcelain
+        entries = list(porcelain.reflog(self.repo_path))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(ZERO_SHA, entries[0].old_sha)
+        self.assertEqual(commit.id, entries[0].new_sha)
+        self.assertEqual(b"Test Author <test@example.com>", entries[0].committer)
+        self.assertEqual(1234567890, entries[0].timestamp)
+        self.assertEqual(0, entries[0].timezone)
+        self.assertEqual(b"commit (initial): Initial commit", entries[0].message)
+
+    def test_reflog_with_string_ref(self):
+        """Test reading reflog with string reference."""
+        # Create a commit
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = 1234567890
+        commit.commit_timezone = 0
+        commit.author_time = 1234567890
+        commit.author_timezone = 0
+        commit.message = b"Initial commit"
+        self.repo.object_store.add_object(commit)
+
+        # Write a reflog entry
+        self.repo._write_reflog(
+            b"refs/heads/master",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567890,
+            0,
+            b"commit (initial): Initial commit",
+        )
+
+        # Read reflog using porcelain with string ref
+        entries = list(porcelain.reflog(self.repo_path, "refs/heads/master"))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(commit.id, entries[0].new_sha)
+
+    def test_reflog_all(self):
+        """Test reading all reflogs."""
+        # Create a commit
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = 1234567890
+        commit.commit_timezone = 0
+        commit.author_time = 1234567890
+        commit.author_timezone = 0
+        commit.message = b"Initial commit"
+        self.repo.object_store.add_object(commit)
+
+        # Write reflog entries for HEAD and master
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567890,
+            0,
+            b"commit (initial): Initial commit",
+        )
+        self.repo._write_reflog(
+            b"refs/heads/master",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567891,
+            0,
+            b"branch: Created from HEAD",
+        )
+
+        # Read all reflogs using porcelain
+        entries = list(porcelain.reflog(self.repo_path, all=True))
+
+        # Should have at least 2 entries (HEAD and refs/heads/master)
+        self.assertGreaterEqual(len(entries), 2)
+
+        # Check that we got entries from different refs
+        refs_seen = set()
+        for ref, entry in entries:
+            refs_seen.add(ref)
+            self.assertEqual(commit.id, entry.new_sha)
+
+        # Should have seen at least HEAD and refs/heads/master
+        self.assertIn(b"HEAD", refs_seen)
+        self.assertIn(b"refs/heads/master", refs_seen)

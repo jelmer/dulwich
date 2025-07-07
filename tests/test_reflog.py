@@ -21,15 +21,18 @@
 
 """Tests for dulwich.reflog."""
 
+import tempfile
 from io import BytesIO
 
-from dulwich.objects import ZERO_SHA
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.reflog import (
     drop_reflog_entry,
     format_reflog_line,
+    iter_reflogs,
     parse_reflog_line,
     read_reflog,
 )
+from dulwich.repo import Repo
 
 from . import TestCase
 
@@ -142,3 +145,122 @@ class ReflogDropTests(TestCase):
         self.assertEqual(len(log), 1)
         self.assertEqual(ZERO_SHA, log[0].old_sha)
         self.assertEqual(self.original_log[2].new_sha, log[0].new_sha)
+
+
+class RepoReflogTests(TestCase):
+    def setUp(self) -> None:
+        TestCase.setUp(self)
+        self.test_dir = tempfile.mkdtemp()
+        self.repo = Repo.init(self.test_dir)
+
+    def tearDown(self) -> None:
+        TestCase.tearDown(self)
+        import shutil
+
+        shutil.rmtree(self.test_dir)
+
+    def test_read_reflog_nonexistent(self) -> None:
+        # Reading a reflog that doesn't exist should return empty
+        entries = list(self.repo.read_reflog(b"refs/heads/nonexistent"))
+        self.assertEqual([], entries)
+
+    def test_read_reflog_head(self) -> None:
+        # Create a commit to generate a reflog entry
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = 1234567890
+        commit.commit_timezone = 0
+        commit.author_time = 1234567890
+        commit.author_timezone = 0
+        commit.message = b"Initial commit"
+        self.repo.object_store.add_object(commit)
+
+        # Manually write a reflog entry
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567890,
+            0,
+            b"commit (initial): Initial commit",
+        )
+
+        # Read the reflog
+        entries = list(self.repo.read_reflog(b"HEAD"))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(ZERO_SHA, entries[0].old_sha)
+        self.assertEqual(commit.id, entries[0].new_sha)
+        self.assertEqual(b"Test Author <test@example.com>", entries[0].committer)
+        self.assertEqual(1234567890, entries[0].timestamp)
+        self.assertEqual(0, entries[0].timezone)
+        self.assertEqual(b"commit (initial): Initial commit", entries[0].message)
+
+    def test_iter_reflogs(self) -> None:
+        # Create commits and reflog entries
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = 1234567890
+        commit.commit_timezone = 0
+        commit.author_time = 1234567890
+        commit.author_timezone = 0
+        commit.message = b"Initial commit"
+        self.repo.object_store.add_object(commit)
+
+        # Write reflog entries for multiple refs
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567890,
+            0,
+            b"commit (initial): Initial commit",
+        )
+        self.repo._write_reflog(
+            b"refs/heads/master",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567891,
+            0,
+            b"branch: Created from HEAD",
+        )
+        self.repo._write_reflog(
+            b"refs/heads/develop",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1234567892,
+            0,
+            b"branch: Created from HEAD",
+        )
+
+        # Use iter_reflogs to get all reflogs
+        import os
+
+        logs_dir = os.path.join(self.repo.controldir(), "logs")
+        reflogs = list(iter_reflogs(logs_dir))
+
+        # Should have at least HEAD, refs/heads/master, and refs/heads/develop
+        self.assertIn(b"HEAD", reflogs)
+        self.assertIn(b"refs/heads/master", reflogs)
+        self.assertIn(b"refs/heads/develop", reflogs)

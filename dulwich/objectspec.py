@@ -64,11 +64,11 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "
     # If already a Tree, return it directly
     if isinstance(treeish, Tree):
         return treeish
-    
+
     # If it's a Commit, return its tree
     if isinstance(treeish, Commit):
         return repo[treeish.tree]
-    
+
     # For Tag objects or strings, use the existing logic
     if isinstance(treeish, Tag):
         treeish = treeish.id
@@ -250,12 +250,12 @@ def scan_for_short_id(object_store, prefix, tp):
     raise AmbiguousShortId(prefix, ret)
 
 
-def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit]) -> "Commit":
+def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit, Tag]) -> "Commit":
     """Parse a string referring to a single commit.
 
     Args:
       repo: A` Repo` object
-      committish: A string referring to a single commit, or a Commit object.
+      committish: A string referring to a single commit, or a Commit or Tag object.
     Returns: A Commit object
     Raises:
       KeyError: When the reference commits can not be found
@@ -278,6 +278,10 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit]) -> "Commit
     # If already a Commit object, return it directly
     if isinstance(committish, Commit):
         return committish
+
+    # If it's a Tag object, dereference it
+    if isinstance(committish, Tag):
+        return dereference_tag(committish)
 
     committish = to_bytes(committish)
     try:

@@ -2,6 +2,11 @@
 
  * Add ``reflog`` command in porcelain. (Jelmer Vernooĳ)
 
+ * Optimize writing unchanged refs by avoiding unnecessary fsync
+   when ref already has the desired value. File locking behavior
+   is preserved to ensure proper concurrency control.
+   (Dan Villiom Podlaski Christiansen, Jelmer Vernooĳ, #1120)
+
 0.23.2	2025-07-07
 
  * Print deprecations on usage, not import.

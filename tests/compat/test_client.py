@@ -186,8 +186,11 @@ class DulwichClientTestBase:
                     committer=b"Joe Example <joe@example.com>",
                     tree=tree_id,
                 )
+        # Create a new client for the second fetch operation
+        # TCP connections are single-use for git protocol operations
+        c2 = self._client()
         with repo.Repo(self.dest) as local:
-            result = c.fetch(remote_path, local, depth=DEPTH_INFINITE)
+            result = c2.fetch(remote_path, local, depth=DEPTH_INFINITE)
             _import_remote_refs(
                 local.refs,
                 "origin",

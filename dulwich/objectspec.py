@@ -234,12 +234,12 @@ def scan_for_short_id(object_store, prefix, tp):
     raise AmbiguousShortId(prefix, ret)
 
 
-def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
+def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit]) -> "Commit":
     """Parse a string referring to a single commit.
 
     Args:
       repo: A` Repo` object
-      committish: A string referring to a single commit.
+      committish: A string referring to a single commit, or a Commit object.
     Returns: A Commit object
     Raises:
       KeyError: When the reference commits can not be found
@@ -258,6 +258,10 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
         if not isinstance(obj, Commit):
             raise ValueError(f"Expected commit, got {obj.type_name}")
         return obj
+
+    # If already a Commit object, return it directly
+    if isinstance(committish, Commit):
+        return committish
 
     committish = to_bytes(committish)
     try:

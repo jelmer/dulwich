@@ -51,17 +51,29 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
     return repo[objectish]
 
 
-def parse_tree(repo: "Repo", treeish: Union[bytes, str]) -> "Tree":
+def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "Tree":
     """Parse a string referring to a tree.
 
     Args:
       repo: A `Repo` object
-      treeish: A string referring to a tree
-    Returns: A git object
+      treeish: A string referring to a tree, or a Tree, Commit, or Tag object
+    Returns: A Tree object
     Raises:
       KeyError: If the object can not be found
     """
-    treeish = to_bytes(treeish)
+    # If already a Tree, return it directly
+    if isinstance(treeish, Tree):
+        return treeish
+    
+    # If it's a Commit, return its tree
+    if isinstance(treeish, Commit):
+        return repo[treeish.tree]
+    
+    # For Tag objects or strings, use the existing logic
+    if isinstance(treeish, Tag):
+        treeish = treeish.id
+    else:
+        treeish = to_bytes(treeish)
     try:
         treeish = parse_ref(repo, treeish)
     except KeyError:  # treeish is commit sha
@@ -77,6 +89,10 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str]) -> "Tree":
             raise KeyError(treeish)
     if o.type_name == b"commit":
         return repo[o.tree]
+    elif o.type_name == b"tag":
+        # Tag handling - dereference and recurse
+        obj_type, obj_sha = o.object
+        return parse_tree(repo, obj_sha)
     return o
 
 

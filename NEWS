@@ -1,4 +1,4 @@
-0.23.2	UNRELEASED
+0.23.2	2025-07-07
 
  * Print deprecations on usage, not import.
    (Alyssa Coghlan, #1650)

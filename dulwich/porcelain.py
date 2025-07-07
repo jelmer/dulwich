@@ -4544,3 +4544,34 @@ def bisect_replay(repo, log_file):
             log_content = log_file.read()
 
         state.replay(log_content)
+
+
+def reflog(repo=".", ref=b"HEAD", all=False):
+    """Show reflog entries for a reference or all references.
+
+    Args:
+        repo: Path to repository or a Repo object
+        ref: Reference name (defaults to HEAD)
+        all: If True, show reflogs for all refs (ignores ref parameter)
+
+    Yields:
+        If all=False: ReflogEntry objects
+        If all=True: Tuples of (ref_name, ReflogEntry) for all refs with reflogs
+    """
+    import os
+
+    from .reflog import iter_reflogs
+
+    if isinstance(ref, str):
+        ref = ref.encode("utf-8")
+
+    with open_repo_closing(repo) as r:
+        if not all:
+            yield from r.read_reflog(ref)
+        else:
+            logs_dir = os.path.join(r.controldir(), "logs")
+            # Use iter_reflogs to discover all reflogs
+            for ref_bytes in iter_reflogs(logs_dir):
+                # Read the reflog entries for this ref
+                for entry in r.read_reflog(ref_bytes):
+                    yield (ref_bytes, entry)

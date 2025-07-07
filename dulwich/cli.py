@@ -533,6 +533,36 @@ class cmd_repack(Command):
         porcelain.repack(".")
 
 
+class cmd_reflog(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "ref", nargs="?", default="HEAD", help="Reference to show reflog for"
+        )
+        parser.add_argument(
+            "--all", action="store_true", help="Show reflogs for all refs"
+        )
+        args = parser.parse_args(args)
+
+        if args.all:
+            # Show reflogs for all refs
+            for ref_bytes, entry in porcelain.reflog(".", all=True):
+                ref_str = ref_bytes.decode("utf-8", "replace")
+                short_new = entry.new_sha[:8].decode("ascii")
+                print(
+                    f"{short_new} {ref_str}: {entry.message.decode('utf-8', 'replace')}"
+                )
+        else:
+            ref = args.ref.encode("utf-8") if isinstance(args.ref, str) else args.ref
+
+            for i, entry in enumerate(porcelain.reflog(".", ref)):
+                # Format similar to git reflog
+                short_new = entry.new_sha[:8].decode("ascii")
+                print(
+                    f"{short_new} {ref.decode('utf-8', 'replace')}@{{{i}}}: {entry.message.decode('utf-8', 'replace')}"
+                )
+
+
 class cmd_reset(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -1968,6 +1998,7 @@ commands = {
     "push": cmd_push,
     "rebase": cmd_rebase,
     "receive-pack": cmd_receive_pack,
+    "reflog": cmd_reflog,
     "remote": cmd_remote,
     "repack": cmd_repack,
     "reset": cmd_reset,

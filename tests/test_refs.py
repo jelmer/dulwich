@@ -784,6 +784,59 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         expected_refs.add(b"HEAD")
         self.assertEqual(expected_refs, set(self._repo.get_refs().keys()))
 
+    def test_write_unchanged_ref_optimization(self):
+        # Test that writing unchanged ref avoids fsync but still checks locks
+        ref_name = b"refs/heads/unchanged"
+        ref_value = b"a" * 40
+
+        # Set initial ref value
+        self._refs[ref_name] = ref_value
+
+        # Test 1: Writing same value should succeed without changes
+        result = self._refs.set_if_equals(ref_name, ref_value, ref_value)
+        self.assertTrue(result)
+
+        # Test 2: Writing same value with wrong old_ref should fail
+        wrong_old = b"b" * 40
+        result = self._refs.set_if_equals(ref_name, wrong_old, ref_value)
+        self.assertFalse(result)
+
+        # Test 3: Writing different value should update normally
+        new_value = b"c" * 40
+        result = self._refs.set_if_equals(ref_name, ref_value, new_value)
+        self.assertTrue(result)
+        self.assertEqual(new_value, self._refs[ref_name])
+
+    def test_write_unchanged_ref_with_lock(self):
+        # Test that file locking is still detected when ref unchanged
+
+        from dulwich.file import FileLocked
+
+        ref_name = b"refs/heads/locktest"
+        ref_value = b"d" * 40
+
+        # Set initial ref value
+        self._refs[ref_name] = ref_value
+
+        # Get the actual file path
+        ref_file = os.path.join(os.fsencode(self._refs.path), ref_name)
+        lock_file = ref_file + b".lock"
+
+        # Create lock file to simulate another process holding lock
+        with open(lock_file, "wb") as f:
+            f.write(b"locked by another process")
+
+            # Try to write same value - should raise FileLocked
+            with self.assertRaises(FileLocked):
+                self._refs[ref_name] = ref_value
+
+        # Clean up lock file
+        if os.path.exists(lock_file):
+            os.unlink(lock_file)
+
+        # Now it should work
+        self._refs[ref_name] = ref_value
+
 
 _TEST_REFS_SERIALIZED = (
     b"42d06bd4b77fed026b154d16493e5deab78f02ec\t"

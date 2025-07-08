@@ -62,6 +62,7 @@ Currently implemented:
  * tag{_create,_delete,_list}
  * upload_pack
  * update_server_info
+ * write_commit_graph
  * status
  * symbolic_ref
 
@@ -412,6 +413,21 @@ def update_server_info(repo=".") -> None:
     """
     with open_repo_closing(repo) as r:
         server_update_server_info(r)
+
+
+def write_commit_graph(repo=".", reachable=True) -> None:
+    """Write a commit graph file for a repository.
+
+    Args:
+      repo: path to the repository or a Repo object
+      reachable: if True, include all commits reachable from refs.
+                 if False, only include direct ref targets.
+    """
+    with open_repo_closing(repo) as r:
+        # Get all refs
+        refs = list(r.refs.as_dict().values())
+        if refs:
+            r.object_store.write_commit_graph(refs, reachable=reachable)
 
 
 def symbolic_ref(repo, ref_name, force=False) -> None:

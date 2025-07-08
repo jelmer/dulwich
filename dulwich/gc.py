@@ -321,6 +321,14 @@ def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
     Returns:
         True if GC should run, False otherwise
     """
+    # Check environment variable first
+    if os.environ.get("GIT_AUTO_GC") == "0":
+        return False
+
+    # Check programmatic disable flag
+    if getattr(repo, "_autogc_disabled", False):
+        return False
+
     if config is None:
         config = repo.get_config()
 

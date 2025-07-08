@@ -2,6 +2,10 @@
 
  * Add ``reflog`` command in porcelain. (Jelmer Vernooĳ)
 
+ * Add support for ``core.preloadIndex`` configuration setting to enable
+   parallel stat operations when checking for unstaged changes. This improves
+   performance on slow filesystems like NFS. (Jelmer Vernooĳ)
+
 0.23.2	2025-07-07
 
  * Print deprecations on usage, not import.

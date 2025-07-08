@@ -854,6 +854,51 @@ class GetUnstagedChangesTests(TestCase):
 
             self.assertEqual(list(changes), [b"foo1"])
 
+    def test_get_unstaged_changes_with_preload(self) -> None:
+        """Unit test for get_unstaged_changes with preload_index=True."""
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            # Create multiple files to test parallel processing
+            files = []
+            for i in range(10):
+                filename = f"foo{i}"
+                fullpath = os.path.join(repo_dir, filename)
+                with open(fullpath, "wb") as f:
+                    f.write(b"origstuff" + str(i).encode())
+                files.append(filename)
+
+            repo.stage(files)
+            repo.do_commit(
+                b"test status",
+                author=b"author <email>",
+                committer=b"committer <email>",
+            )
+
+            # Modify some files
+            modified_files = [b"foo1", b"foo3", b"foo5", b"foo7"]
+            for filename in modified_files:
+                fullpath = os.path.join(repo_dir, filename.decode())
+                with open(fullpath, "wb") as f:
+                    f.write(b"newstuff")
+                os.utime(fullpath, (0, 0))
+
+            # Test with preload_index=False (serial)
+            changes_serial = list(
+                get_unstaged_changes(repo.open_index(), repo_dir, preload_index=False)
+            )
+            changes_serial.sort()
+
+            # Test with preload_index=True (parallel)
+            changes_parallel = list(
+                get_unstaged_changes(repo.open_index(), repo_dir, preload_index=True)
+            )
+            changes_parallel.sort()
+
+            # Both should return the same results
+            self.assertEqual(changes_serial, changes_parallel)
+            self.assertEqual(changes_serial, sorted(modified_files))
+
     def test_get_unstaged_deleted_changes(self) -> None:
         """Unit test for get_unstaged_changes."""
         repo_dir = tempfile.mkdtemp()

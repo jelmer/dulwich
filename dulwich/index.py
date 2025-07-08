@@ -2440,10 +2440,55 @@ def update_working_tree(
     index.write()
 
 
+def _check_entry_for_changes(
+    tree_path: bytes,
+    entry: Union[IndexEntry, ConflictedIndexEntry],
+    root_path: bytes,
+    filter_blob_callback: Optional[Callable] = None,
+) -> Optional[bytes]:
+    """Check a single index entry for changes.
+
+    Args:
+      tree_path: Path in the tree
+      entry: Index entry to check
+      root_path: Root filesystem path
+      filter_blob_callback: Optional callback to filter blobs
+    Returns: tree_path if changed, None otherwise
+    """
+    if isinstance(entry, ConflictedIndexEntry):
+        # Conflicted files are always unstaged
+        return tree_path
+
+    full_path = _tree_to_fs_path(root_path, tree_path)
+    try:
+        st = os.lstat(full_path)
+        if stat.S_ISDIR(st.st_mode):
+            if _has_directory_changed(tree_path, entry):
+                return tree_path
+            return None
+
+        if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+            return None
+
+        blob = blob_from_path_and_stat(full_path, st)
+
+        if filter_blob_callback is not None:
+            blob = filter_blob_callback(blob, tree_path)
+    except FileNotFoundError:
+        # The file was removed, so we assume that counts as
+        # different from whatever file used to exist.
+        return tree_path
+    else:
+        if blob.id != entry.sha:
+            return tree_path
+    return None
+
+
 def get_unstaged_changes(
     index: Index,
     root_path: Union[str, bytes],
     filter_blob_callback: Optional[Callable] = None,
+    preload_index: bool = False,
 ) -> Generator[bytes, None, None]:
     """Walk through an index and check for differences against working tree.
 
@@ -2451,40 +2496,56 @@ def get_unstaged_changes(
       index: index to check
       root_path: path in which to find files
       filter_blob_callback: Optional callback to filter blobs
+      preload_index: If True, use parallel threads to check files (requires threading support)
     Returns: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
     if not isinstance(root_path, bytes):
         root_path = os.fsencode(root_path)
 
-    for tree_path, entry in index.iteritems():
-        full_path = _tree_to_fs_path(root_path, tree_path)
-        if isinstance(entry, ConflictedIndexEntry):
-            # Conflicted files are always unstaged
-            yield tree_path
-            continue
-
+    if preload_index:
+        # Use parallel processing for better performance on slow filesystems
         try:
-            st = os.lstat(full_path)
-            if stat.S_ISDIR(st.st_mode):
-                if _has_directory_changed(tree_path, entry):
-                    yield tree_path
-                continue
-
-            if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
-                continue
-
-            blob = blob_from_path_and_stat(full_path, st)
-
-            if filter_blob_callback is not None:
-                blob = filter_blob_callback(blob, tree_path)
-        except FileNotFoundError:
-            # The file was removed, so we assume that counts as
-            # different from whatever file used to exist.
-            yield tree_path
+            import multiprocessing
+            from concurrent.futures import ThreadPoolExecutor
+        except ImportError:
+            # If threading is not available, fall back to serial processing
+            preload_index = False
         else:
-            if blob.id != entry.sha:
-                yield tree_path
+            # Collect all entries first
+            entries = list(index.iteritems())
+
+            # Use number of CPUs but cap at 8 threads to avoid overhead
+            num_workers = min(multiprocessing.cpu_count(), 8)
+
+            # Process entries in parallel
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                # Submit all tasks
+                futures = [
+                    executor.submit(
+                        _check_entry_for_changes,
+                        tree_path,
+                        entry,
+                        root_path,
+                        filter_blob_callback,
+                    )
+                    for tree_path, entry in entries
+                ]
+
+                # Yield results as they complete
+                for future in futures:
+                    result = future.result()
+                    if result is not None:
+                        yield result
+
+    if not preload_index:
+        # Serial processing
+        for tree_path, entry in index.iteritems():
+            result = _check_entry_for_changes(
+                tree_path, entry, root_path, filter_blob_callback
+            )
+            if result is not None:
+                yield result
 
 
 def _tree_to_fs_path(

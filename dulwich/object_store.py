@@ -108,10 +108,19 @@ def find_shallow(store, heads, depth):
         these sets may overlap if a commit is reachable along multiple paths.
     """
     parents = {}
+    commit_graph = store.get_commit_graph()
 
     def get_parents(sha):
         result = parents.get(sha, None)
         if not result:
+            # Try to use commit graph first if available
+            if commit_graph:
+                graph_parents = commit_graph.get_parents(sha)
+                if graph_parents is not None:
+                    result = graph_parents
+                    parents[sha] = result
+                    return result
+            # Fall back to loading the object
             result = store[sha].parents
             parents[sha] = result
         return result
@@ -159,16 +168,26 @@ def get_depth(
         return 0
     current_depth = 1
     queue = [(head, current_depth)]
+    commit_graph = store.get_commit_graph()
+
     while queue and (max_depth is None or current_depth < max_depth):
         e, depth = queue.pop(0)
         current_depth = max(current_depth, depth)
-        cmt = store[e]
-        if isinstance(cmt, Tag):
-            _cls, sha = cmt.object
-            cmt = store[sha]
-        queue.extend(
-            (parent, depth + 1) for parent in get_parents(cmt) if parent in store
-        )
+
+        # Try to use commit graph for parent lookup if available
+        parents = None
+        if commit_graph:
+            parents = commit_graph.get_parents(e)
+
+        if parents is None:
+            # Fall back to loading the object
+            cmt = store[e]
+            if isinstance(cmt, Tag):
+                _cls, sha = cmt.object
+                cmt = store[sha]
+            parents = get_parents(cmt)
+
+        queue.extend((parent, depth + 1) for parent in parents if parent in store)
     return current_depth
 
 
@@ -914,6 +933,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
+        self._use_commit_graph = True  # Default to true
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}({self.path!r})>"
@@ -942,9 +962,15 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_index_version = int(config.get((b"pack",), b"indexVersion").decode())
         except KeyError:
             pack_index_version = None
-        return cls(
+
+        # Read core.commitGraph setting
+        use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
+
+        instance = cls(
             path, loose_compression_level, pack_compression_level, pack_index_version
         )
+        instance._use_commit_graph = use_commit_graph
+        return instance
 
     @property
     def alternates(self):
@@ -1310,6 +1336,9 @@ class DiskObjectStore(PackBasedObjectStore):
         Returns:
           CommitGraph object if available, None otherwise
         """
+        if not self._use_commit_graph:
+            return None
+
         if self._commit_graph is None:
             from .commit_graph import read_commit_graph
 
@@ -2146,6 +2175,10 @@ def _collect_ancestors(
     commits = set()
     queue = []
     queue.extend(heads)
+
+    # Try to use commit graph if available
+    commit_graph = store.get_commit_graph()
+
     while queue:
         e = queue.pop(0)
         if e in common:
@@ -2154,8 +2187,18 @@ def _collect_ancestors(
             commits.add(e)
             if e in shallow:
                 continue
-            cmt = store[e]
-            queue.extend(get_parents(cmt))
+
+            # Try to use commit graph for parent lookup
+            parents = None
+            if commit_graph:
+                parents = commit_graph.get_parents(e)
+
+            if parents is None:
+                # Fall back to loading the object
+                cmt = store[e]
+                parents = get_parents(cmt)
+
+            queue.extend(parents)
     return (commits, bases)
 
 

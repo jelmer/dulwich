@@ -612,14 +612,6 @@ def _handle_upload_pack_head(
     if protocol_version != 2:
         proto.write_pkt_line(None)
 
-    if depth not in (0, None):
-        if can_read is not None:
-            (new_shallow, new_unshallow) = _read_shallow_updates(proto.read_pkt_seq())
-        else:
-            new_shallow = new_unshallow = None
-    else:
-        new_shallow = new_unshallow = set()
-
     have = next(graph_walker)
     while have:
         proto.write_pkt_line(COMMAND_HAVE + b" " + have + b"\n")
@@ -640,6 +632,15 @@ def _handle_upload_pack_head(
     proto.write_pkt_line(COMMAND_DONE + b"\n")
     if protocol_version == 2:
         proto.write_pkt_line(None)
+
+    if depth not in (0, None):
+        if can_read is not None:
+            (new_shallow, new_unshallow) = _read_shallow_updates(proto.read_pkt_seq())
+        else:
+            new_shallow = new_unshallow = None
+    else:
+        new_shallow = new_unshallow = set()
+
     return (new_shallow, new_unshallow)
 
 

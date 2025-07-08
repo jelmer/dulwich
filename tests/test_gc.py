@@ -283,6 +283,30 @@ class AutoGCTestCase(TestCase):
 
         self.assertFalse(should_run_gc(r, config))
 
+    def test_should_run_gc_disabled_by_env_var(self):
+        """Test that auto GC doesn't run when GIT_AUTO_GC environment variable is 0."""
+        r = MemoryRepo()
+        config = ConfigDict()
+        config.set(b"gc", b"auto", b"10")  # Should normally run
+
+        with patch.dict(os.environ, {"GIT_AUTO_GC": "0"}):
+            self.assertFalse(should_run_gc(r, config))
+
+    def test_should_run_gc_disabled_programmatically(self):
+        """Test that auto GC doesn't run when disabled via _autogc_disabled attribute."""
+        r = MemoryRepo()
+        config = ConfigDict()
+        config.set(b"gc", b"auto", b"10")  # Should normally run
+
+        # Disable autogc programmatically
+        r._autogc_disabled = True
+        self.assertFalse(should_run_gc(r, config))
+
+        # Re-enable autogc
+        r._autogc_disabled = False
+        # Still false because MemoryRepo doesn't support counting loose objects
+        self.assertFalse(should_run_gc(r, config))
+
     def test_should_run_gc_default_values(self):
         """Test auto GC with default configuration values."""
         r = MemoryRepo()

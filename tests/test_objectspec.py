@@ -160,6 +160,12 @@ class ParseCommitTests(TestCase):
         # Should raise ValueError as it's not a commit
         self.assertRaises(ValueError, parse_commit, r, tag.id)
 
+    def test_commit_object(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Test that passing a Commit object directly returns the same object
+        self.assertEqual(c1, parse_commit(r, c1))
+
 
 class ParseRefTests(TestCase):
     def test_nonexistent(self) -> None:
@@ -335,3 +341,31 @@ class ParseTreeTests(TestCase):
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         r.refs[b"refs/heads/foo"] = c1.id
         self.assertEqual(r[c1.tree], parse_tree(r, b"foo"))
+
+    def test_tree_object(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        tree = r[c1.tree]
+        # Test that passing a Tree object directly returns the same object
+        self.assertEqual(tree, parse_tree(r, tree))
+
+    def test_commit_object(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Test that passing a Commit object returns its tree
+        self.assertEqual(r[c1.tree], parse_tree(r, c1))
+
+    def test_tag_object(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Create an annotated tag pointing to the commit
+        tag = Tag()
+        tag.name = b"v1.0"
+        tag.message = b"Test tag"
+        tag.tag_time = 1234567890
+        tag.tag_timezone = 0
+        tag.object = (Commit, c1.id)
+        tag.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag)
+        # parse_tree should follow the tag to the commit's tree
+        self.assertEqual(r[c1.tree], parse_tree(r, tag))

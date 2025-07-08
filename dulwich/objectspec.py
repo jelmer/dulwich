@@ -51,17 +51,29 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
     return repo[objectish]
 
 
-def parse_tree(repo: "Repo", treeish: Union[bytes, str]) -> "Tree":
+def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "Tree":
     """Parse a string referring to a tree.
 
     Args:
       repo: A `Repo` object
-      treeish: A string referring to a tree
-    Returns: A git object
+      treeish: A string referring to a tree, or a Tree, Commit, or Tag object
+    Returns: A Tree object
     Raises:
       KeyError: If the object can not be found
     """
-    treeish = to_bytes(treeish)
+    # If already a Tree, return it directly
+    if isinstance(treeish, Tree):
+        return treeish
+
+    # If it's a Commit, return its tree
+    if isinstance(treeish, Commit):
+        return repo[treeish.tree]
+
+    # For Tag objects or strings, use the existing logic
+    if isinstance(treeish, Tag):
+        treeish = treeish.id
+    else:
+        treeish = to_bytes(treeish)
     try:
         treeish = parse_ref(repo, treeish)
     except KeyError:  # treeish is commit sha
@@ -77,6 +89,10 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str]) -> "Tree":
             raise KeyError(treeish)
     if o.type_name == b"commit":
         return repo[o.tree]
+    elif o.type_name == b"tag":
+        # Tag handling - dereference and recurse
+        obj_type, obj_sha = o.object
+        return parse_tree(repo, obj_sha)
     return o
 
 
@@ -234,12 +250,12 @@ def scan_for_short_id(object_store, prefix, tp):
     raise AmbiguousShortId(prefix, ret)
 
 
-def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
+def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit, Tag]) -> "Commit":
     """Parse a string referring to a single commit.
 
     Args:
       repo: A` Repo` object
-      committish: A string referring to a single commit.
+      committish: A string referring to a single commit, or a Commit or Tag object.
     Returns: A Commit object
     Raises:
       KeyError: When the reference commits can not be found
@@ -258,6 +274,14 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes]) -> "Commit":
         if not isinstance(obj, Commit):
             raise ValueError(f"Expected commit, got {obj.type_name}")
         return obj
+
+    # If already a Commit object, return it directly
+    if isinstance(committish, Commit):
+        return committish
+
+    # If it's a Tag object, dereference it
+    if isinstance(committish, Tag):
+        return dereference_tag(committish)
 
     committish = to_bytes(committish)
     try:

@@ -1,5 +1,9 @@
 0.23.3	UNRELEASED
 
+ * Add support for ``core.commitGraph`` configuration setting to control
+   whether commit-graph files are used for performance optimization.
+   (Jelmer Vernooĳ)
+
  * Add ``reflog`` command in porcelain. (Jelmer Vernooĳ)
 
 0.23.2	2025-07-07

@@ -129,6 +129,14 @@ class ObjectContainer(Protocol):
     def __getitem__(self, sha1: bytes) -> ShaFile:
         """Retrieve an object."""
 
+    def get_commit_graph(self):
+        """Get the commit graph for this object store.
+
+        Returns:
+          CommitGraph object if available, None otherwise
+        """
+        return None
+
 
 class PackedObjectContainer(ObjectContainer):
     def get_unpacked_object(

@@ -505,6 +505,267 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # Verify the orphaned file was cleaned up
         self.assertFalse(os.path.exists(tmp_pack_path))
 
+    def test_commit_graph_enabled_by_default(self) -> None:
+        """Test that commit graph is enabled by default."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        store = DiskObjectStore.from_config(self.store_dir, config)
+        self.addCleanup(store.close)
+
+        # Should be enabled by default
+        self.assertTrue(store._use_commit_graph)
+
+    def test_commit_graph_disabled_by_config(self) -> None:
+        """Test that commit graph can be disabled via config."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config[(b"core",)] = {b"commitGraph": b"false"}
+        store = DiskObjectStore.from_config(self.store_dir, config)
+        self.addCleanup(store.close)
+
+        # Should be disabled
+        self.assertFalse(store._use_commit_graph)
+
+        # get_commit_graph should return None when disabled
+        self.assertIsNone(store.get_commit_graph())
+
+    def test_commit_graph_enabled_by_config(self) -> None:
+        """Test that commit graph can be explicitly enabled via config."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config[(b"core",)] = {b"commitGraph": b"true"}
+        store = DiskObjectStore.from_config(self.store_dir, config)
+        self.addCleanup(store.close)
+
+        # Should be enabled
+        self.assertTrue(store._use_commit_graph)
+
+    def test_commit_graph_usage_in_find_shallow(self) -> None:
+        """Test that find_shallow uses commit graph when available."""
+        import time
+
+        from dulwich.object_store import find_shallow
+        from dulwich.objects import Commit
+
+        # Create a simple commit chain: c1 -> c2 -> c3
+        ts = int(time.time())
+        c1 = make_object(
+            Commit,
+            message=b"commit 1",
+            tree=b"1" * 40,
+            parents=[],
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+            commit_time=ts,
+            commit_timezone=0,
+            author_time=ts,
+            author_timezone=0,
+        )
+
+        c2 = make_object(
+            Commit,
+            message=b"commit 2",
+            tree=b"2" * 40,
+            parents=[c1.id],
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+            commit_time=ts + 1,
+            commit_timezone=0,
+            author_time=ts + 1,
+            author_timezone=0,
+        )
+
+        c3 = make_object(
+            Commit,
+            message=b"commit 3",
+            tree=b"3" * 40,
+            parents=[c2.id],
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+            commit_time=ts + 2,
+            commit_timezone=0,
+            author_time=ts + 2,
+            author_timezone=0,
+        )
+
+        self.store.add_objects([(c1, None), (c2, None), (c3, None)])
+
+        # Write a commit graph
+        self.store.write_commit_graph([c1.id, c2.id, c3.id])
+
+        # Verify commit graph was written
+        commit_graph = self.store.get_commit_graph()
+        self.assertIsNotNone(commit_graph)
+        self.assertEqual(3, len(commit_graph))
+
+        # Test find_shallow with depth
+        # With depth 2 starting from c3:
+        # - depth 1 includes c3 itself (not shallow)
+        # - depth 2 includes c3 and c2 (not shallow)
+        # - c1 is at depth 3, so it's marked as shallow
+        shallow, not_shallow = find_shallow(self.store, [c3.id], 2)
+
+        # c2 should be marked as shallow since it's at the depth boundary
+        self.assertEqual({c2.id}, shallow)
+        self.assertEqual({c3.id}, not_shallow)
+
+    def test_commit_graph_end_to_end(self) -> None:
+        """Test end-to-end commit graph generation and usage."""
+        import os
+        import time
+
+        from dulwich.object_store import get_depth
+        from dulwich.objects import Blob, Commit, Tree
+
+        # Create a more complex commit history:
+        #   c1 -- c2 -- c4
+        #     \        /
+        #      \-- c3 -/
+
+        ts = int(time.time())
+
+        # Create some blobs and trees for the commits
+        blob1 = make_object(Blob, data=b"content 1")
+        blob2 = make_object(Blob, data=b"content 2")
+        blob3 = make_object(Blob, data=b"content 3")
+        blob4 = make_object(Blob, data=b"content 4")
+
+        tree1 = make_object(Tree)
+        tree1[b"file1.txt"] = (0o100644, blob1.id)
+
+        tree2 = make_object(Tree)
+        tree2[b"file1.txt"] = (0o100644, blob1.id)
+        tree2[b"file2.txt"] = (0o100644, blob2.id)
+
+        tree3 = make_object(Tree)
+        tree3[b"file1.txt"] = (0o100644, blob1.id)
+        tree3[b"file3.txt"] = (0o100644, blob3.id)
+
+        tree4 = make_object(Tree)
+        tree4[b"file1.txt"] = (0o100644, blob1.id)
+        tree4[b"file2.txt"] = (0o100644, blob2.id)
+        tree4[b"file3.txt"] = (0o100644, blob3.id)
+        tree4[b"file4.txt"] = (0o100644, blob4.id)
+
+        # Add all objects to store
+        self.store.add_objects(
+            [
+                (blob1, None),
+                (blob2, None),
+                (blob3, None),
+                (blob4, None),
+                (tree1, None),
+                (tree2, None),
+                (tree3, None),
+                (tree4, None),
+            ]
+        )
+
+        # Create commits
+        c1 = make_object(
+            Commit,
+            message=b"Initial commit",
+            tree=tree1.id,
+            parents=[],
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+            commit_time=ts,
+            commit_timezone=0,
+            author_time=ts,
+            author_timezone=0,
+        )
+
+        c2 = make_object(
+            Commit,
+            message=b"Second commit",
+            tree=tree2.id,
+            parents=[c1.id],
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+            commit_time=ts + 10,
+            commit_timezone=0,
+            author_time=ts + 10,
+            author_timezone=0,
+        )
+
+        c3 = make_object(
+            Commit,
+            message=b"Branch commit",
+            tree=tree3.id,
+            parents=[c1.id],
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+            commit_time=ts + 20,
+            commit_timezone=0,
+            author_time=ts + 20,
+            author_timezone=0,
+        )
+
+        c4 = make_object(
+            Commit,
+            message=b"Merge commit",
+            tree=tree4.id,
+            parents=[c2.id, c3.id],
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+            commit_time=ts + 30,
+            commit_timezone=0,
+            author_time=ts + 30,
+            author_timezone=0,
+        )
+
+        self.store.add_objects([(c1, None), (c2, None), (c3, None), (c4, None)])
+
+        # First, verify operations work without commit graph
+        # Check depth calculation
+        depth_before = get_depth(self.store, c4.id)
+        self.assertEqual(3, depth_before)  # c4 -> c2/c3 -> c1
+
+        # Generate commit graph
+        self.store.write_commit_graph([c1.id, c2.id, c3.id, c4.id])
+
+        # Verify commit graph file was created
+        graph_path = os.path.join(self.store.path, "info", "commit-graph")
+        self.assertTrue(os.path.exists(graph_path))
+
+        # Load and verify commit graph
+        commit_graph = self.store.get_commit_graph()
+        self.assertIsNotNone(commit_graph)
+        self.assertEqual(4, len(commit_graph))
+
+        # Verify commit graph contains correct parent information
+        c1_entry = commit_graph.get_entry_by_oid(c1.id)
+        self.assertIsNotNone(c1_entry)
+        self.assertEqual([], c1_entry.parents)
+
+        c2_entry = commit_graph.get_entry_by_oid(c2.id)
+        self.assertIsNotNone(c2_entry)
+        self.assertEqual([c1.id], c2_entry.parents)
+
+        c3_entry = commit_graph.get_entry_by_oid(c3.id)
+        self.assertIsNotNone(c3_entry)
+        self.assertEqual([c1.id], c3_entry.parents)
+
+        c4_entry = commit_graph.get_entry_by_oid(c4.id)
+        self.assertIsNotNone(c4_entry)
+        self.assertEqual([c2.id, c3.id], c4_entry.parents)
+
+        # Test that operations now use the commit graph
+        # Check depth calculation again - should use commit graph
+        depth_after = get_depth(self.store, c4.id)
+        self.assertEqual(3, depth_after)
+
+        # Test with commit graph disabled
+        self.store._use_commit_graph = False
+        self.assertIsNone(self.store.get_commit_graph())
+
+        # Operations should still work without commit graph
+        depth_disabled = get_depth(self.store, c4.id)
+        self.assertEqual(3, depth_disabled)
+
 
 class TreeLookupPathTests(TestCase):
     def setUp(self) -> None:

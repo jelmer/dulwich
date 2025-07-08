@@ -609,8 +609,6 @@ def _handle_upload_pack_head(
             proto.write_pkt_line(
                 COMMAND_DEEPEN + b" " + str(depth).encode("ascii") + b"\n"
             )
-        if protocol_version == 2:
-            proto.write_pkt_line(None)
     if protocol_version != 2:
         proto.write_pkt_line(None)
 

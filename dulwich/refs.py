@@ -931,7 +931,7 @@ class DiskRefsContainer(RefsContainer):
         with GitFile(filename, "wb") as f:
             if old_ref is not None:
                 try:
-                    # read again while holding the lock
+                    # read again while holding the lock to handle race conditions
                     orig_ref = self.read_loose_ref(realname)
                     if orig_ref is None:
                         orig_ref = self.get_packed_refs().get(realname, ZERO_SHA)
@@ -941,6 +941,18 @@ class DiskRefsContainer(RefsContainer):
                 except OSError:
                     f.abort()
                     raise
+
+            # Check if ref already has the desired value while holding the lock
+            # This avoids fsync when ref is unchanged but still detects lock conflicts
+            current_ref = self.read_loose_ref(realname)
+            if current_ref is None:
+                current_ref = packed_refs.get(realname, None)
+
+            if current_ref is not None and current_ref == new_ref:
+                # Ref already has desired value, abort write to avoid fsync
+                f.abort()
+                return True
+
             try:
                 f.write(new_ref + b"\n")
             except OSError:

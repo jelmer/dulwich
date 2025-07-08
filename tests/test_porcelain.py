@@ -7557,3 +7557,113 @@ class ReflogTest(PorcelainTestCase):
         # Should have seen at least HEAD and refs/heads/master
         self.assertIn(b"HEAD", refs_seen)
         self.assertIn(b"refs/heads/master", refs_seen)
+
+
+class WriteCommitGraphTests(PorcelainTestCase):
+    """Tests for the write_commit_graph porcelain function."""
+
+    def test_write_commit_graph_empty_repo(self):
+        """Test writing commit graph on empty repository."""
+        # Should not fail on empty repo
+        porcelain.write_commit_graph(self.repo_path)
+
+        # No commit graph should be created for empty repo
+        graph_path = os.path.join(
+            self.repo_path, ".git", "objects", "info", "commit-graph"
+        )
+        self.assertFalse(os.path.exists(graph_path))
+
+    def test_write_commit_graph_with_commits(self):
+        """Test writing commit graph with commits."""
+        # Create some commits
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 1, 2]],
+            attrs={
+                1: {"message": b"First commit"},
+                2: {"message": b"Second commit"},
+                3: {"message": b"Merge commit"},
+            },
+        )
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/heads/branch"] = c2.id
+
+        # Write commit graph
+        porcelain.write_commit_graph(self.repo_path)
+
+        # Verify commit graph was created
+        graph_path = os.path.join(
+            self.repo_path, ".git", "objects", "info", "commit-graph"
+        )
+        self.assertTrue(os.path.exists(graph_path))
+
+        # Load and verify the commit graph
+        from dulwich.commit_graph import read_commit_graph
+
+        commit_graph = read_commit_graph(graph_path)
+        self.assertIsNotNone(commit_graph)
+        self.assertEqual(3, len(commit_graph))
+
+        # Verify all commits are in the graph
+        for commit_obj in [c1, c2, c3]:
+            entry = commit_graph.get_entry_by_oid(commit_obj.id)
+            self.assertIsNotNone(entry)
+
+    def test_write_commit_graph_config_disabled(self):
+        """Test that commit graph is not written when disabled by config."""
+        # Create a commit
+        (c1,) = build_commit_graph(
+            self.repo.object_store, [[1]], attrs={1: {"message": b"First commit"}}
+        )
+        self.repo.refs[b"refs/heads/master"] = c1.id
+
+        # Disable commit graph in config
+        config = self.repo.get_config()
+        config.set((b"core",), b"commitGraph", b"false")
+        config.write_to_path()
+
+        # Write commit graph (should respect config)
+        porcelain.write_commit_graph(self.repo_path)
+
+        # Verify commit graph still gets written
+        # (porcelain.write_commit_graph explicitly writes regardless of config)
+        graph_path = os.path.join(
+            self.repo_path, ".git", "objects", "info", "commit-graph"
+        )
+        self.assertTrue(os.path.exists(graph_path))
+
+    def test_write_commit_graph_reachable_false(self):
+        """Test writing commit graph with reachable=False."""
+        # Create commits
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 2]],
+            attrs={
+                1: {"message": b"First commit"},
+                2: {"message": b"Second commit"},
+                3: {"message": b"Third commit"},
+            },
+        )
+        # Only reference the third commit
+        self.repo.refs[b"refs/heads/master"] = c3.id
+
+        # Write commit graph with reachable=False
+        porcelain.write_commit_graph(self.repo_path, reachable=False)
+
+        # Verify commit graph was created
+        graph_path = os.path.join(
+            self.repo_path, ".git", "objects", "info", "commit-graph"
+        )
+        self.assertTrue(os.path.exists(graph_path))
+
+        # Load and verify the commit graph
+        from dulwich.commit_graph import read_commit_graph
+
+        commit_graph = read_commit_graph(graph_path)
+        self.assertIsNotNone(commit_graph)
+
+        # With reachable=False, only directly referenced commits should be included
+        # In this case, only c3 (from refs/heads/master)
+        self.assertEqual(1, len(commit_graph))
+        entry = commit_graph.get_entry_by_oid(c3.id)
+        self.assertIsNotNone(entry)

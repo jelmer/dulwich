@@ -28,7 +28,7 @@ the dulwich.client.get_ssh_vendor attribute:
   >>> from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
   >>> _mod_client.get_ssh_vendor = ParamikoSSHVendor
 
-This implementation is experimental and does not have any tests.
+This implementation has comprehensive tests in tests/contrib/test_paramiko_vendor.py.
 """
 
 import os

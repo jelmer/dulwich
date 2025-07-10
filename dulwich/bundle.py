@@ -21,7 +21,7 @@
 
 """Bundle format support."""
 
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Callable, Optional
 
 from .pack import PackData, write_pack_data
 
@@ -30,7 +30,7 @@ class Bundle:
     version: Optional[int]
 
     capabilities: dict[str, Optional[str]]
-    prerequisites: list[tuple[bytes, str]]
+    prerequisites: list[tuple[bytes, bytes]]
     references: dict[bytes, bytes]
     pack_data: PackData
 
@@ -76,7 +76,7 @@ def _read_bundle(f: BinaryIO, version: int) -> Bundle:
             line = f.readline()
     while line.startswith(b"-"):
         (obj_id, comment) = line[1:].rstrip(b"\n").split(b" ", 1)
-        prerequisites.append((obj_id, comment.decode("utf-8")))
+        prerequisites.append((obj_id, comment))
         line = f.readline()
     while line != b"\n":
         (obj_id, ref) = line.rstrip(b"\n").split(b" ", 1)
@@ -122,12 +122,124 @@ def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
                 f.write(b"=" + value.encode("utf-8"))
             f.write(b"\n")
     for obj_id, comment in bundle.prerequisites:
-        f.write(b"-%s %s\n" % (obj_id, comment.encode("utf-8")))
+        f.write(b"-" + obj_id + b" " + comment + b"\n")
     for ref, obj_id in bundle.references.items():
-        f.write(b"%s %s\n" % (obj_id, ref))
+        f.write(obj_id + b" " + ref + b"\n")
     f.write(b"\n")
     write_pack_data(
         f.write,
         num_records=len(bundle.pack_data),
         records=bundle.pack_data.iter_unpacked(),
     )
+
+
+def create_bundle_from_repo(
+    repo,
+    refs: Optional[list[bytes]] = None,
+    prerequisites: Optional[list[bytes]] = None,
+    version: Optional[int] = None,
+    capabilities: Optional[dict[str, Optional[str]]] = None,
+    progress: Optional[Callable[[str], None]] = None,
+) -> Bundle:
+    """Create a bundle from a repository.
+
+    Args:
+        repo: Repository object to create bundle from
+        refs: List of refs to include (defaults to all refs)
+        prerequisites: List of commit SHAs that are prerequisites
+        version: Bundle version (2 or 3, auto-detected if None)
+        capabilities: Bundle capabilities (for v3 bundles)
+        progress: Optional progress reporting function
+
+    Returns:
+        Bundle object ready for writing
+    """
+    if refs is None:
+        refs = list(repo.refs.keys())
+
+    if prerequisites is None:
+        prerequisites = []
+
+    if capabilities is None:
+        capabilities = {}
+
+    # Build the references dictionary for the bundle
+    bundle_refs = {}
+    want_objects = []
+
+    for ref in refs:
+        if ref in repo.refs:
+            ref_value = repo.refs[ref]
+            # Handle peeled refs
+            try:
+                peeled_value = repo.refs.get_peeled(ref)
+                if peeled_value is not None and peeled_value != ref_value:
+                    bundle_refs[ref] = peeled_value
+                else:
+                    bundle_refs[ref] = ref_value
+            except KeyError:
+                bundle_refs[ref] = ref_value
+            want_objects.append(bundle_refs[ref])
+
+    # Convert prerequisites to proper format
+    bundle_prerequisites = []
+    have_objects = []
+    for prereq in prerequisites:
+        if isinstance(prereq, str):
+            prereq = prereq.encode("utf-8")
+        if isinstance(prereq, bytes):
+            if len(prereq) == 40:  # SHA1 hex string
+                try:
+                    # Validate it's actually hex
+                    bytes.fromhex(prereq.decode("utf-8"))
+                    # Store hex in bundle and for pack generation
+                    bundle_prerequisites.append((prereq, b""))
+                    have_objects.append(prereq)
+                except ValueError:
+                    # Not a valid hex string, invalid prerequisite
+                    raise ValueError(f"Invalid prerequisite format: {prereq!r}")
+            elif len(prereq) == 20:
+                # Binary SHA, convert to hex for both bundle and pack generation
+                hex_prereq = prereq.hex().encode("ascii")
+                bundle_prerequisites.append((hex_prereq, b""))
+                have_objects.append(hex_prereq)
+            else:
+                # Invalid length
+                raise ValueError(f"Invalid prerequisite SHA length: {len(prereq)}")
+        else:
+            # Assume it's already a binary SHA
+            hex_prereq = prereq.hex().encode("ascii")
+            bundle_prerequisites.append((hex_prereq, b""))
+            have_objects.append(hex_prereq)
+
+    # Generate pack data containing all objects needed for the refs
+    pack_count, pack_objects = repo.generate_pack_data(
+        have=have_objects,
+        want=want_objects,
+        progress=progress,
+    )
+
+    # Store the pack objects directly, we'll write them when saving the bundle
+    # For now, create a simple wrapper to hold the data
+    class _BundlePackData:
+        def __init__(self, count, objects):
+            self._count = count
+            self._objects = list(objects)  # Materialize the iterator
+
+        def __len__(self):
+            return self._count
+
+        def iter_unpacked(self):
+            return iter(self._objects)
+
+    pack_data = _BundlePackData(pack_count, pack_objects)
+
+    # Create bundle object
+    bundle = Bundle()
+    bundle.version = version
+    bundle.capabilities = capabilities
+    bundle.prerequisites = bundle_prerequisites
+    bundle.references = bundle_refs
+    bundle.pack_data = pack_data  # type: ignore[assignment]
+
+    return bundle

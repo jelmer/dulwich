@@ -72,6 +72,7 @@ from .errors import GitProtocolError, NotGitRepository, SendPackError
 from .pack import (
     PACK_SPOOL_FILE_MAX_SIZE,
     PackChunkGenerator,
+    PackData,
     UnpackedObject,
     write_pack_from_container,
 )
@@ -1946,6 +1947,243 @@ class LocalGitClient(GitClient):
             return LsRemoteResult(refs, symrefs)
 
 
+class BundleClient(GitClient):
+    """Git Client that reads from a bundle file."""
+
+    def __init__(
+        self,
+        thin_packs: bool = True,
+        report_activity=None,
+        config: Optional[Config] = None,
+    ) -> None:
+        """Create a new BundleClient instance.
+
+        Args:
+          thin_packs: Whether or not thin packs should be retrieved
+          report_activity: Optional callback for reporting transport
+            activity.
+        """
+        self._report_activity = report_activity
+
+    def get_url(self, path):
+        return path
+
+    @classmethod
+    def from_parsedurl(cls, parsedurl, **kwargs):
+        return cls(**kwargs)
+
+    @classmethod
+    def _is_bundle_file(cls, path):
+        """Check if a file is a git bundle by reading the first line."""
+        try:
+            with open(path, "rb") as f:
+                first_line = f.readline()
+                return first_line in (b"# v2 git bundle\n", b"# v3 git bundle\n")
+        except OSError:
+            return False
+
+    @classmethod
+    def _open_bundle(cls, path):
+        if not isinstance(path, str):
+            path = os.fsdecode(path)
+        # Read bundle metadata without PackData to avoid file handle issues
+        with open(path, "rb") as f:
+            from dulwich.bundle import Bundle
+
+            version = None
+            firstline = f.readline()
+            if firstline == b"# v2 git bundle\n":
+                version = 2
+            elif firstline == b"# v3 git bundle\n":
+                version = 3
+            else:
+                raise AssertionError(f"unsupported bundle format header: {firstline!r}")
+
+            capabilities = {}
+            prerequisites = []
+            references = {}
+            line = f.readline()
+
+            if version >= 3:
+                while line.startswith(b"@"):
+                    line = line[1:].rstrip(b"\n")
+                    try:
+                        key, value_bytes = line.split(b"=", 1)
+                        value = value_bytes.decode("utf-8")
+                    except ValueError:
+                        key = line
+                        value = None
+                    capabilities[key.decode("utf-8")] = value
+                    line = f.readline()
+
+            while line.startswith(b"-"):
+                (obj_id, comment) = line[1:].rstrip(b"\n").split(b" ", 1)
+                prerequisites.append((obj_id, comment.decode("utf-8")))
+                line = f.readline()
+
+            while line != b"\n":
+                (obj_id, ref) = line.rstrip(b"\n").split(b" ", 1)
+                references[ref] = obj_id
+                line = f.readline()
+
+            # Don't read PackData here, we'll do it later
+            bundle = Bundle()
+            bundle.version = version
+            bundle.capabilities = capabilities
+            bundle.prerequisites = prerequisites
+            bundle.references = references
+            bundle.pack_data = None  # Will be read on demand
+
+            return bundle
+
+    @staticmethod
+    def _skip_to_pack_data(f, version):
+        """Skip to the pack data section in a bundle file."""
+        # Skip header
+        header = f.readline()
+        if header not in (b"# v2 git bundle\n", b"# v3 git bundle\n"):
+            raise AssertionError(f"Invalid bundle header: {header!r}")
+
+        line = f.readline()
+
+        # Skip capabilities (v3 only)
+        if version >= 3:
+            while line.startswith(b"@"):
+                line = f.readline()
+
+        # Skip prerequisites
+        while line.startswith(b"-"):
+            line = f.readline()
+
+        # Skip references
+        while line != b"\n":
+            line = f.readline()
+
+        # Now at pack data
+
+    def send_pack(self, path, update_refs, generate_pack_data, progress=None):
+        """Upload is not supported for bundle files."""
+        raise NotImplementedError("Bundle files are read-only")
+
+    def fetch(
+        self,
+        path: str,
+        target: BaseRepo,
+        determine_wants: Optional[
+            Callable[[dict[bytes, bytes], Optional[int]], list[bytes]]
+        ] = None,
+        progress: Optional[Callable[[bytes], None]] = None,
+        depth: Optional[int] = None,
+        ref_prefix: Optional[list[Ref]] = None,
+        filter_spec: Optional[bytes] = None,
+        protocol_version: Optional[int] = None,
+        **kwargs,
+    ):
+        """Fetch into a target repository from a bundle file."""
+        bundle = self._open_bundle(path)
+
+        # Get references from bundle
+        refs = dict(bundle.references)
+
+        # Determine what we want to fetch
+        if determine_wants is None:
+            _ = list(refs.values())
+        else:
+            _ = determine_wants(refs, None)
+
+        # Add pack data to target repository
+        # Need to reopen the file for pack data access
+        with open(path, "rb") as pack_file:
+            # Skip to pack data section
+            BundleClient._skip_to_pack_data(pack_file, bundle.version)
+            # Read pack data into memory to avoid file positioning issues
+            pack_bytes = pack_file.read()
+
+        # Create PackData from in-memory bytes
+        from io import BytesIO
+
+        pack_io = BytesIO(pack_bytes)
+        pack_data = PackData.from_file(pack_io)
+        target.object_store.add_pack_data(len(pack_data), pack_data.iter_unpacked())
+
+        # Apply ref filtering if specified
+        if ref_prefix:
+            filtered_refs = {}
+            for ref_name, ref_value in refs.items():
+                for prefix in ref_prefix:
+                    if ref_name.startswith(prefix):
+                        filtered_refs[ref_name] = ref_value
+                        break
+            refs = filtered_refs
+
+        return FetchPackResult(refs, {}, agent_string())
+
+    def fetch_pack(
+        self,
+        path,
+        determine_wants,
+        graph_walker,
+        pack_data,
+        progress=None,
+        depth: Optional[int] = None,
+        ref_prefix: Optional[list[Ref]] = None,
+        filter_spec: Optional[bytes] = None,
+        protocol_version: Optional[int] = None,
+    ) -> FetchPackResult:
+        """Retrieve a pack from a bundle file."""
+        bundle = self._open_bundle(path)
+
+        # Get references from bundle
+        refs = dict(bundle.references)
+
+        # Determine what we want to fetch
+        _ = determine_wants(refs)
+
+        # Write pack data to the callback
+        # Need to reopen the file for pack data access
+        with open(path, "rb") as pack_file:
+            # Skip to pack data section
+            BundleClient._skip_to_pack_data(pack_file, bundle.version)
+            # Read pack data and write it to the callback
+            pack_bytes = pack_file.read()
+            pack_data(pack_bytes)
+
+        # Apply ref filtering if specified
+        if ref_prefix:
+            filtered_refs = {}
+            for ref_name, ref_value in refs.items():
+                for prefix in ref_prefix:
+                    if ref_name.startswith(prefix):
+                        filtered_refs[ref_name] = ref_value
+                        break
+            refs = filtered_refs
+
+        return FetchPackResult(refs, {}, agent_string())
+
+    def get_refs(
+        self,
+        path,
+        protocol_version: Optional[int] = None,
+        ref_prefix: Optional[list[Ref]] = None,
+    ):
+        """Retrieve the current refs from a bundle file."""
+        bundle = self._open_bundle(path)
+
+        refs = dict(bundle.references)
+
+        # Apply ref filtering if specified
+        if ref_prefix:
+            filtered_refs = {}
+            for ref_name, ref_value in refs.items():
+                for prefix in ref_prefix:
+                    if ref_name.startswith(prefix):
+                        filtered_refs[ref_name] = ref_value
+                        break
+            refs = filtered_refs
+
+        return LsRemoteResult(refs, {})
+
+
 # What Git client to use for local access
 default_local_git_client_cls = LocalGitClient
 
@@ -3086,12 +3324,17 @@ def get_transport_and_path(
         pass
 
     if sys.platform == "win32" and location[0].isalpha() and location[1:3] == ":\\":
-        # Windows local path
+        # Windows local path - but check if it's a bundle file first
+        if BundleClient._is_bundle_file(location):
+            return BundleClient(**kwargs), location
         return default_local_git_client_cls(**kwargs), location
 
     try:
         (username, hostname, path) = parse_rsync_url(location)
     except ValueError:
+        # Check if it's a bundle file before assuming it's a local path
+        if BundleClient._is_bundle_file(location):
+            return BundleClient(**kwargs), location
         # Otherwise, assume it's a local path.
         return default_local_git_client_cls(**kwargs), location
     else:

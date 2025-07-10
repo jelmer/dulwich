@@ -25,8 +25,10 @@ import os
 import tempfile
 from io import BytesIO
 
-from dulwich.bundle import Bundle, read_bundle, write_bundle
+from dulwich.bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
+from dulwich.objects import Blob, Commit, Tree
 from dulwich.pack import PackData, write_pack_objects
+from dulwich.repo import MemoryRepo
 
 from . import TestCase
 
@@ -152,7 +154,7 @@ class BundleTests(TestCase):
         bundle = read_bundle(f)
         self.assertEqual(2, bundle.version)
         self.assertEqual({}, bundle.capabilities)
-        self.assertEqual([(b"cc" * 20, "prerequisite comment")], bundle.prerequisites)
+        self.assertEqual([(b"cc" * 20, b"prerequisite comment")], bundle.prerequisites)
         self.assertEqual({b"refs/heads/master": b"ab" * 20}, bundle.references)
 
     def test_read_bundle_v3(self) -> None:
@@ -175,7 +177,7 @@ class BundleTests(TestCase):
         self.assertEqual(
             {"capability1": None, "capability2": "value2"}, bundle.capabilities
         )
-        self.assertEqual([(b"cc" * 20, "prerequisite comment")], bundle.prerequisites)
+        self.assertEqual([(b"cc" * 20, b"prerequisite comment")], bundle.prerequisites)
         self.assertEqual({b"refs/heads/master": b"ab" * 20}, bundle.references)
 
     def test_read_bundle_invalid_format(self) -> None:
@@ -192,7 +194,7 @@ class BundleTests(TestCase):
         bundle = Bundle()
         bundle.version = 2
         bundle.capabilities = {}
-        bundle.prerequisites = [(b"cc" * 20, "prerequisite comment")]
+        bundle.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
         bundle.references = {b"refs/heads/master": b"ab" * 20}
 
         # Create a simple pack data
@@ -218,7 +220,7 @@ class BundleTests(TestCase):
         bundle = Bundle()
         bundle.version = 3
         bundle.capabilities = {"capability1": None, "capability2": "value2"}
-        bundle.prerequisites = [(b"cc" * 20, "prerequisite comment")]
+        bundle.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
         bundle.references = {b"refs/heads/master": b"ab" * 20}
 
         # Create a simple pack data
@@ -247,7 +249,7 @@ class BundleTests(TestCase):
         bundle1 = Bundle()
         bundle1.version = None
         bundle1.capabilities = {"capability1": "value1"}
-        bundle1.prerequisites = [(b"cc" * 20, "prerequisite comment")]
+        bundle1.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
         bundle1.references = {b"refs/heads/master": b"ab" * 20}
 
         b1 = BytesIO()
@@ -265,7 +267,7 @@ class BundleTests(TestCase):
         bundle2 = Bundle()
         bundle2.version = None
         bundle2.capabilities = {}
-        bundle2.prerequisites = [(b"cc" * 20, "prerequisite comment")]
+        bundle2.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
         bundle2.references = {b"refs/heads/master": b"ab" * 20}
 
         b2 = BytesIO()
@@ -301,7 +303,7 @@ class BundleTests(TestCase):
         origbundle.version = 3
         origbundle.capabilities = {"foo": None}
         origbundle.references = {b"refs/heads/master": b"ab" * 20}
-        origbundle.prerequisites = [(b"cc" * 20, "comment")]
+        origbundle.prerequisites = [(b"cc" * 20, b"comment")]
         b = BytesIO()
         write_pack_objects(b.write, [])
         b.seek(0)
@@ -314,3 +316,136 @@ class BundleTests(TestCase):
                 newbundle = read_bundle(f)
 
                 self.assertEqual(origbundle, newbundle)
+
+    def test_create_bundle_from_repo(self) -> None:
+        """Test creating a bundle from a repository."""
+        # Create a simple repository
+        repo = MemoryRepo()
+
+        # Create a blob
+        blob = Blob.from_string(b"Hello world")
+        repo.object_store.add_object(blob)
+
+        # Create a tree
+        tree = Tree()
+        tree.add(b"hello.txt", 0o100644, blob.id)
+        repo.object_store.add_object(tree)
+
+        # Create a commit
+        commit = Commit()
+        commit.tree = tree.id
+        commit.message = b"Initial commit"
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        repo.object_store.add_object(commit)
+
+        # Add a reference
+        repo.refs[b"refs/heads/master"] = commit.id
+
+        # Create bundle from repository
+        bundle = create_bundle_from_repo(repo)
+
+        # Verify bundle contents
+        self.assertEqual(bundle.references, {b"refs/heads/master": commit.id})
+        self.assertEqual(bundle.prerequisites, [])
+        self.assertEqual(bundle.capabilities, {})
+        self.assertIsNotNone(bundle.pack_data)
+
+        # Verify the bundle contains the right objects
+        objects = list(bundle.pack_data.iter_unpacked())
+        object_ids = {obj.sha().hex().encode("ascii") for obj in objects}
+        self.assertIn(blob.id, object_ids)
+        self.assertIn(tree.id, object_ids)
+        self.assertIn(commit.id, object_ids)
+
+    def test_create_bundle_with_prerequisites(self) -> None:
+        """Test creating a bundle with prerequisites."""
+        repo = MemoryRepo()
+
+        # Create some objects
+        blob = Blob.from_string(b"Hello world")
+        repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"hello.txt", 0o100644, blob.id)
+        repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.message = b"Initial commit"
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        repo.object_store.add_object(commit)
+
+        repo.refs[b"refs/heads/master"] = commit.id
+
+        # Create bundle with prerequisites
+        prereq_id = b"aa" * 20  # hex string like other object ids
+        bundle = create_bundle_from_repo(repo, prerequisites=[prereq_id])
+
+        # Verify prerequisites are included
+        self.assertEqual(len(bundle.prerequisites), 1)
+        self.assertEqual(bundle.prerequisites[0][0], prereq_id)
+
+    def test_create_bundle_with_specific_refs(self) -> None:
+        """Test creating a bundle with specific refs."""
+        repo = MemoryRepo()
+
+        # Create objects and refs
+        blob = Blob.from_string(b"Hello world")
+        repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"hello.txt", 0o100644, blob.id)
+        repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.message = b"Initial commit"
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        repo.object_store.add_object(commit)
+
+        repo.refs[b"refs/heads/master"] = commit.id
+        repo.refs[b"refs/heads/feature"] = commit.id
+
+        # Create bundle with only master ref
+        bundle = create_bundle_from_repo(repo, refs=[b"refs/heads/master"])
+
+        # Verify only master ref is included
+        self.assertEqual(len(bundle.references), 1)
+        self.assertIn(b"refs/heads/master", bundle.references)
+        self.assertNotIn(b"refs/heads/feature", bundle.references)
+
+    def test_create_bundle_with_capabilities(self) -> None:
+        """Test creating a bundle with capabilities."""
+        repo = MemoryRepo()
+
+        # Create minimal objects
+        blob = Blob.from_string(b"Hello world")
+        repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"hello.txt", 0o100644, blob.id)
+        repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.message = b"Initial commit"
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        repo.object_store.add_object(commit)
+
+        repo.refs[b"refs/heads/master"] = commit.id
+
+        # Create bundle with capabilities
+        capabilities = {"object-format": "sha1"}
+        bundle = create_bundle_from_repo(repo, capabilities=capabilities, version=3)
+
+        # Verify capabilities are included
+        self.assertEqual(bundle.capabilities, capabilities)
+        self.assertEqual(bundle.version, 3)

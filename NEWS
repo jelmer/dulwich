@@ -1,5 +1,8 @@
 0.23.3	UNRELEASED
 
+ * ``dulwich.porcelain.diff``: Support diffing two commits
+   and diffing cached and working tree. (Jelmer Vernooĳ)
+
  * Add ``format-patch`` command in porcelain. (Jelmer Vernooĳ)
 
  * Add support for ``core.commitGraph`` configuration setting to control

@@ -41,7 +41,7 @@ from .client import GitProtocolError, get_transport_and_path
 from .errors import ApplyDeltaError
 from .index import Index
 from .objects import valid_hexsha
-from .objectspec import parse_commit
+from .objectspec import parse_commit, parse_committish_range
 from .pack import Pack, sha_to_hex
 from .repo import Repo
 
@@ -1955,6 +1955,58 @@ For a list of supported commands, see 'dulwich help -a'.
             )
 
 
+class cmd_format_patch(Command):
+    def run(self, args) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "committish",
+            nargs="?",
+            help="Commit or commit range (e.g., HEAD~3..HEAD or origin/master..HEAD)",
+        )
+        parser.add_argument(
+            "-n",
+            "--numbered",
+            type=int,
+            default=1,
+            help="Number of commits to format (default: 1)",
+        )
+        parser.add_argument(
+            "-o",
+            "--output-directory",
+            dest="outdir",
+            help="Output directory for patches",
+        )
+        parser.add_argument(
+            "--stdout",
+            action="store_true",
+            help="Output patches to stdout",
+        )
+        args = parser.parse_args(args)
+
+        # Parse committish using the new function
+        committish = None
+        if args.committish:
+            with Repo(".") as r:
+                range_result = parse_committish_range(r, args.committish)
+                if range_result:
+                    committish = range_result
+                else:
+                    committish = args.committish
+
+        filenames = porcelain.format_patch(
+            ".",
+            committish=committish,
+            outstream=sys.stdout,
+            outdir=args.outdir,
+            n=args.numbered,
+            stdout=args.stdout,
+        )
+
+        if not args.stdout:
+            for filename in filenames:
+                print(filename)
+
+
 commands = {
     "add": cmd_add,
     "annotate": cmd_annotate,
@@ -1980,6 +2032,7 @@ commands = {
     "fetch": cmd_fetch,
     "filter-branch": cmd_filter_branch,
     "for-each-ref": cmd_for_each_ref,
+    "format-patch": cmd_format_patch,
     "fsck": cmd_fsck,
     "gc": cmd_gc,
     "help": cmd_help,

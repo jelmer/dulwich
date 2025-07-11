@@ -1230,6 +1230,108 @@ def diff_tree(repo, old_tree, new_tree, outstream=default_bytes_out_stream) -> N
         write_tree_diff(outstream, r.object_store, old_tree, new_tree)
 
 
+def diff(
+    repo=".",
+    commit=None,
+    commit2=None,
+    staged=False,
+    paths=None,
+    outstream=default_bytes_out_stream,
+) -> None:
+    """Show diff.
+
+    Args:
+      repo: Path to repository
+      commit: First commit to compare. If staged is True, compare
+              index to this commit. If staged is False, compare working tree
+              to this commit. If None, defaults to HEAD for staged and index
+              for unstaged.
+      commit2: Second commit to compare against first commit. If provided,
+               show diff between commit and commit2 (ignoring staged flag).
+      staged: If True, show staged changes (index vs commit).
+              If False, show unstaged changes (working tree vs commit/index).
+              Ignored if commit2 is provided.
+      paths: Optional list of paths to limit diff
+      outstream: Stream to write to
+    """
+    from . import diff as diff_module
+    from .objectspec import parse_commit
+
+    with open_repo_closing(repo) as r:
+        # Normalize paths to bytes
+        if paths is not None and paths:  # Check if paths is not empty
+            byte_paths = []
+            for p in paths:
+                if isinstance(p, str):
+                    byte_paths.append(p.encode("utf-8"))
+                else:
+                    byte_paths.append(p)
+            paths = byte_paths
+        elif paths == []:  # Convert empty list to None
+            paths = None
+
+        # Resolve commit refs to SHAs if provided
+        if commit is not None:
+            from .objects import Commit
+
+            if isinstance(commit, Commit):
+                # Already a Commit object
+                commit_sha = commit.id
+                commit_obj = commit
+            else:
+                # parse_commit handles both refs and SHAs, and always returns a Commit object
+                commit_obj = parse_commit(r, commit)
+                commit_sha = commit_obj.id
+        else:
+            commit_sha = None
+            commit_obj = None
+
+        if commit2 is not None:
+            # Compare two commits
+            from .objects import Commit
+            from .patch import write_object_diff
+
+            if isinstance(commit2, Commit):
+                commit2_obj = commit2
+            else:
+                commit2_obj = parse_commit(r, commit2)
+
+            # Get trees from commits
+            old_tree = commit_obj.tree if commit_obj else None
+            new_tree = commit2_obj.tree
+
+            # Use tree_changes to get the changes and apply path filtering
+            changes = r.object_store.tree_changes(old_tree, new_tree)
+            for (oldpath, newpath), (oldmode, newmode), (oldsha, newsha) in changes:
+                # Skip if paths are specified and this change doesn't match
+                if paths:
+                    path_to_check = newpath or oldpath
+                    if not any(
+                        path_to_check == p or path_to_check.startswith(p + b"/")
+                        for p in paths
+                    ):
+                        continue
+
+                write_object_diff(
+                    outstream,
+                    r.object_store,
+                    (oldpath, oldmode, oldsha),
+                    (newpath, newmode, newsha),
+                )
+        elif staged:
+            # Show staged changes (index vs commit)
+            diff_module.diff_index_to_tree(r, outstream, commit_sha, paths)
+        elif commit is not None:
+            # Compare working tree to a specific commit
+            assert (
+                commit_sha is not None
+            )  # mypy: commit_sha is set when commit is not None
+            diff_module.diff_working_tree_to_tree(r, outstream, commit_sha, paths)
+        else:
+            # Compare working tree to index
+            diff_module.diff_working_tree_to_index(r, outstream, paths)
+
+
 def rev_list(repo, commits, outstream=sys.stdout) -> None:
     """Lists commit objects in reverse chronological order.
 

@@ -107,14 +107,22 @@ from .errors import SendPackError
 from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
 from .index import (
+    IndexEntry,
     _fs_to_tree_path,
     blob_from_path_and_stat,
     build_file_from_blob,
+    build_index_from_tree,
     get_unstaged_changes,
+    index_entry_from_stat,
+    symlink,
     update_working_tree,
+    validate_path_element_default,
+    validate_path_element_hfs,
+    validate_path_element_ntfs,
 )
 from .object_store import tree_lookup_path
 from .objects import (
+    Blob,
     Commit,
     Tag,
     Tree,
@@ -130,7 +138,13 @@ from .objectspec import (
     parse_tree,
 )
 from .pack import write_pack_from_container, write_pack_index
-from .patch import write_commit_patch, write_tree_diff
+from .patch import (
+    get_summary,
+    write_blob_diff,
+    write_commit_patch,
+    write_object_diff,
+    write_tree_diff,
+)
 from .protocol import ZERO_SHA, Protocol
 from .refs import (
     LOCAL_BRANCH_PREFIX,
@@ -1255,7 +1269,6 @@ def diff(
       outstream: Stream to write to
     """
     from . import diff as diff_module
-    from .objectspec import parse_commit
 
     with open_repo_closing(repo) as r:
         # Normalize paths to bytes
@@ -1272,8 +1285,6 @@ def diff(
 
         # Resolve commit refs to SHAs if provided
         if commit is not None:
-            from .objects import Commit
-
             if isinstance(commit, Commit):
                 # Already a Commit object
                 commit_sha = commit.id
@@ -1288,9 +1299,6 @@ def diff(
 
         if commit2 is not None:
             # Compare two commits
-            from .objects import Commit
-            from .patch import write_object_diff
-
             if isinstance(commit2, Commit):
                 commit2_obj = commit2
             else:
@@ -1416,8 +1424,6 @@ def submodule_update(repo, paths=None, init=False, force=False, errstream=None) 
       init: If True, initialize submodules first
       force: Force update even if local changes exist
     """
-    from .client import get_transport_and_path
-    from .index import build_index_from_tree
     from .submodule import iter_cached_submodules
 
     with open_repo_closing(repo) as r:
@@ -1809,7 +1815,6 @@ def reset(repo, mode, treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD") ->
 
         elif mode == "mixed":
             # Mixed reset: update HEAD and index, but leave working tree unchanged
-            from .index import IndexEntry
             from .object_store import iter_tree_contents
 
             # Open the index
@@ -1852,13 +1857,6 @@ def reset(repo, mode, treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD") ->
             config = r.get_config()
             honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
 
-            # Import validation functions
-            from .index import (
-                validate_path_element_default,
-                validate_path_element_hfs,
-                validate_path_element_ntfs,
-            )
-
             if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
                 validate_path_element = validate_path_element_ntfs
             elif config.get_boolean(
@@ -1869,9 +1867,6 @@ def reset(repo, mode, treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD") ->
                 validate_path_element = validate_path_element_default
 
             if config.get_boolean(b"core", b"symlinks", True):
-                # Import symlink function
-                from .index import symlink
-
                 symlink_fn = symlink
             else:
 
@@ -3074,9 +3069,10 @@ def update_head(repo, target, detached=False, new_branch=None) -> None:
 
 def checkout(
     repo,
-    target: Union[str, bytes, Commit, Tag],
+    target: Optional[Union[str, bytes, Commit, Tag]] = None,
     force: bool = False,
     new_branch: Optional[Union[bytes, str]] = None,
+    paths: Optional[list[Union[bytes, str]]] = None,
 ) -> None:
     """Switch to a branch or commit, updating both HEAD and the working tree.
 
@@ -3086,9 +3082,12 @@ def checkout(
 
     Args:
       repo: Path to repository or repository object
-      target: Branch name, tag, or commit SHA to checkout
+      target: Branch name, tag, or commit SHA to checkout. If None and paths is specified,
+              restores files from HEAD
       force: Force checkout even if there are local changes
       new_branch: Create a new branch at target (like git checkout -b)
+      paths: List of specific paths to checkout. If specified, only these paths are updated
+             and HEAD is not changed
 
     Raises:
       CheckoutError: If checkout cannot be performed due to conflicts
@@ -3097,6 +3096,77 @@ def checkout(
     with open_repo_closing(repo) as r:
         # Store the original target for later reference checks
         original_target = target
+        # Handle path-specific checkout (like git checkout -- <paths>)
+        if paths is not None:
+            # Convert paths to bytes
+            byte_paths = []
+            for path in paths:
+                if isinstance(path, str):
+                    byte_paths.append(path.encode(DEFAULT_ENCODING))
+                else:
+                    byte_paths.append(path)
+
+            # If no target specified, use HEAD
+            if target is None:
+                try:
+                    target = r.refs[b"HEAD"]
+                except KeyError:
+                    raise CheckoutError("No HEAD reference found")
+            else:
+                if isinstance(target, str):
+                    target = target.encode(DEFAULT_ENCODING)
+
+            # Get the target commit and tree
+            target_commit = parse_commit(r, target)
+            target_tree = r[target_commit.tree]
+
+            # Get blob normalizer for line ending conversion
+            blob_normalizer = r.get_blob_normalizer()
+
+            # Restore specified paths from target tree
+            for path in byte_paths:
+                try:
+                    # Look up the path in the target tree
+                    mode, sha = target_tree.lookup_path(
+                        r.object_store.__getitem__, path
+                    )
+                    obj = r[sha]
+
+                    # Create directories if needed
+                    # Handle path as string
+                    if isinstance(path, bytes):
+                        path_str = path.decode(DEFAULT_ENCODING)
+                    else:
+                        path_str = path
+                    file_path = os.path.join(r.path, path_str)
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+                    # Write the file content
+                    if stat.S_ISREG(mode):
+                        # Apply checkout filters (smudge)
+                        if blob_normalizer:
+                            obj = blob_normalizer.checkout_normalize(obj, path)
+
+                        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                        if sys.platform == "win32":
+                            flags |= os.O_BINARY
+
+                        with os.fdopen(os.open(file_path, flags, mode), "wb") as f:
+                            f.write(obj.data)
+
+                    # Update the index
+                    r.stage(path)
+
+                except KeyError:
+                    # Path doesn't exist in target tree
+                    pass
+
+            return
+
+        # Normal checkout (switching branches/commits)
+        if target is None:
+            raise ValueError("Target must be specified for branch/commit checkout")
+
         if isinstance(target, str):
             target_bytes = target.encode(DEFAULT_ENCODING)
         elif isinstance(target, bytes):
@@ -3153,18 +3223,12 @@ def checkout(
         config = r.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
 
-        # Import validation functions
-        from .index import validate_path_element_default, validate_path_element_ntfs
-
         if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
         else:
             validate_path_element = validate_path_element_default
 
         if config.get_boolean(b"core", b"symlinks", True):
-            # Import symlink function
-            from .index import symlink
-
             symlink_fn = symlink
         else:
 
@@ -4621,8 +4685,6 @@ def format_patch(
                 )
             else:
                 # Generate filename
-                from .patch import get_summary
-
                 summary = get_summary(commit)
                 filename = os.path.join(outdir, f"{i:04d}-{summary}.patch")
 
@@ -4865,3 +4927,615 @@ def reflog(repo=".", ref=b"HEAD", all=False):
                 # Read the reflog entries for this ref
                 for entry in r.read_reflog(ref_bytes):
                     yield (ref_bytes, entry)
+
+
+def lfs_track(repo=".", patterns=None):
+    """Track file patterns with Git LFS.
+
+    Args:
+      repo: Path to repository
+      patterns: List of file patterns to track (e.g., ["*.bin", "*.pdf"])
+                If None, returns current tracked patterns
+
+    Returns:
+      List of tracked patterns
+    """
+    from .attrs import GitAttributes
+
+    with open_repo_closing(repo) as r:
+        gitattributes_path = os.path.join(r.path, ".gitattributes")
+
+        # Load existing GitAttributes
+        if os.path.exists(gitattributes_path):
+            gitattributes = GitAttributes.from_file(gitattributes_path)
+        else:
+            gitattributes = GitAttributes()
+
+        if patterns is None:
+            # Return current LFS tracked patterns
+            tracked = []
+            for pattern_obj, attrs in gitattributes:
+                if attrs.get(b"filter") == b"lfs":
+                    tracked.append(pattern_obj.pattern.decode())
+            return tracked
+
+        # Add new patterns
+        for pattern in patterns:
+            # Ensure pattern is bytes
+            if isinstance(pattern, str):
+                pattern = pattern.encode()
+
+            # Set LFS attributes for the pattern
+            gitattributes.set_attribute(pattern, b"filter", b"lfs")
+            gitattributes.set_attribute(pattern, b"diff", b"lfs")
+            gitattributes.set_attribute(pattern, b"merge", b"lfs")
+            gitattributes.set_attribute(pattern, b"text", False)
+
+        # Write updated attributes
+        gitattributes.write_to_file(gitattributes_path)
+
+        # Stage the .gitattributes file
+        add(r, [".gitattributes"])
+
+        return lfs_track(r)  # Return updated list
+
+
+def lfs_untrack(repo=".", patterns=None):
+    """Untrack file patterns from Git LFS.
+
+    Args:
+      repo: Path to repository
+      patterns: List of file patterns to untrack
+
+    Returns:
+      List of remaining tracked patterns
+    """
+    from .attrs import GitAttributes
+
+    if not patterns:
+        return lfs_track(repo)
+
+    with open_repo_closing(repo) as r:
+        gitattributes_path = os.path.join(r.path, ".gitattributes")
+
+        if not os.path.exists(gitattributes_path):
+            return []
+
+        # Load existing GitAttributes
+        gitattributes = GitAttributes.from_file(gitattributes_path)
+
+        # Remove specified patterns
+        for pattern in patterns:
+            if isinstance(pattern, str):
+                pattern = pattern.encode()
+
+            # Check if pattern is tracked by LFS
+            for pattern_obj, attrs in list(gitattributes):
+                if pattern_obj.pattern == pattern and attrs.get(b"filter") == b"lfs":
+                    gitattributes.remove_pattern(pattern)
+                    break
+
+        # Write updated attributes
+        gitattributes.write_to_file(gitattributes_path)
+
+        # Stage the .gitattributes file
+        add(r, [".gitattributes"])
+
+        return lfs_track(r)  # Return updated list
+
+
+def lfs_init(repo="."):
+    """Initialize Git LFS in a repository.
+
+    Args:
+      repo: Path to repository
+
+    Returns:
+      None
+    """
+    from .lfs import LFSStore
+
+    with open_repo_closing(repo) as r:
+        # Create LFS store
+        LFSStore.from_repo(r, create=True)
+
+        # Set up Git config for LFS
+        config = r.get_config()
+        config.set((b"filter", b"lfs"), b"process", b"git-lfs filter-process")
+        config.set((b"filter", b"lfs"), b"required", b"true")
+        config.set((b"filter", b"lfs"), b"clean", b"git-lfs clean -- %f")
+        config.set((b"filter", b"lfs"), b"smudge", b"git-lfs smudge -- %f")
+        config.write_to_path()
+
+
+def lfs_clean(repo=".", path=None):
+    """Clean a file by converting it to an LFS pointer.
+
+    Args:
+      repo: Path to repository
+      path: Path to file to clean (relative to repo root)
+
+    Returns:
+      LFS pointer content as bytes
+    """
+    from .lfs import LFSFilterDriver, LFSStore
+
+    with open_repo_closing(repo) as r:
+        if path is None:
+            raise ValueError("Path must be specified")
+
+        # Get LFS store
+        lfs_store = LFSStore.from_repo(r)
+        filter_driver = LFSFilterDriver(lfs_store)
+
+        # Read file content
+        full_path = os.path.join(r.path, path)
+        with open(full_path, "rb") as f:
+            content = f.read()
+
+        # Clean the content (convert to LFS pointer)
+        return filter_driver.clean(content)
+
+
+def lfs_smudge(repo=".", pointer_content=None):
+    """Smudge an LFS pointer by retrieving the actual content.
+
+    Args:
+      repo: Path to repository
+      pointer_content: LFS pointer content as bytes
+
+    Returns:
+      Actual file content as bytes
+    """
+    from .lfs import LFSFilterDriver, LFSStore
+
+    with open_repo_closing(repo) as r:
+        if pointer_content is None:
+            raise ValueError("Pointer content must be specified")
+
+        # Get LFS store
+        lfs_store = LFSStore.from_repo(r)
+        filter_driver = LFSFilterDriver(lfs_store)
+
+        # Smudge the pointer (retrieve actual content)
+        return filter_driver.smudge(pointer_content)
+
+
+def lfs_ls_files(repo=".", ref=None):
+    """List files tracked by Git LFS.
+
+    Args:
+      repo: Path to repository
+      ref: Git ref to check (defaults to HEAD)
+
+    Returns:
+      List of (path, oid, size) tuples for LFS files
+    """
+    from .lfs import LFSPointer
+    from .object_store import iter_tree_contents
+
+    with open_repo_closing(repo) as r:
+        if ref is None:
+            ref = b"HEAD"
+        elif isinstance(ref, str):
+            ref = ref.encode()
+
+        # Get the commit and tree
+        try:
+            commit = r[ref]
+            tree = r[commit.tree]
+        except KeyError:
+            return []
+
+        lfs_files = []
+
+        # Walk the tree
+        for path, mode, sha in iter_tree_contents(r.object_store, tree.id):
+            if not stat.S_ISREG(mode):
+                continue
+
+            # Check if it's an LFS pointer
+            obj = r.object_store[sha]
+            pointer = LFSPointer.from_bytes(obj.data)
+            if pointer is not None:
+                lfs_files.append((path.decode(), pointer.oid, pointer.size))
+
+        return lfs_files
+
+
+def lfs_migrate(repo=".", include=None, exclude=None, everything=False):
+    """Migrate files to Git LFS.
+
+    Args:
+      repo: Path to repository
+      include: Patterns of files to include
+      exclude: Patterns of files to exclude
+      everything: Migrate all files above a certain size
+
+    Returns:
+      Number of migrated files
+    """
+    from .lfs import LFSFilterDriver, LFSStore
+
+    with open_repo_closing(repo) as r:
+        # Initialize LFS if needed
+        lfs_store = LFSStore.from_repo(r, create=True)
+        filter_driver = LFSFilterDriver(lfs_store)
+
+        # Get current index
+        index = r.open_index()
+
+        migrated = 0
+
+        # Determine files to migrate
+        files_to_migrate = []
+
+        if everything:
+            # Migrate all files above 100MB
+            for path, entry in index.items():
+                full_path = os.path.join(r.path, path.decode())
+                if os.path.exists(full_path):
+                    size = os.path.getsize(full_path)
+                    if size > 100 * 1024 * 1024:  # 100MB
+                        files_to_migrate.append(path.decode())
+        else:
+            # Use include/exclude patterns
+            for path, entry in index.items():
+                path_str = path.decode()
+
+                # Check include patterns
+                if include:
+                    matched = any(
+                        fnmatch.fnmatch(path_str, pattern) for pattern in include
+                    )
+                    if not matched:
+                        continue
+
+                # Check exclude patterns
+                if exclude:
+                    excluded = any(
+                        fnmatch.fnmatch(path_str, pattern) for pattern in exclude
+                    )
+                    if excluded:
+                        continue
+
+                files_to_migrate.append(path_str)
+
+        # Migrate files
+        for path in files_to_migrate:
+            full_path = os.path.join(r.path, path)
+            if not os.path.exists(full_path):
+                continue
+
+            # Read file content
+            with open(full_path, "rb") as f:
+                content = f.read()
+
+            # Convert to LFS pointer
+            pointer_content = filter_driver.clean(content)
+
+            # Write pointer back to file
+            with open(full_path, "wb") as f:
+                f.write(pointer_content)
+
+            # Create blob for pointer content and update index
+            blob = Blob()
+            blob.data = pointer_content
+            r.object_store.add_object(blob)
+
+            st = os.stat(full_path)
+            index_entry = index_entry_from_stat(st, blob.id, 0)
+            index[path.encode()] = index_entry
+
+            migrated += 1
+
+        # Write updated index
+        index.write()
+
+        # Track patterns if include was specified
+        if include:
+            lfs_track(r, include)
+
+        return migrated
+
+
+def lfs_pointer_check(repo=".", paths=None):
+    """Check if files are valid LFS pointers.
+
+    Args:
+      repo: Path to repository
+      paths: List of file paths to check (if None, check all files)
+
+    Returns:
+      Dict mapping paths to LFSPointer objects (or None if not a pointer)
+    """
+    from .lfs import LFSPointer
+
+    with open_repo_closing(repo) as r:
+        results = {}
+
+        if paths is None:
+            # Check all files in index
+            index = r.open_index()
+            paths = [path.decode() for path in index]
+
+        for path in paths:
+            full_path = os.path.join(r.path, path)
+            if os.path.exists(full_path):
+                try:
+                    with open(full_path, "rb") as f:
+                        content = f.read()
+                    pointer = LFSPointer.from_bytes(content)
+                    results[path] = pointer
+                except OSError:
+                    results[path] = None
+            else:
+                results[path] = None
+
+        return results
+
+
+def lfs_fetch(repo=".", remote="origin", refs=None):
+    """Fetch LFS objects from remote.
+
+    Args:
+      repo: Path to repository
+      remote: Remote name (default: origin)
+      refs: Specific refs to fetch LFS objects for (default: all refs)
+
+    Returns:
+      Number of objects fetched
+    """
+    from .lfs import LFSClient, LFSPointer, LFSStore
+
+    with open_repo_closing(repo) as r:
+        # Get LFS server URL from config
+        config = r.get_config()
+        lfs_url = config.get((b"lfs",), b"url")
+        if not lfs_url:
+            # Try remote URL
+            remote_url = config.get((b"remote", remote.encode()), b"url")
+            if remote_url:
+                # Append /info/lfs to remote URL
+                remote_url = remote_url.decode()
+                if remote_url.endswith(".git"):
+                    remote_url = remote_url[:-4]
+                lfs_url = f"{remote_url}/info/lfs"
+            else:
+                raise ValueError(f"No LFS URL configured for remote {remote}")
+        else:
+            lfs_url = lfs_url.decode()
+
+        # Get authentication
+        auth = None
+        # TODO: Support credential helpers and other auth methods
+
+        # Create LFS client and store
+        client = LFSClient(lfs_url, auth)
+        store = LFSStore.from_repo(r)
+
+        # Find all LFS pointers in the refs
+        pointers_to_fetch = []
+
+        if refs is None:
+            # Get all refs
+            refs = list(r.refs.keys())
+
+        for ref in refs:
+            if isinstance(ref, str):
+                ref = ref.encode()
+            try:
+                commit = r[r.refs[ref]]
+            except KeyError:
+                continue
+
+            # Walk the commit tree
+            for entry in r.object_store.iter_tree_contents(commit.tree):
+                try:
+                    obj = r.object_store[entry.sha]
+                    if obj.type_name == b"blob":
+                        pointer = LFSPointer.from_bytes(obj.data)
+                        if pointer and pointer.is_valid_oid():
+                            # Check if we already have it
+                            try:
+                                store.open_object(pointer.oid)
+                            except KeyError:
+                                pointers_to_fetch.append((pointer.oid, pointer.size))
+                except KeyError:
+                    pass
+
+        # Fetch missing objects
+        fetched = 0
+        for oid, size in pointers_to_fetch:
+            try:
+                content = client.download(oid, size)
+                store.write_object([content])
+                fetched += 1
+            except Exception as e:
+                # Log error but continue
+                print(f"Failed to fetch {oid}: {e}")
+
+        return fetched
+
+
+def lfs_pull(repo=".", remote="origin"):
+    """Pull LFS objects for current checkout.
+
+    Args:
+      repo: Path to repository
+      remote: Remote name (default: origin)
+
+    Returns:
+      Number of objects fetched
+    """
+    from .lfs import LFSPointer, LFSStore
+
+    with open_repo_closing(repo) as r:
+        # First do a fetch for HEAD
+        fetched = lfs_fetch(repo, remote, [b"HEAD"])
+
+        # Then checkout LFS files in working directory
+        store = LFSStore.from_repo(r)
+        index = r.open_index()
+
+        for path, entry in index.items():
+            full_path = os.path.join(r.path, path.decode())
+            if os.path.exists(full_path):
+                with open(full_path, "rb") as f:
+                    content = f.read()
+
+                pointer = LFSPointer.from_bytes(content)
+                if pointer and pointer.is_valid_oid():
+                    try:
+                        # Replace pointer with actual content
+                        with store.open_object(pointer.oid) as lfs_file:
+                            lfs_content = lfs_file.read()
+                        with open(full_path, "wb") as f:
+                            f.write(lfs_content)
+                    except KeyError:
+                        # Object not available
+                        pass
+
+        return fetched
+
+
+def lfs_push(repo=".", remote="origin", refs=None):
+    """Push LFS objects to remote.
+
+    Args:
+      repo: Path to repository
+      remote: Remote name (default: origin)
+      refs: Specific refs to push LFS objects for (default: current branch)
+
+    Returns:
+      Number of objects pushed
+    """
+    from .lfs import LFSClient, LFSPointer, LFSStore
+
+    with open_repo_closing(repo) as r:
+        # Get LFS server URL from config
+        config = r.get_config()
+        lfs_url = config.get((b"lfs",), b"url")
+        if not lfs_url:
+            # Try remote URL
+            remote_url = config.get((b"remote", remote.encode()), b"url")
+            if remote_url:
+                # Append /info/lfs to remote URL
+                remote_url = remote_url.decode()
+                if remote_url.endswith(".git"):
+                    remote_url = remote_url[:-4]
+                lfs_url = f"{remote_url}/info/lfs"
+            else:
+                raise ValueError(f"No LFS URL configured for remote {remote}")
+        else:
+            lfs_url = lfs_url.decode()
+
+        # Get authentication
+        auth = None
+        # TODO: Support credential helpers and other auth methods
+
+        # Create LFS client and store
+        client = LFSClient(lfs_url, auth)
+        store = LFSStore.from_repo(r)
+
+        # Find all LFS objects to push
+        if refs is None:
+            # Push current branch
+            refs = [r.refs.read_ref(b"HEAD")]
+
+        objects_to_push = set()
+
+        for ref in refs:
+            if isinstance(ref, str):
+                ref = ref.encode()
+            try:
+                if ref.startswith(b"refs/"):
+                    commit = r[r.refs[ref]]
+                else:
+                    commit = r[ref]
+            except KeyError:
+                continue
+
+            # Walk the commit tree
+            for entry in r.object_store.iter_tree_contents(commit.tree):
+                try:
+                    obj = r.object_store[entry.sha]
+                    if obj.type_name == b"blob":
+                        pointer = LFSPointer.from_bytes(obj.data)
+                        if pointer and pointer.is_valid_oid():
+                            objects_to_push.add((pointer.oid, pointer.size))
+                except KeyError:
+                    pass
+
+        # Push objects
+        pushed = 0
+        for oid, size in objects_to_push:
+            try:
+                with store.open_object(oid) as f:
+                    content = f.read()
+                client.upload(oid, size, content)
+                pushed += 1
+            except KeyError:
+                # Object not in local store
+                print(f"Warning: LFS object {oid} not found locally")
+            except Exception as e:
+                # Log error but continue
+                print(f"Failed to push {oid}: {e}")
+
+        return pushed
+
+
+def lfs_status(repo="."):
+    """Show status of LFS files.
+
+    Args:
+      repo: Path to repository
+
+    Returns:
+      Dict with status information
+    """
+    from .lfs import LFSPointer, LFSStore
+
+    with open_repo_closing(repo) as r:
+        store = LFSStore.from_repo(r)
+        index = r.open_index()
+
+        status = {
+            "tracked": [],
+            "not_staged": [],
+            "not_committed": [],
+            "not_pushed": [],
+            "missing": [],
+        }
+
+        # Check working directory files
+        for path, entry in index.items():
+            path_str = path.decode()
+            full_path = os.path.join(r.path, path_str)
+
+            if os.path.exists(full_path):
+                with open(full_path, "rb") as f:
+                    content = f.read()
+
+                pointer = LFSPointer.from_bytes(content)
+                if pointer and pointer.is_valid_oid():
+                    status["tracked"].append(path_str)
+
+                    # Check if object exists locally
+                    try:
+                        store.open_object(pointer.oid)
+                    except KeyError:
+                        status["missing"].append(path_str)
+
+                    # Check if file has been modified
+                    try:
+                        staged_obj = r.object_store[entry.binsha]
+                        staged_pointer = LFSPointer.from_bytes(staged_obj.data)
+                        if staged_pointer and staged_pointer.oid != pointer.oid:
+                            status["not_staged"].append(path_str)
+                    except KeyError:
+                        pass
+
+        # TODO: Check for not committed and not pushed files
+
+        return status

@@ -5,6 +5,9 @@
 
  * Add ``format-patch`` command in porcelain. (Jelmer Vernooĳ)
 
+ * Add functions for creating bundles and ``BundleClient``
+   for interacting with bundles. (Jelmer Vernooĳ, #1246)
+
  * Add support for ``core.commitGraph`` configuration setting to control
    whether commit-graph files are used for performance optimization.
    (Jelmer Vernooĳ)

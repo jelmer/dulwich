@@ -210,6 +210,39 @@ def parse_refs(container, refspecs):
     return ret
 
 
+def parse_committish_range(
+    repo: "Repo", committish: Union[str, bytes]
+) -> Optional[tuple[bytes, bytes]]:
+    """Parse a string referring to a commit range.
+
+    Args:
+      repo: A `Repo` object
+      committish: A string referring to a commit or range (e.g., "HEAD~3..HEAD")
+
+    Returns:
+      None if committish is a single commit reference
+      A tuple of (start_commit_id, end_commit_id) if it's a range
+    Raises:
+      KeyError: When the commits can not be found
+      ValueError: If the range can not be parsed
+    """
+    committish = to_bytes(committish)
+    if b".." not in committish:
+        return None
+
+    parts = committish.split(b"..", 1)
+    if len(parts) != 2:
+        raise ValueError(f"Invalid commit range: {committish.decode('utf-8')}")
+
+    start_ref = parts[0]
+    end_ref = parts[1] if parts[1] else b"HEAD"
+
+    start_commit = parse_commit(repo, start_ref)
+    end_commit = parse_commit(repo, end_ref)
+
+    return (start_commit.id, end_commit.id)
+
+
 def parse_commit_range(
     repo: "Repo", committishs: Union[str, bytes]
 ) -> Iterator["Commit"]:

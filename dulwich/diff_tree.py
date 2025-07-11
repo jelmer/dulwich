@@ -125,6 +125,7 @@ def walk_trees(
     tree1_id: Optional[ObjectID],
     tree2_id: Optional[ObjectID],
     prune_identical: bool = False,
+    paths: Optional[list[bytes]] = None,
 ) -> Iterator[tuple[TreeEntry, TreeEntry]]:
     """Recursively walk all the entries of two trees.
 
@@ -135,6 +136,7 @@ def walk_trees(
       tree1_id: The SHA of the first Tree object to iterate, or None.
       tree2_id: The SHA of the second Tree object to iterate, or None.
       prune_identical: If True, identical subtrees will not be walked.
+      paths: Optional list of paths to filter to (as bytes).
 
     Returns:
       Iterator over Pairs of TreeEntry objects for each pair of entries
@@ -159,6 +161,31 @@ def walk_trees(
         tree2 = (is_tree2 and store[entry2.sha]) or None
         path = entry1.path or entry2.path
 
+        # If we have path filters, check if we should process this tree
+        if paths is not None and (is_tree1 or is_tree2):
+            # Special case for root tree
+            if path == b"":
+                should_recurse = True
+            else:
+                # Check if any of our filter paths could be under this tree
+                should_recurse = False
+                for filter_path in paths:
+                    if filter_path == path:
+                        # Exact match - we want this directory itself
+                        should_recurse = True
+                        break
+                    elif filter_path.startswith(path + b"/"):
+                        # Filter path is under this directory
+                        should_recurse = True
+                        break
+                    elif path.startswith(filter_path + b"/"):
+                        # This directory is under a filter path
+                        should_recurse = True
+                        break
+            if not should_recurse:
+                # Skip this tree entirely
+                continue
+
         # Ensure trees are Tree objects before merging
         if tree1 is not None and not isinstance(tree1, Tree):
             tree1 = None
@@ -172,7 +199,25 @@ def walk_trees(
             if tree2 is None:
                 tree2 = Tree()
             todo.extend(reversed(_merge_entries(path, tree1, tree2)))
-        yield entry1, entry2
+
+        # Only yield entries that match our path filters
+        if paths is None:
+            yield entry1, entry2
+        else:
+            # Check if this entry matches any of our filters
+            for filter_path in paths:
+                if path == filter_path:
+                    # Exact match
+                    yield entry1, entry2
+                    break
+                elif path.startswith(filter_path + b"/"):
+                    # This entry is under a filter directory
+                    yield entry1, entry2
+                    break
+                elif filter_path.startswith(path + b"/") and (is_tree1 or is_tree2):
+                    # This is a parent directory of a filter path
+                    yield entry1, entry2
+                    break
 
 
 def _skip_tree(entry: TreeEntry, include_trees: bool) -> TreeEntry:
@@ -189,6 +234,7 @@ def tree_changes(
     rename_detector: Optional["RenameDetector"] = None,
     include_trees: bool = False,
     change_type_same: bool = False,
+    paths: Optional[list[bytes]] = None,
 ) -> Iterator[TreeChange]:
     """Find the differences between the contents of two trees.
 
@@ -202,6 +248,7 @@ def tree_changes(
       rename_detector: RenameDetector object for detecting renames.
       change_type_same: Whether to report change types in the same
         entry or as delete+add.
+      paths: Optional list of paths to filter to (as bytes).
 
     Returns:
       Iterator over TreeChange instances for each change between the
@@ -217,7 +264,7 @@ def tree_changes(
         return
 
     entries = walk_trees(
-        store, tree1_id, tree2_id, prune_identical=(not want_unchanged)
+        store, tree1_id, tree2_id, prune_identical=(not want_unchanged), paths=paths
     )
     for entry1, entry2 in entries:
         if entry1 == entry2 and not want_unchanged:

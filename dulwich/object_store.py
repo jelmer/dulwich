@@ -271,6 +271,7 @@ class BaseObjectStore:
         include_trees=False,
         change_type_same=False,
         rename_detector=None,
+        paths=None,
     ):
         """Find the differences between the contents of two trees.
 
@@ -281,6 +282,8 @@ class BaseObjectStore:
           include_trees: Whether to include trees
           change_type_same: Whether to report files changing
             type in the same entry.
+          rename_detector: RenameDetector object for detecting renames.
+          paths: Optional list of paths to filter to (as bytes).
         Returns: Iterator over tuples with
             (oldpath, newpath), (oldmode, newmode), (oldsha, newsha)
         """
@@ -294,6 +297,7 @@ class BaseObjectStore:
             include_trees=include_trees,
             change_type_same=change_type_same,
             rename_detector=rename_detector,
+            paths=paths,
         ):
             yield (
                 (change.old.path, change.new.path),

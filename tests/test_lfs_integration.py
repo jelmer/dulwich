@@ -49,9 +49,12 @@ class LFSFilterIntegrationTests(TestCase):
         self.registry.register_driver("lfs", self.lfs_filter)
 
         # Set up gitattributes to use LFS for .bin files
-        self.gitattributes = {
-            b"*.bin": {b"filter": b"lfs"},
-        }
+        from dulwich.attrs import GitAttributes, Pattern
+
+        patterns = [
+            (Pattern(b"*.bin"), {b"filter": b"lfs"}),
+        ]
+        self.gitattributes = GitAttributes(patterns)
 
         self.normalizer = FilterBlobNormalizer(
             self.config, self.gitattributes, self.registry

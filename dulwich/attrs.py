@@ -364,6 +364,7 @@ class GitAttributes:
         else:
             # Update the existing pattern in the list
             assert pattern_index >= 0
+            assert attrs_dict is not None
             self._patterns[pattern_index] = (pattern_obj, attrs_dict)
 
         # Update the attribute

@@ -130,7 +130,7 @@ from .objectspec import (
     parse_tree,
 )
 from .pack import write_pack_from_container, write_pack_index
-from .patch import write_tree_diff
+from .patch import write_commit_patch, write_tree_diff
 from .protocol import ZERO_SHA, Protocol
 from .refs import (
     LOCAL_BRANCH_PREFIX,
@@ -4416,6 +4416,125 @@ def filter_branch(
             )
         except ValueError as e:
             raise Error(str(e)) from e
+
+
+def format_patch(
+    repo=".",
+    committish=None,
+    outstream=sys.stdout,
+    outdir=None,
+    n=1,
+    stdout=False,
+    version=None,
+) -> list[str]:
+    """Generate patches suitable for git am.
+
+    Args:
+      repo: Path to repository
+      committish: Commit-ish or commit range to generate patches for.
+        Can be a single commit id, or a tuple of (start, end) commit ids
+        for a range. If None, formats the last n commits from HEAD.
+      outstream: Stream to write to if stdout=True
+      outdir: Directory to write patch files to (default: current directory)
+      n: Number of patches to generate if committish is None
+      stdout: Write patches to stdout instead of files
+      version: Version string to include in patches (default: Dulwich version)
+
+    Returns:
+      List of patch filenames that were created (empty if stdout=True)
+    """
+    if outdir is None:
+        outdir = "."
+
+    filenames = []
+
+    with open_repo_closing(repo) as r:
+        # Determine which commits to format
+        commits_to_format = []
+
+        if committish is None:
+            # Get the last n commits from HEAD
+            try:
+                walker = r.get_walker()
+                for entry in walker:
+                    commits_to_format.append(entry.commit)
+                    if len(commits_to_format) >= n:
+                        break
+                commits_to_format.reverse()
+            except KeyError:
+                # No HEAD or empty repository
+                pass
+        elif isinstance(committish, tuple):
+            # Handle commit range (start, end)
+            start_id, end_id = committish
+
+            # Walk from end back to start
+            walker = r.get_walker(include=[end_id], exclude=[start_id])
+            for entry in walker:
+                commits_to_format.append(entry.commit)
+            commits_to_format.reverse()
+        else:
+            # Single commit
+            commit = r.object_store[committish]
+            commits_to_format.append(commit)
+
+        # Generate patches
+        total = len(commits_to_format)
+        for i, commit in enumerate(commits_to_format, 1):
+            # Get the parent
+            if commit.parents:
+                parent_id = commit.parents[0]
+                parent = r.object_store[parent_id]
+            else:
+                parent = None
+
+            # Generate the diff
+            from io import BytesIO
+
+            diff_content = BytesIO()
+            if parent:
+                write_tree_diff(
+                    diff_content,
+                    r.object_store,
+                    parent.tree,
+                    commit.tree,
+                )
+            else:
+                # Initial commit - diff against empty tree
+                write_tree_diff(
+                    diff_content,
+                    r.object_store,
+                    None,
+                    commit.tree,
+                )
+
+            # Generate patch with commit metadata
+            if stdout:
+                write_commit_patch(
+                    outstream.buffer if hasattr(outstream, "buffer") else outstream,
+                    commit,
+                    diff_content.getvalue(),
+                    (i, total),
+                    version=version,
+                )
+            else:
+                # Generate filename
+                from .patch import get_summary
+
+                summary = get_summary(commit)
+                filename = os.path.join(outdir, f"{i:04d}-{summary}.patch")
+
+                with open(filename, "wb") as f:
+                    write_commit_patch(
+                        f,
+                        commit,
+                        diff_content.getvalue(),
+                        (i, total),
+                        version=version,
+                    )
+                filenames.append(filename)
+
+    return filenames
 
 
 def bisect_start(

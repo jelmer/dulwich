@@ -588,6 +588,266 @@ class ShowCommandTest(DulwichCliTestCase):
         self.assertIn("Test commit", stdout)
 
 
+class FormatPatchCommandTest(DulwichCliTestCase):
+    """Tests for format-patch command."""
+
+    def test_format_patch_single_commit(self):
+        # Create a commit with actual content
+        from dulwich.objects import Blob, Tree
+
+        # Initial commit
+        tree1 = Tree()
+        self.repo.object_store.add_object(tree1)
+        self.repo.do_commit(
+            message=b"Initial commit",
+            tree=tree1.id,
+        )
+
+        # Second commit with a file
+        blob = Blob.from_string(b"Hello, World!\n")
+        self.repo.object_store.add_object(blob)
+        tree2 = Tree()
+        tree2.add(b"hello.txt", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree2)
+        self.repo.do_commit(
+            message=b"Add hello.txt",
+            tree=tree2.id,
+        )
+
+        # Test format-patch for last commit
+        result, stdout, stderr = self._run_cli("format-patch", "-n", "1")
+        self.assertEqual(result, None)
+        self.assertIn("0001-Add-hello.txt.patch", stdout)
+
+        # Check patch contents
+        patch_file = os.path.join(self.repo_path, "0001-Add-hello.txt.patch")
+        with open(patch_file, "rb") as f:
+            content = f.read()
+            # Check header
+            self.assertIn(b"Subject: [PATCH 1/1] Add hello.txt", content)
+            self.assertIn(b"From:", content)
+            self.assertIn(b"Date:", content)
+            # Check diff content
+            self.assertIn(b"diff --git a/hello.txt b/hello.txt", content)
+            self.assertIn(b"new file mode", content)
+            self.assertIn(b"+Hello, World!", content)
+            # Check footer
+            self.assertIn(b"-- \nDulwich", content)
+
+        # Clean up
+        os.remove(patch_file)
+
+    def test_format_patch_multiple_commits(self):
+        from dulwich.objects import Blob, Tree
+
+        # Initial commit
+        tree1 = Tree()
+        self.repo.object_store.add_object(tree1)
+        self.repo.do_commit(
+            message=b"Initial commit",
+            tree=tree1.id,
+        )
+
+        # Second commit
+        blob1 = Blob.from_string(b"File 1 content\n")
+        self.repo.object_store.add_object(blob1)
+        tree2 = Tree()
+        tree2.add(b"file1.txt", 0o100644, blob1.id)
+        self.repo.object_store.add_object(tree2)
+        self.repo.do_commit(
+            message=b"Add file1.txt",
+            tree=tree2.id,
+        )
+
+        # Third commit
+        blob2 = Blob.from_string(b"File 2 content\n")
+        self.repo.object_store.add_object(blob2)
+        tree3 = Tree()
+        tree3.add(b"file1.txt", 0o100644, blob1.id)
+        tree3.add(b"file2.txt", 0o100644, blob2.id)
+        self.repo.object_store.add_object(tree3)
+        self.repo.do_commit(
+            message=b"Add file2.txt",
+            tree=tree3.id,
+        )
+
+        # Test format-patch for last 2 commits
+        result, stdout, stderr = self._run_cli("format-patch", "-n", "2")
+        self.assertEqual(result, None)
+        self.assertIn("0001-Add-file1.txt.patch", stdout)
+        self.assertIn("0002-Add-file2.txt.patch", stdout)
+
+        # Check first patch
+        with open(os.path.join(self.repo_path, "0001-Add-file1.txt.patch"), "rb") as f:
+            content = f.read()
+            self.assertIn(b"Subject: [PATCH 1/2] Add file1.txt", content)
+            self.assertIn(b"+File 1 content", content)
+
+        # Check second patch
+        with open(os.path.join(self.repo_path, "0002-Add-file2.txt.patch"), "rb") as f:
+            content = f.read()
+            self.assertIn(b"Subject: [PATCH 2/2] Add file2.txt", content)
+            self.assertIn(b"+File 2 content", content)
+
+        # Clean up
+        os.remove(os.path.join(self.repo_path, "0001-Add-file1.txt.patch"))
+        os.remove(os.path.join(self.repo_path, "0002-Add-file2.txt.patch"))
+
+    def test_format_patch_output_directory(self):
+        from dulwich.objects import Blob, Tree
+
+        # Create a commit
+        blob = Blob.from_string(b"Test content\n")
+        self.repo.object_store.add_object(blob)
+        tree = Tree()
+        tree.add(b"test.txt", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+        self.repo.do_commit(
+            message=b"Test commit",
+            tree=tree.id,
+        )
+
+        # Create output directory
+        output_dir = os.path.join(self.test_dir, "patches")
+        os.makedirs(output_dir)
+
+        # Test format-patch with output directory
+        result, stdout, stderr = self._run_cli(
+            "format-patch", "-o", output_dir, "-n", "1"
+        )
+        self.assertEqual(result, None)
+
+        # Check that file was created in output directory with correct content
+        patch_file = os.path.join(output_dir, "0001-Test-commit.patch")
+        self.assertTrue(os.path.exists(patch_file))
+        with open(patch_file, "rb") as f:
+            content = f.read()
+            self.assertIn(b"Subject: [PATCH 1/1] Test commit", content)
+            self.assertIn(b"+Test content", content)
+
+    def test_format_patch_commit_range(self):
+        from dulwich.objects import Blob, Tree
+
+        # Create commits with actual file changes
+        commits = []
+        trees = []
+
+        # Initial empty commit
+        tree0 = Tree()
+        self.repo.object_store.add_object(tree0)
+        trees.append(tree0)
+        c0 = self.repo.do_commit(
+            message=b"Initial commit",
+            tree=tree0.id,
+        )
+        commits.append(c0)
+
+        # Add three files in separate commits
+        for i in range(1, 4):
+            blob = Blob.from_string(f"Content {i}\n".encode())
+            self.repo.object_store.add_object(blob)
+            tree = Tree()
+            # Copy previous files
+            for j in range(1, i):
+                prev_blob_id = trees[j][f"file{j}.txt".encode()][1]
+                tree.add(f"file{j}.txt".encode(), 0o100644, prev_blob_id)
+            # Add new file
+            tree.add(f"file{i}.txt".encode(), 0o100644, blob.id)
+            self.repo.object_store.add_object(tree)
+            trees.append(tree)
+
+            c = self.repo.do_commit(
+                message=f"Add file{i}.txt".encode(),
+                tree=tree.id,
+            )
+            commits.append(c)
+
+        # Test format-patch with commit range (should get commits 2 and 3)
+        result, stdout, stderr = self._run_cli(
+            "format-patch", f"{commits[1].decode()}..{commits[3].decode()}"
+        )
+        self.assertEqual(result, None)
+
+        # Should create patches for commits 2 and 3
+        self.assertIn("0001-Add-file2.txt.patch", stdout)
+        self.assertIn("0002-Add-file3.txt.patch", stdout)
+
+        # Verify patch contents
+        with open(os.path.join(self.repo_path, "0001-Add-file2.txt.patch"), "rb") as f:
+            content = f.read()
+            self.assertIn(b"Subject: [PATCH 1/2] Add file2.txt", content)
+            self.assertIn(b"+Content 2", content)
+            self.assertNotIn(b"file3.txt", content)  # Should not include file3
+
+        with open(os.path.join(self.repo_path, "0002-Add-file3.txt.patch"), "rb") as f:
+            content = f.read()
+            self.assertIn(b"Subject: [PATCH 2/2] Add file3.txt", content)
+            self.assertIn(b"+Content 3", content)
+            self.assertNotIn(b"file2.txt", content)  # Should not modify file2
+
+        # Clean up
+        os.remove(os.path.join(self.repo_path, "0001-Add-file2.txt.patch"))
+        os.remove(os.path.join(self.repo_path, "0002-Add-file3.txt.patch"))
+
+    def test_format_patch_stdout(self):
+        from dulwich.objects import Blob, Tree
+
+        # Create a commit with modified file
+        tree1 = Tree()
+        blob1 = Blob.from_string(b"Original content\n")
+        self.repo.object_store.add_object(blob1)
+        tree1.add(b"file.txt", 0o100644, blob1.id)
+        self.repo.object_store.add_object(tree1)
+        self.repo.do_commit(
+            message=b"Initial commit",
+            tree=tree1.id,
+        )
+
+        tree2 = Tree()
+        blob2 = Blob.from_string(b"Modified content\n")
+        self.repo.object_store.add_object(blob2)
+        tree2.add(b"file.txt", 0o100644, blob2.id)
+        self.repo.object_store.add_object(tree2)
+        self.repo.do_commit(
+            message=b"Modify file.txt",
+            tree=tree2.id,
+        )
+
+        # Mock stdout as a BytesIO for binary output
+        stdout_stream = io.BytesIO()
+        stdout_stream.buffer = stdout_stream
+
+        # Run command with --stdout
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        old_cwd = os.getcwd()
+        try:
+            sys.stdout = stdout_stream
+            sys.stderr = io.StringIO()
+            os.chdir(self.repo_path)
+            cli.main(["format-patch", "--stdout", "-n", "1"])
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+            os.chdir(old_cwd)
+
+        # Check output
+        stdout_stream.seek(0)
+        output = stdout_stream.read()
+        self.assertIn(b"Subject: [PATCH 1/1] Modify file.txt", output)
+        self.assertIn(b"diff --git a/file.txt b/file.txt", output)
+        self.assertIn(b"-Original content", output)
+        self.assertIn(b"+Modified content", output)
+        self.assertIn(b"-- \nDulwich", output)
+
+    def test_format_patch_empty_repo(self):
+        # Test with empty repository
+        result, stdout, stderr = self._run_cli("format-patch", "-n", "5")
+        self.assertEqual(result, None)
+        # Should produce no output for empty repo
+        self.assertEqual(stdout.strip(), "")
+
+
 class FetchPackCommandTest(DulwichCliTestCase):
     """Tests for fetch-pack command."""
 

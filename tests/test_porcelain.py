@@ -2374,6 +2374,140 @@ index ea5c7bf..fd38bcb 100644
         )
 
 
+class FormatPatchTests(PorcelainTestCase):
+    def test_format_patch_single_commit(self) -> None:
+        # Create initial commit
+        tree1 = Tree()
+        c1 = make_commit(
+            tree=tree1,
+            message=b"Initial commit",
+        )
+        self.repo.object_store.add_objects([(tree1, None), (c1, None)])
+
+        # Create second commit
+        b = Blob.from_string(b"modified")
+        tree = Tree()
+        tree.add(b"test.txt", 0o100644, b.id)
+        c2 = make_commit(
+            tree=tree,
+            parents=[c1.id],
+            message=b"Add test.txt",
+        )
+        self.repo.object_store.add_objects([(b, None), (tree, None), (c2, None)])
+        self.repo[b"HEAD"] = c2.id
+
+        # Generate patch for single commit
+        with tempfile.TemporaryDirectory() as tmpdir:
+            patches = porcelain.format_patch(
+                self.repo.path,
+                committish=c2.id,
+                outdir=tmpdir,
+            )
+
+            self.assertEqual(len(patches), 1)
+            self.assertTrue(patches[0].endswith("-Add-test.txt.patch"))
+
+            # Verify patch content
+            with open(patches[0], "rb") as f:
+                content = f.read()
+                self.assertIn(b"Subject: [PATCH 1/1] Add test.txt", content)
+                self.assertIn(b"+modified", content)
+
+    def test_format_patch_multiple_commits(self) -> None:
+        # Create commit chain
+        commits = []
+        for i in range(3):
+            blob = Blob.from_string(f"content {i}".encode())
+            tree = Tree()
+            tree.add(f"file{i}.txt".encode(), 0o100644, blob.id)
+
+            parents = [commits[-1].id] if commits else []
+            commit = make_commit(
+                tree=tree,
+                parents=parents,
+                message=f"Commit {i}".encode(),
+            )
+            self.repo.object_store.add_objects(
+                [(blob, None), (tree, None), (commit, None)]
+            )
+            commits.append(commit)
+
+        self.repo[b"HEAD"] = commits[-1].id
+
+        # Test generating last 2 commits
+        with tempfile.TemporaryDirectory() as tmpdir:
+            patches = porcelain.format_patch(
+                self.repo.path,
+                n=2,
+                outdir=tmpdir,
+            )
+
+            self.assertEqual(len(patches), 2)
+            self.assertTrue(patches[0].endswith("-Commit-1.patch"))
+            self.assertTrue(patches[1].endswith("-Commit-2.patch"))
+
+            # Check patch numbering
+            with open(patches[0], "rb") as f:
+                self.assertIn(b"Subject: [PATCH 1/2] Commit 1", f.read())
+            with open(patches[1], "rb") as f:
+                self.assertIn(b"Subject: [PATCH 2/2] Commit 2", f.read())
+
+    def test_format_patch_range(self) -> None:
+        # Create commit chain
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+        self.repo[b"HEAD"] = c3.id
+
+        # Test commit range
+        with tempfile.TemporaryDirectory() as tmpdir:
+            patches = porcelain.format_patch(
+                self.repo.path,
+                committish=(c1.id, c3.id),
+                outdir=tmpdir,
+            )
+
+            # Should include c2 and c3
+            self.assertEqual(len(patches), 2)
+
+    def test_format_patch_stdout(self) -> None:
+        # Create a commit
+        blob = Blob.from_string(b"test content")
+        tree = Tree()
+        tree.add(b"test.txt", 0o100644, blob.id)
+        commit = make_commit(
+            tree=tree,
+            message=b"Test commit",
+        )
+        self.repo.object_store.add_objects([(blob, None), (tree, None), (commit, None)])
+        self.repo[b"HEAD"] = commit.id
+
+        # Test stdout output
+        outstream = BytesIO()
+        patches = porcelain.format_patch(
+            self.repo.path,
+            committish=commit.id,
+            stdout=True,
+            outstream=outstream,
+        )
+
+        # Should return empty list when writing to stdout
+        self.assertEqual(patches, [])
+
+        # Check stdout content
+        outstream.seek(0)
+        content = outstream.read()
+        self.assertIn(b"Subject: [PATCH 1/1] Test commit", content)
+        self.assertIn(b"diff --git", content)
+
+    def test_format_patch_no_commits(self) -> None:
+        # Test with a new repository with no commits
+        # Just remove HEAD to simulate empty repo
+        patches = porcelain.format_patch(
+            self.repo.path,
+            n=5,
+        )
+        self.assertEqual(patches, [])
+
+
 class SymbolicRefTests(PorcelainTestCase):
     def test_set_wrong_symbolic_ref(self) -> None:
         c1, c2, c3 = build_commit_graph(

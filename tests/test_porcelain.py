@@ -2568,6 +2568,273 @@ class DiffTreeTests(PorcelainTestCase):
         self.assertEqual(outstream.getvalue(), b"")
 
 
+class DiffTests(PorcelainTestCase):
+    def test_diff_uncommitted_stage(self) -> None:
+        # Test diff in repository with no commits yet
+        fullpath = os.path.join(self.repo.path, "test.txt")
+        with open(fullpath, "w") as f:
+            f.write("Hello, world!\n")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+
+        outstream = BytesIO()
+        porcelain.diff(self.repo.path, staged=True, outstream=outstream)
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/test.txt b/test.txt", diff_output)
+        self.assertIn(b"new file mode", diff_output)
+        self.assertIn(b"+Hello, world!", diff_output)
+
+    def test_diff_uncommitted_working_tree(self) -> None:
+        # Test unstaged changes in repository with no commits
+        fullpath = os.path.join(self.repo.path, "test.txt")
+        with open(fullpath, "w") as f:
+            f.write("Hello, world!\n")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+
+        # Modify file in working tree
+        with open(fullpath, "w") as f:
+            f.write("Hello, world!\nNew line\n")
+
+        outstream = BytesIO()
+        porcelain.diff(self.repo.path, staged=False, outstream=outstream)
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/test.txt b/test.txt", diff_output)
+        self.assertIn(b"+New line", diff_output)
+
+    def test_diff_with_commits_staged(self) -> None:
+        # Test staged changes with existing commits
+        fullpath = os.path.join(self.repo.path, "test.txt")
+        with open(fullpath, "w") as f:
+            f.write("Initial content\n")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+        porcelain.commit(self.repo.path, message=b"Initial commit")
+
+        # Modify and stage
+        with open(fullpath, "w") as f:
+            f.write("Initial content\nModified\n")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+
+        outstream = BytesIO()
+        porcelain.diff(self.repo.path, staged=True, outstream=outstream)
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/test.txt b/test.txt", diff_output)
+        self.assertIn(b"+Modified", diff_output)
+
+    def test_diff_with_commits_unstaged(self) -> None:
+        # Test unstaged changes with existing commits
+        fullpath = os.path.join(self.repo.path, "test.txt")
+        with open(fullpath, "w") as f:
+            f.write("Initial content\n")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+        porcelain.commit(self.repo.path, message=b"Initial commit")
+
+        # Modify without staging
+        with open(fullpath, "w") as f:
+            f.write("Initial content\nModified\n")
+
+        outstream = BytesIO()
+        porcelain.diff(self.repo.path, staged=False, outstream=outstream)
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/test.txt b/test.txt", diff_output)
+        self.assertIn(b"+Modified", diff_output)
+
+    def test_diff_file_deletion(self) -> None:
+        # Test showing file deletion
+        fullpath = os.path.join(self.repo.path, "test.txt")
+        with open(fullpath, "w") as f:
+            f.write("Content to delete\n")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+        porcelain.commit(self.repo.path, message=b"Add file")
+
+        # Delete file
+        os.unlink(fullpath)
+
+        outstream = BytesIO()
+        porcelain.diff(self.repo.path, staged=False, outstream=outstream)
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/test.txt b/test.txt", diff_output)
+        self.assertIn(b"deleted file mode", diff_output)
+        self.assertIn(b"-Content to delete", diff_output)
+
+    def test_diff_with_paths(self) -> None:
+        # Test diff with specific paths
+        # Create two files
+        fullpath1 = os.path.join(self.repo.path, "file1.txt")
+        fullpath2 = os.path.join(self.repo.path, "file2.txt")
+        with open(fullpath1, "w") as f:
+            f.write("File 1 content\n")
+        with open(fullpath2, "w") as f:
+            f.write("File 2 content\n")
+        porcelain.add(self.repo.path, paths=["file1.txt", "file2.txt"])
+        porcelain.commit(self.repo.path, message=b"Add two files")
+
+        # Modify both files
+        with open(fullpath1, "w") as f:
+            f.write("File 1 modified\n")
+        with open(fullpath2, "w") as f:
+            f.write("File 2 modified\n")
+
+        # Test diff with specific path
+        outstream = BytesIO()
+        porcelain.diff(self.repo.path, paths=["file1.txt"], outstream=outstream)
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/file1.txt b/file1.txt", diff_output)
+        self.assertIn(b"-File 1 content", diff_output)
+        self.assertIn(b"+File 1 modified", diff_output)
+        # file2.txt should not appear in diff
+        self.assertNotIn(b"file2.txt", diff_output)
+
+    def test_diff_with_paths_multiple(self) -> None:
+        # Test diff with multiple paths
+        # Create three files
+        fullpath1 = os.path.join(self.repo.path, "file1.txt")
+        fullpath2 = os.path.join(self.repo.path, "file2.txt")
+        fullpath3 = os.path.join(self.repo.path, "file3.txt")
+        with open(fullpath1, "w") as f:
+            f.write("File 1 content\n")
+        with open(fullpath2, "w") as f:
+            f.write("File 2 content\n")
+        with open(fullpath3, "w") as f:
+            f.write("File 3 content\n")
+        porcelain.add(self.repo.path, paths=["file1.txt", "file2.txt", "file3.txt"])
+        porcelain.commit(self.repo.path, message=b"Add three files")
+
+        # Modify all files
+        with open(fullpath1, "w") as f:
+            f.write("File 1 modified\n")
+        with open(fullpath2, "w") as f:
+            f.write("File 2 modified\n")
+        with open(fullpath3, "w") as f:
+            f.write("File 3 modified\n")
+
+        # Test diff with two specific paths
+        outstream = BytesIO()
+        porcelain.diff(
+            self.repo.path, paths=["file1.txt", "file3.txt"], outstream=outstream
+        )
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/file1.txt b/file1.txt", diff_output)
+        self.assertIn(b"diff --git a/file3.txt b/file3.txt", diff_output)
+        # file2.txt should not appear in diff
+        self.assertNotIn(b"file2.txt", diff_output)
+
+    def test_diff_with_paths_directory(self) -> None:
+        # Test diff with directory paths
+        # Create files in subdirectory
+        os.mkdir(os.path.join(self.repo.path, "subdir"))
+        fullpath1 = os.path.join(self.repo.path, "subdir", "file1.txt")
+        fullpath2 = os.path.join(self.repo.path, "subdir", "file2.txt")
+        fullpath3 = os.path.join(self.repo.path, "root.txt")
+        with open(fullpath1, "w") as f:
+            f.write("Subdir file 1\n")
+        with open(fullpath2, "w") as f:
+            f.write("Subdir file 2\n")
+        with open(fullpath3, "w") as f:
+            f.write("Root file\n")
+        porcelain.add(
+            self.repo.path, paths=["subdir/file1.txt", "subdir/file2.txt", "root.txt"]
+        )
+        porcelain.commit(self.repo.path, message=b"Add files in subdir")
+
+        # Modify all files
+        with open(fullpath1, "w") as f:
+            f.write("Subdir file 1 modified\n")
+        with open(fullpath2, "w") as f:
+            f.write("Subdir file 2 modified\n")
+        with open(fullpath3, "w") as f:
+            f.write("Root file modified\n")
+
+        # Test diff with directory path
+        outstream = BytesIO()
+        porcelain.diff(self.repo.path, paths=["subdir"], outstream=outstream)
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"subdir/file1.txt", diff_output)
+        self.assertIn(b"subdir/file2.txt", diff_output)
+        # root.txt should not appear in diff
+        self.assertNotIn(b"root.txt", diff_output)
+
+    def test_diff_staged_with_paths(self) -> None:
+        # Test staged diff with specific paths
+        # Create two files
+        fullpath1 = os.path.join(self.repo.path, "file1.txt")
+        fullpath2 = os.path.join(self.repo.path, "file2.txt")
+        with open(fullpath1, "w") as f:
+            f.write("File 1 content\n")
+        with open(fullpath2, "w") as f:
+            f.write("File 2 content\n")
+        porcelain.add(self.repo.path, paths=["file1.txt", "file2.txt"])
+        porcelain.commit(self.repo.path, message=b"Add two files")
+
+        # Modify and stage both files
+        with open(fullpath1, "w") as f:
+            f.write("File 1 staged\n")
+        with open(fullpath2, "w") as f:
+            f.write("File 2 staged\n")
+        porcelain.add(self.repo.path, paths=["file1.txt", "file2.txt"])
+
+        # Test staged diff with specific path
+        outstream = BytesIO()
+        porcelain.diff(
+            self.repo.path, staged=True, paths=["file1.txt"], outstream=outstream
+        )
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/file1.txt b/file1.txt", diff_output)
+        self.assertIn(b"-File 1 content", diff_output)
+        self.assertIn(b"+File 1 staged", diff_output)
+        # file2.txt should not appear in diff
+        self.assertNotIn(b"file2.txt", diff_output)
+
+    def test_diff_with_commit_and_paths(self) -> None:
+        # Test diff against specific commit with paths
+        # Create initial file
+        fullpath1 = os.path.join(self.repo.path, "file1.txt")
+        fullpath2 = os.path.join(self.repo.path, "file2.txt")
+        with open(fullpath1, "w") as f:
+            f.write("Initial content 1\n")
+        with open(fullpath2, "w") as f:
+            f.write("Initial content 2\n")
+        porcelain.add(self.repo.path, paths=["file1.txt", "file2.txt"])
+        first_commit = porcelain.commit(self.repo.path, message=b"Initial commit")
+
+        # Make second commit
+        with open(fullpath1, "w") as f:
+            f.write("Second content 1\n")
+        with open(fullpath2, "w") as f:
+            f.write("Second content 2\n")
+        porcelain.add(self.repo.path, paths=["file1.txt", "file2.txt"])
+        porcelain.commit(self.repo.path, message=b"Second commit")
+
+        # Modify working tree
+        with open(fullpath1, "w") as f:
+            f.write("Working content 1\n")
+        with open(fullpath2, "w") as f:
+            f.write("Working content 2\n")
+
+        # Test diff against first commit with specific path
+        outstream = BytesIO()
+        porcelain.diff(
+            self.repo.path,
+            commit=first_commit,
+            paths=["file1.txt"],
+            outstream=outstream,
+        )
+
+        diff_output = outstream.getvalue()
+        self.assertIn(b"diff --git a/file1.txt b/file1.txt", diff_output)
+        self.assertIn(b"-Initial content 1", diff_output)
+        self.assertIn(b"+Working content 1", diff_output)
+        # file2.txt should not appear in diff
+        self.assertNotIn(b"file2.txt", diff_output)
+
+
 class CommitTreeTests(PorcelainTestCase):
     def test_simple(self) -> None:
         c1, c2, c3 = build_commit_graph(

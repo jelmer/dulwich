@@ -41,7 +41,7 @@ from .client import GitProtocolError, get_transport_and_path
 from .errors import ApplyDeltaError
 from .index import Index
 from .objects import valid_hexsha
-from .objectspec import parse_commit, parse_committish_range
+from .objectspec import parse_committish_range
 from .pack import Pack, sha_to_hex
 from .repo import Repo
 
@@ -299,19 +299,59 @@ class cmd_diff(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            "commit", nargs="?", default="HEAD", help="Commit to show diff for"
+            "committish", nargs="*", default=[], help="Commits or refs to compare"
         )
-        args = parser.parse_args(args)
+        parser.add_argument("--staged", action="store_true", help="Show staged changes")
+        parser.add_argument(
+            "--cached",
+            action="store_true",
+            help="Show staged changes (same as --staged)",
+        )
+        parser.add_argument(
+            "--", dest="separator", action="store_true", help=argparse.SUPPRESS
+        )
+        parser.add_argument("paths", nargs="*", default=[], help="Paths to limit diff")
 
-        r = Repo(".")
-        commit_id = (
-            args.commit.encode() if isinstance(args.commit, str) else args.commit
-        )
-        commit = parse_commit(r, commit_id)
-        parent_commit = r[commit.parents[0]]
-        porcelain.diff_tree(
-            r, parent_commit.tree, commit.tree, outstream=sys.stdout.buffer
-        )
+        # Handle the -- separator for paths
+        if "--" in args:
+            sep_index = args.index("--")
+            parsed_args = parser.parse_args(args[:sep_index])
+            parsed_args.paths = args[sep_index + 1 :]
+        else:
+            parsed_args = parser.parse_args(args)
+
+        args = parsed_args
+
+        if len(args.committish) == 0:
+            # Show diff for working tree or staged changes
+            porcelain.diff(
+                ".",
+                staged=(args.staged or args.cached),
+                paths=args.paths or None,
+                outstream=sys.stdout.buffer,
+            )
+        elif len(args.committish) == 1:
+            # Show diff between working tree and specified commit
+            if args.staged or args.cached:
+                parser.error("--staged/--cached cannot be used with commits")
+            porcelain.diff(
+                ".",
+                commit=args.committish[0],
+                staged=False,
+                paths=args.paths or None,
+                outstream=sys.stdout.buffer,
+            )
+        elif len(args.committish) == 2:
+            # Show diff between two commits
+            porcelain.diff(
+                ".",
+                commit=args.committish[0],
+                commit2=args.committish[1],
+                paths=args.paths or None,
+                outstream=sys.stdout.buffer,
+            )
+        else:
+            parser.error("Too many arguments - specify at most two commits")
 
 
 class cmd_dump_pack(Command):

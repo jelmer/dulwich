@@ -1969,6 +1969,180 @@ class cmd_filter_branch(Command):
                 return 1
 
 
+class cmd_lfs(Command):
+    """Git LFS management commands."""
+
+    def run(self, argv) -> None:
+        parser = argparse.ArgumentParser(prog="dulwich lfs")
+        subparsers = parser.add_subparsers(dest="subcommand", help="LFS subcommands")
+
+        # lfs init
+        subparsers.add_parser("init", help="Initialize Git LFS")
+
+        # lfs track
+        parser_track = subparsers.add_parser(
+            "track", help="Track file patterns with LFS"
+        )
+        parser_track.add_argument("patterns", nargs="*", help="File patterns to track")
+
+        # lfs untrack
+        parser_untrack = subparsers.add_parser(
+            "untrack", help="Untrack file patterns from LFS"
+        )
+        parser_untrack.add_argument(
+            "patterns", nargs="+", help="File patterns to untrack"
+        )
+
+        # lfs ls-files
+        parser_ls = subparsers.add_parser("ls-files", help="List LFS files")
+        parser_ls.add_argument("--ref", help="Git ref to check (defaults to HEAD)")
+
+        # lfs migrate
+        parser_migrate = subparsers.add_parser("migrate", help="Migrate files to LFS")
+        parser_migrate.add_argument("--include", nargs="+", help="Patterns to include")
+        parser_migrate.add_argument("--exclude", nargs="+", help="Patterns to exclude")
+        parser_migrate.add_argument(
+            "--everything", action="store_true", help="Migrate all files above 100MB"
+        )
+
+        # lfs pointer
+        parser_pointer = subparsers.add_parser("pointer", help="Check LFS pointers")
+        parser_pointer.add_argument(
+            "--check", nargs="*", dest="paths", help="Check if files are LFS pointers"
+        )
+
+        # lfs clean
+        parser_clean = subparsers.add_parser("clean", help="Clean file to LFS pointer")
+        parser_clean.add_argument("path", help="File path to clean")
+
+        # lfs smudge
+        parser_smudge = subparsers.add_parser(
+            "smudge", help="Smudge LFS pointer to content"
+        )
+        parser_smudge.add_argument(
+            "--stdin", action="store_true", help="Read pointer from stdin"
+        )
+
+        # lfs fetch
+        parser_fetch = subparsers.add_parser(
+            "fetch", help="Fetch LFS objects from remote"
+        )
+        parser_fetch.add_argument(
+            "--remote", default="origin", help="Remote to fetch from"
+        )
+        parser_fetch.add_argument("refs", nargs="*", help="Specific refs to fetch")
+
+        # lfs pull
+        parser_pull = subparsers.add_parser(
+            "pull", help="Pull LFS objects for current checkout"
+        )
+        parser_pull.add_argument(
+            "--remote", default="origin", help="Remote to pull from"
+        )
+
+        # lfs push
+        parser_push = subparsers.add_parser("push", help="Push LFS objects to remote")
+        parser_push.add_argument("--remote", default="origin", help="Remote to push to")
+        parser_push.add_argument("refs", nargs="*", help="Specific refs to push")
+
+        # lfs status
+        subparsers.add_parser("status", help="Show status of LFS files")
+
+        args = parser.parse_args(argv)
+
+        if args.subcommand == "init":
+            porcelain.lfs_init()
+            print("Git LFS initialized.")
+
+        elif args.subcommand == "track":
+            if args.patterns:
+                tracked = porcelain.lfs_track(patterns=args.patterns)
+                print("Tracking patterns:")
+            else:
+                tracked = porcelain.lfs_track()
+                print("Currently tracked patterns:")
+            for pattern in tracked:
+                print(f"  {pattern}")
+
+        elif args.subcommand == "untrack":
+            tracked = porcelain.lfs_untrack(patterns=args.patterns)
+            print("Remaining tracked patterns:")
+            for pattern in tracked:
+                print(f"  {pattern}")
+
+        elif args.subcommand == "ls-files":
+            files = porcelain.lfs_ls_files(ref=args.ref)
+            for path, oid, size in files:
+                print(f"{oid[:12]} * {path} ({format_bytes(size)})")
+
+        elif args.subcommand == "migrate":
+            count = porcelain.lfs_migrate(
+                include=args.include, exclude=args.exclude, everything=args.everything
+            )
+            print(f"Migrated {count} file(s) to Git LFS.")
+
+        elif args.subcommand == "pointer":
+            if args.paths is not None:
+                results = porcelain.lfs_pointer_check(paths=args.paths or None)
+                for path, pointer in results.items():
+                    if pointer:
+                        print(
+                            f"{path}: LFS pointer (oid: {pointer.oid[:12]}, size: {format_bytes(pointer.size)})"
+                        )
+                    else:
+                        print(f"{path}: Not an LFS pointer")
+
+        elif args.subcommand == "clean":
+            pointer = porcelain.lfs_clean(path=args.path)
+            sys.stdout.buffer.write(pointer)
+
+        elif args.subcommand == "smudge":
+            if args.stdin:
+                pointer_content = sys.stdin.buffer.read()
+                content = porcelain.lfs_smudge(pointer_content=pointer_content)
+                sys.stdout.buffer.write(content)
+            else:
+                print("Error: --stdin required for smudge command")
+                sys.exit(1)
+
+        elif args.subcommand == "fetch":
+            refs = args.refs or None
+            count = porcelain.lfs_fetch(remote=args.remote, refs=refs)
+            print(f"Fetched {count} LFS object(s).")
+
+        elif args.subcommand == "pull":
+            count = porcelain.lfs_pull(remote=args.remote)
+            print(f"Pulled {count} LFS object(s).")
+
+        elif args.subcommand == "push":
+            refs = args.refs or None
+            count = porcelain.lfs_push(remote=args.remote, refs=refs)
+            print(f"Pushed {count} LFS object(s).")
+
+        elif args.subcommand == "status":
+            status = porcelain.lfs_status()
+
+            if status["tracked"]:
+                print(f"LFS tracked files: {len(status['tracked'])}")
+
+            if status["missing"]:
+                print("\nMissing LFS objects:")
+                for path in status["missing"]:
+                    print(f"  {path}")
+
+            if status["not_staged"]:
+                print("\nModified LFS files not staged:")
+                for path in status["not_staged"]:
+                    print(f"  {path}")
+
+            if not any(status.values()):
+                print("No LFS files found.")
+
+        else:
+            parser.print_help()
+            sys.exit(1)
+
+
 class cmd_help(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
@@ -2077,6 +2251,7 @@ commands = {
     "gc": cmd_gc,
     "help": cmd_help,
     "init": cmd_init,
+    "lfs": cmd_lfs,
     "log": cmd_log,
     "ls-files": cmd_ls_files,
     "ls-remote": cmd_ls_remote,

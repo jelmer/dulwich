@@ -187,16 +187,16 @@ class TreeChangesTest(DiffTestCase):
         tree = self.commit_tree([(b"a", blob_a, 0o100644), (b"x/b", blob_b, 0o100755)])
         self.assertChangesEqual(
             [
-                TreeChange.add((b"a", 0o100644, blob_a.id)),
-                TreeChange.add((b"x/b", 0o100755, blob_b.id)),
+                TreeChange.add(TreeEntry(b"a", 0o100644, blob_a.id)),
+                TreeChange.add(TreeEntry(b"x/b", 0o100755, blob_b.id)),
             ],
             self.empty_tree,
             tree,
         )
         self.assertChangesEqual(
             [
-                TreeChange.delete((b"a", 0o100644, blob_a.id)),
-                TreeChange.delete((b"x/b", 0o100755, blob_b.id)),
+                TreeChange.delete(TreeEntry(b"a", 0o100644, blob_a.id)),
+                TreeChange.delete(TreeEntry(b"x/b", 0o100755, blob_b.id)),
             ],
             tree,
             self.empty_tree,
@@ -236,8 +236,8 @@ class TreeChangesTest(DiffTestCase):
         tree2 = self.commit_tree([(b"a", blob_a2, 0o120000)])
         self.assertChangesEqual(
             [
-                TreeChange.delete((b"a", 0o100644, blob_a1.id)),
-                TreeChange.add((b"a", 0o120000, blob_a2.id)),
+                TreeChange.delete(TreeEntry(b"a", 0o100644, blob_a1.id)),
+                TreeChange.add(TreeEntry(b"a", 0o120000, blob_a2.id)),
             ],
             tree1,
             tree2,
@@ -268,8 +268,8 @@ class TreeChangesTest(DiffTestCase):
         tree2 = self.commit_tree([(b"a/x", blob_x)])
         self.assertChangesEqual(
             [
-                TreeChange.delete((b"a", F, blob_a.id)),
-                TreeChange.add((b"a/x", F, blob_x.id)),
+                TreeChange.delete(TreeEntry(b"a", F, blob_a.id)),
+                TreeChange.add(TreeEntry(b"a/x", F, blob_x.id)),
             ],
             tree1,
             tree2,
@@ -311,11 +311,11 @@ class TreeChangesTest(DiffTestCase):
                     (b"a", F, blob_a_1.id),
                     (b"a", F, blob_a_2.id),
                 ),
-                TreeChange.delete((b"b/x/2", F, blob_bx2_1.id)),
-                TreeChange.add((b"b/y", F, blob_by_2.id)),
-                TreeChange.delete((b"b/y/1", F, blob_by1_1.id)),
-                TreeChange.delete((b"b/y/2", F, blob_by2_1.id)),
-                TreeChange.add((b"c", F, blob_c_2.id)),
+                TreeChange.delete(TreeEntry(b"b/x/2", F, blob_bx2_1.id)),
+                TreeChange.add(TreeEntry(b"b/y", F, blob_by_2.id)),
+                TreeChange.delete(TreeEntry(b"b/y/1", F, blob_by1_1.id)),
+                TreeChange.delete(TreeEntry(b"b/y/2", F, blob_by2_1.id)),
+                TreeChange.add(TreeEntry(b"c", F, blob_c_2.id)),
             ],
             tree1,
             tree2,
@@ -330,10 +330,10 @@ class TreeChangesTest(DiffTestCase):
 
         self.assertChangesEqual(
             [
-                TreeChange.delete((b"a", F, blob.id)),
-                TreeChange.add((b"a/x", F, blob.id)),
-                TreeChange.delete((b"a.", F, blob.id)),
-                TreeChange.add((b"a./x", F, blob.id)),
+                TreeChange.delete(TreeEntry(b"a", F, blob.id)),
+                TreeChange.add(TreeEntry(b"a/x", F, blob.id)),
+                TreeChange.delete(TreeEntry(b"a.", F, blob.id)),
+                TreeChange.add(TreeEntry(b"a./x", F, blob.id)),
             ],
             tree1,
             tree2,
@@ -367,21 +367,21 @@ class TreeChangesTest(DiffTestCase):
 
         self.assertChangesEqual(
             [
-                TreeChange.delete((b"a", F, blob_a1.id)),
-                TreeChange.add((b"c", F, blob_a2.id)),
+                TreeChange.delete(TreeEntry(b"a", F, blob_a1.id)),
+                TreeChange.add(TreeEntry(b"c", F, blob_a2.id)),
             ],
             tree1,
             tree2,
         )
         self.assertChangesEqual(
             [
-                TreeChange.delete((b"a", F, blob_a1.id)),
+                TreeChange.delete(TreeEntry(b"a", F, blob_a1.id)),
                 TreeChange(
                     CHANGE_UNCHANGED,
                     (b"b", F, blob_b.id),
                     (b"b", F, blob_b.id),
                 ),
-                TreeChange.add((b"c", F, blob_a2.id)),
+                TreeChange.add(TreeEntry(b"c", F, blob_a2.id)),
             ],
             tree1,
             tree2,
@@ -440,7 +440,7 @@ class TreeChangesTest(DiffTestCase):
         self.assertChangesForMergeEqual(
             [
                 [
-                    TreeChange.add((b"a", F, blob2.id)),
+                    TreeChange.add(TreeEntry(b"a", F, blob2.id)),
                     TreeChange(CHANGE_MODIFY, (b"a", F, blob1.id), (b"a", F, blob2.id)),
                 ]
             ],
@@ -482,8 +482,8 @@ class TreeChangesTest(DiffTestCase):
         self.assertChangesForMergeEqual(
             [
                 [
-                    TreeChange.delete((b"a", F, blob1.id)),
-                    TreeChange.delete((b"a", F, blob2.id)),
+                    TreeChange.delete(TreeEntry(b"a", F, blob1.id)),
+                    TreeChange.delete(TreeEntry(b"a", F, blob2.id)),
                 ]
             ],
             [parent1, parent2],
@@ -538,8 +538,8 @@ class TreeChangesTest(DiffTestCase):
         self.assertChangesForMergeEqual(
             [
                 [
-                    TreeChange.delete((b"a", F, blob1.id)),
-                    TreeChange.delete((b"a", F, blob2.id)),
+                    TreeChange.delete(TreeEntry(b"a", F, blob1.id)),
+                    TreeChange.delete(TreeEntry(b"a", F, blob2.id)),
                     None,
                 ]
             ],
@@ -552,7 +552,7 @@ class TreeChangesTest(DiffTestCase):
         parent1 = self.commit_tree([(b"a", blob)])
         parent2 = self.commit_tree([])
         merge = self.commit_tree([(b"b", blob)])
-        add = TreeChange.add((b"b", F, blob.id))
+        add = TreeChange.add(TreeEntry(b"b", F, blob.id))
         self.assertChangesForMergeEqual([[add, add]], [parent1, parent2], merge)
 
     def test_tree_changes_for_merge_add_exact_rename_conflict(self) -> None:
@@ -564,7 +564,7 @@ class TreeChangesTest(DiffTestCase):
             [
                 [
                     TreeChange(CHANGE_RENAME, (b"a", F, blob.id), (b"b", F, blob.id)),
-                    TreeChange.add((b"b", F, blob.id)),
+                    TreeChange.add(TreeEntry(b"b", F, blob.id)),
                 ]
             ],
             [parent1, parent2],
@@ -582,7 +582,7 @@ class TreeChangesTest(DiffTestCase):
             [
                 [
                     TreeChange(CHANGE_RENAME, (b"a", F, blob1.id), (b"b", F, blob2.id)),
-                    TreeChange.add((b"b", F, blob2.id)),
+                    TreeChange.add(TreeEntry(b"b", F, blob2.id)),
                 ]
             ],
             [parent1, parent2],
@@ -606,6 +606,252 @@ class TreeChangesTest(DiffTestCase):
             [parent1, parent2],
             merge,
             rename_detector=self.detector,
+        )
+
+    def test_tree_changes_with_paths(self) -> None:
+        # Test filtering to specific paths
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
+        blob_c = make_object(Blob, data=b"c")
+        tree1 = self.commit_tree(
+            [
+                (b"file_a", blob_a),
+                (b"file_b", blob_b),
+            ]
+        )
+        tree2 = self.commit_tree(
+            [
+                (b"file_a", blob_b),  # modified
+                (b"file_b", blob_b),  # unchanged
+                (b"file_c", blob_c),  # added
+            ]
+        )
+
+        # No filtering - should see all changes
+        self.assertChangesEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY, (b"file_a", F, blob_a.id), (b"file_a", F, blob_b.id)
+                ),
+                TreeChange.add(TreeEntry(b"file_c", F, blob_c.id)),
+            ],
+            tree1,
+            tree2,
+        )
+
+        # Filter to file_a only
+        changes = list(tree_changes(self.store, tree1.id, tree2.id, paths=[b"file_a"]))
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY, (b"file_a", F, blob_a.id), (b"file_a", F, blob_b.id)
+                ),
+            ],
+            changes,
+        )
+
+        # Filter to file_c only
+        changes = list(tree_changes(self.store, tree1.id, tree2.id, paths=[b"file_c"]))
+        self.assertEqual(
+            [
+                TreeChange.add(TreeEntry(b"file_c", F, blob_c.id)),
+            ],
+            changes,
+        )
+
+        # Filter to multiple files
+        changes = list(
+            tree_changes(self.store, tree1.id, tree2.id, paths=[b"file_a", b"file_c"])
+        )
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY, (b"file_a", F, blob_a.id), (b"file_a", F, blob_b.id)
+                ),
+                TreeChange.add(TreeEntry(b"file_c", F, blob_c.id)),
+            ],
+            changes,
+        )
+
+        # Filter to non-existent file
+        changes = list(tree_changes(self.store, tree1.id, tree2.id, paths=[b"file_d"]))
+        self.assertEqual([], changes)
+
+    def test_tree_changes_with_paths_dirs(self) -> None:
+        # Test filtering with directories
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
+        blob_c = make_object(Blob, data=b"c")
+        tree1 = self.commit_tree(
+            [
+                (b"dir1/file_a", blob_a),
+                (b"dir2/file_b", blob_b),
+            ]
+        )
+        tree2 = self.commit_tree(
+            [
+                (b"dir1/file_a", blob_b),  # modified
+                (b"dir1/file_c", blob_c),  # added
+                (b"dir2/file_b", blob_b),  # unchanged
+            ]
+        )
+
+        # Filter to dir1 only
+        changes = list(tree_changes(self.store, tree1.id, tree2.id, paths=[b"dir1"]))
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY,
+                    (b"dir1/file_a", F, blob_a.id),
+                    (b"dir1/file_a", F, blob_b.id),
+                ),
+                TreeChange.add(TreeEntry(b"dir1/file_c", F, blob_c.id)),
+            ],
+            changes,
+        )
+
+        # Filter to specific file in directory
+        changes = list(
+            tree_changes(self.store, tree1.id, tree2.id, paths=[b"dir1/file_a"])
+        )
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY,
+                    (b"dir1/file_a", F, blob_a.id),
+                    (b"dir1/file_a", F, blob_b.id),
+                ),
+            ],
+            changes,
+        )
+
+        # Filter to dir2 (no changes)
+        changes = list(tree_changes(self.store, tree1.id, tree2.id, paths=[b"dir2"]))
+        self.assertEqual([], changes)
+
+    def test_tree_changes_with_paths_deep(self) -> None:
+        # Test filtering with deep directory structure
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
+        tree1 = self.commit_tree(
+            [
+                (b"a/b/c/file1", blob_a),
+                (b"a/b/d/file2", blob_a),
+                (b"x/y/z/file3", blob_a),
+            ]
+        )
+        tree2 = self.commit_tree(
+            [
+                (b"a/b/c/file1", blob_b),  # modified
+                (b"a/b/d/file2", blob_a),  # unchanged
+                (b"x/y/z/file3", blob_b),  # modified
+            ]
+        )
+
+        # Filter to a/b/c
+        changes = list(tree_changes(self.store, tree1.id, tree2.id, paths=[b"a/b/c"]))
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY,
+                    (b"a/b/c/file1", F, blob_a.id),
+                    (b"a/b/c/file1", F, blob_b.id),
+                ),
+            ],
+            changes,
+        )
+
+        # Filter to a/b (should include both subdirs)
+        changes = list(tree_changes(self.store, tree1.id, tree2.id, paths=[b"a/b"]))
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY,
+                    (b"a/b/c/file1", F, blob_a.id),
+                    (b"a/b/c/file1", F, blob_b.id),
+                ),
+            ],
+            changes,
+        )
+
+        # Filter to multiple deep paths
+        changes = list(
+            tree_changes(
+                self.store, tree1.id, tree2.id, paths=[b"a/b/c/file1", b"x/y/z/file3"]
+            )
+        )
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY,
+                    (b"a/b/c/file1", F, blob_a.id),
+                    (b"a/b/c/file1", F, blob_b.id),
+                ),
+                TreeChange(
+                    CHANGE_MODIFY,
+                    (b"x/y/z/file3", F, blob_a.id),
+                    (b"x/y/z/file3", F, blob_b.id),
+                ),
+            ],
+            changes,
+        )
+
+    def test_tree_changes_with_paths_include_unchanged(self) -> None:
+        # Test path filtering with want_unchanged=True
+        blob_a = make_object(Blob, data=b"a")
+        blob_b = make_object(Blob, data=b"b")
+        tree1 = self.commit_tree(
+            [
+                (b"file_a", blob_a),
+                (b"file_b", blob_b),
+            ]
+        )
+        tree2 = self.commit_tree(
+            [
+                (b"file_a", blob_b),  # modified
+                (b"file_b", blob_b),  # unchanged
+            ]
+        )
+
+        # Filter to file_b with want_unchanged=True
+        changes = list(
+            tree_changes(
+                self.store, tree1.id, tree2.id, paths=[b"file_b"], want_unchanged=True
+            )
+        )
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_UNCHANGED,
+                    (b"file_b", F, blob_b.id),
+                    (b"file_b", F, blob_b.id),
+                ),
+            ],
+            changes,
+        )
+
+        # Filter to both files with want_unchanged=True
+        changes = list(
+            tree_changes(
+                self.store,
+                tree1.id,
+                tree2.id,
+                paths=[b"file_a", b"file_b"],
+                want_unchanged=True,
+            )
+        )
+        self.assertEqual(
+            [
+                TreeChange(
+                    CHANGE_MODIFY, (b"file_a", F, blob_a.id), (b"file_a", F, blob_b.id)
+                ),
+                TreeChange(
+                    CHANGE_UNCHANGED,
+                    (b"file_b", F, blob_b.id),
+                    (b"file_b", F, blob_b.id),
+                ),
+            ],
+            changes,
         )
 
 
@@ -686,7 +932,7 @@ class RenameDetectionTest(DiffTestCase):
         blob1 = make_object(Blob, data=b"ab\ncd\n")
         blob2 = make_object(Blob, data=b"ab\n")
 
-        block_cache = {}
+        block_cache: dict[bytes, dict[int, int]] = {}
         self.assertEqual(50, _similarity_score(blob1, blob2, block_cache=block_cache))
         self.assertEqual({blob1.id, blob2.id}, set(block_cache))
 
@@ -759,8 +1005,8 @@ class RenameDetectionTest(DiffTestCase):
         tree2 = self.commit_tree([(b"a", blob, 0o120000)])
         self.assertEqual(
             [
-                TreeChange.add((b"a", 0o120000, blob.id)),
-                TreeChange.delete((b"a", 0o100644, blob.id)),
+                TreeChange.add(TreeEntry(b"a", 0o120000, blob.id)),
+                TreeChange.delete(TreeEntry(b"a", 0o100644, blob.id)),
             ],
             self.detect_renames(tree1, tree2),
         )
@@ -772,7 +1018,7 @@ class RenameDetectionTest(DiffTestCase):
         tree2 = self.commit_tree([(b"a", blob2, 0o120000), (b"b", blob1)])
         self.assertEqual(
             [
-                TreeChange.add((b"a", 0o120000, blob2.id)),
+                TreeChange.add(TreeEntry(b"a", 0o120000, blob2.id)),
                 TreeChange(CHANGE_RENAME, (b"a", F, blob1.id), (b"b", F, blob1.id)),
             ],
             self.detect_renames(tree1, tree2),
@@ -797,7 +1043,7 @@ class RenameDetectionTest(DiffTestCase):
         self.assertEqual(
             [
                 TreeChange(CHANGE_RENAME, (b"a", F, blob.id), (b"c", F, blob.id)),
-                TreeChange.delete((b"b", F, blob.id)),
+                TreeChange.delete(TreeEntry(b"b", F, blob.id)),
             ],
             self.detect_renames(tree1, tree2),
         )
@@ -855,8 +1101,8 @@ class RenameDetectionTest(DiffTestCase):
         )
         self.assertEqual(
             [
-                TreeChange.delete((b"a", F, blob1.id)),
-                TreeChange.add((b"b", F, blob2.id)),
+                TreeChange.delete(TreeEntry(b"a", F, blob1.id)),
+                TreeChange.add(TreeEntry(b"b", F, blob2.id)),
             ],
             self.detect_renames(tree1, tree2, rename_threshold=75),
         )
@@ -877,10 +1123,10 @@ class RenameDetectionTest(DiffTestCase):
         )
         self.assertEqual(
             [
-                TreeChange.delete((b"a", F, blob1.id)),
-                TreeChange.delete((b"b", F, blob2.id)),
-                TreeChange.add((b"c", F, blob3.id)),
-                TreeChange.add((b"d", F, blob4.id)),
+                TreeChange.delete(TreeEntry(b"a", F, blob1.id)),
+                TreeChange.delete(TreeEntry(b"b", F, blob2.id)),
+                TreeChange.add(TreeEntry(b"c", F, blob3.id)),
+                TreeChange.add(TreeEntry(b"d", F, blob4.id)),
             ],
             self.detect_renames(tree1, tree2, max_files=1),
         )
@@ -909,7 +1155,7 @@ class RenameDetectionTest(DiffTestCase):
         tree2 = self.commit_tree([(b"c", blob3)])
         self.assertEqual(
             [
-                TreeChange.delete((b"a", F, blob1.id)),
+                TreeChange.delete(TreeEntry(b"a", F, blob1.id)),
                 TreeChange(CHANGE_RENAME, (b"b", F, blob2.id), (b"c", F, blob3.id)),
             ],
             self.detect_renames(tree1, tree2),
@@ -920,7 +1166,7 @@ class RenameDetectionTest(DiffTestCase):
         self.assertEqual(
             [
                 TreeChange(CHANGE_RENAME, (b"a", F, blob2.id), (b"c", F, blob3.id)),
-                TreeChange.delete((b"b", F, blob1.id)),
+                TreeChange.delete(TreeEntry(b"b", F, blob1.id)),
             ],
             self.detect_renames(tree3, tree4),
         )
@@ -948,7 +1194,7 @@ class RenameDetectionTest(DiffTestCase):
         self.assertEqual(
             [
                 TreeChange(CHANGE_RENAME, (b"a", F, blob1.id), (b"c", F, blob3.id)),
-                TreeChange.delete((b"b", F, blob2.id)),
+                TreeChange.delete(TreeEntry(b"b", F, blob2.id)),
             ],
             self.detect_renames(tree1, tree2),
         )
@@ -966,7 +1212,7 @@ class RenameDetectionTest(DiffTestCase):
             [
                 TreeChange(CHANGE_RENAME, (b"a", F, blob1.id), (b"c", F, blob3.id)),
                 TreeChange(CHANGE_COPY, (b"a", F, blob1.id), (b"d", F, blob4.id)),
-                TreeChange.delete((b"b", F, blob2.id)),
+                TreeChange.delete(TreeEntry(b"b", F, blob2.id)),
             ],
             self.detect_renames(tree1, tree2),
         )
@@ -983,7 +1229,7 @@ class RenameDetectionTest(DiffTestCase):
                 TreeChange(CHANGE_RENAME, (b"a", F, blob1.id), (b"e", F, blob1.id)),
                 TreeChange(CHANGE_RENAME, (b"b", F, blob1.id), (b"f", F, blob1.id)),
                 TreeChange(CHANGE_RENAME, (b"c", F, blob1.id), (b"g", F, blob1.id)),
-                TreeChange.delete((b"d", F, blob1.id)),
+                TreeChange.delete(TreeEntry(b"d", F, blob1.id)),
             ],
             self.detect_renames(tree1, tree2),
         )
@@ -997,10 +1243,10 @@ class RenameDetectionTest(DiffTestCase):
         tree2 = self.commit_tree([(b"c", blob2), (b"d", link2, 0o160000)])
         self.assertEqual(
             [
-                TreeChange.delete((b"a", 0o100644, blob1.id)),
-                TreeChange.delete((b"b", 0o160000, link1)),
-                TreeChange.add((b"c", 0o100644, blob2.id)),
-                TreeChange.add((b"d", 0o160000, link2)),
+                TreeChange.delete(TreeEntry(b"a", 0o100644, blob1.id)),
+                TreeChange.delete(TreeEntry(b"b", 0o160000, link1)),
+                TreeChange.add(TreeEntry(b"c", 0o100644, blob2.id)),
+                TreeChange.add(TreeEntry(b"d", 0o160000, link2)),
             ],
             self.detect_renames(tree1, tree2),
         )
@@ -1058,7 +1304,7 @@ class RenameDetectionTest(DiffTestCase):
         )
         self.assertEqual(
             [
-                TreeChange.add((b"a", F, blob3.id)),
+                TreeChange.add(TreeEntry(b"a", F, blob3.id)),
                 TreeChange(CHANGE_RENAME, (b"a", F, blob1.id), (b"b", F, blob2.id)),
             ],
             self.detect_renames(tree1, tree2, rewrite_threshold=80),
@@ -1069,7 +1315,7 @@ class RenameDetectionTest(DiffTestCase):
         tree1 = self.commit_tree([(b"a", blob)])
         tree2 = self.commit_tree([(b"a", blob), (b"b", blob)])
         self.assertEqual(
-            [TreeChange.add((b"b", F, blob.id))],
+            [TreeChange.add(TreeEntry(b"b", F, blob.id))],
             self.detect_renames(tree1, tree2),
         )
         self.assertEqual(
@@ -1083,7 +1329,7 @@ class RenameDetectionTest(DiffTestCase):
         tree1 = self.commit_tree([(b"a", blob1)])
         tree2 = self.commit_tree([(b"a", blob1), (b"b", blob2)])
         self.assertEqual(
-            [TreeChange.add((b"b", F, blob2.id))],
+            [TreeChange.add(TreeEntry(b"b", F, blob2.id))],
             self.detect_renames(tree1, tree2),
         )
         self.assertEqual(
@@ -1106,7 +1352,7 @@ class RenameDetectionTest(DiffTestCase):
         )
         self.assertEqual(
             [
-                TreeChange.add((b"a", F, blob_a2.id)),
+                TreeChange.add(TreeEntry(b"a", F, blob_a2.id)),
                 TreeChange(CHANGE_RENAME, (b"a", F, blob_a1.id), (b"b", F, blob_b2.id)),
             ],
             self.detect_renames(

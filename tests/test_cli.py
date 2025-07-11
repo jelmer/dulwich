@@ -295,6 +295,191 @@ class TagCommandTest(DulwichCliTestCase):
         self.assertIn(b"refs/tags/v1.0", self.repo.refs.keys())
 
 
+class DiffCommandTest(DulwichCliTestCase):
+    """Tests for diff command."""
+
+    def test_diff_working_tree(self):
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Modify the file
+        with open(test_file, "w") as f:
+            f.write("initial content\nmodified\n")
+
+        # Test unstaged diff
+        result, stdout, stderr = self._run_cli("diff")
+        self.assertIn("+modified", stdout)
+
+    def test_diff_staged(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Modify and stage the file
+        with open(test_file, "w") as f:
+            f.write("initial content\nnew file\n")
+        self._run_cli("add", "test.txt")
+
+        # Test staged diff
+        result, stdout, stderr = self._run_cli("diff", "--staged")
+        self.assertIn("+new file", stdout)
+
+    def test_diff_cached(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Modify and stage the file
+        with open(test_file, "w") as f:
+            f.write("initial content\nnew file\n")
+        self._run_cli("add", "test.txt")
+
+        # Test cached diff (alias for staged)
+        result, stdout, stderr = self._run_cli("diff", "--cached")
+        self.assertIn("+new file", stdout)
+
+    def test_diff_commit(self):
+        # Create two commits
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("first version\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=First")
+
+        with open(test_file, "w") as f:
+            f.write("first version\nsecond line\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Second")
+
+        # Add working tree changes
+        with open(test_file, "a") as f:
+            f.write("working tree change\n")
+
+        # Test single commit diff (should show working tree vs HEAD)
+        result, stdout, stderr = self._run_cli("diff", "HEAD")
+        self.assertIn("+working tree change", stdout)
+
+    def test_diff_two_commits(self):
+        # Create two commits
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("first version\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=First")
+
+        # Get first commit SHA
+        first_commit = self.repo.refs[b"HEAD"].decode()
+
+        with open(test_file, "w") as f:
+            f.write("first version\nsecond line\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Second")
+
+        # Get second commit SHA
+        second_commit = self.repo.refs[b"HEAD"].decode()
+
+        # Test diff between two commits
+        result, stdout, stderr = self._run_cli("diff", first_commit, second_commit)
+        self.assertIn("+second line", stdout)
+
+    def test_diff_commit_vs_working_tree(self):
+        # Test that diff <commit> shows working tree vs commit (not commit vs parent)
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("first version\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=First")
+
+        first_commit = self.repo.refs[b"HEAD"].decode()
+
+        with open(test_file, "w") as f:
+            f.write("first version\nsecond line\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Second")
+
+        # Add changes to working tree
+        with open(test_file, "w") as f:
+            f.write("completely different\n")
+
+        # diff <first_commit> should show working tree vs first commit
+        result, stdout, stderr = self._run_cli("diff", first_commit)
+        self.assertIn("-first version", stdout)
+        self.assertIn("+completely different", stdout)
+
+    def test_diff_with_paths(self):
+        # Test path filtering
+        # Create multiple files
+        file1 = os.path.join(self.repo_path, "file1.txt")
+        file2 = os.path.join(self.repo_path, "file2.txt")
+        subdir = os.path.join(self.repo_path, "subdir")
+        os.makedirs(subdir)
+        file3 = os.path.join(subdir, "file3.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1\n")
+        with open(file2, "w") as f:
+            f.write("content2\n")
+        with open(file3, "w") as f:
+            f.write("content3\n")
+
+        self._run_cli("add", ".")
+        self._run_cli("commit", "--message=Initial")
+
+        # Modify all files
+        with open(file1, "w") as f:
+            f.write("modified1\n")
+        with open(file2, "w") as f:
+            f.write("modified2\n")
+        with open(file3, "w") as f:
+            f.write("modified3\n")
+
+        # Test diff with specific file
+        result, stdout, stderr = self._run_cli("diff", "--", "file1.txt")
+        self.assertIn("file1.txt", stdout)
+        self.assertNotIn("file2.txt", stdout)
+        self.assertNotIn("file3.txt", stdout)
+
+        # Test diff with directory
+        result, stdout, stderr = self._run_cli("diff", "--", "subdir")
+        self.assertNotIn("file1.txt", stdout)
+        self.assertNotIn("file2.txt", stdout)
+        self.assertIn("file3.txt", stdout)
+
+        # Test staged diff with paths
+        self._run_cli("add", "file1.txt")
+        result, stdout, stderr = self._run_cli("diff", "--staged", "--", "file1.txt")
+        self.assertIn("file1.txt", stdout)
+        self.assertIn("+modified1", stdout)
+
+        # Test diff with multiple paths (file2 and file3 are still unstaged)
+        result, stdout, stderr = self._run_cli(
+            "diff", "--", "file2.txt", "subdir/file3.txt"
+        )
+        self.assertIn("file2.txt", stdout)
+        self.assertIn("file3.txt", stdout)
+        self.assertNotIn("file1.txt", stdout)
+
+        # Test diff with commit and paths
+        first_commit = self.repo.refs[b"HEAD"].decode()
+        with open(file1, "w") as f:
+            f.write("newer1\n")
+        result, stdout, stderr = self._run_cli("diff", first_commit, "--", "file1.txt")
+        self.assertIn("file1.txt", stdout)
+        self.assertIn("-content1", stdout)
+        self.assertIn("+newer1", stdout)
+        self.assertNotIn("file2.txt", stdout)
+
+
 class FilterBranchCommandTest(DulwichCliTestCase):
     """Tests for filter-branch command."""
 

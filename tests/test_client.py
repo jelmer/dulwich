@@ -33,7 +33,9 @@ from urllib.parse import urlparse
 
 import dulwich
 from dulwich import client
+from dulwich.bundle import create_bundle_from_repo, write_bundle
 from dulwich.client import (
+    BundleClient,
     FetchPackResult,
     GitProtocolError,
     HangupException,
@@ -59,7 +61,7 @@ from dulwich.client import (
     parse_rsync_url,
 )
 from dulwich.config import ConfigDict
-from dulwich.objects import Commit, Tree
+from dulwich.objects import Blob, Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
 from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
@@ -1021,6 +1023,137 @@ class LocalGitClientTests(TestCase):
         obj_local = local.get_object(result.refs[ref_name])
         obj_target = target.get_object(result.refs[ref_name])
         self.assertEqual(obj_local, obj_target)
+
+
+class BundleClientTests(TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def _create_test_bundle(self):
+        """Create a test bundle file and return its path."""
+        # Create a simple repository
+        repo = MemoryRepo()
+
+        # Create some objects
+        blob = Blob.from_string(b"Hello world")
+        repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"hello.txt", 0o100644, blob.id)
+        repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.message = b"Initial commit"
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        repo.object_store.add_object(commit)
+
+        repo.refs[b"refs/heads/master"] = commit.id
+
+        # Create bundle
+        bundle = create_bundle_from_repo(repo)
+
+        # Write bundle to file
+        bundle_path = os.path.join(self.tempdir, "test.bundle")
+        with open(bundle_path, "wb") as f:
+            write_bundle(f, bundle)
+
+        return bundle_path, repo
+
+    def test_is_bundle_file(self) -> None:
+        """Test bundle file detection."""
+        bundle_path, _ = self._create_test_bundle()
+
+        # Test positive case
+        self.assertTrue(BundleClient._is_bundle_file(bundle_path))
+
+        # Test negative case - regular file
+        regular_file = os.path.join(self.tempdir, "regular.txt")
+        with open(regular_file, "w") as f:
+            f.write("not a bundle")
+        self.assertFalse(BundleClient._is_bundle_file(regular_file))
+
+        # Test negative case - non-existent file
+        self.assertFalse(BundleClient._is_bundle_file("/non/existent/file"))
+
+    def test_get_refs(self) -> None:
+        """Test getting refs from bundle."""
+        bundle_path, _ = self._create_test_bundle()
+
+        client = BundleClient()
+        result = client.get_refs(bundle_path)
+
+        self.assertIn(b"refs/heads/master", result.refs)
+        self.assertEqual(result.symrefs, {})
+
+    def test_fetch_pack(self) -> None:
+        """Test fetching pack from bundle."""
+        bundle_path, source_repo = self._create_test_bundle()
+
+        client = BundleClient()
+        pack_data = BytesIO()
+
+        def determine_wants(refs):
+            return list(refs.values())
+
+        class MockGraphWalker:
+            def next(self):
+                return None
+
+            def ack(self, sha):
+                pass
+
+        result = client.fetch_pack(
+            bundle_path, determine_wants, MockGraphWalker(), pack_data.write
+        )
+
+        # Verify we got refs back
+        self.assertIn(b"refs/heads/master", result.refs)
+
+        # Verify pack data was written
+        self.assertGreater(len(pack_data.getvalue()), 0)
+
+    def test_fetch(self) -> None:
+        """Test fetching from bundle into target repo."""
+        bundle_path, source_repo = self._create_test_bundle()
+
+        client = BundleClient()
+        target_repo = MemoryRepo()
+
+        result = client.fetch(bundle_path, target_repo)
+
+        # Verify refs were imported
+        self.assertIn(b"refs/heads/master", result.refs)
+
+        # Verify objects were imported
+        master_id = result.refs[b"refs/heads/master"]
+        self.assertIn(master_id, target_repo.object_store)
+
+        # Verify the commit object is correct
+        commit = target_repo.object_store[master_id]
+        self.assertEqual(commit.message, b"Initial commit")
+
+    def test_send_pack_not_supported(self) -> None:
+        """Test that send_pack raises NotImplementedError."""
+        bundle_path, _ = self._create_test_bundle()
+
+        client = BundleClient()
+
+        with self.assertRaises(NotImplementedError):
+            client.send_pack(bundle_path, None, None)
+
+    def test_get_transport_and_path_bundle(self) -> None:
+        """Test that get_transport_and_path detects bundle files."""
+        bundle_path, _ = self._create_test_bundle()
+
+        client, path = get_transport_and_path(bundle_path)
+
+        self.assertIsInstance(client, BundleClient)
+        self.assertEqual(path, bundle_path)
 
 
 class HttpGitClientTests(TestCase):

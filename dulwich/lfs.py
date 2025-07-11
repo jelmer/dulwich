@@ -25,7 +25,7 @@ import os
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, BinaryIO, Optional
+from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 from urllib.error import HTTPError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
@@ -122,7 +122,12 @@ class LFSStore:
         path = self._sha_path(sha.hexdigest())
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
-        os.rename(tmppath, path)
+
+        # Handle concurrent writes - if file already exists, just remove temp file
+        if os.path.exists(path):
+            os.remove(tmppath)
+        else:
+            os.rename(tmppath, path)
         return sha.hexdigest()
 
 
@@ -282,7 +287,7 @@ class LFSClient:
     def batch(
         self,
         operation: str,
-        objects: list[dict[str, str | int]],
+        objects: list[dict[str, Union[str, int]]],
         ref: Optional[str] = None,
     ) -> LFSBatchResponse:
         """Perform batch operation to get transfer URLs.
@@ -296,7 +301,7 @@ class LFSClient:
             Batch response from server
         """
         data: dict[
-            str, str | list[str] | list[dict[str, str | int]] | dict[str, str]
+            str, Union[str, list[str], list[dict[str, Union[str, int]]], dict[str, str]]
         ] = {
             "operation": operation,
             "transfers": ["basic"],

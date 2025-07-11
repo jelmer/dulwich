@@ -140,7 +140,6 @@ from .objectspec import (
 from .pack import write_pack_from_container, write_pack_index
 from .patch import (
     get_summary,
-    write_blob_diff,
     write_commit_patch,
     write_object_diff,
     write_tree_diff,
@@ -3179,6 +3178,9 @@ def checkout(
             new_branch = new_branch.encode(DEFAULT_ENCODING)
 
         # Parse the target to get the commit
+        assert (
+            original_target is not None
+        )  # Guaranteed by earlier check for normal checkout
         target_commit = parse_commit(r, original_target)
         target_tree_id = target_commit.tree
 

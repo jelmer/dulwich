@@ -185,8 +185,10 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
             self.send_error(400, f"OID mismatch: expected {oid}, got {calculated_oid}")
             return
 
-        # Store the object
-        self.server.lfs_store.write_object(chunks)
+        # Check if object already exists
+        if not self._object_exists(oid):
+            # Store the object only if it doesn't exist
+            self.server.lfs_store.write_object(chunks)
 
         self.send_response(200)
         self.end_headers()

@@ -22,7 +22,6 @@
 """Compatibility tests for LFS functionality between dulwich and git-lfs."""
 
 import os
-import shutil
 import subprocess
 import tempfile
 from unittest import skipUnless
@@ -31,7 +30,7 @@ from dulwich import porcelain
 from dulwich.lfs import LFSPointer
 from dulwich.porcelain import lfs_clean, lfs_init, lfs_smudge, lfs_track
 
-from .utils import CompatTestCase, run_git_or_fail
+from .utils import CompatTestCase, rmtree_ro, run_git_or_fail
 
 
 def git_lfs_version():
@@ -63,7 +62,7 @@ class LFSCompatTestCase(CompatTestCase):
     def make_temp_dir(self):
         """Create a temporary directory that will be cleaned up."""
         temp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, temp_dir)
+        self.addCleanup(rmtree_ro, temp_dir)
         return temp_dir
 
 
@@ -79,18 +78,20 @@ class LFSInitCompatTest(LFSCompatTestCase):
 
         # Verify with git-lfs
         output = run_git_or_fail(["lfs", "env"], cwd=repo_dir)
-        self.assertIn("git config filter.lfs.clean", output)
-        self.assertIn("git config filter.lfs.smudge", output)
+        self.assertIn(b"git config filter.lfs.clean", output)
+        self.assertIn(b"git config filter.lfs.smudge", output)
 
     def test_lfs_init_git(self):
         """Test that git-lfs init is compatible with dulwich."""
         # Initialize with git-lfs
         repo_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=repo_dir)
-        run_git_or_fail(["lfs", "install"], cwd=repo_dir)
+        run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
 
         # Verify with dulwich
-        config = porcelain.get_config_stack(repo_dir)
+        repo = porcelain.open_repo(repo_dir)
+        self.addCleanup(repo.close)
+        config = repo.get_config_stack()
         self.assertEqual(
             config.get(("filter", "lfs"), "clean").decode(), "git-lfs clean -- %f"
         )
@@ -113,14 +114,14 @@ class LFSTrackCompatTest(LFSCompatTestCase):
 
         # Verify with git-lfs
         output = run_git_or_fail(["lfs", "track"], cwd=repo_dir)
-        self.assertIn("*.bin", output)
-        self.assertIn("*.dat", output)
+        self.assertIn(b"*.bin", output)
+        self.assertIn(b"*.dat", output)
 
     def test_track_git(self):
         """Test that git-lfs track is compatible with dulwich."""
         repo_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=repo_dir)
-        run_git_or_fail(["lfs", "install"], cwd=repo_dir)
+        run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
 
         # Track with git-lfs
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
@@ -156,19 +157,19 @@ class LFSFileOperationsCompatTest(LFSCompatTestCase):
 
         # Verify with git-lfs
         output = run_git_or_fail(["lfs", "ls-files"], cwd=repo_dir)
-        self.assertIn("test.bin", output)
+        self.assertIn(b"test.bin", output)
 
         # Check pointer file in git
         output = run_git_or_fail(["show", "HEAD:test.bin"], cwd=repo_dir)
-        self.assertIn("version https://git-lfs.github.com/spec/v1", output)
-        self.assertIn("oid sha256:", output)
-        self.assertIn("size 1048576", output)
+        self.assertIn(b"version https://git-lfs.github.com/spec/v1", output)
+        self.assertIn(b"oid sha256:", output)
+        self.assertIn(b"size 1048576", output)
 
     def test_add_commit_git(self):
         """Test adding and committing LFS files with git-lfs."""
         repo_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=repo_dir)
-        run_git_or_fail(["lfs", "install"], cwd=repo_dir)
+        run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)
         run_git_or_fail(["commit", "-m", "Track .bin files"], cwd=repo_dir)
@@ -185,9 +186,10 @@ class LFSFileOperationsCompatTest(LFSCompatTestCase):
 
         # Verify with dulwich
         repo = porcelain.open_repo(repo_dir)
+        self.addCleanup(repo.close)
         tree = repo[repo.head()].tree
-        entry = repo.object_store[tree][b"test.bin"]
-        blob = repo.object_store[entry.binsha]
+        mode, sha = repo.object_store[tree][b"test.bin"]
+        blob = repo.object_store[sha]
         pointer = LFSPointer.from_bytes(blob.data)
         self.assertEqual(pointer.size, 1048576)
 
@@ -196,7 +198,7 @@ class LFSFileOperationsCompatTest(LFSCompatTestCase):
         # Create repo with git-lfs
         repo_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=repo_dir)
-        run_git_or_fail(["lfs", "install"], cwd=repo_dir)
+        run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)
         run_git_or_fail(["commit", "-m", "Track .bin files"], cwd=repo_dir)
@@ -227,10 +229,16 @@ class LFSPointerCompatTest(LFSCompatTestCase):
     def test_pointer_format_dulwich(self):
         """Test that dulwich creates git-lfs compatible pointers."""
         repo_dir = self.make_temp_dir()
+        run_git_or_fail(["init"], cwd=repo_dir)
+        lfs_init(repo_dir)
+
         test_content = b"test content for LFS"
+        test_file = os.path.join(repo_dir, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(test_content)
 
         # Create pointer with dulwich
-        pointer_data = lfs_clean(test_content)
+        pointer_data = lfs_clean(repo_dir, "test.txt")
 
         # Parse with git-lfs (create a file and check)
         test_file = os.path.join(repo_dir, "test_pointer")
@@ -264,10 +272,17 @@ class LFSFilterCompatTest(LFSCompatTestCase):
 
     def test_clean_filter_compat(self):
         """Test clean filter compatibility between dulwich and git-lfs."""
+        repo_dir = self.make_temp_dir()
+        run_git_or_fail(["init"], cwd=repo_dir)
+        lfs_init(repo_dir)
+
         test_content = b"x" * 1000
+        test_file = os.path.join(repo_dir, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(test_content)
 
         # Clean with dulwich
-        dulwich_pointer = lfs_clean(test_content)
+        dulwich_pointer = lfs_clean(repo_dir, "test.txt")
 
         # Clean with git-lfs (simulate)
         # Since we can't easily invoke git-lfs clean directly,
@@ -285,7 +300,11 @@ class LFSFilterCompatTest(LFSCompatTestCase):
 
         # Create test content
         test_content = b"test data for smudge filter"
-        pointer_data = lfs_clean(test_content)
+        test_file = os.path.join(repo_dir, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        pointer_data = lfs_clean(repo_dir, "test.txt")
 
         # Store object in LFS
         lfs_dir = os.path.join(repo_dir, ".git", "lfs")
@@ -318,7 +337,7 @@ class LFSCloneCompatTest(LFSCompatTestCase):
         # Create source repo with LFS
         source_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=source_dir)
-        run_git_or_fail(["lfs", "install"], cwd=source_dir)
+        run_git_or_fail(["lfs", "install", "--local"], cwd=source_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=source_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=source_dir)
         run_git_or_fail(["commit", "-m", "Track .bin files"], cwd=source_dir)

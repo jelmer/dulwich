@@ -5385,7 +5385,7 @@ class StatusTests(PorcelainTestCase):
         self.assertDictEqual(
             {"add": [b"crlf-new"], "delete": [], "modify": []}, results.staged
         )
-        self.assertListEqual(results.unstaged, [])
+        self.assertListEqual(results.unstaged, [b"crlf-exists"])
         self.assertListEqual(results.untracked, [])
 
     def test_get_tree_changes_add(self) -> None:

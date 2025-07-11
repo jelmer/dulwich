@@ -22,13 +22,14 @@
 """Tests for porcelain filter integration."""
 
 import os
-import shutil
 import tempfile
+from io import BytesIO
 
 from dulwich import porcelain
 from dulwich.repo import Repo
 
 from . import TestCase
+from .compat.utils import rmtree_ro
 
 
 class PorcelainFilterTests(TestCase):
@@ -37,8 +38,9 @@ class PorcelainFilterTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.test_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.addCleanup(rmtree_ro, self.test_dir)
         self.repo = Repo.init(self.test_dir)
+        self.addCleanup(self.repo.close)
 
     def test_add_with_autocrlf(self) -> None:
         """Test adding files with autocrlf enabled."""
@@ -132,7 +134,9 @@ class PorcelainFilterTests(TestCase):
             f.write(b"line1\r\nmodified\r\nline3\r\n")
 
         # Get diff - should normalize line endings for comparison
-        diff_output = b"".join(porcelain.diff(self.repo))
+        outstream = BytesIO()
+        porcelain.diff(self.repo, outstream=outstream)
+        diff_output = outstream.getvalue()
         self.assertIn(b"-line2", diff_output)
         self.assertIn(b"+modified", diff_output)
         self.assertIn(b"+line3", diff_output)
@@ -176,8 +180,9 @@ class PorcelainFilterTests(TestCase):
         """Test cloning a repository with filters."""
         # Create a source repository
         source_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, source_dir)
+        self.addCleanup(rmtree_ro, source_dir)
         source_repo = Repo.init(source_dir)
+        self.addCleanup(source_repo.close)
 
         # Add a file with LF endings
         test_file = os.path.join(source_dir, "test.txt")
@@ -189,10 +194,11 @@ class PorcelainFilterTests(TestCase):
 
         # Clone the repository without checkout
         target_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, target_dir)
+        self.addCleanup(rmtree_ro, target_dir)
 
         # Clone without checkout first
         target_repo = porcelain.clone(source_dir, target_dir, checkout=False)
+        self.addCleanup(target_repo.close)
 
         # Configure autocrlf in target repo
         target_config = target_repo.get_config()
@@ -274,8 +280,9 @@ class PorcelainLFSIntegrationTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.test_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.addCleanup(rmtree_ro, self.test_dir)
         self.repo = Repo.init(self.test_dir)
+        self.addCleanup(self.repo.close)
 
         # Set up LFS
         lfs_dir = os.path.join(self.test_dir, ".git", "lfs")
@@ -353,8 +360,9 @@ class FilterEdgeCaseTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.test_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.addCleanup(rmtree_ro, self.test_dir)
         self.repo = Repo.init(self.test_dir)
+        self.addCleanup(self.repo.close)
 
     def test_mixed_line_endings(self) -> None:
         """Test handling files with mixed line endings."""

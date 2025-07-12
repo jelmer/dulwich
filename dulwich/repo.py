@@ -73,7 +73,6 @@ from .hooks import (
     PostReceiveShellHook,
     PreCommitShellHook,
 )
-from .line_ending import BlobNormalizer, TreeBlobNormalizer
 from .object_store import (
     DiskObjectStore,
     MemoryObjectStore,
@@ -760,6 +759,24 @@ class BaseRepo:
         Returns: RebaseStateManager instance
         """
         raise NotImplementedError(self.get_rebase_state_manager)
+
+    def get_blob_normalizer(self):
+        """Return a BlobNormalizer object for checkin/checkout operations.
+
+        Returns: BlobNormalizer instance
+        """
+        raise NotImplementedError(self.get_blob_normalizer)
+
+    def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
+        """Read gitattributes for the repository.
+
+        Args:
+            tree: Tree SHA to read .gitattributes from (defaults to HEAD)
+
+        Returns:
+            GitAttributes object that can be used to match paths
+        """
+        raise NotImplementedError(self.get_gitattributes)
 
     def get_config_stack(self) -> "StackedConfig":
         """Return a config stack for this repository.
@@ -2078,24 +2095,58 @@ class Repo(BaseRepo):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+    def _read_gitattributes(self) -> dict[bytes, dict[bytes, bytes]]:
+        """Read .gitattributes file from working tree.
+
+        Returns:
+            Dictionary mapping file patterns to attributes
+        """
+        gitattributes = {}
+        gitattributes_path = os.path.join(self.path, ".gitattributes")
+
+        if os.path.exists(gitattributes_path):
+            with open(gitattributes_path, "rb") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith(b"#"):
+                        continue
+
+                    parts = line.split()
+                    if len(parts) < 2:
+                        continue
+
+                    pattern = parts[0]
+                    attrs = {}
+
+                    for attr in parts[1:]:
+                        if attr.startswith(b"-"):
+                            # Unset attribute
+                            attrs[attr[1:]] = b"false"
+                        elif b"=" in attr:
+                            # Set to value
+                            key, value = attr.split(b"=", 1)
+                            attrs[key] = value
+                        else:
+                            # Set attribute
+                            attrs[attr] = b"true"
+
+                    gitattributes[pattern] = attrs
+
+        return gitattributes
+
     def get_blob_normalizer(self):
         """Return a BlobNormalizer object."""
-        # TODO Parse the git attributes files
-        git_attributes = {}
+        from .filters import FilterBlobNormalizer, FilterRegistry
+
+        # Get proper GitAttributes object
+        git_attributes = self.get_gitattributes()
         config_stack = self.get_config_stack()
-        try:
-            head_sha = self.refs[b"HEAD"]
-            # Peel tags to get the underlying commit
-            _, obj = peel_sha(self.object_store, head_sha)
-            tree = obj.tree
-            return TreeBlobNormalizer(
-                config_stack,
-                git_attributes,
-                self.object_store,
-                tree,
-            )
-        except KeyError:
-            return BlobNormalizer(config_stack, git_attributes)
+
+        # Create FilterRegistry with repo reference
+        filter_registry = FilterRegistry(config_stack, self)
+
+        # Return FilterBlobNormalizer which handles all filters including line endings
+        return FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
 
     def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
         """Read gitattributes for the repository.
@@ -2148,6 +2199,14 @@ class Repo(BaseRepo):
         info_attrs_path = os.path.join(self.controldir(), "info", "attributes")
         if os.path.exists(info_attrs_path):
             with open(info_attrs_path, "rb") as f:
+                for pattern_bytes, attrs in parse_git_attributes(f):
+                    pattern = Pattern(pattern_bytes)
+                    patterns.append((pattern, attrs))
+
+        # Read .gitattributes from working directory (if it exists)
+        working_attrs_path = os.path.join(self.path, ".gitattributes")
+        if os.path.exists(working_attrs_path):
+            with open(working_attrs_path, "rb") as f:
                 for pattern_bytes, attrs in parse_git_attributes(f):
                     pattern = Pattern(pattern_bytes)
                     patterns.append((pattern, attrs))
@@ -2317,6 +2376,28 @@ class MemoryRepo(BaseRepo):
         from .rebase import MemoryRebaseStateManager
 
         return MemoryRebaseStateManager(self)
+
+    def get_blob_normalizer(self):
+        """Return a BlobNormalizer object for checkin/checkout operations."""
+        from .filters import FilterBlobNormalizer, FilterRegistry
+
+        # Get GitAttributes object
+        git_attributes = self.get_gitattributes()
+        config_stack = self.get_config_stack()
+
+        # Create FilterRegistry with repo reference
+        filter_registry = FilterRegistry(config_stack, self)
+
+        # Return FilterBlobNormalizer which handles all filters
+        return FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
+
+    def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
+        """Read gitattributes for the repository."""
+        from .attrs import GitAttributes
+
+        # Memory repos don't have working trees or gitattributes files
+        # Return empty GitAttributes
+        return GitAttributes([])
 
     @classmethod
     def init_bare(cls, objects, refs, format: Optional[int] = None):

@@ -553,8 +553,11 @@ class ApplyIncludedPathsTests(TestCase):
         filter_registry = FilterRegistry()
         filter_registry.register_driver("uppercase", UppercaseFilter())
 
-        # Create gitattributes dict
-        gitattributes = {b"*.txt": {b"filter": b"uppercase"}}
+        # Create gitattributes object
+        from dulwich.attrs import GitAttributes, Pattern
+
+        patterns = [(Pattern(b"*.txt"), {b"filter": b"uppercase"})]
+        gitattributes = GitAttributes(patterns)
 
         # Monkey patch the repo to use our filter registry
         original_get_blob_normalizer = self.repo.get_blob_normalizer

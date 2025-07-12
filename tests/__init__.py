@@ -146,6 +146,7 @@ def self_test_suite():
         "lru_cache",
         "mailmap",
         "merge",
+        "merge_drivers",
         "missing_obj_finder",
         "notes",
         "objects",

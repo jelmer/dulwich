@@ -43,7 +43,7 @@ class FilterDriver(Protocol):
         """Apply clean filter (working tree → repository)."""
         ...
 
-    def smudge(self, data: bytes) -> bytes:
+    def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Apply smudge filter (repository → working tree)."""
         ...
 
@@ -56,10 +56,12 @@ class ProcessFilterDriver:
         clean_cmd: Optional[str] = None,
         smudge_cmd: Optional[str] = None,
         required: bool = False,
+        cwd: Optional[str] = None,
     ) -> None:
         self.clean_cmd = clean_cmd
         self.smudge_cmd = smudge_cmd
         self.required = required
+        self.cwd = cwd
 
     def clean(self, data: bytes) -> bytes:
         """Apply clean filter using external process."""
@@ -75,6 +77,7 @@ class ProcessFilterDriver:
                 input=data,
                 capture_output=True,
                 check=True,
+                cwd=self.cwd,
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
@@ -84,20 +87,24 @@ class ProcessFilterDriver:
             logging.warning(f"Optional clean filter failed: {e}")
             return data
 
-    def smudge(self, data: bytes) -> bytes:
+    def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Apply smudge filter using external process."""
         if not self.smudge_cmd:
             if self.required:
                 raise FilterError("Smudge command is required but not configured")
             return data
 
+        # Substitute %f placeholder with file path
+        cmd = self.smudge_cmd.replace("%f", path.decode("utf-8", errors="replace"))
+
         try:
             result = subprocess.run(
-                self.smudge_cmd,
+                cmd,
                 shell=True,
                 input=data,
                 capture_output=True,
                 check=True,
+                cwd=self.cwd,
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
@@ -140,18 +147,18 @@ class FilterRegistry:
         if name in self._drivers:
             return self._drivers[name]
 
-        # Try to create from factory
-        if name in self._factories:
-            factory_driver = self._factories[name](self)
-            self._drivers[name] = factory_driver
-            return factory_driver
-
-        # Try to create from config
+        # Try to create from config first (respect user configuration)
         if self.config is not None:
             config_driver = self._create_from_config(name)
             if config_driver is not None:
                 self._drivers[name] = config_driver
                 return config_driver
+
+        # Try to create from factory as fallback
+        if name in self._factories:
+            factory_driver = self._factories[name](self)
+            self._drivers[name] = factory_driver
+            return factory_driver
 
         return None
 
@@ -187,7 +194,9 @@ class FilterRegistry:
         required = self.config.get_boolean(("filter", name), "required", False)
 
         if clean_cmd or smudge_cmd:
-            return ProcessFilterDriver(clean_cmd, smudge_cmd, required)
+            # Get repository working directory
+            repo_path = self.repo.path if self.repo else None
+            return ProcessFilterDriver(clean_cmd, smudge_cmd, required, repo_path)
 
         return None
 
@@ -205,7 +214,7 @@ class FilterRegistry:
             lfs_dir = tempfile.mkdtemp(prefix="dulwich-lfs-")
             lfs_store = LFSStore.create(lfs_dir)
 
-        return LFSFilterDriver(lfs_store)
+        return LFSFilterDriver(lfs_store, repo=registry.repo)
 
     def _create_text_filter(self, registry: "FilterRegistry") -> FilterDriver:
         """Create text filter driver for line ending conversion.
@@ -397,7 +406,7 @@ class FilterBlobNormalizer:
             return blob
 
         # Apply smudge filter
-        filtered_data = filter_driver.smudge(blob.data)
+        filtered_data = filter_driver.smudge(blob.data, path)
         if filtered_data == blob.data:
             return blob
 

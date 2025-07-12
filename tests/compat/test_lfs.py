@@ -352,7 +352,8 @@ class LFSCloneCompatTest(LFSCompatTestCase):
 
         # Clone with dulwich
         target_dir = self.make_temp_dir()
-        porcelain.clone(source_dir, target_dir)
+        cloned_repo = porcelain.clone(source_dir, target_dir)
+        self.addCleanup(cloned_repo.close)
 
         # Verify LFS file exists as pointer
         cloned_file = os.path.join(target_dir, "test.bin")

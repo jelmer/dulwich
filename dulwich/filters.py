@@ -22,10 +22,9 @@
 """Implementation of Git filter drivers (clean/smudge filters)."""
 
 import subprocess
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Callable, Optional, Protocol
 
-from .attrs import AttributeValue, Pattern, match_path
+from .attrs import GitAttributes
 from .objects import Blob
 
 if TYPE_CHECKING:
@@ -93,6 +92,10 @@ class FilterRegistry:
 
         # Register built-in filter factories
         self.register_factory("lfs", self._create_lfs_filter)
+        self.register_factory("text", self._create_text_filter)
+
+        # Auto-register line ending filter if autocrlf is enabled
+        self._setup_line_ending_filter()
 
     def register_factory(
         self, name: str, factory: Callable[["FilterRegistry"], FilterDriver]
@@ -112,9 +115,9 @@ class FilterRegistry:
 
         # Try to create from factory
         if name in self._factories:
-            driver = self._factories[name](self)
-            self._drivers[name] = driver
-            return driver
+            factory_driver = self._factories[name](self)
+            self._drivers[name] = factory_driver
+            return factory_driver
 
         # Try to create from config
         if self.config is not None:
@@ -135,21 +138,21 @@ class FilterRegistry:
 
         # Get clean command
         try:
-            clean_value = self.config.get(("filter", name), "clean")
-            if isinstance(clean_value, bytes):
-                clean_cmd = clean_value.decode("utf-8")
+            clean_cmd_raw = self.config.get(("filter", name), "clean")
+            if isinstance(clean_cmd_raw, bytes):
+                clean_cmd = clean_cmd_raw.decode("utf-8")
             else:
-                clean_cmd = clean_value
+                clean_cmd = clean_cmd_raw
         except KeyError:
             pass
 
         # Get smudge command
         try:
-            smudge_value = self.config.get(("filter", name), "smudge")
-            if isinstance(smudge_value, bytes):
-                smudge_cmd = smudge_value.decode("utf-8")
+            smudge_cmd_raw = self.config.get(("filter", name), "smudge")
+            if isinstance(smudge_cmd_raw, bytes):
+                smudge_cmd = smudge_cmd_raw.decode("utf-8")
             else:
-                smudge_cmd = smudge_value
+                smudge_cmd = smudge_cmd_raw
         except KeyError:
             pass
 
@@ -174,30 +177,99 @@ class FilterRegistry:
 
         return LFSFilterDriver(lfs_store)
 
+    def _create_text_filter(self, registry: "FilterRegistry") -> FilterDriver:
+        """Create text filter driver for line ending conversion.
+
+        This filter is used when files have the 'text' attribute set explicitly.
+        It always normalizes line endings on checkin (CRLF -> LF).
+        """
+        from .line_ending import (
+            LineEndingFilter,
+            convert_crlf_to_lf,
+            get_smudge_filter,
+        )
+
+        if self.config is None:
+            # Default text filter: always normalize on checkin
+            return LineEndingFilter(
+                clean_conversion=convert_crlf_to_lf,
+                smudge_conversion=None,
+                binary_detection=True,
+            )
+
+        # Get core.eol and core.autocrlf settings for smudge behavior
+        try:
+            core_eol_raw = self.config.get("core", "eol")
+            core_eol: str = (
+                core_eol_raw.decode("ascii")
+                if isinstance(core_eol_raw, bytes)
+                else core_eol_raw
+            )
+        except KeyError:
+            core_eol = "native"
+
+        # Parse autocrlf as bytes (can be b"true", b"input", or b"false")
+        try:
+            autocrlf_raw = self.config.get("core", "autocrlf")
+            autocrlf: bytes = (
+                autocrlf_raw.lower()
+                if isinstance(autocrlf_raw, bytes)
+                else str(autocrlf_raw).lower().encode("ascii")
+            )
+        except KeyError:
+            autocrlf = b"false"
+
+        # For explicit text attribute:
+        # - Always normalize to LF on checkin (clean)
+        # - Smudge behavior depends on core.eol and core.autocrlf
+        smudge_filter = get_smudge_filter(core_eol, autocrlf)
+        clean_filter = convert_crlf_to_lf
+
+        return LineEndingFilter(
+            clean_conversion=clean_filter,
+            smudge_conversion=smudge_filter,
+            binary_detection=True,
+        )
+
+    def _setup_line_ending_filter(self) -> None:
+        """Automatically register line ending filter if configured."""
+        if self.config is None:
+            return
+
+        # Parse autocrlf as bytes
+        try:
+            autocrlf_raw = self.config.get("core", "autocrlf")
+            autocrlf: bytes = (
+                autocrlf_raw.lower()
+                if isinstance(autocrlf_raw, bytes)
+                else str(autocrlf_raw).lower().encode("ascii")
+            )
+        except KeyError:
+            return
+
+        # If autocrlf is enabled, register the text filter
+        if autocrlf in (b"true", b"input"):
+            # Pre-create the text filter so it's available
+            self.get_driver("text")
+
 
 def get_filter_for_path(
     path: bytes,
-    gitattributes: dict[bytes, dict[bytes, AttributeValue]],
+    gitattributes: "GitAttributes",
     filter_registry: FilterRegistry,
 ) -> Optional[FilterDriver]:
     """Get the appropriate filter driver for a given path.
 
     Args:
         path: Path to check
-        gitattributes: Parsed gitattributes (pattern -> attributes mapping)
+        gitattributes: GitAttributes object with parsed patterns
         filter_registry: Registry of filter drivers
 
     Returns:
         FilterDriver instance or None
     """
-    # Convert gitattributes dict to list of (Pattern, attrs) tuples
-    patterns: list[tuple[Pattern, Mapping[bytes, AttributeValue]]] = []
-    for pattern_bytes, attrs in gitattributes.items():
-        pattern = Pattern(pattern_bytes)
-        patterns.append((pattern, attrs))
-
     # Get all attributes for this path
-    attributes = match_path(patterns, path)
+    attributes = gitattributes.match_path(path)
 
     # Check if there's a filter attribute
     filter_name = attributes.get(b"filter")
@@ -208,6 +280,31 @@ def get_filter_for_path(
             filter_name_str = filter_name.decode("utf-8")
             return filter_registry.get_driver(filter_name_str)
         return None
+
+    # Check for text attribute
+    text_attr = attributes.get(b"text")
+    if text_attr is True:
+        # Use the text filter for line ending conversion
+        return filter_registry.get_driver("text")
+    elif text_attr is False:
+        # -text means binary, no conversion
+        return None
+
+    # If no explicit text attribute, check if autocrlf is enabled
+    # When autocrlf is true/input, files are treated as text by default
+    if filter_registry.config is not None:
+        try:
+            autocrlf_raw = filter_registry.config.get("core", "autocrlf")
+            autocrlf: bytes = (
+                autocrlf_raw.lower()
+                if isinstance(autocrlf_raw, bytes)
+                else str(autocrlf_raw).lower().encode("ascii")
+            )
+            if autocrlf in (b"true", b"input"):
+                # Use text filter for files without explicit attributes
+                return filter_registry.get_driver("text")
+        except KeyError:
+            pass
 
     return None
 
@@ -221,7 +318,7 @@ class FilterBlobNormalizer:
     def __init__(
         self,
         config_stack: Optional["StackedConfig"],
-        gitattributes: dict[bytes, dict[bytes, AttributeValue]],
+        gitattributes: GitAttributes,
         filter_registry: Optional[FilterRegistry] = None,
         repo=None,
     ) -> None:

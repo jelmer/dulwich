@@ -32,6 +32,7 @@ def test_suite():
         "commit_graph",
         "dumb",
         "index",
+        "lfs",
         "pack",
         "patch",
         "porcelain",

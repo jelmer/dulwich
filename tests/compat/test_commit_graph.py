@@ -137,6 +137,7 @@ class CommitGraphCompatTests(CompatTestCase):
 
         # Open the repository with dulwich
         repo = Repo(self.repo_path)
+        self.addCleanup(repo.close)
 
         # Verify that all commits in the graph are accessible
         for entry in commit_graph:
@@ -165,6 +166,7 @@ class CommitGraphCompatTests(CompatTestCase):
         commits, work_dir = self.create_test_repo_with_history()
 
         repo = Repo(self.repo_path)
+        self.addCleanup(repo.close)
 
         # Get some commit IDs for testing
         main_head = repo.refs[b"refs/heads/master"]
@@ -177,7 +179,9 @@ class CommitGraphCompatTests(CompatTestCase):
         run_git_or_fail(["commit-graph", "write", "--reachable"], cwd=work_dir)
 
         # Force reload of repository to pick up commit graph
+        repo.close()
         repo = Repo(self.repo_path)
+        self.addCleanup(repo.close)
 
         # Calculate merge base with commit graph
         merge_base_with_graph = find_merge_base(repo, [main_head, feature_head])
@@ -206,6 +210,7 @@ class CommitGraphCompatTests(CompatTestCase):
         commits, work_dir = self.create_test_repo_with_history()
 
         repo = Repo(self.repo_path)
+        self.addCleanup(repo.close)
 
         # Test with a simple fast-forward case (older commit to newer commit)
         commit1 = commits[1]  # Second commit
@@ -218,7 +223,9 @@ class CommitGraphCompatTests(CompatTestCase):
         run_git_or_fail(["commit-graph", "write", "--reachable"], cwd=work_dir)
 
         # Force reload
+        repo.close()
         repo = Repo(self.repo_path)
+        self.addCleanup(repo.close)
 
         # Check with commit graph
         can_ff_with_graph = can_fast_forward(repo, commit1, commit2)
@@ -259,6 +266,7 @@ class CommitGraphCompatTests(CompatTestCase):
         commit_graph = read_commit_graph(graph_file)
 
         repo = Repo(self.repo_path)
+        self.addCleanup(repo.close)
 
         # Build a map of commit to generation number
         generation_map = {}
@@ -415,6 +423,7 @@ class CommitGraphCompatTests(CompatTestCase):
         commit_graph = read_commit_graph(graph_file)
 
         repo = Repo(self.repo_path)
+        self.addCleanup(repo.close)
 
         # Verify tagged commits are in the graph
         tagged_commits = [commits[2], commits[4]]

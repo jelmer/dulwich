@@ -155,6 +155,8 @@ def self_test_suite():
         "patch",
         "porcelain",
         "porcelain_cherry_pick",
+        "porcelain_filters",
+        "porcelain_lfs",
         "porcelain_merge",
         "porcelain_notes",
         "protocol",

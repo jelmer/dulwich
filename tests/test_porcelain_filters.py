@@ -218,15 +218,23 @@ class PorcelainFilterTests(TestCase):
 
     def test_process_filter_priority(self) -> None:
         """Test that process filters take priority over built-in ones."""
-        # Create a custom filter script
-        filter_script = os.path.join(self.test_dir, "test-filter.sh")
-        with open(filter_script, "w") as f:
-            f.write("#!/bin/sh\necho 'FILTERED'")
-        os.chmod(filter_script, 0o755)
+        # Create a cross-platform filter command
+        import sys
+
+        if sys.platform == "win32":
+            # On Windows, use echo command directly
+            filter_cmd = "echo FILTERED"
+        else:
+            # On Unix, create a shell script
+            filter_script = os.path.join(self.test_dir, "test-filter.sh")
+            with open(filter_script, "w") as f:
+                f.write("#!/bin/sh\necho 'FILTERED'")
+            os.chmod(filter_script, 0o755)
+            filter_cmd = filter_script
 
         # Configure custom filter
         config = self.repo.get_config()
-        config.set((b"filter", b"test"), b"smudge", filter_script.encode())
+        config.set((b"filter", b"test"), b"smudge", filter_cmd.encode())
         config.write_to_path()
 
         # Create .gitattributes
@@ -247,13 +255,27 @@ class PorcelainFilterTests(TestCase):
 
         # Test smudge
         result = test_driver.smudge(b"original", b"test.txt")
-        self.assertEqual(result, b"FILTERED\n")
+        # Strip line endings to handle platform differences
+        self.assertEqual(result.rstrip(), b"FILTERED")
 
     def test_commit_with_clean_filter(self) -> None:
         """Test committing with a clean filter."""
         # Set up a custom filter in git config
         config = self.repo.get_config()
-        config.set((b"filter", b"testfilter"), b"clean", b"sed 's/SECRET/REDACTED/g'")
+        import sys
+
+        if sys.platform == "win32":
+            # On Windows, use PowerShell for string replacement
+            config.set(
+                (b"filter", b"testfilter"),
+                b"clean",
+                b"powershell -Command \"$input -replace 'SECRET', 'REDACTED'\"",
+            )
+        else:
+            # On Unix, use sed
+            config.set(
+                (b"filter", b"testfilter"), b"clean", b"sed 's/SECRET/REDACTED/g'"
+            )
         config.write_to_path()
 
         # Create .gitattributes to use the filter

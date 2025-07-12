@@ -27,7 +27,7 @@ import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, BinaryIO, Optional, Union
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
@@ -93,6 +93,13 @@ class LFSStore:
     @classmethod
     def from_repo(cls, repo: "Repo", create: bool = False) -> "LFSStore":
         lfs_dir = os.path.join(repo.controldir(), "lfs")
+        if create:
+            return cls.create(lfs_dir)
+        return cls(lfs_dir)
+
+    @classmethod
+    def from_controldir(cls, controldir: str, create: bool = False) -> "LFSStore":
+        lfs_dir = os.path.join(controldir, "lfs")
         if create:
             return cls.create(lfs_dir)
         return cls(lfs_dir)
@@ -201,9 +208,11 @@ class LFSPointer:
 class LFSFilterDriver:
     """LFS filter driver implementation."""
 
-    def __init__(self, lfs_store: "LFSStore", repo: Optional["Repo"] = None) -> None:
+    def __init__(
+        self, lfs_store: "LFSStore", config: Optional["Config"] = None
+    ) -> None:
         self.lfs_store = lfs_store
-        self.repo = repo
+        self.config = config
 
     def clean(self, data: bytes) -> bytes:
         """Convert file content to LFS pointer (clean filter)."""
@@ -243,10 +252,9 @@ class LFSFilterDriver:
             except LFSError as e:
                 # Download failed, fall back to returning pointer
                 logging.warning("LFS object download failed for %s: %s", pointer.oid, e)
-                pass
 
-            # Return pointer as-is when object is missing and download failed
-            return data
+                # Return pointer as-is when object is missing and download failed
+                return data
 
     def _download_object(self, pointer: LFSPointer) -> bytes:
         """Download an LFS object from the server.
@@ -260,17 +268,13 @@ class LFSFilterDriver:
         Raises:
             LFSError: If download fails for any reason
         """
-        if self.repo is None:
-            raise LFSError("No repository available for LFS download")
-
-        # Get LFS server URL from remote
-        lfs_url = self._get_lfs_url()
-        if not lfs_url:
-            raise LFSError("No LFS server URL configured")
+        if self.config is None:
+            raise LFSError("No configuration available for LFS download")
 
         # Create LFS client and download
-        config = self.repo.get_config_stack() if self.repo else None
-        client = LFSClient(lfs_url, config=config)
+        client = LFSClient.from_config(self.config)
+        if client is None:
+            raise LFSError("No LFS client available from configuration")
         content = client.download(pointer.oid, pointer.size)
 
         # Store the downloaded content in local LFS store
@@ -278,57 +282,11 @@ class LFSFilterDriver:
 
         # Verify the stored OID matches what we expected
         if stored_oid != pointer.oid:
-            raise LFSError(f"Downloaded OID mismatch: expected {pointer.oid}, got {stored_oid}")
+            raise LFSError(
+                f"Downloaded OID mismatch: expected {pointer.oid}, got {stored_oid}"
+            )
 
         return content
-
-    def _get_lfs_url(self) -> Optional[str]:
-        """Get LFS server URL from repository configuration.
-
-        Returns:
-            LFS server URL or None if not configured
-        """
-        if self.repo is None:
-            return None
-
-        # Try to get LFS URL from config first
-        config = self.repo.get_config_stack()
-        try:
-            return config.get((b"lfs",), b"url").decode()
-        except KeyError:
-            pass
-
-        # Fall back to deriving from remote URL (same as git-lfs)
-        try:
-            remote_url = config.get((b"remote", b"origin"), b"url").decode()
-        except KeyError:
-            pass
-        else:
-            # Convert SSH URLs to HTTPS if needed
-            if remote_url.startswith("git@"):
-                # Convert git@host:user/repo.git to https://host/user/repo.git
-                if ":" in remote_url and "/" in remote_url:
-                    host_and_path = remote_url[4:]  # Remove "git@"
-                    if ":" in host_and_path:
-                        host, path = host_and_path.split(":", 1)
-                        remote_url = f"https://{host}/{path}"
-
-            # Ensure URL ends with .git for consistent LFS endpoint
-            if not remote_url.endswith(".git"):
-                remote_url = f"{remote_url}.git"
-
-            # Standard LFS endpoint is remote_url + "/info/lfs"
-            lfs_url = f"{remote_url}/info/lfs"
-            
-            # Validate URL by parsing it
-            from urllib.parse import urlparse
-            parsed = urlparse(lfs_url)
-            if not parsed.scheme or not parsed.netloc:
-                return None
-                
-            return lfs_url
-
-        return None
 
 
 def _get_lfs_user_agent(config):
@@ -361,6 +319,47 @@ class LFSClient:
         self.config = config
         self._pool_manager = None
 
+    @classmethod
+    def from_config(cls, config: "Config") -> Optional["LFSClient"]:
+        """Create LFS client from git config."""
+        # Try to get LFS URL from config first
+        try:
+            url = config.get((b"lfs",), b"url").decode()
+        except KeyError:
+            pass
+        else:
+            return cls(url, config)
+
+        # Fall back to deriving from remote URL (same as git-lfs)
+        try:
+            remote_url = config.get((b"remote", b"origin"), b"url").decode()
+        except KeyError:
+            pass
+        else:
+            # Convert SSH URLs to HTTPS if needed
+            if remote_url.startswith("git@"):
+                # Convert git@host:user/repo.git to https://host/user/repo.git
+                if ":" in remote_url and "/" in remote_url:
+                    host_and_path = remote_url[4:]  # Remove "git@"
+                    if ":" in host_and_path:
+                        host, path = host_and_path.split(":", 1)
+                        remote_url = f"https://{host}/{path}"
+
+            # Ensure URL ends with .git for consistent LFS endpoint
+            if not remote_url.endswith(".git"):
+                remote_url = f"{remote_url}.git"
+
+            # Standard LFS endpoint is remote_url + "/info/lfs"
+            lfs_url = f"{remote_url}/info/lfs"
+
+            parsed = urlparse(lfs_url)
+            if not parsed.scheme or not parsed.netloc:
+                return None
+
+            return LFSClient(lfs_url, config)
+
+        return None
+
     @property
     def url(self) -> str:
         """Get the LFS server URL without trailing slash."""
@@ -369,11 +368,9 @@ class LFSClient:
     def _get_pool_manager(self):
         """Get urllib3 pool manager with git config applied."""
         if self._pool_manager is None:
-            # For now, use plain urllib3 since dulwich's version has issues with LFS
-            # TODO: Investigate why default_urllib3_manager breaks LFS requests
-            import urllib3
+            from dulwich.client import default_urllib3_manager
 
-            self._pool_manager = urllib3.PoolManager()
+            self._pool_manager = default_urllib3_manager(self.config)
         return self._pool_manager
 
     def _make_request(
@@ -397,7 +394,9 @@ class LFSClient:
         pool_manager = self._get_pool_manager()
         response = pool_manager.request(method, url, headers=req_headers, body=data)
         if response.status >= 400:
-            raise ValueError(f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}")
+            raise ValueError(
+                f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}"
+            )
         return response.data
 
     def batch(

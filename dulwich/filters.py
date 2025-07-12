@@ -214,7 +214,8 @@ class FilterRegistry:
             lfs_dir = tempfile.mkdtemp(prefix="dulwich-lfs-")
             lfs_store = LFSStore.create(lfs_dir)
 
-        return LFSFilterDriver(lfs_store, repo=registry.repo)
+        config = registry.repo.get_config_stack() if registry.repo else None
+        return LFSFilterDriver(lfs_store, config=config)
 
     def _create_text_filter(self, registry: "FilterRegistry") -> FilterDriver:
         """Create text filter driver for line ending conversion.

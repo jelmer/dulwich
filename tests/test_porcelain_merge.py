@@ -283,6 +283,7 @@ class PorcelainMergeTreeTests(TestCase):
             # Initialize repo
             porcelain.init(tmpdir)
             repo = Repo(tmpdir)
+            self.addCleanup(repo.close)
 
             # Create base tree
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
@@ -329,6 +330,7 @@ class PorcelainMergeTreeTests(TestCase):
             # Initialize repo
             porcelain.init(tmpdir)
             repo = Repo(tmpdir)
+            self.addCleanup(repo.close)
 
             # Create base tree
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
@@ -381,6 +383,7 @@ class PorcelainMergeTreeTests(TestCase):
             # Initialize repo
             porcelain.init(tmpdir)
             repo = Repo(tmpdir)
+            self.addCleanup(repo.close)
 
             # Create our tree
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
@@ -414,6 +417,7 @@ class PorcelainMergeTreeTests(TestCase):
             # Initialize repo
             porcelain.init(tmpdir)
             repo = Repo(tmpdir)
+            self.addCleanup(repo.close)
 
             # Create base tree
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:

@@ -157,6 +157,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
         # Open with Dulwich
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         # Verify it's using reftable
         self.assertIsInstance(repo.refs, ReftableRefsContainer)
@@ -274,6 +275,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
         # Read refs with Dulwich
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
         dulwich_refs = repo.get_refs()
 
         # Compare non-symbolic refs
@@ -300,6 +302,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
         # Read with both git and Dulwich
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
         dulwich_refs = repo.get_refs()
 
         git_output = self._run_git(["show-ref"])
@@ -407,6 +410,7 @@ class ReftableCompatTestCase(CompatTestCase):
         ).strip()
 
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         # Test complex batched operations
         with repo.refs.batch_update():
@@ -478,6 +482,7 @@ class ReftableCompatTestCase(CompatTestCase):
         ).strip()
 
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         # Create multiple refs
         with repo.refs.batch_update():
@@ -529,6 +534,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
         # Create many refs efficiently
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         with repo.refs.batch_update():
             # Create 50 branches
@@ -590,6 +596,7 @@ class ReftableCompatTestCase(CompatTestCase):
         ).strip()
 
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         # Create chain of symbolic refs
         with repo.refs.batch_update():
@@ -633,6 +640,7 @@ class ReftableCompatTestCase(CompatTestCase):
         ).strip()
 
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         # Test refs with special characters and structures
         special_refs = [
@@ -689,6 +697,7 @@ class ReftableCompatTestCase(CompatTestCase):
             commits.append(commit_sha)
 
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         # Simulate concurrent operations with multiple batch updates
         # First batch: Create initial refs
@@ -759,6 +768,7 @@ class ReftableCompatTestCase(CompatTestCase):
         ).strip()
 
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
 
         with repo.refs.batch_update():
             repo.refs.set_if_equals(b"refs/heads/master", None, commit_sha)
@@ -775,6 +785,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
         # Verify dulwich can still read after git modifications
         repo = Repo(self.test_dir)
+        self.addCleanup(repo.close)
         dulwich_refs = repo.get_refs()
 
         # Should be able to read git-modified refs

@@ -918,6 +918,7 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(r.close)
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
+        self.addCleanup(target_repo.close)
         self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c3.id, target_repo.refs[b"refs/tags/foo"])
         self.assertNotIn(b"f1", os.listdir(target_path))
@@ -1055,6 +1056,7 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(r.close)
         self.assertEqual(r.path, target_path)
         target_repo = Repo(target_path)
+        self.addCleanup(target_repo.close)
         self.assertEqual(0, len(target_repo.open_index()))
         self.assertEqual(c1.id, target_repo.refs[b"refs/heads/else"])
         self.assertEqual(c1.id, target_repo.refs[b"HEAD"])
@@ -4187,6 +4189,7 @@ class CheckoutTests(PorcelainTestCase):
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
         target_repo = porcelain.clone(remote_path, target_path)
+        self.addCleanup(target_repo.close)
 
         # Create a remote tracking branch reference
         remote_branch_ref = b"refs/remotes/origin/feature"

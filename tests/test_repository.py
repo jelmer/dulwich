@@ -1302,6 +1302,7 @@ class BuildRepoRootTests(TestCase):
         c.set(("core",), "looseCompression", "4")
         c.write_to_path()
         r = Repo(self._repo_dir)
+        self.addCleanup(r.close)
         self.assertEqual(r.object_store.loose_compression_level, 4)
 
     def test_repositoryformatversion_unsupported(self) -> None:

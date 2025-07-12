@@ -691,6 +691,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
         # Verify commit graph is loaded by creating new repo instance
         repo2 = Repo(repo_path)
+        self.addCleanup(repo2.close)
         repo2.object_store = object_store
 
         # Verify commit graph is available
@@ -780,6 +781,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
         # Create new repo instance to pick up commit graph
         repo2 = Repo(repo_path)
+        self.addCleanup(repo2.close)
         repo2.object_store = object_store
 
         # Verify commit graph is loaded

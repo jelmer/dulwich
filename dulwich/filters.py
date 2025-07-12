@@ -21,6 +21,7 @@
 
 """Implementation of Git filter drivers (clean/smudge filters)."""
 
+import logging
 import subprocess
 from typing import TYPE_CHECKING, Callable, Optional, Protocol
 
@@ -29,6 +30,10 @@ from .objects import Blob
 
 if TYPE_CHECKING:
     from .config import StackedConfig
+
+
+class FilterError(Exception):
+    """Exception raised when filter operations fail."""
 
 
 class FilterDriver(Protocol):
@@ -47,38 +52,60 @@ class ProcessFilterDriver:
     """Filter driver that executes external processes."""
 
     def __init__(
-        self, clean_cmd: Optional[str] = None, smudge_cmd: Optional[str] = None
+        self,
+        clean_cmd: Optional[str] = None,
+        smudge_cmd: Optional[str] = None,
+        required: bool = False,
     ) -> None:
         self.clean_cmd = clean_cmd
         self.smudge_cmd = smudge_cmd
+        self.required = required
 
     def clean(self, data: bytes) -> bytes:
         """Apply clean filter using external process."""
         if not self.clean_cmd:
+            if self.required:
+                raise FilterError("Clean command is required but not configured")
             return data
 
-        result = subprocess.run(
-            self.clean_cmd,
-            shell=True,
-            input=data,
-            capture_output=True,
-            check=True,
-        )
-        return result.stdout
+        try:
+            result = subprocess.run(
+                self.clean_cmd,
+                shell=True,
+                input=data,
+                capture_output=True,
+                check=True,
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            if self.required:
+                raise FilterError(f"Required clean filter failed: {e}")
+            # If not required, log warning and return original data on failure
+            logging.warning(f"Optional clean filter failed: {e}")
+            return data
 
     def smudge(self, data: bytes) -> bytes:
         """Apply smudge filter using external process."""
         if not self.smudge_cmd:
+            if self.required:
+                raise FilterError("Smudge command is required but not configured")
             return data
 
-        result = subprocess.run(
-            self.smudge_cmd,
-            shell=True,
-            input=data,
-            capture_output=True,
-            check=True,
-        )
-        return result.stdout
+        try:
+            result = subprocess.run(
+                self.smudge_cmd,
+                shell=True,
+                input=data,
+                capture_output=True,
+                check=True,
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            if self.required:
+                raise FilterError(f"Required smudge filter failed: {e}")
+            # If not required, log warning and return original data on failure
+            logging.warning(f"Optional smudge filter failed: {e}")
+            return data
 
 
 class FilterRegistry:
@@ -156,8 +183,11 @@ class FilterRegistry:
         except KeyError:
             pass
 
+        # Get required flag (defaults to False)
+        required = self.config.get_boolean(("filter", name), "required", False)
+
         if clean_cmd or smudge_cmd:
-            return ProcessFilterDriver(clean_cmd, smudge_cmd)
+            return ProcessFilterDriver(clean_cmd, smudge_cmd, required)
 
         return None
 
@@ -278,7 +308,19 @@ def get_filter_for_path(
             return None
         if isinstance(filter_name, bytes):
             filter_name_str = filter_name.decode("utf-8")
-            return filter_registry.get_driver(filter_name_str)
+            driver = filter_registry.get_driver(filter_name_str)
+
+            # Check if filter is required but missing
+            if driver is None and filter_registry.config is not None:
+                required = filter_registry.config.get_boolean(
+                    ("filter", filter_name_str), "required", False
+                )
+                if required:
+                    raise FilterError(
+                        f"Required filter '{filter_name_str}' is not available"
+                    )
+
+            return driver
         return None
 
     # Check for text attribute

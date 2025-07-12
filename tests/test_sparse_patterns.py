@@ -543,7 +543,7 @@ class ApplyIncludedPathsTests(TestCase):
 
         # Create a simple filter that converts content to uppercase
         class UppercaseFilter:
-            def smudge(self, input_bytes):
+            def smudge(self, input_bytes, path=b""):
                 return input_bytes.upper()
 
             def clean(self, input_bytes):

@@ -21,16 +21,17 @@
 
 import hashlib
 import json
+import logging
 import os
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, BinaryIO, Optional, Union
-from urllib.error import HTTPError
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
+    from .config import Config
     from .repo import Repo
 
 
@@ -92,6 +93,13 @@ class LFSStore:
     @classmethod
     def from_repo(cls, repo: "Repo", create: bool = False) -> "LFSStore":
         lfs_dir = os.path.join(repo.controldir(), "lfs")
+        if create:
+            return cls.create(lfs_dir)
+        return cls(lfs_dir)
+
+    @classmethod
+    def from_controldir(cls, controldir: str, create: bool = False) -> "LFSStore":
+        lfs_dir = os.path.join(controldir, "lfs")
         if create:
             return cls.create(lfs_dir)
         return cls(lfs_dir)
@@ -200,8 +208,11 @@ class LFSPointer:
 class LFSFilterDriver:
     """LFS filter driver implementation."""
 
-    def __init__(self, lfs_store: "LFSStore") -> None:
+    def __init__(
+        self, lfs_store: "LFSStore", config: Optional["Config"] = None
+    ) -> None:
         self.lfs_store = lfs_store
+        self.config = config
 
     def clean(self, data: bytes) -> bytes:
         """Convert file content to LFS pointer (clean filter)."""
@@ -217,7 +228,7 @@ class LFSFilterDriver:
         pointer = LFSPointer(sha, len(data))
         return pointer.to_bytes()
 
-    def smudge(self, data: bytes) -> bytes:
+    def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Convert LFS pointer to file content (smudge filter)."""
         # Try to parse as LFS pointer
         pointer = LFSPointer.from_bytes(data)
@@ -234,23 +245,133 @@ class LFSFilterDriver:
             with self.lfs_store.open_object(pointer.oid) as f:
                 return f.read()
         except KeyError:
-            # Object not found in LFS store, return pointer as-is
-            # This matches Git LFS behavior when object is missing
-            return data
+            # Object not found in LFS store, try to download it
+            try:
+                content = self._download_object(pointer)
+                return content
+            except LFSError as e:
+                # Download failed, fall back to returning pointer
+                logging.warning("LFS object download failed for %s: %s", pointer.oid, e)
+
+                # Return pointer as-is when object is missing and download failed
+                return data
+
+    def _download_object(self, pointer: LFSPointer) -> bytes:
+        """Download an LFS object from the server.
+
+        Args:
+            pointer: LFS pointer containing OID and size
+
+        Returns:
+            Downloaded content
+
+        Raises:
+            LFSError: If download fails for any reason
+        """
+        if self.config is None:
+            raise LFSError("No configuration available for LFS download")
+
+        # Create LFS client and download
+        client = LFSClient.from_config(self.config)
+        if client is None:
+            raise LFSError("No LFS client available from configuration")
+        content = client.download(pointer.oid, pointer.size)
+
+        # Store the downloaded content in local LFS store
+        stored_oid = self.lfs_store.write_object([content])
+
+        # Verify the stored OID matches what we expected
+        if stored_oid != pointer.oid:
+            raise LFSError(
+                f"Downloaded OID mismatch: expected {pointer.oid}, got {stored_oid}"
+            )
+
+        return content
+
+
+def _get_lfs_user_agent(config):
+    """Get User-Agent string for LFS requests, respecting git config."""
+    try:
+        if config:
+            # Use configured user agent verbatim if set
+            return config.get(b"http", b"useragent").decode()
+    except KeyError:
+        pass
+
+    # Default LFS user agent (similar to git-lfs format)
+    from . import __version__
+
+    version_str = ".".join([str(x) for x in __version__])
+    return f"git-lfs/dulwich/{version_str}"
 
 
 class LFSClient:
     """LFS client for network operations."""
 
-    def __init__(self, url: str, auth: Optional[tuple[str, str]] = None) -> None:
+    def __init__(self, url: str, config: Optional["Config"] = None) -> None:
         """Initialize LFS client.
 
         Args:
             url: LFS server URL
-            auth: Optional (username, password) tuple for authentication
+            config: Optional git config for authentication/proxy settings
         """
-        self.url = url.rstrip("/")
-        self.auth = auth
+        self._base_url = url.rstrip("/") + "/"  # Ensure trailing slash for urljoin
+        self.config = config
+        self._pool_manager = None
+
+    @classmethod
+    def from_config(cls, config: "Config") -> Optional["LFSClient"]:
+        """Create LFS client from git config."""
+        # Try to get LFS URL from config first
+        try:
+            url = config.get((b"lfs",), b"url").decode()
+        except KeyError:
+            pass
+        else:
+            return cls(url, config)
+
+        # Fall back to deriving from remote URL (same as git-lfs)
+        try:
+            remote_url = config.get((b"remote", b"origin"), b"url").decode()
+        except KeyError:
+            pass
+        else:
+            # Convert SSH URLs to HTTPS if needed
+            if remote_url.startswith("git@"):
+                # Convert git@host:user/repo.git to https://host/user/repo.git
+                if ":" in remote_url and "/" in remote_url:
+                    host_and_path = remote_url[4:]  # Remove "git@"
+                    if ":" in host_and_path:
+                        host, path = host_and_path.split(":", 1)
+                        remote_url = f"https://{host}/{path}"
+
+            # Ensure URL ends with .git for consistent LFS endpoint
+            if not remote_url.endswith(".git"):
+                remote_url = f"{remote_url}.git"
+
+            # Standard LFS endpoint is remote_url + "/info/lfs"
+            lfs_url = f"{remote_url}/info/lfs"
+
+            parsed = urlparse(lfs_url)
+            if not parsed.scheme or not parsed.netloc:
+                return None
+
+            return LFSClient(lfs_url, config)
+
+        return None
+
+    @property
+    def url(self) -> str:
+        """Get the LFS server URL without trailing slash."""
+        return self._base_url.rstrip("/")
+
+    def _get_pool_manager(self):
+        """Get urllib3 pool manager with git config applied."""
+        if self._pool_manager is None:
+            from dulwich.client import default_urllib3_manager
+
+            self._pool_manager = default_urllib3_manager(self.config)
+        return self._pool_manager
 
     def _make_request(
         self,
@@ -260,29 +381,23 @@ class LFSClient:
         headers: Optional[dict[str, str]] = None,
     ) -> bytes:
         """Make an HTTP request to the LFS server."""
-        url = urljoin(self.url, path)
+        url = urljoin(self._base_url, path)
         req_headers = {
             "Accept": "application/vnd.git-lfs+json",
             "Content-Type": "application/vnd.git-lfs+json",
+            "User-Agent": _get_lfs_user_agent(self.config),
         }
         if headers:
             req_headers.update(headers)
 
-        req = Request(url, data=data, headers=req_headers, method=method)
-
-        if self.auth:
-            import base64
-
-            auth_str = f"{self.auth[0]}:{self.auth[1]}"
-            b64_auth = base64.b64encode(auth_str.encode()).decode("ascii")
-            req.add_header("Authorization", f"Basic {b64_auth}")
-
-        try:
-            with urlopen(req) as response:
-                return response.read()
-        except HTTPError as e:
-            error_body = e.read().decode("utf-8", errors="ignore")
-            raise LFSError(f"LFS server error {e.code}: {error_body}")
+        # Use urllib3 pool manager with git config applied
+        pool_manager = self._get_pool_manager()
+        response = pool_manager.request(method, url, headers=req_headers, body=data)
+        if response.status >= 400:
+            raise ValueError(
+                f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}"
+            )
+        return response.data
 
     def batch(
         self,
@@ -311,8 +426,10 @@ class LFSClient:
             data["ref"] = {"name": ref}
 
         response = self._make_request(
-            "POST", "/objects/batch", json.dumps(data).encode("utf-8")
+            "POST", "objects/batch", json.dumps(data).encode("utf-8")
         )
+        if not response:
+            raise ValueError("Empty response from LFS server")
         response_data = json.loads(response)
         return self._parse_batch_response(response_data)
 
@@ -378,14 +495,14 @@ class LFSClient:
         download_action = obj.actions["download"]
         download_url = download_action.href
 
-        # Download the object
-        req = Request(download_url)
+        # Download the object using urllib3 with git config
+        download_headers = {"User-Agent": _get_lfs_user_agent(self.config)}
         if download_action.header:
-            for name, value in download_action.header.items():
-                req.add_header(name, value)
+            download_headers.update(download_action.header)
 
-        with urlopen(req) as response:
-            content = response.read()
+        pool_manager = self._get_pool_manager()
+        response = pool_manager.request("GET", download_url, headers=download_headers)
+        content = response.data
 
         # Verify size
         if len(content) != size:

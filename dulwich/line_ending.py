@@ -178,7 +178,7 @@ class LineEndingFilter(FilterDriver):
 
         return self.clean_conversion(data)
 
-    def smudge(self, data: bytes) -> bytes:
+    def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Apply line ending conversion for checkout (repository -> working tree)."""
         if self.smudge_conversion is None:
             return data

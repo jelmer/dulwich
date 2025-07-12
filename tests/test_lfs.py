@@ -22,10 +22,13 @@
 """Tests for LFS support."""
 
 import json
+import os
 import shutil
 import tempfile
 
+from dulwich import porcelain
 from dulwich.lfs import LFSFilterDriver, LFSPointer, LFSStore
+from dulwich.repo import Repo
 
 from . import TestCase
 
@@ -305,6 +308,107 @@ class LFSIntegrationTests(TestCase):
                 expected_is_pointer,
                 f"Failed for content: {content!r}",
             )
+
+    def test_builtin_lfs_clone_no_config(self) -> None:
+        """Test cloning with LFS when no git-lfs commands are configured."""
+        # Create source repository
+        source_dir = os.path.join(self.test_dir, "source")
+        os.makedirs(source_dir)
+        source_repo = Repo.init(source_dir)
+
+        # Create empty config (no LFS commands)
+        config = source_repo.get_config()
+        config.write_to_path()
+
+        # Create .gitattributes with LFS filter
+        gitattributes_path = os.path.join(source_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.bin filter=lfs\n")
+
+        # Create test content and store in LFS
+        test_content = b"Test binary content"
+        test_oid = LFSStore.from_repo(source_repo, create=True).write_object(
+            [test_content]
+        )
+
+        # Create LFS pointer file
+        pointer = LFSPointer(test_oid, len(test_content))
+        pointer_file = os.path.join(source_dir, "test.bin")
+        with open(pointer_file, "wb") as f:
+            f.write(pointer.to_bytes())
+
+        # Commit files
+        porcelain.add(source_repo, paths=[".gitattributes", "test.bin"])
+        porcelain.commit(source_repo, message=b"Add LFS tracked file")
+        source_repo.close()
+
+        # Clone the repository
+        target_dir = os.path.join(self.test_dir, "target")
+        target_repo = porcelain.clone(source_dir, target_dir)
+
+        # Verify no LFS commands in config
+        target_config = target_repo.get_config_stack()
+        with self.assertRaises(KeyError):
+            target_config.get((b"filter", b"lfs"), b"smudge")
+
+        # Check the cloned file
+        cloned_file = os.path.join(target_dir, "test.bin")
+        with open(cloned_file, "rb") as f:
+            content = f.read()
+
+        # Should still be a pointer (LFS object not in target's store)
+        self.assertTrue(
+            content.startswith(b"version https://git-lfs.github.com/spec/v1")
+        )
+        self.assertIn(test_oid.encode(), content)
+        target_repo.close()
+
+    def test_builtin_lfs_with_local_objects(self) -> None:
+        """Test built-in LFS filter when objects are available locally."""
+        # No LFS config
+        config = self.repo.get_config()
+        config.write_to_path()
+
+        # Create .gitattributes
+        gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.dat filter=lfs\n")
+
+        # Create LFS store and add object
+        test_content = b"Hello from LFS!"
+        lfs_store = LFSStore.from_repo(self.repo, create=True)
+        test_oid = lfs_store.write_object([test_content])
+
+        # Create pointer file
+        pointer = LFSPointer(test_oid, len(test_content))
+        pointer_file = os.path.join(self.test_dir, "data.dat")
+        with open(pointer_file, "wb") as f:
+            f.write(pointer.to_bytes())
+
+        # Commit
+        porcelain.add(self.repo, paths=[".gitattributes", "data.dat"])
+        porcelain.commit(self.repo, message=b"Add LFS file")
+
+        # Reset index to trigger checkout with filter
+        self.repo.reset_index()
+
+        # Check file content
+        with open(pointer_file, "rb") as f:
+            content = f.read()
+
+        # Built-in filter should have converted pointer to actual content
+        self.assertEqual(content, test_content)
+
+    def test_builtin_lfs_filter_used(self) -> None:
+        """Verify that built-in LFS filter is used when no config exists."""
+        # Get filter registry
+        normalizer = self.repo.get_blob_normalizer()
+        filter_registry = normalizer.filter_registry
+        lfs_driver = filter_registry.get_driver("lfs")
+
+        # Should be built-in LFS filter
+        self.assertIsInstance(lfs_driver, LFSFilterDriver)
+        self.assertEqual(type(lfs_driver).__module__, "dulwich.lfs")
 
 
 class LFSFilterDriverTests(TestCase):
@@ -873,7 +977,7 @@ class LFSClientTests(TestCase):
         self.addCleanup(self.server.shutdown)
 
         # Create LFS client pointing to our test server
-        self.client = LFSClient(f"{self.server_url}/objects")
+        self.client = LFSClient(self.server_url)
 
     def test_client_url_normalization(self) -> None:
         """Test that client URL is normalized correctly."""

@@ -26,6 +26,7 @@ import tempfile
 import unittest
 
 from dulwich import porcelain
+from dulwich.filters import FilterError
 from dulwich.repo import Repo
 
 from . import TestCase
@@ -197,3 +198,122 @@ class GitAttributesFilterIntegrationTests(TestCase):
         # Check it has access to gitattributes
         self.assertIsNotNone(normalizer.gitattributes)
         self.assertIsNotNone(normalizer.filter_registry)
+
+    def test_required_filter_missing(self) -> None:
+        """Test that missing required filter raises an error."""
+        # Create .gitattributes with required filter
+        gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.secret filter=required_filter\n")
+
+        # Configure filter as required but without commands
+        config = self.repo.get_config()
+        config.set((b"filter", b"required_filter"), b"required", b"true")
+        config.write_to_path()
+
+        # Add .gitattributes
+        porcelain.add(self.repo, paths=[".gitattributes"])
+
+        # Create file that would use the filter
+        secret_file = os.path.join(self.test_dir, "test.secret")
+        with open(secret_file, "wb") as f:
+            f.write(b"test content\n")
+
+        # Adding file should raise error due to missing required filter
+        with self.assertRaises(FilterError) as cm:
+            porcelain.add(self.repo, paths=["test.secret"])
+        self.assertIn(
+            "Required filter 'required_filter' is not available", str(cm.exception)
+        )
+
+    def test_required_filter_clean_command_fails(self) -> None:
+        """Test that required filter failure during clean raises an error."""
+        # Create .gitattributes with required filter
+        gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.secret filter=failing_filter\n")
+
+        # Configure filter as required with failing command
+        config = self.repo.get_config()
+        config.set(
+            (b"filter", b"failing_filter"), b"clean", b"false"
+        )  # false command always fails
+        config.set((b"filter", b"failing_filter"), b"required", b"true")
+        config.write_to_path()
+
+        # Add .gitattributes
+        porcelain.add(self.repo, paths=[".gitattributes"])
+
+        # Create file that would use the filter
+        secret_file = os.path.join(self.test_dir, "test.secret")
+        with open(secret_file, "wb") as f:
+            f.write(b"test content\n")
+
+        # Adding file should raise error due to failing required filter
+        with self.assertRaises(FilterError) as cm:
+            porcelain.add(self.repo, paths=["test.secret"])
+        self.assertIn("Required clean filter failed", str(cm.exception))
+
+    def test_required_filter_success(self) -> None:
+        """Test that required filter works when properly configured."""
+        # Create .gitattributes with required filter
+        gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.secret filter=working_filter\n")
+
+        # Configure filter as required with working command
+        config = self.repo.get_config()
+        config.set(
+            (b"filter", b"working_filter"), b"clean", b"tr 'a-z' 'A-Z'"
+        )  # uppercase
+        config.set((b"filter", b"working_filter"), b"required", b"true")
+        config.write_to_path()
+
+        # Add .gitattributes
+        porcelain.add(self.repo, paths=[".gitattributes"])
+
+        # Create file that would use the filter
+        secret_file = os.path.join(self.test_dir, "test.secret")
+        with open(secret_file, "wb") as f:
+            f.write(b"hello world\n")
+
+        # Adding file should work and apply filter
+        porcelain.add(self.repo, paths=["test.secret"])
+
+        # Check that content was filtered
+        index = self.repo.open_index()
+        entry = index[b"test.secret"]
+        blob = self.repo.object_store[entry.sha]
+        self.assertEqual(blob.data, b"HELLO WORLD\n")
+
+    def test_optional_filter_failure_fallback(self) -> None:
+        """Test that optional filter failure falls back to original data."""
+        # Create .gitattributes with optional filter
+        gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.txt filter=optional_filter\n")
+
+        # Configure filter as optional (required=false) with failing command
+        config = self.repo.get_config()
+        config.set(
+            (b"filter", b"optional_filter"), b"clean", b"false"
+        )  # false command always fails
+        config.set((b"filter", b"optional_filter"), b"required", b"false")
+        config.write_to_path()
+
+        # Add .gitattributes
+        porcelain.add(self.repo, paths=[".gitattributes"])
+
+        # Create file that would use the filter
+        test_file = os.path.join(self.test_dir, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+
+        # Adding file should work and fallback to original content
+        porcelain.add(self.repo, paths=["test.txt"])
+
+        # Check that original content was preserved
+        index = self.repo.open_index()
+        entry = index[b"test.txt"]
+        blob = self.repo.object_store[entry.sha]
+        self.assertEqual(blob.data, b"test content\n")

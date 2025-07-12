@@ -5068,7 +5068,7 @@ def lfs_clean(repo=".", path=None):
 
         # Get LFS store
         lfs_store = LFSStore.from_repo(r)
-        filter_driver = LFSFilterDriver(lfs_store)
+        filter_driver = LFSFilterDriver(lfs_store, repo=r)
 
         # Read file content
         full_path = os.path.join(r.path, path)
@@ -5097,7 +5097,7 @@ def lfs_smudge(repo=".", pointer_content=None):
 
         # Get LFS store
         lfs_store = LFSStore.from_repo(r)
-        filter_driver = LFSFilterDriver(lfs_store)
+        filter_driver = LFSFilterDriver(lfs_store, repo=r)
 
         # Smudge the pointer (retrieve actual content)
         return filter_driver.smudge(pointer_content)
@@ -5162,7 +5162,7 @@ def lfs_migrate(repo=".", include=None, exclude=None, everything=False):
     with open_repo_closing(repo) as r:
         # Initialize LFS if needed
         lfs_store = LFSStore.from_repo(r, create=True)
-        filter_driver = LFSFilterDriver(lfs_store)
+        filter_driver = LFSFilterDriver(lfs_store, repo=r)
 
         # Get current index
         index = r.open_index()

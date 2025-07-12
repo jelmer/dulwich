@@ -21,6 +21,7 @@
 
 """Tests for porcelain filter integration."""
 
+import hashlib
 import os
 import tempfile
 from io import BytesIO
@@ -215,6 +216,39 @@ class PorcelainFilterTests(TestCase):
             # The checkout should apply the smudge filter
             self.assertIn(b"\r\n", content)
 
+    def test_process_filter_priority(self) -> None:
+        """Test that process filters take priority over built-in ones."""
+        # Create a custom filter script
+        filter_script = os.path.join(self.test_dir, "test-filter.sh")
+        with open(filter_script, "w") as f:
+            f.write("#!/bin/sh\necho 'FILTERED'")
+        os.chmod(filter_script, 0o755)
+
+        # Configure custom filter
+        config = self.repo.get_config()
+        config.set((b"filter", b"test"), b"smudge", filter_script.encode())
+        config.write_to_path()
+
+        # Create .gitattributes
+        gitattributes = os.path.join(self.test_dir, ".gitattributes")
+        with open(gitattributes, "wb") as f:
+            f.write(b"*.txt filter=test\n")
+
+        # Test filter application
+        from dulwich.filters import FilterRegistry
+
+        filter_registry = FilterRegistry(config, self.repo)
+        test_driver = filter_registry.get_driver("test")
+
+        # Should be ProcessFilterDriver, not built-in
+        from dulwich.filters import ProcessFilterDriver
+
+        self.assertIsInstance(test_driver, ProcessFilterDriver)
+
+        # Test smudge
+        result = test_driver.smudge(b"original", b"test.txt")
+        self.assertEqual(result, b"FILTERED\n")
+
     def test_commit_with_clean_filter(self) -> None:
         """Test committing with a clean filter."""
         # Set up a custom filter in git config
@@ -240,6 +274,87 @@ class PorcelainFilterTests(TestCase):
 
         # The committed blob should have filtered content
         # (Note: actual filter execution requires process filter support)
+
+    def test_clone_with_builtin_lfs_filter(self) -> None:
+        """Test cloning with built-in LFS filter (no subprocess)."""
+        # Create a source repository with LFS
+        source_dir = tempfile.mkdtemp()
+        self.addCleanup(rmtree_ro, source_dir)
+        source_repo = Repo.init(source_dir)
+        self.addCleanup(source_repo.close)
+
+        # Create .gitattributes with LFS filter
+        gitattributes_path = os.path.join(source_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.bin filter=lfs\n")
+
+        # Create LFS pointer file manually
+        from dulwich.lfs import LFSPointer
+
+        pointer = LFSPointer(
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0
+        )
+        pointer_file = os.path.join(source_dir, "empty.bin")
+        with open(pointer_file, "wb") as f:
+            f.write(pointer.to_bytes())
+
+        # Create actual LFS object in the store
+        from dulwich.lfs import LFSStore
+
+        lfs_store = LFSStore.from_repo(source_repo, create=True)
+        lfs_store.write_object([b""])  # Empty file content
+
+        # Commit the files
+        porcelain.add(source_repo, paths=[".gitattributes", "empty.bin"])
+        porcelain.commit(source_repo, message=b"Add LFS file")
+
+        # Clone the repository (should use built-in LFS filter)
+        target_dir = tempfile.mkdtemp()
+        self.addCleanup(rmtree_ro, target_dir)
+
+        # Clone with built-in filter (no git-lfs config)
+        target_repo = porcelain.clone(source_dir, target_dir)
+        self.addCleanup(target_repo.close)
+
+        # Verify the file was checked out with the filter
+        target_file = os.path.join(target_dir, "empty.bin")
+        with open(target_file, "rb") as f:
+            content = f.read()
+
+        # Without git-lfs configured, the built-in filter is used
+        # Since the LFS object isn't in the target repo's store,
+        # it should remain as a pointer
+        self.assertIn(b"version https://git-lfs", content)
+        self.assertIn(
+            b"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", content
+        )
+
+    def test_builtin_lfs_filter_with_object(self) -> None:
+        """Test built-in LFS filter when object is available in store."""
+        # Create test content
+        test_content = b"Hello, LFS!"
+        test_oid = hashlib.sha256(test_content).hexdigest()
+
+        # Create LFS pointer
+        from dulwich.lfs import LFSPointer
+
+        pointer = LFSPointer(test_oid, len(test_content))
+
+        # Create LFS store and write object
+        from dulwich.lfs import LFSStore
+
+        lfs_store = LFSStore.from_repo(self.repo, create=True)
+        lfs_store.write_object([test_content])
+
+        # Test smudge filter
+        from dulwich.filters import FilterRegistry
+
+        filter_registry = FilterRegistry(self.repo.get_config_stack(), self.repo)
+        lfs_driver = filter_registry.get_driver("lfs")
+
+        # Smudge should return actual content since object is in store
+        smudged = lfs_driver.smudge(pointer.to_bytes(), b"test.txt")
+        self.assertEqual(smudged, test_content)
 
     def test_ls_files_with_filters(self) -> None:
         """Test ls-files respects filter settings."""

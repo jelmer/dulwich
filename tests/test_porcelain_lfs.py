@@ -239,6 +239,192 @@ class LFSPorcelainTestCase(TestCase):
         self.assertIsNone(results["regular.txt"])
         self.assertIsNone(results["nonexistent.txt"])
 
+    def test_clone_with_builtin_lfs_no_config(self):
+        """Test cloning with built-in LFS filter when no git-lfs config exists."""
+        # Create a source repo with LFS content
+        source_dir = tempfile.mkdtemp()
+        self.addCleanup(lambda: self._cleanup_test_dir_path(source_dir))
+        source_repo = Repo.init(source_dir)
+
+        # Create .gitattributes
+        gitattributes_path = os.path.join(source_dir, ".gitattributes")
+        with open(gitattributes_path, "w") as f:
+            f.write("*.bin filter=lfs diff=lfs merge=lfs -text\n")
+
+        # Create test content and store in LFS
+        # LFSStore.from_repo with create=True will create the directories
+        test_content = b"This is test content for LFS"
+        lfs_store = LFSStore.from_repo(source_repo, create=True)
+        oid = lfs_store.write_object([test_content])
+
+        # Create LFS pointer file
+        pointer = LFSPointer(oid, len(test_content))
+        test_file = os.path.join(source_dir, "test.bin")
+        with open(test_file, "wb") as f:
+            f.write(pointer.to_bytes())
+
+        # Add and commit
+        porcelain.add(source_repo, paths=[".gitattributes", "test.bin"])
+        porcelain.commit(source_repo, message=b"Add LFS file")
+
+        # Clone with empty config (no git-lfs commands)
+        clone_dir = tempfile.mkdtemp()
+        self.addCleanup(lambda: self._cleanup_test_dir_path(clone_dir))
+
+        # Verify source repo has no LFS filter config
+        config = source_repo.get_config()
+        with self.assertRaises(KeyError):
+            config.get((b"filter", b"lfs"), b"smudge")
+
+        # Clone the repository
+        cloned_repo = porcelain.clone(source_dir, clone_dir)
+
+        # Verify that built-in LFS filter was used
+        normalizer = cloned_repo.get_blob_normalizer()
+        if hasattr(normalizer, "filter_registry"):
+            lfs_driver = normalizer.filter_registry.get_driver("lfs")
+            # Should be the built-in LFSFilterDriver
+            self.assertEqual(type(lfs_driver).__name__, "LFSFilterDriver")
+            self.assertEqual(type(lfs_driver).__module__, "dulwich.lfs")
+
+        # Check that the file remains as a pointer (expected behavior)
+        # The built-in LFS filter preserves pointers when objects aren't available
+        cloned_file = os.path.join(clone_dir, "test.bin")
+        with open(cloned_file, "rb") as f:
+            content = f.read()
+
+        # Should still be a pointer since objects weren't transferred
+        self.assertTrue(
+            content.startswith(b"version https://git-lfs.github.com/spec/v1")
+        )
+        cloned_pointer = LFSPointer.from_bytes(content)
+        self.assertIsNotNone(cloned_pointer)
+        self.assertEqual(cloned_pointer.oid, pointer.oid)
+        self.assertEqual(cloned_pointer.size, pointer.size)
+
+        source_repo.close()
+        cloned_repo.close()
+
+    def _cleanup_test_dir_path(self, path):
+        """Clean up a test directory by path."""
+        import shutil
+
+        shutil.rmtree(path, ignore_errors=True)
+
+    def test_add_applies_clean_filter(self):
+        """Test that add operation applies LFS clean filter."""
+        # Don't use lfs_init to avoid configuring git-lfs commands
+        # Create LFS store manually
+        lfs_store = LFSStore.from_repo(self.repo, create=True)
+
+        # Create .gitattributes
+        gitattributes_path = os.path.join(self.repo.path, ".gitattributes")
+        with open(gitattributes_path, "w") as f:
+            f.write("*.bin filter=lfs diff=lfs merge=lfs -text\n")
+
+        # Create a file that should be cleaned to LFS
+        test_content = b"This is large file content that should be stored in LFS"
+        test_file = os.path.join(self.repo.path, "large.bin")
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Add the file - this should apply the clean filter
+        porcelain.add(self.repo, paths=["large.bin"])
+
+        # Check that the file was cleaned to a pointer in the index
+        index = self.repo.open_index()
+        entry = index[b"large.bin"]
+
+        # Get the blob from the object store
+        blob = self.repo.get_object(entry.sha)
+        content = blob.data
+
+        # Should be an LFS pointer
+        self.assertTrue(
+            content.startswith(b"version https://git-lfs.github.com/spec/v1")
+        )
+        pointer = LFSPointer.from_bytes(content)
+        self.assertIsNotNone(pointer)
+        self.assertEqual(pointer.size, len(test_content))
+
+        # Verify the actual content was stored in LFS
+        with lfs_store.open_object(pointer.oid) as f:
+            stored_content = f.read()
+        self.assertEqual(stored_content, test_content)
+
+    def test_checkout_applies_smudge_filter(self):
+        """Test that checkout operation applies LFS smudge filter."""
+        # Create LFS store and content
+        lfs_store = LFSStore.from_repo(self.repo, create=True)
+
+        # Create .gitattributes
+        gitattributes_path = os.path.join(self.repo.path, ".gitattributes")
+        with open(gitattributes_path, "w") as f:
+            f.write("*.bin filter=lfs diff=lfs merge=lfs -text\n")
+
+        # Create test content and store in LFS
+        test_content = b"This is the actual file content from LFS"
+        oid = lfs_store.write_object([test_content])
+
+        # Create LFS pointer file
+        pointer = LFSPointer(oid, len(test_content))
+        test_file = os.path.join(self.repo.path, "data.bin")
+        with open(test_file, "wb") as f:
+            f.write(pointer.to_bytes())
+
+        # Add and commit the pointer
+        porcelain.add(self.repo, paths=[".gitattributes", "data.bin"])
+        porcelain.commit(self.repo, message=b"Add LFS file")
+
+        # Remove the file from working directory
+        os.remove(test_file)
+
+        # Checkout the file - this should apply the smudge filter
+        porcelain.checkout(self.repo, paths=["data.bin"])
+
+        # Verify the file was expanded from pointer to content
+        with open(test_file, "rb") as f:
+            content = f.read()
+
+        self.assertEqual(content, test_content)
+
+    def test_reset_hard_applies_smudge_filter(self):
+        """Test that reset --hard applies LFS smudge filter."""
+        # Create LFS store and content
+        lfs_store = LFSStore.from_repo(self.repo, create=True)
+
+        # Create .gitattributes
+        gitattributes_path = os.path.join(self.repo.path, ".gitattributes")
+        with open(gitattributes_path, "w") as f:
+            f.write("*.bin filter=lfs diff=lfs merge=lfs -text\n")
+
+        # Create test content and store in LFS
+        test_content = b"Content that should be restored by reset"
+        oid = lfs_store.write_object([test_content])
+
+        # Create LFS pointer file
+        pointer = LFSPointer(oid, len(test_content))
+        test_file = os.path.join(self.repo.path, "reset-test.bin")
+        with open(test_file, "wb") as f:
+            f.write(pointer.to_bytes())
+
+        # Add and commit
+        porcelain.add(self.repo, paths=[".gitattributes", "reset-test.bin"])
+        commit_sha = porcelain.commit(self.repo, message=b"Add LFS file for reset test")
+
+        # Modify the file in working directory
+        with open(test_file, "wb") as f:
+            f.write(b"Modified content that should be discarded")
+
+        # Reset hard - this should restore the file with smudge filter applied
+        porcelain.reset(self.repo, mode="hard", treeish=commit_sha)
+
+        # Verify the file was restored with LFS content
+        with open(test_file, "rb") as f:
+            content = f.read()
+
+        self.assertEqual(content, test_content)
+
 
 if __name__ == "__main__":
     unittest.main()

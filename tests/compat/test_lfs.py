@@ -355,14 +355,25 @@ class LFSCloneCompatTest(LFSCompatTestCase):
         cloned_repo = porcelain.clone(source_dir, target_dir)
         self.addCleanup(cloned_repo.close)
 
-        # Verify LFS file exists as pointer
+        # Verify LFS file exists
         cloned_file = os.path.join(target_dir, "test.bin")
         with open(cloned_file, "rb") as f:
             content = f.read()
 
-        # Should be a pointer, not the full content
-        self.assertLess(len(content), 1000)  # Pointer is much smaller
-        self.assertIn(b"version https://git-lfs.github.com/spec/v1", content)
+        # Check if filter.lfs.smudge is configured
+        cloned_config = cloned_repo.get_config()
+        try:
+            lfs_smudge = cloned_config.get((b"filter", b"lfs"), b"smudge")
+            has_lfs_config = bool(lfs_smudge)
+        except KeyError:
+            has_lfs_config = False
+
+        if has_lfs_config:
+            # git-lfs smudge filter should have converted it
+            self.assertEqual(content, test_content)
+        else:
+            # No git-lfs config (uses built-in filter), should be a pointer
+            self.assertIn(b"version https://git-lfs.github.com/spec/v1", content)
 
 
 if __name__ == "__main__":

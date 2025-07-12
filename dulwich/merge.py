@@ -7,6 +7,9 @@ try:
 except ImportError:
     merge3 = None  # type: ignore
 
+from dulwich.attrs import GitAttributes
+from dulwich.config import Config
+from dulwich.merge_drivers import get_merge_driver_registry
 from dulwich.object_store import BaseObjectStore
 from dulwich.objects import S_ISGITLINK, Blob, Commit, Tree, is_blob, is_tree
 
@@ -91,6 +94,9 @@ def merge_blobs(
     base_blob: Optional[Blob],
     ours_blob: Optional[Blob],
     theirs_blob: Optional[Blob],
+    path: Optional[bytes] = None,
+    gitattributes: Optional[GitAttributes] = None,
+    config: Optional[Config] = None,
 ) -> tuple[bytes, bool]:
     """Perform three-way merge on blob contents.
 
@@ -98,10 +104,44 @@ def merge_blobs(
         base_blob: Common ancestor blob (can be None)
         ours_blob: Our version of the blob (can be None)
         theirs_blob: Their version of the blob (can be None)
+        path: Optional path of the file being merged
+        gitattributes: Optional GitAttributes object for checking merge drivers
+        config: Optional Config object for loading merge driver configuration
 
     Returns:
         Tuple of (merged_content, had_conflicts)
     """
+    # Check for merge driver
+    merge_driver_name = None
+    if path and gitattributes:
+        attrs = gitattributes.match_path(path)
+        merge_value = attrs.get(b"merge")
+        if merge_value and isinstance(merge_value, bytes) and merge_value != b"text":
+            merge_driver_name = merge_value.decode("utf-8", errors="replace")
+
+    # Use merge driver if found
+    if merge_driver_name:
+        registry = get_merge_driver_registry(config)
+        driver = registry.get_driver(merge_driver_name)
+        if driver:
+            # Get content from blobs
+            base_content = base_blob.data if base_blob else b""
+            ours_content = ours_blob.data if ours_blob else b""
+            theirs_content = theirs_blob.data if theirs_blob else b""
+
+            # Use merge driver
+            merged_content, success = driver.merge(
+                ancestor=base_content,
+                ours=ours_content,
+                theirs=theirs_content,
+                path=path.decode("utf-8", errors="replace") if path else None,
+                marker_size=7,
+            )
+            # Convert success (no conflicts) to had_conflicts (conflicts occurred)
+            had_conflicts = not success
+            return merged_content, had_conflicts
+
+    # Fall back to default merge behavior
     # Handle deletion cases
     if ours_blob is None and theirs_blob is None:
         return b"", False
@@ -183,19 +223,29 @@ def merge_blobs(
 class Merger:
     """Handles git merge operations."""
 
-    def __init__(self, object_store: BaseObjectStore) -> None:
+    def __init__(
+        self,
+        object_store: BaseObjectStore,
+        gitattributes: Optional[GitAttributes] = None,
+        config: Optional[Config] = None,
+    ) -> None:
         """Initialize merger.
 
         Args:
             object_store: Object store to read objects from
+            gitattributes: Optional GitAttributes object for checking merge drivers
+            config: Optional Config object for loading merge driver configuration
         """
         self.object_store = object_store
+        self.gitattributes = gitattributes
+        self.config = config
 
-    @staticmethod
     def merge_blobs(
+        self,
         base_blob: Optional[Blob],
         ours_blob: Optional[Blob],
         theirs_blob: Optional[Blob],
+        path: Optional[bytes] = None,
     ) -> tuple[bytes, bool]:
         """Perform three-way merge on blob contents.
 
@@ -203,11 +253,14 @@ class Merger:
             base_blob: Common ancestor blob (can be None)
             ours_blob: Our version of the blob (can be None)
             theirs_blob: Their version of the blob (can be None)
+            path: Optional path of the file being merged
 
         Returns:
             Tuple of (merged_content, had_conflicts)
         """
-        return merge_blobs(base_blob, ours_blob, theirs_blob)
+        return merge_blobs(
+            base_blob, ours_blob, theirs_blob, path, self.gitattributes, self.config
+        )
 
     def merge_trees(
         self, base_tree: Optional[Tree], ours_tree: Tree, theirs_tree: Tree
@@ -375,7 +428,7 @@ class Merger:
                     assert isinstance(ours_blob, Blob)
                     assert isinstance(theirs_blob, Blob)
                     merged_content, had_conflict = self.merge_blobs(
-                        base_blob, ours_blob, theirs_blob
+                        base_blob, ours_blob, theirs_blob, path
                     )
 
                     if had_conflict:
@@ -400,6 +453,8 @@ def three_way_merge(
     base_commit: Optional[Commit],
     ours_commit: Commit,
     theirs_commit: Commit,
+    gitattributes: Optional[GitAttributes] = None,
+    config: Optional[Config] = None,
 ) -> tuple[Tree, list[bytes]]:
     """Perform a three-way merge between commits.
 
@@ -408,11 +463,13 @@ def three_way_merge(
         base_commit: Common ancestor commit (None if no common ancestor)
         ours_commit: Our commit
         theirs_commit: Their commit
+        gitattributes: Optional GitAttributes object for checking merge drivers
+        config: Optional Config object for loading merge driver configuration
 
     Returns:
         tuple of (merged_tree, list_of_conflicted_paths)
     """
-    merger = Merger(object_store)
+    merger = Merger(object_store, gitattributes, config)
 
     base_tree = None
     if base_commit:

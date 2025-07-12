@@ -1,5 +1,8 @@
 0.23.3	UNRELEASED
 
+ * Add support for merge drivers.
+   (Jelmer Vernooĳ)
+
  * ``dulwich.porcelain.diff``: Support diffing two commits
    and diffing cached and working tree. (Jelmer Vernooĳ)
 

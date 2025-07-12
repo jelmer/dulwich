@@ -3762,8 +3762,10 @@ def _do_merge(
 
     # Perform three-way merge
     base_commit = r[base_commit_id]
+    gitattributes = r.get_gitattributes()
+    config = r.get_config()
     merged_tree, conflicts = three_way_merge(
-        r.object_store, base_commit, head_commit, merge_commit
+        r.object_store, base_commit, head_commit, merge_commit, gitattributes, config
     )
 
     # Add merged tree to object store
@@ -3917,7 +3919,9 @@ def merge_tree(
         theirs = parse_tree(r, their_tree)
 
         # Perform the merge
-        merger = Merger(r.object_store)
+        gitattributes = r.get_gitattributes()
+        config = r.get_config()
+        merger = Merger(r.object_store, gitattributes, config)
         merged_tree, conflicts = merger.merge_trees(base, ours, theirs)
 
         # Add the merged tree to the object store

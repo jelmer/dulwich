@@ -168,6 +168,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         r._put_named_file(os.path.join("info", "grafts"), b"")
 
         r = Repo(self._repo_dir)
+        self.addCleanup(r.close)
         self.assertEqual({}, r._graftpoints)
 
     def test_init_with_info_grafts(self) -> None:
@@ -178,6 +179,7 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
         )
 
         r = Repo(self._repo_dir)
+        self.addCleanup(r.close)
         self.assertEqual({self._shas[-1]: [self._shas[0]]}, r._graftpoints)
 
 

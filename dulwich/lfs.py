@@ -20,13 +20,55 @@
 #
 
 import hashlib
+import json
 import os
 import tempfile
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, BinaryIO, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, BinaryIO, Optional, Union
+from urllib.error import HTTPError
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
     from .repo import Repo
+
+
+@dataclass
+class LFSAction:
+    """LFS action structure."""
+
+    href: str
+    header: Optional[dict[str, str]] = None
+    expires_at: Optional[str] = None
+
+
+@dataclass
+class LFSErrorInfo:
+    """LFS error structure."""
+
+    code: int
+    message: str
+
+
+@dataclass
+class LFSBatchObject:
+    """LFS batch object structure."""
+
+    oid: str
+    size: int
+    authenticated: Optional[bool] = None
+    actions: Optional[dict[str, LFSAction]] = None
+    error: Optional[LFSErrorInfo] = None
+
+
+@dataclass
+class LFSBatchResponse:
+    """LFS batch response structure."""
+
+    transfer: str
+    objects: list[LFSBatchObject]
+    hash_algo: Optional[str] = None
 
 
 class LFSStore:
@@ -39,8 +81,12 @@ class LFSStore:
     def create(cls, lfs_dir: str) -> "LFSStore":
         if not os.path.isdir(lfs_dir):
             os.mkdir(lfs_dir)
-        os.mkdir(os.path.join(lfs_dir, "tmp"))
-        os.mkdir(os.path.join(lfs_dir, "objects"))
+        tmp_dir = os.path.join(lfs_dir, "tmp")
+        if not os.path.isdir(tmp_dir):
+            os.mkdir(tmp_dir)
+        objects_dir = os.path.join(lfs_dir, "objects")
+        if not os.path.isdir(objects_dir):
+            os.mkdir(objects_dir)
         return cls(lfs_dir)
 
     @classmethod
@@ -76,7 +122,12 @@ class LFSStore:
         path = self._sha_path(sha.hexdigest())
         if not os.path.exists(os.path.dirname(path)):
             os.makedirs(os.path.dirname(path))
-        os.rename(tmppath, path)
+
+        # Handle concurrent writes - if file already exists, just remove temp file
+        if os.path.exists(path):
+            os.remove(tmppath)
+        else:
+            os.rename(tmppath, path)
         return sha.hexdigest()
 
 
@@ -116,6 +167,9 @@ class LFSPointer:
             elif line.startswith("size "):
                 try:
                     size = int(line[5:].strip())
+                    # Size must be non-negative
+                    if size < 0:
+                        return None
                 except ValueError:
                     return None
 
@@ -183,3 +237,223 @@ class LFSFilterDriver:
             # Object not found in LFS store, return pointer as-is
             # This matches Git LFS behavior when object is missing
             return data
+
+
+class LFSClient:
+    """LFS client for network operations."""
+
+    def __init__(self, url: str, auth: Optional[tuple[str, str]] = None) -> None:
+        """Initialize LFS client.
+
+        Args:
+            url: LFS server URL
+            auth: Optional (username, password) tuple for authentication
+        """
+        self.url = url.rstrip("/")
+        self.auth = auth
+
+    def _make_request(
+        self,
+        method: str,
+        path: str,
+        data: Optional[bytes] = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> bytes:
+        """Make an HTTP request to the LFS server."""
+        url = urljoin(self.url, path)
+        req_headers = {
+            "Accept": "application/vnd.git-lfs+json",
+            "Content-Type": "application/vnd.git-lfs+json",
+        }
+        if headers:
+            req_headers.update(headers)
+
+        req = Request(url, data=data, headers=req_headers, method=method)
+
+        if self.auth:
+            import base64
+
+            auth_str = f"{self.auth[0]}:{self.auth[1]}"
+            b64_auth = base64.b64encode(auth_str.encode()).decode("ascii")
+            req.add_header("Authorization", f"Basic {b64_auth}")
+
+        try:
+            with urlopen(req) as response:
+                return response.read()
+        except HTTPError as e:
+            error_body = e.read().decode("utf-8", errors="ignore")
+            raise LFSError(f"LFS server error {e.code}: {error_body}")
+
+    def batch(
+        self,
+        operation: str,
+        objects: list[dict[str, Union[str, int]]],
+        ref: Optional[str] = None,
+    ) -> LFSBatchResponse:
+        """Perform batch operation to get transfer URLs.
+
+        Args:
+            operation: "download" or "upload"
+            objects: List of {"oid": str, "size": int} dicts
+            ref: Optional ref name
+
+        Returns:
+            Batch response from server
+        """
+        data: dict[
+            str, Union[str, list[str], list[dict[str, Union[str, int]]], dict[str, str]]
+        ] = {
+            "operation": operation,
+            "transfers": ["basic"],
+            "objects": objects,
+        }
+        if ref:
+            data["ref"] = {"name": ref}
+
+        response = self._make_request(
+            "POST", "/objects/batch", json.dumps(data).encode("utf-8")
+        )
+        response_data = json.loads(response)
+        return self._parse_batch_response(response_data)
+
+    def _parse_batch_response(self, data: dict) -> LFSBatchResponse:
+        """Parse JSON response into LFSBatchResponse dataclass."""
+        objects = []
+        for obj_data in data.get("objects", []):
+            actions = None
+            if "actions" in obj_data:
+                actions = {}
+                for action_name, action_data in obj_data["actions"].items():
+                    actions[action_name] = LFSAction(
+                        href=action_data["href"],
+                        header=action_data.get("header"),
+                        expires_at=action_data.get("expires_at"),
+                    )
+
+            error = None
+            if "error" in obj_data:
+                error = LFSErrorInfo(
+                    code=obj_data["error"]["code"], message=obj_data["error"]["message"]
+                )
+
+            batch_obj = LFSBatchObject(
+                oid=obj_data["oid"],
+                size=obj_data["size"],
+                authenticated=obj_data.get("authenticated"),
+                actions=actions,
+                error=error,
+            )
+            objects.append(batch_obj)
+
+        return LFSBatchResponse(
+            transfer=data.get("transfer", "basic"),
+            objects=objects,
+            hash_algo=data.get("hash_algo"),
+        )
+
+    def download(self, oid: str, size: int, ref: Optional[str] = None) -> bytes:
+        """Download an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Expected size
+            ref: Optional ref name
+
+        Returns:
+            Object content
+        """
+        # Get download URL via batch API
+        batch_resp = self.batch("download", [{"oid": oid, "size": size}], ref)
+
+        if not batch_resp.objects:
+            raise LFSError(f"No objects returned for {oid}")
+
+        obj = batch_resp.objects[0]
+        if obj.error:
+            raise LFSError(f"Server error for {oid}: {obj.error.message}")
+
+        if not obj.actions or "download" not in obj.actions:
+            raise LFSError(f"No download actions for {oid}")
+
+        download_action = obj.actions["download"]
+        download_url = download_action.href
+
+        # Download the object
+        req = Request(download_url)
+        if download_action.header:
+            for name, value in download_action.header.items():
+                req.add_header(name, value)
+
+        with urlopen(req) as response:
+            content = response.read()
+
+        # Verify size
+        if len(content) != size:
+            raise LFSError(f"Downloaded size {len(content)} != expected {size}")
+
+        # Verify SHA256
+        actual_oid = hashlib.sha256(content).hexdigest()
+        if actual_oid != oid:
+            raise LFSError(f"Downloaded OID {actual_oid} != expected {oid}")
+
+        return content
+
+    def upload(
+        self, oid: str, size: int, content: bytes, ref: Optional[str] = None
+    ) -> None:
+        """Upload an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Object size
+            content: Object content
+            ref: Optional ref name
+        """
+        # Get upload URL via batch API
+        batch_resp = self.batch("upload", [{"oid": oid, "size": size}], ref)
+
+        if not batch_resp.objects:
+            raise LFSError(f"No objects returned for {oid}")
+
+        obj = batch_resp.objects[0]
+        if obj.error:
+            raise LFSError(f"Server error for {oid}: {obj.error.message}")
+
+        # If no actions, object already exists
+        if not obj.actions:
+            return
+
+        if "upload" not in obj.actions:
+            raise LFSError(f"No upload action for {oid}")
+
+        upload_action = obj.actions["upload"]
+        upload_url = upload_action.href
+
+        # Upload the object
+        req = Request(upload_url, data=content, method="PUT")
+        if upload_action.header:
+            for name, value in upload_action.header.items():
+                req.add_header(name, value)
+
+        with urlopen(req) as response:
+            if response.status >= 400:
+                raise LFSError(f"Upload failed with status {response.status}")
+
+        # Verify if needed
+        if obj.actions and "verify" in obj.actions:
+            verify_action = obj.actions["verify"]
+            verify_data = json.dumps({"oid": oid, "size": size}).encode("utf-8")
+
+            req = Request(verify_action.href, data=verify_data, method="POST")
+            req.add_header("Content-Type", "application/vnd.git-lfs+json")
+            if verify_action.header:
+                for name, value in verify_action.header.items():
+                    req.add_header(name, value)
+
+            with urlopen(req) as response:
+                if response.status >= 400:
+                    raise LFSError(f"Verification failed with status {response.status}")
+
+
+class LFSError(Exception):
+    """LFS-specific error."""

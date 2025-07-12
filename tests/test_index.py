@@ -718,7 +718,8 @@ class BuildIndexTests(TestCase):
             repo.object_store.add_objects([(blob, None), (tree, None)])
 
             # Create blob normalizer
-            blob_normalizer = BlobNormalizer(config, {})
+            autocrlf = config.get((b"core",), b"autocrlf")
+            blob_normalizer = BlobNormalizer(config, {}, autocrlf=autocrlf)
 
             # Build index with normalization
             build_index_from_tree(

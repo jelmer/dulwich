@@ -76,6 +76,11 @@ def flat_walk_dir(dir_to_walk):
 class PorcelainTestCase(TestCase):
     def setUp(self) -> None:
         super().setUp()
+        # Disable pagers for tests
+        self.overrideEnv("PAGER", "false")
+        self.overrideEnv("GIT_PAGER", "false")
+        self.overrideEnv("DULWICH_PAGER", "false")
+
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.repo_path = os.path.join(self.test_dir, "repo")

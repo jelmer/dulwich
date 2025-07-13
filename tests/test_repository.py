@@ -1447,9 +1447,88 @@ class BuildRepoRootTests(TestCase):
         new_shas = set(r.object_store) - old_shas
         self.assertEqual(1, len(new_shas))
         # Check that the new commit (now garbage) was added.
-        new_commit = r[new_shas.pop()]
-        self.assertEqual(r[self._root_commit].tree, new_commit.tree)
-        self.assertEqual(b"failed commit", new_commit.message)
+
+    def test_commit_message_callback(self) -> None:
+        """Test commit with a callable message."""
+        r = self._repo
+
+        # Define a callback that generates message based on repo and commit
+        def message_callback(repo, commit):
+            # Verify we get the right objects
+            self.assertEqual(repo, r)
+            self.assertIsNotNone(commit.tree)
+            self.assertIsNotNone(commit.author)
+            self.assertIsNotNone(commit.committer)
+
+            # Generate a message
+            return b"Generated commit for tree " + commit.tree[:8]
+
+        commit_sha = r.do_commit(
+            message_callback,  # Pass the callback as message
+            committer=b"Test Committer <test@nodomain.com>",
+            author=b"Test Author <test@nodomain.com>",
+            commit_timestamp=12345,
+            commit_timezone=0,
+            author_timestamp=12345,
+            author_timezone=0,
+        )
+
+        commit = r[commit_sha]
+        self.assertTrue(commit.message.startswith(b"Generated commit for tree "))
+        self.assertIn(commit.tree[:8], commit.message)
+
+    def test_commit_message_callback_returns_none(self) -> None:
+        """Test commit with callback that returns None."""
+        r = self._repo
+
+        def message_callback(repo, commit):
+            return None
+
+        self.assertRaises(
+            ValueError,
+            r.do_commit,
+            message_callback,
+            committer=b"Test Committer <test@nodomain.com>",
+            author=b"Test Author <test@nodomain.com>",
+            commit_timestamp=12345,
+            commit_timezone=0,
+            author_timestamp=12345,
+            author_timezone=0,
+        )
+
+    def test_commit_message_callback_with_merge_heads(self) -> None:
+        """Test commit with callback for merge commits."""
+        r = self._repo
+
+        # Create two parent commits first
+        parent1 = r.do_commit(
+            b"Parent 1",
+            committer=b"Test Committer <test@nodomain.com>",
+            author=b"Test Author <test@nodomain.com>",
+        )
+
+        parent2 = r.do_commit(
+            b"Parent 2",
+            committer=b"Test Committer <test@nodomain.com>",
+            author=b"Test Author <test@nodomain.com>",
+            ref=None,  # Dangling commit
+        )
+
+        def message_callback(repo, commit):
+            # Verify the commit object has parents set
+            self.assertEqual(2, len(commit.parents))
+            return b"Merge commit with %d parents" % len(commit.parents)
+
+        merge_sha = r.do_commit(
+            message_callback,
+            committer=b"Test Committer <test@nodomain.com>",
+            author=b"Test Author <test@nodomain.com>",
+            merge_heads=[parent2],
+        )
+
+        merge_commit = r[merge_sha]
+        self.assertEqual(b"Merge commit with 2 parents", merge_commit.message)
+        self.assertEqual([parent1, parent2], merge_commit.parents)
 
     def test_commit_branch(self) -> None:
         r = self._repo

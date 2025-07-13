@@ -44,7 +44,7 @@ from .client import GitProtocolError, get_transport_and_path
 from .errors import ApplyDeltaError
 from .index import Index
 from .objects import valid_hexsha
-from .objectspec import parse_committish_range
+from .objectspec import parse_commit_range
 from .pack import Pack, sha_to_hex
 from .repo import Repo
 
@@ -2477,7 +2477,7 @@ class cmd_format_patch(Command):
         committish = None
         if args.committish:
             with Repo(".") as r:
-                range_result = parse_committish_range(r, args.committish)
+                range_result = parse_commit_range(r, args.committish)
                 if range_result:
                     committish = range_result
                 else:
@@ -2555,10 +2555,10 @@ class cmd_bundle(Command):
         elif parsed_args.refs:
             for ref_arg in parsed_args.refs:
                 if ".." in ref_arg:
-                    range_result = parse_committish_range(repo, ref_arg)
+                    range_result = parse_commit_range(repo, ref_arg)
                     if range_result:
                         start_commit, end_commit = range_result
-                        prerequisites.append(start_commit)
+                        prerequisites.append(start_commit.id)
                         # For ranges like A..B, we need to include B if it's a ref
                         # Split the range to get the end part
                         end_part = ref_arg.split("..")[1]

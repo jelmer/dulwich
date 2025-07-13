@@ -4653,7 +4653,15 @@ def format_patch(
                 pass
         elif isinstance(committish, tuple):
             # Handle commit range (start, end)
-            start_id, end_id = committish
+            start_commit, end_commit = committish
+
+            # Extract commit IDs from commit objects if needed
+            from .objects import Commit
+
+            start_id = (
+                start_commit.id if isinstance(start_commit, Commit) else start_commit
+            )
+            end_id = end_commit.id if isinstance(end_commit, Commit) else end_commit
 
             # Walk from end back to start
             walker = r.get_walker(include=[end_id], exclude=[start_id])

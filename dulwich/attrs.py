@@ -3,7 +3,7 @@
 # Copyright (C) 2019-2020 Andrej Shadura <andrew.shadura@collabora.co.uk>
 #
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
+# General Public License as published by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or
 # modify it under the terms of either of these two licenses.
 #

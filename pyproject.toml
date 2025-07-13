@@ -41,6 +41,7 @@ fastimport = ["fastimport"]
 https = ["urllib3>=1.24.1"]
 pgp = ["gpg"]
 paramiko = ["paramiko"]
+colordiff = ["rich"]
 dev = [
     "ruff==0.12.2",
     "mypy==1.16.1",

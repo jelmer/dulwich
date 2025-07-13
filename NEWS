@@ -3,6 +3,10 @@
  * Add support for merge drivers.
    (Jelmer Vernooĳ)
 
+ * Add support for ``GIT_CONFIG_GLOBAL`` and ``GIT_CONFIG_SYSTEM``
+   environment variables to override global and system configuration
+   paths. (Jelmer Vernooĳ, #1193)
+
  * ``dulwich.porcelain.diff``: Support diffing two commits
    and diffing cached and working tree. (Jelmer Vernooĳ)
 

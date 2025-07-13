@@ -1212,13 +1212,22 @@ class StackedConfig(Config):
         See git-config(1) for details on the files searched.
         """
         paths = []
-        paths.append(os.path.expanduser("~/.gitconfig"))
-        paths.append(get_xdg_config_home_path("git", "config"))
 
-        if "GIT_CONFIG_NOSYSTEM" not in os.environ:
-            paths.append("/etc/gitconfig")
-            if sys.platform == "win32":
-                paths.extend(get_win_system_paths())
+        # Handle GIT_CONFIG_GLOBAL - overrides user config paths
+        try:
+            paths.append(os.environ["GIT_CONFIG_GLOBAL"])
+        except KeyError:
+            paths.append(os.path.expanduser("~/.gitconfig"))
+            paths.append(get_xdg_config_home_path("git", "config"))
+
+        # Handle GIT_CONFIG_SYSTEM and GIT_CONFIG_NOSYSTEM
+        try:
+            paths.append(os.environ["GIT_CONFIG_SYSTEM"])
+        except KeyError:
+            if "GIT_CONFIG_NOSYSTEM" not in os.environ:
+                paths.append("/etc/gitconfig")
+                if sys.platform == "win32":
+                    paths.extend(get_win_system_paths())
 
         backends = []
         for path in paths:

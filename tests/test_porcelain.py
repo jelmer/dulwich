@@ -5644,6 +5644,248 @@ class StatusTests(PorcelainTestCase):
             ),
         )
 
+    def test_get_untracked_paths_nested_gitignore(self) -> None:
+        """Test directories with nested .gitignore files that ignore all contents."""
+        # Create cache directories with .gitignore files that contain "*"
+        cache_dirs = [".ruff_cache", ".pytest_cache", "__pycache__"]
+        for cache_dir in cache_dirs:
+            cache_path = os.path.join(self.repo.path, cache_dir)
+            os.mkdir(cache_path)
+            # Create .gitignore with * pattern (ignores everything)
+            with open(os.path.join(cache_path, ".gitignore"), "w") as f:
+                f.write("*\n")
+            # Create some files in the cache directory
+            with open(os.path.join(cache_path, "somefile.txt"), "w") as f:
+                f.write("cached data\n")
+            with open(os.path.join(cache_path, "data.json"), "w") as f:
+                f.write("{}\n")
+
+        # Create a normal untracked file
+        with open(os.path.join(self.repo.path, "untracked.txt"), "w") as f:
+            f.write("untracked content\n")
+
+        # Test with exclude_ignored=True (default for status)
+        untracked = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=True,
+                untracked_files="normal",
+            )
+        )
+        # Cache directories should NOT be in untracked since all their contents are ignored
+        self.assertEqual({"untracked.txt"}, untracked)
+
+        # Test with exclude_ignored=False
+        untracked_with_ignored = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=False,
+                untracked_files="normal",
+            )
+        )
+        # Cache directories should be included when not excluding ignored
+        expected = {"untracked.txt"}
+        for cache_dir in cache_dirs:
+            expected.add(cache_dir + os.sep)
+        self.assertEqual(expected, untracked_with_ignored)
+
+        # Test status() which uses exclude_ignored=True by default
+        status = porcelain.status(self.repo)
+        self.assertEqual(["untracked.txt"], status.untracked)
+
+        # Test status() with ignored=True which uses exclude_ignored=False
+        status_with_ignored = porcelain.status(self.repo, ignored=True)
+        # Should include cache directories
+        self.assertIn("untracked.txt", status_with_ignored.untracked)
+        for cache_dir in cache_dirs:
+            self.assertIn(cache_dir + "/", status_with_ignored.untracked)
+
+    def test_get_untracked_paths_mixed_directory(self) -> None:
+        """Test directory with both ignored and non-ignored files."""
+        # Create a directory with mixed content
+        mixed_dir = os.path.join(self.repo.path, "mixed")
+        os.mkdir(mixed_dir)
+
+        # Create .gitignore that ignores .log files
+        with open(os.path.join(mixed_dir, ".gitignore"), "w") as f:
+            f.write("*.log\n")
+
+        # Create ignored and non-ignored files
+        with open(os.path.join(mixed_dir, "debug.log"), "w") as f:
+            f.write("debug info\n")
+        with open(os.path.join(mixed_dir, "readme.txt"), "w") as f:
+            f.write("important\n")
+
+        # Test with exclude_ignored=True and normal mode
+        untracked = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=True,
+                untracked_files="normal",
+            )
+        )
+        # In normal mode, should show the directory (matching git behavior)
+        self.assertEqual({os.path.join("mixed", "")}, untracked)
+
+        # Test with untracked_files="all"
+        untracked_all = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=True,
+                untracked_files="all",
+            )
+        )
+        # Should list the non-ignored files
+        expected = {
+            os.path.join("mixed", ".gitignore"),
+            os.path.join("mixed", "readme.txt"),
+        }
+        self.assertEqual(expected, untracked_all)
+
+    def test_get_untracked_paths_specific_ignore_pattern(self) -> None:
+        """Test directory with .gitignore that ignores specific files, not all."""
+        # Create a directory
+        test_dir = os.path.join(self.repo.path, "testdir")
+        os.mkdir(test_dir)
+
+        # Create .gitignore that ignores only files named "test"
+        with open(os.path.join(test_dir, ".gitignore"), "w") as f:
+            f.write("test\n")
+
+        # Create files
+        with open(os.path.join(test_dir, "test"), "w") as f:
+            f.write("ignored\n")
+        with open(os.path.join(test_dir, "other.txt"), "w") as f:
+            f.write("not ignored\n")
+
+        # Test with exclude_ignored=True and normal mode
+        untracked = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=True,
+                untracked_files="normal",
+            )
+        )
+        # Directory should be shown because it has non-ignored files
+        self.assertEqual({os.path.join("testdir", "")}, untracked)
+
+    def test_get_untracked_paths_nested_subdirs_all_ignored(self) -> None:
+        """Test directory containing only subdirectories where all files are ignored."""
+        # Create parent directory with .gitignore that ignores everything
+        parent_dir = os.path.join(self.repo.path, "parent")
+        os.mkdir(parent_dir)
+        with open(os.path.join(parent_dir, ".gitignore"), "w") as f:
+            f.write("*\n")
+
+        # Create subdirectories with files (all should be ignored by parent's .gitignore)
+        sub1 = os.path.join(parent_dir, "sub1")
+        sub2 = os.path.join(parent_dir, "sub2")
+        os.mkdir(sub1)
+        os.mkdir(sub2)
+
+        # Create files in subdirectories
+        with open(os.path.join(sub1, "file1.txt"), "w") as f:
+            f.write("content1\n")
+        with open(os.path.join(sub2, "file2.txt"), "w") as f:
+            f.write("content2\n")
+
+        # Create another normal untracked file
+        with open(os.path.join(self.repo.path, "normal.txt"), "w") as f:
+            f.write("normal\n")
+
+        # Test with exclude_ignored=True
+        untracked = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=True,
+                untracked_files="normal",
+            )
+        )
+        # Parent directory should NOT be shown since all nested files are ignored
+        self.assertEqual({"normal.txt"}, untracked)
+
+    def test_get_untracked_paths_nested_subdirs_mixed(self) -> None:
+        """Test directory containing only subdirectories where some files are ignored, some aren't."""
+        # Create parent directory with .gitignore that ignores .log files
+        parent_dir = os.path.join(self.repo.path, "parent")
+        os.mkdir(parent_dir)
+        with open(os.path.join(parent_dir, ".gitignore"), "w") as f:
+            f.write("*.log\n")
+
+        # Create subdirectories
+        sub1 = os.path.join(parent_dir, "sub1")
+        sub2 = os.path.join(parent_dir, "sub2")
+        os.mkdir(sub1)
+        os.mkdir(sub2)
+
+        # sub1: only ignored files
+        with open(os.path.join(sub1, "debug.log"), "w") as f:
+            f.write("log content\n")
+        with open(os.path.join(sub1, "error.log"), "w") as f:
+            f.write("error log\n")
+
+        # sub2: mix of ignored and non-ignored files
+        with open(os.path.join(sub2, "access.log"), "w") as f:
+            f.write("access log\n")
+        with open(os.path.join(sub2, "readme.txt"), "w") as f:
+            f.write("important info\n")
+
+        # Test with exclude_ignored=True
+        untracked = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=True,
+                untracked_files="normal",
+            )
+        )
+        # Parent directory SHOULD be shown since sub2 has non-ignored files
+        self.assertEqual({os.path.join("parent", "")}, untracked)
+
+    def test_get_untracked_paths_deeply_nested_all_ignored(self) -> None:
+        """Test deeply nested directories where all files are eventually ignored."""
+        # Create nested structure: parent/sub/subsub/
+        parent_dir = os.path.join(self.repo.path, "parent")
+        sub_dir = os.path.join(parent_dir, "sub")
+        subsub_dir = os.path.join(sub_dir, "subsub")
+        os.makedirs(subsub_dir)
+
+        # Parent has .gitignore that ignores everything
+        with open(os.path.join(parent_dir, ".gitignore"), "w") as f:
+            f.write("*\n")
+
+        # Create files at different levels
+        with open(os.path.join(subsub_dir, "deep_file.txt"), "w") as f:
+            f.write("deep content\n")
+        with open(os.path.join(sub_dir, "mid_file.txt"), "w") as f:
+            f.write("mid content\n")
+
+        # Test with exclude_ignored=True
+        untracked = set(
+            porcelain.get_untracked_paths(
+                self.repo.path,
+                self.repo.path,
+                self.repo.open_index(),
+                exclude_ignored=True,
+                untracked_files="normal",
+            )
+        )
+        # Parent directory should NOT be shown since all nested files are ignored
+        self.assertEqual(set(), untracked)
+
     def test_get_untracked_paths_subdir(self) -> None:
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
             f.write("subdir/\nignored")

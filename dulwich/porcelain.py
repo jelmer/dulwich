@@ -2271,13 +2271,31 @@ def get_untracked_paths(
     # List to store untracked directories found during traversal
     untracked_dir_list = []
 
+    def directory_has_non_ignored_files(dir_path, base_rel_path):
+        """Recursively check if directory contains any non-ignored files."""
+        try:
+            for entry in os.listdir(dir_path):
+                entry_path = os.path.join(dir_path, entry)
+                rel_entry = os.path.join(base_rel_path, entry)
+
+                if os.path.isfile(entry_path):
+                    if ignore_manager.is_ignored(rel_entry) is not True:
+                        return True
+                elif os.path.isdir(entry_path):
+                    if directory_has_non_ignored_files(entry_path, rel_entry):
+                        return True
+            return False
+        except OSError:
+            # If we can't read the directory, assume it has non-ignored files
+            return True
+
     def prune_dirnames(dirpath, dirnames):
         for i in range(len(dirnames) - 1, -1, -1):
             path = os.path.join(dirpath, dirnames[i])
             ip = os.path.join(os.path.relpath(path, basepath), "")
 
             # Check if directory is ignored
-            if ignore_manager.is_ignored(ip):
+            if ignore_manager.is_ignored(ip) is True:
                 if not exclude_ignored:
                     ignored_dirs.append(
                         os.path.join(os.path.relpath(path, frompath), "")
@@ -2296,13 +2314,20 @@ def get_untracked_paths(
 
                 if not has_tracked_files:
                     # This directory is entirely untracked
+                    rel_path_base = os.path.relpath(path, basepath)
+                    rel_path_from = os.path.join(os.path.relpath(path, frompath), "")
+
+                    # If excluding ignored, check if directory contains any non-ignored files
+                    if exclude_ignored:
+                        if not directory_has_non_ignored_files(path, rel_path_base):
+                            # Directory only contains ignored files, skip it
+                            del dirnames[i]
+                            continue
+
                     # Check if it should be excluded due to ignore rules
-                    is_ignored = ignore_manager.is_ignored(
-                        os.path.relpath(path, basepath)
-                    )
+                    is_ignored = ignore_manager.is_ignored(rel_path_base)
                     if not exclude_ignored or not is_ignored:
-                        rel_path = os.path.join(os.path.relpath(path, frompath), "")
-                        untracked_dir_list.append(rel_path)
+                        untracked_dir_list.append(rel_path_from)
                     del dirnames[i]
 
         return dirnames

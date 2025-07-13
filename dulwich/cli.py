@@ -34,8 +34,9 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import Callable, ClassVar, Optional, Union
 
 from dulwich import porcelain
 
@@ -47,6 +48,10 @@ from .objects import valid_hexsha
 from .objectspec import parse_committish_range
 from .pack import Pack, sha_to_hex
 from .repo import Repo
+
+
+class CommitMessageError(Exception):
+    """Raised when there's an issue with the commit message."""
 
 
 def signal_int(signal, frame) -> None:
@@ -124,6 +129,37 @@ def format_bytes(bytes):
     return f"{bytes:.1f} TB"
 
 
+def launch_editor(template_content=b""):
+    """Launch an editor for the user to enter text.
+
+    Args:
+        template_content: Initial content for the editor
+
+    Returns:
+        The edited content as bytes
+    """
+    # Determine which editor to use
+    editor = os.environ.get("GIT_EDITOR") or os.environ.get("EDITOR") or "vi"
+
+    # Create a temporary file
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
+        temp_file = f.name
+        f.write(template_content)
+
+    try:
+        # Launch the editor
+        subprocess.run([editor, temp_file], check=True)
+
+        # Read the edited content
+        with open(temp_file, "rb") as f:
+            content = f.read()
+
+        return content
+    finally:
+        # Clean up the temporary file
+        os.unlink(temp_file)
+
+
 class PagerBuffer:
     """Binary buffer wrapper for Pager to mimic sys.stdout.buffer."""
 
@@ -155,6 +191,7 @@ class Pager:
         self.buffer = PagerBuffer(self)
         self._closed = False
         self.pager_cmd = pager_cmd
+        self._pager_died = False
 
     def _get_pager_command(self) -> str:
         """Get the pager command to use."""
@@ -182,28 +219,33 @@ class Pager:
         if self._closed:
             raise ValueError("I/O operation on closed file")
 
+        # If pager died (user quit), stop writing output
+        if self._pager_died:
+            return len(text)
+
         self._ensure_pager_started()
 
         if self.pager_process and self.pager_process.stdin:
             try:
                 return self.pager_process.stdin.write(text)
             except (OSError, subprocess.SubprocessError, BrokenPipeError):
-                # Pager died, fall back to direct output
-                return sys.stdout.write(text)
+                # Pager died (user quit), stop writing output
+                self._pager_died = True
+                return len(text)
         else:
             # No pager available, write directly to stdout
             return sys.stdout.write(text)
 
     def flush(self):
         """Flush the pager."""
-        if self._closed:
+        if self._closed or self._pager_died:
             return
 
         if self.pager_process and self.pager_process.stdin:
             try:
                 self.pager_process.stdin.flush()
             except (OSError, subprocess.SubprocessError, BrokenPipeError):
-                pass
+                self._pager_died = True
         else:
             sys.stdout.flush()
 
@@ -233,6 +275,8 @@ class Pager:
     # Additional file-like methods for compatibility
     def writelines(self, lines):
         """Write a list of lines to the pager."""
+        if self._pager_died:
+            return
         for line in lines:
             self.write(line)
 
@@ -715,10 +759,47 @@ class cmd_clone(Command):
             print(f"{e}")
 
 
+def _get_commit_message(repo, commit):
+    # Prepare a template
+    template = b"\n"
+    template += b"# Please enter the commit message for your changes. Lines starting\n"
+    template += b"# with '#' will be ignored, and an empty message aborts the commit.\n"
+    template += b"#\n"
+    try:
+        ref_names, ref_sha = repo.refs.follow(b"HEAD")
+        ref_path = ref_names[-1]  # Get the final reference
+        if ref_path.startswith(b"refs/heads/"):
+            branch = ref_path[11:]  # Remove 'refs/heads/' prefix
+        else:
+            branch = ref_path
+        template += b"# On branch %s\n" % branch
+    except (KeyError, IndexError):
+        template += b"# On branch (unknown)\n"
+    template += b"#\n"
+    template += b"# Changes to be committed:\n"
+
+    # Launch editor
+    content = launch_editor(template)
+
+    # Check if content was unchanged
+    if content == template:
+        raise CommitMessageError("Aborting commit due to unchanged commit message")
+
+    # Remove comment lines and strip
+    lines = content.split(b"\n")
+    message_lines = [line for line in lines if not line.strip().startswith(b"#")]
+    message = b"\n".join(message_lines).strip()
+
+    if not message:
+        raise CommitMessageError("Aborting commit due to empty commit message")
+
+    return message
+
+
 class cmd_commit(Command):
-    def run(self, args) -> None:
+    def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
-        parser.add_argument("--message", "-m", required=True, help="Commit message")
+        parser.add_argument("--message", "-m", help="Commit message")
         parser.add_argument(
             "-a",
             "--all",
@@ -726,7 +807,20 @@ class cmd_commit(Command):
             help="Automatically stage all tracked files that have been modified",
         )
         args = parser.parse_args(args)
-        porcelain.commit(".", message=args.message, all=args.all)
+
+        message: Union[bytes, str, Callable]
+
+        if args.message:
+            message = args.message
+        else:
+            message = _get_commit_message
+
+        try:
+            porcelain.commit(".", message=message, all=args.all)
+        except CommitMessageError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        return None
 
 
 class cmd_commit_tree(Command):

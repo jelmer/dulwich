@@ -129,6 +129,7 @@ def self_test_suite():
         "commit_graph",
         "config",
         "credentials",
+        "diff",
         "diff_tree",
         "dumb",
         "fastexport",

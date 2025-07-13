@@ -759,31 +759,36 @@ class cmd_clone(Command):
             print(f"{e}")
 
 
-def _get_commit_message(repo, commit):
-    # Prepare a template
-    template = b"\n"
+def _get_commit_message_with_template(initial_message, repo=None, commit=None):
+    """Get commit message with an initial message template."""
+    # Start with the initial message
+    template = initial_message
+    if template and not template.endswith(b"\n"):
+        template += b"\n"
+
+    template += b"\n"
     template += b"# Please enter the commit message for your changes. Lines starting\n"
     template += b"# with '#' will be ignored, and an empty message aborts the commit.\n"
     template += b"#\n"
-    try:
-        ref_names, ref_sha = repo.refs.follow(b"HEAD")
-        ref_path = ref_names[-1]  # Get the final reference
-        if ref_path.startswith(b"refs/heads/"):
-            branch = ref_path[11:]  # Remove 'refs/heads/' prefix
-        else:
-            branch = ref_path
-        template += b"# On branch %s\n" % branch
-    except (KeyError, IndexError):
-        template += b"# On branch (unknown)\n"
-    template += b"#\n"
+
+    # Add branch info if repo is provided
+    if repo:
+        try:
+            ref_names, ref_sha = repo.refs.follow(b"HEAD")
+            ref_path = ref_names[-1]  # Get the final reference
+            if ref_path.startswith(b"refs/heads/"):
+                branch = ref_path[11:]  # Remove 'refs/heads/' prefix
+            else:
+                branch = ref_path
+            template += b"# On branch %s\n" % branch
+        except (KeyError, IndexError):
+            template += b"# On branch (unknown)\n"
+        template += b"#\n"
+
     template += b"# Changes to be committed:\n"
 
     # Launch editor
     content = launch_editor(template)
-
-    # Check if content was unchanged
-    if content == template:
-        raise CommitMessageError("Aborting commit due to unchanged commit message")
 
     # Remove comment lines and strip
     lines = content.split(b"\n")
@@ -806,17 +811,40 @@ class cmd_commit(Command):
             action="store_true",
             help="Automatically stage all tracked files that have been modified",
         )
+        parser.add_argument(
+            "--amend",
+            action="store_true",
+            help="Replace the tip of the current branch by creating a new commit",
+        )
         args = parser.parse_args(args)
 
         message: Union[bytes, str, Callable]
 
         if args.message:
             message = args.message
+        elif args.amend:
+            # For amend, create a callable that opens editor with original message pre-populated
+            def get_amend_message(repo, commit):
+                # Get the original commit message from current HEAD
+                try:
+                    head_commit = repo[repo.head()]
+                    original_message = head_commit.message
+                except KeyError:
+                    original_message = b""
+
+                # Open editor with original message
+                return _get_commit_message_with_template(original_message, repo, commit)
+
+            message = get_amend_message
         else:
-            message = _get_commit_message
+            # For regular commits, use empty template
+            def get_regular_message(repo, commit):
+                return _get_commit_message_with_template(b"", repo, commit)
+
+            message = get_regular_message
 
         try:
-            porcelain.commit(".", message=message, all=args.all)
+            porcelain.commit(".", message=message, all=args.all, amend=args.amend)
         except CommitMessageError as e:
             print(f"error: {e}", file=sys.stderr)
             return 1

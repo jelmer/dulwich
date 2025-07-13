@@ -475,6 +475,7 @@ def commit(
     no_verify=False,
     signoff=False,
     all=False,
+    amend=False,
 ):
     """Create a new commit.
 
@@ -491,6 +492,7 @@ def commit(
         pass True to use default GPG key,
         pass a str containing Key ID to use a specific GPG key)
       all: Automatically stage all tracked files that have been modified
+      amend: Replace the tip of the current branch by creating a new commit
     Returns: SHA1 of the new commit
     """
     if getattr(message, "encode", None):
@@ -506,6 +508,25 @@ def commit(
         commit_timezone = local_timezone[1]
 
     with open_repo_closing(repo) as r:
+        # Handle amend logic
+        merge_heads = None
+        if amend:
+            try:
+                head_commit = r[r.head()]
+            except KeyError:
+                raise ValueError("Cannot amend: no existing commit found")
+
+            # If message not provided, use the message from the current HEAD
+            if message is None:
+                message = head_commit.message
+            # If author not provided, use the author from the current HEAD
+            if author is None:
+                author = head_commit.author
+                if author_timezone is None:
+                    author_timezone = head_commit.author_timezone
+            # Use the parent(s) of the current HEAD as our parent(s)
+            merge_heads = list(head_commit.parents)
+
         # If -a flag is used, stage all modified tracked files
         if all:
             index = r.open_index()
@@ -525,16 +546,27 @@ def commit(
 
                 add(r, paths=modified_files)
 
-        return r.do_commit(
-            message=message,
-            author=author,
-            author_timezone=author_timezone,
-            committer=committer,
-            commit_timezone=commit_timezone,
-            encoding=encoding,
-            no_verify=no_verify,
-            sign=signoff if isinstance(signoff, (str, bool)) else None,
-        )
+        commit_kwargs = {
+            "message": message,
+            "author": author,
+            "author_timezone": author_timezone,
+            "committer": committer,
+            "commit_timezone": commit_timezone,
+            "encoding": encoding,
+            "no_verify": no_verify,
+            "sign": signoff if isinstance(signoff, (str, bool)) else None,
+            "merge_heads": merge_heads,
+        }
+
+        # For amend, create dangling commit to avoid adding current HEAD as parent
+        if amend:
+            commit_kwargs["ref"] = None
+            commit_sha = r.do_commit(**commit_kwargs)
+            # Update HEAD to point to the new commit
+            r.refs[b"HEAD"] = commit_sha
+            return commit_sha
+        else:
+            return r.do_commit(**commit_kwargs)
 
 
 def commit_tree(repo, tree, message=None, author=None, committer=None):

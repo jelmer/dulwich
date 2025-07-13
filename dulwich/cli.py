@@ -29,6 +29,7 @@ a way to test Dulwich.
 """
 
 import argparse
+import logging
 import os
 import shutil
 import signal
@@ -145,6 +146,27 @@ class PagerBuffer:
         """Write multiple lines to pager."""
         for line in lines:
             self.write(line)
+
+    def readable(self):
+        """Return whether the buffer is readable (it's not)."""
+        return False
+
+    def writable(self):
+        """Return whether the buffer is writable."""
+        return not self.pager._closed
+
+    def seekable(self):
+        """Return whether the buffer is seekable (it's not)."""
+        return False
+
+    def close(self):
+        """Close the pager."""
+        return self.pager.close()
+
+    @property
+    def closed(self):
+        """Return whether the buffer is closed."""
+        return self.pager.closed
 
 
 class Pager:
@@ -562,6 +584,12 @@ class cmd_diff(Command):
             help="Show staged changes (same as --staged)",
         )
         parser.add_argument(
+            "--color",
+            choices=["always", "never", "auto"],
+            default="auto",
+            help="Use colored output (requires pygments)",
+        )
+        parser.add_argument(
             "--", dest="separator", action="store_true", help=argparse.SUPPRESS
         )
         parser.add_argument("paths", nargs="*", default=[], help="Paths to limit diff")
@@ -576,16 +604,46 @@ class cmd_diff(Command):
 
         args = parsed_args
 
+        # Determine if we should use color
+        def _should_use_color():
+            if args.color == "always":
+                return True
+            elif args.color == "never":
+                return False
+            else:  # auto
+                return sys.stdout.isatty()
+
+        def _create_output_stream(outstream):
+            """Create output stream, optionally with colorization."""
+            if not _should_use_color():
+                return outstream.buffer
+
+            from .diff import ColorizedDiffStream
+
+            if not ColorizedDiffStream.is_available():
+                if args.color == "always":
+                    raise ImportError(
+                        "Rich is required for colored output. Install with: pip install 'dulwich[colordiff]'"
+                    )
+                else:
+                    logging.warning(
+                        "Rich not available, disabling colored output. Install with: pip install 'dulwich[colordiff]'"
+                    )
+                    return outstream.buffer
+
+            return ColorizedDiffStream(outstream.buffer)
+
         with Repo(".") as repo:
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="diff") as outstream:
+                output_stream = _create_output_stream(outstream)
                 if len(args.committish) == 0:
                     # Show diff for working tree or staged changes
                     porcelain.diff(
                         repo,
                         staged=(args.staged or args.cached),
                         paths=args.paths or None,
-                        outstream=outstream.buffer,
+                        outstream=output_stream,
                     )
                 elif len(args.committish) == 1:
                     # Show diff between working tree and specified commit
@@ -596,7 +654,7 @@ class cmd_diff(Command):
                         commit=args.committish[0],
                         staged=False,
                         paths=args.paths or None,
-                        outstream=outstream.buffer,
+                        outstream=output_stream,
                     )
                 elif len(args.committish) == 2:
                     # Show diff between two commits
@@ -605,10 +663,14 @@ class cmd_diff(Command):
                         commit=args.committish[0],
                         commit2=args.committish[1],
                         paths=args.paths or None,
-                        outstream=outstream.buffer,
+                        outstream=output_stream,
                     )
                 else:
                     parser.error("Too many arguments - specify at most two commits")
+
+                # Flush any remaining output
+                if hasattr(output_stream, "flush"):
+                    output_stream.flush()
 
 
 class cmd_dump_pack(Command):

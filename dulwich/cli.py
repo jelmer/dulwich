@@ -37,6 +37,7 @@ from typing import ClassVar, Optional
 
 from dulwich import porcelain
 
+from .bundle import create_bundle_from_repo, read_bundle, write_bundle
 from .client import GitProtocolError, get_transport_and_path
 from .errors import ApplyDeltaError
 from .index import Index
@@ -2221,6 +2222,205 @@ class cmd_format_patch(Command):
                 print(filename)
 
 
+class cmd_bundle(Command):
+    def run(self, args) -> int:
+        if not args:
+            print("Usage: bundle <create|verify|list-heads|unbundle> <options>")
+            return 1
+
+        subcommand = args[0]
+        subargs = args[1:]
+
+        if subcommand == "create":
+            return self._create(subargs)
+        elif subcommand == "verify":
+            return self._verify(subargs)
+        elif subcommand == "list-heads":
+            return self._list_heads(subargs)
+        elif subcommand == "unbundle":
+            return self._unbundle(subargs)
+        else:
+            print(f"Unknown bundle subcommand: {subcommand}")
+            return 1
+
+    def _create(self, args) -> int:
+        parser = argparse.ArgumentParser(prog="bundle create")
+        parser.add_argument(
+            "-q", "--quiet", action="store_true", help="Suppress progress"
+        )
+        parser.add_argument("--progress", action="store_true", help="Show progress")
+        parser.add_argument(
+            "--version", type=int, choices=[2, 3], help="Bundle version"
+        )
+        parser.add_argument("--all", action="store_true", help="Include all refs")
+        parser.add_argument("--stdin", action="store_true", help="Read refs from stdin")
+        parser.add_argument("file", help="Output bundle file (use - for stdout)")
+        parser.add_argument("refs", nargs="*", help="References or rev-list args")
+
+        parsed_args = parser.parse_args(args)
+
+        repo = Repo(".")
+
+        progress = None
+        if parsed_args.progress and not parsed_args.quiet:
+
+            def progress(msg: str) -> None:
+                print(msg, file=sys.stderr)
+
+        refs_to_include = []
+        prerequisites = []
+
+        if parsed_args.all:
+            refs_to_include = list(repo.refs.keys())
+        elif parsed_args.stdin:
+            for line in sys.stdin:
+                ref = line.strip().encode("utf-8")
+                if ref:
+                    refs_to_include.append(ref)
+        elif parsed_args.refs:
+            for ref_arg in parsed_args.refs:
+                if ".." in ref_arg:
+                    range_result = parse_committish_range(repo, ref_arg)
+                    if range_result:
+                        start_commit, end_commit = range_result
+                        prerequisites.append(start_commit)
+                        # For ranges like A..B, we need to include B if it's a ref
+                        # Split the range to get the end part
+                        end_part = ref_arg.split("..")[1]
+                        if end_part:  # Not empty (not "A..")
+                            end_ref = end_part.encode("utf-8")
+                            if end_ref in repo.refs:
+                                refs_to_include.append(end_ref)
+                    else:
+                        sha = repo.refs[ref_arg.encode("utf-8")]
+                        refs_to_include.append(ref_arg.encode("utf-8"))
+                else:
+                    if ref_arg.startswith("^"):
+                        sha = repo.refs[ref_arg[1:].encode("utf-8")]
+                        prerequisites.append(sha)
+                    else:
+                        sha = repo.refs[ref_arg.encode("utf-8")]
+                        refs_to_include.append(ref_arg.encode("utf-8"))
+        else:
+            print("No refs specified. Use --all, --stdin, or specify refs")
+            return 1
+
+        if not refs_to_include:
+            print("fatal: Refusing to create empty bundle.")
+            return 1
+
+        bundle = create_bundle_from_repo(
+            repo,
+            refs=refs_to_include,
+            prerequisites=prerequisites,
+            version=parsed_args.version,
+            progress=progress,
+        )
+
+        if parsed_args.file == "-":
+            write_bundle(sys.stdout.buffer, bundle)
+        else:
+            with open(parsed_args.file, "wb") as f:
+                write_bundle(f, bundle)
+
+        return 0
+
+    def _verify(self, args) -> int:
+        parser = argparse.ArgumentParser(prog="bundle verify")
+        parser.add_argument(
+            "-q", "--quiet", action="store_true", help="Suppress output"
+        )
+        parser.add_argument("file", help="Bundle file to verify (use - for stdin)")
+
+        parsed_args = parser.parse_args(args)
+
+        repo = Repo(".")
+
+        def verify_bundle(bundle):
+            missing_prereqs = []
+            for prereq_sha, comment in bundle.prerequisites:
+                try:
+                    repo.object_store[prereq_sha]
+                except KeyError:
+                    missing_prereqs.append(prereq_sha)
+
+            if missing_prereqs:
+                if not parsed_args.quiet:
+                    print("The bundle requires these prerequisite commits:")
+                    for sha in missing_prereqs:
+                        print(f"  {sha.decode()}")
+                return 1
+            else:
+                if not parsed_args.quiet:
+                    print(
+                        "The bundle is valid and can be applied to the current repository"
+                    )
+                return 0
+
+        if parsed_args.file == "-":
+            bundle = read_bundle(sys.stdin.buffer)
+            return verify_bundle(bundle)
+        else:
+            with open(parsed_args.file, "rb") as f:
+                bundle = read_bundle(f)
+                return verify_bundle(bundle)
+
+    def _list_heads(self, args) -> int:
+        parser = argparse.ArgumentParser(prog="bundle list-heads")
+        parser.add_argument("file", help="Bundle file (use - for stdin)")
+        parser.add_argument("refnames", nargs="*", help="Only show these refs")
+
+        parsed_args = parser.parse_args(args)
+
+        def list_heads(bundle):
+            for ref, sha in bundle.references.items():
+                if not parsed_args.refnames or ref.decode() in parsed_args.refnames:
+                    print(f"{sha.decode()} {ref.decode()}")
+
+        if parsed_args.file == "-":
+            bundle = read_bundle(sys.stdin.buffer)
+            list_heads(bundle)
+        else:
+            with open(parsed_args.file, "rb") as f:
+                bundle = read_bundle(f)
+                list_heads(bundle)
+
+        return 0
+
+    def _unbundle(self, args) -> int:
+        parser = argparse.ArgumentParser(prog="bundle unbundle")
+        parser.add_argument("--progress", action="store_true", help="Show progress")
+        parser.add_argument("file", help="Bundle file (use - for stdin)")
+        parser.add_argument("refnames", nargs="*", help="Only unbundle these refs")
+
+        parsed_args = parser.parse_args(args)
+
+        repo = Repo(".")
+
+        progress = None
+        if parsed_args.progress:
+
+            def progress(msg: str) -> None:
+                print(msg, file=sys.stderr)
+
+        if parsed_args.file == "-":
+            bundle = read_bundle(sys.stdin.buffer)
+            # Process the bundle while file is still available via stdin
+            bundle.store_objects(repo.object_store, progress=progress)
+        else:
+            # Keep the file open during bundle processing
+            with open(parsed_args.file, "rb") as f:
+                bundle = read_bundle(f)
+                # Process pack data while file is still open
+                bundle.store_objects(repo.object_store, progress=progress)
+
+        for ref, sha in bundle.references.items():
+            if not parsed_args.refnames or ref.decode() in parsed_args.refnames:
+                print(ref.decode())
+
+        return 0
+
+
 commands = {
     "add": cmd_add,
     "annotate": cmd_annotate,
@@ -2228,6 +2428,7 @@ commands = {
     "bisect": cmd_bisect,
     "blame": cmd_blame,
     "branch": cmd_branch,
+    "bundle": cmd_bundle,
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
     "checkout": cmd_checkout,

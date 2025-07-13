@@ -59,12 +59,21 @@ class ParseCommitRangeTests(TestCase):
 
     def test_nonexistent(self) -> None:
         r = MemoryRepo()
-        self.assertRaises(KeyError, parse_commit_range, r, "thisdoesnotexist")
+        self.assertRaises(KeyError, parse_commit_range, r, "thisdoesnotexist..HEAD")
 
     def test_commit_by_sha(self) -> None:
         r = MemoryRepo()
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
-        self.assertEqual([c1], list(parse_commit_range(r, c1.id)))
+        self.assertIsNone(parse_commit_range(r, c1.id))
+
+    def test_commit_range(self) -> None:
+        r = MemoryRepo()
+        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        result = parse_commit_range(r, f"{c1.id.decode()}..{c2.id.decode()}")
+        self.assertIsNotNone(result)
+        start_commit, end_commit = result
+        self.assertEqual(c1, start_commit)
+        self.assertEqual(c2, end_commit)
 
 
 class ParseCommitTests(TestCase):

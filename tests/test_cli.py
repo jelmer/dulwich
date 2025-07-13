@@ -179,6 +179,92 @@ class CommitCommandTest(DulwichCliTestCase):
         # Check that HEAD points to a commit
         self.assertIsNotNone(self.repo.head())
 
+    def test_commit_all_flag(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Modify the file (don't stage it)
+        with open(test_file, "w") as f:
+            f.write("modified content")
+
+        # Create another file and don't add it (untracked)
+        untracked_file = os.path.join(self.repo_path, "untracked.txt")
+        with open(untracked_file, "w") as f:
+            f.write("untracked content")
+
+        # Commit with -a flag should stage and commit the modified file,
+        # but not the untracked file
+        result, stdout, stderr = self._run_cli(
+            "commit", "-a", "--message=Modified commit"
+        )
+        self.assertIsNotNone(self.repo.head())
+
+        # Check that the modification was committed
+        with open(test_file) as f:
+            content = f.read()
+        self.assertEqual(content, "modified content")
+
+        # Check that untracked file is still untracked
+        self.assertTrue(os.path.exists(untracked_file))
+
+    def test_commit_all_flag_no_changes(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Try to commit with -a when there are no changes
+        # This should still work (git allows this)
+        result, stdout, stderr = self._run_cli(
+            "commit", "-a", "--message=No changes commit"
+        )
+        self.assertIsNotNone(self.repo.head())
+
+    def test_commit_all_flag_multiple_files(self):
+        # Create initial commit with multiple files
+        file1 = os.path.join(self.repo_path, "file1.txt")
+        file2 = os.path.join(self.repo_path, "file2.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        self._run_cli("add", "file1.txt", "file2.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Modify both files
+        with open(file1, "w") as f:
+            f.write("modified content1")
+        with open(file2, "w") as f:
+            f.write("modified content2")
+
+        # Create an untracked file
+        untracked_file = os.path.join(self.repo_path, "untracked.txt")
+        with open(untracked_file, "w") as f:
+            f.write("untracked content")
+
+        # Commit with -a should stage both modified files but not untracked
+        result, stdout, stderr = self._run_cli(
+            "commit", "-a", "--message=Modified both files"
+        )
+        self.assertIsNotNone(self.repo.head())
+
+        # Verify modifications were committed
+        with open(file1) as f:
+            self.assertEqual(f.read(), "modified content1")
+        with open(file2) as f:
+            self.assertEqual(f.read(), "modified content2")
+
+        # Verify untracked file still exists
+        self.assertTrue(os.path.exists(untracked_file))
+
 
 class LogCommandTest(DulwichCliTestCase):
     """Tests for log command."""

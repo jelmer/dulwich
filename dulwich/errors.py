@@ -180,3 +180,7 @@ class RefFormatError(Exception):
 
 class HookError(Exception):
     """An error occurred while executing a hook."""
+
+
+class WorkingTreeModifiedError(Exception):
+    """Indicates that the working tree has modifications that would be overwritten."""

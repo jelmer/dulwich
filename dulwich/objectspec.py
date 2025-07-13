@@ -48,7 +48,57 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
       KeyError: If the object can not be found
     """
     objectish = to_bytes(objectish)
-    return repo[objectish]
+
+    # Find where the operators start
+    base_end = 0
+    for i, c in enumerate(objectish):
+        if c in (ord(b"~"), ord(b"^")):
+            base_end = i
+            break
+    else:
+        # No operators found
+        return repo[objectish]
+
+    if base_end == 0:
+        raise ValueError("Empty base object before ~ or ^")
+
+    # Get the base commit
+    base_ref = objectish[:base_end]
+    current = parse_commit(repo, base_ref)
+
+    # Process operators from left to right
+    i = base_end
+    while i < len(objectish):
+        op = chr(objectish[i])
+        i += 1
+
+        # Parse the number after the operator (default is 1)
+        num_str = ""
+        while i < len(objectish) and chr(objectish[i]).isdigit():
+            num_str += chr(objectish[i])
+            i += 1
+        num = int(num_str) if num_str else 1
+
+        if op == "~":
+            # ~N means N-th generation ancestor (follow first parent N times)
+            for _ in range(num):
+                if not current.parents:
+                    raise ValueError(f"Commit {current.id.decode('ascii', 'replace')} has no parents")
+                current = repo[current.parents[0]]
+        elif op == "^":
+            # ^N means N-th parent (1-indexed)
+            if num == 0:
+                # ^0 means the commit itself
+                continue
+            if num > len(current.parents):
+                raise ValueError(f"Commit {current.id.decode('ascii', 'replace')} does not have parent #{num}")
+            current = repo[current.parents[num - 1]]
+        else:
+            # If we encounter a non-operator character, this might be part of the base ref
+            # This shouldn't happen if we parsed correctly above
+            raise ValueError(f"Unexpected character in revision spec: {op!r}")
+
+    return current
 
 
 def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "Tree":

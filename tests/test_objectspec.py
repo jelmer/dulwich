@@ -23,7 +23,7 @@
 
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
-from dulwich.objects import Blob, Commit, Tag
+from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.objectspec import (
     parse_commit,
     parse_commit_range,
@@ -111,6 +111,140 @@ class ParseObjectTests(TestCase):
         r.object_store.add_object(b)
         # Can't apply ~ or ^ to a blob
         self.assertRaises(ValueError, parse_object, r, b.id + b"~1")
+
+    def test_tag_dereference(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Create an annotated tag
+        tag = Tag()
+        tag.name = b"v1.0"
+        tag.message = b"Test tag"
+        tag.tag_time = 1234567890
+        tag.tag_timezone = 0
+        tag.object = (Commit, c1.id)
+        tag.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag)
+        # ^{} dereferences the tag
+        self.assertEqual(c1, parse_object(r, tag.id + b"^{}"))
+
+    def test_nested_tag_dereference(self) -> None:
+        r = MemoryRepo()
+        [c1] = build_commit_graph(r.object_store, [[1]])
+        # Create a tag pointing to a commit
+        tag1 = Tag()
+        tag1.name = b"v1.0"
+        tag1.message = b"Test tag"
+        tag1.tag_time = 1234567890
+        tag1.tag_timezone = 0
+        tag1.object = (Commit, c1.id)
+        tag1.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag1)
+
+        # Create another tag pointing to the first tag
+        tag2 = Tag()
+        tag2.name = b"v1.0-release"
+        tag2.message = b"Release tag"
+        tag2.tag_time = 1234567900
+        tag2.tag_timezone = 0
+        tag2.object = (Tag, tag1.id)
+        tag2.tagger = b"Test Tagger <test@example.com>"
+        r.object_store.add_object(tag2)
+
+        # ^{} should recursively dereference to the commit
+        self.assertEqual(c1, parse_object(r, tag2.id + b"^{}"))
+
+    def test_path_in_tree(self) -> None:
+        r = MemoryRepo()
+        # Create a blob
+        b = Blob.from_string(b"Test content")
+
+        # Create a commit with the blob in its tree
+        [c1] = build_commit_graph(r.object_store, [[1]], trees={1: [(b"test.txt", b)]})
+
+        # HEAD:test.txt should return the blob
+        r.refs[b"HEAD"] = c1.id
+        result = parse_object(r, b"HEAD:test.txt")
+        self.assertEqual(b"Test content", result.data)
+
+    def test_path_in_tree_nested(self) -> None:
+        r = MemoryRepo()
+        # Create blobs
+        b1 = Blob.from_string(b"Content 1")
+        b2 = Blob.from_string(b"Content 2")
+
+        # For nested trees, we need to create them manually
+        # Create subtree
+        subtree = Tree()
+        subtree.add(b"file.txt", 0o100644, b1.id)
+        r.object_store.add_object(b1)
+        r.object_store.add_object(subtree)
+
+        # Create main tree
+        main_tree = Tree()
+        main_tree.add(b"README", 0o100644, b2.id)
+        main_tree.add(b"subdir", 0o040000, subtree.id)
+        r.object_store.add_object(b2)
+        r.object_store.add_object(main_tree)
+
+        # Create commit with our tree
+        c = Commit()
+        c.tree = main_tree.id
+        c.author = c.committer = b"Test User <test@example.com>"
+        c.author_time = c.commit_time = 1234567890
+        c.author_timezone = c.commit_timezone = 0
+        c.message = b"Test commit"
+        r.object_store.add_object(c)
+
+        # Lookup nested path
+        result = parse_object(r, c.id + b":subdir/file.txt")
+        self.assertEqual(b"Content 1", result.data)
+
+    def test_reflog_lookup(self) -> None:
+        # Use a real repo for reflog testing
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            r = Repo.init_bare(tmpdir)
+            c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
+
+            # Write reflog entries using the repo's _write_reflog method
+            # These are written in chronological order (oldest first)
+            r._write_reflog(
+                b"HEAD",
+                None,
+                c1.id,
+                b"Test User <test@example.com>",
+                1234567890,
+                0,
+                b"commit: Initial commit",
+            )
+            r._write_reflog(
+                b"HEAD",
+                c1.id,
+                c2.id,
+                b"Test User <test@example.com>",
+                1234567891,
+                0,
+                b"commit: Second commit",
+            )
+            r._write_reflog(
+                b"HEAD",
+                c2.id,
+                c3.id,
+                b"Test User <test@example.com>",
+                1234567892,
+                0,
+                b"commit: Third commit",
+            )
+
+            # HEAD@{0} is the most recent (c3)
+            self.assertEqual(c3, parse_object(r, b"HEAD@{0}"))
+            # HEAD@{1} is the second most recent (c2)
+            self.assertEqual(c2, parse_object(r, b"HEAD@{1}"))
+            # HEAD@{2} is the third/oldest (c1)
+            self.assertEqual(c1, parse_object(r, b"HEAD@{2}"))
 
 
 class ParseCommitRangeTests(TestCase):

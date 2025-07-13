@@ -1010,7 +1010,8 @@ class BaseRepo:
         and get_user_identity(..., 'AUTHOR') respectively.
 
         Args:
-          message: Commit message
+          message: Commit message (bytes or callable that takes (repo, commit)
+            and returns bytes)
           committer: Committer fullname
           author: Author fullname
           commit_timestamp: Commit timestamp (defaults to now)
@@ -1083,6 +1084,39 @@ class BaseRepo:
                 pass  # No dice
         if encoding is not None:
             c.encoding = encoding
+        # Store original message (might be callable)
+        original_message = message
+        message = None  # Will be set later after parents are set
+
+        # Check if we should sign the commit
+        should_sign = sign
+        if sign is None:
+            # Check commit.gpgSign configuration when sign is not explicitly set
+            config = self.get_config_stack()
+            try:
+                should_sign = config.get_boolean((b"commit",), b"gpgSign")
+            except KeyError:
+                should_sign = False  # Default to not signing if no config
+        keyid = sign if isinstance(sign, str) else None
+
+        if ref is None:
+            # Create a dangling commit
+            c.parents = merge_heads
+        else:
+            try:
+                old_head = self.refs[ref]
+                c.parents = [old_head, *merge_heads]
+            except KeyError:
+                c.parents = merge_heads
+
+        # Handle message after parents are set
+        if callable(original_message):
+            message = original_message(self, c)
+            if message is None:
+                raise ValueError("Message callback returned None")
+        else:
+            message = original_message
+
         if message is None:
             # FIXME: Try to read commit message from .git/MERGE_MSG
             raise ValueError("No commit message specified")
@@ -1099,27 +1133,14 @@ class BaseRepo:
         except KeyError:  # no hook defined, message not modified
             c.message = message
 
-        # Check if we should sign the commit
-        should_sign = sign
-        if sign is None:
-            # Check commit.gpgSign configuration when sign is not explicitly set
-            config = self.get_config_stack()
-            try:
-                should_sign = config.get_boolean((b"commit",), b"gpgSign")
-            except KeyError:
-                should_sign = False  # Default to not signing if no config
-        keyid = sign if isinstance(sign, str) else None
-
         if ref is None:
             # Create a dangling commit
-            c.parents = merge_heads
             if should_sign:
                 c.sign(keyid)
             self.object_store.add_object(c)
         else:
             try:
                 old_head = self.refs[ref]
-                c.parents = [old_head, *merge_heads]
                 if should_sign:
                     c.sign(keyid)
                 self.object_store.add_object(c)

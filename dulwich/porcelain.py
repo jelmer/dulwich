@@ -480,7 +480,8 @@ def commit(
 
     Args:
       repo: Path to repository
-      message: Optional commit message
+      message: Optional commit message (string/bytes or callable that takes
+        (repo, commit) and returns bytes)
       author: Optional author name and email
       author_timezone: Author timestamp timezone
       committer: Optional committer name and email

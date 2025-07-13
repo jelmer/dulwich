@@ -463,8 +463,14 @@ class cmd_commit(Command):
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("--message", "-m", required=True, help="Commit message")
+        parser.add_argument(
+            "-a",
+            "--all",
+            action="store_true",
+            help="Automatically stage all tracked files that have been modified",
+        )
         args = parser.parse_args(args)
-        porcelain.commit(".", message=args.message)
+        porcelain.commit(".", message=args.message, all=args.all)
 
 
 class cmd_commit_tree(Command):

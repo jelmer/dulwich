@@ -474,6 +474,7 @@ def commit(
     encoding=None,
     no_verify=False,
     signoff=False,
+    all=False,
 ):
     """Create a new commit.
 
@@ -488,9 +489,9 @@ def commit(
       signoff: GPG Sign the commit (bool, defaults to False,
         pass True to use default GPG key,
         pass a str containing Key ID to use a specific GPG key)
+      all: Automatically stage all tracked files that have been modified
     Returns: SHA1 of the new commit
     """
-    # FIXME: Support --all argument
     if getattr(message, "encode", None):
         message = message.encode(encoding or DEFAULT_ENCODING)
     if getattr(author, "encode", None):
@@ -502,7 +503,27 @@ def commit(
         author_timezone = local_timezone[0]
     if commit_timezone is None:
         commit_timezone = local_timezone[1]
+
     with open_repo_closing(repo) as r:
+        # If -a flag is used, stage all modified tracked files
+        if all:
+            index = r.open_index()
+            normalizer = r.get_blob_normalizer()
+            filter_callback = normalizer.checkin_normalize
+            unstaged_changes = list(
+                get_unstaged_changes(index, r.path, filter_callback)
+            )
+
+            if unstaged_changes:
+                # Convert bytes paths to strings for add function
+                modified_files = []
+                for path in unstaged_changes:
+                    if isinstance(path, bytes):
+                        path = path.decode()
+                    modified_files.append(path)
+
+                add(r, paths=modified_files)
+
         return r.do_commit(
             message=message,
             author=author,

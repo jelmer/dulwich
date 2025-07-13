@@ -3540,11 +3540,12 @@ class ResetTests(PorcelainTestCase):
         with open(file2, "w") as f:
             f.write("new content")
 
-        # Reset to commit that has file2 removed - should delete untracked file2
+        # Reset to commit that has file2 removed - untracked file2 should remain
         porcelain.reset(self.repo, "hard", sha2)
 
         self.assertTrue(os.path.exists(file1))
-        self.assertFalse(os.path.exists(file2))
+        # Untracked files are not removed by reset --hard
+        self.assertTrue(os.path.exists(file2))
 
     def test_hard_reset_to_remote_branch(self) -> None:
         """Test reset --hard to remote branch deletes local files not in remote."""
@@ -4024,16 +4025,30 @@ class CheckoutTests(PorcelainTestCase):
             [{"add": [], "delete": [], "modify": [b"nee"]}, [], []], status
         )
 
-        # The new checkout behavior allows switching if the file doesn't exist in target branch
-        # (changes can be preserved)
-        porcelain.checkout(self.repo, b"uni")
+        # Checkout should fail when there are staged changes that would be lost
+        # This matches Git's behavior to prevent data loss
+        from dulwich.errors import WorkingTreeModifiedError
+
+        with self.assertRaises(WorkingTreeModifiedError) as cm:
+            porcelain.checkout(self.repo, b"uni")
+
+        self.assertIn("nee", str(cm.exception))
+
+        # Should still be on master branch
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+        # The staged changes should still be present
+        status = list(porcelain.status(self.repo))
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": [b"nee"]}, [], []], status
+        )
+        self.assertTrue(os.path.exists(nee_path))
+
+        # Force checkout should work and lose the changes
+        porcelain.checkout(self.repo, b"uni", force=True)
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
-        # The staged changes are lost and the file is removed from working tree
-        # because it doesn't exist in the target branch
-        status = list(porcelain.status(self.repo))
-        # File 'nee' is gone completely
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
+        # Now the file should be gone
         self.assertFalse(os.path.exists(nee_path))
 
     def test_checkout_to_branch_with_modified_file_not_present_forced(self) -> None:
@@ -4454,7 +4469,7 @@ class GeneralCheckoutTests(PorcelainTestCase):
         self.assertEqual(b"master", porcelain.active_branch(self.repo))
 
     def test_checkout_force(self) -> None:
-        """Test forced checkout discards local changes."""
+        """Test forced checkout discards local changes for files that differ between branches."""
         # Modify a file
         with open(self._foo_path, "w") as f:
             f.write("modified content\n")
@@ -4464,10 +4479,11 @@ class GeneralCheckoutTests(PorcelainTestCase):
 
         self.assertEqual(b"feature", porcelain.active_branch(self.repo))
 
-        # Local changes should be discarded
+        # Since foo has the same content in master and feature branches,
+        # checkout should NOT restore it - the modified content should remain
         with open(self._foo_path) as f:
             content = f.read()
-        self.assertEqual("initial content\n", content)
+        self.assertEqual("modified content\n", content)
 
     def test_checkout_nonexistent_ref(self) -> None:
         """Test checkout of non-existent branch/commit."""
@@ -5289,6 +5305,190 @@ class PullTests(PorcelainTestCase):
         self.assertTrue(os.path.exists(target_file))
         with open(target_file) as f:
             self.assertEqual(f.read(), "This is new content")
+
+        # Check the HEAD is updated too
+        with Repo(self.target_path) as r:
+            self.assertEqual(r[b"HEAD"].id, self.repo[b"HEAD"].id)
+
+    def test_pull_protects_modified_files(self) -> None:
+        """Test that pull refuses to overwrite uncommitted changes by default."""
+        from dulwich.errors import WorkingTreeModifiedError
+
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create a file with content in the source repo
+        test_file = os.path.join(self.repo.path, "testfile.txt")
+        with open(test_file, "w") as f:
+            f.write("original content")
+
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Add test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Pull this change to target first
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # Now modify the file in source repo
+        with open(test_file, "w") as f:
+            f.write("updated content")
+
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Update test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Modify the same file in target working directory (uncommitted)
+        target_file = os.path.join(self.target_path, "testfile.txt")
+        with open(target_file, "w") as f:
+            f.write("local modifications")
+
+        # Pull should fail because of uncommitted changes
+        with self.assertRaises(WorkingTreeModifiedError) as cm:
+            porcelain.pull(
+                self.target_path,
+                self.repo.path,
+                b"refs/heads/master",
+                outstream=outstream,
+                errstream=errstream,
+            )
+
+        self.assertIn("Your local changes", str(cm.exception))
+        self.assertIn("testfile.txt", str(cm.exception))
+
+        # Verify the file still has local modifications
+        with open(target_file) as f:
+            self.assertEqual(f.read(), "local modifications")
+
+    def test_pull_force_overwrites_modified_files(self) -> None:
+        """Test that pull with force=True overwrites uncommitted changes."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create a file with content in the source repo
+        test_file = os.path.join(self.repo.path, "testfile.txt")
+        with open(test_file, "w") as f:
+            f.write("original content")
+
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Add test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Pull this change to target first
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # Now modify the file in source repo
+        with open(test_file, "w") as f:
+            f.write("updated content")
+
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Update test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Modify the same file in target working directory (uncommitted)
+        target_file = os.path.join(self.target_path, "testfile.txt")
+        with open(target_file, "w") as f:
+            f.write("local modifications")
+
+        # Pull with force=True should succeed and overwrite local changes
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master",
+            outstream=outstream,
+            errstream=errstream,
+            force=True,
+        )
+
+        # Verify the file now has the remote content
+        with open(target_file) as f:
+            self.assertEqual(f.read(), "updated content")
+
+        # Check the HEAD is updated too
+        with Repo(self.target_path) as r:
+            self.assertEqual(r[b"HEAD"].id, self.repo[b"HEAD"].id)
+
+    def test_pull_allows_unmodified_files(self) -> None:
+        """Test that pull allows updating files that haven't been modified locally."""
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create a file with content in the source repo
+        test_file = os.path.join(self.repo.path, "testfile.txt")
+        with open(test_file, "w") as f:
+            f.write("original content")
+
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Add test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Pull this change to target first
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # Now modify the file in source repo
+        with open(test_file, "w") as f:
+            f.write("updated content")
+
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Update test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        # Don't modify the file in target - it should be safe to update
+        target_file = os.path.join(self.target_path, "testfile.txt")
+
+        # Pull should succeed since the file wasn't modified locally
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master",
+            outstream=outstream,
+            errstream=errstream,
+        )
+
+        # Verify the file now has the remote content
+        with open(target_file) as f:
+            self.assertEqual(f.read(), "updated content")
 
         # Check the HEAD is updated too
         with Repo(self.target_path) as r:

@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
+# General Public License as published by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or
 # modify it under the terms of either of these two licenses.
 #
@@ -517,7 +517,7 @@ class PackIndex:
 
     def object_sha1(self, index: int) -> bytes:
         """Return the SHA1 corresponding to the index in the pack file."""
-        for name, offset, crc32 in self.iterentries():
+        for name, offset, _crc32 in self.iterentries():
             if offset == index:
                 return name
         else:
@@ -561,7 +561,7 @@ class MemoryPackIndex(PackIndex):
         """
         self._by_sha = {}
         self._by_offset = {}
-        for name, offset, crc32 in entries:
+        for name, offset, _crc32 in entries:
             self._by_sha[name] = offset
             self._by_offset[offset] = name
         self._entries = entries
@@ -1132,7 +1132,7 @@ class PackStreamReader:
         """
         pack_version, self._num_objects = read_pack_header(self.read)
 
-        for i in range(self._num_objects):
+        for _ in range(self._num_objects):
             offset = self.offset
             unpacked, unused = unpack_object(
                 self.read,
@@ -2403,13 +2403,13 @@ def write_pack_index_v1(f, entries, pack_checksum):
     """
     f = SHA1Writer(f)
     fan_out_table = defaultdict(lambda: 0)
-    for name, offset, entry_checksum in entries:
+    for name, _offset, _entry_checksum in entries:
         fan_out_table[ord(name[:1])] += 1
     # Fan-out table
     for i in range(0x100):
         f.write(struct.pack(">L", fan_out_table[i]))
         fan_out_table[i + 1] += fan_out_table[i]
-    for name, offset, entry_checksum in entries:
+    for name, offset, _entry_checksum in entries:
         if not (offset <= 0xFFFFFFFF):
             raise TypeError("pack format 1 only supports offsets < 2Gb")
         f.write(struct.pack(">L20s", offset, name))
@@ -2987,7 +2987,7 @@ class Pack:
         # Now grab the base object (mustn't be a delta) and apply the
         # deltas all the way up the stack.
         chunks = base_obj
-        for prev_offset, delta_type, delta in reversed(delta_stack):
+        for prev_offset, _delta_type, delta in reversed(delta_stack):
             chunks = apply_delta(chunks, delta)
             # TODO(dborowitz): This can result in poor performance if
             # large base objects are separated from deltas in the pack.

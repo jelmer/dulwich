@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
+# General Public License as published by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or
 # modify it under the terms of either of these two licenses.
 #
@@ -148,10 +148,10 @@ def hex_to_filename(
     # as path.
     if type(path) is not type(hex) and isinstance(path, str):
         hex = hex.decode("ascii")  # type: ignore
-    dir = hex[:2]
-    file = hex[2:]
+    dir_name = hex[:2]
+    file_name = hex[2:]
     # Check from object dir
-    return os.path.join(path, dir, file)  # type: ignore
+    return os.path.join(path, dir_name, file_name)  # type: ignore
 
 
 def filename_to_hex(filename: Union[str, bytes]) -> str:

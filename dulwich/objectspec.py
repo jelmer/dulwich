@@ -21,7 +21,6 @@
 
 """Object specification."""
 
-from collections.abc import Iterator
 from typing import TYPE_CHECKING, Optional, Union
 
 from .objects import Commit, ShaFile, Tag, Tree
@@ -210,9 +209,9 @@ def parse_refs(container, refspecs):
     return ret
 
 
-def parse_committish_range(
+def parse_commit_range(
     repo: "Repo", committish: Union[str, bytes]
-) -> Optional[tuple[bytes, bytes]]:
+) -> Optional[tuple["Commit", "Commit"]]:
     """Parse a string referring to a commit range.
 
     Args:
@@ -221,7 +220,7 @@ def parse_committish_range(
 
     Returns:
       None if committish is a single commit reference
-      A tuple of (start_commit_id, end_commit_id) if it's a range
+      A tuple of (start_commit, end_commit) if it's a range
     Raises:
       KeyError: When the commits can not be found
       ValueError: If the range can not be parsed
@@ -240,25 +239,7 @@ def parse_committish_range(
     start_commit = parse_commit(repo, start_ref)
     end_commit = parse_commit(repo, end_ref)
 
-    return (start_commit.id, end_commit.id)
-
-
-def parse_commit_range(
-    repo: "Repo", committishs: Union[str, bytes]
-) -> Iterator["Commit"]:
-    """Parse a string referring to a range of commits.
-
-    Args:
-      repo: A `Repo` object
-      committishs: A string referring to a range of commits.
-    Returns: An iterator over `Commit` objects
-    Raises:
-      KeyError: When the reference commits can not be found
-      ValueError: If the range can not be parsed
-    """
-    committishs = to_bytes(committishs)
-    # TODO(jelmer): Support more than a single commit..
-    return iter([parse_commit(repo, committishs)])
+    return (start_commit, end_commit)
 
 
 class AmbiguousShortId(Exception):

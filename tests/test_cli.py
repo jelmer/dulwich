@@ -33,7 +33,7 @@ from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
 from dulwich import cli
-from dulwich.cli import format_bytes, parse_relative_time
+from dulwich.cli import format_bytes, launch_editor, parse_relative_time
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
     build_commit_graph,
@@ -116,6 +116,25 @@ class InitCommandTest(DulwichCliTestCase):
         result, stdout, stderr = self._run_cli("init", "--bare", bare_repo_path)
         self.assertTrue(os.path.exists(os.path.join(bare_repo_path, "HEAD")))
         self.assertFalse(os.path.exists(os.path.join(bare_repo_path, ".git")))
+
+
+class HelperFunctionsTest(TestCase):
+    """Tests for CLI helper functions."""
+
+    def test_format_bytes(self):
+        self.assertEqual("0.0 B", format_bytes(0))
+        self.assertEqual("100.0 B", format_bytes(100))
+        self.assertEqual("1.0 KB", format_bytes(1024))
+        self.assertEqual("1.5 KB", format_bytes(1536))
+        self.assertEqual("1.0 MB", format_bytes(1024 * 1024))
+        self.assertEqual("1.0 GB", format_bytes(1024 * 1024 * 1024))
+        self.assertEqual("1.0 TB", format_bytes(1024 * 1024 * 1024 * 1024))
+
+    def test_launch_editor_with_cat(self):
+        """Test launch_editor by using cat as the editor."""
+        self.overrideEnv("GIT_EDITOR", "cat")
+        result = launch_editor(b"Test template content")
+        self.assertEqual(b"Test template content", result)
 
 
 class AddCommandTest(DulwichCliTestCase):
@@ -264,6 +283,63 @@ class CommitCommandTest(DulwichCliTestCase):
 
         # Verify untracked file still exists
         self.assertTrue(os.path.exists(untracked_file))
+
+    @patch("dulwich.cli.launch_editor")
+    def test_commit_editor_success(self, mock_editor):
+        """Test commit with editor when user provides a message."""
+        # Create and add a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+
+        # Mock editor to return a commit message
+        mock_editor.return_value = b"My commit message\n\n# This is a comment\n"
+
+        # Commit without --message flag
+        result, stdout, stderr = self._run_cli("commit")
+
+        # Check that HEAD points to a commit
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(commit.message, b"My commit message")
+
+        # Verify editor was called
+        mock_editor.assert_called_once()
+
+    @patch("dulwich.cli.launch_editor")
+    def test_commit_editor_empty_message(self, mock_editor):
+        """Test commit with editor when user provides empty message."""
+        # Create and add a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+
+        # Mock editor to return only comments
+        mock_editor.return_value = b"# All lines are comments\n# No actual message\n"
+
+        # Commit without --message flag should fail with exit code 1
+        result, stdout, stderr = self._run_cli("commit")
+        self.assertEqual(result, 1)
+
+    @patch("dulwich.cli.launch_editor")
+    def test_commit_editor_unchanged_template(self, mock_editor):
+        """Test commit with editor when user doesn't change the template."""
+        # Create and add a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+
+        # Mock editor to return the exact template that was passed to it
+        def return_unchanged_template(template):
+            return template
+
+        mock_editor.side_effect = return_unchanged_template
+
+        # Commit without --message flag should fail with exit code 1
+        result, stdout, stderr = self._run_cli("commit")
+        self.assertEqual(result, 1)
 
 
 class LogCommandTest(DulwichCliTestCase):

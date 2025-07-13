@@ -545,6 +545,66 @@ class CommitTests(PorcelainTestCase):
         self.assertIn(b"file1.txt", tree)
         self.assertIn(b"file2.txt", tree)
 
+    def test_commit_amend_message(self) -> None:
+        # Create initial commit
+        filename = os.path.join(self.repo.path, "test.txt")
+        with open(filename, "wb") as f:
+            f.write(b"initial content")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+        original_sha = porcelain.commit(self.repo.path, message=b"Original commit")
+
+        # Amend with new message
+        amended_sha = porcelain.commit(
+            self.repo.path, message=b"Amended commit", amend=True
+        )
+
+        self.assertIsInstance(amended_sha, bytes)
+        self.assertEqual(len(amended_sha), 40)
+        self.assertNotEqual(amended_sha, original_sha)
+
+        # Check that the amended commit has the new message
+        amended_commit = self.repo.get_object(amended_sha)
+        assert isinstance(amended_commit, Commit)
+        self.assertEqual(amended_commit.message, b"Amended commit")
+
+        # Check that the amended commit uses the original commit's parents
+        original_commit = self.repo.get_object(original_sha)
+        assert isinstance(original_commit, Commit)
+        # Since this was the first commit, it should have no parents,
+        # and the amended commit should also have no parents
+        self.assertEqual(amended_commit.parents, original_commit.parents)
+
+    def test_commit_amend_no_message(self) -> None:
+        # Create initial commit
+        filename = os.path.join(self.repo.path, "test.txt")
+        with open(filename, "wb") as f:
+            f.write(b"initial content")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+        original_sha = porcelain.commit(self.repo.path, message=b"Original commit")
+
+        # Modify file and stage it
+        with open(filename, "wb") as f:
+            f.write(b"modified content")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+
+        # Amend without providing message (should reuse original message)
+        amended_sha = porcelain.commit(self.repo.path, amend=True)
+
+        self.assertIsInstance(amended_sha, bytes)
+        self.assertEqual(len(amended_sha), 40)
+        self.assertNotEqual(amended_sha, original_sha)
+
+        # Check that the amended commit has the original message
+        amended_commit = self.repo.get_object(amended_sha)
+        assert isinstance(amended_commit, Commit)
+        self.assertEqual(amended_commit.message, b"Original commit")
+
+    def test_commit_amend_no_existing_commit(self) -> None:
+        # Try to amend when there's no existing commit
+        with self.assertRaises(ValueError) as cm:
+            porcelain.commit(self.repo.path, message=b"Should fail", amend=True)
+        self.assertIn("Cannot amend: no existing commit found", str(cm.exception))
+
 
 @skipIf(
     platform.python_implementation() == "PyPy" or sys.platform == "win32",

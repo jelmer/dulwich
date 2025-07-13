@@ -25,6 +25,7 @@ import os
 import sys
 from typing import TYPE_CHECKING, Optional, TypedDict
 
+from .diff_tree import tree_changes
 from .file import GitFile
 from .index import (
     IndexEntry,
@@ -317,10 +318,13 @@ class Stash:
         # Update from stash tree to HEAD tree
         # This will remove files that were in stash but not in HEAD,
         # and restore files to their HEAD versions
+        changes = tree_changes(self._repo.object_store, stash_tree_id, head_tree_id)
         update_working_tree(
             self._repo,
             old_tree_id=stash_tree_id,
             new_tree_id=head_tree_id,
+            change_iterator=changes,
+            allow_overwrite_modified=True,  # We need to overwrite modified files
         )
 
         return cid

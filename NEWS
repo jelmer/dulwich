@@ -6,8 +6,9 @@
  * Add support for merge drivers.
    (Jelmer Vernooĳ)
 
- * Add support for Git revision syntax operators ``~`` and ``^`` in
-   ``dulwich.objectspec.parse_object``, e.g. ``HEAD~1``, ``HEAD^2``.
+ * Add support for Git revision syntax operators ``~``, ``^``, ``^{}``,
+   ``@{N}``, and ``:path`` in ``dulwich.objectspec.parse_object``,
+   e.g. ``HEAD~1``, ``HEAD^2``, ``v1.0^{}``, ``HEAD@{1}``, ``HEAD:README``.
    (Jelmer Vernooĳ)
 
  * Add support for ``GIT_CONFIG_GLOBAL`` and ``GIT_CONFIG_SYSTEM``

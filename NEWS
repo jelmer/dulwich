@@ -3,6 +3,9 @@
  * Add support for ``-a`` argument to
    ``dulwich.cli.commit``. (Jelmer Vernooĳ)
 
+ * Add support for ``--amend`` argument to
+   ``dulwich.cli.commit`` and ``dulwich.porcelain.commit``. (Jelmer Vernooĳ)
+
  * Add support for merge drivers.
    (Jelmer Vernooĳ)
 

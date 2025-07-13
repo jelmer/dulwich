@@ -57,6 +57,33 @@ class Bundle:
             return False
         return True
 
+    def store_objects(
+        self, object_store, progress: Optional[Callable[[str], None]] = None
+    ):
+        """Store all objects from this bundle into an object store.
+
+        Args:
+            object_store: The object store to add objects to
+            progress: Optional progress callback function
+        """
+        from .objects import ShaFile
+
+        count = 0
+        for unpacked in self.pack_data.iter_unpacked():
+            # Convert the unpacked object to a proper git object
+            if unpacked.decomp_chunks:
+                git_obj = ShaFile.from_raw_chunks(
+                    unpacked.obj_type_num, unpacked.decomp_chunks
+                )
+                object_store.add_object(git_obj)
+                count += 1
+
+                if progress and count % 100 == 0:
+                    progress(f"Stored {count} objects")
+
+        if progress:
+            progress(f"Stored {count} objects total")
+
 
 def _read_bundle(f: BinaryIO, version: int) -> Bundle:
     capabilities = {}
@@ -82,7 +109,16 @@ def _read_bundle(f: BinaryIO, version: int) -> Bundle:
         (obj_id, ref) = line.rstrip(b"\n").split(b" ", 1)
         references[ref] = obj_id
         line = f.readline()
-    pack_data = PackData.from_file(f)
+    # Extract pack data to separate stream since PackData expects
+    # the file to start with PACK header at position 0
+    pack_bytes = f.read()
+    if not pack_bytes:
+        raise ValueError("Bundle file contains no pack data")
+
+    from io import BytesIO
+
+    pack_file = BytesIO(pack_bytes)
+    pack_data = PackData.from_file(pack_file)
     ret = Bundle()
     ret.references = references
     ret.capabilities = capabilities
@@ -93,7 +129,15 @@ def _read_bundle(f: BinaryIO, version: int) -> Bundle:
 
 
 def read_bundle(f: BinaryIO) -> Bundle:
-    """Read a bundle file."""
+    """Read a bundle file.
+
+    Args:
+        f: A seekable binary file-like object. The file must remain open
+           for the lifetime of the returned Bundle object.
+    """
+    if not hasattr(f, "seek"):
+        raise ValueError("Bundle file must be seekable")
+
     firstline = f.readline()
     if firstline == b"# v2 git bundle\n":
         return _read_bundle(f, 2)

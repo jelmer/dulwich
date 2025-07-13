@@ -427,13 +427,9 @@ class PorcelainLFSIntegrationTests(TestCase):
 
     def test_add_large_file_with_lfs(self) -> None:
         """Test adding large files with LFS filter."""
-        # Configure LFS filter
-        config = self.repo.get_config()
-        config.set((b"filter", b"lfs"), b"clean", b"git-lfs clean -- %f")
-        config.set((b"filter", b"lfs"), b"smudge", b"git-lfs smudge -- %f")
-        config.set((b"filter", b"lfs"), b"process", b"git-lfs filter-process")
-        config.set((b"filter", b"lfs"), b"required", b"true")
-        config.write_to_path()
+        # Don't configure external git-lfs commands - the FilterRegistry will
+        # automatically use the built-in LFSFilterDriver when it sees the
+        # filter=lfs attribute in .gitattributes
 
         # Create .gitattributes for LFS
         gitattributes_path = os.path.join(self.test_dir, ".gitattributes")

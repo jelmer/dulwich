@@ -30,7 +30,9 @@ a way to test Dulwich.
 
 import argparse
 import os
+import shutil
 import signal
+import subprocess
 import sys
 from pathlib import Path
 from typing import ClassVar, Optional
@@ -121,6 +123,203 @@ def format_bytes(bytes):
     return f"{bytes:.1f} TB"
 
 
+class PagerBuffer:
+    """Binary buffer wrapper for Pager to mimic sys.stdout.buffer."""
+
+    def __init__(self, pager):
+        self.pager = pager
+
+    def write(self, data: bytes):
+        """Write bytes to pager."""
+        if isinstance(data, bytes):
+            text = data.decode("utf-8", errors="replace")
+            return self.pager.write(text)
+        return self.pager.write(data)
+
+    def flush(self):
+        """Flush the pager."""
+        return self.pager.flush()
+
+    def writelines(self, lines):
+        """Write multiple lines to pager."""
+        for line in lines:
+            self.write(line)
+
+
+class Pager:
+    """File-like object that pages output through external pager programs."""
+
+    def __init__(self):
+        self.pager_process = None
+        self.buffer = PagerBuffer(self)
+        self._closed = False
+
+    def _get_pager_command(self) -> str:
+        """Get the pager command to use."""
+        # Priority order: DULWICH_PAGER, GIT_PAGER, PAGER, then fallback
+        for env_var in ["DULWICH_PAGER", "GIT_PAGER", "PAGER"]:
+            pager = os.environ.get(env_var)
+            if pager and pager != "false":
+                return pager
+
+        # Fallback to common pagers
+        for pager in ["less", "more", "cat"]:
+            if shutil.which(pager):
+                if pager == "less":
+                    return "less -FRX"  # -F: quit if one screen, -R: raw control chars, -X: no init/deinit
+                return pager
+
+        return "cat"  # Ultimate fallback
+
+    def _ensure_pager_started(self):
+        """Start the pager process if not already started."""
+        if self.pager_process is None and not self._closed:
+            try:
+                pager_cmd = self._get_pager_command()
+                self.pager_process = subprocess.Popen(
+                    pager_cmd,
+                    shell=True,
+                    stdin=subprocess.PIPE,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                    text=True,
+                )
+            except (OSError, subprocess.SubprocessError):
+                # Pager failed to start, fall back to direct output
+                self.pager_process = None
+
+    def write(self, text: str) -> int:
+        """Write text to the pager."""
+        if self._closed:
+            raise ValueError("I/O operation on closed file")
+
+        self._ensure_pager_started()
+
+        if self.pager_process and self.pager_process.stdin:
+            try:
+                return self.pager_process.stdin.write(text)
+            except (OSError, subprocess.SubprocessError, BrokenPipeError):
+                # Pager died, fall back to direct output
+                return sys.stdout.write(text)
+        else:
+            # No pager available, write directly to stdout
+            return sys.stdout.write(text)
+
+    def flush(self):
+        """Flush the pager."""
+        if self._closed:
+            return
+
+        if self.pager_process and self.pager_process.stdin:
+            try:
+                self.pager_process.stdin.flush()
+            except (OSError, subprocess.SubprocessError, BrokenPipeError):
+                pass
+        else:
+            sys.stdout.flush()
+
+    def close(self):
+        """Close the pager."""
+        if self._closed:
+            return
+
+        self._closed = True
+        if self.pager_process:
+            try:
+                if self.pager_process.stdin:
+                    self.pager_process.stdin.close()
+                self.pager_process.wait()
+            except (OSError, subprocess.SubprocessError):
+                pass
+            self.pager_process = None
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()
+
+    # Additional file-like methods for compatibility
+    def writelines(self, lines):
+        """Write a list of lines to the pager."""
+        for line in lines:
+            self.write(line)
+
+    @property
+    def closed(self):
+        """Return whether the pager is closed."""
+        return self._closed
+
+    def readable(self):
+        """Return whether the pager is readable (it's not)."""
+        return False
+
+    def writable(self):
+        """Return whether the pager is writable."""
+        return not self._closed
+
+    def seekable(self):
+        """Return whether the pager is seekable (it's not)."""
+        return False
+
+
+class _StreamContextAdapter:
+    """Adapter to make streams work with context manager protocol."""
+
+    def __init__(self, stream):
+        self.stream = stream
+        # Expose buffer if it exists
+        if hasattr(stream, "buffer"):
+            self.buffer = stream.buffer
+        else:
+            self.buffer = stream
+
+    def __enter__(self):
+        return self.stream
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # For stdout/stderr, we don't close them
+        pass
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+
+def get_pager():
+    """Get a pager instance if paging should be used, otherwise return sys.stdout.
+
+    Returns:
+        Either a wrapped sys.stdout or a Pager instance (both context managers)
+    """
+    # Check global pager disable flag
+    if getattr(get_pager, "_disabled", False):
+        return _StreamContextAdapter(sys.stdout)
+
+    # Check if paging should be disabled via environment
+    if os.environ.get("DULWICH_PAGER") == "false":
+        return _StreamContextAdapter(sys.stdout)
+    if os.environ.get("GIT_PAGER") == "false":
+        return _StreamContextAdapter(sys.stdout)
+
+    # Don't page if stdout is not a terminal
+    if not sys.stdout.isatty():
+        return _StreamContextAdapter(sys.stdout)
+
+    return Pager()
+
+
+def disable_pager():
+    """Disable pager for this session."""
+    get_pager._disabled = True
+
+
+def enable_pager():
+    """Enable pager for this session."""
+    get_pager._disabled = False
+
+
 class Command:
     """A Dulwich subcommand."""
 
@@ -176,11 +375,12 @@ class cmd_annotate(Command):
         parser.add_argument("committish", nargs="?", help="Commit to start from")
         args = parser.parse_args(argv)
 
-        results = porcelain.annotate(".", args.path, args.committish)
-        for (commit, entry), line in results:
-            # Show shortened commit hash and line content
-            commit_hash = commit.id[:8]
-            print(f"{commit_hash.decode()} {line.decode()}")
+        with get_pager() as outstream:
+            results = porcelain.annotate(".", args.path, args.committish)
+            for (commit, entry), line in results:
+                # Show shortened commit hash and line content
+                commit_hash = commit.id[:8]
+                outstream.write(f"{commit_hash.decode()} {line.decode()}\n")
 
 
 class cmd_blame(Command):
@@ -286,13 +486,14 @@ class cmd_log(Command):
         parser.add_argument("paths", nargs="*", help="Paths to show log for")
         args = parser.parse_args(args)
 
-        porcelain.log(
-            ".",
-            paths=args.paths,
-            reverse=args.reverse,
-            name_status=args.name_status,
-            outstream=sys.stdout,
-        )
+        with get_pager() as outstream:
+            porcelain.log(
+                ".",
+                paths=args.paths,
+                reverse=args.reverse,
+                name_status=args.name_status,
+                outstream=outstream,
+            )
 
 
 class cmd_diff(Command):
@@ -322,36 +523,37 @@ class cmd_diff(Command):
 
         args = parsed_args
 
-        if len(args.committish) == 0:
-            # Show diff for working tree or staged changes
-            porcelain.diff(
-                ".",
-                staged=(args.staged or args.cached),
-                paths=args.paths or None,
-                outstream=sys.stdout.buffer,
-            )
-        elif len(args.committish) == 1:
-            # Show diff between working tree and specified commit
-            if args.staged or args.cached:
-                parser.error("--staged/--cached cannot be used with commits")
-            porcelain.diff(
-                ".",
-                commit=args.committish[0],
-                staged=False,
-                paths=args.paths or None,
-                outstream=sys.stdout.buffer,
-            )
-        elif len(args.committish) == 2:
-            # Show diff between two commits
-            porcelain.diff(
-                ".",
-                commit=args.committish[0],
-                commit2=args.committish[1],
-                paths=args.paths or None,
-                outstream=sys.stdout.buffer,
-            )
-        else:
-            parser.error("Too many arguments - specify at most two commits")
+        with get_pager() as outstream:
+            if len(args.committish) == 0:
+                # Show diff for working tree or staged changes
+                porcelain.diff(
+                    ".",
+                    staged=(args.staged or args.cached),
+                    paths=args.paths or None,
+                    outstream=outstream.buffer,
+                )
+            elif len(args.committish) == 1:
+                # Show diff between working tree and specified commit
+                if args.staged or args.cached:
+                    parser.error("--staged/--cached cannot be used with commits")
+                porcelain.diff(
+                    ".",
+                    commit=args.committish[0],
+                    staged=False,
+                    paths=args.paths or None,
+                    outstream=outstream.buffer,
+                )
+            elif len(args.committish) == 2:
+                # Show diff between two commits
+                porcelain.diff(
+                    ".",
+                    commit=args.committish[0],
+                    commit2=args.committish[1],
+                    paths=args.paths or None,
+                    outstream=outstream.buffer,
+                )
+            else:
+                parser.error("Too many arguments - specify at most two commits")
 
 
 class cmd_dump_pack(Command):
@@ -527,7 +729,8 @@ class cmd_show(Command):
         parser = argparse.ArgumentParser()
         parser.add_argument("objectish", type=str, nargs="*")
         args = parser.parse_args(argv)
-        porcelain.show(".", args.objectish or None, outstream=sys.stdout)
+        with get_pager() as outstream:
+            porcelain.show(".", args.objectish or None, outstream=outstream)
 
 
 class cmd_diff_tree(Command):
@@ -584,23 +787,26 @@ class cmd_reflog(Command):
         )
         args = parser.parse_args(args)
 
-        if args.all:
-            # Show reflogs for all refs
-            for ref_bytes, entry in porcelain.reflog(".", all=True):
-                ref_str = ref_bytes.decode("utf-8", "replace")
-                short_new = entry.new_sha[:8].decode("ascii")
-                print(
-                    f"{short_new} {ref_str}: {entry.message.decode('utf-8', 'replace')}"
+        with get_pager() as outstream:
+            if args.all:
+                # Show reflogs for all refs
+                for ref_bytes, entry in porcelain.reflog(".", all=True):
+                    ref_str = ref_bytes.decode("utf-8", "replace")
+                    short_new = entry.new_sha[:8].decode("ascii")
+                    outstream.write(
+                        f"{short_new} {ref_str}: {entry.message.decode('utf-8', 'replace')}\n"
+                    )
+            else:
+                ref = (
+                    args.ref.encode("utf-8") if isinstance(args.ref, str) else args.ref
                 )
-        else:
-            ref = args.ref.encode("utf-8") if isinstance(args.ref, str) else args.ref
 
-            for i, entry in enumerate(porcelain.reflog(".", ref)):
-                # Format similar to git reflog
-                short_new = entry.new_sha[:8].decode("ascii")
-                print(
-                    f"{short_new} {ref.decode('utf-8', 'replace')}@{{{i}}}: {entry.message.decode('utf-8', 'replace')}"
-                )
+                for i, entry in enumerate(porcelain.reflog(".", ref)):
+                    # Format similar to git reflog
+                    short_new = entry.new_sha[:8].decode("ascii")
+                    outstream.write(
+                        f"{short_new} {ref.decode('utf-8', 'replace')}@{{{i}}}: {entry.message.decode('utf-8', 'replace')}\n"
+                    )
 
 
 class cmd_reset(Command):
@@ -791,13 +997,14 @@ class cmd_ls_tree(Command):
         )
         parser.add_argument("treeish", nargs="?", help="Tree-ish to list")
         args = parser.parse_args(args)
-        porcelain.ls_tree(
-            ".",
-            args.treeish,
-            outstream=sys.stdout,
-            recursive=args.recursive,
-            name_only=args.name_only,
-        )
+        with get_pager() as outstream:
+            porcelain.ls_tree(
+                ".",
+                args.treeish,
+                outstream=outstream,
+                recursive=args.recursive,
+                name_only=args.name_only,
+            )
 
 
 class cmd_pack_objects(Command):
@@ -2292,18 +2499,51 @@ def main(argv=None) -> Optional[int]:
     if argv is None:
         argv = sys.argv[1:]
 
-    if len(argv) < 1:
-        print("Usage: dulwich <{}> [OPTIONS...]".format("|".join(commands.keys())))
+    # Parse only the global options and command, stop at first positional
+    parser = argparse.ArgumentParser(
+        prog="dulwich",
+        description="Simple command-line interface to Dulwich",
+        add_help=False,  # We'll handle help ourselves
+    )
+    parser.add_argument("--no-pager", action="store_true", help="Disable pager")
+    parser.add_argument("--pager", action="store_true", help="Force enable pager")
+    parser.add_argument("--help", "-h", action="store_true", help="Show help")
+
+    # Parse known args to separate global options from command args
+    global_args, remaining = parser.parse_known_args(argv)
+
+    # Apply global pager settings
+    if global_args.no_pager:
+        disable_pager()
+    elif global_args.pager:
+        enable_pager()
+
+    # Handle help
+    if global_args.help or not remaining:
+        parser = argparse.ArgumentParser(
+            prog="dulwich", description="Simple command-line interface to Dulwich"
+        )
+        parser.add_argument("--no-pager", action="store_true", help="Disable pager")
+        parser.add_argument("--pager", action="store_true", help="Force enable pager")
+        parser.add_argument(
+            "command",
+            nargs="?",
+            help=f"Command to run. Available: {', '.join(sorted(commands.keys()))}",
+        )
+        parser.print_help()
         return 1
 
-    cmd = argv[0]
+    # First remaining arg is the command
+    cmd = remaining[0]
+    cmd_args = remaining[1:]
+
     try:
         cmd_kls = commands[cmd]
     except KeyError:
         print(f"No such subcommand: {cmd}")
         return 1
     # TODO(jelmer): Return non-0 on errors
-    return cmd_kls().run(argv[1:])
+    return cmd_kls().run(cmd_args)
 
 
 def _main() -> None:

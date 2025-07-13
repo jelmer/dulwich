@@ -504,3 +504,103 @@ def diff_working_tree_to_index(
             write_blob_diff(
                 outstream, (tree_path, old_mode, old_blob), (None, None, None)
             )
+
+
+class ColorizedDiffStream:
+    """Stream wrapper that colorizes diff output line by line using Rich.
+
+    This class wraps a binary output stream and applies color formatting
+    to diff output as it's written. It processes data line by line to
+    enable streaming colorization without buffering the entire diff.
+    """
+
+    @staticmethod
+    def is_available():
+        """Check if Rich is available for colorization.
+
+        Returns:
+            bool: True if Rich can be imported, False otherwise
+        """
+        try:
+            import importlib.util
+
+            return importlib.util.find_spec("rich.console") is not None
+        except ImportError:
+            return False
+
+    def __init__(self, output_stream):
+        """Initialize the colorized stream wrapper.
+
+        Args:
+            output_stream: The underlying binary stream to write to
+        """
+        self.output_stream = output_stream
+        import io
+
+        from rich.console import Console
+
+        # Rich expects a text stream, so we need to wrap our binary stream
+        self.text_wrapper = io.TextIOWrapper(
+            output_stream, encoding="utf-8", newline=""
+        )
+        self.console = Console(file=self.text_wrapper, force_terminal=True)
+        self.buffer = b""
+
+    def write(self, data):
+        """Write data to the stream, applying colorization.
+
+        Args:
+            data: Bytes to write
+        """
+        # Add new data to buffer
+        self.buffer += data
+
+        # Process complete lines
+        while b"\n" in self.buffer:
+            line, self.buffer = self.buffer.split(b"\n", 1)
+            self._colorize_and_write_line(line + b"\n")
+
+    def writelines(self, lines):
+        """Write a list of lines to the stream.
+
+        Args:
+            lines: Iterable of bytes to write
+        """
+        for line in lines:
+            self.write(line)
+
+    def _colorize_and_write_line(self, line_bytes):
+        """Apply color formatting to a single line and write it.
+
+        Args:
+            line_bytes: The line to colorize and write (as bytes)
+        """
+        try:
+            line = line_bytes.decode("utf-8", errors="replace")
+
+            # Colorize based on diff line type
+            if line.startswith("+") and not line.startswith("+++"):
+                self.console.print(line, style="green", end="")
+            elif line.startswith("-") and not line.startswith("---"):
+                self.console.print(line, style="red", end="")
+            elif line.startswith("@@"):
+                self.console.print(line, style="cyan", end="")
+            elif line.startswith(("+++", "---")):
+                self.console.print(line, style="bold", end="")
+            else:
+                self.console.print(line, end="")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            # Fallback to raw output if we can't decode/encode the text
+            self.output_stream.write(line_bytes)
+
+    def flush(self):
+        """Flush any remaining buffered content and the underlying stream."""
+        # Write any remaining buffer content
+        if self.buffer:
+            self._colorize_and_write_line(self.buffer)
+            self.buffer = b""
+        # Flush the text wrapper and underlying stream
+        if hasattr(self.text_wrapper, "flush"):
+            self.text_wrapper.flush()
+        if hasattr(self.output_stream, "flush"):
+            self.output_stream.flush()

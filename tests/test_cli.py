@@ -1582,5 +1582,196 @@ class ParseRelativeTimeTestCase(TestCase):
         )
 
 
+class GetPagerTest(TestCase):
+    """Tests for get_pager function."""
+
+    def setUp(self):
+        super().setUp()
+        # Save original environment
+        self.original_env = os.environ.copy()
+        # Clear pager-related environment variables
+        for var in ["DULWICH_PAGER", "GIT_PAGER", "PAGER"]:
+            os.environ.pop(var, None)
+        # Reset the global pager disable flag
+        cli.get_pager._disabled = False
+
+    def tearDown(self):
+        super().tearDown()
+        # Restore original environment
+        os.environ.clear()
+        os.environ.update(self.original_env)
+        # Reset the global pager disable flag
+        cli.get_pager._disabled = False
+
+    def test_pager_disabled_globally(self):
+        """Test that globally disabled pager returns stdout wrapper."""
+        cli.disable_pager()
+        pager = cli.get_pager()
+        self.assertIsInstance(pager, cli._StreamContextAdapter)
+        self.assertEqual(pager.stream, sys.stdout)
+
+    def test_pager_not_tty(self):
+        """Test that pager is disabled when stdout is not a TTY."""
+        with patch("sys.stdout.isatty", return_value=False):
+            pager = cli.get_pager()
+            self.assertIsInstance(pager, cli._StreamContextAdapter)
+
+    def test_pager_env_dulwich_pager(self):
+        """Test DULWICH_PAGER environment variable."""
+        os.environ["DULWICH_PAGER"] = "custom_pager"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager()
+            self.assertIsInstance(pager, cli.Pager)
+            self.assertEqual(pager.pager_cmd, "custom_pager")
+
+    def test_pager_env_dulwich_pager_false(self):
+        """Test DULWICH_PAGER=false disables pager."""
+        os.environ["DULWICH_PAGER"] = "false"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager()
+            self.assertIsInstance(pager, cli._StreamContextAdapter)
+
+    def test_pager_env_git_pager(self):
+        """Test GIT_PAGER environment variable."""
+        os.environ["GIT_PAGER"] = "git_custom_pager"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager()
+            self.assertIsInstance(pager, cli.Pager)
+            self.assertEqual(pager.pager_cmd, "git_custom_pager")
+
+    def test_pager_env_pager(self):
+        """Test PAGER environment variable."""
+        os.environ["PAGER"] = "my_pager"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager()
+            self.assertIsInstance(pager, cli.Pager)
+            self.assertEqual(pager.pager_cmd, "my_pager")
+
+    def test_pager_env_priority(self):
+        """Test environment variable priority order."""
+        os.environ["PAGER"] = "pager_low"
+        os.environ["GIT_PAGER"] = "pager_medium"
+        os.environ["DULWICH_PAGER"] = "pager_high"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager()
+            self.assertEqual(pager.pager_cmd, "pager_high")
+
+    def test_pager_config_core_pager(self):
+        """Test core.pager configuration."""
+        config = MagicMock()
+        config.get.return_value = b"config_pager"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager(config=config)
+            self.assertIsInstance(pager, cli.Pager)
+            self.assertEqual(pager.pager_cmd, "config_pager")
+            config.get.assert_called_with(("core",), b"pager")
+
+    def test_pager_config_core_pager_false(self):
+        """Test core.pager=false disables pager."""
+        config = MagicMock()
+        config.get.return_value = b"false"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager(config=config)
+            self.assertIsInstance(pager, cli._StreamContextAdapter)
+
+    def test_pager_config_core_pager_empty(self):
+        """Test core.pager="" disables pager."""
+        config = MagicMock()
+        config.get.return_value = b""
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager(config=config)
+            self.assertIsInstance(pager, cli._StreamContextAdapter)
+
+    def test_pager_config_per_command(self):
+        """Test per-command pager configuration."""
+        config = MagicMock()
+        config.get.side_effect = lambda section, key: {
+            (("pager",), b"log"): b"log_pager",
+        }.get((section, key), KeyError())
+
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager(config=config, cmd_name="log")
+            self.assertIsInstance(pager, cli.Pager)
+            self.assertEqual(pager.pager_cmd, "log_pager")
+
+    def test_pager_config_per_command_false(self):
+        """Test per-command pager=false disables pager."""
+        config = MagicMock()
+        config.get.return_value = b"false"
+        with patch("sys.stdout.isatty", return_value=True):
+            pager = cli.get_pager(config=config, cmd_name="log")
+            self.assertIsInstance(pager, cli._StreamContextAdapter)
+
+    def test_pager_config_per_command_true(self):
+        """Test per-command pager=true uses default pager."""
+        config = MagicMock()
+
+        def get_side_effect(section, key):
+            if section == ("pager",) and key == b"log":
+                return b"true"
+            raise KeyError
+
+        config.get.side_effect = get_side_effect
+
+        with patch("sys.stdout.isatty", return_value=True):
+            with patch("shutil.which", side_effect=lambda cmd: cmd == "less"):
+                pager = cli.get_pager(config=config, cmd_name="log")
+                self.assertIsInstance(pager, cli.Pager)
+                self.assertEqual(pager.pager_cmd, "less -FRX")
+
+    def test_pager_priority_order(self):
+        """Test complete priority order."""
+        # Set up all possible configurations
+        os.environ["PAGER"] = "env_pager"
+        os.environ["GIT_PAGER"] = "env_git_pager"
+
+        config = MagicMock()
+
+        def get_side_effect(section, key):
+            if section == ("pager",) and key == b"log":
+                return b"cmd_pager"
+            elif section == ("core",) and key == b"pager":
+                return b"core_pager"
+            raise KeyError
+
+        config.get.side_effect = get_side_effect
+
+        with patch("sys.stdout.isatty", return_value=True):
+            # Per-command config should win
+            pager = cli.get_pager(config=config, cmd_name="log")
+            self.assertEqual(pager.pager_cmd, "cmd_pager")
+
+    def test_pager_fallback_less(self):
+        """Test fallback to less with proper flags."""
+        with patch("sys.stdout.isatty", return_value=True):
+            with patch("shutil.which", side_effect=lambda cmd: cmd == "less"):
+                pager = cli.get_pager()
+                self.assertIsInstance(pager, cli.Pager)
+                self.assertEqual(pager.pager_cmd, "less -FRX")
+
+    def test_pager_fallback_more(self):
+        """Test fallback to more when less is not available."""
+        with patch("sys.stdout.isatty", return_value=True):
+            with patch("shutil.which", side_effect=lambda cmd: cmd == "more"):
+                pager = cli.get_pager()
+                self.assertIsInstance(pager, cli.Pager)
+                self.assertEqual(pager.pager_cmd, "more")
+
+    def test_pager_fallback_cat(self):
+        """Test ultimate fallback to cat."""
+        with patch("sys.stdout.isatty", return_value=True):
+            with patch("shutil.which", return_value=None):
+                pager = cli.get_pager()
+                self.assertIsInstance(pager, cli.Pager)
+                self.assertEqual(pager.pager_cmd, "cat")
+
+    def test_pager_context_manager(self):
+        """Test that pager works as a context manager."""
+        with patch("sys.stdout.isatty", return_value=True):
+            with cli.get_pager() as pager:
+                self.assertTrue(hasattr(pager, "write"))
+                self.assertTrue(hasattr(pager, "flush"))
+
+
 if __name__ == "__main__":
     unittest.main()

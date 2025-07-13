@@ -462,6 +462,84 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(commit._author_timezone, local_timezone)
         self.assertEqual(commit._commit_timezone, local_timezone)
 
+    def test_commit_all(self) -> None:
+        # Create initial commit
+        filename = os.path.join(self.repo.path, "test.txt")
+        with open(filename, "wb") as f:
+            f.write(b"initial content")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+        initial_sha = porcelain.commit(self.repo.path, message=b"Initial commit")
+
+        # Modify the file without staging
+        with open(filename, "wb") as f:
+            f.write(b"modified content")
+
+        # Create an untracked file
+        untracked_file = os.path.join(self.repo.path, "untracked.txt")
+        with open(untracked_file, "wb") as f:
+            f.write(b"untracked content")
+
+        # Commit with all=True should stage modified files but not untracked
+        sha = porcelain.commit(self.repo.path, message=b"Modified commit", all=True)
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+        self.assertNotEqual(sha, initial_sha)
+
+        # Verify the commit contains the modification
+        commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
+        tree = self.repo.get_object(commit.tree)
+        # The modified file should be in the commit
+        self.assertIn(b"test.txt", tree)
+        # The untracked file should not be in the commit
+        self.assertNotIn(b"untracked.txt", tree)
+
+    def test_commit_all_no_changes(self) -> None:
+        # Create initial commit
+        filename = os.path.join(self.repo.path, "test.txt")
+        with open(filename, "wb") as f:
+            f.write(b"initial content")
+        porcelain.add(self.repo.path, paths=["test.txt"])
+        initial_sha = porcelain.commit(self.repo.path, message=b"Initial commit")
+
+        # Try to commit with all=True when there are no unstaged changes
+        sha = porcelain.commit(self.repo.path, message=b"No changes commit", all=True)
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+        self.assertNotEqual(sha, initial_sha)
+
+    def test_commit_all_multiple_files(self) -> None:
+        # Create initial commit with multiple files
+        file1 = os.path.join(self.repo.path, "file1.txt")
+        file2 = os.path.join(self.repo.path, "file2.txt")
+
+        with open(file1, "wb") as f:
+            f.write(b"content1")
+        with open(file2, "wb") as f:
+            f.write(b"content2")
+
+        porcelain.add(self.repo.path, paths=["file1.txt", "file2.txt"])
+        initial_sha = porcelain.commit(self.repo.path, message=b"Initial commit")
+
+        # Modify both files
+        with open(file1, "wb") as f:
+            f.write(b"modified content1")
+        with open(file2, "wb") as f:
+            f.write(b"modified content2")
+
+        # Commit with all=True should stage both modified files
+        sha = porcelain.commit(self.repo.path, message=b"Modified both files", all=True)
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+        self.assertNotEqual(sha, initial_sha)
+
+        # Verify both modifications are in the commit
+        commit = self.repo.get_object(sha)
+        assert isinstance(commit, Commit)
+        tree = self.repo.get_object(commit.tree)
+        self.assertIn(b"file1.txt", tree)
+        self.assertIn(b"file2.txt", tree)
+
 
 @skipIf(
     platform.python_implementation() == "PyPy" or sys.platform == "win32",

@@ -78,6 +78,7 @@ Functions should generally accept both unicode strings and bytestrings
 
 import datetime
 import fnmatch
+import logging
 import os
 import posixpath
 import stat
@@ -473,6 +474,7 @@ def commit(
     encoding=None,
     no_verify=False,
     signoff=False,
+    all=False,
 ):
     """Create a new commit.
 
@@ -487,9 +489,9 @@ def commit(
       signoff: GPG Sign the commit (bool, defaults to False,
         pass True to use default GPG key,
         pass a str containing Key ID to use a specific GPG key)
+      all: Automatically stage all tracked files that have been modified
     Returns: SHA1 of the new commit
     """
-    # FIXME: Support --all argument
     if getattr(message, "encode", None):
         message = message.encode(encoding or DEFAULT_ENCODING)
     if getattr(author, "encode", None):
@@ -501,7 +503,27 @@ def commit(
         author_timezone = local_timezone[0]
     if commit_timezone is None:
         commit_timezone = local_timezone[1]
+
     with open_repo_closing(repo) as r:
+        # If -a flag is used, stage all modified tracked files
+        if all:
+            index = r.open_index()
+            normalizer = r.get_blob_normalizer()
+            filter_callback = normalizer.checkin_normalize
+            unstaged_changes = list(
+                get_unstaged_changes(index, r.path, filter_callback)
+            )
+
+            if unstaged_changes:
+                # Convert bytes paths to strings for add function
+                modified_files = []
+                for path in unstaged_changes:
+                    if isinstance(path, bytes):
+                        path = path.decode()
+                    modified_files.append(path)
+
+                add(r, paths=modified_files)
+
         return r.do_commit(
             message=message,
             author=author,
@@ -644,13 +666,9 @@ def clone(
             submodule_update(repo, init=True)
         except FileNotFoundError as e:
             # .gitmodules file doesn't exist - no submodules to process
-            import logging
-
             logging.debug("No .gitmodules file found: %s", e)
         except KeyError as e:
             # Submodule configuration missing
-            import logging
-
             logging.warning("Submodule configuration error: %s", e)
             if errstream:
                 errstream.write(
@@ -3130,7 +3148,10 @@ def checkout(
                         r.object_store.__getitem__, path
                     )
                     obj = r[sha]
-
+                except KeyError:
+                    # Path doesn't exist in target tree
+                    pass
+                else:
                     # Create directories if needed
                     # Handle path as string
                     if isinstance(path, bytes):
@@ -3155,10 +3176,6 @@ def checkout(
 
                     # Update the index
                     r.stage(path)
-
-                except KeyError:
-                    # Path doesn't exist in target tree
-                    pass
 
             return
 
@@ -3212,14 +3229,15 @@ def checkout(
 
                     try:
                         target_tree.lookup_path(r.object_store.__getitem__, change)
+                    except KeyError:
+                        # File doesn't exist in target tree - change can be preserved
+                        pass
+                    else:
                         # File exists in target tree - would overwrite local changes
                         raise CheckoutError(
                             f"Your local changes to '{change.decode()}' would be "
                             "overwritten by checkout. Please commit or stash before switching."
                         )
-                    except KeyError:
-                        # File doesn't exist in target tree - change can be preserved
-                        pass
 
         # Get configuration for working directory update
         config = r.get_config()
@@ -4046,12 +4064,9 @@ def cherry_pick(
         parent_commit = r[cherry_pick_commit.parents[0]]
 
         # Perform three-way merge
-        try:
-            merged_tree, conflicts = three_way_merge(
-                r.object_store, parent_commit, head_commit, cherry_pick_commit
-            )
-        except Exception as e:
-            raise Error(f"Cherry-pick failed: {e}")
+        merged_tree, conflicts = three_way_merge(
+            r.object_store, parent_commit, head_commit, cherry_pick_commit
+        )
 
         # Add merged tree to object store
         r.object_store.add_object(merged_tree)
@@ -5339,7 +5354,10 @@ def lfs_fetch(repo=".", remote="origin", refs=None):
             for entry in r.object_store.iter_tree_contents(commit.tree):
                 try:
                     obj = r.object_store[entry.sha]
-                    if obj.type_name == b"blob":
+                except KeyError:
+                    pass
+                else:
+                    if isinstance(obj, Blob):
                         pointer = LFSPointer.from_bytes(obj.data)
                         if pointer and pointer.is_valid_oid():
                             # Check if we already have it
@@ -5347,19 +5365,13 @@ def lfs_fetch(repo=".", remote="origin", refs=None):
                                 store.open_object(pointer.oid)
                             except KeyError:
                                 pointers_to_fetch.append((pointer.oid, pointer.size))
-                except KeyError:
-                    pass
 
         # Fetch missing objects
         fetched = 0
         for oid, size in pointers_to_fetch:
-            try:
-                content = client.download(oid, size)
-                store.write_object([content])
-                fetched += 1
-            except Exception as e:
-                # Log error but continue
-                print(f"Failed to fetch {oid}: {e}")
+            content = client.download(oid, size)
+            store.write_object([content])
+            fetched += 1
 
         return fetched
 
@@ -5466,12 +5478,13 @@ def lfs_push(repo=".", remote="origin", refs=None):
             for entry in r.object_store.iter_tree_contents(commit.tree):
                 try:
                     obj = r.object_store[entry.sha]
-                    if obj.type_name == b"blob":
+                except KeyError:
+                    pass
+                else:
+                    if isinstance(obj, Blob):
                         pointer = LFSPointer.from_bytes(obj.data)
                         if pointer and pointer.is_valid_oid():
                             objects_to_push.add((pointer.oid, pointer.size))
-                except KeyError:
-                    pass
 
         # Push objects
         pushed = 0
@@ -5479,14 +5492,12 @@ def lfs_push(repo=".", remote="origin", refs=None):
             try:
                 with store.open_object(oid) as f:
                     content = f.read()
-                client.upload(oid, size, content)
-                pushed += 1
             except KeyError:
                 # Object not in local store
-                print(f"Warning: LFS object {oid} not found locally")
-            except Exception as e:
-                # Log error but continue
-                print(f"Failed to push {oid}: {e}")
+                logging.warn("LFS object %s not found locally", oid)
+            else:
+                client.upload(oid, size, content)
+                pushed += 1
 
         return pushed
 
@@ -5536,11 +5547,12 @@ def lfs_status(repo="."):
                     # Check if file has been modified
                     try:
                         staged_obj = r.object_store[entry.binsha]
+                    except KeyError:
+                        pass
+                    else:
                         staged_pointer = LFSPointer.from_bytes(staged_obj.data)
                         if staged_pointer and staged_pointer.oid != pointer.oid:
                             status["not_staged"].append(path_str)
-                    except KeyError:
-                        pass
 
         # TODO: Check for not committed and not pushed files
 

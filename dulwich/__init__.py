@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
+# General Public License as published by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or
 # modify it under the terms of either of these two licenses.
 #
@@ -24,7 +24,7 @@
 """Python implementation of the Git file formats and protocols."""
 
 import sys
-from typing import Any, Callable, Optional, TypeVar
+from typing import Callable, Optional, TypeVar
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -33,11 +33,10 @@ else:
 
 __version__ = (0, 23, 3)
 
-__all__ = ["replace_me"]
+__all__ = ["__version__", "replace_me"]
 
 P = ParamSpec("P")
 R = TypeVar("R")
-F = TypeVar("F", bound=Callable[..., Any])
 
 try:
     from dissolve import replace_me

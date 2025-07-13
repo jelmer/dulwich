@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
-# General Public License as public by the Free Software Foundation; version 2.0
+# General Public License as published by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or
 # modify it under the terms of either of these two licenses.
 #
@@ -669,12 +669,12 @@ class DiskRefsContainer(RefsContainer):
         subkeys = set()
         path = self.refpath(base)
         for root, unused_dirs, files in os.walk(path):
-            dir = root[len(path) :]
+            directory = root[len(path) :]
             if os.path.sep != "/":
-                dir = dir.replace(os.fsencode(os.path.sep), b"/")
-            dir = dir.strip(b"/")
+                directory = directory.replace(os.fsencode(os.path.sep), b"/")
+            directory = directory.strip(b"/")
             for filename in files:
-                refname = b"/".join(([dir] if dir else []) + [filename])
+                refname = b"/".join(([directory] if directory else []) + [filename])
                 # check_ref_format requires at least one /, so we prepend the
                 # base before calling it.
                 if check_ref_format(base + b"/" + refname):
@@ -691,11 +691,11 @@ class DiskRefsContainer(RefsContainer):
         path = self.refpath(b"")
         refspath = self.refpath(b"refs")
         for root, unused_dirs, files in os.walk(refspath):
-            dir = root[len(path) :]
+            directory = root[len(path) :]
             if os.path.sep != "/":
-                dir = dir.replace(os.fsencode(os.path.sep), b"/")
+                directory = directory.replace(os.fsencode(os.path.sep), b"/")
             for filename in files:
-                refname = b"/".join([dir, filename])
+                refname = b"/".join([directory, filename])
                 if check_ref_format(refname):
                     allkeys.add(refname)
         allkeys.update(self.get_packed_refs())

@@ -53,6 +53,65 @@ class ParseObjectTests(TestCase):
         r.object_store.add_object(b)
         self.assertEqual(b, parse_object(r, b.id))
 
+    def test_parent_caret(self) -> None:
+        r = MemoryRepo()
+        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        # c3's parents are [c1, c2]
+        self.assertEqual(c1, parse_object(r, c3.id + b"^1"))
+        self.assertEqual(c1, parse_object(r, c3.id + b"^"))  # ^ defaults to ^1
+        self.assertEqual(c2, parse_object(r, c3.id + b"^2"))
+
+    def test_parent_tilde(self) -> None:
+        r = MemoryRepo()
+        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
+        self.assertEqual(c2, parse_object(r, c3.id + b"~"))
+        self.assertEqual(c2, parse_object(r, c3.id + b"~1"))
+        self.assertEqual(c1, parse_object(r, c3.id + b"~2"))
+
+    def test_combined_operators(self) -> None:
+        r = MemoryRepo()
+        c1, c2, c3, c4 = build_commit_graph(
+            r.object_store, [[1], [2, 1], [3, 1, 2], [4, 3]]
+        )
+        # c4~1^2 means: go back 1 generation from c4 (to c3), then take its 2nd parent
+        # c3's parents are [c1, c2], so ^2 is c2
+        self.assertEqual(c2, parse_object(r, c4.id + b"~1^2"))
+        self.assertEqual(c1, parse_object(r, c4.id + b"~^"))
+
+    def test_with_ref(self) -> None:
+        r = MemoryRepo()
+        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
+        r.refs[b"refs/heads/master"] = c3.id
+        self.assertEqual(c2, parse_object(r, b"master~"))
+        self.assertEqual(c1, parse_object(r, b"master~2"))
+
+    def test_caret_zero(self) -> None:
+        r = MemoryRepo()
+        c1, c2 = build_commit_graph(r.object_store, [[1], [2, 1]])
+        # ^0 means the commit itself
+        self.assertEqual(c2, parse_object(r, c2.id + b"^0"))
+        self.assertEqual(c1, parse_object(r, c2.id + b"~^0"))
+
+    def test_missing_parent(self) -> None:
+        r = MemoryRepo()
+        c1, c2 = build_commit_graph(r.object_store, [[1], [2, 1]])
+        # c2 only has 1 parent, so ^2 should fail
+        self.assertRaises(ValueError, parse_object, r, c2.id + b"^2")
+        # c1 has no parents, so ~ should fail
+        self.assertRaises(ValueError, parse_object, r, c1.id + b"~")
+
+    def test_empty_base(self) -> None:
+        r = MemoryRepo()
+        self.assertRaises(ValueError, parse_object, r, b"~1")
+        self.assertRaises(ValueError, parse_object, r, b"^1")
+
+    def test_non_commit_with_operators(self) -> None:
+        r = MemoryRepo()
+        b = Blob.from_string(b"Blah")
+        r.object_store.add_object(b)
+        # Can't apply ~ or ^ to a blob
+        self.assertRaises(ValueError, parse_object, r, b.id + b"~1")
+
 
 class ParseCommitRangeTests(TestCase):
     """Test parse_commit_range."""

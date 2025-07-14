@@ -29,7 +29,16 @@ import sys
 import tempfile
 from io import BytesIO
 
-from dulwich.diff_tree import tree_changes
+from dulwich.config import ConfigDict
+from dulwich.diff_tree import (
+    CHANGE_ADD,
+    CHANGE_COPY,
+    CHANGE_DELETE,
+    CHANGE_MODIFY,
+    CHANGE_RENAME,
+    TreeChange,
+    tree_changes,
+)
 from dulwich.index import (
     Index,
     IndexEntry,
@@ -43,6 +52,7 @@ from dulwich.index import (
     build_index_from_tree,
     cleanup_mode,
     commit_tree,
+    detect_case_only_renames,
     get_unstaged_changes,
     index_entry_from_directory,
     index_entry_from_path,
@@ -59,7 +69,7 @@ from dulwich.index import (
     write_index_dict,
 )
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
+from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree, TreeEntry
 from dulwich.repo import Repo
 
 from . import TestCase, skipIf
@@ -1732,6 +1742,254 @@ class TestPathPrefixCompression(TestCase):
         self.assertEqual(b"short", decompressed)
 
 
+class TestDetectCaseOnlyRenames(TestCase):
+    """Tests for detect_case_only_renames function."""
+
+    def setUp(self):
+        self.config = ConfigDict()
+
+    def test_no_renames(self):
+        """Test when there are no renames."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"file1.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"file2.txt", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # No case-only renames, so should return original changes
+        self.assertEqual(changes, result)
+
+    def test_simple_case_rename(self):
+        """Test simple case-only rename detection."""
+        # Default config uses case-insensitive comparison
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"README.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"readme.txt", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME instead of ADD/DELETE pair
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"README.txt", result[0].old.path)
+        self.assertEqual(b"readme.txt", result[0].new.path)
+
+    def test_nested_path_case_rename(self):
+        """Test case-only rename in nested paths."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"src/Main.java", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"src/main.java", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME instead of ADD/DELETE pair
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"src/Main.java", result[0].old.path)
+        self.assertEqual(b"src/main.java", result[0].new.path)
+
+    def test_multiple_case_renames(self):
+        """Test multiple case-only renames."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"File1.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"File2.TXT", 0o100644, b"b" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"file1.txt", 0o100644, b"a" * 40),
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"file2.txt", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return two CHANGE_RENAME instead of ADD/DELETE pairs
+        self.assertEqual(2, len(result))
+        rename_changes = [c for c in result if c.type == CHANGE_RENAME]
+        self.assertEqual(2, len(rename_changes))
+        # Check that the renames are correct (order may vary)
+        rename_map = {c.old.path: c.new.path for c in rename_changes}
+        self.assertEqual(
+            {b"File1.txt": b"file1.txt", b"File2.TXT": b"file2.txt"}, rename_map
+        )
+
+    def test_case_rename_with_modify(self):
+        """Test case rename detection with CHANGE_MODIFY."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"README.md", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_MODIFY,
+                TreeEntry(b"readme.md", 0o100644, b"a" * 40),
+                TreeEntry(b"readme.md", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME instead of DELETE/MODIFY pair
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"README.md", result[0].old.path)
+        self.assertEqual(b"readme.md", result[0].new.path)
+
+    def test_hfs_normalization(self):
+        """Test case rename detection with HFS+ normalization."""
+        # Configure for HFS+ (macOS)
+        self.config.set((b"core",), b"protectHFS", b"true")
+        self.config.set((b"core",), b"protectNTFS", b"false")
+
+        # Test with composed vs decomposed Unicode
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry("café.txt".encode(), 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry("CAFÉ.txt".encode(), 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+
+        # Should return one CHANGE_RENAME for the case-only rename
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual("café.txt".encode(), result[0].old.path)
+        self.assertEqual("CAFÉ.txt".encode(), result[0].new.path)
+
+    def test_ntfs_normalization(self):
+        """Test case rename detection with NTFS normalization."""
+        # Configure for NTFS (Windows)
+        self.config.set((b"core",), b"protectNTFS", b"true")
+        self.config.set((b"core",), b"protectHFS", b"false")
+
+        # NTFS strips trailing dots and spaces
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"file.txt.", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"FILE.TXT", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME for the case-only rename
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"file.txt.", result[0].old.path)
+        self.assertEqual(b"FILE.TXT", result[0].new.path)
+
+    def test_invalid_utf8_handling(self):
+        """Test handling of invalid UTF-8 in paths."""
+        # Invalid UTF-8 sequence
+        invalid_path = b"\xff\xfe"
+
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(invalid_path, 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"valid.txt", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        # Should not crash, just skip invalid paths
+        result = detect_case_only_renames(changes, self.config)
+        # No case-only renames detected, returns original changes
+        self.assertEqual(changes, result)
+
+    def test_rename_and_copy_changes(self):
+        """Test case rename detection with CHANGE_RENAME and CHANGE_COPY."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"OldFile.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_RENAME,
+                TreeEntry(b"other.txt", 0o100644, b"b" * 40),
+                TreeEntry(b"oldfile.txt", 0o100644, b"a" * 40),
+            ),
+            TreeChange(
+                CHANGE_COPY,
+                TreeEntry(b"source.txt", 0o100644, b"c" * 40),
+                TreeEntry(b"OLDFILE.TXT", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # The DELETE of OldFile.txt and COPY to OLDFILE.TXT are detected as a case-only rename
+        # The original RENAME (other.txt -> oldfile.txt) remains
+        # The COPY is consumed by the case-only rename detection
+        self.assertEqual(2, len(result))
+
+        # Find the changes
+        rename_changes = [c for c in result if c.type == CHANGE_RENAME]
+        self.assertEqual(2, len(rename_changes))
+
+        # Check for the case-only rename
+        case_rename = None
+        for change in rename_changes:
+            if change.old.path == b"OldFile.txt" and change.new.path == b"OLDFILE.TXT":
+                case_rename = change
+                break
+
+        self.assertIsNotNone(case_rename)
+        self.assertEqual(b"OldFile.txt", case_rename.old.path)
+        self.assertEqual(b"OLDFILE.TXT", case_rename.new.path)
+
+
 class TestUpdateWorkingTree(TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
@@ -2225,6 +2483,19 @@ class TestUpdateWorkingTree(TestCase):
 
     def test_update_working_tree_case_sensitivity(self):
         """Test handling of case-sensitive filename changes."""
+        # Detect if filesystem is case-insensitive by testing
+        test_file = os.path.join(self.tempdir, "TeSt.tmp")
+        with open(test_file, "w") as f:
+            f.write("test")
+        is_case_insensitive = os.path.exists(os.path.join(self.tempdir, "test.tmp"))
+        os.unlink(test_file)
+
+        # Set core.ignorecase to match actual filesystem behavior
+        # (This ensures test works correctly regardless of platform defaults)
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", is_case_insensitive)
+        config.write_to_path()
+
         # Create tree with lowercase file
         blob1 = Blob()
         blob1.data = b"lowercase content"
@@ -2255,11 +2526,93 @@ class TestUpdateWorkingTree(TestCase):
         lowercase_path = os.path.join(self.tempdir, "readme.txt")
         uppercase_path = os.path.join(self.tempdir, "README.txt")
 
-        # On case-insensitive filesystems, one will overwrite the other
-        # On case-sensitive filesystems, both may exist
-        self.assertTrue(
-            os.path.exists(lowercase_path) or os.path.exists(uppercase_path)
+        if is_case_insensitive:
+            # On case-insensitive filesystems, should have one file with new content
+            # The exact case of the filename may vary by OS
+            self.assertTrue(
+                os.path.exists(lowercase_path) or os.path.exists(uppercase_path)
+            )
+            # Verify content is the new content
+            if os.path.exists(lowercase_path):
+                with open(lowercase_path, "rb") as f:
+                    self.assertEqual(b"uppercase content", f.read())
+            else:
+                with open(uppercase_path, "rb") as f:
+                    self.assertEqual(b"uppercase content", f.read())
+        else:
+            # On case-sensitive filesystems, only the uppercase file should exist
+            self.assertFalse(os.path.exists(lowercase_path))
+            self.assertTrue(os.path.exists(uppercase_path))
+            with open(uppercase_path, "rb") as f:
+                self.assertEqual(b"uppercase content", f.read())
+
+    def test_update_working_tree_case_rename_updates_filename(self):
+        """Test that case-only renames update the actual filename on case-insensitive FS."""
+        # Detect if filesystem is case-insensitive by testing
+        test_file = os.path.join(self.tempdir, "TeSt.tmp")
+        with open(test_file, "w") as f:
+            f.write("test")
+        is_case_insensitive = os.path.exists(os.path.join(self.tempdir, "test.tmp"))
+        os.unlink(test_file)
+
+        if not is_case_insensitive:
+            self.skipTest("Test only relevant on case-insensitive filesystems")
+
+        # Set core.ignorecase to match actual filesystem behavior
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", True)
+        config.write_to_path()
+
+        # Create tree with lowercase file
+        blob1 = Blob()
+        blob1.data = b"same content"  # Using same content to test pure case rename
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1[b"readme.txt"] = (0o100644, blob1.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
+
+        # Verify initial state
+        files = [f for f in os.listdir(self.tempdir) if not f.startswith(".git")]
+        self.assertEqual(["readme.txt"], files)
+
+        # Create tree with uppercase file (same content, same blob)
+        tree2 = Tree()
+        tree2[b"README.txt"] = (0o100644, blob1.id)  # Same blob!
+        self.repo.object_store.add_object(tree2)
+
+        # Update to tree2 (case-only rename)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
+
+        # On case-insensitive filesystems, should have one file with updated case
+        files = [f for f in os.listdir(self.tempdir) if not f.startswith(".git")]
+        self.assertEqual(
+            1, len(files), "Should have exactly one file after case rename"
         )
+
+        # The file should now have the new case in the directory listing
+        actual_filename = files[0]
+        self.assertEqual(
+            "README.txt",
+            actual_filename,
+            "Filename case should be updated in directory listing",
+        )
+
+        # Verify content is preserved
+        file_path = os.path.join(self.tempdir, actual_filename)
+        with open(file_path, "rb") as f:
+            self.assertEqual(b"same content", f.read())
+
+        # Both old and new case should access the same file
+        lowercase_path = os.path.join(self.tempdir, "readme.txt")
+        uppercase_path = os.path.join(self.tempdir, "README.txt")
+        self.assertTrue(os.path.exists(lowercase_path))
+        self.assertTrue(os.path.exists(uppercase_path))
 
     def test_update_working_tree_deeply_nested_removal(self):
         """Test removal of deeply nested directory structures."""

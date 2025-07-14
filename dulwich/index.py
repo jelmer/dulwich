@@ -42,6 +42,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from .config import Config
     from .diff_tree import TreeChange
     from .file import _GitFile
     from .line_ending import BlobNormalizer
@@ -1299,15 +1300,59 @@ def build_file_from_blob(
 INVALID_DOTNAMES = (b".git", b".", b"..", b"")
 
 
+def _normalize_path_element_default(element: bytes) -> bytes:
+    """Normalize path element for default case-insensitive comparison."""
+    return element.lower()
+
+
+def _normalize_path_element_ntfs(element: bytes) -> bytes:
+    """Normalize path element for NTFS filesystem."""
+    return element.rstrip(b". ").lower()
+
+
+def _normalize_path_element_hfs(element: bytes) -> bytes:
+    """Normalize path element for HFS+ filesystem."""
+    import unicodedata
+
+    # Decode to Unicode (let UnicodeDecodeError bubble up)
+    element_str = element.decode("utf-8", errors="strict")
+
+    # Remove HFS+ ignorable characters
+    filtered = "".join(c for c in element_str if ord(c) not in HFS_IGNORABLE_CHARS)
+    # Normalize to NFD
+    normalized = unicodedata.normalize("NFD", filtered)
+    return normalized.lower().encode("utf-8", errors="strict")
+
+
+def get_path_element_normalizer(config) -> Callable[[bytes], bytes]:
+    """Get the appropriate path element normalization function based on config.
+
+    Args:
+        config: Repository configuration object
+
+    Returns:
+        Function that normalizes path elements for the configured filesystem
+    """
+    import os
+    import sys
+
+    if config.get_boolean(b"core", b"protectNTFS", os.name == "nt"):
+        return _normalize_path_element_ntfs
+    elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
+        return _normalize_path_element_hfs
+    else:
+        return _normalize_path_element_default
+
+
 def validate_path_element_default(element: bytes) -> bool:
-    return element.lower() not in INVALID_DOTNAMES
+    return _normalize_path_element_default(element) not in INVALID_DOTNAMES
 
 
 def validate_path_element_ntfs(element: bytes) -> bool:
-    stripped = element.rstrip(b". ").lower()
-    if stripped in INVALID_DOTNAMES:
+    normalized = _normalize_path_element_ntfs(element)
+    if normalized in INVALID_DOTNAMES:
         return False
-    if stripped == b"git~1":
+    if normalized == b"git~1":
         return False
     return True
 
@@ -1339,28 +1384,18 @@ def validate_path_element_hfs(element: bytes) -> bool:
     Equivalent to Git's is_hfs_dotgit and related checks.
     Uses NFD normalization and ignores HFS+ ignorable characters.
     """
-    import unicodedata
-
     try:
-        # Decode to Unicode
-        element_str = element.decode("utf-8", errors="strict")
+        normalized = _normalize_path_element_hfs(element)
     except UnicodeDecodeError:
         # Malformed UTF-8 - be conservative and reject
         return False
 
-    # Remove HFS+ ignorable characters (like Git's next_hfs_char)
-    filtered = "".join(c for c in element_str if ord(c) not in HFS_IGNORABLE_CHARS)
-
-    # Normalize to NFD (HFS+ uses a variant of NFD)
-    normalized = unicodedata.normalize("NFD", filtered)
-
-    # Check against invalid names (case-insensitive)
-    normalized_bytes = normalized.encode("utf-8", errors="strict")
-    if normalized_bytes.lower() in INVALID_DOTNAMES:
+    # Check against invalid names
+    if normalized in INVALID_DOTNAMES:
         return False
 
     # Also check for 8.3 short name
-    if normalized_bytes.lower() == b"git~1":
+    if normalized == b"git~1":
         return False
 
     return True
@@ -1837,6 +1872,130 @@ def _transition_to_absent(repo, path, full_path, current_stat, index):
     )
 
 
+def detect_case_only_renames(
+    changes: list["TreeChange"],
+    config: "Config",
+) -> list["TreeChange"]:
+    """Detect and transform case-only renames in a list of tree changes.
+
+    This function identifies file renames that only differ in case (e.g.,
+    README.txt -> readme.txt) and transforms matching ADD/DELETE pairs into
+    CHANGE_RENAME operations. It uses filesystem-appropriate path normalization
+    based on the repository configuration.
+
+    Args:
+      changes: List of TreeChange objects representing file changes
+      config: Repository configuration object
+
+    Returns:
+      New list of TreeChange objects with case-only renames converted to CHANGE_RENAME
+    """
+    from .diff_tree import (
+        CHANGE_ADD,
+        CHANGE_COPY,
+        CHANGE_DELETE,
+        CHANGE_MODIFY,
+        CHANGE_RENAME,
+        TreeChange,
+    )
+
+    # Build dictionaries of old and new paths with their normalized forms
+    old_paths_normalized = {}
+    new_paths_normalized = {}
+    old_changes = {}  # Map from old path to change object
+    new_changes = {}  # Map from new path to change object
+
+    # Get the appropriate normalizer based on config
+    normalize_func = get_path_element_normalizer(config)
+
+    def normalize_path(path: bytes) -> bytes:
+        """Normalize entire path using element normalization."""
+        return b"/".join(normalize_func(part) for part in path.split(b"/"))
+
+    # Pre-normalize all paths once to avoid repeated normalization
+    for change in changes:
+        if change.type == CHANGE_DELETE and change.old:
+            try:
+                normalized = normalize_path(change.old.path)
+            except UnicodeDecodeError:
+                import logging
+
+                logging.warning(
+                    "Skipping case-only rename detection for path with invalid UTF-8: %r",
+                    change.old.path,
+                )
+            else:
+                old_paths_normalized[normalized] = change.old.path
+                old_changes[change.old.path] = change
+        elif change.type == CHANGE_RENAME and change.old:
+            # Treat RENAME as DELETE + ADD for case-only detection
+            try:
+                normalized = normalize_path(change.old.path)
+            except UnicodeDecodeError:
+                import logging
+
+                logging.warning(
+                    "Skipping case-only rename detection for path with invalid UTF-8: %r",
+                    change.old.path,
+                )
+            else:
+                old_paths_normalized[normalized] = change.old.path
+                old_changes[change.old.path] = change
+
+        if (
+            change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY)
+            and change.new
+        ):
+            try:
+                normalized = normalize_path(change.new.path)
+            except UnicodeDecodeError:
+                import logging
+
+                logging.warning(
+                    "Skipping case-only rename detection for path with invalid UTF-8: %r",
+                    change.new.path,
+                )
+            else:
+                new_paths_normalized[normalized] = change.new.path
+                new_changes[change.new.path] = change
+
+    # Find case-only renames and transform changes
+    case_only_renames = set()
+    new_rename_changes = []
+
+    for norm_path, old_path in old_paths_normalized.items():
+        if norm_path in new_paths_normalized:
+            new_path = new_paths_normalized[norm_path]
+            if old_path != new_path:
+                # Found a case-only rename
+                old_change = old_changes[old_path]
+                new_change = new_changes[new_path]
+
+                # Create a CHANGE_RENAME to replace the DELETE and ADD/MODIFY pair
+                if new_change.type == CHANGE_ADD:
+                    # Simple case: DELETE + ADD becomes RENAME
+                    rename_change = TreeChange(
+                        CHANGE_RENAME, old_change.old, new_change.new
+                    )
+                else:
+                    # Complex case: DELETE + MODIFY becomes RENAME
+                    # Use the old file from DELETE and new file from MODIFY
+                    rename_change = TreeChange(
+                        CHANGE_RENAME, old_change.old, new_change.new
+                    )
+
+                new_rename_changes.append(rename_change)
+
+                # Mark the old changes for removal
+                case_only_renames.add(old_change)
+                case_only_renames.add(new_change)
+
+    # Return new list with original ADD/DELETE changes replaced by renames
+    result = [change for change in changes if change not in case_only_renames]
+    result.extend(new_rename_changes)
+    return result
+
+
 def update_working_tree(
     repo: "Repo",
     old_tree_id: Optional[bytes],
@@ -1891,6 +2050,17 @@ def update_working_tree(
 
     # Convert iterator to list since we need multiple passes
     changes = list(change_iterator)
+
+    # Transform case-only renames on case-insensitive filesystems
+    import platform
+
+    default_ignore_case = platform.system() in ("Windows", "Darwin")
+    config = repo.get_config()
+    ignore_case = config.get_boolean((b"core",), b"ignorecase", default_ignore_case)
+
+    if ignore_case:
+        config = repo.get_config()
+        changes = detect_case_only_renames(changes, config)
 
     # Check for path conflicts where files need to become directories
     paths_becoming_dirs = set()
@@ -1996,7 +2166,7 @@ def update_working_tree(
 
     # Apply the changes
     for change in changes:
-        if change.type == CHANGE_DELETE:
+        if change.type in (CHANGE_DELETE, CHANGE_RENAME):
             # Remove file/directory
             path = change.old.path
             if path.startswith(b".git") or not validate_path(
@@ -2016,7 +2186,13 @@ def update_working_tree(
 
             _transition_to_absent(repo, path, full_path, delete_stat, index)
 
-        elif change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_UNCHANGED):
+        if change.type in (
+            CHANGE_ADD,
+            CHANGE_MODIFY,
+            CHANGE_UNCHANGED,
+            CHANGE_COPY,
+            CHANGE_RENAME,
+        ):
             # Add or modify file
             path = change.new.path
             if path.startswith(b".git") or not validate_path(
@@ -2051,63 +2227,6 @@ def update_working_tree(
                     blob_normalizer,
                     tree_encoding,
                 )
-
-        elif change.type in (CHANGE_RENAME, CHANGE_COPY):
-            # Handle rename/copy: remove old, add new
-            old_path = change.old.path
-            new_path = change.new.path
-
-            if not old_path.startswith(b".git") and validate_path(
-                old_path, validate_path_element
-            ):
-                old_full_path = _tree_to_fs_path(repo_path, old_path, tree_encoding)
-                try:
-                    old_current_stat = os.lstat(old_full_path)
-                except FileNotFoundError:
-                    old_current_stat = None
-                except OSError as e:
-                    raise OSError(
-                        f"Cannot access {old_path.decode('utf-8', errors='replace')}: {e}"
-                    ) from e
-                _transition_to_absent(
-                    repo, old_path, old_full_path, old_current_stat, index
-                )
-
-            if not new_path.startswith(b".git") and validate_path(
-                new_path, validate_path_element
-            ):
-                new_full_path = _tree_to_fs_path(repo_path, new_path, tree_encoding)
-                try:
-                    new_current_stat = os.lstat(new_full_path)
-                except FileNotFoundError:
-                    new_current_stat = None
-                except OSError as e:
-                    raise OSError(
-                        f"Cannot access {new_path.decode('utf-8', errors='replace')}: {e}"
-                    ) from e
-
-                if S_ISGITLINK(change.new.mode):
-                    _transition_to_submodule(
-                        repo,
-                        new_path,
-                        new_full_path,
-                        new_current_stat,
-                        change.new,
-                        index,
-                    )
-                else:
-                    _transition_to_file(
-                        repo.object_store,
-                        new_path,
-                        new_full_path,
-                        new_current_stat,
-                        change.new,
-                        index,
-                        honor_filemode,
-                        symlink_fn,
-                        blob_normalizer,
-                        tree_encoding,
-                    )
 
     index.write()
 

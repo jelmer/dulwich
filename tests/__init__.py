@@ -173,6 +173,7 @@ def self_test_suite():
         "utils",
         "walk",
         "web",
+        "worktree",
     ]
     module_names = ["tests.test_" + name for name in names]
     loader = unittest.TestLoader()

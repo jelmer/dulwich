@@ -1,5 +1,7 @@
 0.23.3	UNRELEASED
 
+ * Split out ``WorkTree`` from ``Repo``. (Jelmer Vernooĳ)
+
  * Add support for ``-a`` argument to
    ``dulwich.cli.commit``. (Jelmer Vernooĳ)
 

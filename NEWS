@@ -44,6 +44,10 @@
    is preserved to ensure proper concurrency control.
    (Dan Villiom Podlaski Christiansen, Jelmer Vernooĳ, #1120)
 
+ * Fix Unicode filename encoding issue on Windows where non-ASCII
+   filenames were corrupted during clone/checkout operations.
+   (Jelmer Vernooĳ, #203)
+
 0.23.2	2025-07-07
 
  * Print deprecations on usage, not import.

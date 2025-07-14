@@ -614,6 +614,77 @@ class BuildIndexTests(TestCase):
 
             self.assertTrue(os.path.exists(utf8_path))
 
+    def test_windows_unicode_filename_encoding(self) -> None:
+        """Test that Unicode filenames are handled correctly on Windows.
+
+        This test verifies the fix for GitHub issue #203, where filenames
+        containing Unicode characters like 'À' were incorrectly encoded/decoded
+        on Windows, resulting in corruption like 'À' -> 'Ã€'.
+        """
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        with Repo.init(repo_dir) as repo:
+            # Create a blob
+            file_content = b"test file content"
+            blob = Blob.from_string(file_content)
+
+            # Create a tree with a Unicode filename
+            tree = Tree()
+            unicode_filename = "À"  # This is the character from GitHub issue #203
+            utf8_filename_bytes = unicode_filename.encode(
+                "utf-8"
+            )  # This is how it's stored in git trees
+
+            tree[utf8_filename_bytes] = (stat.S_IFREG | 0o644, blob.id)
+            repo.object_store.add_objects([(blob, None), (tree, None)])
+
+            # Build index from tree (this is what happens during checkout/clone)
+            try:
+                build_index_from_tree(
+                    repo.path, repo.index_path(), repo.object_store, tree.id
+                )
+            except (OSError, UnicodeError) as e:
+                if sys.platform == "win32" and "cannot" in str(e).lower():
+                    self.skipTest(f"Platform doesn't support filename: {e}")
+                raise
+
+            # Check that the file was created correctly
+            expected_file_path = os.path.join(repo.path, unicode_filename)
+            self.assertTrue(
+                os.path.exists(expected_file_path),
+                f"File should exist at {expected_file_path}",
+            )
+
+            # Verify the file content is correct
+            with open(expected_file_path, "rb") as f:
+                actual_content = f.read()
+            self.assertEqual(actual_content, file_content)
+
+            # Test the reverse: adding a Unicode filename to the index
+            if sys.platform == "win32":
+                # On Windows, test that _tree_to_fs_path and _fs_to_tree_path
+                # handle UTF-8 encoded tree paths correctly
+                from dulwich.index import _fs_to_tree_path, _tree_to_fs_path
+
+                repo_path_bytes = os.fsencode(repo.path)
+
+                # Test tree path to filesystem path conversion
+                fs_path = _tree_to_fs_path(repo_path_bytes, utf8_filename_bytes)
+                expected_fs_path = os.path.join(
+                    repo_path_bytes, os.fsencode(unicode_filename)
+                )
+                self.assertEqual(fs_path, expected_fs_path)
+
+                # Test filesystem path to tree path conversion
+                # _fs_to_tree_path expects relative paths, not absolute paths
+                # Extract just the filename from the full path
+                filename_only = os.path.basename(fs_path)
+                reconstructed_tree_path = _fs_to_tree_path(
+                    filename_only, tree_encoding="utf-8"
+                )
+                self.assertEqual(reconstructed_tree_path, utf8_filename_bytes)
+
     def test_git_submodule(self) -> None:
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)

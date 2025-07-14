@@ -1387,6 +1387,7 @@ def build_index_from_tree(
     validate_path_element: Callable[[bytes], bool] = validate_path_element_default,
     symlink_fn: Optional[Callable] = None,
     blob_normalizer: Optional["BlobNormalizer"] = None,
+    tree_encoding: str = "utf-8",
 ) -> None:
     """Generate and materialize index from a tree.
 
@@ -1401,6 +1402,7 @@ def build_index_from_tree(
         out; default just refuses .git and .. directories.
       blob_normalizer: An optional BlobNormalizer to use for converting line
         endings when writing blobs to the working directory.
+      tree_encoding: Encoding used for tree paths (default: utf-8)
 
     Note: existing index is wiped and contents are not merged
         in a working dir. Suitable only for fresh clones.
@@ -1412,7 +1414,7 @@ def build_index_from_tree(
     for entry in iter_tree_contents(object_store, tree_id):
         if not validate_path(entry.path, validate_path_element):
             continue
-        full_path = _tree_to_fs_path(root_path, entry.path)
+        full_path = _tree_to_fs_path(root_path, entry.path, tree_encoding)
 
         if not os.path.exists(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
@@ -1434,6 +1436,7 @@ def build_index_from_tree(
                 entry.mode,
                 full_path,
                 honor_filemode=honor_filemode,
+                tree_encoding=tree_encoding,
                 symlink_fn=symlink_fn,
             )
 
@@ -1697,6 +1700,7 @@ def _transition_to_file(
     honor_filemode,
     symlink_fn,
     blob_normalizer,
+    tree_encoding="utf-8",
 ):
     """Transition any type to regular file or symlink."""
     # Check if we need to update
@@ -1768,6 +1772,7 @@ def _transition_to_file(
         entry.mode,
         full_path,
         honor_filemode=honor_filemode,
+        tree_encoding=tree_encoding,
         symlink_fn=symlink_fn,
     )
     index[path] = index_entry_from_stat(st, entry.sha)
@@ -1814,6 +1819,7 @@ def update_working_tree(
     symlink_fn: Optional[Callable] = None,
     force_remove_untracked: bool = False,
     blob_normalizer: Optional["BlobNormalizer"] = None,
+    tree_encoding: str = "utf-8",
 ) -> None:
     """Update the working tree and index to match a new tree.
 
@@ -1834,6 +1840,7 @@ def update_working_tree(
         directory but not in target tree, even if old_tree_id is None
       blob_normalizer: An optional BlobNormalizer to use for converting line
         endings when writing blobs to the working directory.
+      tree_encoding: Encoding used for tree paths (default: utf-8)
     """
     if validate_path_element is None:
         validate_path_element = validate_path_element_default
@@ -1872,7 +1879,7 @@ def update_working_tree(
     current_stat: Optional[os.stat_result]
     stat_cache: dict[bytes, Optional[os.stat_result]] = {}
     for path in paths_needing_dir:
-        full_path = _tree_to_fs_path(repo_path, path)
+        full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
         try:
             current_stat = os.lstat(full_path)
         except FileNotFoundError:
@@ -1914,7 +1921,7 @@ def update_working_tree(
 
     # First process removals
     for path in paths_to_remove:
-        full_path = _tree_to_fs_path(repo_path, path)
+        full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
 
         # Determine current state - use cache if available
         try:
@@ -1929,7 +1936,7 @@ def update_working_tree(
 
     # Then process additions/updates
     for path in paths_to_update:
-        full_path = _tree_to_fs_path(repo_path, path)
+        full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
 
         # Determine current state - use cache if available
         try:
@@ -1958,6 +1965,7 @@ def update_working_tree(
                 honor_filemode,
                 symlink_fn,
                 blob_normalizer,
+                tree_encoding,
             )
 
     # Handle force_remove_untracked
@@ -2045,12 +2053,15 @@ def get_unstaged_changes(
                 yield tree_path
 
 
-def _tree_to_fs_path(root_path: bytes, tree_path: bytes) -> bytes:
+def _tree_to_fs_path(
+    root_path: bytes, tree_path: bytes, tree_encoding: str = "utf-8"
+) -> bytes:
     """Convert a git tree path to a file system path.
 
     Args:
       root_path: Root filesystem path
-      tree_path: Git tree path as bytes
+      tree_path: Git tree path as bytes (encoded with tree_encoding)
+      tree_encoding: Encoding used for tree paths (default: utf-8)
 
     Returns: File system path.
     """
@@ -2059,21 +2070,44 @@ def _tree_to_fs_path(root_path: bytes, tree_path: bytes) -> bytes:
         sep_corrected_path = tree_path.replace(b"/", os_sep_bytes)
     else:
         sep_corrected_path = tree_path
+
+    # On Windows, we need to handle tree path encoding properly
+    if sys.platform == "win32":
+        # Decode from tree encoding, then re-encode for filesystem
+        try:
+            tree_path_str = sep_corrected_path.decode(tree_encoding)
+            sep_corrected_path = os.fsencode(tree_path_str)
+        except UnicodeDecodeError:
+            # If decoding fails, use the original bytes
+            pass
+
     return os.path.join(root_path, sep_corrected_path)
 
 
-def _fs_to_tree_path(fs_path: Union[str, bytes]) -> bytes:
+def _fs_to_tree_path(fs_path: Union[str, bytes], tree_encoding: str = "utf-8") -> bytes:
     """Convert a file system path to a git tree path.
 
     Args:
       fs_path: File system path.
+      tree_encoding: Encoding to use for tree paths (default: utf-8)
 
-    Returns:  Git tree path as bytes
+    Returns:  Git tree path as bytes (encoded with tree_encoding)
     """
     if not isinstance(fs_path, bytes):
         fs_path_bytes = os.fsencode(fs_path)
     else:
         fs_path_bytes = fs_path
+
+    # On Windows, we need to ensure tree paths are properly encoded
+    if sys.platform == "win32":
+        try:
+            # Decode from filesystem encoding, then re-encode with tree encoding
+            fs_path_str = os.fsdecode(fs_path_bytes)
+            fs_path_bytes = fs_path_str.encode(tree_encoding)
+        except UnicodeDecodeError:
+            # If filesystem decoding fails, use the original bytes
+            pass
+
     if os_sep_bytes != b"/":
         tree_path = fs_path_bytes.replace(os_sep_bytes, b"/")
     else:

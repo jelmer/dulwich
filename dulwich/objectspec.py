@@ -36,6 +36,33 @@ def to_bytes(text: Union[str, bytes]) -> bytes:
     return text  # type: ignore
 
 
+def _resolve_object(repo: "Repo", ref: bytes) -> "ShaFile":
+    """Resolve a reference to an object using multiple strategies."""
+    try:
+        return repo[ref]
+    except KeyError:
+        try:
+            ref_sha = parse_ref(repo, ref)
+            return repo[ref_sha]
+        except KeyError:
+            try:
+                return repo.object_store[ref]
+            except (KeyError, ValueError):
+                # Re-raise original KeyError for consistency
+                raise KeyError(ref)
+
+
+def _parse_number_suffix(suffix: bytes) -> tuple[int, bytes]:
+    """Parse a number from the start of suffix, return (number, remaining)."""
+    if not suffix or not suffix[0:1].isdigit():
+        return 1, suffix
+
+    end = 1
+    while end < len(suffix) and suffix[end : end + 1].isdigit():
+        end += 1
+    return int(suffix[:end]), suffix[end:]
+
+
 def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
     """Parse a string referring to an object.
 
@@ -47,7 +74,78 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
       KeyError: If the object can not be found
     """
     objectish = to_bytes(objectish)
-    return repo[objectish]
+
+    # Handle :<path> - lookup path in tree
+    if b":" in objectish:
+        rev, path = objectish.split(b":", 1)
+        if not rev:
+            raise NotImplementedError("Index path lookup (:path) not yet supported")
+        tree = parse_tree(repo, rev)
+        mode, sha = tree.lookup_path(repo.object_store.__getitem__, path)
+        return repo[sha]
+
+    # Handle @{N} - reflog lookup
+    if b"@{" in objectish:
+        base, rest = objectish.split(b"@{", 1)
+        if not rest.endswith(b"}"):
+            raise ValueError("Invalid @{} syntax")
+        spec = rest[:-1]
+        if not spec.isdigit():
+            raise NotImplementedError(f"Only @{{N}} supported, not @{{{spec!r}}}")
+
+        ref = base if base else b"HEAD"
+        entries = list(repo.read_reflog(ref))
+        entries.reverse()  # Git uses reverse chronological order
+        index = int(spec)
+        if index >= len(entries):
+            raise ValueError(f"Reflog for {ref!r} has only {len(entries)} entries")
+        return repo[entries[index].new_sha]
+
+    # Handle ^{} - tag dereferencing
+    if objectish.endswith(b"^{}"):
+        obj = _resolve_object(repo, objectish[:-3])
+        while isinstance(obj, Tag):
+            obj_type, obj_sha = obj.object
+            obj = repo[obj_sha]
+        return obj
+
+    # Handle ~ and ^ operators
+    for sep in [b"~", b"^"]:
+        if sep in objectish:
+            base, suffix = objectish.split(sep, 1)
+            if not base:
+                raise ValueError(f"Empty base before {sep!r}")
+
+            obj = _resolve_object(repo, base)
+            num, suffix = _parse_number_suffix(suffix)
+
+            if sep == b"~":
+                # Follow first parent N times
+                commit = obj if isinstance(obj, Commit) else parse_commit(repo, obj.id)
+                for _ in range(num):
+                    if not commit.parents:
+                        raise ValueError(
+                            f"Commit {commit.id.decode('ascii', 'replace')} has no parents"
+                        )
+                    commit = repo[commit.parents[0]]
+                obj = commit
+            else:  # sep == b"^"
+                # Get N-th parent (or commit itself if N=0)
+                commit = obj if isinstance(obj, Commit) else parse_commit(repo, obj.id)
+                if num == 0:
+                    obj = commit
+                elif num > len(commit.parents):
+                    raise ValueError(
+                        f"Commit {commit.id.decode('ascii', 'replace')} does not have parent #{num}"
+                    )
+                else:
+                    obj = repo[commit.parents[num - 1]]
+
+            # Process remaining operators recursively
+            return parse_object(repo, obj.id + suffix) if suffix else obj
+
+    # No operators, just return the object
+    return _resolve_object(repo, objectish)
 
 
 def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "Tree":

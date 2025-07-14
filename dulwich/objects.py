@@ -26,6 +26,7 @@ import binascii
 import os
 import posixpath
 import stat
+import sys
 import zlib
 from collections import namedtuple
 from collections.abc import Callable, Iterable, Iterator
@@ -37,6 +38,11 @@ from typing import (
     Optional,
     Union,
 )
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 try:
     from typing import TypeGuard  # type: ignore
@@ -538,7 +544,7 @@ class ShaFile:
         return obj
 
     @classmethod
-    def from_string(cls, string: bytes) -> "ShaFile":
+    def from_string(cls, string: bytes) -> Self:
         """Create a ShaFile from a string."""
         obj = cls()
         obj.set_raw_string(string)

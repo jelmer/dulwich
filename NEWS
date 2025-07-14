@@ -24,6 +24,13 @@
 
  * Add ``reflog`` command in porcelain. (Jelmer Vernooĳ)
 
+ * Add ``locked_ref`` context manager for atomic ref operations.
+   (Jelmer Vernooĳ)
+
+ * Fix bug in ``DiskRefsContainer._remove_packed_ref`` that prevented
+   packed ref deletions from being persisted to disk.
+   (Jelmer Vernooĳ)
+
  * Optimize writing unchanged refs by avoiding unnecessary fsync
    when ref already has the desired value. File locking behavior
    is preserved to ensure proper concurrency control.

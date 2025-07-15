@@ -42,6 +42,8 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from .config import Config
+    from .diff_tree import TreeChange
     from .file import _GitFile
     from .line_ending import BlobNormalizer
     from .repo import Repo
@@ -1298,15 +1300,59 @@ def build_file_from_blob(
 INVALID_DOTNAMES = (b".git", b".", b"..", b"")
 
 
+def _normalize_path_element_default(element: bytes) -> bytes:
+    """Normalize path element for default case-insensitive comparison."""
+    return element.lower()
+
+
+def _normalize_path_element_ntfs(element: bytes) -> bytes:
+    """Normalize path element for NTFS filesystem."""
+    return element.rstrip(b". ").lower()
+
+
+def _normalize_path_element_hfs(element: bytes) -> bytes:
+    """Normalize path element for HFS+ filesystem."""
+    import unicodedata
+
+    # Decode to Unicode (let UnicodeDecodeError bubble up)
+    element_str = element.decode("utf-8", errors="strict")
+
+    # Remove HFS+ ignorable characters
+    filtered = "".join(c for c in element_str if ord(c) not in HFS_IGNORABLE_CHARS)
+    # Normalize to NFD
+    normalized = unicodedata.normalize("NFD", filtered)
+    return normalized.lower().encode("utf-8", errors="strict")
+
+
+def get_path_element_normalizer(config) -> Callable[[bytes], bytes]:
+    """Get the appropriate path element normalization function based on config.
+
+    Args:
+        config: Repository configuration object
+
+    Returns:
+        Function that normalizes path elements for the configured filesystem
+    """
+    import os
+    import sys
+
+    if config.get_boolean(b"core", b"protectNTFS", os.name == "nt"):
+        return _normalize_path_element_ntfs
+    elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
+        return _normalize_path_element_hfs
+    else:
+        return _normalize_path_element_default
+
+
 def validate_path_element_default(element: bytes) -> bool:
-    return element.lower() not in INVALID_DOTNAMES
+    return _normalize_path_element_default(element) not in INVALID_DOTNAMES
 
 
 def validate_path_element_ntfs(element: bytes) -> bool:
-    stripped = element.rstrip(b". ").lower()
-    if stripped in INVALID_DOTNAMES:
+    normalized = _normalize_path_element_ntfs(element)
+    if normalized in INVALID_DOTNAMES:
         return False
-    if stripped == b"git~1":
+    if normalized == b"git~1":
         return False
     return True
 
@@ -1338,28 +1384,18 @@ def validate_path_element_hfs(element: bytes) -> bool:
     Equivalent to Git's is_hfs_dotgit and related checks.
     Uses NFD normalization and ignores HFS+ ignorable characters.
     """
-    import unicodedata
-
     try:
-        # Decode to Unicode
-        element_str = element.decode("utf-8", errors="strict")
+        normalized = _normalize_path_element_hfs(element)
     except UnicodeDecodeError:
         # Malformed UTF-8 - be conservative and reject
         return False
 
-    # Remove HFS+ ignorable characters (like Git's next_hfs_char)
-    filtered = "".join(c for c in element_str if ord(c) not in HFS_IGNORABLE_CHARS)
-
-    # Normalize to NFD (HFS+ uses a variant of NFD)
-    normalized = unicodedata.normalize("NFD", filtered)
-
-    # Check against invalid names (case-insensitive)
-    normalized_bytes = normalized.encode("utf-8", errors="strict")
-    if normalized_bytes.lower() in INVALID_DOTNAMES:
+    # Check against invalid names
+    if normalized in INVALID_DOTNAMES:
         return False
 
     # Also check for 8.3 short name
-    if normalized_bytes.lower() == b"git~1":
+    if normalized == b"git~1":
         return False
 
     return True
@@ -1613,7 +1649,7 @@ def _check_symlink_matches(
 ) -> bool:
     """Check if symlink target matches expected target.
 
-    Returns True if symlink needs to be written, False if it matches.
+    Returns True if symlink matches, False if it doesn't match.
     """
     try:
         current_target = os.readlink(full_path)
@@ -1621,14 +1657,14 @@ def _check_symlink_matches(
         expected_target = blob_obj.as_raw_string()
         if isinstance(current_target, str):
             current_target = current_target.encode()
-        return current_target != expected_target
+        return current_target == expected_target
     except FileNotFoundError:
         # Symlink doesn't exist
-        return True
+        return False
     except OSError as e:
         if e.errno == errno.EINVAL:
             # Not a symlink
-            return True
+            return False
         raise
 
 
@@ -1644,19 +1680,43 @@ def _check_file_matches(
 ) -> bool:
     """Check if a file on disk matches the expected git object.
 
-    Returns True if file needs to be written, False if it matches.
+    Returns True if file matches, False if it doesn't match.
     """
     # Check mode first (if honor_filemode is True)
     if honor_filemode:
         current_mode = stat.S_IMODE(current_stat.st_mode)
         expected_mode = stat.S_IMODE(entry_mode)
-        if current_mode != expected_mode:
-            return True
+
+        # For regular files, only check the user executable bit, not group/other permissions
+        # This matches Git's behavior where umask differences don't count as modifications
+        if stat.S_ISREG(current_stat.st_mode):
+            # Normalize regular file modes to ignore group/other write permissions
+            current_mode_normalized = (
+                current_mode & 0o755
+            )  # Keep only user rwx and all read+execute
+            expected_mode_normalized = expected_mode & 0o755
+
+            # For Git compatibility, regular files should be either 644 or 755
+            if expected_mode_normalized not in (0o644, 0o755):
+                expected_mode_normalized = 0o644  # Default for regular files
+            if current_mode_normalized not in (0o644, 0o755):
+                # Determine if it should be executable based on user execute bit
+                if current_mode & 0o100:  # User execute bit is set
+                    current_mode_normalized = 0o755
+                else:
+                    current_mode_normalized = 0o644
+
+            if current_mode_normalized != expected_mode_normalized:
+                return False
+        else:
+            # For non-regular files (symlinks, etc.), check mode exactly
+            if current_mode != expected_mode:
+                return False
 
     # If mode matches (or we don't care), check content via size first
     blob_obj = repo_object_store[entry_sha]
     if current_stat.st_size != blob_obj.raw_length():
-        return True
+        return False
 
     # Size matches, check actual content
     try:
@@ -1668,9 +1728,9 @@ def _check_file_matches(
                     blob_obj, tree_path
                 )
                 expected_content = normalized_blob.as_raw_string()
-            return current_content != expected_content
+            return current_content == expected_content
     except (FileNotFoundError, PermissionError, IsADirectoryError):
-        return True
+        return False
 
 
 def _transition_to_submodule(repo, path, full_path, current_stat, entry, index):
@@ -1710,7 +1770,7 @@ def _transition_to_file(
         and not stat.S_ISLNK(entry.mode)
     ):
         # File to file - check if update needed
-        needs_update = _check_file_matches(
+        file_matches = _check_file_matches(
             object_store,
             full_path,
             entry.sha,
@@ -1720,13 +1780,15 @@ def _transition_to_file(
             blob_normalizer,
             path,
         )
+        needs_update = not file_matches
     elif (
         current_stat is not None
         and stat.S_ISLNK(current_stat.st_mode)
         and stat.S_ISLNK(entry.mode)
     ):
         # Symlink to symlink - check if update needed
-        needs_update = _check_symlink_matches(full_path, object_store, entry.sha)
+        symlink_matches = _check_symlink_matches(full_path, object_store, entry.sha)
+        needs_update = not symlink_matches
     else:
         needs_update = True
 
@@ -1810,16 +1872,142 @@ def _transition_to_absent(repo, path, full_path, current_stat, index):
     )
 
 
+def detect_case_only_renames(
+    changes: list["TreeChange"],
+    config: "Config",
+) -> list["TreeChange"]:
+    """Detect and transform case-only renames in a list of tree changes.
+
+    This function identifies file renames that only differ in case (e.g.,
+    README.txt -> readme.txt) and transforms matching ADD/DELETE pairs into
+    CHANGE_RENAME operations. It uses filesystem-appropriate path normalization
+    based on the repository configuration.
+
+    Args:
+      changes: List of TreeChange objects representing file changes
+      config: Repository configuration object
+
+    Returns:
+      New list of TreeChange objects with case-only renames converted to CHANGE_RENAME
+    """
+    from .diff_tree import (
+        CHANGE_ADD,
+        CHANGE_COPY,
+        CHANGE_DELETE,
+        CHANGE_MODIFY,
+        CHANGE_RENAME,
+        TreeChange,
+    )
+
+    # Build dictionaries of old and new paths with their normalized forms
+    old_paths_normalized = {}
+    new_paths_normalized = {}
+    old_changes = {}  # Map from old path to change object
+    new_changes = {}  # Map from new path to change object
+
+    # Get the appropriate normalizer based on config
+    normalize_func = get_path_element_normalizer(config)
+
+    def normalize_path(path: bytes) -> bytes:
+        """Normalize entire path using element normalization."""
+        return b"/".join(normalize_func(part) for part in path.split(b"/"))
+
+    # Pre-normalize all paths once to avoid repeated normalization
+    for change in changes:
+        if change.type == CHANGE_DELETE and change.old:
+            try:
+                normalized = normalize_path(change.old.path)
+            except UnicodeDecodeError:
+                import logging
+
+                logging.warning(
+                    "Skipping case-only rename detection for path with invalid UTF-8: %r",
+                    change.old.path,
+                )
+            else:
+                old_paths_normalized[normalized] = change.old.path
+                old_changes[change.old.path] = change
+        elif change.type == CHANGE_RENAME and change.old:
+            # Treat RENAME as DELETE + ADD for case-only detection
+            try:
+                normalized = normalize_path(change.old.path)
+            except UnicodeDecodeError:
+                import logging
+
+                logging.warning(
+                    "Skipping case-only rename detection for path with invalid UTF-8: %r",
+                    change.old.path,
+                )
+            else:
+                old_paths_normalized[normalized] = change.old.path
+                old_changes[change.old.path] = change
+
+        if (
+            change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY)
+            and change.new
+        ):
+            try:
+                normalized = normalize_path(change.new.path)
+            except UnicodeDecodeError:
+                import logging
+
+                logging.warning(
+                    "Skipping case-only rename detection for path with invalid UTF-8: %r",
+                    change.new.path,
+                )
+            else:
+                new_paths_normalized[normalized] = change.new.path
+                new_changes[change.new.path] = change
+
+    # Find case-only renames and transform changes
+    case_only_renames = set()
+    new_rename_changes = []
+
+    for norm_path, old_path in old_paths_normalized.items():
+        if norm_path in new_paths_normalized:
+            new_path = new_paths_normalized[norm_path]
+            if old_path != new_path:
+                # Found a case-only rename
+                old_change = old_changes[old_path]
+                new_change = new_changes[new_path]
+
+                # Create a CHANGE_RENAME to replace the DELETE and ADD/MODIFY pair
+                if new_change.type == CHANGE_ADD:
+                    # Simple case: DELETE + ADD becomes RENAME
+                    rename_change = TreeChange(
+                        CHANGE_RENAME, old_change.old, new_change.new
+                    )
+                else:
+                    # Complex case: DELETE + MODIFY becomes RENAME
+                    # Use the old file from DELETE and new file from MODIFY
+                    rename_change = TreeChange(
+                        CHANGE_RENAME, old_change.old, new_change.new
+                    )
+
+                new_rename_changes.append(rename_change)
+
+                # Mark the old changes for removal
+                case_only_renames.add(old_change)
+                case_only_renames.add(new_change)
+
+    # Return new list with original ADD/DELETE changes replaced by renames
+    result = [change for change in changes if change not in case_only_renames]
+    result.extend(new_rename_changes)
+    return result
+
+
 def update_working_tree(
     repo: "Repo",
     old_tree_id: Optional[bytes],
     new_tree_id: bytes,
+    change_iterator: Iterator["TreeChange"],
     honor_filemode: bool = True,
     validate_path_element: Optional[Callable[[bytes], bool]] = None,
     symlink_fn: Optional[Callable] = None,
     force_remove_untracked: bool = False,
     blob_normalizer: Optional["BlobNormalizer"] = None,
     tree_encoding: str = "utf-8",
+    allow_overwrite_modified: bool = False,
 ) -> None:
     """Update the working tree and index to match a new tree.
 
@@ -1833,6 +2021,7 @@ def update_working_tree(
       repo: Repository object
       old_tree_id: SHA of the tree before the update
       new_tree_id: SHA of the tree to update to
+      change_iterator: Iterator of TreeChange objects to apply
       honor_filemode: An optional flag to honor core.filemode setting
       validate_path_element: Function to validate path elements to check out
       symlink_fn: Function to use for creating symlinks
@@ -1841,168 +2030,203 @@ def update_working_tree(
       blob_normalizer: An optional BlobNormalizer to use for converting line
         endings when writing blobs to the working directory.
       tree_encoding: Encoding used for tree paths (default: utf-8)
+      allow_overwrite_modified: If False, raise an error when attempting to
+        overwrite files that have been modified compared to old_tree_id
     """
     if validate_path_element is None:
         validate_path_element = validate_path_element_default
 
+    from .diff_tree import (
+        CHANGE_ADD,
+        CHANGE_COPY,
+        CHANGE_DELETE,
+        CHANGE_MODIFY,
+        CHANGE_RENAME,
+        CHANGE_UNCHANGED,
+    )
+
     repo_path = repo.path if isinstance(repo.path, bytes) else repo.path.encode()
     index = repo.open_index()
 
-    # Build sets of paths for efficient lookup
-    new_paths = {}
-    for entry in iter_tree_contents(repo.object_store, new_tree_id):
-        if entry.path.startswith(b".git") or not validate_path(
-            entry.path, validate_path_element
-        ):
-            continue
-        new_paths[entry.path] = entry
+    # Convert iterator to list since we need multiple passes
+    changes = list(change_iterator)
 
-    old_paths = {}
-    if old_tree_id:
-        for entry in iter_tree_contents(repo.object_store, old_tree_id):
-            if not entry.path.startswith(b".git"):
-                old_paths[entry.path] = entry
+    # Transform case-only renames on case-insensitive filesystems
+    import platform
 
-    # Process all paths
-    all_paths = set(new_paths.keys()) | set(old_paths.keys())
+    default_ignore_case = platform.system() in ("Windows", "Darwin")
+    config = repo.get_config()
+    ignore_case = config.get_boolean((b"core",), b"ignorecase", default_ignore_case)
 
-    # Check for paths that need to become directories
-    paths_needing_dir = set()
-    for path in new_paths:
-        parts = path.split(b"/")
-        for i in range(1, len(parts)):
-            parent = b"/".join(parts[:i])
-            if parent in old_paths and parent not in new_paths:
-                paths_needing_dir.add(parent)
+    if ignore_case:
+        config = repo.get_config()
+        changes = detect_case_only_renames(changes, config)
+
+    # Check for path conflicts where files need to become directories
+    paths_becoming_dirs = set()
+    for change in changes:
+        if change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY):
+            path = change.new.path
+            if b"/" in path:  # This is a file inside a directory
+                # Check if any parent path exists as a file in the old tree or changes
+                parts = path.split(b"/")
+                for i in range(1, len(parts)):
+                    parent = b"/".join(parts[:i])
+                    # See if this parent path is being deleted (was a file, becoming a dir)
+                    for other_change in changes:
+                        if (
+                            other_change.type == CHANGE_DELETE
+                            and other_change.old
+                            and other_change.old.path == parent
+                        ):
+                            paths_becoming_dirs.add(parent)
 
     # Check if any path that needs to become a directory has been modified
-    current_stat: Optional[os.stat_result]
-    stat_cache: dict[bytes, Optional[os.stat_result]] = {}
-    for path in paths_needing_dir:
+    for path in paths_becoming_dirs:
         full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
         try:
             current_stat = os.lstat(full_path)
         except FileNotFoundError:
-            # File doesn't exist, proceed
-            stat_cache[full_path] = None
-        except PermissionError:
-            # Can't read file, proceed
-            pass
-        else:
-            stat_cache[full_path] = current_stat
-            if stat.S_ISREG(current_stat.st_mode):
+            continue  # File doesn't exist, nothing to check
+        except OSError as e:
+            raise OSError(
+                f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
+            ) from e
+
+        if stat.S_ISREG(current_stat.st_mode):
+            # Find the old entry for this path
+            old_change = None
+            for change in changes:
+                if (
+                    change.type == CHANGE_DELETE
+                    and change.old
+                    and change.old.path == path
+                ):
+                    old_change = change
+                    break
+
+            if old_change:
                 # Check if file has been modified
-                old_entry = old_paths[path]
-                if _check_file_matches(
+                file_matches = _check_file_matches(
                     repo.object_store,
                     full_path,
-                    old_entry.sha,
-                    old_entry.mode,
+                    old_change.old.sha,
+                    old_change.old.mode,
                     current_stat,
                     honor_filemode,
                     blob_normalizer,
                     path,
-                ):
-                    # File has been modified, can't replace with directory
+                )
+                if not file_matches:
                     raise OSError(
                         f"Cannot replace modified file with directory: {path!r}"
                     )
 
-    # Process in two passes: deletions first, then additions/updates
-    # This handles case-only renames on case-insensitive filesystems correctly
-    paths_to_remove = []
-    paths_to_update = []
+    # Check for uncommitted modifications before making any changes
+    if not allow_overwrite_modified and old_tree_id:
+        for change in changes:
+            # Only check files that are being modified or deleted
+            if change.type in (CHANGE_MODIFY, CHANGE_DELETE) and change.old:
+                path = change.old.path
+                if path.startswith(b".git") or not validate_path(
+                    path, validate_path_element
+                ):
+                    continue
 
-    for path in sorted(all_paths):
-        if path in new_paths:
-            paths_to_update.append(path)
-        else:
-            paths_to_remove.append(path)
-
-    # First process removals
-    for path in paths_to_remove:
-        full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
-
-        # Determine current state - use cache if available
-        try:
-            current_stat = stat_cache[full_path]
-        except KeyError:
-            try:
-                current_stat = os.lstat(full_path)
-            except FileNotFoundError:
-                current_stat = None
-
-        _transition_to_absent(repo, path, full_path, current_stat, index)
-
-    # Then process additions/updates
-    for path in paths_to_update:
-        full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
-
-        # Determine current state - use cache if available
-        try:
-            current_stat = stat_cache[full_path]
-        except KeyError:
-            try:
-                current_stat = os.lstat(full_path)
-            except FileNotFoundError:
-                current_stat = None
-
-        new_entry = new_paths[path]
-
-        # Path should exist
-        if S_ISGITLINK(new_entry.mode):
-            _transition_to_submodule(
-                repo, path, full_path, current_stat, new_entry, index
-            )
-        else:
-            _transition_to_file(
-                repo.object_store,
-                path,
-                full_path,
-                current_stat,
-                new_entry,
-                index,
-                honor_filemode,
-                symlink_fn,
-                blob_normalizer,
-                tree_encoding,
-            )
-
-    # Handle force_remove_untracked
-    if force_remove_untracked:
-        for root, dirs, files in os.walk(repo_path):
-            if b".git" in os.fsencode(root):
-                continue
-            root_bytes = os.fsencode(root)
-            for file in files:
-                full_path = os.path.join(root_bytes, os.fsencode(file))
-                tree_path = os.path.relpath(full_path, repo_path)
-                if os.sep != "/":
-                    tree_path = tree_path.replace(os.sep.encode(), b"/")
-
-                if tree_path not in new_paths:
-                    _remove_file_with_readonly_handling(full_path)
-                    if tree_path in index:
-                        del index[tree_path]
-
-        # Clean up empty directories
-        for root, dirs, files in os.walk(repo_path, topdown=False):
-            root_bytes = os.fsencode(root)
-            if (
-                b".git" not in root_bytes
-                and root_bytes != repo_path
-                and not files
-                and not dirs
-            ):
+                full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
                 try:
-                    os.rmdir(root)
+                    current_stat = os.lstat(full_path)
                 except FileNotFoundError:
-                    # Directory was already removed
-                    pass
+                    continue  # File doesn't exist, nothing to check
                 except OSError as e:
-                    if e.errno != errno.ENOTEMPTY:
-                        # Only ignore "directory not empty" errors
-                        raise
+                    raise OSError(
+                        f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
+                    ) from e
+
+                if stat.S_ISREG(current_stat.st_mode):
+                    # Check if working tree file differs from old tree
+                    file_matches = _check_file_matches(
+                        repo.object_store,
+                        full_path,
+                        change.old.sha,
+                        change.old.mode,
+                        current_stat,
+                        honor_filemode,
+                        blob_normalizer,
+                        path,
+                    )
+                    if not file_matches:
+                        from .errors import WorkingTreeModifiedError
+
+                        raise WorkingTreeModifiedError(
+                            f"Your local changes to '{path.decode('utf-8', errors='replace')}' "
+                            f"would be overwritten by checkout. "
+                            f"Please commit your changes or stash them before you switch branches."
+                        )
+
+    # Apply the changes
+    for change in changes:
+        if change.type in (CHANGE_DELETE, CHANGE_RENAME):
+            # Remove file/directory
+            path = change.old.path
+            if path.startswith(b".git") or not validate_path(
+                path, validate_path_element
+            ):
+                continue
+
+            full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
+            try:
+                delete_stat: Optional[os.stat_result] = os.lstat(full_path)
+            except FileNotFoundError:
+                delete_stat = None
+            except OSError as e:
+                raise OSError(
+                    f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
+                ) from e
+
+            _transition_to_absent(repo, path, full_path, delete_stat, index)
+
+        if change.type in (
+            CHANGE_ADD,
+            CHANGE_MODIFY,
+            CHANGE_UNCHANGED,
+            CHANGE_COPY,
+            CHANGE_RENAME,
+        ):
+            # Add or modify file
+            path = change.new.path
+            if path.startswith(b".git") or not validate_path(
+                path, validate_path_element
+            ):
+                continue
+
+            full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
+            try:
+                modify_stat: Optional[os.stat_result] = os.lstat(full_path)
+            except FileNotFoundError:
+                modify_stat = None
+            except OSError as e:
+                raise OSError(
+                    f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
+                ) from e
+
+            if S_ISGITLINK(change.new.mode):
+                _transition_to_submodule(
+                    repo, path, full_path, modify_stat, change.new, index
+                )
+            else:
+                _transition_to_file(
+                    repo.object_store,
+                    path,
+                    full_path,
+                    modify_stat,
+                    change.new,
+                    index,
+                    honor_filemode,
+                    symlink_fn,
+                    blob_normalizer,
+                    tree_encoding,
+                )
 
     index.write()
 

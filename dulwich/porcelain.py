@@ -85,6 +85,7 @@ import stat
 import sys
 import time
 from collections import namedtuple
+from collections.abc import Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
@@ -103,6 +104,8 @@ from .diff_tree import (
     CHANGE_MODIFY,
     CHANGE_RENAME,
     RENAME_CHANGE_TYPES,
+    TreeChange,
+    tree_changes,
 )
 from .errors import SendPackError
 from .graph import can_fast_forward
@@ -1896,13 +1899,6 @@ def reset(repo, mode, treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD") ->
 
         elif mode == "hard":
             # Hard reset: update HEAD, index, and working tree
-            # Get current HEAD tree for comparison
-            try:
-                current_head = r.refs[b"HEAD"]
-                current_tree = r[current_head].tree
-            except KeyError:
-                current_tree = None
-
             # Get configuration for working directory update
             config = r.get_config()
             honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
@@ -1929,15 +1925,28 @@ def reset(repo, mode, treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD") ->
 
             # Update working tree and index
             blob_normalizer = r.get_blob_normalizer()
+            # For reset --hard, use current index tree as old tree to get proper deletions
+            index = r.open_index()
+            if len(index) > 0:
+                index_tree_id = index.commit(r.object_store)
+            else:
+                # Empty index
+                index_tree_id = None
+
+            changes = tree_changes(
+                r.object_store, index_tree_id, tree.id, want_unchanged=True
+            )
             update_working_tree(
                 r,
-                current_tree,
+                index_tree_id,
                 tree.id,
+                change_iterator=changes,
                 honor_filemode=honor_filemode,
                 validate_path_element=validate_path_element,
                 symlink_fn=symlink_fn,
                 force_remove_untracked=True,
                 blob_normalizer=blob_normalizer,
+                allow_overwrite_modified=True,  # Allow overwriting modified files
             )
         else:
             raise Error(f"Invalid reset mode: {mode}")
@@ -2106,6 +2115,8 @@ def pull(
       fast_forward: If True, raise an exception when fast-forward is not possible
       ff_only: If True, only allow fast-forward merges. Raises DivergedBranches
         when branches have diverged rather than performing a merge.
+      force: If True, allow overwriting local changes in the working tree.
+        If False, pull will abort if it would overwrite uncommitted changes.
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
@@ -2181,8 +2192,14 @@ def pull(
         if not merged and old_tree_id is not None:
             new_tree_id = r[b"HEAD"].tree
             blob_normalizer = r.get_blob_normalizer()
+            changes = tree_changes(r.object_store, old_tree_id, new_tree_id)
             update_working_tree(
-                r, old_tree_id, new_tree_id, blob_normalizer=blob_normalizer
+                r,
+                old_tree_id,
+                new_tree_id,
+                change_iterator=changes,
+                blob_normalizer=blob_normalizer,
+                allow_overwrite_modified=force,
             )
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
@@ -3319,15 +3336,20 @@ def checkout(
         blob_normalizer = r.get_blob_normalizer()
 
         # Update working tree
+        tree_change_iterator: Iterator[TreeChange] = tree_changes(
+            r.object_store, current_tree_id, target_tree_id
+        )
         update_working_tree(
             r,
             current_tree_id,
             target_tree_id,
+            change_iterator=tree_change_iterator,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
             symlink_fn=symlink_fn,
             force_remove_untracked=force,
             blob_normalizer=blob_normalizer,
+            allow_overwrite_modified=force,
         )
 
         # Update HEAD
@@ -3829,7 +3851,10 @@ def _do_merge(
         # Fast-forward merge
         r.refs[b"HEAD"] = merge_commit_id
         # Update the working directory
-        update_working_tree(r, head_commit.tree, merge_commit.tree)
+        changes = tree_changes(r.object_store, head_commit.tree, merge_commit.tree)
+        update_working_tree(
+            r, head_commit.tree, merge_commit.tree, change_iterator=changes
+        )
         return (merge_commit_id, [])
 
     if base_commit_id == merge_commit_id:
@@ -3848,7 +3873,8 @@ def _do_merge(
     r.object_store.add_object(merged_tree)
 
     # Update index and working directory
-    update_working_tree(r, head_commit.tree, merged_tree.id)
+    changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
+    update_working_tree(r, head_commit.tree, merged_tree.id, change_iterator=changes)
 
     if conflicts or no_commit:
         # Don't create a commit if there are conflicts or no_commit is True
@@ -4134,7 +4160,15 @@ def cherry_pick(
         r.reset_index(merged_tree.id)
 
         # Update working tree from the new index
-        update_working_tree(r, head_commit.tree, merged_tree.id)
+        # Allow overwriting because we're applying the merge result
+        changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
+        update_working_tree(
+            r,
+            head_commit.tree,
+            merged_tree.id,
+            change_iterator=changes,
+            allow_overwrite_modified=True,
+        )
 
         if conflicts:
             # Save state for later continuation
@@ -4248,7 +4282,10 @@ def revert(
 
             if conflicts:
                 # Update working tree with conflicts
-                update_working_tree(r, current_tree, merged_tree.id)
+                changes = tree_changes(r.object_store, current_tree, merged_tree.id)
+                update_working_tree(
+                    r, current_tree, merged_tree.id, change_iterator=changes
+                )
                 conflicted_paths = [c.decode("utf-8", "replace") for c in conflicts]
                 raise Error(f"Conflicts while reverting: {', '.join(conflicted_paths)}")
 
@@ -4256,7 +4293,10 @@ def revert(
             r.object_store.add_object(merged_tree)
 
             # Update working tree
-            update_working_tree(r, current_tree, merged_tree.id)
+            changes = tree_changes(r.object_store, current_tree, merged_tree.id)
+            update_working_tree(
+                r, current_tree, merged_tree.id, change_iterator=changes
+            )
             current_tree = merged_tree.id
 
             if not no_commit:
@@ -4831,7 +4871,8 @@ def bisect_start(
                 old_tree = r[r.head()].tree if r.head() else None
                 r.refs[b"HEAD"] = next_sha
                 commit = r[next_sha]
-                update_working_tree(r, old_tree, commit.tree)
+                changes = tree_changes(r.object_store, old_tree, commit.tree)
+                update_working_tree(r, old_tree, commit.tree, change_iterator=changes)
             return next_sha
 
 
@@ -4855,7 +4896,8 @@ def bisect_bad(repo=".", rev: Optional[Union[str, bytes, Commit, Tag]] = None):
             old_tree = r[r.head()].tree if r.head() else None
             r.refs[b"HEAD"] = next_sha
             commit = r[next_sha]
-            update_working_tree(r, old_tree, commit.tree)
+            changes = tree_changes(r.object_store, old_tree, commit.tree)
+            update_working_tree(r, old_tree, commit.tree, change_iterator=changes)
 
         return next_sha
 
@@ -4880,7 +4922,8 @@ def bisect_good(repo=".", rev: Optional[Union[str, bytes, Commit, Tag]] = None):
             old_tree = r[r.head()].tree if r.head() else None
             r.refs[b"HEAD"] = next_sha
             commit = r[next_sha]
-            update_working_tree(r, old_tree, commit.tree)
+            changes = tree_changes(r.object_store, old_tree, commit.tree)
+            update_working_tree(r, old_tree, commit.tree, change_iterator=changes)
 
         return next_sha
 
@@ -4918,7 +4961,8 @@ def bisect_skip(
             old_tree = r[r.head()].tree if r.head() else None
             r.refs[b"HEAD"] = next_sha
             commit = r[next_sha]
-            update_working_tree(r, old_tree, commit.tree)
+            changes = tree_changes(r.object_store, old_tree, commit.tree)
+            update_working_tree(r, old_tree, commit.tree, change_iterator=changes)
 
         return next_sha
 
@@ -4946,7 +4990,10 @@ def bisect_reset(repo=".", commit: Optional[Union[str, bytes, Commit, Tag]] = No
             new_head = r.head()
             if new_head:
                 new_commit = r[new_head]
-                update_working_tree(r, old_tree, new_commit.tree)
+                changes = tree_changes(r.object_store, old_tree, new_commit.tree)
+                update_working_tree(
+                    r, old_tree, new_commit.tree, change_iterator=changes
+                )
         except KeyError:
             # No HEAD after reset
             pass

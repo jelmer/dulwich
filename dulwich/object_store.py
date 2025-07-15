@@ -508,10 +508,26 @@ class BaseObjectStore:
 
 
 class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
-    def __init__(self, pack_compression_level=-1, pack_index_version=None) -> None:
+    def __init__(
+        self,
+        pack_compression_level=-1,
+        pack_index_version=None,
+        pack_delta_window_size=None,
+        pack_window_memory=None,
+        pack_delta_cache_size=None,
+        pack_depth=None,
+        pack_threads=None,
+        pack_big_file_threshold=None,
+    ) -> None:
         self._pack_cache: dict[str, Pack] = {}
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
+        self.pack_delta_window_size = pack_delta_window_size
+        self.pack_window_memory = pack_window_memory
+        self.pack_delta_cache_size = pack_delta_cache_size
+        self.pack_depth = pack_depth
+        self.pack_threads = pack_threads
+        self.pack_big_file_threshold = pack_big_file_threshold
 
     def add_pack(self) -> tuple[BytesIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack to this object store."""
@@ -915,6 +931,12 @@ class DiskObjectStore(PackBasedObjectStore):
         loose_compression_level=-1,
         pack_compression_level=-1,
         pack_index_version=None,
+        pack_delta_window_size=None,
+        pack_window_memory=None,
+        pack_delta_cache_size=None,
+        pack_depth=None,
+        pack_threads=None,
+        pack_big_file_threshold=None,
     ) -> None:
         """Open an object store.
 
@@ -923,10 +945,22 @@ class DiskObjectStore(PackBasedObjectStore):
           loose_compression_level: zlib compression level for loose objects
           pack_compression_level: zlib compression level for pack objects
           pack_index_version: pack index version to use (1, 2, or 3)
+          pack_delta_window_size: sliding window size for delta compression
+          pack_window_memory: memory limit for delta window operations
+          pack_delta_cache_size: size of cache for delta operations
+          pack_depth: maximum delta chain depth
+          pack_threads: number of threads for pack operations
+          pack_big_file_threshold: threshold for treating files as big
         """
         super().__init__(
             pack_compression_level=pack_compression_level,
             pack_index_version=pack_index_version,
+            pack_delta_window_size=pack_delta_window_size,
+            pack_window_memory=pack_window_memory,
+            pack_delta_cache_size=pack_delta_cache_size,
+            pack_depth=pack_depth,
+            pack_threads=pack_threads,
+            pack_big_file_threshold=pack_big_file_threshold,
         )
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
@@ -967,11 +1001,52 @@ class DiskObjectStore(PackBasedObjectStore):
         except KeyError:
             pack_index_version = None
 
+        # Read pack configuration options
+        try:
+            pack_delta_window_size = int(
+                config.get((b"pack",), b"deltaWindowSize").decode()
+            )
+        except KeyError:
+            pack_delta_window_size = None
+        try:
+            pack_window_memory = int(config.get((b"pack",), b"windowMemory").decode())
+        except KeyError:
+            pack_window_memory = None
+        try:
+            pack_delta_cache_size = int(
+                config.get((b"pack",), b"deltaCacheSize").decode()
+            )
+        except KeyError:
+            pack_delta_cache_size = None
+        try:
+            pack_depth = int(config.get((b"pack",), b"depth").decode())
+        except KeyError:
+            pack_depth = None
+        try:
+            pack_threads = int(config.get((b"pack",), b"threads").decode())
+        except KeyError:
+            pack_threads = None
+        try:
+            pack_big_file_threshold = int(
+                config.get((b"pack",), b"bigFileThreshold").decode()
+            )
+        except KeyError:
+            pack_big_file_threshold = None
+
         # Read core.commitGraph setting
         use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
 
         instance = cls(
-            path, loose_compression_level, pack_compression_level, pack_index_version
+            path,
+            loose_compression_level,
+            pack_compression_level,
+            pack_index_version,
+            pack_delta_window_size,
+            pack_window_memory,
+            pack_delta_cache_size,
+            pack_depth,
+            pack_threads,
+            pack_big_file_threshold,
         )
         instance._use_commit_graph = use_commit_graph
         return instance
@@ -1042,7 +1117,15 @@ class DiskObjectStore(PackBasedObjectStore):
         new_packs = []
         for f in pack_files:
             if f not in self._pack_cache:
-                pack = Pack(os.path.join(self.pack_dir, f))
+                pack = Pack(
+                    os.path.join(self.pack_dir, f),
+                    delta_window_size=self.pack_delta_window_size,
+                    window_memory=self.pack_window_memory,
+                    delta_cache_size=self.pack_delta_cache_size,
+                    depth=self.pack_depth,
+                    threads=self.pack_threads,
+                    big_file_threshold=self.pack_big_file_threshold,
+                )
                 new_packs.append(pack)
                 self._pack_cache[f] = pack
         # Remove disappeared pack files
@@ -1209,7 +1292,15 @@ class DiskObjectStore(PackBasedObjectStore):
             )
 
         # Add the pack to the store and return it.
-        final_pack = Pack(pack_base_name)
+        final_pack = Pack(
+            pack_base_name,
+            delta_window_size=self.pack_delta_window_size,
+            window_memory=self.pack_window_memory,
+            delta_cache_size=self.pack_delta_cache_size,
+            depth=self.pack_depth,
+            threads=self.pack_threads,
+            big_file_threshold=self.pack_big_file_threshold,
+        )
         final_pack.check_length_and_checksum()
         self._add_cached_pack(pack_base_name, final_pack)
         return final_pack

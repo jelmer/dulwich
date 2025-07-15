@@ -1274,7 +1274,19 @@ class PackData:
     position.  It will all just throw a zlib or KeyError.
     """
 
-    def __init__(self, filename: Union[str, os.PathLike], file=None, size=None) -> None:
+    def __init__(
+        self,
+        filename: Union[str, os.PathLike],
+        file=None,
+        size=None,
+        *,
+        delta_window_size=None,
+        window_memory=None,
+        delta_cache_size=None,
+        depth=None,
+        threads=None,
+        big_file_threshold=None,
+    ) -> None:
         """Create a PackData object representing the pack in the given filename.
 
         The file must exist and stay readable until the object is disposed of.
@@ -1286,13 +1298,23 @@ class PackData:
         self._filename = filename
         self._size = size
         self._header_size = 12
+        self.delta_window_size = delta_window_size
+        self.window_memory = window_memory
+        self.delta_cache_size = delta_cache_size
+        self.depth = depth
+        self.threads = threads
+        self.big_file_threshold = big_file_threshold
+
         if file is None:
             self._file = GitFile(self._filename, "rb")
         else:
             self._file = file
         (version, self._num_objects) = read_pack_header(self._file.read)
+
+        # Use delta_cache_size config if available, otherwise default
+        cache_size = delta_cache_size or (1024 * 1024 * 20)
         self._offset_cache = LRUSizeCache[int, tuple[int, OldUnpackedObject]](
-            1024 * 1024 * 20, compute_size=_compute_object_size
+            cache_size, compute_size=_compute_object_size
         )
 
     @property
@@ -2724,14 +2746,37 @@ class Pack:
     _idx: Optional[PackIndex]
 
     def __init__(
-        self, basename, resolve_ext_ref: Optional[ResolveExtRefFn] = None
+        self,
+        basename,
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
+        *,
+        delta_window_size=None,
+        window_memory=None,
+        delta_cache_size=None,
+        depth=None,
+        threads=None,
+        big_file_threshold=None,
     ) -> None:
         self._basename = basename
         self._data = None
         self._idx = None
         self._idx_path = self._basename + ".idx"
         self._data_path = self._basename + ".pack"
-        self._data_load = lambda: PackData(self._data_path)
+        self.delta_window_size = delta_window_size
+        self.window_memory = window_memory
+        self.delta_cache_size = delta_cache_size
+        self.depth = depth
+        self.threads = threads
+        self.big_file_threshold = big_file_threshold
+        self._data_load = lambda: PackData(
+            self._data_path,
+            delta_window_size=delta_window_size,
+            window_memory=window_memory,
+            delta_cache_size=delta_cache_size,
+            depth=depth,
+            threads=threads,
+            big_file_threshold=big_file_threshold,
+        )
         self._idx_load = lambda: load_pack_index(self._idx_path)
         self.resolve_ext_ref = resolve_ext_ref
 

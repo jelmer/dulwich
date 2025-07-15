@@ -29,6 +29,16 @@ import sys
 import tempfile
 from io import BytesIO
 
+from dulwich.config import ConfigDict
+from dulwich.diff_tree import (
+    CHANGE_ADD,
+    CHANGE_COPY,
+    CHANGE_DELETE,
+    CHANGE_MODIFY,
+    CHANGE_RENAME,
+    TreeChange,
+    tree_changes,
+)
 from dulwich.index import (
     Index,
     IndexEntry,
@@ -42,6 +52,7 @@ from dulwich.index import (
     build_index_from_tree,
     cleanup_mode,
     commit_tree,
+    detect_case_only_renames,
     get_unstaged_changes,
     index_entry_from_directory,
     index_entry_from_path,
@@ -58,7 +69,7 @@ from dulwich.index import (
     write_index_dict,
 )
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
+from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree, TreeEntry
 from dulwich.repo import Repo
 
 from . import TestCase, skipIf
@@ -1731,6 +1742,254 @@ class TestPathPrefixCompression(TestCase):
         self.assertEqual(b"short", decompressed)
 
 
+class TestDetectCaseOnlyRenames(TestCase):
+    """Tests for detect_case_only_renames function."""
+
+    def setUp(self):
+        self.config = ConfigDict()
+
+    def test_no_renames(self):
+        """Test when there are no renames."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"file1.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"file2.txt", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # No case-only renames, so should return original changes
+        self.assertEqual(changes, result)
+
+    def test_simple_case_rename(self):
+        """Test simple case-only rename detection."""
+        # Default config uses case-insensitive comparison
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"README.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"readme.txt", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME instead of ADD/DELETE pair
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"README.txt", result[0].old.path)
+        self.assertEqual(b"readme.txt", result[0].new.path)
+
+    def test_nested_path_case_rename(self):
+        """Test case-only rename in nested paths."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"src/Main.java", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"src/main.java", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME instead of ADD/DELETE pair
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"src/Main.java", result[0].old.path)
+        self.assertEqual(b"src/main.java", result[0].new.path)
+
+    def test_multiple_case_renames(self):
+        """Test multiple case-only renames."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"File1.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"File2.TXT", 0o100644, b"b" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"file1.txt", 0o100644, b"a" * 40),
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"file2.txt", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return two CHANGE_RENAME instead of ADD/DELETE pairs
+        self.assertEqual(2, len(result))
+        rename_changes = [c for c in result if c.type == CHANGE_RENAME]
+        self.assertEqual(2, len(rename_changes))
+        # Check that the renames are correct (order may vary)
+        rename_map = {c.old.path: c.new.path for c in rename_changes}
+        self.assertEqual(
+            {b"File1.txt": b"file1.txt", b"File2.TXT": b"file2.txt"}, rename_map
+        )
+
+    def test_case_rename_with_modify(self):
+        """Test case rename detection with CHANGE_MODIFY."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"README.md", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_MODIFY,
+                TreeEntry(b"readme.md", 0o100644, b"a" * 40),
+                TreeEntry(b"readme.md", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME instead of DELETE/MODIFY pair
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"README.md", result[0].old.path)
+        self.assertEqual(b"readme.md", result[0].new.path)
+
+    def test_hfs_normalization(self):
+        """Test case rename detection with HFS+ normalization."""
+        # Configure for HFS+ (macOS)
+        self.config.set((b"core",), b"protectHFS", b"true")
+        self.config.set((b"core",), b"protectNTFS", b"false")
+
+        # Test with composed vs decomposed Unicode
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry("café.txt".encode(), 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry("CAFÉ.txt".encode(), 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+
+        # Should return one CHANGE_RENAME for the case-only rename
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual("café.txt".encode(), result[0].old.path)
+        self.assertEqual("CAFÉ.txt".encode(), result[0].new.path)
+
+    def test_ntfs_normalization(self):
+        """Test case rename detection with NTFS normalization."""
+        # Configure for NTFS (Windows)
+        self.config.set((b"core",), b"protectNTFS", b"true")
+        self.config.set((b"core",), b"protectHFS", b"false")
+
+        # NTFS strips trailing dots and spaces
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"file.txt.", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"FILE.TXT", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # Should return one CHANGE_RENAME for the case-only rename
+        self.assertEqual(1, len(result))
+        self.assertEqual(CHANGE_RENAME, result[0].type)
+        self.assertEqual(b"file.txt.", result[0].old.path)
+        self.assertEqual(b"FILE.TXT", result[0].new.path)
+
+    def test_invalid_utf8_handling(self):
+        """Test handling of invalid UTF-8 in paths."""
+        # Invalid UTF-8 sequence
+        invalid_path = b"\xff\xfe"
+
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(invalid_path, 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_ADD,
+                None,
+                TreeEntry(b"valid.txt", 0o100644, b"b" * 40),
+            ),
+        ]
+
+        # Should not crash, just skip invalid paths
+        result = detect_case_only_renames(changes, self.config)
+        # No case-only renames detected, returns original changes
+        self.assertEqual(changes, result)
+
+    def test_rename_and_copy_changes(self):
+        """Test case rename detection with CHANGE_RENAME and CHANGE_COPY."""
+        changes = [
+            TreeChange(
+                CHANGE_DELETE,
+                TreeEntry(b"OldFile.txt", 0o100644, b"a" * 40),
+                None,
+            ),
+            TreeChange(
+                CHANGE_RENAME,
+                TreeEntry(b"other.txt", 0o100644, b"b" * 40),
+                TreeEntry(b"oldfile.txt", 0o100644, b"a" * 40),
+            ),
+            TreeChange(
+                CHANGE_COPY,
+                TreeEntry(b"source.txt", 0o100644, b"c" * 40),
+                TreeEntry(b"OLDFILE.TXT", 0o100644, b"a" * 40),
+            ),
+        ]
+
+        result = detect_case_only_renames(changes, self.config)
+        # The DELETE of OldFile.txt and COPY to OLDFILE.TXT are detected as a case-only rename
+        # The original RENAME (other.txt -> oldfile.txt) remains
+        # The COPY is consumed by the case-only rename detection
+        self.assertEqual(2, len(result))
+
+        # Find the changes
+        rename_changes = [c for c in result if c.type == CHANGE_RENAME]
+        self.assertEqual(2, len(rename_changes))
+
+        # Check for the case-only rename
+        case_rename = None
+        for change in rename_changes:
+            if change.old.path == b"OldFile.txt" and change.new.path == b"OLDFILE.TXT":
+                case_rename = change
+                break
+
+        self.assertIsNotNone(case_rename)
+        self.assertEqual(b"OldFile.txt", case_rename.old.path)
+        self.assertEqual(b"OLDFILE.TXT", case_rename.new.path)
+
+
 class TestUpdateWorkingTree(TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
@@ -1776,10 +2035,12 @@ class TestUpdateWorkingTree(TestCase):
 
         # Update working tree with normalizer
         normalizer = TestBlobNormalizer()
+        changes = tree_changes(self.repo.object_store, None, tree.id)
         update_working_tree(
             self.repo,
             None,  # old_tree_id
             tree.id,  # new_tree_id
+            change_iterator=changes,
             blob_normalizer=normalizer,
         )
 
@@ -1806,10 +2067,12 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree)
 
         # Update working tree without normalizer
+        changes = tree_changes(self.repo.object_store, None, tree.id)
         update_working_tree(
             self.repo,
             None,  # old_tree_id
             tree.id,  # new_tree_id
+            change_iterator=changes,
             blob_normalizer=None,
         )
 
@@ -1841,7 +2104,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1 (create directory with files)
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Verify directory and files exist
         dir_path = os.path.join(self.tempdir, "dir")
@@ -1854,7 +2118,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update to empty tree
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Verify directory was removed
         self.assertFalse(os.path.exists(dir_path))
@@ -1868,7 +2133,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree with submodule
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Verify submodule directory exists with .git file
         submodule_path = os.path.join(self.tempdir, "submodule")
@@ -1885,7 +2151,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update to tree with file (should remove submodule directory and create file)
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Verify it's now a file
         self.assertTrue(os.path.isfile(submodule_path))
@@ -1904,7 +2171,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Verify nested structure exists
         path_a = os.path.join(self.tempdir, "a")
@@ -1919,7 +2187,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update to empty tree
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Verify all directories were removed
         self.assertFalse(os.path.exists(path_a))
@@ -1936,7 +2205,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Verify file exists
         file_path = os.path.join(self.tempdir, "path")
@@ -1953,7 +2223,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update should succeed but leave the directory alone
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Directory should still exist with its contents
         self.assertTrue(os.path.isdir(file_path))
@@ -1971,7 +2242,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Verify file exists
         file_path = os.path.join(self.tempdir, "path")
@@ -1986,7 +2258,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update should remove the empty directory
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Directory should be gone
         self.assertFalse(os.path.exists(file_path))
@@ -2007,7 +2280,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree with symlink
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         link_path = os.path.join(self.tempdir, "link")
         self.assertTrue(os.path.islink(link_path))
@@ -2022,7 +2296,8 @@ class TestUpdateWorkingTree(TestCase):
         tree2[b"link"] = (0o100644, blob2.id)
         self.repo.object_store.add_object(tree2)
 
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         self.assertFalse(os.path.islink(link_path))
         self.assertTrue(os.path.isfile(link_path))
@@ -2030,7 +2305,8 @@ class TestUpdateWorkingTree(TestCase):
             self.assertEqual(b"file content", f.read())
 
         # Test 2: Replace file with symlink
-        update_working_tree(self.repo, tree2.id, tree1.id)
+        changes = tree_changes(self.repo.object_store, tree2.id, tree1.id)
+        update_working_tree(self.repo, tree2.id, tree1.id, change_iterator=changes)
 
         self.assertTrue(os.path.islink(link_path))
         self.assertEqual(b"target/path", os.readlink(link_path).encode())
@@ -2044,7 +2320,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree3)
 
         # Should remove empty directory
-        update_working_tree(self.repo, tree1.id, tree3.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree3.id)
+        update_working_tree(self.repo, tree1.id, tree3.id, change_iterator=changes)
         self.assertFalse(os.path.exists(link_path))
 
     def test_update_working_tree_modified_file_to_dir_transition(self):
@@ -2059,7 +2336,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         file_path = os.path.join(self.tempdir, "path")
 
@@ -2078,7 +2356,8 @@ class TestUpdateWorkingTree(TestCase):
 
         # Update should fail because can't create directory where modified file exists
         with self.assertRaises(IOError):
-            update_working_tree(self.repo, tree1.id, tree2.id)
+            changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+            update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # File should still exist with modifications
         self.assertTrue(os.path.isfile(file_path))
@@ -2101,7 +2380,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         script_path = os.path.join(self.tempdir, "script.sh")
         self.assertTrue(os.path.isfile(script_path))
@@ -2116,7 +2396,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update to tree2
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Check it's now executable
         mode = os.stat(script_path).st_mode
@@ -2133,7 +2414,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree with submodule
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Add untracked file to submodule directory
         submodule_path = os.path.join(self.tempdir, "submodule")
@@ -2146,7 +2428,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update should not remove submodule directory with untracked files
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Directory should still exist with untracked file
         self.assertTrue(os.path.isdir(submodule_path))
@@ -2169,7 +2452,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Verify structure exists
         dir_path = os.path.join(self.tempdir, "dir")
@@ -2191,13 +2475,27 @@ class TestUpdateWorkingTree(TestCase):
 
         # Update should fail because directory is not empty
         with self.assertRaises(IsADirectoryError):
-            update_working_tree(self.repo, tree1.id, tree2.id)
+            changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+            update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Directory should still exist
         self.assertTrue(os.path.isdir(dir_path))
 
     def test_update_working_tree_case_sensitivity(self):
         """Test handling of case-sensitive filename changes."""
+        # Detect if filesystem is case-insensitive by testing
+        test_file = os.path.join(self.tempdir, "TeSt.tmp")
+        with open(test_file, "w") as f:
+            f.write("test")
+        is_case_insensitive = os.path.exists(os.path.join(self.tempdir, "test.tmp"))
+        os.unlink(test_file)
+
+        # Set core.ignorecase to match actual filesystem behavior
+        # (This ensures test works correctly regardless of platform defaults)
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", is_case_insensitive)
+        config.write_to_path()
+
         # Create tree with lowercase file
         blob1 = Blob()
         blob1.data = b"lowercase content"
@@ -2208,7 +2506,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Create tree with uppercase file (different content)
         blob2 = Blob()
@@ -2220,17 +2519,100 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update to tree2
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Check what exists (behavior depends on filesystem)
         lowercase_path = os.path.join(self.tempdir, "readme.txt")
         uppercase_path = os.path.join(self.tempdir, "README.txt")
 
-        # On case-insensitive filesystems, one will overwrite the other
-        # On case-sensitive filesystems, both may exist
-        self.assertTrue(
-            os.path.exists(lowercase_path) or os.path.exists(uppercase_path)
+        if is_case_insensitive:
+            # On case-insensitive filesystems, should have one file with new content
+            # The exact case of the filename may vary by OS
+            self.assertTrue(
+                os.path.exists(lowercase_path) or os.path.exists(uppercase_path)
+            )
+            # Verify content is the new content
+            if os.path.exists(lowercase_path):
+                with open(lowercase_path, "rb") as f:
+                    self.assertEqual(b"uppercase content", f.read())
+            else:
+                with open(uppercase_path, "rb") as f:
+                    self.assertEqual(b"uppercase content", f.read())
+        else:
+            # On case-sensitive filesystems, only the uppercase file should exist
+            self.assertFalse(os.path.exists(lowercase_path))
+            self.assertTrue(os.path.exists(uppercase_path))
+            with open(uppercase_path, "rb") as f:
+                self.assertEqual(b"uppercase content", f.read())
+
+    def test_update_working_tree_case_rename_updates_filename(self):
+        """Test that case-only renames update the actual filename on case-insensitive FS."""
+        # Detect if filesystem is case-insensitive by testing
+        test_file = os.path.join(self.tempdir, "TeSt.tmp")
+        with open(test_file, "w") as f:
+            f.write("test")
+        is_case_insensitive = os.path.exists(os.path.join(self.tempdir, "test.tmp"))
+        os.unlink(test_file)
+
+        if not is_case_insensitive:
+            self.skipTest("Test only relevant on case-insensitive filesystems")
+
+        # Set core.ignorecase to match actual filesystem behavior
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", True)
+        config.write_to_path()
+
+        # Create tree with lowercase file
+        blob1 = Blob()
+        blob1.data = b"same content"  # Using same content to test pure case rename
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1[b"readme.txt"] = (0o100644, blob1.id)
+        self.repo.object_store.add_object(tree1)
+
+        # Update to tree1
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
+
+        # Verify initial state
+        files = [f for f in os.listdir(self.tempdir) if not f.startswith(".git")]
+        self.assertEqual(["readme.txt"], files)
+
+        # Create tree with uppercase file (same content, same blob)
+        tree2 = Tree()
+        tree2[b"README.txt"] = (0o100644, blob1.id)  # Same blob!
+        self.repo.object_store.add_object(tree2)
+
+        # Update to tree2 (case-only rename)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
+
+        # On case-insensitive filesystems, should have one file with updated case
+        files = [f for f in os.listdir(self.tempdir) if not f.startswith(".git")]
+        self.assertEqual(
+            1, len(files), "Should have exactly one file after case rename"
         )
+
+        # The file should now have the new case in the directory listing
+        actual_filename = files[0]
+        self.assertEqual(
+            "README.txt",
+            actual_filename,
+            "Filename case should be updated in directory listing",
+        )
+
+        # Verify content is preserved
+        file_path = os.path.join(self.tempdir, actual_filename)
+        with open(file_path, "rb") as f:
+            self.assertEqual(b"same content", f.read())
+
+        # Both old and new case should access the same file
+        lowercase_path = os.path.join(self.tempdir, "readme.txt")
+        uppercase_path = os.path.join(self.tempdir, "README.txt")
+        self.assertTrue(os.path.exists(lowercase_path))
+        self.assertTrue(os.path.exists(uppercase_path))
 
     def test_update_working_tree_deeply_nested_removal(self):
         """Test removal of deeply nested directory structures."""
@@ -2246,7 +2628,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Verify deep structure exists
         current_path = self.tempdir
@@ -2259,7 +2642,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update should remove all empty directories
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Verify top level directory is gone
         top_level = os.path.join(self.tempdir, "level0")
@@ -2277,7 +2661,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Make file read-only
         file_path = os.path.join(self.tempdir, "readonly.txt")
@@ -2293,7 +2678,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update should handle read-only file
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         # Verify content was updated
         with open(file_path, "rb") as f:
@@ -2316,7 +2702,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree)
 
         # Update should skip invalid files based on validation
-        update_working_tree(self.repo, None, tree.id)
+        changes = tree_changes(self.repo.object_store, None, tree.id)
+        update_working_tree(self.repo, None, tree.id, change_iterator=changes)
 
         # Valid file should exist
         self.assertTrue(os.path.exists(os.path.join(self.tempdir, "valid.txt")))
@@ -2342,7 +2729,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         link_path = os.path.join(self.tempdir, "link")
         self.assertTrue(os.path.islink(link_path))
@@ -2357,7 +2745,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree2)
 
         # Update should replace symlink with actual directory
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
 
         self.assertFalse(os.path.islink(link_path))
         self.assertTrue(os.path.isdir(link_path))
@@ -2393,10 +2782,12 @@ class TestUpdateWorkingTree(TestCase):
         tree2[b"item"] = (S_IFGITLINK, submodule_sha)
         self.repo.object_store.add_object(tree2)
 
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
         self.assertTrue(os.path.isfile(os.path.join(self.tempdir, "item")))
 
-        update_working_tree(self.repo, tree1.id, tree2.id)
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
         self.assertTrue(os.path.isdir(os.path.join(self.tempdir, "item")))
 
         # Test 2: Submodule → Executable file
@@ -2404,7 +2795,8 @@ class TestUpdateWorkingTree(TestCase):
         tree3[b"item"] = (0o100755, exec_blob.id)
         self.repo.object_store.add_object(tree3)
 
-        update_working_tree(self.repo, tree2.id, tree3.id)
+        changes = tree_changes(self.repo.object_store, tree2.id, tree3.id)
+        update_working_tree(self.repo, tree2.id, tree3.id, change_iterator=changes)
         item_path = os.path.join(self.tempdir, "item")
         self.assertTrue(os.path.isfile(item_path))
         if sys.platform != "win32":
@@ -2415,7 +2807,8 @@ class TestUpdateWorkingTree(TestCase):
         tree4[b"item"] = (0o120000, link_blob.id)
         self.repo.object_store.add_object(tree4)
 
-        update_working_tree(self.repo, tree3.id, tree4.id)
+        changes = tree_changes(self.repo.object_store, tree3.id, tree4.id)
+        update_working_tree(self.repo, tree3.id, tree4.id, change_iterator=changes)
         self.assertTrue(os.path.islink(item_path))
 
         # Test 4: Symlink → Submodule
@@ -2423,14 +2816,16 @@ class TestUpdateWorkingTree(TestCase):
         tree5[b"item"] = (S_IFGITLINK, submodule_sha)
         self.repo.object_store.add_object(tree5)
 
-        update_working_tree(self.repo, tree4.id, tree5.id)
+        changes = tree_changes(self.repo.object_store, tree4.id, tree5.id)
+        update_working_tree(self.repo, tree4.id, tree5.id, change_iterator=changes)
         self.assertTrue(os.path.isdir(item_path))
 
         # Test 5: Clean up - Submodule → absent
         tree6 = Tree()
         self.repo.object_store.add_object(tree6)
 
-        update_working_tree(self.repo, tree5.id, tree6.id)
+        changes = tree_changes(self.repo.object_store, tree5.id, tree6.id)
+        update_working_tree(self.repo, tree5.id, tree6.id, change_iterator=changes)
         self.assertFalse(os.path.exists(item_path))
 
         # Test 6: Symlink → Executable file
@@ -2438,7 +2833,8 @@ class TestUpdateWorkingTree(TestCase):
         tree7[b"item2"] = (0o120000, link_blob.id)
         self.repo.object_store.add_object(tree7)
 
-        update_working_tree(self.repo, tree6.id, tree7.id)
+        changes = tree_changes(self.repo.object_store, tree6.id, tree7.id)
+        update_working_tree(self.repo, tree6.id, tree7.id, change_iterator=changes)
         item2_path = os.path.join(self.tempdir, "item2")
         self.assertTrue(os.path.islink(item2_path))
 
@@ -2446,7 +2842,8 @@ class TestUpdateWorkingTree(TestCase):
         tree8[b"item2"] = (0o100755, exec_blob.id)
         self.repo.object_store.add_object(tree8)
 
-        update_working_tree(self.repo, tree7.id, tree8.id)
+        changes = tree_changes(self.repo.object_store, tree7.id, tree8.id)
+        update_working_tree(self.repo, tree7.id, tree8.id, change_iterator=changes)
         self.assertTrue(os.path.isfile(item2_path))
         if sys.platform != "win32":
             self.assertTrue(os.access(item2_path, os.X_OK))
@@ -2468,7 +2865,8 @@ class TestUpdateWorkingTree(TestCase):
         self.repo.object_store.add_object(tree1)
 
         # Update to tree1
-        update_working_tree(self.repo, None, tree1.id)
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
 
         # Create a directory where file2.txt is, to cause a conflict
         file2_path = os.path.join(self.tempdir, "file2.txt")
@@ -2494,7 +2892,8 @@ class TestUpdateWorkingTree(TestCase):
 
         # Update should partially succeed - file1 updated, file2 blocked
         try:
-            update_working_tree(self.repo, tree1.id, tree2.id)
+            changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+            update_working_tree(self.repo, tree1.id, tree2.id, change_iterator=changes)
         except IsADirectoryError:
             # Expected to fail on file2 because it's a directory
             pass

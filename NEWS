@@ -1,5 +1,13 @@
 0.23.3	UNRELEASED
 
+ * Implement multi-threaded pack deltification with adaptive thread
+   selection. Automatically chooses optimal thread count based on
+   object count for best performance. (Jelmer Vernooĳ)
+
+ * Add Rust implementation of ``create_delta`` function for significant
+   performance improvements (up to 31x faster for large object sets).
+   Uses enum-based opcodes for better efficiency. (Jelmer Vernooĳ)
+
  * Add support for ``-a`` argument to
    ``dulwich.cli.commit``. (Jelmer Vernooĳ)
 

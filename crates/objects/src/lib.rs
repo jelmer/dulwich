@@ -28,7 +28,7 @@ use pyo3::types::{PyBytes, PyDict};
 import_exception!(dulwich.errors, ObjectFormatException);
 
 const S_IFDIR: u32 = 0o40000;
-const S_IFMT: u32 = 0o170000;  // File type mask
+const S_IFMT: u32 = 0o170000; // File type mask
 
 #[inline]
 fn bytehex(byte: u8) -> u8 {

@@ -2989,11 +2989,6 @@ class Pack:
         chunks = base_obj
         for prev_offset, _delta_type, delta in reversed(delta_stack):
             chunks = apply_delta(chunks, delta)
-            # TODO(dborowitz): This can result in poor performance if
-            # large base objects are separated from deltas in the pack.
-            # We should reorganize so that we apply deltas to all
-            # objects in a chain one after the other to optimize cache
-            # performance.
             if prev_offset is not None:
                 self.data._offset_cache[prev_offset] = base_type, chunks
         return base_type, chunks

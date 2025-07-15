@@ -258,16 +258,16 @@ class DumbHTTPObjectStore(BaseObjectStore):
         if sha in self._cached_objects:
             return self._cached_objects[sha]
 
-        # Try loose object first
+        # Try packs first
         try:
-            result = self._fetch_loose_object(sha)
+            result = self._fetch_from_pack(sha)
             self._cached_objects[sha] = result
             return result
         except KeyError:
             pass
 
-        # Try packs
-        result = self._fetch_from_pack(sha)
+        # Try loose object
+        result = self._fetch_loose_object(sha)
         self._cached_objects[sha] = result
         return result
 
@@ -284,16 +284,16 @@ class DumbHTTPObjectStore(BaseObjectStore):
         if sha in self._cached_objects:
             return True
 
-        # Try loose object
+        # Try packs
         try:
-            self._fetch_loose_object(sha)
+            self._fetch_from_pack(sha)
             return True
         except KeyError:
             pass
 
-        # Try packs
+        # Try loose object
         try:
-            self._fetch_from_pack(sha)
+            self._fetch_loose_object(sha)
             return True
         except KeyError:
             return False

@@ -2657,6 +2657,8 @@ def create_delta(base_buf, target_buf):
         target_buf = b"".join(target_buf)
     assert isinstance(base_buf, bytes)
     assert isinstance(target_buf, bytes)
+
+    # Python implementation (may be overridden by Rust version via import)
     # write delta header
     yield _delta_encode_size(len(base_buf))
     yield _delta_encode_size(len(target_buf))
@@ -3315,6 +3317,7 @@ try:
     from dulwich._pack import (  # type: ignore
         apply_delta,  # type: ignore
         bisect_find_sha,  # type: ignore
+        create_delta,  # type: ignore
     )
 except ImportError:
     pass

@@ -1813,6 +1813,35 @@ class BuildRepoRootTests(TestCase):
         with self.assertRaises(NotGitRepository):
             Repo.discover("/")
 
+    def test_pack_allow_pack_reuse_config(self) -> None:
+        """Test that pack.allowPackReuse configuration is respected."""
+        # Create a config file with pack.allowPackReuse set to false
+        config_path = os.path.join(self._repo_dir, ".git", "config")
+        with open(config_path, "ab") as f:
+            f.write(b"\n[pack]\n")
+            f.write(b"\tallowPackReuse = false\n")
+
+        # Reload the repository to pick up the new config
+        self._repo = Repo(self._repo_dir)
+
+        # The object store should have pack_allow_pack_reuse set to False
+        self.assertFalse(self._repo.object_store.pack_allow_pack_reuse)
+
+        # Test with pack.allowPackReuse set to true
+        with open(config_path, "wb") as f:
+            f.write(b"[core]\n")
+            f.write(b"\trepositoryformatversion = 0\n")
+            f.write(b"\tfilemode = true\n")
+            f.write(b"\tbare = false\n")
+            f.write(b"[pack]\n")
+            f.write(b"\tallowPackReuse = true\n")
+
+        # Reload the repository
+        self._repo = Repo(self._repo_dir)
+
+        # The object store should have pack_allow_pack_reuse set to True
+        self.assertTrue(self._repo.object_store.pack_allow_pack_reuse)
+
 
 class CheckUserIdentityTests(TestCase):
     def test_valid(self) -> None:

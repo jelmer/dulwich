@@ -524,8 +524,20 @@ class BaseRepo:
             return 0, iter([])
         remote_has = missing_objects.get_remote_has()
         object_ids = list(missing_objects)
+        # Respect pack configuration from object store
+        reuse_deltas = True
+        if (
+            hasattr(self.object_store, "pack_allow_pack_reuse")
+            and self.object_store.pack_allow_pack_reuse is not None
+        ):
+            reuse_deltas = self.object_store.pack_allow_pack_reuse
+
         return len(object_ids), generate_unpacked_objects(
-            self.object_store, object_ids, progress=progress, other_haves=remote_has
+            self.object_store,
+            object_ids,
+            progress=progress,
+            other_haves=remote_has,
+            reuse_deltas=reuse_deltas,
         )
 
     def find_missing_objects(

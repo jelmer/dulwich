@@ -9,3 +9,8 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { workspace = true, features = ["extension-module"]}
 memchr = "2"
+rayon = { version = "1.7", optional = true }
+
+[features]
+default = ["parallel"]
+parallel = ["rayon"]

@@ -578,6 +578,9 @@ fn create_delta(py: Python, py_base_buf: PyObject, py_target_buf: PyObject) -> P
 use pyo3::types::PyTuple;
 use std::collections::VecDeque;
 
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+
 /// Default window size for delta compression
 const DEFAULT_PACK_DELTA_WINDOW_SIZE: usize = 10;
 
@@ -680,6 +683,23 @@ fn deltify_pack_objects(
     window_size: Option<usize>,
     progress: Option<PyObject>,
 ) -> PyResult<PyObject> {
+    #[cfg(feature = "parallel")]
+    {
+        deltify_pack_objects_parallel(py, objects, window_size, progress)
+    }
+    #[cfg(not(feature = "parallel"))]
+    {
+        deltify_pack_objects_sequential(py, objects, window_size, progress)
+    }
+}
+
+/// Sequential implementation for when parallel feature is disabled
+fn deltify_pack_objects_sequential(
+    py: Python,
+    objects: PyObject,
+    window_size: Option<usize>,
+    progress: Option<PyObject>,
+) -> PyResult<PyObject> {
     let window_size = window_size.unwrap_or(DEFAULT_PACK_DELTA_WINDOW_SIZE);
 
     // Convert objects to list with hints
@@ -772,6 +792,178 @@ fn deltify_pack_objects(
     // Return iterator over results
     let iter_fn = py.import("builtins")?.getattr("iter")?;
     Ok(iter_fn.call1((results,))?.into())
+}
+
+#[cfg(feature = "parallel")]
+/// Parallel implementation using rayon for better performance
+fn deltify_pack_objects_parallel(
+    py: Python,
+    objects: PyObject,
+    window_size: Option<usize>,
+    progress: Option<PyObject>,
+) -> PyResult<PyObject> {
+    let window_size = window_size.unwrap_or(DEFAULT_PACK_DELTA_WINDOW_SIZE);
+
+    // Convert objects to list with hints
+    let objects_with_hints = PyList::empty(py);
+    let objects_list = objects.extract::<Bound<PyList>>(py)?;
+
+    for item in objects_list.iter() {
+        if let Ok(_tuple) = item.downcast::<PyTuple>() {
+            // Already a tuple
+            objects_with_hints.append(item)?;
+        } else {
+            // Just an object - create tuple with hint
+            let type_num = item.getattr("type_num")?;
+            let none = py.None().into_bound(py);
+            let hint = PyTuple::new(py, &[type_num, none])?;
+            let tuple = PyTuple::new(py, &[item.to_owned(), hint.into_any()])?;
+            objects_with_hints.append(tuple)?;
+        }
+    }
+
+    // Sort objects and extract data
+    let sorted_objects = sort_objects_for_delta(py, &objects_with_hints.into())?;
+    let total_objects = sorted_objects.len();
+
+    // For small counts, use sequential processing
+    if total_objects < 50 {
+        return deltify_pack_objects_sequential(py, objects, Some(window_size), progress);
+    }
+
+    // Extract object data for parallel processing
+    let object_data: Vec<ObjectData> = sorted_objects.into_iter().map(|(_, data)| data).collect();
+
+    // Process with parallel deltification
+    let results = PyList::empty(py);
+    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>)>::new();
+
+    for (i, obj_data) in object_data.iter().enumerate() {
+        if let Some(ref progress_fn) = progress {
+            if i % 1000 == 0 {
+                let msg = format!("generating deltas: {}\r", i);
+                progress_fn.call1(py, (PyBytes::new(py, msg.as_bytes()),))?;
+            }
+        }
+
+        // Get snapshot of possible bases
+        let bases_snapshot: Vec<_> = possible_bases.iter().cloned().collect();
+
+        // Compute best delta in parallel if we have enough candidates
+        let (winner, winner_len, winner_base) = if bases_snapshot.len() > 5 {
+            // Worth parallelizing - release GIL and compute in parallel
+            py.allow_threads(|| compute_best_delta_parallel(obj_data, &bases_snapshot))
+        } else {
+            // Not worth parallelizing
+            compute_best_delta_sequential(obj_data, &bases_snapshot)
+        };
+
+        // Create delta chunks list
+        let delta_chunks = PyList::empty(py);
+        delta_chunks.append(PyBytes::new(py, &winner))?;
+
+        // Import and create Python UnpackedObject
+        let pack_module = py.import("dulwich.pack")?;
+        let unpacked_class = pack_module.getattr("UnpackedObject")?;
+
+        // Create UnpackedObject instance
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("sha", PyBytes::new(py, &obj_data.sha))?;
+        if let Some(base) = winner_base {
+            kwargs.set_item("delta_base", PyBytes::new(py, &base))?;
+        } else {
+            kwargs.set_item("delta_base", py.None())?;
+        }
+        kwargs.set_item("decomp_len", winner_len)?;
+        kwargs.set_item("decomp_chunks", delta_chunks)?;
+
+        let unpacked = unpacked_class.call((obj_data.type_num,), Some(&kwargs))?;
+        results.append(unpacked)?;
+
+        // Add this object as a potential base for future objects
+        possible_bases.push_front((
+            obj_data.sha.clone(),
+            obj_data.type_num,
+            obj_data.raw_data.clone(),
+        ));
+
+        // Maintain window size
+        while possible_bases.len() > window_size {
+            possible_bases.pop_back();
+        }
+    }
+
+    // Return iterator over results
+    let iter_fn = py.import("builtins")?.getattr("iter")?;
+    Ok(iter_fn.call1((results,))?.into())
+}
+
+/// Compute best delta sequentially
+fn compute_best_delta_sequential(
+    obj_data: &ObjectData,
+    possible_bases: &[(Vec<u8>, u8, Vec<u8>)],
+) -> (Vec<u8>, usize, Option<Vec<u8>>) {
+    let mut winner = obj_data.raw_data.clone();
+    let mut winner_len = winner.len();
+    let mut winner_base = None;
+
+    // Try delta compression against recent objects
+    for (base_id, base_type_num, base_data) in possible_bases {
+        if *base_type_num != obj_data.type_num {
+            continue;
+        }
+
+        let delta = create_delta_internal(base_data, &obj_data.raw_data);
+
+        if delta.len() < winner_len {
+            winner_base = Some(base_id.clone());
+            winner = delta;
+            winner_len = winner.len();
+        }
+    }
+
+    (winner, winner_len, winner_base)
+}
+
+#[cfg(feature = "parallel")]
+/// Compute best delta using parallel processing
+fn compute_best_delta_parallel(
+    obj_data: &ObjectData,
+    possible_bases: &[(Vec<u8>, u8, Vec<u8>)],
+) -> (Vec<u8>, usize, Option<Vec<u8>>) {
+    // Filter bases by type first to avoid unnecessary work
+    let compatible_bases: Vec<_> = possible_bases
+        .iter()
+        .filter(|(_, base_type_num, _)| *base_type_num == obj_data.type_num)
+        .collect();
+
+    if compatible_bases.is_empty() {
+        return (obj_data.raw_data.clone(), obj_data.raw_data.len(), None);
+    }
+
+    // Compute deltas in parallel
+    let results: Vec<_> = compatible_bases
+        .par_iter()
+        .map(|(base_id, _, base_data)| {
+            let delta = create_delta_internal(base_data, &obj_data.raw_data);
+            (base_id.clone(), delta.len(), delta)
+        })
+        .collect();
+
+    // Find the best result
+    let mut best_size = obj_data.raw_data.len();
+    let mut best_base = None;
+    let mut best_delta = obj_data.raw_data.clone();
+
+    for (base_id, delta_len, delta) in results {
+        if delta_len < best_size {
+            best_size = delta_len;
+            best_base = Some(base_id);
+            best_delta = delta;
+        }
+    }
+
+    (best_delta, best_size, best_base)
 }
 
 #[pymodule]

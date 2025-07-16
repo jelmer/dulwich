@@ -1,4 +1,4 @@
-# porcelain.py -- Porcelain-like layer on top of Dulwich
+# e porcelain.py -- Porcelain-like layer on top of Dulwich
 # Copyright (C) 2013 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
@@ -86,11 +86,11 @@ import sys
 import time
 from collections import namedtuple
 from collections.abc import Iterator
-from contextlib import closing, contextmanager
+from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, TypeVar, Union, overload
 
 from . import replace_me
 from .archive import tar_stream
@@ -173,6 +173,9 @@ from .sparse_patterns import (
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
+
+# TypeVar for preserving BaseRepo subclass types
+T = TypeVar("T", bound="BaseRepo")
 
 
 @dataclass
@@ -310,10 +313,22 @@ def get_user_timezones():
     return author_timezone, commit_timezone
 
 
-def open_repo(path_or_repo: Union[str, os.PathLike, BaseRepo]):
+@overload
+def open_repo(path_or_repo: T) -> AbstractContextManager[T]: ...
+
+
+@overload
+def open_repo(
+    path_or_repo: Union[str, os.PathLike],
+) -> AbstractContextManager[Repo]: ...
+
+
+def open_repo(
+    path_or_repo: Union[str, os.PathLike, T],
+) -> AbstractContextManager[Union[T, Repo]]:
     """Open an argument that can be a repository or a path for a repository."""
     if isinstance(path_or_repo, BaseRepo):
-        return path_or_repo
+        return _noop_context_manager(path_or_repo)
     return Repo(path_or_repo)
 
 
@@ -323,7 +338,19 @@ def _noop_context_manager(obj):
     yield obj
 
 
-def open_repo_closing(path_or_repo: Union[str, os.PathLike, BaseRepo]):
+@overload
+def open_repo_closing(path_or_repo: T) -> AbstractContextManager[T]: ...
+
+
+@overload
+def open_repo_closing(
+    path_or_repo: Union[str, os.PathLike],
+) -> AbstractContextManager[Repo]: ...
+
+
+def open_repo_closing(
+    path_or_repo: Union[str, os.PathLike, T],
+) -> AbstractContextManager[Union[T, Repo]]:
     """Open an argument that can be a repository or a path for a repository.
     returns a context manager that will close the repo on exit if the argument
     is a path, else does nothing if the argument is a repo.
@@ -714,7 +741,7 @@ def clone(
     return repo
 
 
-def add(repo: Union[str, os.PathLike, BaseRepo] = ".", paths=None):
+def add(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
     """Add files to the staging area.
 
     Args:
@@ -949,7 +976,7 @@ rm = remove
 
 
 def mv(
-    repo: Union[str, os.PathLike, BaseRepo],
+    repo: Union[str, os.PathLike, Repo],
     source: Union[str, bytes, os.PathLike],
     destination: Union[str, bytes, os.PathLike],
     force: bool = False,
@@ -3483,7 +3510,8 @@ def sparse_checkout(
             repo_obj.set_sparse_checkout_patterns(patterns)
 
         # --- 2) Determine the set of included paths ---
-        included_paths = determine_included_paths(repo_obj, lines, cone)
+        index = repo_obj.open_index()
+        included_paths = determine_included_paths(index, lines, cone)
 
         # --- 3) Apply those results to the index & working tree ---
         try:

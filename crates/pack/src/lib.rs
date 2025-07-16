@@ -517,7 +517,20 @@ fn find_delta_operations(base: &[u8], target: &[u8]) -> Vec<DeltaOperation> {
 /// Creates a Git-compatible delta between base and target buffers
 /// Optimized version that works with borrowed data
 fn create_delta_internal(base_buf: &[u8], target_buf: &[u8]) -> Vec<u8> {
-    let mut result = Vec::new();
+    create_delta_with_pool(base_buf, target_buf, None)
+}
+
+/// Creates a Git-compatible delta with optional memory pool
+fn create_delta_with_pool(
+    base_buf: &[u8],
+    target_buf: &[u8],
+    pool: Option<&mut MemoryPool>,
+) -> Vec<u8> {
+    let mut result = if let Some(pool) = pool {
+        pool.get_delta_buffer()
+    } else {
+        Vec::new()
+    };
 
     // Write delta header - encoded sizes of base and target
     result.extend(delta_encode_size(base_buf.len()));
@@ -593,6 +606,50 @@ const MAX_WINDOW_MEMORY: usize = 256 * 1024 * 1024; // 256MB
 
 /// Maximum depth of delta chains
 const MAX_DELTA_DEPTH: usize = 50;
+
+/// Memory pool for reusing buffers during delta processing
+struct MemoryPool {
+    delta_buffers: Vec<Vec<u8>>,
+    temp_buffers: Vec<Vec<u8>>,
+    hash_buffers: Vec<Vec<u8>>,
+}
+
+impl MemoryPool {
+    fn new() -> Self {
+        MemoryPool {
+            delta_buffers: Vec::new(),
+            temp_buffers: Vec::new(),
+            hash_buffers: Vec::new(),
+        }
+    }
+
+    fn get_delta_buffer(&mut self) -> Vec<u8> {
+        self.delta_buffers
+            .pop()
+            .unwrap_or_else(|| Vec::with_capacity(8192))
+    }
+
+    fn return_delta_buffer(&mut self, mut buffer: Vec<u8>) {
+        buffer.clear();
+        if buffer.capacity() <= 64 * 1024 {
+            // Only keep reasonably sized buffers
+            self.delta_buffers.push(buffer);
+        }
+    }
+
+    fn get_temp_buffer(&mut self) -> Vec<u8> {
+        self.temp_buffers
+            .pop()
+            .unwrap_or_else(|| Vec::with_capacity(4096))
+    }
+
+    fn return_temp_buffer(&mut self, mut buffer: Vec<u8>) {
+        buffer.clear();
+        if buffer.capacity() <= 32 * 1024 {
+            self.temp_buffers.push(buffer);
+        }
+    }
+}
 
 /// Calculate optimal window size based on object sizes and memory constraints
 fn calculate_window_size(objects: &[(PyObject, ObjectData)], default_window: usize) -> usize {
@@ -824,6 +881,7 @@ fn deltify_pack_objects_sequential(
     let results = PyList::empty(py);
     let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>, usize)>::new(); // Added depth
     let mut current_window_memory = 0usize;
+    let mut memory_pool = MemoryPool::new();
 
     for (i, (_obj, obj_data)) in sorted_objects.iter().enumerate() {
         if let Some(ref progress_fn) = progress {
@@ -849,7 +907,7 @@ fn deltify_pack_objects_sequential(
                 continue;
             }
 
-            let delta = create_delta_internal(base_data, &obj_data.raw_data);
+            let delta = create_delta_with_pool(base_data, &obj_data.raw_data, Some(&mut memory_pool));
 
             if delta.len() < winner_len {
                 winner_base = Some(base_id.clone());

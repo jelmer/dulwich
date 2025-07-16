@@ -584,11 +584,71 @@ use rayon::prelude::*;
 /// Default window size for delta compression
 const DEFAULT_PACK_DELTA_WINDOW_SIZE: usize = 10;
 
+/// Maximum window size for delta compression
+const MAX_PACK_DELTA_WINDOW_SIZE: usize = 250;
+
+/// Memory limit for delta window (in bytes)
+const MAX_WINDOW_MEMORY: usize = 256 * 1024 * 1024; // 256MB
+
+/// Maximum depth of delta chains
+const MAX_DELTA_DEPTH: usize = 50;
+
+/// Calculate optimal window size based on object sizes and memory constraints
+fn calculate_window_size(objects: &[(PyObject, ObjectData)], default_window: usize) -> usize {
+    if objects.is_empty() {
+        return default_window;
+    }
+    
+    // Calculate average object size
+    let total_size: usize = objects.iter().take(100).map(|(_, obj)| obj.raw_data.len()).sum();
+    let avg_size = total_size / objects.len().min(100);
+    
+    // Calculate window size based on memory constraint
+    let memory_based_window = if avg_size > 0 {
+        MAX_WINDOW_MEMORY / avg_size
+    } else {
+        default_window
+    };
+    
+    // Use minimum of memory-based, max allowed, and default * 2
+    memory_based_window.min(MAX_PACK_DELTA_WINDOW_SIZE).min(default_window * 2).max(default_window)
+}
+
+/// Compute Git-style name hash for better delta candidate grouping
+/// This is based on C Git's name_hash() function
+fn compute_name_hash(path: &str) -> u32 {
+    if path.is_empty() {
+        return 0;
+    }
+    
+    // Extract filename and extension for hashing
+    let filename = path.split('/').last().unwrap_or(path);
+    
+    // Create hash input prioritizing extension and filename
+    let hash_input = if let Some(dot_pos) = filename.rfind('.') {
+        let (name, ext) = filename.split_at(dot_pos);
+        format!("{}:{}", &ext[1..], name)  // ext:name format
+    } else {
+        filename.to_string()
+    };
+    
+    // Simple hash function similar to C Git's approach
+    let mut hash: u32 = 0;
+    for byte in hash_input.bytes() {
+        hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
+    }
+    
+    hash
+}
+
 /// Structure to hold object data for processing
 struct ObjectData {
     sha: Vec<u8>,
     type_num: u8,
     raw_data: Vec<u8>,
+    name_hash: u32,
+    path: Option<String>,
+    delta_depth: usize,
 }
 
 /// Sort objects for delta compression using Git's heuristic
@@ -630,19 +690,26 @@ fn sort_objects_for_delta(py: Python, objects: &PyObject) -> PyResult<Vec<(PyObj
         // Use hint type_num if available, otherwise use object's type_num
         let sort_type = type_num_hint.unwrap_or(type_num);
 
-        magic.push((sort_type, path, -raw_length, obj.unbind()));
+        // Compute name hash for Git-style sorting
+        let name_hash = if let Some(ref path_str) = path {
+            compute_name_hash(path_str)
+        } else {
+            0
+        };
+
+        magic.push((sort_type, name_hash, -raw_length, path, obj.unbind()));
     }
 
-    // Sort by the magic heuristic
-    magic.sort_by(|a, b| match (a.0.cmp(&b.0), &a.1, &b.1, a.2.cmp(&b.2)) {
-        (std::cmp::Ordering::Equal, Some(p1), Some(p2), std::cmp::Ordering::Equal) => p1.cmp(p2),
-        (std::cmp::Ordering::Equal, _, _, ord) => ord,
-        (ord, _, _, _) => ord,
+    // Sort by Git's magic heuristic: type_num, name_hash, size (descending)
+    magic.sort_by(|a, b| {
+        a.0.cmp(&b.0)
+            .then_with(|| a.1.cmp(&b.1))
+            .then_with(|| a.2.cmp(&b.2))
     });
 
     // Prepare object data for efficient processing
     let mut result = Vec::new();
-    for (_, _, _, obj) in magic {
+    for (_, name_hash, _, path, obj) in magic {
         // Get object data
         let py_obj = obj.bind(py);
         let type_num = py_obj.getattr("type_num")?.extract::<u8>()?;
@@ -667,6 +734,9 @@ fn sort_objects_for_delta(py: Python, objects: &PyObject) -> PyResult<Vec<(PyObj
                 sha,
                 type_num,
                 raw_data,
+                name_hash,
+                path,
+                delta_depth: 0,  // Base objects start with depth 0
             },
         ));
     }
@@ -723,9 +793,13 @@ fn deltify_pack_objects_sequential(
     // Sort objects
     let sorted_objects = sort_objects_for_delta(py, &objects_with_hints.into())?;
 
+    // Calculate optimal window size
+    let effective_window_size = calculate_window_size(&sorted_objects, window_size);
+
     // Generate deltas
     let results = PyList::empty(py);
-    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>)>::new();
+    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>, usize)>::new();  // Added depth
+    let mut current_window_memory = 0usize;
 
     for (i, (_obj, obj_data)) in sorted_objects.iter().enumerate() {
         if let Some(ref progress_fn) = progress {
@@ -738,10 +812,16 @@ fn deltify_pack_objects_sequential(
         let mut winner = obj_data.raw_data.clone();
         let mut winner_len = winner.len();
         let mut winner_base = None;
+        let mut winner_depth = 0;
 
         // Try delta compression against recent objects
-        for (base_id, base_type_num, base_data) in &possible_bases {
+        for (base_id, base_type_num, base_data, base_depth) in &possible_bases {
             if *base_type_num != obj_data.type_num {
+                continue;
+            }
+            
+            // Skip if using this base would exceed maximum delta depth
+            if *base_depth >= MAX_DELTA_DEPTH {
                 continue;
             }
 
@@ -751,6 +831,7 @@ fn deltify_pack_objects_sequential(
                 winner_base = Some(base_id.clone());
                 winner = delta;
                 winner_len = winner.len();
+                winner_depth = base_depth + 1;
             }
         }
 
@@ -777,15 +858,21 @@ fn deltify_pack_objects_sequential(
         results.append(unpacked)?;
 
         // Add this object as a potential base for future objects
+        let obj_size = obj_data.raw_data.len();
         possible_bases.push_front((
             obj_data.sha.clone(),
             obj_data.type_num,
             obj_data.raw_data.clone(),
+            winner_depth,  // Track the depth of this object
         ));
+        current_window_memory += obj_size;
 
-        // Maintain window size
-        while possible_bases.len() > window_size {
-            possible_bases.pop_back();
+        // Maintain window size and memory constraints
+        while possible_bases.len() > effective_window_size 
+            || current_window_memory > MAX_WINDOW_MEMORY {
+            if let Some((_, _, removed_data, _)) = possible_bases.pop_back() {
+                current_window_memory = current_window_memory.saturating_sub(removed_data.len());
+            }
         }
     }
 
@@ -831,12 +918,16 @@ fn deltify_pack_objects_parallel(
         return deltify_pack_objects_sequential(py, objects, Some(window_size), progress);
     }
 
+    // Calculate optimal window size
+    let effective_window_size = calculate_window_size(&sorted_objects, window_size);
+
     // Extract object data for parallel processing
     let object_data: Vec<ObjectData> = sorted_objects.into_iter().map(|(_, data)| data).collect();
 
     // Process with parallel deltification
     let results = PyList::empty(py);
-    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>)>::new();
+    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>, usize)>::new();  // Added depth
+    let mut current_window_memory = 0usize;
 
     for (i, obj_data) in object_data.iter().enumerate() {
         if let Some(ref progress_fn) = progress {
@@ -850,7 +941,7 @@ fn deltify_pack_objects_parallel(
         let bases_snapshot: Vec<_> = possible_bases.iter().cloned().collect();
 
         // Compute best delta in parallel if we have enough candidates
-        let (winner, winner_len, winner_base) = if bases_snapshot.len() > 5 {
+        let (winner, winner_len, winner_base, winner_depth) = if bases_snapshot.len() > 5 {
             // Worth parallelizing - release GIL and compute in parallel
             py.allow_threads(|| compute_best_delta_parallel(obj_data, &bases_snapshot))
         } else {
@@ -881,15 +972,21 @@ fn deltify_pack_objects_parallel(
         results.append(unpacked)?;
 
         // Add this object as a potential base for future objects
+        let obj_size = obj_data.raw_data.len();
         possible_bases.push_front((
             obj_data.sha.clone(),
             obj_data.type_num,
             obj_data.raw_data.clone(),
+            winner_depth,  // Track the depth of this object
         ));
+        current_window_memory += obj_size;
 
-        // Maintain window size
-        while possible_bases.len() > window_size {
-            possible_bases.pop_back();
+        // Maintain window size and memory constraints
+        while possible_bases.len() > effective_window_size 
+            || current_window_memory > MAX_WINDOW_MEMORY {
+            if let Some((_, _, removed_data, _)) = possible_bases.pop_back() {
+                current_window_memory = current_window_memory.saturating_sub(removed_data.len());
+            }
         }
     }
 
@@ -901,15 +998,21 @@ fn deltify_pack_objects_parallel(
 /// Compute best delta sequentially
 fn compute_best_delta_sequential(
     obj_data: &ObjectData,
-    possible_bases: &[(Vec<u8>, u8, Vec<u8>)],
-) -> (Vec<u8>, usize, Option<Vec<u8>>) {
+    possible_bases: &[(Vec<u8>, u8, Vec<u8>, usize)],
+) -> (Vec<u8>, usize, Option<Vec<u8>>, usize) {
     let mut winner = obj_data.raw_data.clone();
     let mut winner_len = winner.len();
     let mut winner_base = None;
+    let mut winner_depth = 0;
 
     // Try delta compression against recent objects
-    for (base_id, base_type_num, base_data) in possible_bases {
+    for (base_id, base_type_num, base_data, base_depth) in possible_bases {
         if *base_type_num != obj_data.type_num {
+            continue;
+        }
+        
+        // Skip if using this base would exceed maximum delta depth
+        if *base_depth >= MAX_DELTA_DEPTH {
             continue;
         }
 
@@ -919,34 +1022,37 @@ fn compute_best_delta_sequential(
             winner_base = Some(base_id.clone());
             winner = delta;
             winner_len = winner.len();
+            winner_depth = base_depth + 1;
         }
     }
 
-    (winner, winner_len, winner_base)
+    (winner, winner_len, winner_base, winner_depth)
 }
 
 #[cfg(feature = "parallel")]
 /// Compute best delta using parallel processing
 fn compute_best_delta_parallel(
     obj_data: &ObjectData,
-    possible_bases: &[(Vec<u8>, u8, Vec<u8>)],
-) -> (Vec<u8>, usize, Option<Vec<u8>>) {
-    // Filter bases by type first to avoid unnecessary work
+    possible_bases: &[(Vec<u8>, u8, Vec<u8>, usize)],
+) -> (Vec<u8>, usize, Option<Vec<u8>>, usize) {
+    // Filter bases by type and depth first to avoid unnecessary work
     let compatible_bases: Vec<_> = possible_bases
         .iter()
-        .filter(|(_, base_type_num, _)| *base_type_num == obj_data.type_num)
+        .filter(|(_, base_type_num, _, base_depth)| {
+            *base_type_num == obj_data.type_num && *base_depth < MAX_DELTA_DEPTH
+        })
         .collect();
 
     if compatible_bases.is_empty() {
-        return (obj_data.raw_data.clone(), obj_data.raw_data.len(), None);
+        return (obj_data.raw_data.clone(), obj_data.raw_data.len(), None, 0);
     }
 
     // Compute deltas in parallel
     let results: Vec<_> = compatible_bases
         .par_iter()
-        .map(|(base_id, _, base_data)| {
+        .map(|(base_id, _, base_data, base_depth)| {
             let delta = create_delta_internal(base_data, &obj_data.raw_data);
-            (base_id.clone(), delta.len(), delta)
+            (base_id.clone(), delta.len(), delta, base_depth + 1)
         })
         .collect();
 
@@ -954,16 +1060,18 @@ fn compute_best_delta_parallel(
     let mut best_size = obj_data.raw_data.len();
     let mut best_base = None;
     let mut best_delta = obj_data.raw_data.clone();
+    let mut best_depth = 0;
 
-    for (base_id, delta_len, delta) in results {
+    for (base_id, delta_len, delta, depth) in results {
         if delta_len < best_size {
             best_size = delta_len;
             best_base = Some(base_id);
             best_delta = delta;
+            best_depth = depth;
         }
     }
 
-    (best_delta, best_size, best_base)
+    (best_delta, best_size, best_base, best_depth)
 }
 
 #[pymodule]

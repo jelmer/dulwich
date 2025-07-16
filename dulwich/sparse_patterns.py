@@ -23,10 +23,10 @@
 
 import os
 from fnmatch import fnmatch
-from typing import Any, Union, cast
 
 from .file import ensure_dir_exists
-from .index import IndexEntry
+from .index import Index, IndexEntry
+from .objects import Blob
 from .repo import Repo
 
 
@@ -38,14 +38,12 @@ class BlobNotFoundError(Exception):
     """Raised when a requested blob is not found in the repository's object store."""
 
 
-def determine_included_paths(
-    repo: Union[str, Repo], lines: list[str], cone: bool
-) -> set[str]:
+def determine_included_paths(index: Index, lines: list[str], cone: bool) -> set[str]:
     """Determine which paths in the index should be included based on either
     a full-pattern match or a cone-mode approach.
 
     Args:
-      repo: A path to the repository or a Repo object.
+      index: An Index object containing the repository's index.
       lines: A list of pattern lines (strings) from sparse-checkout config.
       cone: A bool indicating cone mode.
 
@@ -53,32 +51,25 @@ def determine_included_paths(
       A set of included path strings.
     """
     if cone:
-        return compute_included_paths_cone(repo, lines)
+        return compute_included_paths_cone(index, lines)
     else:
-        return compute_included_paths_full(repo, lines)
+        return compute_included_paths_full(index, lines)
 
 
-def compute_included_paths_full(repo: Union[str, Repo], lines: list[str]) -> set[str]:
+def compute_included_paths_full(index: Index, lines: list[str]) -> set[str]:
     """Use .gitignore-style parsing and matching to determine included paths.
 
     Each file path in the index is tested against the parsed sparse patterns.
     If it matches the final (most recently applied) positive pattern, it is included.
 
     Args:
-      repo: A path to the repository or a Repo object.
+      index: An Index object containing the repository's index.
       lines: A list of pattern lines (strings) from sparse-checkout config.
 
     Returns:
       A set of included path strings.
     """
     parsed = parse_sparse_patterns(lines)
-    if isinstance(repo, str):
-        from .porcelain import open_repo
-
-        repo_obj = open_repo(repo)
-    else:
-        repo_obj = repo
-    index = repo_obj.open_index()
     included = set()
     for path_bytes, entry in index.items():
         path_str = path_bytes.decode("utf-8")
@@ -88,7 +79,7 @@ def compute_included_paths_full(repo: Union[str, Repo], lines: list[str]) -> set
     return included
 
 
-def compute_included_paths_cone(repo: Union[str, Repo], lines: list[str]) -> set[str]:
+def compute_included_paths_cone(index: Index, lines: list[str]) -> set[str]:
     """Implement a simplified 'cone' approach for sparse-checkout.
 
     By default, this can include top-level files, exclude all subdirectories,
@@ -97,7 +88,7 @@ def compute_included_paths_cone(repo: Union[str, Repo], lines: list[str]) -> set
     of the recursive cone mode.
 
     Args:
-      repo: A path to the repository or a Repo object.
+      index: An Index object containing the repository's index.
       lines: A list of pattern lines (strings), typically including entries like
         "/*", "!/*/", or "/mydir/".
 
@@ -119,13 +110,6 @@ def compute_included_paths_cone(repo: Union[str, Repo], lines: list[str]) -> set
             if d:
                 reinclude_dirs.add(d)
 
-    if isinstance(repo, str):
-        from .porcelain import open_repo
-
-        repo_obj = open_repo(repo)
-    else:
-        repo_obj = repo
-    index = repo_obj.open_index()
     included = set()
 
     for path_bytes, entry in index.items():
@@ -152,7 +136,7 @@ def compute_included_paths_cone(repo: Union[str, Repo], lines: list[str]) -> set
 
 
 def apply_included_paths(
-    repo: Union[str, Repo], included_paths: set[str], force: bool = False
+    repo: Repo, included_paths: set[str], force: bool = False
 ) -> None:
     """Apply the sparse-checkout inclusion set to the index and working tree.
 
@@ -169,16 +153,8 @@ def apply_included_paths(
     Returns:
       None
     """
-    if isinstance(repo, str):
-        from .porcelain import open_repo
-
-        repo_obj = open_repo(repo)
-    else:
-        repo_obj = repo
-    index = repo_obj.open_index()
-    if not hasattr(repo_obj, "get_blob_normalizer"):
-        raise ValueError("Repository must support get_blob_normalizer")
-    normalizer = repo_obj.get_blob_normalizer()
+    index = repo.open_index()
+    normalizer = repo.get_blob_normalizer()
 
     def local_modifications_exist(full_path: str, index_entry: IndexEntry) -> bool:
         if not os.path.exists(full_path):
@@ -186,12 +162,10 @@ def apply_included_paths(
         with open(full_path, "rb") as f:
             disk_data = f.read()
         try:
-            blob_obj = repo_obj.object_store[index_entry.sha]
+            blob_obj = repo.object_store[index_entry.sha]
         except KeyError:
             return True
         norm_data = normalizer.checkin_normalize(disk_data, full_path)
-        from .objects import Blob
-
         if not isinstance(blob_obj, Blob):
             return True
         return norm_data != blob_obj.data
@@ -213,9 +187,7 @@ def apply_included_paths(
     for path_bytes, entry in list(index.items()):
         if not isinstance(entry, IndexEntry):
             continue  # Skip conflicted entries
-        if not hasattr(repo_obj, "path"):
-            raise ValueError("Repository must have a path attribute")
-        full_path = os.path.join(cast(Any, repo_obj).path, path_bytes.decode("utf-8"))
+        full_path = os.path.join(repo.path, path_bytes.decode("utf-8"))
 
         if entry.skip_worktree:
             # Excluded => remove if safe
@@ -238,14 +210,12 @@ def apply_included_paths(
             # Included => materialize if missing
             if not os.path.exists(full_path):
                 try:
-                    blob = repo_obj.object_store[entry.sha]
+                    blob = repo.object_store[entry.sha]
                 except KeyError:
                     raise BlobNotFoundError(
                         f"Blob {entry.sha.hex()} not found for {path_bytes.decode('utf-8')}."
                     )
                 ensure_dir_exists(os.path.dirname(full_path))
-                from .objects import Blob
-
                 # Apply checkout normalization if normalizer is available
                 if normalizer and isinstance(blob, Blob):
                     blob = normalizer.checkout_normalize(blob, path_bytes)

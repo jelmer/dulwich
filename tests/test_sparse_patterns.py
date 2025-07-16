@@ -209,7 +209,7 @@ class ComputeIncludedPathsFullTests(TestCase):
             "!bar.*",  # exclude bar.md
             "docs/",  # include docs dir
         ]
-        included = compute_included_paths_full(self.repo, lines)
+        included = compute_included_paths_full(self.repo.open_index(), lines)
         self.assertEqual(included, {"foo.py", "docs/readme"})
 
     def test_full_with_utf8_paths(self):
@@ -219,7 +219,7 @@ class ComputeIncludedPathsFullTests(TestCase):
 
         # Include all text files
         lines = ["*.txt"]
-        included = compute_included_paths_full(self.repo, lines)
+        included = compute_included_paths_full(self.repo.open_index(), lines)
         self.assertEqual(included, {"unicode/文件.txt"})
 
 
@@ -256,7 +256,7 @@ class ComputeIncludedPathsConeTests(TestCase):
             "!/*/",
             "/docs/",
         ]
-        included = compute_included_paths_cone(self.repo, lines)
+        included = compute_included_paths_cone(self.repo.open_index(), lines)
         # top-level => includes 'topfile'
         # subdirs => excluded, except docs/
         self.assertEqual(included, {"topfile", "docs/readme.md"})
@@ -272,7 +272,7 @@ class ComputeIncludedPathsConeTests(TestCase):
             "!/*/",
             "/",  # This empty pattern should be skipped
         ]
-        included = compute_included_paths_cone(self.repo, lines)
+        included = compute_included_paths_cone(self.repo.open_index(), lines)
         # Only topfile should be included since the empty pattern is skipped
         self.assertEqual(included, {"topfile"})
 
@@ -286,7 +286,7 @@ class ComputeIncludedPathsConeTests(TestCase):
             "/*",  # top-level
             "/docs/",  # re-include docs?
         ]
-        included = compute_included_paths_cone(self.repo, lines)
+        included = compute_included_paths_cone(self.repo.open_index(), lines)
         # Because exclude_subdirs was never set, everything is included:
         self.assertEqual(
             included,
@@ -301,7 +301,7 @@ class ComputeIncludedPathsConeTests(TestCase):
 
         # Only specify reinclude_dirs, need to explicitly exclude subdirs
         lines = ["!/*/", "/docs/"]
-        included = compute_included_paths_cone(self.repo, lines)
+        included = compute_included_paths_cone(self.repo.open_index(), lines)
         # Only docs/* should be included, not topfile or lib/*
         self.assertEqual(included, {"docs/readme.md"})
 
@@ -313,7 +313,7 @@ class ComputeIncludedPathsConeTests(TestCase):
 
         # Only exclude subdirs and reinclude docs
         lines = ["!/*/", "/docs/"]
-        included = compute_included_paths_cone(self.repo, lines)
+        included = compute_included_paths_cone(self.repo.open_index(), lines)
         # Only docs/* should be included since we didn't include top level
         self.assertEqual(included, {"docs/readme.md"})
 
@@ -339,7 +339,8 @@ class DetermineIncludedPathsTests(TestCase):
         self._add_file_to_index("bar.md")
 
         lines = ["*.py", "!bar.*"]
-        included = determine_included_paths(self.repo, lines, cone=False)
+        index = self.repo.open_index()
+        included = determine_included_paths(index, lines, cone=False)
         self.assertEqual(included, {"foo.py"})
 
     def test_cone_mode(self):
@@ -347,7 +348,8 @@ class DetermineIncludedPathsTests(TestCase):
         self._add_file_to_index("subdir/anotherfile")
 
         lines = ["/*", "!/*/"]
-        included = determine_included_paths(self.repo, lines, cone=True)
+        index = self.repo.open_index()
+        included = determine_included_paths(index, lines, cone=True)
         self.assertEqual(included, {"topfile"})
 
 

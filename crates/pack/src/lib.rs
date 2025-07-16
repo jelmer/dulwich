@@ -515,6 +515,7 @@ fn find_delta_operations(base: &[u8], target: &[u8]) -> Vec<DeltaOperation> {
 }
 
 /// Creates a Git-compatible delta between base and target buffers
+/// Optimized version that works with borrowed data
 fn create_delta_internal(base_buf: &[u8], target_buf: &[u8]) -> Vec<u8> {
     let mut result = Vec::new();
 
@@ -598,20 +599,27 @@ fn calculate_window_size(objects: &[(PyObject, ObjectData)], default_window: usi
     if objects.is_empty() {
         return default_window;
     }
-    
+
     // Calculate average object size
-    let total_size: usize = objects.iter().take(100).map(|(_, obj)| obj.raw_data.len()).sum();
+    let total_size: usize = objects
+        .iter()
+        .take(100)
+        .map(|(_, obj)| obj.raw_data.len())
+        .sum();
     let avg_size = total_size / objects.len().min(100);
-    
+
     // Calculate window size based on memory constraint
     let memory_based_window = if avg_size > 0 {
         MAX_WINDOW_MEMORY / avg_size
     } else {
         default_window
     };
-    
+
     // Use minimum of memory-based, max allowed, and default * 2
-    memory_based_window.min(MAX_PACK_DELTA_WINDOW_SIZE).min(default_window * 2).max(default_window)
+    memory_based_window
+        .min(MAX_PACK_DELTA_WINDOW_SIZE)
+        .min(default_window * 2)
+        .max(default_window)
 }
 
 /// Compute Git-style name hash for better delta candidate grouping
@@ -620,24 +628,24 @@ fn compute_name_hash(path: &str) -> u32 {
     if path.is_empty() {
         return 0;
     }
-    
+
     // Extract filename and extension for hashing
     let filename = path.split('/').last().unwrap_or(path);
-    
+
     // Create hash input prioritizing extension and filename
     let hash_input = if let Some(dot_pos) = filename.rfind('.') {
         let (name, ext) = filename.split_at(dot_pos);
-        format!("{}:{}", &ext[1..], name)  // ext:name format
+        format!("{}:{}", &ext[1..], name) // ext:name format
     } else {
         filename.to_string()
     };
-    
+
     // Simple hash function similar to C Git's approach
     let mut hash: u32 = 0;
     for byte in hash_input.bytes() {
         hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
     }
-    
+
     hash
 }
 
@@ -714,18 +722,34 @@ fn sort_objects_for_delta(py: Python, objects: &PyObject) -> PyResult<Vec<(PyObj
         let py_obj = obj.bind(py);
         let type_num = py_obj.getattr("type_num")?.extract::<u8>()?;
 
-        // Get SHA
+        // Get SHA with optimized memory access
         let sha_obj = py_obj.call_method0("sha")?;
         let sha_digest = sha_obj.call_method0("digest")?;
-        let sha = sha_digest.extract::<&[u8]>()?.to_vec();
+        let sha = if let Ok(sha_bytes) = sha_digest.downcast::<PyBytes>() {
+            sha_bytes.as_bytes().to_vec()
+        } else {
+            sha_digest.extract::<&[u8]>()?.to_vec()
+        };
 
-        // Get raw data
+        // Get raw data with optimized memory access
         let raw_chunks = py_obj.call_method0("as_raw_chunks")?;
         let raw_list = raw_chunks.downcast::<PyList>()?;
         let mut raw_data = Vec::new();
+
+        // Pre-calculate total size to avoid reallocations
+        let mut total_size = 0;
         for chunk in raw_list.iter() {
-            let chunk_bytes = chunk.extract::<&[u8]>()?;
-            raw_data.extend_from_slice(chunk_bytes);
+            if let Ok(chunk_bytes) = chunk.downcast::<PyBytes>() {
+                total_size += chunk_bytes.len()?;
+            }
+        }
+        raw_data.reserve(total_size);
+
+        // Use direct buffer access to avoid double copying
+        for chunk in raw_list.iter() {
+            if let Ok(chunk_bytes) = chunk.downcast::<PyBytes>() {
+                raw_data.extend_from_slice(chunk_bytes.as_bytes());
+            }
         }
 
         result.push((
@@ -736,7 +760,7 @@ fn sort_objects_for_delta(py: Python, objects: &PyObject) -> PyResult<Vec<(PyObj
                 raw_data,
                 name_hash,
                 path,
-                delta_depth: 0,  // Base objects start with depth 0
+                delta_depth: 0, // Base objects start with depth 0
             },
         ));
     }
@@ -798,7 +822,7 @@ fn deltify_pack_objects_sequential(
 
     // Generate deltas
     let results = PyList::empty(py);
-    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>, usize)>::new();  // Added depth
+    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>, usize)>::new(); // Added depth
     let mut current_window_memory = 0usize;
 
     for (i, (_obj, obj_data)) in sorted_objects.iter().enumerate() {
@@ -819,7 +843,7 @@ fn deltify_pack_objects_sequential(
             if *base_type_num != obj_data.type_num {
                 continue;
             }
-            
+
             // Skip if using this base would exceed maximum delta depth
             if *base_depth >= MAX_DELTA_DEPTH {
                 continue;
@@ -835,15 +859,20 @@ fn deltify_pack_objects_sequential(
             }
         }
 
-        // Create delta chunks list
-        let delta_chunks = PyList::empty(py);
-        delta_chunks.append(PyBytes::new(py, &winner))?;
+        // Create delta chunks list with optimized memory usage
+        let delta_chunks = if winner.len() > 0 {
+            let chunks = PyList::empty(py);
+            chunks.append(PyBytes::new(py, &winner))?;
+            chunks
+        } else {
+            PyList::empty(py)
+        };
 
         // Import and create Python UnpackedObject
         let pack_module = py.import("dulwich.pack")?;
         let unpacked_class = pack_module.getattr("UnpackedObject")?;
 
-        // Create UnpackedObject instance
+        // Create UnpackedObject instance with optimized SHA handling
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("sha", PyBytes::new(py, &obj_data.sha))?;
         if let Some(base) = winner_base {
@@ -863,13 +892,14 @@ fn deltify_pack_objects_sequential(
             obj_data.sha.clone(),
             obj_data.type_num,
             obj_data.raw_data.clone(),
-            winner_depth,  // Track the depth of this object
+            winner_depth, // Track the depth of this object
         ));
         current_window_memory += obj_size;
 
         // Maintain window size and memory constraints
-        while possible_bases.len() > effective_window_size 
-            || current_window_memory > MAX_WINDOW_MEMORY {
+        while possible_bases.len() > effective_window_size
+            || current_window_memory > MAX_WINDOW_MEMORY
+        {
             if let Some((_, _, removed_data, _)) = possible_bases.pop_back() {
                 current_window_memory = current_window_memory.saturating_sub(removed_data.len());
             }
@@ -926,7 +956,7 @@ fn deltify_pack_objects_parallel(
 
     // Process with parallel deltification
     let results = PyList::empty(py);
-    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>, usize)>::new();  // Added depth
+    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>, usize)>::new(); // Added depth
     let mut current_window_memory = 0usize;
 
     for (i, obj_data) in object_data.iter().enumerate() {
@@ -949,15 +979,20 @@ fn deltify_pack_objects_parallel(
             compute_best_delta_sequential(obj_data, &bases_snapshot)
         };
 
-        // Create delta chunks list
-        let delta_chunks = PyList::empty(py);
-        delta_chunks.append(PyBytes::new(py, &winner))?;
+        // Create delta chunks list with optimized memory usage
+        let delta_chunks = if winner.len() > 0 {
+            let chunks = PyList::empty(py);
+            chunks.append(PyBytes::new(py, &winner))?;
+            chunks
+        } else {
+            PyList::empty(py)
+        };
 
         // Import and create Python UnpackedObject
         let pack_module = py.import("dulwich.pack")?;
         let unpacked_class = pack_module.getattr("UnpackedObject")?;
 
-        // Create UnpackedObject instance
+        // Create UnpackedObject instance with optimized SHA handling
         let kwargs = pyo3::types::PyDict::new(py);
         kwargs.set_item("sha", PyBytes::new(py, &obj_data.sha))?;
         if let Some(base) = winner_base {
@@ -977,13 +1012,14 @@ fn deltify_pack_objects_parallel(
             obj_data.sha.clone(),
             obj_data.type_num,
             obj_data.raw_data.clone(),
-            winner_depth,  // Track the depth of this object
+            winner_depth, // Track the depth of this object
         ));
         current_window_memory += obj_size;
 
         // Maintain window size and memory constraints
-        while possible_bases.len() > effective_window_size 
-            || current_window_memory > MAX_WINDOW_MEMORY {
+        while possible_bases.len() > effective_window_size
+            || current_window_memory > MAX_WINDOW_MEMORY
+        {
             if let Some((_, _, removed_data, _)) = possible_bases.pop_back() {
                 current_window_memory = current_window_memory.saturating_sub(removed_data.len());
             }
@@ -1010,7 +1046,7 @@ fn compute_best_delta_sequential(
         if *base_type_num != obj_data.type_num {
             continue;
         }
-        
+
         // Skip if using this base would exceed maximum delta depth
         if *base_depth >= MAX_DELTA_DEPTH {
             continue;

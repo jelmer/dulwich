@@ -151,8 +151,7 @@ fn sorted_tree_items(
                         .unbind()
                         .into_any(),
                 ))?
-                .unbind()
-                .into())
+                .unbind())
         })
         .collect::<PyResult<Vec<PyObject>>>()
 }

@@ -184,7 +184,10 @@ fn apply_delta(py: Python, py_src_buf: PyObject, py_delta: PyObject) -> PyResult
                 cp_size = 0x10000;
             }
 
-            if cp_off + cp_size < cp_size || cp_off + cp_size > src_size || cp_size > dest_size {
+            if cp_off.saturating_add(cp_size) < cp_size
+                || cp_off + cp_size > src_size
+                || cp_size > dest_size
+            {
                 break;
             }
 
@@ -280,19 +283,81 @@ struct DeltaOperation {
     target_end: usize,
 }
 
-/// Sophisticated diff algorithm using hash-based matching
+/// Rabin fingerprinting constants
+const RABIN_WINDOW_SIZE: usize = 16;
+const RABIN_SHIFT: u64 = 23;
+
+/// Rabin fingerprint structure for efficient string matching
+#[derive(Debug, Clone)]
+struct RabinIndex {
+    /// Maps fingerprint to list of positions in base buffer
+    fingerprints: HashMap<u64, Vec<usize>>,
+}
+
+impl RabinIndex {
+    fn new(base: &[u8]) -> Self {
+        let mut fingerprints = HashMap::new();
+
+        if base.len() < RABIN_WINDOW_SIZE {
+            return RabinIndex { fingerprints };
+        }
+
+        // Calculate initial fingerprint
+        let mut hash = 0u64;
+        for item in base.iter().take(RABIN_WINDOW_SIZE) {
+            hash = hash.wrapping_mul(RABIN_SHIFT).wrapping_add(*item as u64);
+        }
+
+        fingerprints.entry(hash).or_insert_with(Vec::new).push(0);
+
+        // Rolling hash for remaining positions
+        let shift_value = (1u64 << RABIN_SHIFT).wrapping_sub(1);
+        for i in RABIN_WINDOW_SIZE..base.len() {
+            // Remove leftmost character and add rightmost
+            let old_char = base[i - RABIN_WINDOW_SIZE] as u64;
+            let new_char = base[i] as u64;
+
+            hash = hash
+                .wrapping_sub(old_char.wrapping_mul(shift_value))
+                .wrapping_mul(RABIN_SHIFT)
+                .wrapping_add(new_char);
+
+            let pos = i - RABIN_WINDOW_SIZE + 1;
+            fingerprints.entry(hash).or_insert_with(Vec::new).push(pos);
+        }
+
+        RabinIndex { fingerprints }
+    }
+
+    fn find_matches(&self, target: &[u8], target_pos: usize) -> Vec<usize> {
+        if target_pos + RABIN_WINDOW_SIZE > target.len() {
+            return Vec::new();
+        }
+
+        // Calculate fingerprint for target window
+        let mut hash = 0u64;
+        for item in target.iter().skip(target_pos).take(RABIN_WINDOW_SIZE) {
+            hash = hash.wrapping_mul(RABIN_SHIFT).wrapping_add(*item as u64);
+        }
+
+        self.fingerprints.get(&hash).cloned().unwrap_or_default()
+    }
+}
+
+/// Advanced diff algorithm using Rabin fingerprinting
 fn find_delta_operations(base: &[u8], target: &[u8]) -> Vec<DeltaOperation> {
     let mut operations = Vec::new();
+    let min_match_len = 3;
 
-    // Build a hash map of base buffer for efficient searching
-    let mut base_map: HashMap<&[u8], Vec<usize>> = HashMap::new();
-    let min_match_len = 4; // Minimum match length to consider
+    // Build Rabin fingerprint index for base buffer
+    let rabin_index = RabinIndex::new(base);
 
-    // Index base buffer with sliding windows
+    // Also build a simple hash map for short matches
+    let mut short_map: HashMap<&[u8], Vec<usize>> = HashMap::new();
     for i in 0..=base.len().saturating_sub(min_match_len) {
-        let end = std::cmp::min(i + 32, base.len()); // Limit window size
+        let end = std::cmp::min(i + 8, base.len());
         let window = &base[i..end];
-        base_map.entry(window).or_insert_with(Vec::new).push(i);
+        short_map.entry(window).or_default().push(i);
     }
 
     let mut target_pos = 0;
@@ -300,34 +365,80 @@ fn find_delta_operations(base: &[u8], target: &[u8]) -> Vec<DeltaOperation> {
     while target_pos < target.len() {
         let mut best_match: Option<(usize, usize, usize)> = None;
 
-        // Try different window sizes to find the best match
-        for window_size in (min_match_len..=std::cmp::min(32, target.len() - target_pos)).rev() {
-            if target_pos + window_size <= target.len() {
-                let target_window = &target[target_pos..target_pos + window_size];
+        // For simple cases, check if we have a direct match from the beginning
+        if target_pos == 0 && target.len() <= base.len() {
+            // Check if the entire target matches the beginning of base
+            let mut match_len = 0;
+            while match_len < target.len() && base[match_len] == target[match_len] {
+                match_len += 1;
+            }
+            if match_len >= min_match_len {
+                best_match = Some((0, 0, match_len));
+            }
+        }
 
-                if let Some(base_positions) = base_map.get(target_window) {
-                    for &base_start in base_positions {
-                        // Try to extend the match
-                        let mut match_len = 0;
-                        let max_extend =
-                            std::cmp::min(base.len() - base_start, target.len() - target_pos);
+        // First try Rabin fingerprinting for longer matches
+        if target_pos + RABIN_WINDOW_SIZE <= target.len() {
+            let candidates = rabin_index.find_matches(target, target_pos);
 
-                        while match_len < max_extend
-                            && base[base_start + match_len] == target[target_pos + match_len]
-                        {
-                            match_len += 1;
-                        }
+            // Limit the number of candidates to check to avoid performance issues
+            // with highly repetitive content
+            let max_candidates = std::cmp::min(candidates.len(), 20);
 
-                        if match_len >= min_match_len
-                            && (best_match.is_none() || match_len > best_match.unwrap().2)
-                        {
-                            best_match = Some((base_start, target_pos, match_len));
-                        }
-                    }
+            for &base_start in candidates.iter().take(max_candidates) {
+                // Verify and extend the match
+                let mut match_len = 0;
+                let max_extend = std::cmp::min(base.len() - base_start, target.len() - target_pos);
+
+                while match_len < max_extend
+                    && base[base_start + match_len] == target[target_pos + match_len]
+                {
+                    match_len += 1;
                 }
 
-                if best_match.is_some() {
-                    break; // Found a good match, don't try smaller windows
+                if match_len >= min_match_len
+                    && (best_match.is_none() || match_len > best_match.unwrap().2)
+                {
+                    best_match = Some((base_start, target_pos, match_len));
+                }
+
+                // Early exit if we found a very good match
+                if match_len >= RABIN_WINDOW_SIZE * 2 {
+                    break;
+                }
+            }
+        }
+
+        // If no good match found with Rabin, try short hash matches
+        if best_match.is_none() {
+            for window_size in (min_match_len..=std::cmp::min(8, target.len() - target_pos)).rev() {
+                if target_pos + window_size <= target.len() {
+                    let target_window = &target[target_pos..target_pos + window_size];
+
+                    if let Some(base_positions) = short_map.get(target_window) {
+                        for &base_start in base_positions {
+                            // Try to extend the match
+                            let mut match_len = 0;
+                            let max_extend =
+                                std::cmp::min(base.len() - base_start, target.len() - target_pos);
+
+                            while match_len < max_extend
+                                && base[base_start + match_len] == target[target_pos + match_len]
+                            {
+                                match_len += 1;
+                            }
+
+                            if match_len >= min_match_len
+                                && (best_match.is_none() || match_len > best_match.unwrap().2)
+                            {
+                                best_match = Some((base_start, target_pos, match_len));
+                            }
+                        }
+                    }
+
+                    if best_match.is_some() {
+                        break;
+                    }
                 }
             }
         }
@@ -350,17 +461,39 @@ fn find_delta_operations(base: &[u8], target: &[u8]) -> Vec<DeltaOperation> {
             // Continue until we find a potential match
             while target_pos < target.len() {
                 let mut found_match = false;
-                for window_size in
-                    (min_match_len..=std::cmp::min(16, target.len() - target_pos)).rev()
-                {
-                    if target_pos + window_size <= target.len() {
-                        let window = &target[target_pos..target_pos + window_size];
-                        if base_map.contains_key(window) {
-                            found_match = true;
-                            break;
+
+                // Check for Rabin fingerprint matches
+                if target_pos + RABIN_WINDOW_SIZE <= target.len() {
+                    let candidates = rabin_index.find_matches(target, target_pos);
+                    if !candidates.is_empty() {
+                        // Quick verification of at least one candidate
+                        for &base_start in &candidates {
+                            if base_start < base.len()
+                                && target_pos < target.len()
+                                && base[base_start] == target[target_pos]
+                            {
+                                found_match = true;
+                                break;
+                            }
                         }
                     }
                 }
+
+                // Check short hash matches if no Rabin match
+                if !found_match {
+                    for window_size in
+                        (min_match_len..=std::cmp::min(8, target.len() - target_pos)).rev()
+                    {
+                        if target_pos + window_size <= target.len() {
+                            let window = &target[target_pos..target_pos + window_size];
+                            if short_map.contains_key(window) {
+                                found_match = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 if found_match {
                     break;
                 }
@@ -442,10 +575,210 @@ fn create_delta(py: Python, py_base_buf: PyObject, py_target_buf: PyObject) -> P
     Ok(py_list.into())
 }
 
+use pyo3::types::PyTuple;
+use std::collections::VecDeque;
+
+/// Default window size for delta compression
+const DEFAULT_PACK_DELTA_WINDOW_SIZE: usize = 10;
+
+/// Structure to hold object data for processing
+struct ObjectData {
+    sha: Vec<u8>,
+    type_num: u8,
+    raw_data: Vec<u8>,
+}
+
+/// Sort objects for delta compression using Git's heuristic
+fn sort_objects_for_delta(py: Python, objects: &PyObject) -> PyResult<Vec<(PyObject, ObjectData)>> {
+    let mut magic = Vec::new();
+
+    // Iterate through objects (can be ShaFile or (ShaFile, hint) tuples)
+    let objects_list = objects.extract::<Bound<PyList>>(py)?;
+    for item in objects_list.iter() {
+        let (obj, hint) = if let Ok(tuple) = item.downcast::<PyTuple>() {
+            // It's a tuple (object, hint)
+            let obj = tuple.get_item(0)?;
+            let hint = tuple.get_item(1)?;
+            (obj, Some(hint))
+        } else {
+            // It's just an object
+            (item, None)
+        };
+
+        // Extract type_num and path from hint if present
+        let (type_num_hint, path) = if let Some(hint) = hint {
+            if hint.is_none() {
+                (None, None)
+            } else if let Ok(hint_tuple) = hint.downcast::<PyTuple>() {
+                let type_num = hint_tuple.get_item(0)?.extract::<Option<u8>>()?;
+                let path = hint_tuple.get_item(1)?.extract::<Option<String>>()?;
+                (type_num, path)
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+        // Get object's properties
+        let type_num = obj.getattr("type_num")?.extract::<u8>()?;
+        let raw_length = obj.call_method0("raw_length")?.extract::<i64>()?;
+
+        // Use hint type_num if available, otherwise use object's type_num
+        let sort_type = type_num_hint.unwrap_or(type_num);
+
+        magic.push((sort_type, path, -raw_length, obj.unbind()));
+    }
+
+    // Sort by the magic heuristic
+    magic.sort_by(|a, b| match (a.0.cmp(&b.0), &a.1, &b.1, a.2.cmp(&b.2)) {
+        (std::cmp::Ordering::Equal, Some(p1), Some(p2), std::cmp::Ordering::Equal) => p1.cmp(p2),
+        (std::cmp::Ordering::Equal, _, _, ord) => ord,
+        (ord, _, _, _) => ord,
+    });
+
+    // Prepare object data for efficient processing
+    let mut result = Vec::new();
+    for (_, _, _, obj) in magic {
+        // Get object data
+        let py_obj = obj.bind(py);
+        let type_num = py_obj.getattr("type_num")?.extract::<u8>()?;
+
+        // Get SHA
+        let sha_obj = py_obj.call_method0("sha")?;
+        let sha_digest = sha_obj.call_method0("digest")?;
+        let sha = sha_digest.extract::<&[u8]>()?.to_vec();
+
+        // Get raw data
+        let raw_chunks = py_obj.call_method0("as_raw_chunks")?;
+        let raw_list = raw_chunks.downcast::<PyList>()?;
+        let mut raw_data = Vec::new();
+        for chunk in raw_list.iter() {
+            let chunk_bytes = chunk.extract::<&[u8]>()?;
+            raw_data.extend_from_slice(chunk_bytes);
+        }
+
+        result.push((
+            obj,
+            ObjectData {
+                sha,
+                type_num,
+                raw_data,
+            },
+        ));
+    }
+
+    Ok(result)
+}
+
+/// Main deltify function implementation
+#[pyfunction]
+#[pyo3(signature = (objects, *, window_size=None, progress=None))]
+fn deltify_pack_objects(
+    py: Python,
+    objects: PyObject,
+    window_size: Option<usize>,
+    progress: Option<PyObject>,
+) -> PyResult<PyObject> {
+    let window_size = window_size.unwrap_or(DEFAULT_PACK_DELTA_WINDOW_SIZE);
+
+    // Convert objects to list with hints
+    let objects_with_hints = PyList::empty(py);
+    let objects_list = objects.extract::<Bound<PyList>>(py)?;
+
+    for item in objects_list.iter() {
+        if let Ok(_tuple) = item.downcast::<PyTuple>() {
+            // Already a tuple
+            objects_with_hints.append(item)?;
+        } else {
+            // Just an object - create tuple with hint
+            let type_num = item.getattr("type_num")?;
+            let none = py.None().into_bound(py);
+            let hint = PyTuple::new(py, &[type_num, none])?;
+            let tuple = PyTuple::new(py, &[item.to_owned(), hint.into_any()])?;
+            objects_with_hints.append(tuple)?;
+        }
+    }
+
+    // Sort objects
+    let sorted_objects = sort_objects_for_delta(py, &objects_with_hints.into())?;
+
+    // Generate deltas
+    let results = PyList::empty(py);
+    let mut possible_bases = VecDeque::<(Vec<u8>, u8, Vec<u8>)>::new();
+
+    for (i, (_obj, obj_data)) in sorted_objects.iter().enumerate() {
+        if let Some(ref progress_fn) = progress {
+            if i % 1000 == 0 {
+                let msg = format!("generating deltas: {}\r", i);
+                progress_fn.call1(py, (PyBytes::new(py, msg.as_bytes()),))?;
+            }
+        }
+
+        let mut winner = obj_data.raw_data.clone();
+        let mut winner_len = winner.len();
+        let mut winner_base = None;
+
+        // Try delta compression against recent objects
+        for (base_id, base_type_num, base_data) in &possible_bases {
+            if *base_type_num != obj_data.type_num {
+                continue;
+            }
+
+            let delta = create_delta_internal(base_data, &obj_data.raw_data);
+
+            if delta.len() < winner_len {
+                winner_base = Some(base_id.clone());
+                winner = delta;
+                winner_len = winner.len();
+            }
+        }
+
+        // Create delta chunks list
+        let delta_chunks = PyList::empty(py);
+        delta_chunks.append(PyBytes::new(py, &winner))?;
+
+        // Import and create Python UnpackedObject
+        let pack_module = py.import("dulwich.pack")?;
+        let unpacked_class = pack_module.getattr("UnpackedObject")?;
+
+        // Create UnpackedObject instance
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("sha", PyBytes::new(py, &obj_data.sha))?;
+        if let Some(base) = winner_base {
+            kwargs.set_item("delta_base", PyBytes::new(py, &base))?;
+        } else {
+            kwargs.set_item("delta_base", py.None())?;
+        }
+        kwargs.set_item("decomp_len", winner_len)?;
+        kwargs.set_item("decomp_chunks", delta_chunks)?;
+
+        let unpacked = unpacked_class.call((obj_data.type_num,), Some(&kwargs))?;
+        results.append(unpacked)?;
+
+        // Add this object as a potential base for future objects
+        possible_bases.push_front((
+            obj_data.sha.clone(),
+            obj_data.type_num,
+            obj_data.raw_data.clone(),
+        ));
+
+        // Maintain window size
+        while possible_bases.len() > window_size {
+            possible_bases.pop_back();
+        }
+    }
+
+    // Return iterator over results
+    let iter_fn = py.import("builtins")?.getattr("iter")?;
+    Ok(iter_fn.call1((results,))?.into())
+}
+
 #[pymodule]
 fn _pack(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bisect_find_sha, m)?)?;
     m.add_function(wrap_pyfunction!(apply_delta, m)?)?;
     m.add_function(wrap_pyfunction!(create_delta, m)?)?;
+    m.add_function(wrap_pyfunction!(deltify_pack_objects, m)?)?;
     Ok(())
 }

@@ -2305,7 +2305,7 @@ def deltas_from_sorted_objects_multi_threaded(
 # - deltas_from_sorted_objects_no_deltas: Fastest, no compression
 # - deltas_from_sorted_objects_single_threaded: Slowest, most memory efficient
 # - deltas_from_sorted_objects_multi_threaded: Recommended, adaptive threading
-deltas_from_sorted_objects = deltas_from_sorted_objects_multi_threaded
+deltas_from_sorted_objects = deltas_from_sorted_objects_single_threaded
 
 
 def pack_objects_to_data(
@@ -3319,5 +3319,10 @@ try:
         bisect_find_sha,  # type: ignore
         create_delta,  # type: ignore
     )
+    from dulwich._pack import (
+        deltify_pack_objects as deltify_pack_objects_rs,  # type: ignore
+    )
 except ImportError:
-    pass
+    deltify_pack_objects_rs = None
+else:
+    deltify_pack_objects = deltify_pack_objects_rs

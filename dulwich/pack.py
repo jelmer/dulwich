@@ -2072,29 +2072,29 @@ def deltify_pack_objects(
     )
 
 
-def compute_name_hash(path: str) -> int:
+def compute_name_hash(path: bytes) -> int:
     """Compute Git-style name hash for better delta candidate grouping.
-    
+
     This mirrors C Git's name_hash() function behavior.
     """
     if not path:
         return 0
-    
+
     # Extract filename and extension for hashing
-    filename = path.split('/')[-1]
-    
+    filename = path.split(b"/")[-1]
+
     # Create hash input prioritizing extension and filename
-    if '.' in filename:
-        name, ext = filename.rsplit('.', 1)
-        hash_input = f"{ext}:{name}"  # ext:name format
+    if b"." in filename:
+        name, ext = filename.rsplit(b".", 1)
+        hash_input = ext + b":" + name  # ext:name format
     else:
         hash_input = filename
-    
+
     # Simple hash function similar to C Git's approach
     hash_val = 0
-    for byte in hash_input.encode():
+    for byte in hash_input:
         hash_val = (hash_val * 33 + byte) & 0xFFFFFFFF
-    
+
     return hash_val
 
 
@@ -2116,12 +2116,12 @@ def sort_objects_for_delta(
             obj = entry
             sort_type_num = obj.type_num
             path = None
-        
+
         # Compute name hash for Git-style sorting
         name_hash = compute_name_hash(path) if path else 0
-        
+
         magic.append((sort_type_num, name_hash, -obj.raw_length(), obj))
-    
+
     # Build a list of objects ordered by Git's heuristic: type_num, name_hash, size (descending)
     # This helps us find good objects to diff against us
     magic.sort()
@@ -2169,15 +2169,19 @@ def deltas_from_sorted_objects_single_threaded(
     if objects_list:
         total_size = sum(o.raw_length() for o in objects_list[:100])
         avg_size = total_size // min(100, len(objects_list))
-        memory_based_window = MAX_WINDOW_MEMORY // avg_size if avg_size > 0 else window_size
-        effective_window_size = min(memory_based_window, MAX_PACK_DELTA_WINDOW_SIZE, window_size * 2)
+        memory_based_window = (
+            MAX_WINDOW_MEMORY // avg_size if avg_size > 0 else window_size
+        )
+        effective_window_size = min(
+            memory_based_window, MAX_PACK_DELTA_WINDOW_SIZE, window_size * 2
+        )
         effective_window_size = max(effective_window_size, window_size)
     else:
         effective_window_size = window_size
 
     possible_bases: deque[tuple[bytes, int, list[bytes], int]] = deque()  # Added depth
     current_window_memory = 0
-    
+
     for i, o in enumerate(objects_list):
         if progress is not None and i % 1000 == 0:
             progress((f"generating deltas: {i}\r").encode())
@@ -2186,15 +2190,15 @@ def deltas_from_sorted_objects_single_threaded(
         winner_len = sum(map(len, winner))
         winner_base = None
         winner_depth = 0
-        
+
         for base_id, base_type_num, base, base_depth in possible_bases:
             if base_type_num != o.type_num:
                 continue
-            
+
             # Skip if using this base would exceed maximum delta depth
             if base_depth >= MAX_DELTA_DEPTH:
                 continue
-                
+
             delta_len = 0
             delta = []
             for chunk in create_delta(base, raw):
@@ -2214,15 +2218,17 @@ def deltas_from_sorted_objects_single_threaded(
             decomp_len=winner_len,
             decomp_chunks=winner,
         )
-        
+
         # Add to window with memory tracking
         obj_size = sum(len(chunk) for chunk in raw)
         possible_bases.appendleft((o.sha().digest(), o.type_num, raw, winner_depth))
         current_window_memory += obj_size
-        
+
         # Maintain window size and memory constraints
-        while (len(possible_bases) > effective_window_size 
-               or current_window_memory > MAX_WINDOW_MEMORY):
+        while (
+            len(possible_bases) > effective_window_size
+            or current_window_memory > MAX_WINDOW_MEMORY
+        ):
             if possible_bases:
                 removed_base = possible_bases.pop()
                 removed_size = sum(len(chunk) for chunk in removed_base[2])

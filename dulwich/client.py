@@ -1699,7 +1699,7 @@ class SubprocessGitClient(TraditionalGitClient):
     def from_parsedurl(cls, parsedurl, **kwargs):
         return cls(**kwargs)
 
-    git_command = None
+    git_command: Optional[str] = None
 
     def _connect(
         self,

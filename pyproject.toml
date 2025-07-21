@@ -44,7 +44,7 @@ paramiko = ["paramiko"]
 colordiff = ["rich"]
 dev = [
     "ruff==0.12.3",
-    "mypy==1.16.1",
+    "mypy==1.17.0",
     "dissolve>=0.1.1"
 ]
 merge = ["merge3"]

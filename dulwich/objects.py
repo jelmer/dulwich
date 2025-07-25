@@ -1313,6 +1313,10 @@ class Tree(ShaFile):
           path: Path to lookup
         Returns: A tuple of (mode, SHA) of the resulting path.
         """
+        # Handle empty path - return the tree itself
+        if not path:
+            return stat.S_IFDIR, self.id
+
         parts = path.split(b"/")
         sha = self.id
         mode: Optional[int] = None

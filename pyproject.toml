@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Operating System :: POSIX",
@@ -132,4 +133,5 @@ skip = """\
     cp311-macosx_x86_64 cp311-macosx_universal2 \
     cp312-macosx_x86_64 cp312-macosx_universal2 \
     cp313-macosx_x86_64 cp313-macosx_universal2 \
+    cp314-macosx_x86_64 cp314-macosx_universal2 \
     """

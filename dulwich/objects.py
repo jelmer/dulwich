@@ -44,9 +44,9 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-try:
+if sys.version_info >= (3, 10):
     from typing import TypeGuard  # type: ignore
-except ImportError:
+else:
     from typing_extensions import TypeGuard
 
 from . import replace_me

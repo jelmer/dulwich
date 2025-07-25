@@ -44,9 +44,9 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-try:
+if sys.version_info >= (3, 10):
     from typing import TypeGuard  # type: ignore
-except ImportError:
+else:
     from typing_extensions import TypeGuard
 
 from . import replace_me
@@ -1313,6 +1313,10 @@ class Tree(ShaFile):
           path: Path to lookup
         Returns: A tuple of (mode, SHA) of the resulting path.
         """
+        # Handle empty path - return the tree itself
+        if not path:
+            return stat.S_IFDIR, self.id
+
         parts = path.split(b"/")
         sha = self.id
         mode: Optional[int] = None

@@ -826,6 +826,12 @@ class TreeLookupPathTests(TestCase):
             b"ad/b/j",
         )
 
+    def test_lookup_empty_path(self) -> None:
+        # Empty path should return the tree itself
+        mode, sha = tree_lookup_path(self.get_object, self.tree_id, b"")
+        self.assertEqual(sha, self.tree_id)
+        self.assertEqual(mode, stat.S_IFDIR)
+
 
 class ObjectStoreGraphWalkerTests(TestCase):
     def get_walker(self, heads, parent_map):

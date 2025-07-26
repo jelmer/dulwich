@@ -1096,10 +1096,67 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
             # Verify unquoted paths contain the expected files
             expected_unquoted = {"тест.txt", "файл.测试", "mixed_тест.log"}
             self.assertEqual(unquoted_ignored, expected_unquoted)
-
         except (UnicodeEncodeError, OSError):
             # Skip test if filesystem doesn't support unicode
             self.skipTest("Filesystem doesn't support unicode filenames")
+
+    def test_parent_exclusion_wildcard_directories(self) -> None:
+        """Test parent directory exclusion with wildcard patterns (issue #1721)."""
+        self._write_gitignore("*/build/\n!*/build/important.txt\n")
+        self._create_dir("src/build")
+        self._create_dir("test/build")
+        self._create_file("src/build/important.txt")
+        self._create_file("test/build/important.txt")
+        self._create_file("src/build/other.txt")
+
+        paths = [
+            "src/build/",
+            "src/build/important.txt",
+            "src/build/other.txt",
+            "test/build/",
+            "test/build/important.txt",
+        ]
+        self._assert_ignore_match(paths)
+
+    def test_parent_exclusion_double_asterisk(self) -> None:
+        """Test parent directory exclusion with ** patterns."""
+        self._write_gitignore("**/node_modules/\n!**/node_modules/keep.txt\n")
+        self._create_dir("node_modules")
+        self._create_dir("src/node_modules")
+        self._create_dir("deep/nested/node_modules")
+        self._create_file("node_modules/keep.txt")
+        self._create_file("src/node_modules/keep.txt")
+        self._create_file("deep/nested/node_modules/keep.txt")
+
+        paths = [
+            "node_modules/",
+            "node_modules/keep.txt",
+            "src/node_modules/",
+            "src/node_modules/keep.txt",
+            "deep/nested/node_modules/",
+            "deep/nested/node_modules/keep.txt",
+        ]
+        self._assert_ignore_match(paths)
+
+    def test_glob_pattern_base_directory(self) -> None:
+        """Test that dir/** doesn't match dir/ itself."""
+        self._write_gitignore("logs/**\n!logs/important.log\n!logs/keep/\n")
+        self._create_dir("logs")
+        self._create_dir("logs/keep")
+        self._create_dir("logs/subdir")
+        self._create_file("logs/important.log")
+        self._create_file("logs/other.log")
+        self._create_file("logs/subdir/file.txt")
+
+        paths = [
+            "logs/",
+            "logs/important.log",
+            "logs/other.log",
+            "logs/keep/",
+            "logs/subdir/",
+            "logs/subdir/file.txt",
+        ]
+        self._assert_ignore_match(paths)
 
     def _git_check_ignore_quoted(self, paths: list[str]) -> set[str]:
         """Run git check-ignore with default quoting and return set of ignored paths."""

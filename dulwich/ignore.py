@@ -40,12 +40,11 @@ from .config import Config, get_xdg_config_home_path
 
 def _pattern_to_str(pattern: Union["Pattern", bytes, str]) -> str:
     """Convert a pattern to string, handling both Pattern objects and raw patterns."""
-    if hasattr(pattern, "pattern"):
-        pattern_bytes = pattern.pattern
+    if isinstance(pattern, Pattern):
+        pattern_data: Union[bytes, str] = pattern.pattern
     else:
-        pattern_bytes = pattern
-
-    return pattern_bytes.decode() if isinstance(pattern_bytes, bytes) else pattern_bytes
+        pattern_data = pattern
+    return pattern_data.decode() if isinstance(pattern_data, bytes) else pattern_data
 
 
 def _check_parent_exclusion(path: str, matching_patterns: list) -> bool:
@@ -58,55 +57,65 @@ def _check_parent_exclusion(path: str, matching_patterns: list) -> bool:
     Returns:
         True if parent exclusion applies (negation should be ineffective), False otherwise
     """
-    # Find the final negation pattern that would include this file
-    final_negation_pattern = None
-    for pattern in reversed(matching_patterns):
-        if not pattern.is_exclude:  # is_exclude=False means negation/inclusion
-            final_negation_pattern = pattern
-            break
+    # Find the last negation pattern
+    final_negation = next(
+        (p for p in reversed(matching_patterns) if not p.is_exclude), None
+    )
+    if not final_negation:
+        return False
 
-    if not final_negation_pattern:
-        return False  # No negation to check
+    final_pattern_str = _pattern_to_str(final_negation)
 
-    final_pattern_str = _pattern_to_str(final_negation_pattern)
-
-    # Check each exclusion pattern to see if it excludes a parent directory
-    for pattern in matching_patterns:
-        if not pattern.is_exclude:  # Skip negations
-            continue
-
-        pattern_str = _pattern_to_str(pattern)
-
-        if _pattern_excludes_parent(pattern_str, path, final_pattern_str):
-            return True
-
-    return False  # No parent exclusion applies
+    # Check if any exclusion pattern excludes a parent directory
+    return any(
+        pattern.is_exclude
+        and _pattern_excludes_parent(_pattern_to_str(pattern), path, final_pattern_str)
+        for pattern in matching_patterns
+    )
 
 
 def _pattern_excludes_parent(
     pattern_str: str, path: str, final_pattern_str: str
 ) -> bool:
     """Check if a pattern excludes a parent directory of the given path."""
-    # Case 1: Direct directory exclusion (pattern ending with /)
-    if pattern_str.endswith("/"):
-        excluded_dir = pattern_str[:-1]  # Remove trailing /
-        return "/" in path and path.startswith(excluded_dir + "/")
-
-    # Case 2: Recursive exclusion patterns (**/dir/**)
+    # Handle **/middle/** patterns
     if pattern_str.startswith("**/") and pattern_str.endswith("/**"):
-        dir_name = pattern_str[3:-3]  # Remove **/ and /**
-        return dir_name != "" and ("/" + dir_name + "/") in ("/" + path)
+        middle = pattern_str[3:-3]
+        return f"/{middle}/" in f"/{path}" or path.startswith(f"{middle}/")
 
-    # Case 3: Directory glob patterns (dir/**)
+    # Handle dir/** patterns
     if pattern_str.endswith("/**") and not pattern_str.startswith("**/"):
-        dir_prefix = pattern_str[:-3]  # Remove /**
-        if path.startswith(dir_prefix + "/"):
-            # Check if this is a nested path (more than one level under dir_prefix)
-            remaining_path = path[len(dir_prefix + "/") :]
-            if "/" in remaining_path:
-                # This is a nested path - parent directory exclusion applies
-                # BUT only for directory negations, not file negations
-                return final_pattern_str.endswith("/")
+        base_dir = pattern_str[:-3]
+        if not path.startswith(base_dir + "/"):
+            return False
+
+        remaining = path[len(base_dir) + 1 :]
+
+        # Special case: dir/** allows immediate child file negations
+        if (
+            not path.endswith("/")
+            and final_pattern_str.startswith("!")
+            and "/" not in remaining
+        ):
+            neg_pattern = final_pattern_str[1:]
+            if neg_pattern == path or ("*" in neg_pattern and "**" not in neg_pattern):
+                return False
+
+        # Nested files with ** negation patterns
+        if "**" in final_pattern_str and Pattern(final_pattern_str[1:].encode()).match(
+            path.encode()
+        ):
+            return False
+
+        return True
+
+    # Directory patterns (ending with /) can exclude parent directories
+    if pattern_str.endswith("/") and "/" in path:
+        p = Pattern(pattern_str.encode())
+        parts = path.split("/")
+        return any(
+            p.match(("/".join(parts[:i]) + "/").encode()) for i in range(1, len(parts))
+        )
 
     return False
 
@@ -347,17 +356,22 @@ class Pattern:
           path: Path to match (relative to ignore location)
         Returns: boolean
         """
+        # For negation directory patterns (e.g., !dir/), only match directories
+        if self.is_directory_only and not self.is_exclude and not path.endswith(b"/"):
+            return False
+
+        # Check if the regex matches
         if self._re.match(path):
             return True
 
-        # Special handling for directory patterns that exclude files under them
-        if self.is_directory_only and self.is_exclude:
-            # For exclusion directory patterns, also match files under the directory
-            if not path.endswith(b"/"):
-                # This is a file - check if it's under any directory that matches the pattern
-                path_dir = path.rsplit(b"/", 1)[0] + b"/"
-                if len(path.split(b"/")) > 1 and self._re.match(path_dir):
-                    return True
+        # For exclusion directory patterns, also match files under the directory
+        if (
+            self.is_directory_only
+            and self.is_exclude
+            and not path.endswith(b"/")
+            and b"/" in path
+        ):
+            return bool(self._re.match(path.rsplit(b"/", 1)[0] + b"/"))
 
         return False
 
@@ -462,12 +476,11 @@ class IgnoreFilterStack:
           None if the file is not mentioned, True if it is included,
           False if it is explicitly excluded.
         """
-        status = None
         for filter in self._filters:
             status = filter.is_ignored(path)
             if status is not None:
                 return status
-        return status
+        return None
 
 
 def default_user_ignore_filter_path(config: Config) -> str:
@@ -592,7 +605,7 @@ class IgnoreFilterManager:
         patterns for its subdirectories, then the directory itself should not
         be ignored (to allow traversal).
         """
-        # Get the last pattern that determined the result
+        # Original logic for traversal check
         last_excluding_pattern = None
         for match in matches:
             if match.is_exclude:

@@ -22,14 +22,25 @@
 """Tests for dulwich.worktree."""
 
 import os
+import shutil
 import stat
 import tempfile
 from unittest import skipIf
 
 from dulwich import porcelain
+from dulwich.errors import CommitError
 from dulwich.object_store import tree_lookup_path
 from dulwich.repo import Repo
-from dulwich.worktree import WorkTree
+from dulwich.worktree import (
+    WorkTree,
+    add_worktree,
+    list_worktrees,
+    lock_worktree,
+    move_worktree,
+    prune_worktrees,
+    remove_worktree,
+    unlock_worktree,
+)
 
 from . import TestCase
 
@@ -39,8 +50,9 @@ class WorkTreeTestCase(TestCase):
 
     def setUp(self):
         super().setUp()
-        self.test_dir = tempfile.mkdtemp()
-        self.repo = Repo.init(self.test_dir)
+        self.tempdir = tempfile.mkdtemp()
+        self.test_dir = os.path.join(self.tempdir, "main")
+        self.repo = Repo.init(self.test_dir, mkdir=True)
 
         # Create initial commit with a file
         with open(os.path.join(self.test_dir, "a"), "wb") as f:
@@ -60,6 +72,11 @@ class WorkTreeTestCase(TestCase):
     def tearDown(self):
         self.repo.close()
         super().tearDown()
+
+    def write_file(self, filename, content):
+        """Helper to write a file in the repo."""
+        with open(os.path.join(self.test_dir, filename), "wb") as f:
+            f.write(content)
 
 
 class WorkTreeInitTests(TestCase):
@@ -408,3 +425,289 @@ class WorkTreeBackwardCompatibilityTests(WorkTreeTestCase):
             self.repo.set_sparse_checkout_patterns(["*.py"])
             self.assertTrue(len(w) > 0)
             self.assertTrue(issubclass(w[0].category, DeprecationWarning))
+
+    def test_pre_commit_hook_fail(self):
+        """Test that failing pre-commit hook raises CommitError."""
+        if os.name != "posix":
+            self.skipTest("shell hook tests requires POSIX shell")
+
+        # Create a failing pre-commit hook
+        hooks_dir = os.path.join(self.repo.controldir(), "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        hook_path = os.path.join(hooks_dir, "pre-commit")
+
+        with open(hook_path, "w") as f:
+            f.write("#!/bin/sh\nexit 1\n")
+        os.chmod(hook_path, 0o755)
+
+        # Try to commit
+        worktree = self.repo.get_worktree()
+        with self.assertRaises(CommitError):
+            worktree.commit(b"No message")
+
+    def write_file(self, filename, content):
+        """Helper to write a file in the repo."""
+        with open(os.path.join(self.test_dir, filename), "wb") as f:
+            f.write(content)
+
+
+class WorkTreeOperationsTests(WorkTreeTestCase):
+    """Tests for worktree operations like add, list, remove."""
+
+    def test_list_worktrees_single(self) -> None:
+        """Test listing worktrees when only main worktree exists."""
+        worktrees = list_worktrees(self.repo)
+        self.assertEqual(len(worktrees), 1)
+        self.assertEqual(worktrees[0].path, self.repo.path)
+        self.assertEqual(worktrees[0].bare, False)
+        self.assertIsNotNone(worktrees[0].head)
+        self.assertIsNotNone(worktrees[0].branch)
+
+    def test_add_worktree_new_branch(self) -> None:
+        """Test adding a worktree with a new branch."""
+        # Create a commit first
+        worktree = self.repo.get_worktree()
+        self.write_file("test.txt", b"test content")
+        worktree.stage(["test.txt"])
+        commit_id = worktree.commit(message=b"Initial commit")
+
+        # Add a new worktree
+        wt_path = os.path.join(self.tempdir, "new-worktree")
+        add_worktree(self.repo, wt_path, branch=b"feature-branch")
+
+        # Verify worktree was created
+        self.assertTrue(os.path.exists(wt_path))
+        self.assertTrue(os.path.exists(os.path.join(wt_path, ".git")))
+
+        # Verify it appears in the list
+        worktrees = list_worktrees(self.repo)
+        self.assertEqual(len(worktrees), 2)
+
+        # Find the new worktree in the list
+        new_wt = None
+        for wt in worktrees:
+            if wt.path == wt_path:
+                new_wt = wt
+                break
+
+        self.assertIsNotNone(new_wt)
+        self.assertEqual(new_wt.branch, b"refs/heads/feature-branch")
+        self.assertEqual(new_wt.head, commit_id)
+        self.assertFalse(new_wt.detached)
+
+    def test_add_worktree_detached(self) -> None:
+        """Test adding a worktree with detached HEAD."""
+        # Create a commit
+        worktree = self.repo.get_worktree()
+        self.write_file("test.txt", b"test content")
+        worktree.stage(["test.txt"])
+        commit_id = worktree.commit(message=b"Initial commit")
+
+        # Add a detached worktree
+        wt_path = os.path.join(self.tempdir, "detached-worktree")
+        add_worktree(self.repo, wt_path, commit=commit_id, detach=True)
+
+        # Verify it's detached
+        worktrees = list_worktrees(self.repo)
+        self.assertEqual(len(worktrees), 2)
+
+        for wt in worktrees:
+            if wt.path == wt_path:
+                self.assertTrue(wt.detached)
+                self.assertIsNone(wt.branch)
+                self.assertEqual(wt.head, commit_id)
+
+    def test_add_worktree_existing_path(self) -> None:
+        """Test that adding a worktree to existing path fails."""
+        wt_path = os.path.join(self.tempdir, "existing")
+        os.mkdir(wt_path)
+
+        with self.assertRaises(ValueError) as cm:
+            add_worktree(self.repo, wt_path)
+        self.assertIn("Path already exists", str(cm.exception))
+
+    def test_add_worktree_branch_already_checked_out(self) -> None:
+        """Test that checking out same branch in multiple worktrees fails."""
+        # Create initial commit
+        worktree = self.repo.get_worktree()
+        self.write_file("test.txt", b"test content")
+        worktree.stage(["test.txt"])
+        worktree.commit(message=b"Initial commit")
+
+        # First worktree should succeed with a new branch
+        wt_path1 = os.path.join(self.tempdir, "wt1")
+        add_worktree(self.repo, wt_path1, branch=b"feature")
+
+        # Second worktree with same branch should fail
+        wt_path2 = os.path.join(self.tempdir, "wt2")
+        with self.assertRaises(ValueError) as cm:
+            add_worktree(self.repo, wt_path2, branch=b"feature")
+        self.assertIn("already checked out", str(cm.exception))
+
+        # But should work with force=True
+        add_worktree(self.repo, wt_path2, branch=b"feature", force=True)
+
+    def test_remove_worktree(self) -> None:
+        """Test removing a worktree."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "to-remove")
+        add_worktree(self.repo, wt_path)
+
+        # Verify it exists
+        self.assertTrue(os.path.exists(wt_path))
+        self.assertEqual(len(list_worktrees(self.repo)), 2)
+
+        # Remove it
+        remove_worktree(self.repo, wt_path)
+
+        # Verify it's gone
+        self.assertFalse(os.path.exists(wt_path))
+        self.assertEqual(len(list_worktrees(self.repo)), 1)
+
+    def test_remove_main_worktree_fails(self) -> None:
+        """Test that removing the main worktree fails."""
+        with self.assertRaises(ValueError) as cm:
+            remove_worktree(self.repo, self.repo.path)
+        self.assertIn("Cannot remove the main working tree", str(cm.exception))
+
+    def test_remove_nonexistent_worktree(self) -> None:
+        """Test that removing non-existent worktree fails."""
+        with self.assertRaises(ValueError) as cm:
+            remove_worktree(self.repo, "/nonexistent/path")
+        self.assertIn("Worktree not found", str(cm.exception))
+
+    def test_lock_unlock_worktree(self) -> None:
+        """Test locking and unlocking a worktree."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "lockable")
+        add_worktree(self.repo, wt_path)
+
+        # Lock it
+        lock_worktree(self.repo, wt_path, reason="Testing lock")
+
+        # Verify it's locked
+        worktrees = list_worktrees(self.repo)
+        for wt in worktrees:
+            if wt.path == wt_path:
+                self.assertTrue(wt.locked)
+
+        # Try to remove locked worktree (should fail)
+        with self.assertRaises(ValueError) as cm:
+            remove_worktree(self.repo, wt_path)
+        self.assertIn("locked", str(cm.exception))
+
+        # Unlock it
+        unlock_worktree(self.repo, wt_path)
+
+        # Verify it's unlocked
+        worktrees = list_worktrees(self.repo)
+        for wt in worktrees:
+            if wt.path == wt_path:
+                self.assertFalse(wt.locked)
+
+        # Now removal should work
+        remove_worktree(self.repo, wt_path)
+
+    def test_prune_worktrees(self) -> None:
+        """Test pruning worktrees."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "to-prune")
+        add_worktree(self.repo, wt_path)
+
+        # Manually remove the worktree directory
+        shutil.rmtree(wt_path)
+
+        # Verify it still shows up as prunable
+        worktrees = list_worktrees(self.repo)
+        prunable_count = sum(1 for wt in worktrees if wt.prunable)
+        self.assertEqual(prunable_count, 1)
+
+        # Prune it
+        pruned = prune_worktrees(self.repo)
+        self.assertEqual(len(pruned), 1)
+
+        # Verify it's gone from the list
+        worktrees = list_worktrees(self.repo)
+        self.assertEqual(len(worktrees), 1)
+
+    def test_prune_dry_run(self) -> None:
+        """Test prune with dry_run doesn't remove anything."""
+        # Create and manually remove a worktree
+        wt_path = os.path.join(self.tempdir, "dry-run-test")
+        add_worktree(self.repo, wt_path)
+        shutil.rmtree(wt_path)
+
+        # Dry run should report but not remove
+        pruned = prune_worktrees(self.repo, dry_run=True)
+        self.assertEqual(len(pruned), 1)
+
+        # Worktree should still be in list
+        worktrees = list_worktrees(self.repo)
+        self.assertEqual(len(worktrees), 2)
+
+    def test_prune_locked_worktree_not_pruned(self) -> None:
+        """Test that locked worktrees are not pruned."""
+        # Create and lock a worktree
+        wt_path = os.path.join(self.tempdir, "locked-prune")
+        add_worktree(self.repo, wt_path)
+        lock_worktree(self.repo, wt_path)
+
+        # Remove the directory
+        shutil.rmtree(wt_path)
+
+        # Prune should not remove locked worktree
+        pruned = prune_worktrees(self.repo)
+        self.assertEqual(len(pruned), 0)
+
+        # Worktree should still be in list
+        worktrees = list_worktrees(self.repo)
+        self.assertEqual(len(worktrees), 2)
+
+    def test_move_worktree(self) -> None:
+        """Test moving a worktree."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "to-move")
+        add_worktree(self.repo, wt_path)
+
+        # Create a file in the worktree
+        test_file = os.path.join(wt_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+
+        # Move it
+        new_path = os.path.join(self.tempdir, "moved")
+        move_worktree(self.repo, wt_path, new_path)
+
+        # Verify old path doesn't exist
+        self.assertFalse(os.path.exists(wt_path))
+
+        # Verify new path exists with contents
+        self.assertTrue(os.path.exists(new_path))
+        self.assertTrue(os.path.exists(os.path.join(new_path, "test.txt")))
+
+        # Verify it's in the list at new location
+        worktrees = list_worktrees(self.repo)
+        paths = [wt.path for wt in worktrees]
+        self.assertIn(new_path, paths)
+        self.assertNotIn(wt_path, paths)
+
+    def test_move_main_worktree_fails(self) -> None:
+        """Test that moving the main worktree fails."""
+        new_path = os.path.join(self.tempdir, "new-main")
+        with self.assertRaises(ValueError) as cm:
+            move_worktree(self.repo, self.repo.path, new_path)
+        self.assertIn("Cannot move the main working tree", str(cm.exception))
+
+    def test_move_to_existing_path_fails(self) -> None:
+        """Test that moving to an existing path fails."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "worktree")
+        add_worktree(self.repo, wt_path)
+
+        # Create target directory
+        new_path = os.path.join(self.tempdir, "existing")
+        os.makedirs(new_path)
+
+        with self.assertRaises(ValueError) as cm:
+            move_worktree(self.repo, wt_path, new_path)
+        self.assertIn("Path already exists", str(cm.exception))

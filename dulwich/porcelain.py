@@ -65,6 +65,7 @@ Currently implemented:
  * write_commit_graph
  * status
  * symbolic_ref
+ * worktree{_add,_list,_remove,_prune,_lock,_unlock,_move}
 
 These functions are meant to behave similarly to the git subcommands.
 Differences in behaviour are considered bugs.
@@ -5698,3 +5699,130 @@ def lfs_status(repo="."):
         # TODO: Check for not committed and not pushed files
 
         return status
+
+
+def worktree_list(repo="."):
+    """List all worktrees for a repository.
+
+    Args:
+        repo: Path to repository
+
+    Returns:
+        List of WorkTreeInfo objects
+    """
+    from .worktree import list_worktrees
+
+    with open_repo_closing(repo) as r:
+        return list_worktrees(r)
+
+
+def worktree_add(
+    repo=".", path=None, branch=None, commit=None, detach=False, force=False
+):
+    """Add a new worktree.
+
+    Args:
+        repo: Path to repository
+        path: Path for new worktree
+        branch: Branch to checkout (creates if doesn't exist)
+        commit: Specific commit to checkout
+        detach: Create with detached HEAD
+        force: Force creation even if branch is already checked out
+
+    Returns:
+        Path to the newly created worktree
+    """
+    from .worktree import add_worktree
+
+    if path is None:
+        raise ValueError("Path is required for worktree add")
+
+    with open_repo_closing(repo) as r:
+        wt_repo = add_worktree(
+            r, path, branch=branch, commit=commit, detach=detach, force=force
+        )
+        return wt_repo.path
+
+
+def worktree_remove(repo=".", path=None, force=False):
+    """Remove a worktree.
+
+    Args:
+        repo: Path to repository
+        path: Path to worktree to remove
+        force: Force removal even if there are local changes
+    """
+    from .worktree import remove_worktree
+
+    if path is None:
+        raise ValueError("Path is required for worktree remove")
+
+    with open_repo_closing(repo) as r:
+        remove_worktree(r, path, force=force)
+
+
+def worktree_prune(repo=".", dry_run=False, expire=None):
+    """Prune worktree administrative files.
+
+    Args:
+        repo: Path to repository
+        dry_run: Only show what would be removed
+        expire: Only prune worktrees older than this many seconds
+
+    Returns:
+        List of pruned worktree names
+    """
+    from .worktree import prune_worktrees
+
+    with open_repo_closing(repo) as r:
+        return prune_worktrees(r, expire=expire, dry_run=dry_run)
+
+
+def worktree_lock(repo=".", path=None, reason=None):
+    """Lock a worktree to prevent it from being pruned.
+
+    Args:
+        repo: Path to repository
+        path: Path to worktree to lock
+        reason: Optional reason for locking
+    """
+    from .worktree import lock_worktree
+
+    if path is None:
+        raise ValueError("Path is required for worktree lock")
+
+    with open_repo_closing(repo) as r:
+        lock_worktree(r, path, reason=reason)
+
+
+def worktree_unlock(repo=".", path=None):
+    """Unlock a worktree.
+
+    Args:
+        repo: Path to repository
+        path: Path to worktree to unlock
+    """
+    from .worktree import unlock_worktree
+
+    if path is None:
+        raise ValueError("Path is required for worktree unlock")
+
+    with open_repo_closing(repo) as r:
+        unlock_worktree(r, path)
+
+
+def worktree_move(repo=".", old_path=None, new_path=None):
+    """Move a worktree to a new location.
+
+    Args:
+        repo: Path to repository
+        old_path: Current path of worktree
+        new_path: New path for worktree
+    """
+    from .worktree import move_worktree
+
+    if old_path is None or new_path is None:
+        raise ValueError("Both old_path and new_path are required for worktree move")
+
+    with open_repo_closing(repo) as r:
+        move_worktree(r, old_path, new_path)

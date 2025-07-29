@@ -2322,5 +2322,134 @@ class GetPagerTest(TestCase):
                 self.assertTrue(hasattr(pager, "flush"))
 
 
+class WorktreeCliTests(DulwichCliTestCase):
+    """Tests for worktree CLI commands."""
+
+    def setUp(self):
+        super().setUp()
+        # Base class already creates and initializes the repo
+        # Just create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        from dulwich import porcelain
+
+        porcelain.add(self.repo_path, ["test.txt"])
+        porcelain.commit(self.repo_path, message=b"Initial commit")
+
+    def test_worktree_list(self):
+        """Test worktree list command."""
+        io.StringIO()
+        cmd = cli.cmd_worktree()
+        result = cmd.run(["list"])
+
+        # Should list the main worktree
+        self.assertEqual(result, 0)
+
+    def test_worktree_add(self):
+        """Test worktree add command."""
+        wt_path = os.path.join(self.test_dir, "worktree1")
+
+        # Change to repo directory like real usage
+        old_cwd = os.getcwd()
+        os.chdir(self.repo_path)
+        try:
+            cmd = cli.cmd_worktree()
+            with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                result = cmd.run(["add", wt_path, "feature"])
+
+            self.assertEqual(result, 0)
+            self.assertTrue(os.path.exists(wt_path))
+            self.assertIn("Worktree added:", mock_stdout.getvalue())
+        finally:
+            os.chdir(old_cwd)
+
+    def test_worktree_add_detached(self):
+        """Test worktree add with detached HEAD."""
+        wt_path = os.path.join(self.test_dir, "detached-wt")
+
+        cmd = cli.cmd_worktree()
+        with patch("sys.stdout", new_callable=io.StringIO):
+            result = cmd.run(["add", "--detach", wt_path])
+
+        self.assertEqual(result, 0)
+        self.assertTrue(os.path.exists(wt_path))
+
+    def test_worktree_remove(self):
+        """Test worktree remove command."""
+        # First add a worktree
+        wt_path = os.path.join(self.test_dir, "to-remove")
+        cmd = cli.cmd_worktree()
+        cmd.run(["add", wt_path])
+
+        # Then remove it
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = cmd.run(["remove", wt_path])
+
+        self.assertEqual(result, 0)
+        self.assertFalse(os.path.exists(wt_path))
+        self.assertIn("Worktree removed:", mock_stdout.getvalue())
+
+    def test_worktree_prune(self):
+        """Test worktree prune command."""
+        # Add a worktree and manually remove it
+        wt_path = os.path.join(self.test_dir, "to-prune")
+        cmd = cli.cmd_worktree()
+        cmd.run(["add", wt_path])
+        shutil.rmtree(wt_path)
+
+        # Prune
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = cmd.run(["prune", "-v"])
+
+        self.assertEqual(result, 0)
+        output = mock_stdout.getvalue()
+        self.assertIn("to-prune", output)
+
+    def test_worktree_lock_unlock(self):
+        """Test worktree lock and unlock commands."""
+        # Add a worktree
+        wt_path = os.path.join(self.test_dir, "lockable")
+        cmd = cli.cmd_worktree()
+        cmd.run(["add", wt_path])
+
+        # Lock it
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = cmd.run(["lock", wt_path, "--reason", "Testing"])
+
+        self.assertEqual(result, 0)
+        self.assertIn("Worktree locked:", mock_stdout.getvalue())
+
+        # Unlock it
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = cmd.run(["unlock", wt_path])
+
+        self.assertEqual(result, 0)
+        self.assertIn("Worktree unlocked:", mock_stdout.getvalue())
+
+    def test_worktree_move(self):
+        """Test worktree move command."""
+        # Add a worktree
+        old_path = os.path.join(self.test_dir, "old-location")
+        new_path = os.path.join(self.test_dir, "new-location")
+        cmd = cli.cmd_worktree()
+        cmd.run(["add", old_path])
+
+        # Move it
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = cmd.run(["move", old_path, new_path])
+
+        self.assertEqual(result, 0)
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(new_path))
+        self.assertIn("Worktree moved:", mock_stdout.getvalue())
+
+    def test_worktree_invalid_command(self):
+        """Test invalid worktree subcommand."""
+        cmd = cli.cmd_worktree()
+        with patch("sys.stderr", new_callable=io.StringIO):
+            with self.assertRaises(SystemExit):
+                cmd.run(["invalid"])
+
+
 if __name__ == "__main__":
     unittest.main()

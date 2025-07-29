@@ -1173,6 +1173,11 @@ class Repo(BaseRepo):
             self.commondir(), self._controldir, logger=self._write_reflog
         )
 
+        # Initialize worktrees container
+        from .worktree import WorkTreeContainer
+
+        self.worktrees = WorkTreeContainer(self)
+
         config = self.get_config()
         try:
             repository_format_version = config.get("core", "repositoryformatversion")
@@ -1208,6 +1213,8 @@ class Repo(BaseRepo):
             from .reftable import ReftableRefsContainer
 
             self.refs = ReftableRefsContainer(self.commondir())
+            # Update worktrees container after refs change
+            self.worktrees = WorkTreeContainer(self)
         BaseRepo.__init__(self, object_store, self.refs)
 
         self._graftpoints = {}
@@ -1792,7 +1799,9 @@ class Repo(BaseRepo):
             os.mkdir(path)
         if identifier is None:
             identifier = os.path.basename(path)
-        main_worktreesdir = os.path.join(main_repo.controldir(), WORKTREES)
+        # Ensure we use absolute path for the worktree control directory
+        main_controldir = os.path.abspath(main_repo.controldir())
+        main_worktreesdir = os.path.join(main_controldir, WORKTREES)
         worktree_controldir = os.path.join(main_worktreesdir, identifier)
         gitdirfile = os.path.join(path, CONTROLDIR)
         with open(gitdirfile, "wb") as f:
@@ -1811,7 +1820,7 @@ class Repo(BaseRepo):
             f.write(b"../..\n")
         with open(os.path.join(worktree_controldir, "HEAD"), "wb") as f:
             f.write(main_repo.head() + b"\n")
-        r = cls(path)
+        r = cls(os.path.normpath(path))
         r.reset_index()
         return r
 

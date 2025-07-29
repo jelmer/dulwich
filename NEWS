@@ -2,6 +2,11 @@
 
  * Split out ``WorkTree`` from ``Repo``. (Jelmer Vernooĳ)
 
+ * Add comprehensive git worktree support including ``WorkTreeContainer``
+   class, ``WorkTreeInfo`` objects, and full CLI/porcelain implementations
+   for add, list, remove, prune, lock, unlock, and move operations.
+   (Jelmer Vernooĳ, #1710, #1632)
+
  * Add support for ``-a`` argument to
    ``dulwich.cli.commit``. (Jelmer Vernooĳ)
 

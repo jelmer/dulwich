@@ -8656,3 +8656,183 @@ class WriteCommitGraphTests(PorcelainTestCase):
         self.assertEqual(1, len(commit_graph))
         entry = commit_graph.get_entry_by_oid(c3.id)
         self.assertIsNotNone(entry)
+
+
+class WorktreePorcelainTests(PorcelainTestCase):
+    """Tests for porcelain worktree functions."""
+
+    def test_worktree_list_single(self):
+        """Test listing worktrees when only main worktree exists."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        porcelain.add(self.repo_path, ["test.txt"])
+        porcelain.commit(self.repo_path, message=b"Initial commit")
+
+        # List worktrees
+        worktrees = porcelain.worktree_list(self.repo_path)
+
+        self.assertEqual(len(worktrees), 1)
+        self.assertEqual(worktrees[0].path, self.repo_path)
+        self.assertFalse(worktrees[0].bare)
+        self.assertIsNotNone(worktrees[0].head)
+        self.assertIsNotNone(worktrees[0].branch)
+
+    def test_worktree_add_branch(self):
+        """Test adding a worktree with a new branch."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        porcelain.add(self.repo_path, ["test.txt"])
+        porcelain.commit(self.repo_path, message=b"Initial commit")
+
+        # Add worktree
+        wt_path = os.path.join(self.test_dir, "worktree1")
+        result_path = porcelain.worktree_add(self.repo_path, wt_path, branch=b"feature")
+
+        self.assertEqual(result_path, wt_path)
+        self.assertTrue(os.path.exists(wt_path))
+        self.assertTrue(os.path.exists(os.path.join(wt_path, ".git")))
+
+        # Check it appears in the list
+        worktrees = porcelain.worktree_list(self.repo_path)
+        self.assertEqual(len(worktrees), 2)
+
+        # Find the new worktree
+        new_wt = None
+        for wt in worktrees:
+            if wt.path == wt_path:
+                new_wt = wt
+                break
+
+        self.assertIsNotNone(new_wt)
+        self.assertEqual(new_wt.branch, b"refs/heads/feature")
+        self.assertFalse(new_wt.detached)
+
+    def test_worktree_add_detached(self):
+        """Test adding a detached worktree."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        porcelain.add(self.repo_path, ["test.txt"])
+        sha = porcelain.commit(self.repo_path, message=b"Initial commit")
+
+        # Add detached worktree
+        wt_path = os.path.join(self.test_dir, "detached")
+        porcelain.worktree_add(self.repo_path, wt_path, commit=sha, detach=True)
+
+        # Check it's detached
+        worktrees = porcelain.worktree_list(self.repo_path)
+        for wt in worktrees:
+            if wt.path == wt_path:
+                self.assertTrue(wt.detached)
+                self.assertIsNone(wt.branch)
+                self.assertEqual(wt.head, sha)
+
+    def test_worktree_remove(self):
+        """Test removing a worktree."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        porcelain.add(self.repo_path, ["test.txt"])
+        porcelain.commit(self.repo_path, message=b"Initial commit")
+
+        # Add and remove worktree
+        wt_path = os.path.join(self.test_dir, "to-remove")
+        porcelain.worktree_add(self.repo_path, wt_path)
+
+        # Verify it exists
+        self.assertTrue(os.path.exists(wt_path))
+        self.assertEqual(len(porcelain.worktree_list(self.repo_path)), 2)
+
+        # Remove it
+        porcelain.worktree_remove(self.repo_path, wt_path)
+
+        # Verify it's gone
+        self.assertFalse(os.path.exists(wt_path))
+        self.assertEqual(len(porcelain.worktree_list(self.repo_path)), 1)
+
+    def test_worktree_prune(self):
+        """Test pruning worktrees."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        porcelain.add(self.repo_path, ["test.txt"])
+        porcelain.commit(self.repo_path, message=b"Initial commit")
+
+        # Add worktree
+        wt_path = os.path.join(self.test_dir, "to-prune")
+        porcelain.worktree_add(self.repo_path, wt_path)
+
+        # Manually remove directory
+        shutil.rmtree(wt_path)
+
+        # Prune should remove the administrative files
+        pruned = porcelain.worktree_prune(self.repo_path)
+        self.assertEqual(len(pruned), 1)
+
+        # Verify it's gone from the list
+        worktrees = porcelain.worktree_list(self.repo_path)
+        self.assertEqual(len(worktrees), 1)
+
+    def test_worktree_lock_unlock(self):
+        """Test locking and unlocking worktrees."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        porcelain.add(self.repo_path, ["test.txt"])
+        porcelain.commit(self.repo_path, message=b"Initial commit")
+
+        # Add worktree
+        wt_path = os.path.join(self.test_dir, "lockable")
+        porcelain.worktree_add(self.repo_path, wt_path)
+
+        # Lock it
+        porcelain.worktree_lock(self.repo_path, wt_path, reason="Testing")
+
+        # Verify it's locked
+        worktrees = porcelain.worktree_list(self.repo_path)
+        for wt in worktrees:
+            if wt.path == wt_path:
+                self.assertTrue(wt.locked)
+
+        # Unlock it
+        porcelain.worktree_unlock(self.repo_path, wt_path)
+
+        # Verify it's unlocked
+        worktrees = porcelain.worktree_list(self.repo_path)
+        for wt in worktrees:
+            if wt.path == wt_path:
+                self.assertFalse(wt.locked)
+
+    def test_worktree_move(self):
+        """Test moving a worktree."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test content")
+        porcelain.add(self.repo_path, ["test.txt"])
+        porcelain.commit(self.repo_path, message=b"Initial commit")
+
+        # Add worktree
+        old_path = os.path.join(self.test_dir, "old-location")
+        porcelain.worktree_add(self.repo_path, old_path)
+
+        # Create a file in the worktree
+        test_file = os.path.join(old_path, "workspace.txt")
+        with open(test_file, "w") as f:
+            f.write("workspace content")
+
+        # Move it
+        new_path = os.path.join(self.test_dir, "new-location")
+        porcelain.worktree_move(self.repo_path, old_path, new_path)
+
+        # Verify old path doesn't exist, new path does
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(new_path))
+        self.assertTrue(os.path.exists(os.path.join(new_path, "workspace.txt")))
+
+        # Verify it's in the list at new location
+        worktrees = porcelain.worktree_list(self.repo_path)
+        paths = [wt.path for wt in worktrees]
+        self.assertIn(new_path, paths)
+        self.assertNotIn(old_path, paths)

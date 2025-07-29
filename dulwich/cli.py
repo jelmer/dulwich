@@ -1432,7 +1432,7 @@ class SuperCommand(Command):
             cmd_kls = self.subcommands[cmd]
         except KeyError:
             print(f"No such subcommand: {args[0]}")
-            return False
+            sys.exit(1)
         return cmd_kls().run(args[1:])
 
 
@@ -2880,6 +2880,238 @@ class cmd_bundle(Command):
         return 0
 
 
+class cmd_worktree_add(Command):
+    """Add a new worktree to the repository."""
+
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Add a new worktree", prog="dulwich worktree add"
+        )
+        parser.add_argument("path", help="Path for the new worktree")
+        parser.add_argument("committish", nargs="?", help="Commit-ish to checkout")
+        parser.add_argument("-b", "--create-branch", help="Create a new branch")
+        parser.add_argument(
+            "-B", "--force-create-branch", help="Create or reset a branch"
+        )
+        parser.add_argument(
+            "--detach", action="store_true", help="Detach HEAD in new worktree"
+        )
+        parser.add_argument("--force", action="store_true", help="Force creation")
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        branch = None
+        commit = None
+
+        if parsed_args.create_branch or parsed_args.force_create_branch:
+            branch = (
+                parsed_args.create_branch or parsed_args.force_create_branch
+            ).encode()
+        elif parsed_args.committish and not parsed_args.detach:
+            # If committish is provided and not detaching, treat as branch
+            branch = parsed_args.committish.encode()
+        elif parsed_args.committish:
+            # If committish is provided and detaching, treat as commit
+            commit = parsed_args.committish.encode()
+
+        worktree_path = porcelain.worktree_add(
+            repo=".",
+            path=parsed_args.path,
+            branch=branch,
+            commit=commit,
+            detach=parsed_args.detach,
+            force=parsed_args.force or bool(parsed_args.force_create_branch),
+        )
+        print(f"Worktree added: {worktree_path}")
+        return 0
+
+
+class cmd_worktree_list(Command):
+    """List details of each worktree."""
+
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="List worktrees", prog="dulwich worktree list"
+        )
+        parser.add_argument(
+            "-v", "--verbose", action="store_true", help="Show additional information"
+        )
+        parser.add_argument(
+            "--porcelain", action="store_true", help="Machine-readable output"
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        worktrees = porcelain.worktree_list(repo=".")
+
+        for wt in worktrees:
+            path = wt.path
+            if wt.bare:
+                status = "(bare)"
+            elif wt.detached:
+                status = (
+                    f"(detached HEAD {wt.head[:7].decode() if wt.head else 'unknown'})"
+                )
+            elif wt.branch:
+                branch_name = wt.branch.decode().replace("refs/heads/", "")
+                status = f"[{branch_name}]"
+            else:
+                status = "(unknown)"
+
+            if parsed_args.porcelain:
+                locked = "locked" if wt.locked else "unlocked"
+                prunable = "prunable" if wt.prunable else "unprunable"
+                print(
+                    f"{path} {wt.head.decode() if wt.head else 'unknown'} {status} {locked} {prunable}"
+                )
+            else:
+                line = f"{path}  {status}"
+                if wt.locked:
+                    line += " locked"
+                if wt.prunable:
+                    line += " prunable"
+                print(line)
+        return 0
+
+
+class cmd_worktree_remove(Command):
+    """Remove a worktree."""
+
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Remove a worktree", prog="dulwich worktree remove"
+        )
+        parser.add_argument("worktree", help="Path to worktree to remove")
+        parser.add_argument("--force", action="store_true", help="Force removal")
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        porcelain.worktree_remove(
+            repo=".", path=parsed_args.worktree, force=parsed_args.force
+        )
+        print(f"Worktree removed: {parsed_args.worktree}")
+        return 0
+
+
+class cmd_worktree_prune(Command):
+    """Prune worktree information."""
+
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Prune worktree information", prog="dulwich worktree prune"
+        )
+        parser.add_argument(
+            "--dry-run", action="store_true", help="Do not remove anything"
+        )
+        parser.add_argument(
+            "-v", "--verbose", action="store_true", help="Report all removals"
+        )
+        parser.add_argument(
+            "--expire", type=int, help="Expire worktrees older than time (seconds)"
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        pruned = porcelain.worktree_prune(
+            repo=".", dry_run=parsed_args.dry_run, expire=parsed_args.expire
+        )
+
+        if pruned:
+            if parsed_args.dry_run:
+                print("Would prune worktrees:")
+            elif parsed_args.verbose:
+                print("Pruned worktrees:")
+
+            for wt_id in pruned:
+                print(f"  {wt_id}")
+        elif parsed_args.verbose:
+            print("No worktrees to prune")
+        return 0
+
+
+class cmd_worktree_lock(Command):
+    """Lock a worktree."""
+
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Lock a worktree", prog="dulwich worktree lock"
+        )
+        parser.add_argument("worktree", help="Path to worktree to lock")
+        parser.add_argument("--reason", help="Reason for locking")
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        porcelain.worktree_lock(
+            repo=".", path=parsed_args.worktree, reason=parsed_args.reason
+        )
+        print(f"Worktree locked: {parsed_args.worktree}")
+        return 0
+
+
+class cmd_worktree_unlock(Command):
+    """Unlock a worktree."""
+
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Unlock a worktree", prog="dulwich worktree unlock"
+        )
+        parser.add_argument("worktree", help="Path to worktree to unlock")
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        porcelain.worktree_unlock(repo=".", path=parsed_args.worktree)
+        print(f"Worktree unlocked: {parsed_args.worktree}")
+        return 0
+
+
+class cmd_worktree_move(Command):
+    """Move a worktree."""
+
+    def run(self, args) -> Optional[int]:
+        parser = argparse.ArgumentParser(
+            description="Move a worktree", prog="dulwich worktree move"
+        )
+        parser.add_argument("worktree", help="Path to worktree to move")
+        parser.add_argument("new_path", help="New path for the worktree")
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        porcelain.worktree_move(
+            repo=".", old_path=parsed_args.worktree, new_path=parsed_args.new_path
+        )
+        print(f"Worktree moved: {parsed_args.worktree} -> {parsed_args.new_path}")
+        return 0
+
+
+class cmd_worktree(SuperCommand):
+    """Manage multiple working trees."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "add": cmd_worktree_add,
+        "list": cmd_worktree_list,
+        "remove": cmd_worktree_remove,
+        "prune": cmd_worktree_prune,
+        "lock": cmd_worktree_lock,
+        "unlock": cmd_worktree_unlock,
+        "move": cmd_worktree_move,
+    }
+    default_command = cmd_worktree_list
+
+
 commands = {
     "add": cmd_add,
     "annotate": cmd_annotate,
@@ -2944,6 +3176,7 @@ commands = {
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
     "web-daemon": cmd_web_daemon,
+    "worktree": cmd_worktree,
     "write-tree": cmd_write_tree,
 }
 

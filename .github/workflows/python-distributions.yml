@@ -28,9 +28,9 @@ jobs:
       - name: Find build identifiers using cibuildwheel --print-build-identifiers
         id: all-build-identifiers
         run: |
-          echo "linux=$(cibuildwheel --platform linux --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
-          echo "macos=$(cibuildwheel --platform macos --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
-          echo "windows=$(cibuildwheel --platform windows --print-build-identifiers | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          echo "linux=$(cibuildwheel --platform linux --print-build-identifiers | grep -v cp314 | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          echo "macos=$(cibuildwheel --platform macos --print-build-identifiers | grep -v cp314 | tr '\n' ' ')" >> $GITHUB_OUTPUT
+          echo "windows=$(cibuildwheel --platform windows --print-build-identifiers | grep -v cp314 | tr '\n' ' ')" >> $GITHUB_OUTPUT
       - name: Select build identifiers
         id: select-build-identifiers
         run: |

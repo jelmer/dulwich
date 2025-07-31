@@ -837,11 +837,11 @@ class GetUnstagedChangesTests(TestCase):
             with open(foo2_fullpath, "wb") as f:
                 f.write(b"origstuff")
 
-            repo.stage(["foo1", "foo2"])
-            repo.do_commit(
-                b"test status",
-                author=b"author <email>",
+            repo.get_worktree().stage(["foo1", "foo2"])
+            repo.get_worktree().commit(
+                message=b"test status",
                 committer=b"committer <email>",
+                author=b"author <email>",
             )
 
             with open(foo1_fullpath, "wb") as f:
@@ -864,11 +864,11 @@ class GetUnstagedChangesTests(TestCase):
             with open(foo1_fullpath, "wb") as f:
                 f.write(b"origstuff")
 
-            repo.stage(["foo1"])
-            repo.do_commit(
-                b"test status",
-                author=b"author <email>",
+            repo.get_worktree().stage(["foo1"])
+            repo.get_worktree().commit(
+                message=b"test status",
                 committer=b"committer <email>",
+                author=b"author <email>",
             )
 
             os.unlink(foo1_fullpath)
@@ -887,11 +887,11 @@ class GetUnstagedChangesTests(TestCase):
             with open(foo1_fullpath, "wb") as f:
                 f.write(b"origstuff")
 
-            repo.stage(["foo1"])
-            repo.do_commit(
-                b"test status",
-                author=b"author <email>",
+            repo.get_worktree().stage(["foo1"])
+            repo.get_worktree().commit(
+                message=b"test status",
                 committer=b"committer <email>",
+                author=b"author <email>",
             )
 
             os.remove(foo1_fullpath)
@@ -912,11 +912,11 @@ class GetUnstagedChangesTests(TestCase):
             with open(foo1_fullpath, "wb") as f:
                 f.write(b"origstuff")
 
-            repo.stage(["foo1"])
-            repo.do_commit(
-                b"test status",
-                author=b"author <email>",
+            repo.get_worktree().stage(["foo1"])
+            repo.get_worktree().commit(
+                message=b"test status",
                 committer=b"committer <email>",
+                author=b"author <email>",
             )
 
             os.remove(foo1_fullpath)
@@ -1184,8 +1184,10 @@ class TestIndexEntryFromPath(TestCase):
         with open(test_file, "wb") as f:
             f.write(b"test content")
 
-        submodule_repo.stage(["testfile"])
-        commit_id = submodule_repo.do_commit(b"Test commit for submodule")
+        submodule_repo.get_worktree().stage(["testfile"])
+        commit_id = submodule_repo.get_worktree().commit(
+            message=b"Test commit for submodule",
+        )
 
         # Test reading the HEAD
         head_sha = read_submodule_head(sub_repo_dir)
@@ -1241,8 +1243,10 @@ class TestIndexEntryFromPath(TestCase):
         with open(test_file, "wb") as f:
             f.write(b"test content")
 
-        submodule_repo.stage(["testfile"])
-        commit_id = submodule_repo.do_commit(b"Test commit for submodule")
+        submodule_repo.get_worktree().stage(["testfile"])
+        commit_id = submodule_repo.get_worktree().commit(
+            message=b"Test commit for submodule",
+        )
 
         # Create an entry with the correct commit SHA
         correct_entry = IndexEntry(

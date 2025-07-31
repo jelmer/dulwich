@@ -238,7 +238,7 @@ class LFSIntegrationTests(TestCase):
             f.write(large_content)
 
         # Add files to repo
-        self.repo.stage([".gitattributes", "large.bin"])
+        self.repo.get_worktree().stage([".gitattributes", "large.bin"])
 
         # Get the blob for large.bin from the index
         index = self.repo.open_index()
@@ -390,7 +390,7 @@ class LFSIntegrationTests(TestCase):
         porcelain.commit(self.repo, message=b"Add LFS file")
 
         # Reset index to trigger checkout with filter
-        self.repo.reset_index()
+        self.repo.get_worktree().reset_index()
 
         # Check file content
         with open(pointer_file, "rb") as f:

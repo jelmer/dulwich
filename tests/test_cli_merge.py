@@ -50,7 +50,7 @@ class CLIMergeTests(TestCase):
 
             # Create a branch
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             # Add a file on feature branch
             with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
@@ -59,7 +59,7 @@ class CLIMergeTests(TestCase):
             porcelain.commit(tmpdir, message=b"Add feature")
 
             # Go back to master
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
 
             # Test merge via CLI
             old_cwd = os.getcwd()
@@ -91,14 +91,14 @@ class CLIMergeTests(TestCase):
 
             # Create a branch and modify file1
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
                 f.write("Feature content\n")
             porcelain.add(tmpdir, paths=["file1.txt"])
             porcelain.commit(tmpdir, message=b"Modify file1 in feature")
 
             # Go back to master and modify file1 differently
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
                 f.write("Master content\n")
             porcelain.add(tmpdir, paths=["file1.txt"])
@@ -157,7 +157,7 @@ class CLIMergeTests(TestCase):
 
             # Create a branch
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             # Add a file on feature branch
             with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
@@ -166,7 +166,7 @@ class CLIMergeTests(TestCase):
             porcelain.commit(tmpdir, message=b"Add feature")
 
             # Go back to master and add another file
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
             with open(os.path.join(tmpdir, "file3.txt"), "w") as f:
                 f.write("Master content\n")
             porcelain.add(tmpdir, paths=["file3.txt"])
@@ -203,7 +203,7 @@ class CLIMergeTests(TestCase):
 
             # Create a branch
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             # Add a file on feature branch
             with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
@@ -212,7 +212,7 @@ class CLIMergeTests(TestCase):
             porcelain.commit(tmpdir, message=b"Add feature")
 
             # Go back to master
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
 
             # Test merge via CLI with --no-ff
             old_cwd = os.getcwd()
@@ -242,7 +242,7 @@ class CLIMergeTests(TestCase):
 
             # Create a branch
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             # Add a file on feature branch
             with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
@@ -251,7 +251,7 @@ class CLIMergeTests(TestCase):
             porcelain.commit(tmpdir, message=b"Add feature")
 
             # Go back to master and add another file
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
             with open(os.path.join(tmpdir, "file3.txt"), "w") as f:
                 f.write("Master content\n")
             porcelain.add(tmpdir, paths=["file3.txt"])

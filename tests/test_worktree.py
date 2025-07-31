@@ -57,9 +57,9 @@ class WorkTreeTestCase(TestCase):
         # Create initial commit with a file
         with open(os.path.join(self.test_dir, "a"), "wb") as f:
             f.write(b"contents of file a")
-        self.repo.stage(["a"])
-        self.root_commit = self.repo.do_commit(
-            b"Initial commit",
+        self.repo.get_worktree().stage(["a"])
+        self.root_commit = self.repo.get_worktree().commit(
+            message=b"Initial commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -147,7 +147,9 @@ class WorkTreeStagingTests(WorkTreeTestCase):
         """Test staging a submodule."""
         r = self.repo
         s = Repo.init(os.path.join(r.path, "sub"), mkdir=True)
-        s.do_commit(b"message")
+        s.get_worktree().commit(
+            message=b"message",
+        )
         self.worktree.stage(["sub"])
         self.assertEqual([b"a", b"sub"], list(r.open_index()))
 
@@ -392,7 +394,9 @@ class WorkTreeBackwardCompatibilityTests(WorkTreeTestCase):
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            self.repo.stage(["new_file"])
+            self.repo.stage(
+                ["new_file"]
+            )  # Call deprecated method on Repo, not WorkTree
             self.assertTrue(len(w) > 0)
             self.assertTrue(issubclass(w[0].category, DeprecationWarning))
 
@@ -403,7 +407,7 @@ class WorkTreeBackwardCompatibilityTests(WorkTreeTestCase):
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            self.repo.unstage(["a"])
+            self.repo.unstage(["a"])  # Call deprecated method on Repo, not WorkTree
             self.assertTrue(len(w) > 0)
             self.assertTrue(issubclass(w[0].category, DeprecationWarning))
 
@@ -414,7 +418,9 @@ class WorkTreeBackwardCompatibilityTests(WorkTreeTestCase):
         # Test get_sparse_checkout_patterns
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            patterns = self.repo.get_sparse_checkout_patterns()
+            patterns = (
+                self.repo.get_sparse_checkout_patterns()
+            )  # Call deprecated method on Repo
             self.assertEqual([], patterns)
             self.assertTrue(len(w) > 0)
             self.assertTrue(issubclass(w[0].category, DeprecationWarning))
@@ -422,7 +428,9 @@ class WorkTreeBackwardCompatibilityTests(WorkTreeTestCase):
         # Test set_sparse_checkout_patterns
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            self.repo.set_sparse_checkout_patterns(["*.py"])
+            self.repo.set_sparse_checkout_patterns(
+                ["*.py"]
+            )  # Call deprecated method on Repo
             self.assertTrue(len(w) > 0)
             self.assertTrue(issubclass(w[0].category, DeprecationWarning))
 

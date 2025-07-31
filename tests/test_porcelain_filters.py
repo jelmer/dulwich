@@ -207,7 +207,7 @@ class PorcelainFilterTests(TestCase):
         target_config.write_to_path()
 
         # Now checkout the files with autocrlf enabled
-        target_repo.reset_index()
+        target_repo.get_worktree().reset_index()
 
         # Check that the working tree file has CRLF endings
         target_file = os.path.join(target_dir, "test.txt")

@@ -322,11 +322,11 @@ class IntegrationTestCase(TestCase):
             f.write(content)
 
         # Stage file
-        self.repo.stage([filename.encode()])
+        self.repo.get_worktree().stage([filename.encode()])
 
         # Create commit
-        commit_id = self.repo.do_commit(
-            message.encode(),
+        commit_id = self.repo.get_worktree().commit(
+            message=message.encode(),
             committer=b"Test Committer <test@example.com>",
             author=b"Test Author <test@example.com>",
             commit_timestamp=1000000000,

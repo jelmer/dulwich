@@ -46,7 +46,7 @@ class PorcelainCherryPickTests(TestCase):
 
             # Create a branch and switch to it
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             # Add a file on feature branch
             with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
@@ -55,7 +55,7 @@ class PorcelainCherryPickTests(TestCase):
             feature_commit = porcelain.commit(tmpdir, message=b"Add feature file")
 
             # Go back to master
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
 
             # Cherry-pick the feature commit
             new_commit = porcelain.cherry_pick(tmpdir, feature_commit)
@@ -81,7 +81,7 @@ class PorcelainCherryPickTests(TestCase):
 
             # Create a branch and switch to it
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             # Add a file on feature branch
             with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
@@ -90,7 +90,7 @@ class PorcelainCherryPickTests(TestCase):
             feature_commit = porcelain.commit(tmpdir, message=b"Add feature file")
 
             # Go back to master
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
 
             # Cherry-pick with no-commit
             result = porcelain.cherry_pick(tmpdir, feature_commit, no_commit=True)
@@ -119,7 +119,7 @@ class PorcelainCherryPickTests(TestCase):
 
             # Create a branch and modify the file
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
                 f.write("Feature modification\n")
@@ -127,7 +127,7 @@ class PorcelainCherryPickTests(TestCase):
             feature_commit = porcelain.commit(tmpdir, message=b"Modify file on feature")
 
             # Go back to master and make a different modification
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
                 f.write("Master modification\n")
             porcelain.add(tmpdir, paths=["file1.txt"])
@@ -154,7 +154,7 @@ class PorcelainCherryPickTests(TestCase):
 
             # Create another branch with a different initial commit
             porcelain.branch_create(tmpdir, "other")
-            porcelain.checkout_branch(tmpdir, "other")
+            porcelain.checkout(tmpdir, "other")
 
             # Try to cherry-pick root commit - should fail
             with self.assertRaises(porcelain.Error) as cm:
@@ -176,7 +176,7 @@ class PorcelainCherryPickTests(TestCase):
 
             # Create branch and make conflicting changes
             porcelain.branch_create(tmpdir, "feature")
-            porcelain.checkout_branch(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
 
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
                 f.write("Feature content\n")
@@ -184,7 +184,7 @@ class PorcelainCherryPickTests(TestCase):
             feature_commit = porcelain.commit(tmpdir, message=b"Feature change")
 
             # Go back to master and make different change
-            porcelain.checkout_branch(tmpdir, "master")
+            porcelain.checkout(tmpdir, "master")
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
                 f.write("Master content\n")
             porcelain.add(tmpdir, paths=["file1.txt"])

@@ -27,7 +27,7 @@ local_repo.object_store.add_object(new_blob)
 last_tree.add(b"test", stat.S_IFREG, new_blob.id)
 local_repo.object_store.add_object(last_tree)
 
-local_repo.do_commit(
+local_repo.get_worktree().commit(
     message=b"Add a file called 'test'", ref=b"refs/heads/master", tree=last_tree.id
 )
 

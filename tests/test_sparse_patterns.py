@@ -196,7 +196,7 @@ class ComputeIncludedPathsFullTests(TestCase):
         with open(full, "wb") as f:
             f.write(content)
         # Stage in the index
-        self.repo.stage([relpath])
+        self.repo.get_worktree().stage([relpath])
 
     def test_basic_inclusion_exclusion(self):
         """Given patterns, check correct set of included paths."""
@@ -237,7 +237,7 @@ class ComputeIncludedPathsConeTests(TestCase):
         os.makedirs(os.path.dirname(full), exist_ok=True)
         with open(full, "wb") as f:
             f.write(content)
-        self.repo.stage([relpath])
+        self.repo.get_worktree().stage([relpath])
 
     def test_cone_mode_patterns(self):
         """Simpler pattern handling in cone mode.
@@ -332,7 +332,7 @@ class DetermineIncludedPathsTests(TestCase):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
             f.write(b"data")
-        self.repo.stage([relpath])
+        self.repo.get_worktree().stage([relpath])
 
     def test_full_mode(self):
         self._add_file_to_index("foo.py")
@@ -370,9 +370,11 @@ class ApplyIncludedPathsTests(TestCase):
         os.makedirs(os.path.dirname(full), exist_ok=True)
         with open(full, "wb") as f:
             f.write(content)
-        self.repo.stage([relpath])
+        self.repo.get_worktree().stage([relpath])
         # Actually commit so the object is in the store
-        self.repo.do_commit(message=b"Commit " + relpath.encode())
+        self.repo.get_worktree().commit(
+            message=b"Commit " + relpath.encode(),
+        )
 
     def test_set_skip_worktree_bits(self):
         """If a path is not in included_paths, skip_worktree bit is set."""

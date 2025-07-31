@@ -69,8 +69,10 @@ with open(config_path, "w") as f:
     json.dump(initial_config, f, indent=2)
 
 # Add and commit initial files
-repo.stage([".gitattributes", "config.json"])
-initial_commit = repo.do_commit(b"Initial commit", committer=b"Test <test@example.com>")
+repo.get_worktree().stage([".gitattributes", "config.json"])
+initial_commit = repo.get_worktree().commit(
+    b"Initial commit", committer=b"Test <test@example.com>"
+)
 
 # Register our custom merge driver globally
 registry = get_merge_driver_registry()
@@ -90,8 +92,8 @@ feature_config = {
 with open(config_path, "w") as f:
     json.dump(feature_config, f, indent=2)
 
-repo.stage(["config.json"])
-feature_commit = repo.do_commit(
+repo.get_worktree().stage(["config.json"])
+feature_commit = repo.get_worktree().commit(
     b"Add author and features", committer=b"Alice <alice@example.com>"
 )
 
@@ -108,8 +110,8 @@ master_config = {
 with open(config_path, "w") as f:
     json.dump(master_config, f, indent=2)
 
-repo.stage(["config.json"])
-master_commit = repo.do_commit(
+repo.get_worktree().stage(["config.json"])
+master_commit = repo.get_worktree().commit(
     b"Add description and license", committer=b"Bob <bob@example.com>"
 )
 

@@ -1548,7 +1548,7 @@ class Repo(BaseRepo):
                         head = None
 
                 if checkout and head is not None:
-                    target.reset_index()
+                    target.get_worktree().reset_index()
             except BaseException:
                 target.close()
                 raise
@@ -1822,7 +1822,7 @@ class Repo(BaseRepo):
         with open(os.path.join(worktree_controldir, "HEAD"), "wb") as f:
             f.write(main_repo.head() + b"\n")
         r = cls(os.path.normpath(path))
-        r.reset_index()
+        r.get_worktree().reset_index()
         return r
 
     @classmethod

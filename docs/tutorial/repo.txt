@@ -71,7 +71,7 @@ aren't tracked explicitly by git. Let's create a simple text file and stage it::
     >>> _ = f.write(b"monty")
     >>> f.close()
 
-    >>> repo.stage([b"foo"])
+    >>> repo.get_worktree().stage([b"foo"])
 
 It will now show up in the index::
 
@@ -83,7 +83,7 @@ Creating new commits
 --------------------
 
 Now that we have staged a change, we can commit it. The easiest way to
-do this is by using ``Repo.do_commit``. It is also possible to manipulate
+do this is by using ``WorkTree.commit``. It is also possible to manipulate
 the lower-level objects involved in this, but we'll leave that for a
 separate chapter of the tutorial.
 
@@ -91,10 +91,10 @@ To create a simple commit on the current branch, it is only necessary
 to specify the message. The committer and author will be retrieved from the
 repository configuration or global configuration if they are not specified::
 
-    >>> commit_id = repo.do_commit(
+    >>> commit_id = repo.get_worktree().commit(
     ...     b"The first commit", committer=b"Jelmer Vernooij <jelmer@samba.org>")
 
-``do_commit`` returns the SHA1 of the commit. Since the commit was to the 
+``commit`` returns the SHA1 of the commit. Since the commit was to the 
 default branch, the repository's head will now be set to that commit::
 
     >>> repo.head() == commit_id

@@ -50,7 +50,10 @@ class StashTests(TestCase):
         tree.add(b"initial.txt", 0o100644, blob.id)
         tree_id = self.repo.object_store.add_object(tree)
 
-        self.commit_id = self.repo.do_commit(b"Initial commit", tree=tree_id)
+        self.commit_id = self.repo.get_worktree().commit(
+            message=b"Initial commit",
+            tree=tree_id,
+        )
 
     def tearDown(self):
         shutil.rmtree(self.test_dir)
@@ -77,7 +80,7 @@ class StashTests(TestCase):
         file_path = os.path.join(self.repo_dir, "testfile.txt")
         with open(file_path, "wb") as f:
             f.write(b"test data")
-        self.repo.stage(["testfile.txt"])
+        self.repo.get_worktree().stage(["testfile.txt"])
 
         # Push to stash
         commit_id = stash.push(message=b"Test stash message")
@@ -102,13 +105,13 @@ class StashTests(TestCase):
         file1_path = os.path.join(self.repo_dir, "testfile1.txt")
         with open(file1_path, "wb") as f:
             f.write(b"test data 1")
-        self.repo.stage(["testfile1.txt"])
+        self.repo.get_worktree().stage(["testfile1.txt"])
         commit_id1 = stash.push(message=b"Test stash 1")
 
         file2_path = os.path.join(self.repo_dir, "testfile2.txt")
         with open(file2_path, "wb") as f:
             f.write(b"test data 2")
-        self.repo.stage(["testfile2.txt"])
+        self.repo.get_worktree().stage(["testfile2.txt"])
         stash.push(message=b"Test stash 2")
 
         self.assertEqual(2, len(stash))
@@ -138,7 +141,7 @@ class StashTests(TestCase):
         file_path = os.path.join(self.repo_dir, "testfile.txt")
         with open(file_path, "wb") as f:
             f.write(b"test data")
-        self.repo.stage(["testfile.txt"])
+        self.repo.get_worktree().stage(["testfile.txt"])
 
         # Push to stash
         stash.push(message=b"Test stash message")
@@ -173,13 +176,15 @@ class StashTests(TestCase):
         tracked_path = os.path.join(self.repo_dir, "tracked.txt")
         with open(tracked_path, "wb") as f:
             f.write(b"original content")
-        self.repo.stage(["tracked.txt"])
-        self.repo.do_commit(b"Add tracked file")
+        self.repo.get_worktree().stage(["tracked.txt"])
+        self.repo.get_worktree().commit(
+            message=b"Add tracked file",
+        )
 
         # Modify the tracked file and stage it
         with open(tracked_path, "wb") as f:
             f.write(b"staged changes")
-        self.repo.stage(["tracked.txt"])
+        self.repo.get_worktree().stage(["tracked.txt"])
 
         # Modify it again but don't stage
         with open(tracked_path, "wb") as f:
@@ -189,7 +194,7 @@ class StashTests(TestCase):
         new_file_path = os.path.join(self.repo_dir, "new.txt")
         with open(new_file_path, "wb") as f:
             f.write(b"new file content")
-        self.repo.stage(["new.txt"])
+        self.repo.get_worktree().stage(["new.txt"])
 
         # Push to stash
         stash.push(message=b"Test stash with index")

@@ -1174,7 +1174,7 @@ class UpdateServerInfoTests(TestCase):
             self.assertEqual(b"", f.read())
 
     def test_simple(self) -> None:
-        commit_id = self.repo.do_commit(
+        commit_id = self.repo.get_worktree().commit(
             message=b"foo",
             committer=b"Joe Example <joe@example.com>",
             ref=b"refs/heads/foo",

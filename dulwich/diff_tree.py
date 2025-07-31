@@ -46,7 +46,7 @@ _NULL_ENTRY = TreeEntry(None, None, None)
 _MAX_SCORE = 100
 RENAME_THRESHOLD = 60
 MAX_FILES = 200
-REWRITE_THRESHOLD = None
+REWRITE_THRESHOLD: Optional[int] = None
 
 
 class TreeChange(namedtuple("TreeChange", ["type", "old", "new"])):

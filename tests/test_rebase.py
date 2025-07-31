@@ -385,9 +385,9 @@ class RebasePorcelainTestCase(TestCase):
         with open(os.path.join(self.test_dir, "README.md"), "wb") as f:
             f.write(b"# Test Repository\n")
 
-        self.repo.stage(["README.md"])
-        self.initial_commit = self.repo.do_commit(
-            b"Initial commit",
+        self.repo.get_worktree().stage(["README.md"])
+        self.initial_commit = self.repo.get_worktree().commit(
+            message=b"Initial commit",
             committer=b"Test User <test@example.com>",
             author=b"Test User <test@example.com>",
         )
@@ -404,7 +404,7 @@ class RebasePorcelainTestCase(TestCase):
 
         # Create and checkout feature branch
         self.repo.refs[b"refs/heads/feature"] = self.initial_commit
-        porcelain.checkout_branch(self.repo, "feature")
+        porcelain.checkout(self.repo, "feature")
 
         # Add commit to feature branch
         with open(os.path.join(self.test_dir, "feature.txt"), "wb") as f:
@@ -419,7 +419,7 @@ class RebasePorcelainTestCase(TestCase):
         )
 
         # Switch to main and add different commit
-        porcelain.checkout_branch(self.repo, "master")
+        porcelain.checkout(self.repo, "master")
 
         with open(os.path.join(self.test_dir, "main.txt"), "wb") as f:
             f.write(b"Main file\n")
@@ -433,7 +433,7 @@ class RebasePorcelainTestCase(TestCase):
         )
 
         # Switch back to feature and rebase
-        porcelain.checkout_branch(self.repo, "feature")
+        porcelain.checkout(self.repo, "feature")
 
         # Perform rebase
         new_shas = porcelain.rebase(self.repo, "master")

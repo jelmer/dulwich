@@ -159,9 +159,15 @@ class GraftsInRepoTests(GraftsInRepositoryBase, TestCase):
             "author_timezone": 0,
         }
 
-        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
-        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
-        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
+        self._shas.append(
+            r.get_worktree().commit(message=b"empty commit", **commit_kwargs)
+        )
+        self._shas.append(
+            r.get_worktree().commit(message=b"empty commit", **commit_kwargs)
+        )
+        self._shas.append(
+            r.get_worktree().commit(message=b"empty commit", **commit_kwargs)
+        )
 
     def test_init_with_empty_info_grafts(self) -> None:
         r = self._repo
@@ -191,6 +197,7 @@ class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
         self._shas = []
 
         tree = Tree()
+        r.object_store.add_object(tree)
 
         commit_kwargs = {
             "committer": b"Test Committer <test@nodomain.com>",
@@ -202,6 +209,23 @@ class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
             "tree": tree.id,
         }
 
-        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
-        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
-        self._shas.append(r.do_commit(b"empty commit", **commit_kwargs))
+        # Create commits directly for MemoryRepo since it doesn't support worktree
+        from dulwich.objects import Commit
+
+        for i in range(3):
+            c = Commit()
+            c.message = b"empty commit"
+            c.committer = commit_kwargs["committer"]
+            c.author = commit_kwargs["author"]
+            c.commit_time = commit_kwargs["commit_timestamp"]
+            c.commit_timezone = commit_kwargs["commit_timezone"]
+            c.author_time = commit_kwargs["author_timestamp"]
+            c.author_timezone = commit_kwargs["author_timezone"]
+            c.tree = commit_kwargs["tree"]
+            if self._shas:
+                c.parents = [self._shas[-1]]
+            r.object_store.add_object(c)
+            self._shas.append(c.id)
+
+        # Set HEAD to point to the last commit
+        r.refs[b"HEAD"] = self._shas[-1]

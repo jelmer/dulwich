@@ -38,8 +38,8 @@ def TestOneInput(data) -> Optional[int]:
             return -1
 
         try:
-            repo.stage(file_names)
-            repo.do_commit(
+            repo.get_worktree().stage(file_names)
+            repo.get_worktree().commit(
                 message=fdp.ConsumeRandomBytes(),
                 committer=fdp.ConsumeRandomBytes(),
                 author=fdp.ConsumeRandomBytes(),

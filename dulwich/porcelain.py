@@ -112,6 +112,7 @@ from .errors import SendPackError
 from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
 from .index import (
+    ConflictedIndexEntry,
     IndexEntry,
     _fs_to_tree_path,
     blob_from_path_and_stat,
@@ -177,6 +178,9 @@ GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
 
 # TypeVar for preserving BaseRepo subclass types
 T = TypeVar("T", bound="BaseRepo")
+
+# Type alias for common repository parameter pattern
+RepoPath = Union[str, os.PathLike, Repo]
 
 
 @dataclass
@@ -361,7 +365,9 @@ def open_repo_closing(
     return closing(Repo(path_or_repo))
 
 
-def path_to_tree_path(repopath, path, tree_encoding=DEFAULT_ENCODING):
+def path_to_tree_path(
+    repopath: Union[str, os.PathLike], path, tree_encoding=DEFAULT_ENCODING
+):
     """Convert a path to a path usable in an index, e.g. bytes and relative to
     the repository root.
 
@@ -450,7 +456,7 @@ def archive(
             outstream.write(chunk)
 
 
-def update_server_info(repo=".") -> None:
+def update_server_info(repo: RepoPath = ".") -> None:
     """Update server info files for a repository.
 
     Args:
@@ -460,7 +466,7 @@ def update_server_info(repo=".") -> None:
         server_update_server_info(r)
 
 
-def write_commit_graph(repo=".", reachable=True) -> None:
+def write_commit_graph(repo: RepoPath = ".", reachable=True) -> None:
     """Write a commit graph file for a repository.
 
     Args:
@@ -475,7 +481,7 @@ def write_commit_graph(repo=".", reachable=True) -> None:
             r.object_store.write_commit_graph(refs, reachable=reachable)
 
 
-def symbolic_ref(repo, ref_name, force=False) -> None:
+def symbolic_ref(repo: RepoPath, ref_name, force=False) -> None:
     """Set git symbolic ref into HEAD.
 
     Args:
@@ -490,7 +496,7 @@ def symbolic_ref(repo, ref_name, force=False) -> None:
         repo_obj.refs.set_symbolic_ref(b"HEAD", ref_path)
 
 
-def pack_refs(repo, all=False) -> None:
+def pack_refs(repo: RepoPath, all=False) -> None:
     with open_repo_closing(repo) as repo_obj:
         repo_obj.refs.pack_refs(all=all)
 
@@ -592,15 +598,21 @@ def commit(
         # For amend, create dangling commit to avoid adding current HEAD as parent
         if amend:
             commit_kwargs["ref"] = None
-            commit_sha = r.do_commit(**commit_kwargs)
+            commit_sha = r.get_worktree().commit(**commit_kwargs)
             # Update HEAD to point to the new commit
             r.refs[b"HEAD"] = commit_sha
             return commit_sha
         else:
-            return r.do_commit(**commit_kwargs)
+            return r.get_worktree().commit(**commit_kwargs)
 
 
-def commit_tree(repo, tree, message=None, author=None, committer=None):
+def commit_tree(
+    repo: RepoPath,
+    tree,
+    message=None,
+    author=None,
+    committer=None,
+):
     """Create a new commit object.
 
     Args:
@@ -610,7 +622,7 @@ def commit_tree(repo, tree, message=None, author=None, committer=None):
       committer: Optional committer name and email
     """
     with open_repo_closing(repo) as r:
-        return r.do_commit(
+        return r.get_worktree().commit(
             message=message, tree=tree, committer=committer, author=author
         )
 
@@ -851,7 +863,7 @@ def add(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
                 ignored.add(relpath)
                 continue
             relpaths.append(relpath)
-        r.stage(relpaths)
+        r.get_worktree().stage(relpaths)
     return (relpaths, ignored)
 
 
@@ -867,7 +879,7 @@ def _is_subdir(subdir, parentdir):
 
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
-def clean(repo=".", target_dir=None) -> None:
+def clean(repo: Union[str, os.PathLike, Repo] = ".", target_dir=None) -> None:
     """Remove any untracked files from the target directory recursively.
 
     Equivalent to running ``git clean -fd`` in target_dir.
@@ -913,7 +925,7 @@ def clean(repo=".", target_dir=None) -> None:
                     os.remove(ap)
 
 
-def remove(repo=".", paths=None, cached=False) -> None:
+def remove(repo: Union[str, os.PathLike, Repo] = ".", paths=None, cached=False) -> None:
     """Remove files from the staging area.
 
     Args:
@@ -935,7 +947,10 @@ def remove(repo=".", paths=None, cached=False) -> None:
             # Convert to bytes for file operations
             full_path_bytes = os.fsencode(full_path)
             try:
-                index_sha = index[tree_path].sha
+                entry = index[tree_path]
+                if isinstance(entry, ConflictedIndexEntry):
+                    raise Error(f"{p} has conflicts in the index")
+                index_sha = entry.sha
             except KeyError as exc:
                 raise Error(f"{p} did not match any files") from exc
 
@@ -1141,7 +1156,7 @@ def print_tag(tag, decode, outstream=sys.stdout) -> None:
     outstream.write("\n")
 
 
-def show_blob(repo, blob, decode, outstream=sys.stdout) -> None:
+def show_blob(repo: RepoPath, blob, decode, outstream=sys.stdout) -> None:
     """Write a blob to a stream.
 
     Args:
@@ -1153,7 +1168,7 @@ def show_blob(repo, blob, decode, outstream=sys.stdout) -> None:
     outstream.write(decode(blob.data))
 
 
-def show_commit(repo, commit, decode, outstream=sys.stdout) -> None:
+def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
     """Show a commit to a stream.
 
     Args:
@@ -1162,19 +1177,20 @@ def show_commit(repo, commit, decode, outstream=sys.stdout) -> None:
       decode: Function for decoding bytes to unicode string
       outstream: Stream to write to
     """
-    print_commit(commit, decode=decode, outstream=outstream)
-    if commit.parents:
-        parent_commit = repo[commit.parents[0]]
-        base_tree = parent_commit.tree
-    else:
-        base_tree = None
-    diffstream = BytesIO()
-    write_tree_diff(diffstream, repo.object_store, base_tree, commit.tree)
+    with open_repo_closing(repo) as r:
+        print_commit(commit, decode=decode, outstream=outstream)
+        if commit.parents:
+            parent_commit = r[commit.parents[0]]
+            base_tree = parent_commit.tree
+        else:
+            base_tree = None
+        diffstream = BytesIO()
+        write_tree_diff(diffstream, r.object_store, base_tree, commit.tree)
     diffstream.seek(0)
     outstream.write(commit_decode(commit, diffstream.getvalue()))
 
 
-def show_tree(repo, tree, decode, outstream=sys.stdout) -> None:
+def show_tree(repo: RepoPath, tree, decode, outstream=sys.stdout) -> None:
     """Print a tree to a stream.
 
     Args:
@@ -1187,7 +1203,7 @@ def show_tree(repo, tree, decode, outstream=sys.stdout) -> None:
         outstream.write(decode(n) + "\n")
 
 
-def show_tag(repo, tag, decode, outstream=sys.stdout) -> None:
+def show_tag(repo: RepoPath, tag, decode, outstream=sys.stdout) -> None:
     """Print a tag to a stream.
 
     Args:
@@ -1196,11 +1212,12 @@ def show_tag(repo, tag, decode, outstream=sys.stdout) -> None:
       decode: Function for decoding bytes to unicode string
       outstream: Stream to write to
     """
-    print_tag(tag, decode, outstream)
-    show_object(repo, repo[tag.object[1]], decode, outstream)
+    with open_repo_closing(repo) as r:
+        print_tag(tag, decode, outstream)
+        show_object(repo, r[tag.object[1]], decode, outstream)
 
 
-def show_object(repo, obj, decode, outstream):
+def show_object(repo: RepoPath, obj, decode, outstream):
     return {
         b"tree": show_tree,
         b"blob": show_blob,
@@ -1312,7 +1329,12 @@ def show(
             show_object(r, o, decode, outstream)
 
 
-def diff_tree(repo, old_tree, new_tree, outstream=default_bytes_out_stream) -> None:
+def diff_tree(
+    repo: RepoPath,
+    old_tree,
+    new_tree,
+    outstream=default_bytes_out_stream,
+) -> None:
     """Compares the content and mode of blobs found via two tree objects.
 
     Args:
@@ -1421,7 +1443,7 @@ def diff(
             diff_module.diff_working_tree_to_index(r, outstream, paths)
 
 
-def rev_list(repo, commits, outstream=sys.stdout) -> None:
+def rev_list(repo: RepoPath, commits, outstream=sys.stdout) -> None:
     """Lists commit objects in reverse chronological order.
 
     Args:
@@ -1441,7 +1463,9 @@ def _canonical_part(url: str) -> str:
     return name
 
 
-def submodule_add(repo, url, path=None, name=None) -> None:
+def submodule_add(
+    repo: Union[str, os.PathLike, Repo], url, path=None, name=None
+) -> None:
     """Add a new submodule.
 
     Args:
@@ -1468,7 +1492,7 @@ def submodule_add(repo, url, path=None, name=None) -> None:
         config.write_to_path()
 
 
-def submodule_init(repo) -> None:
+def submodule_init(repo: Union[str, os.PathLike, Repo]) -> None:
     """Initialize submodules.
 
     Args:
@@ -1483,7 +1507,7 @@ def submodule_init(repo) -> None:
         config.write_to_path()
 
 
-def submodule_list(repo):
+def submodule_list(repo: RepoPath):
     """List submodules.
 
     Args:
@@ -1496,7 +1520,13 @@ def submodule_list(repo):
             yield path, sha.decode(DEFAULT_ENCODING)
 
 
-def submodule_update(repo, paths=None, init=False, force=False, errstream=None) -> None:
+def submodule_update(
+    repo: Union[str, os.PathLike, Repo],
+    paths=None,
+    init=False,
+    force=False,
+    errstream=None,
+) -> None:
     """Update submodules.
 
     Args:
@@ -1530,7 +1560,7 @@ def submodule_update(repo, paths=None, init=False, force=False, errstream=None) 
             )
 
             # Find the submodule name from .gitmodules
-            submodule_name = None
+            submodule_name: Optional[bytes] = None
             for sm_path, sm_url, sm_name in read_submodules(gitmodules_path):
                 if sm_path == path:
                     submodule_name = sm_name
@@ -1547,9 +1577,11 @@ def submodule_update(repo, paths=None, init=False, force=False, errstream=None) 
                 else submodule_name.encode(),
             )
             try:
-                url = config.get(section, b"url")
-                if isinstance(url, bytes):
-                    url = url.decode(DEFAULT_ENCODING)
+                url_value = config.get(section, b"url")
+                if isinstance(url_value, bytes):
+                    url = url_value.decode(DEFAULT_ENCODING)
+                else:
+                    url = url_value
             except KeyError:
                 # URL not in config, skip this submodule
                 continue
@@ -1708,7 +1740,7 @@ def tag_create(
         r.refs[_make_tag_ref(tag)] = tag_id
 
 
-def tag_list(repo, outstream=sys.stdout):
+def tag_list(repo: RepoPath, outstream=sys.stdout):
     """List all tags.
 
     Args:
@@ -1720,7 +1752,7 @@ def tag_list(repo, outstream=sys.stdout):
         return tags
 
 
-def tag_delete(repo, name) -> None:
+def tag_delete(repo: RepoPath, name) -> None:
     """Remove a tag.
 
     Args:
@@ -1823,7 +1855,7 @@ def notes_remove(
         )
 
 
-def notes_show(repo, object_sha, ref=b"commits"):
+def notes_show(repo: Union[str, os.PathLike, Repo], object_sha, ref=b"commits"):
     """Show the note for an object.
 
     Args:
@@ -1848,7 +1880,7 @@ def notes_show(repo, object_sha, ref=b"commits"):
         return r.notes.get_note(object_sha, notes_ref, config=config)
 
 
-def notes_list(repo, ref=b"commits"):
+def notes_list(repo: RepoPath, ref=b"commits"):
     """List all notes in a notes ref.
 
     Args:
@@ -1868,7 +1900,11 @@ def notes_list(repo, ref=b"commits"):
         return r.notes.list_notes(notes_ref, config=config)
 
 
-def reset(repo, mode, treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD") -> None:
+def reset(
+    repo: Union[str, os.PathLike, Repo],
+    mode,
+    treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD",
+) -> None:
     """Reset current HEAD to the specified state.
 
     Args:
@@ -2239,7 +2275,11 @@ def pull(
         maybe_auto_gc(r)
 
 
-def status(repo=".", ignored=False, untracked_files="normal"):
+def status(
+    repo: Union[str, os.PathLike, Repo] = ".",
+    ignored=False,
+    untracked_files="normal",
+):
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     Args:
@@ -2453,7 +2493,7 @@ def get_untracked_paths(
     yield from ignored_dirs
 
 
-def get_tree_changes(repo):
+def get_tree_changes(repo: RepoPath):
     """Return add/delete/modify changes to tree by comparing index to HEAD.
 
     Args:
@@ -2466,7 +2506,7 @@ def get_tree_changes(repo):
         # Compares the Index to the HEAD & determines changes
         # Iterate through the changes and report add/delete/modify
         # TODO: call out to dulwich.diff_tree somehow.
-        tracked_changes = {
+        tracked_changes: dict[str, list[Union[str, bytes]]] = {
             "add": [],
             "delete": [],
             "modify": [],
@@ -2478,10 +2518,13 @@ def get_tree_changes(repo):
 
         for change in index.changes_from_tree(r.object_store, tree_id):
             if not change[0][0]:
+                assert change[0][1] is not None
                 tracked_changes["add"].append(change[0][1])
             elif not change[0][1]:
+                assert change[0][0] is not None
                 tracked_changes["delete"].append(change[0][0])
             elif change[0][0] == change[0][1]:
+                assert change[0][0] is not None
                 tracked_changes["modify"].append(change[0][0])
             else:
                 raise NotImplementedError("git mv ops not yet supported")
@@ -2593,7 +2636,7 @@ def _make_tag_ref(name: Union[str, bytes]) -> Ref:
     return LOCAL_TAG_PREFIX + name
 
 
-def branch_delete(repo, name) -> None:
+def branch_delete(repo: RepoPath, name) -> None:
     """Delete a branch.
 
     Args:
@@ -2609,7 +2652,9 @@ def branch_delete(repo, name) -> None:
             del r.refs[_make_branch_ref(name)]
 
 
-def branch_create(repo, name, objectish=None, force=False) -> None:
+def branch_create(
+    repo: Union[str, os.PathLike, Repo], name, objectish=None, force=False
+) -> None:
     """Create a branch.
 
     Args:
@@ -2691,16 +2736,20 @@ def branch_create(repo, name, objectish=None, force=False) -> None:
                     remote_branch = b"refs/heads/" + parts[1]
 
                     # Set up tracking
-                    config = r.get_config()
+                    repo_config = r.get_config()
                     branch_name_bytes = (
                         name.encode(DEFAULT_ENCODING) if isinstance(name, str) else name
                     )
-                    config.set((b"branch", branch_name_bytes), b"remote", remote_name)
-                    config.set((b"branch", branch_name_bytes), b"merge", remote_branch)
-                    config.write_to_path()
+                    repo_config.set(
+                        (b"branch", branch_name_bytes), b"remote", remote_name
+                    )
+                    repo_config.set(
+                        (b"branch", branch_name_bytes), b"merge", remote_branch
+                    )
+                    repo_config.write_to_path()
 
 
-def branch_list(repo):
+def branch_list(repo: RepoPath):
     """List all branches.
 
     Args:
@@ -2756,7 +2805,7 @@ def branch_list(repo):
         return branches
 
 
-def active_branch(repo):
+def active_branch(repo: RepoPath):
     """Return the active branch in the repository, if any.
 
     Args:
@@ -2774,7 +2823,7 @@ def active_branch(repo):
         return active_ref[len(LOCAL_BRANCH_PREFIX) :]
 
 
-def get_branch_remote(repo):
+def get_branch_remote(repo: Union[str, os.PathLike, Repo]):
     """Return the active branch's remote name, if any.
 
     Args:
@@ -2794,7 +2843,7 @@ def get_branch_remote(repo):
     return remote_name
 
 
-def get_branch_merge(repo, branch_name=None):
+def get_branch_merge(repo: RepoPath, branch_name=None):
     """Return the branch's merge reference (upstream branch), if any.
 
     Args:
@@ -2814,7 +2863,9 @@ def get_branch_merge(repo, branch_name=None):
         return config.get((b"branch", branch_name), b"merge")
 
 
-def set_branch_tracking(repo, branch_name, remote_name, remote_ref):
+def set_branch_tracking(
+    repo: Union[str, os.PathLike, Repo], branch_name, remote_name, remote_ref
+):
     """Set up branch tracking configuration.
 
     Args:
@@ -2951,7 +3002,7 @@ def ls_remote(remote, config: Optional[Config] = None, **kwargs):
     return client.get_refs(host_path)
 
 
-def repack(repo) -> None:
+def repack(repo: RepoPath) -> None:
     """Repack loose files in a repository.
 
     Currently this only packs loose objects.
@@ -3033,7 +3084,11 @@ def ls_tree(
         list_tree(r.object_store, tree.id, "")
 
 
-def remote_add(repo, name: Union[bytes, str], url: Union[bytes, str]) -> None:
+def remote_add(
+    repo: RepoPath,
+    name: Union[bytes, str],
+    url: Union[bytes, str],
+) -> None:
     """Add a remote.
 
     Args:
@@ -3107,7 +3162,7 @@ def _quote_path(path: str) -> str:
     return quoted
 
 
-def check_ignore(repo, paths, no_index=False, quote_path=True):
+def check_ignore(repo: RepoPath, paths, no_index=False, quote_path=True):
     r"""Debug gitignore files.
 
     Args:
@@ -3159,7 +3214,7 @@ def check_ignore(repo, paths, no_index=False, quote_path=True):
                 yield _quote_path(output_path) if quote_path else output_path
 
 
-def update_head(repo, target, detached=False, new_branch=None) -> None:
+def update_head(repo: RepoPath, target, detached=False, new_branch=None) -> None:
     """Update HEAD to point at a new branch/commit.
 
     Note that this does not actually update the working tree.
@@ -3188,7 +3243,7 @@ def update_head(repo, target, detached=False, new_branch=None) -> None:
 
 
 def checkout(
-    repo,
+    repo: Union[str, os.PathLike, Repo],
     target: Optional[Union[str, bytes, Commit, Tag]] = None,
     force: bool = False,
     new_branch: Optional[Union[bytes, str]] = None,
@@ -3216,6 +3271,9 @@ def checkout(
     with open_repo_closing(repo) as r:
         # Store the original target for later reference checks
         original_target = target
+
+        worktree = r.get_worktree()
+
         # Handle path-specific checkout (like git checkout -- <paths>)
         if paths is not None:
             # Convert paths to bytes
@@ -3237,8 +3295,7 @@ def checkout(
                     target = target.encode(DEFAULT_ENCODING)
 
             # Get the target commit and tree
-            target_commit = parse_commit(r, target)
-            target_tree = r[target_commit.tree]
+            target_tree = parse_tree(r, target)
 
             # Get blob normalizer for line ending conversion
             blob_normalizer = r.get_blob_normalizer()
@@ -3251,6 +3308,7 @@ def checkout(
                         r.object_store.__getitem__, path
                     )
                     obj = r[sha]
+                    assert isinstance(obj, Blob), "Expected a Blob object"
                 except KeyError:
                     # Path doesn't exist in target tree
                     pass
@@ -3278,7 +3336,7 @@ def checkout(
                             f.write(obj.data)
 
                     # Update the index
-                    r.stage(path)
+                    worktree.stage(path)
 
             return
 
@@ -3307,7 +3365,9 @@ def checkout(
         # Get current HEAD tree for comparison
         try:
             current_head = r.refs[b"HEAD"]
-            current_tree_id = r[current_head].tree
+            current_commit = r[current_head]
+            assert isinstance(current_commit, Commit), "Expected a Commit object"
+            current_tree_id = current_commit.tree
         except KeyError:
             # No HEAD yet (empty repo)
             current_tree_id = None
@@ -3326,6 +3386,7 @@ def checkout(
             if changes:
                 # Check if any changes would conflict with checkout
                 target_tree = r[target_tree_id]
+                assert isinstance(target_tree, Tree), "Expected a Tree object"
                 for change in changes:
                     if isinstance(change, str):
                         change = change.encode(DEFAULT_ENCODING)
@@ -3452,7 +3513,11 @@ def reset_file(
 
 
 @replace_me(since="0.22.9", remove_in="0.24.0")
-def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> None:
+def checkout_branch(
+    repo: Union[str, os.PathLike, Repo],
+    target: Union[bytes, str],
+    force: bool = False,
+) -> None:
     """Switch branches or restore working tree files.
 
     This is now a wrapper around the general checkout() function.
@@ -3468,7 +3533,10 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False) -> Non
 
 
 def sparse_checkout(
-    repo, patterns=None, force: bool = False, cone: Union[bool, None] = None
+    repo: Union[str, os.PathLike, Repo],
+    patterns=None,
+    force: bool = False,
+    cone: Union[bool, None] = None,
 ):
     """Perform a sparse checkout in the repository (either 'full' or 'cone mode').
 
@@ -3499,16 +3567,16 @@ def sparse_checkout(
     with open_repo_closing(repo) as repo_obj:
         # --- 0) Possibly infer 'cone' from config ---
         if cone is None:
-            cone = repo_obj.infer_cone_mode()
+            cone = repo_obj.get_worktree().infer_cone_mode()
 
         # --- 1) Read or write patterns ---
         if patterns is None:
-            lines = repo_obj.get_sparse_checkout_patterns()
+            lines = repo_obj.get_worktree().get_sparse_checkout_patterns()
             if lines is None:
                 raise Error("No sparse checkout patterns found.")
         else:
             lines = patterns
-            repo_obj.set_sparse_checkout_patterns(patterns)
+            repo_obj.get_worktree().set_sparse_checkout_patterns(patterns)
 
         # --- 2) Determine the set of included paths ---
         index = repo_obj.open_index()
@@ -3521,7 +3589,7 @@ def sparse_checkout(
             raise CheckoutError(*exc.args) from exc
 
 
-def cone_mode_init(repo):
+def cone_mode_init(repo: Union[str, os.PathLike, Repo]):
     """Initialize a repository to use sparse checkout in 'cone' mode.
 
     Sets ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` in the config.
@@ -3539,12 +3607,12 @@ def cone_mode_init(repo):
       None
     """
     with open_repo_closing(repo) as repo_obj:
-        repo_obj.configure_for_cone_mode()
+        repo_obj.get_worktree().configure_for_cone_mode()
         patterns = ["/*", "!/*/"]  # root-level files only
         sparse_checkout(repo_obj, patterns, force=True, cone=True)
 
 
-def cone_mode_set(repo, dirs, force=False):
+def cone_mode_set(repo: Union[str, os.PathLike, Repo], dirs, force=False):
     """Overwrite the existing 'cone-mode' sparse patterns with a new set of directories.
 
     Ensures ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` are enabled.
@@ -3560,14 +3628,14 @@ def cone_mode_set(repo, dirs, force=False):
       None
     """
     with open_repo_closing(repo) as repo_obj:
-        repo_obj.configure_for_cone_mode()
-        repo_obj.set_cone_mode_patterns(dirs=dirs)
-        new_patterns = repo_obj.get_sparse_checkout_patterns()
+        repo_obj.get_worktree().configure_for_cone_mode()
+        repo_obj.get_worktree().set_cone_mode_patterns(dirs=dirs)
+        new_patterns = repo_obj.get_worktree().get_sparse_checkout_patterns()
         # Finally, apply the patterns and update the working tree
         sparse_checkout(repo_obj, new_patterns, force=force, cone=True)
 
 
-def cone_mode_add(repo, dirs, force=False):
+def cone_mode_add(repo: Union[str, os.PathLike, Repo], dirs, force=False):
     """Add new directories to the existing 'cone-mode' sparse-checkout patterns.
 
     Reads the current patterns from ``.git/info/sparse-checkout``, adds pattern
@@ -3583,21 +3651,21 @@ def cone_mode_add(repo, dirs, force=False):
       None
     """
     with open_repo_closing(repo) as repo_obj:
-        repo_obj.configure_for_cone_mode()
+        repo_obj.get_worktree().configure_for_cone_mode()
         # Do not pass base patterns as dirs
         base_patterns = ["/*", "!/*/"]
         existing_dirs = [
             pat.strip("/")
-            for pat in repo_obj.get_sparse_checkout_patterns()
+            for pat in repo_obj.get_worktree().get_sparse_checkout_patterns()
             if pat not in base_patterns
         ]
         added_dirs = existing_dirs + (dirs or [])
-        repo_obj.set_cone_mode_patterns(dirs=added_dirs)
-        new_patterns = repo_obj.get_sparse_checkout_patterns()
+        repo_obj.get_worktree().set_cone_mode_patterns(dirs=added_dirs)
+        new_patterns = repo_obj.get_worktree().get_sparse_checkout_patterns()
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
 
 
-def check_mailmap(repo, contact):
+def check_mailmap(repo: RepoPath, contact):
     """Check canonical name and email of contact.
 
     Args:
@@ -3615,7 +3683,7 @@ def check_mailmap(repo, contact):
         return mailmap.lookup(contact)
 
 
-def fsck(repo):
+def fsck(repo: RepoPath):
     """Check a repository.
 
     Args:
@@ -3634,7 +3702,7 @@ def fsck(repo):
                 yield (sha, e)
 
 
-def stash_list(repo):
+def stash_list(repo: Union[str, os.PathLike, Repo]):
     """List all stashes in a repository."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -3643,7 +3711,7 @@ def stash_list(repo):
         return enumerate(list(stash.stashes()))
 
 
-def stash_push(repo) -> None:
+def stash_push(repo: Union[str, os.PathLike, Repo]) -> None:
     """Push a new stash onto the stack."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -3652,7 +3720,7 @@ def stash_push(repo) -> None:
         stash.push()
 
 
-def stash_pop(repo) -> None:
+def stash_pop(repo: Union[str, os.PathLike, Repo]) -> None:
     """Pop a stash from the stack."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -3661,7 +3729,7 @@ def stash_pop(repo) -> None:
         stash.pop(0)
 
 
-def stash_drop(repo, index) -> None:
+def stash_drop(repo: Union[str, os.PathLike, Repo], index) -> None:
     """Drop a stash from the stack."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -3670,7 +3738,7 @@ def stash_drop(repo, index) -> None:
         stash.drop(index)
 
 
-def ls_files(repo):
+def ls_files(repo: RepoPath):
     """List all files in an index."""
     with open_repo_closing(repo) as r:
         return sorted(r.open_index())
@@ -3713,7 +3781,7 @@ def find_unique_abbrev(object_store, object_id, min_length=7):
     return hex_id
 
 
-def describe(repo, abbrev=None):
+def describe(repo: Union[str, os.PathLike, Repo], abbrev=None):
     """Describe the repository version.
 
     Args:
@@ -3730,26 +3798,31 @@ def describe(repo, abbrev=None):
         refs = r.get_refs()
         tags = {}
         for key, value in refs.items():
-            key = key.decode()
+            key_str = key.decode()
             obj = r.get_object(value)
-            if "tags" not in key:
+            if "tags" not in key_str:
                 continue
 
-            _, tag = key.rsplit("/", 1)
+            _, tag = key_str.rsplit("/", 1)
 
-            try:
+            if isinstance(obj, Tag):
                 # Annotated tag case
-                commit = obj.object
-                commit = r.get_object(commit[1])
-            except AttributeError:
+                commit = r.get_object(obj.object[1])
+            else:
                 # Lightweight tag case - obj is already the commit
                 commit = obj
+
+            if not isinstance(commit, Commit):
+                raise AssertionError(
+                    f"Expected Commit object, got {type(commit).__name__}"
+                )
+
             tags[tag] = [
                 datetime.datetime(*time.gmtime(commit.commit_time)[:6]),
                 commit.id.decode("ascii"),
             ]
 
-        sorted_tags = sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)
+        sorted_tags = sorted(tags.items(), key=lambda tag: tag[1][0], reverse=True)  # type: ignore[arg-type, return-value]
 
         # Get the latest commit
         latest_commit = r[r.head()]
@@ -3768,9 +3841,9 @@ def describe(repo, abbrev=None):
         for entry in walker:
             # Check if tag
             commit_id = entry.commit.id.decode("ascii")
-            for tag in sorted_tags:
-                tag_name = tag[0]
-                tag_commit = tag[1][1]
+            for tag_item in sorted_tags:
+                tag_name = tag_item[0]
+                tag_commit = tag_item[1][1]
                 if commit_id == tag_commit:
                     if commit_count == 0:
                         return tag_name
@@ -3814,7 +3887,7 @@ def get_object_by_path(
         return r[sha]
 
 
-def write_tree(repo):
+def write_tree(repo: RepoPath):
     """Write a tree object from the index.
 
     Args:
@@ -3946,7 +4019,7 @@ def _do_merge(
 
 
 def merge(
-    repo,
+    repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag],
     no_commit=False,
     no_ff=False,
@@ -4062,7 +4135,7 @@ def merge_tree(
 
 
 def cherry_pick(
-    repo,
+    repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag, None],
     no_commit=False,
     continue_=False,
@@ -4102,7 +4175,7 @@ def cherry_pick(
             except FileNotFoundError:
                 pass
             # Reset index to HEAD
-            r.reset_index(r[b"HEAD"].tree)
+            r.get_worktree().reset_index(r[b"HEAD"].tree)
             return None
 
         # Handle continue
@@ -4117,8 +4190,7 @@ def cherry_pick(
                 raise Error("No cherry-pick in progress")
 
             # Check for unresolved conflicts
-            conflicts = list(r.open_index().conflicts())
-            if conflicts:
+            if r.open_index().has_conflicts():
                 raise Error("Unresolved conflicts remain")
 
             # Create the commit
@@ -4132,7 +4204,7 @@ def cherry_pick(
             except FileNotFoundError:
                 message = cherry_pick_commit.message
 
-            new_commit = r.do_commit(
+            new_commit = r.get_worktree().commit(
                 message=message,
                 tree=tree_id,
                 author=cherry_pick_commit.author,
@@ -4186,7 +4258,7 @@ def cherry_pick(
 
         # Update working tree and index
         # Reset index to match merged tree
-        r.reset_index(merged_tree.id)
+        r.get_worktree().reset_index(merged_tree.id)
 
         # Update working tree from the new index
         # Allow overwriting because we're applying the merge result
@@ -4217,7 +4289,7 @@ def cherry_pick(
             return None
 
         # Create the commit
-        new_commit = r.do_commit(
+        new_commit = r.get_worktree().commit(
             message=cherry_pick_commit.message,
             tree=merged_tree.id,
             author=cherry_pick_commit.author,
@@ -4229,7 +4301,7 @@ def cherry_pick(
 
 
 def revert(
-    repo,
+    repo: Union[str, os.PathLike, Repo],
     commits: Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]],
     no_commit=False,
     message=None,
@@ -4436,7 +4508,7 @@ def prune(
             r.object_store.prune(grace_period=grace_period)
 
 
-def count_objects(repo=".", verbose=False) -> CountObjectsResult:
+def count_objects(repo: RepoPath = ".", verbose=False) -> CountObjectsResult:
     """Count unpacked objects and their disk usage.
 
     Args:
@@ -4454,6 +4526,9 @@ def count_objects(repo=".", verbose=False) -> CountObjectsResult:
         loose_size = 0
         for sha in object_store._iter_loose_objects():
             loose_count += 1
+            from .object_store import DiskObjectStore
+
+            assert isinstance(object_store, DiskObjectStore)
             path = object_store._get_shafile_path(sha)
             try:
                 stat_info = os.stat(path)
@@ -4580,7 +4655,11 @@ def rebase(
             raise Error(str(e))
 
 
-def annotate(repo, path, committish: Optional[Union[str, bytes, Commit, Tag]] = None):
+def annotate(
+    repo: RepoPath,
+    path,
+    committish: Optional[Union[str, bytes, Commit, Tag]] = None,
+):
     """Annotate the history of a file.
 
     :param repo: Path to the repository
@@ -4858,7 +4937,7 @@ def format_patch(
 
 
 def bisect_start(
-    repo=".",
+    repo: Union[str, os.PathLike, Repo] = ".",
     bad: Optional[Union[str, bytes, Commit, Tag]] = None,
     good: Optional[
         Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
@@ -4905,7 +4984,10 @@ def bisect_start(
             return next_sha
 
 
-def bisect_bad(repo=".", rev: Optional[Union[str, bytes, Commit, Tag]] = None):
+def bisect_bad(
+    repo: Union[str, os.PathLike, Repo] = ".",
+    rev: Optional[Union[str, bytes, Commit, Tag]] = None,
+):
     """Mark a commit as bad.
 
     Args:
@@ -4931,7 +5013,10 @@ def bisect_bad(repo=".", rev: Optional[Union[str, bytes, Commit, Tag]] = None):
         return next_sha
 
 
-def bisect_good(repo=".", rev: Optional[Union[str, bytes, Commit, Tag]] = None):
+def bisect_good(
+    repo: Union[str, os.PathLike, Repo] = ".",
+    rev: Optional[Union[str, bytes, Commit, Tag]] = None,
+):
     """Mark a commit as good.
 
     Args:
@@ -4958,7 +5043,7 @@ def bisect_good(repo=".", rev: Optional[Union[str, bytes, Commit, Tag]] = None):
 
 
 def bisect_skip(
-    repo=".",
+    repo: Union[str, os.PathLike, Repo] = ".",
     revs: Optional[
         Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
     ] = None,
@@ -4996,7 +5081,10 @@ def bisect_skip(
         return next_sha
 
 
-def bisect_reset(repo=".", commit: Optional[Union[str, bytes, Commit, Tag]] = None):
+def bisect_reset(
+    repo: Union[str, os.PathLike, Repo] = ".",
+    commit: Optional[Union[str, bytes, Commit, Tag]] = None,
+):
     """Reset bisect state and return to original branch/commit.
 
     Args:
@@ -5028,7 +5116,7 @@ def bisect_reset(repo=".", commit: Optional[Union[str, bytes, Commit, Tag]] = No
             pass
 
 
-def bisect_log(repo="."):
+def bisect_log(repo: Union[str, os.PathLike, Repo] = "."):
     """Get the bisect log.
 
     Args:
@@ -5042,7 +5130,7 @@ def bisect_log(repo="."):
         return state.get_log()
 
 
-def bisect_replay(repo, log_file):
+def bisect_replay(repo: Union[str, os.PathLike, Repo], log_file):
     """Replay a bisect log.
 
     Args:
@@ -5061,7 +5149,7 @@ def bisect_replay(repo, log_file):
         state.replay(log_content)
 
 
-def reflog(repo=".", ref=b"HEAD", all=False):
+def reflog(repo: RepoPath = ".", ref=b"HEAD", all=False):
     """Show reflog entries for a reference or all references.
 
     Args:
@@ -5092,7 +5180,7 @@ def reflog(repo=".", ref=b"HEAD", all=False):
                     yield (ref_bytes, entry)
 
 
-def lfs_track(repo=".", patterns=None):
+def lfs_track(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
     """Track file patterns with Git LFS.
 
     Args:
@@ -5143,7 +5231,7 @@ def lfs_track(repo=".", patterns=None):
         return lfs_track(r)  # Return updated list
 
 
-def lfs_untrack(repo=".", patterns=None):
+def lfs_untrack(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
     """Untrack file patterns from Git LFS.
 
     Args:
@@ -5187,7 +5275,7 @@ def lfs_untrack(repo=".", patterns=None):
         return lfs_track(r)  # Return updated list
 
 
-def lfs_init(repo="."):
+def lfs_init(repo: Union[str, os.PathLike, Repo] = "."):
     """Initialize Git LFS in a repository.
 
     Args:
@@ -5211,7 +5299,7 @@ def lfs_init(repo="."):
         config.write_to_path()
 
 
-def lfs_clean(repo=".", path=None):
+def lfs_clean(repo: Union[str, os.PathLike, Repo] = ".", path=None):
     """Clean a file by converting it to an LFS pointer.
 
     Args:
@@ -5240,7 +5328,7 @@ def lfs_clean(repo=".", path=None):
         return filter_driver.clean(content)
 
 
-def lfs_smudge(repo=".", pointer_content=None):
+def lfs_smudge(repo: Union[str, os.PathLike, Repo] = ".", pointer_content=None):
     """Smudge an LFS pointer by retrieving the actual content.
 
     Args:
@@ -5264,7 +5352,7 @@ def lfs_smudge(repo=".", pointer_content=None):
         return filter_driver.smudge(pointer_content)
 
 
-def lfs_ls_files(repo=".", ref=None):
+def lfs_ls_files(repo: Union[str, os.PathLike, Repo] = ".", ref=None):
     """List files tracked by Git LFS.
 
     Args:
@@ -5299,6 +5387,8 @@ def lfs_ls_files(repo=".", ref=None):
 
             # Check if it's an LFS pointer
             obj = r.object_store[sha]
+            if not isinstance(obj, Blob):
+                raise AssertionError(f"Expected Blob object, got {type(obj).__name__}")
             pointer = LFSPointer.from_bytes(obj.data)
             if pointer is not None:
                 lfs_files.append((path.decode(), pointer.oid, pointer.size))
@@ -5306,7 +5396,12 @@ def lfs_ls_files(repo=".", ref=None):
         return lfs_files
 
 
-def lfs_migrate(repo=".", include=None, exclude=None, everything=False):
+def lfs_migrate(
+    repo: Union[str, os.PathLike, Repo] = ".",
+    include=None,
+    exclude=None,
+    everything=False,
+):
     """Migrate files to Git LFS.
 
     Args:
@@ -5365,8 +5460,8 @@ def lfs_migrate(repo=".", include=None, exclude=None, everything=False):
                 files_to_migrate.append(path_str)
 
         # Migrate files
-        for path in files_to_migrate:
-            full_path = os.path.join(r.path, path)
+        for path_str in files_to_migrate:
+            full_path = os.path.join(r.path, path_str)
             if not os.path.exists(full_path):
                 continue
 
@@ -5388,7 +5483,8 @@ def lfs_migrate(repo=".", include=None, exclude=None, everything=False):
 
             st = os.stat(full_path)
             index_entry = index_entry_from_stat(st, blob.id, 0)
-            index[path.encode()] = index_entry
+            path_bytes = path_str.encode() if isinstance(path_str, str) else path_str
+            index[path_bytes] = index_entry
 
             migrated += 1
 
@@ -5402,7 +5498,7 @@ def lfs_migrate(repo=".", include=None, exclude=None, everything=False):
         return migrated
 
 
-def lfs_pointer_check(repo=".", paths=None):
+def lfs_pointer_check(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
     """Check if files are valid LFS pointers.
 
     Args:
@@ -5438,7 +5534,7 @@ def lfs_pointer_check(repo=".", paths=None):
         return results
 
 
-def lfs_fetch(repo=".", remote="origin", refs=None):
+def lfs_fetch(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=None):
     """Fetch LFS objects from remote.
 
     Args:
@@ -5454,20 +5550,20 @@ def lfs_fetch(repo=".", remote="origin", refs=None):
     with open_repo_closing(repo) as r:
         # Get LFS server URL from config
         config = r.get_config()
-        lfs_url = config.get((b"lfs",), b"url")
-        if not lfs_url:
+        lfs_url_bytes = config.get((b"lfs",), b"url")
+        if not lfs_url_bytes:
             # Try remote URL
             remote_url = config.get((b"remote", remote.encode()), b"url")
             if remote_url:
                 # Append /info/lfs to remote URL
-                remote_url = remote_url.decode()
-                if remote_url.endswith(".git"):
-                    remote_url = remote_url[:-4]
-                lfs_url = f"{remote_url}/info/lfs"
+                remote_url_str = remote_url.decode()
+                if remote_url_str.endswith(".git"):
+                    remote_url_str = remote_url_str[:-4]
+                lfs_url = f"{remote_url_str}/info/lfs"
             else:
                 raise ValueError(f"No LFS URL configured for remote {remote}")
         else:
-            lfs_url = lfs_url.decode()
+            lfs_url = lfs_url_bytes.decode()
 
         # Get authentication
         auth = None
@@ -5518,7 +5614,7 @@ def lfs_fetch(repo=".", remote="origin", refs=None):
         return fetched
 
 
-def lfs_pull(repo=".", remote="origin"):
+def lfs_pull(repo: Union[str, os.PathLike, Repo] = ".", remote="origin"):
     """Pull LFS objects for current checkout.
 
     Args:
@@ -5559,7 +5655,7 @@ def lfs_pull(repo=".", remote="origin"):
         return fetched
 
 
-def lfs_push(repo=".", remote="origin", refs=None):
+def lfs_push(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=None):
     """Push LFS objects to remote.
 
     Args:
@@ -5575,20 +5671,20 @@ def lfs_push(repo=".", remote="origin", refs=None):
     with open_repo_closing(repo) as r:
         # Get LFS server URL from config
         config = r.get_config()
-        lfs_url = config.get((b"lfs",), b"url")
-        if not lfs_url:
+        lfs_url_bytes = config.get((b"lfs",), b"url")
+        if not lfs_url_bytes:
             # Try remote URL
             remote_url = config.get((b"remote", remote.encode()), b"url")
             if remote_url:
                 # Append /info/lfs to remote URL
-                remote_url = remote_url.decode()
-                if remote_url.endswith(".git"):
-                    remote_url = remote_url[:-4]
-                lfs_url = f"{remote_url}/info/lfs"
+                remote_url_str = remote_url.decode()
+                if remote_url_str.endswith(".git"):
+                    remote_url_str = remote_url_str[:-4]
+                lfs_url = f"{remote_url_str}/info/lfs"
             else:
                 raise ValueError(f"No LFS URL configured for remote {remote}")
         else:
-            lfs_url = lfs_url.decode()
+            lfs_url = lfs_url_bytes.decode()
 
         # Get authentication
         auth = None
@@ -5644,7 +5740,7 @@ def lfs_push(repo=".", remote="origin", refs=None):
         return pushed
 
 
-def lfs_status(repo="."):
+def lfs_status(repo: Union[str, os.PathLike, Repo] = "."):
     """Show status of LFS files.
 
     Args:
@@ -5659,7 +5755,7 @@ def lfs_status(repo="."):
         store = LFSStore.from_repo(r)
         index = r.open_index()
 
-        status = {
+        status: dict[str, list[str]] = {
             "tracked": [],
             "not_staged": [],
             "not_committed": [],
@@ -5687,11 +5783,17 @@ def lfs_status(repo="."):
                         status["missing"].append(path_str)
 
                     # Check if file has been modified
+                    if isinstance(entry, ConflictedIndexEntry):
+                        continue  # Skip conflicted entries
                     try:
-                        staged_obj = r.object_store[entry.binsha]
+                        staged_obj = r.object_store[entry.sha]
                     except KeyError:
                         pass
                     else:
+                        if not isinstance(staged_obj, Blob):
+                            raise AssertionError(
+                                f"Expected Blob object, got {type(staged_obj).__name__}"
+                            )
                         staged_pointer = LFSPointer.from_bytes(staged_obj.data)
                         if staged_pointer and staged_pointer.oid != pointer.oid:
                             status["not_staged"].append(path_str)

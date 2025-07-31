@@ -1,4 +1,4 @@
-0.23.3	UNRELEASED
+0.24.0	2025-08-01
 
  * Split out ``WorkTree`` from ``Repo``. (Jelmer Vernooĳ)
 

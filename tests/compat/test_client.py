@@ -130,7 +130,7 @@ class DulwichClientTestBase:
                 ("zop", "zop contents"),
             ]:
                 tree_id = self._add_file(local, tree_id, filename, contents)
-                commit_id = local.do_commit(
+                commit_id = local.get_worktree().commit(
                     message=b"add " + filename.encode("utf-8"),
                     committer=b"Joe Example <joe@example.com>",
                     tree=tree_id,

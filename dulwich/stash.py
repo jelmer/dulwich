@@ -268,7 +268,7 @@ class Stash:
         # Create a dangling commit for the index state
         # Note: We pass ref=None which is handled specially in do_commit
         # to create a commit without updating any reference
-        index_commit_id = self._repo.do_commit(
+        index_commit_id = self._repo.get_worktree().commit(
             tree=index_tree_id,
             message=b"Index stash",
             merge_heads=[self._repo.head()],
@@ -299,7 +299,7 @@ class Stash:
         # TODO(jelmer): Just pass parents into do_commit()?
         self._repo.refs[self._ref] = self._repo.head()
 
-        cid = self._repo.do_commit(
+        cid = self._repo.get_worktree().commit(
             ref=self._ref,
             tree=stash_tree_id,
             message=message,

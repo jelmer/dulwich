@@ -191,7 +191,7 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
                     dest_repo.refs[ref] = sha
 
             # Checkout files
-            dest_repo.reset_index()
+            dest_repo.get_worktree().reset_index()
 
             # Verify the clone
             test_file = os.path.join(dest_path, "test0.txt")
@@ -245,7 +245,7 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
                     dest_repo.refs[ref] = sha
 
             # Reset to new commit
-            dest_repo.reset_index()
+            dest_repo.get_worktree().reset_index()
 
             # Verify the new file exists
             test_file2_dest = os.path.join(dest_path, "test2.txt")

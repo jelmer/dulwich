@@ -901,7 +901,7 @@ class GitClient:
                     head = None
 
             if checkout and head is not None:
-                target.reset_index()
+                target.get_worktree().reset_index()
         except BaseException:
             if target is not None:
                 target.close()

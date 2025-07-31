@@ -127,7 +127,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
 
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
         # Nothing in the staging area
-        local_repo.do_commit("Test commit", "fbo@localhost")
+        local_repo.get_worktree().commit("Test commit", "fbo@localhost")
         sha = local_repo.refs.read_loose_ref("refs/heads/master")
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)
@@ -144,7 +144,9 @@ class SwiftRepoSmokeTest(unittest.TestCase):
 
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
         # Nothing in the staging area
-        local_repo.do_commit("Test commit", "fbo@localhost", ref="refs/heads/mybranch")
+        local_repo.get_worktree().commit(
+            "Test commit", "fbo@localhost", ref="refs/heads/mybranch"
+        )
         sha = local_repo.refs.read_loose_ref("refs/heads/mybranch")
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)
@@ -168,7 +170,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         local_shas = {}
         remote_shas = {}
         for branch in ("master", "mybranch", "pullr-108"):
-            local_shas[branch] = local_repo.do_commit(
+            local_shas[branch] = local_repo.get_worktree().commit(
                 f"Test commit {branch}",
                 "fbo@localhost",
                 ref=f"refs/heads/{branch}",
@@ -194,8 +196,10 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         for f in files:
             open(os.path.join(self.temp_d, f), "w").write(f"DATA {i}")
             i += 1
-        local_repo.stage(files)
-        local_repo.do_commit("Test commit", "fbo@localhost", ref="refs/heads/master")
+        local_repo.get_worktree().stage(files)
+        local_repo.get_worktree().commit(
+            "Test commit", "fbo@localhost", ref="refs/heads/master"
+        )
         swift.SwiftRepo.init_bare(self.scon, self.conf)
         tcp_client = client.TCPGitClient(self.server_address, port=self.port)
         tcp_client.send_pack(
@@ -245,8 +249,10 @@ class SwiftRepoSmokeTest(unittest.TestCase):
         for f in files:
             open(os.path.join(self.temp_d, f), "w").write(f"DATA {i}")
             i += 1
-        local_repo.stage(files)
-        local_repo.do_commit("Test commit", "fbo@localhost", ref="refs/heads/master")
+        local_repo.get_worktree().stage(files)
+        local_repo.get_worktree().commit(
+            "Test commit", "fbo@localhost", ref="refs/heads/master"
+        )
         tcp_client.send_pack(
             "/fakerepo", determine_wants, local_repo.generate_pack_data
         )
@@ -277,7 +283,7 @@ class SwiftRepoSmokeTest(unittest.TestCase):
 
         local_repo = repo.Repo.init(self.temp_d, mkdir=True)
         # Nothing in the staging area
-        sha = local_repo.do_commit("Test commit", "fbo@localhost")
+        sha = local_repo.get_worktree().commit("Test commit", "fbo@localhost")
         otype, data = local_repo.object_store.get_raw(sha)
         commit = objects.ShaFile.from_raw_string(otype, data)
         tag = objects.Tag()

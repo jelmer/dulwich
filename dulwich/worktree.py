@@ -887,7 +887,7 @@ def add_worktree(
         wt_repo.refs.set_symbolic_ref(b"HEAD", branch)
 
     # Reset index to match HEAD
-    wt_repo.reset_index()
+    wt_repo.get_worktree().reset_index()
 
     return wt_repo
 

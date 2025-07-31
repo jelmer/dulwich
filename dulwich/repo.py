@@ -677,6 +677,7 @@ class BaseRepo:
 
     def head(self) -> bytes:
         """Return the SHA1 pointed at by HEAD."""
+        # TODO: move this method to WorkTree
         return self.refs[b"HEAD"]
 
     def _get_object(self, sha, cls):
@@ -1000,7 +1001,7 @@ class BaseRepo:
             "Working tree operations not supported by this repository type"
         )
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def do_commit(
         self,
         message: Optional[bytes] = None,
@@ -1441,7 +1442,7 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def stage(
         self,
         fs_paths: Union[
@@ -1455,7 +1456,7 @@ class Repo(BaseRepo):
         """
         return self.get_worktree().stage(fs_paths)
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def unstage(self, fs_paths: list[str]) -> None:
         """Unstage specific file in the index
         Args:
@@ -1547,7 +1548,7 @@ class Repo(BaseRepo):
                         head = None
 
                 if checkout and head is not None:
-                    target.reset_index()
+                    target.get_worktree().reset_index()
             except BaseException:
                 target.close()
                 raise
@@ -1559,7 +1560,7 @@ class Repo(BaseRepo):
             raise
         return target
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def reset_index(self, tree: Optional[bytes] = None):
         """Reset the index back to a specific tree.
 
@@ -1821,7 +1822,7 @@ class Repo(BaseRepo):
         with open(os.path.join(worktree_controldir, "HEAD"), "wb") as f:
             f.write(main_repo.head() + b"\n")
         r = cls(os.path.normpath(path))
-        r.reset_index()
+        r.get_worktree().reset_index()
         return r
 
     @classmethod
@@ -1989,22 +1990,22 @@ class Repo(BaseRepo):
 
         return GitAttributes(patterns)
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def _sparse_checkout_file_path(self) -> str:
         """Return the path of the sparse-checkout file in this repo's control dir."""
         return self.get_worktree()._sparse_checkout_file_path()
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def configure_for_cone_mode(self) -> None:
         """Ensure the repository is configured for cone-mode sparse-checkout."""
         return self.get_worktree().configure_for_cone_mode()
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def infer_cone_mode(self) -> bool:
         """Return True if 'core.sparseCheckoutCone' is set to 'true' in config, else False."""
         return self.get_worktree().infer_cone_mode()
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def get_sparse_checkout_patterns(self) -> list[str]:
         """Return a list of sparse-checkout patterns from info/sparse-checkout.
 
@@ -2013,7 +2014,7 @@ class Repo(BaseRepo):
         """
         return self.get_worktree().get_sparse_checkout_patterns()
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def set_sparse_checkout_patterns(self, patterns: list[str]) -> None:
         """Write the given sparse-checkout patterns into info/sparse-checkout.
 
@@ -2024,7 +2025,7 @@ class Repo(BaseRepo):
         """
         return self.get_worktree().set_sparse_checkout_patterns(patterns)
 
-    @replace_me()
+    @replace_me(remove_in="0.26.0")
     def set_cone_mode_patterns(self, dirs: Union[list[str], None] = None) -> None:
         """Write the given cone-mode directory patterns into info/sparse-checkout.
 

@@ -945,7 +945,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         # Initial commit
         tree1 = Tree()
         self.repo.object_store.add_object(tree1)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Initial commit",
             tree=tree1.id,
         )
@@ -956,7 +956,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         tree2 = Tree()
         tree2.add(b"hello.txt", 0o100644, blob.id)
         self.repo.object_store.add_object(tree2)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Add hello.txt",
             tree=tree2.id,
         )
@@ -990,7 +990,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         # Initial commit
         tree1 = Tree()
         self.repo.object_store.add_object(tree1)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Initial commit",
             tree=tree1.id,
         )
@@ -1001,7 +1001,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         tree2 = Tree()
         tree2.add(b"file1.txt", 0o100644, blob1.id)
         self.repo.object_store.add_object(tree2)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Add file1.txt",
             tree=tree2.id,
         )
@@ -1013,7 +1013,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         tree3.add(b"file1.txt", 0o100644, blob1.id)
         tree3.add(b"file2.txt", 0o100644, blob2.id)
         self.repo.object_store.add_object(tree3)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Add file2.txt",
             tree=tree3.id,
         )
@@ -1049,7 +1049,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         tree = Tree()
         tree.add(b"test.txt", 0o100644, blob.id)
         self.repo.object_store.add_object(tree)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Test commit",
             tree=tree.id,
         )
@@ -1083,7 +1083,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         tree0 = Tree()
         self.repo.object_store.add_object(tree0)
         trees.append(tree0)
-        c0 = self.repo.do_commit(
+        c0 = self.repo.get_worktree().commit(
             message=b"Initial commit",
             tree=tree0.id,
         )
@@ -1103,7 +1103,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
             self.repo.object_store.add_object(tree)
             trees.append(tree)
 
-            c = self.repo.do_commit(
+            c = self.repo.get_worktree().commit(
                 message=f"Add file{i}.txt".encode(),
                 tree=tree.id,
             )
@@ -1145,7 +1145,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         self.repo.object_store.add_object(blob1)
         tree1.add(b"file.txt", 0o100644, blob1.id)
         self.repo.object_store.add_object(tree1)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Initial commit",
             tree=tree1.id,
         )
@@ -1155,7 +1155,7 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         self.repo.object_store.add_object(blob2)
         tree2.add(b"file.txt", 0o100644, blob2.id)
         self.repo.object_store.add_object(tree2)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"Modify file.txt",
             tree=tree2.id,
         )

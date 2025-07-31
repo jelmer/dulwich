@@ -68,8 +68,10 @@ class SubmoduleTests(TestCase):
             f.write(b"test file content")
 
         # Stage and commit the file to create some basic content
-        repo.stage(["file.txt"])
-        repo.do_commit(b"Initial commit")
+        repo.get_worktree().stage(["file.txt"])
+        repo.get_worktree().commit(
+            message=b"Initial commit",
+        )
 
         # Manually create the raw string for a tree with our file and a submodule
         # Format for tree entries: [mode] [name]\0[sha]

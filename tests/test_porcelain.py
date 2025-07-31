@@ -6260,14 +6260,14 @@ class ReceivePackTests(PorcelainTestCase):
         with open(fullpath, "w") as f:
             f.write("stuff")
         porcelain.add(repo=self.repo.path, paths=fullpath)
-        self.repo.do_commit(
+        self.repo.get_worktree().commit(
             message=b"test status",
-            author=b"author <email>",
             committer=b"committer <email>",
-            author_timestamp=1402354300,
+            author=b"author <email>",
             commit_timestamp=1402354300,
-            author_timezone=0,
             commit_timezone=0,
+            author_timestamp=1402354300,
+            author_timezone=0,
         )
         outf = BytesIO()
         exitcode = porcelain.receive_pack(self.repo.path, BytesIO(b"0000"), outf)
@@ -6837,7 +6837,7 @@ class CheckIgnoreTests(PorcelainTestCase):
         path = os.path.join(self.repo.path, "foo")
         with open(path, "w") as f:
             f.write("BAR")
-        self.repo.stage(["foo"])
+        self.repo.get_worktree().stage(["foo"])
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
             f.write("foo\n")
         self.assertEqual([], list(porcelain.check_ignore(self.repo, [path])))
@@ -6849,7 +6849,7 @@ class CheckIgnoreTests(PorcelainTestCase):
     def test_check_added_rel(self) -> None:
         with open(os.path.join(self.repo.path, "foo"), "w") as f:
             f.write("BAR")
-        self.repo.stage(["foo"])
+        self.repo.get_worktree().stage(["foo"])
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
             f.write("foo\n")
         cwd = os.getcwd()

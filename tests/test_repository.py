@@ -203,9 +203,9 @@ class MemoryRepoTests(TestCase):
                 f.write("test content\n")
 
             # Stage and commit using dulwich
-            initial_repo.stage(["test.txt"])
-            initial_repo.do_commit(
-                b"Initial commit\n",
+            initial_repo.get_worktree().stage(["test.txt"])
+            initial_repo.get_worktree().commit(
+                message=b"Initial commit\n",
                 committer=b"Test Committer <test@example.com>",
                 author=b"Test Author <test@example.com>",
             )
@@ -606,8 +606,10 @@ class RepositoryRootTests(TestCase):
 
         o = Repo.init(os.path.join(tmp_dir, "s"), mkdir=True)
         os.symlink("foo", os.path.join(tmp_dir, "s", "bar"))
-        o.stage("bar")
-        o.do_commit(b"add symlink")
+        o.get_worktree().stage("bar")
+        o.get_worktree().commit(
+            message=b"add symlink",
+        )
 
         t = o.clone(os.path.join(tmp_dir, "t"), symlinks=True)
         o.close()
@@ -626,8 +628,10 @@ class RepositoryRootTests(TestCase):
         o = Repo.init(os.path.join(tmp_dir, "s"), mkdir=True)
         o.close()
         os.symlink("foo", os.path.join(tmp_dir, "s", "bar"))
-        o.stage("bar")
-        o.do_commit(b"add symlink")
+        o.get_worktree().stage("bar")
+        o.get_worktree().commit(
+            message=b"add symlink",
+        )
 
         t = o.clone(os.path.join(tmp_dir, "t"), symlinks=False)
         with open(os.path.join(tmp_dir, "t", "bar")) as f:
@@ -655,7 +659,7 @@ class RepositoryRootTests(TestCase):
 
         # Try to stage the malicious path - should be rejected
         with self.assertRaises(ValueError):
-            repo.stage([attack_name])
+            repo.get_worktree().stage([attack_name])
 
         # Test with protectHFS disabled
         config.set(b"core", b"core.protectHFS", b"false")
@@ -849,8 +853,8 @@ exit 0
             f.write(pre_commit_success)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        commit_sha = r.do_commit(
-            b"empty commit",
+        commit_sha = r.get_worktree().commit(
+            message=b"empty commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -899,8 +903,8 @@ exit 0
             f.write(commit_msg_success)
         os.chmod(commit_msg, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        commit_sha = r.do_commit(
-            b"empty commit",
+        commit_sha = r.get_worktree().commit(
+            message=b"empty commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -937,7 +941,7 @@ r.stage(['foo'])
         with open(os.path.join(repo_dir, "blah"), "w") as f:
             f.write("blah")
 
-        r.stage(["blah"])
+        r.get_worktree().stage(["blah"])
 
         pre_commit = os.path.join(r.controldir(), "hooks", "pre-commit")
 
@@ -945,8 +949,8 @@ r.stage(['foo'])
             f.write(pre_commit_contents)
         os.chmod(pre_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        commit_sha = r.do_commit(
-            b"new commit",
+        commit_sha = r.get_worktree().commit(
+            message=b"new commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -979,8 +983,8 @@ rm """
 """
         )
 
-        root_sha = r.do_commit(
-            b"empty commit",
+        root_sha = r.get_worktree().commit(
+            message=b"empty commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -996,8 +1000,8 @@ rm """
             f.write(post_commit_msg.encode(locale.getpreferredencoding()))
         os.chmod(post_commit, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
 
-        commit_sha = r.do_commit(
-            b"empty commit",
+        commit_sha = r.get_worktree().commit(
+            message=b"empty commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -1021,8 +1025,8 @@ exit 1
         warnings_list, restore_warnings = setup_warning_catcher()
         self.addCleanup(restore_warnings)
 
-        commit_sha2 = r.do_commit(
-            b"empty commit",
+        commit_sha2 = r.get_worktree().commit(
+            message=b"empty commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -1071,8 +1075,8 @@ exit 1
         self.addCleanup(shutil.rmtree, worktree_temp_dir)
         r = Repo.init(temp_dir)
         self.addCleanup(r.close)
-        root_sha = r.do_commit(
-            b"empty commit",
+        root_sha = r.get_worktree().commit(
+            message=b"empty commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -1083,8 +1087,8 @@ exit 1
         r.refs[b"refs/heads/master"] = root_sha
         w = Repo._init_new_working_directory(worktree_temp_dir, r)
         self.addCleanup(w.close)
-        new_sha = w.do_commit(
-            b"new commit",
+        new_sha = w.get_worktree().commit(
+            message=b"new commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -1122,9 +1126,9 @@ class BuildRepoRootTests(TestCase):
 
         with open(os.path.join(r.path, "a"), "wb") as f:
             f.write(b"file contents")
-        r.stage(["a"])
-        commit_sha = r.do_commit(
-            b"msg",
+        r.get_worktree().stage(["a"])
+        commit_sha = r.get_worktree().commit(
+            message=b"msg",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -1180,9 +1184,9 @@ class BuildRepoRootTests(TestCase):
         r = self._repo
         with open(os.path.join(r.path, "a"), "wb") as f:
             f.write(b"new contents")
-        r.stage(["a"])
-        commit_sha = r.do_commit(
-            b"modified a",
+        r.get_worktree().stage(["a"])
+        commit_sha = r.get_worktree().commit(
+            message=b"modified a",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1199,9 +1203,9 @@ class BuildRepoRootTests(TestCase):
     def test_commit_symlink(self) -> None:
         r = self._repo
         os.symlink("a", os.path.join(r.path, "b"))
-        r.stage(["a", "b"])
-        commit_sha = r.do_commit(
-            b"Symlink b",
+        r.get_worktree().stage(["a", "b"])
+        commit_sha = r.get_worktree().commit(
+            message=b"Symlink b",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1220,8 +1224,8 @@ class BuildRepoRootTests(TestCase):
         r = Repo.init(tmp_dir)
         with open(os.path.join(r.path, "a"), "w") as f:
             f.write("initial text")
-        c1 = r.do_commit(
-            b"initial commit",
+        c1 = r.get_worktree().commit(
+            message=b"initial commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1233,9 +1237,9 @@ class BuildRepoRootTests(TestCase):
             f.write("merged text")
         with open(os.path.join(r.path, ".git", "MERGE_HEAD"), "w") as f:
             f.write("c27a2d21dd136312d7fa9e8baabb82561a1727d0\n")
-        r.stage(["a"])
-        commit_sha = r.do_commit(
-            b"deleted a",
+        r.get_worktree().stage(["a"])
+        commit_sha = r.get_worktree().commit(
+            message=b"deleted a",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1251,9 +1255,9 @@ class BuildRepoRootTests(TestCase):
     def test_commit_deleted(self) -> None:
         r = self._repo
         os.remove(os.path.join(r.path, "a"))
-        r.stage(["a"])
-        commit_sha = r.do_commit(
-            b"deleted a",
+        r.get_worktree().stage(["a"])
+        commit_sha = r.get_worktree().commit(
+            message=b"deleted a",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1269,8 +1273,8 @@ class BuildRepoRootTests(TestCase):
     def test_commit_follows(self) -> None:
         r = self._repo
         r.refs.set_symbolic_ref(b"HEAD", b"refs/heads/bla")
-        commit_sha = r.do_commit(
-            b"commit with strange character",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit with strange character",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1283,8 +1287,8 @@ class BuildRepoRootTests(TestCase):
 
     def test_commit_encoding(self) -> None:
         r = self._repo
-        commit_sha = r.do_commit(
-            b"commit with strange character \xee",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit with strange character \xee",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1361,8 +1365,8 @@ class BuildRepoRootTests(TestCase):
         c = r.get_config()
         c.set(("i18n",), "commitEncoding", "iso8859-1")
         c.write_to_path()
-        commit_sha = r.do_commit(
-            b"commit with strange character \xee",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit with strange character \xee",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1379,7 +1383,9 @@ class BuildRepoRootTests(TestCase):
         c.set((b"user",), b"name", b"Jelmer")
         c.set((b"user",), b"email", b"jelmer@apache.org")
         c.write_to_path()
-        commit_sha = r.do_commit(b"message")
+        commit_sha = r.get_worktree().commit(
+            message=b"message",
+        )
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].author)
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].committer)
 
@@ -1391,7 +1397,9 @@ class BuildRepoRootTests(TestCase):
         c.set((b"user",), b"name", b"Jelmer")
         c.set((b"user",), b"email", b"<jelmer@apache.org>")
         c.write_to_path()
-        commit_sha = r.do_commit(b"message")
+        commit_sha = r.get_worktree().commit(
+            message=b"message",
+        )
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].author)
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].committer)
 
@@ -1402,7 +1410,15 @@ class BuildRepoRootTests(TestCase):
         c.set((b"user",), b"name", b"Jelmer")
         c.set((b"user",), b"email", b"jelmer@apache.org")
 
-        commit_sha = r.do_commit(b"message", tree=objects.Tree().id)
+        # Create a tree object
+        tree = objects.Tree()
+        r.object_store.add_object(tree)
+
+        # Use do_commit for MemoryRepo since it doesn't support worktree
+        commit_sha = r.do_commit(
+            message=b"message",
+            tree=tree.id,
+        )
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].author)
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].committer)
 
@@ -1415,7 +1431,9 @@ class BuildRepoRootTests(TestCase):
         c.set((b"user",), b"name", b"Jelmer")
         c.set((b"user",), b"email", b"jelmer@apache.org")
         c.write_to_path()
-        commit_sha = r.do_commit(b"message")
+        commit_sha = r.get_worktree().commit(
+            message=b"message",
+        )
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].author)
         self.assertEqual(b"joe <joe@example.com>", r[commit_sha].committer)
 
@@ -1463,8 +1481,8 @@ class BuildRepoRootTests(TestCase):
             # Generate a message
             return b"Generated commit for tree " + commit.tree[:8]
 
-        commit_sha = r.do_commit(
-            message_callback,  # Pass the callback as message
+        commit_sha = r.get_worktree().commit(
+            message=message_callback,
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12345,
@@ -1501,17 +1519,17 @@ class BuildRepoRootTests(TestCase):
         r = self._repo
 
         # Create two parent commits first
-        parent1 = r.do_commit(
-            b"Parent 1",
+        parent1 = r.get_worktree().commit(
+            message=b"Parent 1",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
         )
 
-        parent2 = r.do_commit(
-            b"Parent 2",
+        parent2 = r.get_worktree().commit(
+            message=b"Parent 2",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
-            ref=None,  # Dangling commit
+            ref=None,
         )
 
         def message_callback(repo, commit):
@@ -1519,8 +1537,8 @@ class BuildRepoRootTests(TestCase):
             self.assertEqual(2, len(commit.parents))
             return b"Merge commit with %d parents" % len(commit.parents)
 
-        merge_sha = r.do_commit(
-            message_callback,
+        merge_sha = r.get_worktree().commit(
+            message=message_callback,
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             merge_heads=[parent2],
@@ -1533,8 +1551,8 @@ class BuildRepoRootTests(TestCase):
     def test_commit_branch(self) -> None:
         r = self._repo
 
-        commit_sha = r.do_commit(
-            b"commit to branch",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit to branch",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1550,8 +1568,8 @@ class BuildRepoRootTests(TestCase):
 
         new_branch_head = commit_sha
 
-        commit_sha = r.do_commit(
-            b"commit to branch 2",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit to branch 2",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1566,8 +1584,8 @@ class BuildRepoRootTests(TestCase):
 
     def test_commit_merge_heads(self) -> None:
         r = self._repo
-        merge_1 = r.do_commit(
-            b"commit to branch 2",
+        merge_1 = r.get_worktree().commit(
+            message=b"commit to branch 2",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1576,8 +1594,8 @@ class BuildRepoRootTests(TestCase):
             author_timezone=0,
             ref=b"refs/heads/new_branch",
         )
-        commit_sha = r.do_commit(
-            b"commit with merge",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit with merge",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1593,8 +1611,8 @@ class BuildRepoRootTests(TestCase):
 
         old_shas = set(r.object_store)
         old_refs = r.get_refs()
-        commit_sha = r.do_commit(
-            b"commit with no ref",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit with no ref",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1617,8 +1635,8 @@ class BuildRepoRootTests(TestCase):
 
         old_shas = set(r.object_store)
         old_refs = r.get_refs()
-        commit_sha = r.do_commit(
-            b"commit with no ref",
+        commit_sha = r.get_worktree().commit(
+            message=b"commit with no ref",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,
@@ -1645,21 +1663,23 @@ class BuildRepoRootTests(TestCase):
     def test_stage_deleted(self) -> None:
         r = self._repo
         os.remove(os.path.join(r.path, "a"))
-        r.stage(["a"])
-        r.stage(["a"])  # double-stage a deleted path
+        r.get_worktree().stage(["a"])
+        r.get_worktree().stage(["a"])  # double-stage a deleted path
         self.assertEqual([], list(r.open_index()))
 
     def test_stage_directory(self) -> None:
         r = self._repo
         os.mkdir(os.path.join(r.path, "c"))
-        r.stage(["c"])
+        r.get_worktree().stage(["c"])
         self.assertEqual([b"a"], list(r.open_index()))
 
     def test_stage_submodule(self) -> None:
         r = self._repo
         s = Repo.init(os.path.join(r.path, "sub"), mkdir=True)
-        s.do_commit(b"message")
-        r.stage(["sub"])
+        s.get_worktree().commit(
+            message=b"message",
+        )
+        r.get_worktree().stage(["sub"])
         self.assertEqual([b"a", b"sub"], list(r.open_index()))
 
     def test_unstage_midify_file_with_dir(self) -> None:
@@ -1677,7 +1697,7 @@ class BuildRepoRootTests(TestCase):
         )
         with open(full_path, "a") as f:
             f.write("something new")
-        self._repo.unstage(["new_dir/foo"])
+        self._repo.get_worktree().unstage(["new_dir/foo"])
         status = list(porcelain.status(self._repo))
         self.assertEqual(
             [{"add": [], "delete": [], "modify": []}, [b"new_dir/foo"], []], status
@@ -1689,7 +1709,7 @@ class BuildRepoRootTests(TestCase):
         with open(full_path, "w") as f:
             f.write("hello")
         porcelain.add(self._repo, paths=[full_path])
-        self._repo.unstage([file])
+        self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
 
@@ -1705,7 +1725,7 @@ class BuildRepoRootTests(TestCase):
         with open(full_path, "w") as f:
             f.write("hello")
         porcelain.add(self._repo, paths=[full_path])
-        self._repo.unstage([file])
+        self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
 
@@ -1724,7 +1744,7 @@ class BuildRepoRootTests(TestCase):
         with open(full_path, "a") as f:
             f.write("broken")
         porcelain.add(self._repo, paths=[full_path])
-        self._repo.unstage([file])
+        self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
 
         self.assertEqual(
@@ -1744,7 +1764,7 @@ class BuildRepoRootTests(TestCase):
             author=b"John <john@example.com>",
         )
         os.remove(full_path)
-        self._repo.unstage([file])
+        self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual(
             [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
@@ -1756,12 +1776,12 @@ class BuildRepoRootTests(TestCase):
             f.write(b"changed")
         with open(os.path.join(r.path, "b"), "wb") as f:
             f.write(b"added")
-        r.stage(["a", "b"])
+        r.get_worktree().stage(["a", "b"])
         status = list(porcelain.status(self._repo))
         self.assertEqual(
             [{"add": [b"b"], "delete": [], "modify": [b"a"]}, [], []], status
         )
-        r.reset_index()
+        r.get_worktree().reset_index()
         status = list(porcelain.status(self._repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["b"]], status)
 
@@ -1782,9 +1802,9 @@ class BuildRepoRootTests(TestCase):
             # ourselves.
             self.addCleanup(os.remove, full_path)
 
-        r.stage(names)
-        commit_sha = r.do_commit(
-            b"Files with different encodings",
+        r.get_worktree().stage(names)
+        commit_sha = r.get_worktree().commit(
+            message=b"Files with different encodings",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
             commit_timestamp=12395,

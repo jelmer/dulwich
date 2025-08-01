@@ -1,3 +1,8 @@
+0.24.1	UNRELEASE
+
+ * Require ``typing_extensions`` on Python 3.10.
+   (Jelmer Vernooĳ, #1735)
+
 0.24.0	2025-08-01
 
  * Split out ``WorkTree`` from ``Repo``. (Jelmer Vernooĳ)

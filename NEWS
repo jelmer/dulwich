@@ -1,4 +1,4 @@
-0.24.1	UNRELEASE
+0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.
    (Jelmer Vernooĳ, #1735)

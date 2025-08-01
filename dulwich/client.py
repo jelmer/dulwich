@@ -481,6 +481,34 @@ def _read_shallow_updates(pkt_seq):
     return (new_shallow, new_unshallow)
 
 
+def _maybe_read_shallow_updates(proto):
+    """Read shallow updates if present, otherwise return empty sets.
+
+    Peeks at the first packet to determine if shallow updates are coming.
+    If the first packet is not a shallow/unshallow command, it is unread
+    for subsequent processing.
+
+    Args:
+      proto: Protocol instance to read from
+
+    Returns:
+      Tuple of (new_shallow, new_unshallow) sets
+    """
+    first_pkt = proto.read_pkt_line()
+    if first_pkt and (
+        first_pkt.startswith((COMMAND_SHALLOW + b" ", COMMAND_UNSHALLOW + b" "))
+        or first_pkt == b"shallow-info\n"
+    ):
+        # Shallow updates are present, unread and process them
+        proto.unread_pkt_line(first_pkt)
+        return _read_shallow_updates(proto.read_pkt_seq())
+    else:
+        # No shallow updates, unread the packet for next phase
+        if first_pkt:
+            proto.unread_pkt_line(first_pkt)
+        return set(), set()
+
+
 class _v1ReceivePackHeader:
     def __init__(self, capabilities, old_refs, new_refs) -> None:
         self.want: list[bytes] = []
@@ -613,11 +641,22 @@ def _handle_upload_pack_head(
     if protocol_version != 2:
         proto.write_pkt_line(None)
 
+    if depth not in (0, None):
+        if can_read is not None:
+            (new_shallow, new_unshallow) = _maybe_read_shallow_updates(proto)
+        else:
+            new_shallow = new_unshallow = None
+    else:
+        new_shallow = new_unshallow = set()
+
     have = next(graph_walker)
     while have:
         proto.write_pkt_line(COMMAND_HAVE + b" " + have + b"\n")
         if can_read is not None and can_read():
             pkt = proto.read_pkt_line()
+            if pkt is None:
+                # Server sent flush-pkt, no more ACKs
+                break
             parts = pkt.rstrip(b"\n").split(b" ")
             if parts[0] == b"ACK":
                 graph_walker.ack(parts[1])
@@ -633,14 +672,6 @@ def _handle_upload_pack_head(
     proto.write_pkt_line(COMMAND_DONE + b"\n")
     if protocol_version == 2:
         proto.write_pkt_line(None)
-
-    if depth not in (0, None):
-        if can_read is not None:
-            (new_shallow, new_unshallow) = _read_shallow_updates(proto.read_pkt_seq())
-        else:
-            new_shallow = new_unshallow = None
-    else:
-        new_shallow = new_unshallow = set()
 
     return (new_shallow, new_unshallow)
 
@@ -3037,9 +3068,7 @@ class AbstractHttpGitClient(GitClient):
         try:
             resp_proto = Protocol(read, None)  # type: ignore
             if new_shallow is None and new_unshallow is None:
-                (new_shallow, new_unshallow) = _read_shallow_updates(
-                    resp_proto.read_pkt_seq()
-                )
+                (new_shallow, new_unshallow) = _maybe_read_shallow_updates(resp_proto)
             _handle_upload_pack_tail(
                 resp_proto,
                 negotiated_capabilities,

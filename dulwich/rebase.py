@@ -458,7 +458,7 @@ class Rebaser:
 
     def is_in_progress(self) -> bool:
         """Check if a rebase is currently in progress."""
-        return self._state_manager.exists()
+        return bool(self._state_manager.exists())
 
     def abort(self) -> None:
         """Abort an in-progress rebase and restore original state."""

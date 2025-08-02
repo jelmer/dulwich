@@ -3,6 +3,12 @@
  * Fix worktree CLI tests to properly change to repository directory.
    (Jelmer Vernooĳ, #1738)
 
+ * Add ``temporary_worktree`` context manager for creating temporary worktrees
+   that are automatically cleaned up. (Jelmer Vernooĳ)
+
+ * Add ``exist_ok`` parameter to ``add_worktree`` to allow creation with
+   existing directories. (Jelmer Vernooĳ)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

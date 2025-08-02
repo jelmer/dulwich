@@ -609,9 +609,9 @@ class MemoryPackIndex(PackIndex):
         return iter(self._entries)
 
     @classmethod
-    def for_pack(cls, pack: "Pack") -> "MemoryPackIndex":
+    def for_pack(cls, pack_data: "PackData") -> "MemoryPackIndex":
         return MemoryPackIndex(
-            list(pack.sorted_entries()), pack.data.get_stored_checksum()
+            list(pack_data.sorted_entries()), pack_data.get_stored_checksum()
         )
 
     @classmethod

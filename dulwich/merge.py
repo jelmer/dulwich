@@ -5,7 +5,7 @@ from typing import Optional
 try:
     import merge3
 except ImportError:
-    merge3 = None  # type: ignore
+    merge3 = None
 
 from dulwich.attrs import GitAttributes
 from dulwich.config import Config

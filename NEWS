@@ -1,3 +1,8 @@
+0.24.2	UNRELEASED
+
+ * Fix worktree CLI tests to properly change to repository directory.
+   (Jelmer Vernooĳ, #1738)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

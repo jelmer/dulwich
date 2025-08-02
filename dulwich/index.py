@@ -2448,7 +2448,9 @@ class locked_index:
         self._path = path
 
     def __enter__(self) -> Index:
-        self._file = GitFile(self._path, "wb")
+        f = GitFile(self._path, "wb")
+        assert isinstance(f, _GitFile)  # GitFile in write mode always returns _GitFile
+        self._file = f
         self._index = Index(self._path)
         return self._index
 

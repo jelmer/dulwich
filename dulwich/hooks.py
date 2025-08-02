@@ -31,7 +31,7 @@ from .errors import HookError
 class Hook:
     """Generic hook object."""
 
-    def execute(self, *args: Any) -> Any:
+    def execute(self, *args: Any) -> Any:  # noqa: ANN401
         """Execute the hook with the given args.
 
         Args:
@@ -86,7 +86,7 @@ class ShellHook(Hook):
 
         self.cwd = cwd
 
-    def execute(self, *args: Any) -> Any:
+    def execute(self, *args: Any) -> Any:  # noqa: ANN401
         """Execute the hook with given args."""
         if len(args) != self.numparam:
             raise HookError(

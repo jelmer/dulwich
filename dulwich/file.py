@@ -24,7 +24,9 @@
 import os
 import sys
 import warnings
-from typing import Any, ClassVar, Union
+from collections.abc import Iterator
+from types import TracebackType
+from typing import IO, Any, ClassVar, Optional, Union
 
 
 def ensure_dir_exists(dirname: Union[str, bytes, os.PathLike]) -> None:
@@ -58,8 +60,11 @@ def _fancy_rename(oldname: Union[str, bytes], newname: Union[str, bytes]) -> Non
 
 
 def GitFile(
-    filename: Union[str, bytes, os.PathLike], mode: str = "rb", bufsize: int = -1, mask: int = 0o644
-) -> Any:
+    filename: Union[str, bytes, os.PathLike],
+    mode: str = "rb",
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> Union[IO[bytes], "_GitFile"]:
     """Create a file object that obeys the git file locking protocol.
 
     Returns: a builtin file object or a _GitFile object
@@ -90,7 +95,9 @@ def GitFile(
 class FileLocked(Exception):
     """File is already locked."""
 
-    def __init__(self, filename: Union[str, bytes, os.PathLike], lockfilename: Union[str, bytes]) -> None:
+    def __init__(
+        self, filename: Union[str, bytes, os.PathLike], lockfilename: Union[str, bytes]
+    ) -> None:
         self.filename = filename
         self.lockfilename = lockfilename
         super().__init__(filename, lockfilename)
@@ -132,7 +139,11 @@ class _GitFile:
     }
 
     def __init__(
-        self, filename: Union[str, bytes, os.PathLike], mode: str, bufsize: int, mask: int
+        self,
+        filename: Union[str, bytes, os.PathLike],
+        mode: str,
+        bufsize: int,
+        mask: int,
     ) -> None:
         # Convert PathLike to str/bytes for our internal use
         self._filename: Union[str, bytes] = os.fspath(filename)
@@ -153,6 +164,10 @@ class _GitFile:
 
         for method in self.PROXY_METHODS:
             setattr(self, method, getattr(self._file, method))
+
+    def __iter__(self) -> Iterator[bytes]:
+        """Iterate over lines in the file."""
+        return iter(self._file)
 
     def abort(self) -> None:
         """Close and discard the lockfile without overwriting the target.
@@ -208,13 +223,18 @@ class _GitFile:
     def __enter__(self) -> "_GitFile":
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         if exc_type is not None:
             self.abort()
         else:
             self.close()
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         """Proxy property calls to the underlying file."""
         if name in self.PROXY_PROPERTIES:
             return getattr(self._file, name)

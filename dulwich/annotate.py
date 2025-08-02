@@ -108,5 +108,7 @@ def annotate_lines(
 
     lines_annotated: list[tuple[tuple[Commit, TreeEntry], bytes]] = []
     for commit, entry in reversed(revs):
-        lines_annotated = update_lines(lines_annotated, (commit, entry), cast("Blob", store[entry.sha]))
+        lines_annotated = update_lines(
+            lines_annotated, (commit, entry), cast("Blob", store[entry.sha])
+        )
     return lines_annotated

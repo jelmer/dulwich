@@ -28,9 +28,12 @@ import os
 import shutil
 import stat
 import sys
+import tempfile
 import time
 import warnings
 from collections.abc import Iterable
+from contextlib import contextmanager
+from pathlib import Path
 
 from .errors import CommitError, HookError
 from .objects import Commit, ObjectID, Tag, Tree
@@ -140,6 +143,7 @@ class WorkTreeContainer:
         commit: ObjectID | None = None,
         force: bool = False,
         detach: bool = False,
+        exist_ok: bool = False,
     ) -> Repo:
         """Add a new worktree.
 
@@ -149,12 +153,19 @@ class WorkTreeContainer:
             commit: Specific commit to checkout (results in detached HEAD)
             force: Force creation even if branch is already checked out elsewhere
             detach: Detach HEAD in the new worktree
+            exist_ok: If True, do not raise an error if the directory already exists
 
         Returns:
             The newly created worktree repository
         """
         return add_worktree(
-            self._repo, path, branch=branch, commit=commit, force=force, detach=detach
+            self._repo,
+            path,
+            branch=branch,
+            commit=commit,
+            force=force,
+            detach=detach,
+            exist_ok=exist_ok,
         )
 
     def remove(self, path: str | bytes | os.PathLike, force: bool = False) -> None:
@@ -806,6 +817,7 @@ def add_worktree(
     commit: ObjectID | None = None,
     force: bool = False,
     detach: bool = False,
+    exist_ok: bool = False,
 ) -> Repo:
     """Add a new worktree to the repository.
 
@@ -816,12 +828,13 @@ def add_worktree(
         commit: Specific commit to checkout (results in detached HEAD)
         force: Force creation even if branch is already checked out elsewhere
         detach: Detach HEAD in the new worktree
+        exist_ok: If True, do not raise an error if the directory already exists
 
     Returns:
         The newly created worktree repository
 
     Raises:
-        ValueError: If the path already exists or branch is already checked out
+        ValueError: If the path already exists (and exist_ok is False) or branch is already checked out
     """
     from .repo import Repo as RepoClass
 
@@ -830,7 +843,7 @@ def add_worktree(
         path = os.fsdecode(path)
 
     # Check if path already exists
-    if os.path.exists(path):
+    if os.path.exists(path) and not exist_ok:
         raise ValueError(f"Path already exists: {path}")
 
     # Normalize branch name
@@ -871,7 +884,7 @@ def add_worktree(
         detach = True
 
     # Create the worktree directory
-    os.makedirs(path)
+    os.makedirs(path, exist_ok=exist_ok)
 
     # Initialize the worktree
     identifier = os.path.basename(path)
@@ -1141,3 +1154,36 @@ def move_worktree(
     # Update the gitdir pointer in the control directory
     with open(os.path.join(worktree_control_dir, GITDIR), "wb") as f:
         f.write(os.fsencode(gitdir_file) + b"\n")
+
+
+@contextmanager
+def temporary_worktree(repo, prefix="tmp-worktree-"):
+    """Create a temporary worktree that is automatically cleaned up.
+
+    Args:
+        repo: Dulwich repository object
+        prefix: Prefix for the temporary directory name
+
+    Yields:
+        Worktree object
+    """
+    temp_dir = None
+    worktree = None
+
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp(prefix=prefix)
+
+        # Add worktree
+        worktree = repo.worktrees.add(temp_dir, exist_ok=True)
+
+        yield worktree
+
+    finally:
+        # Clean up worktree registration
+        if worktree:
+            repo.worktrees.remove(worktree.path)
+
+        # Clean up temporary directory
+        if temp_dir and Path(temp_dir).exists():
+            shutil.rmtree(temp_dir)

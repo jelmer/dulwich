@@ -21,6 +21,8 @@ import struct
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 
+from .file import _GitFile
+
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
 
@@ -269,7 +271,7 @@ class CommitGraph:
         entry = self.get_entry_by_oid(oid)
         return entry.parents if entry else None
 
-    def write_to_file(self, f: BinaryIO) -> None:
+    def write_to_file(self, f: Union[BinaryIO, _GitFile]) -> None:
         """Write commit graph to file."""
         if not self.entries:
             raise ValueError("Cannot write empty commit graph")

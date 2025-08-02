@@ -32,7 +32,7 @@ from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
     import urllib3
-    
+
     from .config import Config
     from .repo import Repo
 
@@ -319,7 +319,7 @@ class LFSClient:
         """
         self._base_url = url.rstrip("/") + "/"  # Ensure trailing slash for urljoin
         self.config = config
-        self._pool_manager = None
+        self._pool_manager: Optional[urllib3.PoolManager] = None
 
     @classmethod
     def from_config(cls, config: "Config") -> Optional["LFSClient"]:

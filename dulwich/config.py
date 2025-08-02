@@ -40,6 +40,7 @@ from collections.abc import (
 from contextlib import suppress
 from pathlib import Path
 from typing import (
+    IO,
     Any,
     BinaryIO,
     Callable,
@@ -50,7 +51,7 @@ from typing import (
     overload,
 )
 
-from .file import GitFile
+from .file import GitFile, _GitFile
 
 ConfigKey = Union[str, bytes, tuple[Union[str, bytes], ...]]
 ConfigValue = Union[str, bytes, bool, int]
@@ -1112,7 +1113,7 @@ class ConfigFile(ConfigDict):
         with GitFile(path_to_use, "wb") as f:
             self.write_to_file(f)
 
-    def write_to_file(self, f: BinaryIO) -> None:
+    def write_to_file(self, f: Union[IO[bytes], _GitFile]) -> None:
         """Write configuration to a file-like object."""
         for section, values in self._values.items():
             try:

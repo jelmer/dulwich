@@ -118,7 +118,8 @@ def get_summary(commit: "Commit") -> str:
     Returns: Summary string
     """
     decoded = commit.message.decode(errors="replace")
-    return decoded.splitlines()[0].replace(" ", "-")
+    lines = decoded.splitlines()
+    return lines[0].replace(" ", "-") if lines else ""
 
 
 #  Unified Diff

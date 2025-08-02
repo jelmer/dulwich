@@ -26,7 +26,7 @@ import sys
 import warnings
 from collections.abc import Iterator
 from types import TracebackType
-from typing import IO, Any, ClassVar, Optional, Union
+from typing import IO, Any, ClassVar, Literal, Optional, Union, overload
 
 
 def ensure_dir_exists(dirname: Union[str, bytes, os.PathLike]) -> None:
@@ -57,6 +57,33 @@ def _fancy_rename(oldname: Union[str, bytes], newname: Union[str, bytes]) -> Non
         os.rename(tmpfile, newname)
         raise
     os.remove(tmpfile)
+
+
+@overload
+def GitFile(
+    filename: Union[str, bytes, os.PathLike],
+    mode: Literal["wb"],
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> "_GitFile": ...
+
+
+@overload
+def GitFile(
+    filename: Union[str, bytes, os.PathLike],
+    mode: Literal["rb"] = "rb",
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> IO[bytes]: ...
+
+
+@overload
+def GitFile(
+    filename: Union[str, bytes, os.PathLike],
+    mode: str = "rb",
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> Union[IO[bytes], "_GitFile"]: ...
 
 
 def GitFile(

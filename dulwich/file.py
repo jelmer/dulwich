@@ -24,10 +24,10 @@
 import os
 import sys
 import warnings
-from typing import ClassVar, Union
+from typing import Any, ClassVar, Union
 
 
-def ensure_dir_exists(dirname) -> None:
+def ensure_dir_exists(dirname: Union[str, bytes, os.PathLike]) -> None:
     """Ensure a directory exists, creating if necessary."""
     try:
         os.makedirs(dirname)
@@ -35,7 +35,7 @@ def ensure_dir_exists(dirname) -> None:
         pass
 
 
-def _fancy_rename(oldname, newname) -> None:
+def _fancy_rename(oldname: Union[str, bytes], newname: Union[str, bytes]) -> None:
     """Rename file with temporary backup file to rollback if rename fails."""
     if not os.path.exists(newname):
         os.rename(oldname, newname)
@@ -45,7 +45,7 @@ def _fancy_rename(oldname, newname) -> None:
     import tempfile
 
     # destination file exists
-    (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")
+    (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=str(oldname), dir=".")
     os.close(fd)
     os.remove(tmpfile)
     os.rename(newname, tmpfile)
@@ -58,8 +58,8 @@ def _fancy_rename(oldname, newname) -> None:
 
 
 def GitFile(
-    filename: Union[str, bytes, os.PathLike], mode="rb", bufsize=-1, mask=0o644
-):
+    filename: Union[str, bytes, os.PathLike], mode: str = "rb", bufsize: int = -1, mask: int = 0o644
+) -> Any:
     """Create a file object that obeys the git file locking protocol.
 
     Returns: a builtin file object or a _GitFile object
@@ -90,7 +90,7 @@ def GitFile(
 class FileLocked(Exception):
     """File is already locked."""
 
-    def __init__(self, filename, lockfilename) -> None:
+    def __init__(self, filename: Union[str, bytes, os.PathLike], lockfilename: Union[str, bytes]) -> None:
         self.filename = filename
         self.lockfilename = lockfilename
         super().__init__(filename, lockfilename)
@@ -132,7 +132,7 @@ class _GitFile:
     }
 
     def __init__(
-        self, filename: Union[str, bytes, os.PathLike], mode, bufsize, mask
+        self, filename: Union[str, bytes, os.PathLike], mode: str, bufsize: int, mask: int
     ) -> None:
         # Convert PathLike to str/bytes for our internal use
         self._filename: Union[str, bytes] = os.fspath(filename)
@@ -205,16 +205,16 @@ class _GitFile:
             warnings.warn(f"unclosed {self!r}", ResourceWarning, stacklevel=2)
             self.abort()
 
-    def __enter__(self):
+    def __enter__(self) -> "_GitFile":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if exc_type is not None:
             self.abort()
         else:
             self.close()
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         """Proxy property calls to the underlying file."""
         if name in self.PROXY_PROPERTIES:
             return getattr(self._file, name)

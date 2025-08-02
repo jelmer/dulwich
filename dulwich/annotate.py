@@ -53,7 +53,7 @@ def update_lines(
     new_blob: "Blob",
 ) -> list[tuple[tuple["Commit", "TreeEntry"], bytes]]:
     """Update annotation lines with old blob lines."""
-    ret: list[tuple[tuple["Commit", "TreeEntry"], bytes]] = []
+    ret: list[tuple[tuple[Commit, TreeEntry], bytes]] = []
     new_lines = new_blob.splitlines()
     matcher = difflib.SequenceMatcher(
         a=[line for (h, line) in annotated_lines], b=new_lines
@@ -92,10 +92,10 @@ def annotate_lines(
     walker = Walker(
         store, include=[commit_id], paths=[path], order=order, follow=follow
     )
-    revs: list[tuple["Commit", "TreeEntry"]] = []
+    revs: list[tuple[Commit, TreeEntry]] = []
     for log_entry in walker:
         for tree_change in log_entry.changes():
-            changes: list["TreeChange"]
+            changes: list[TreeChange]
             if isinstance(tree_change, list):
                 changes = tree_change
             else:
@@ -106,7 +106,7 @@ def annotate_lines(
                     revs.append((log_entry.commit, change.new))
                     break
 
-    lines_annotated: list[tuple[tuple["Commit", "TreeEntry"], bytes]] = []
+    lines_annotated: list[tuple[tuple[Commit, TreeEntry], bytes]] = []
     for commit, entry in reversed(revs):
         lines_annotated = update_lines(lines_annotated, (commit, entry), cast("Blob", store[entry.sha]))
     return lines_annotated

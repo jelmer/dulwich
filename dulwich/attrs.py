@@ -23,7 +23,7 @@
 
 import os
 import re
-from collections.abc import Generator, Mapping
+from collections.abc import Generator, Iterator, Mapping
 from typing import (
     IO,
     Optional,
@@ -168,7 +168,7 @@ class Pattern:
         self._regex: Optional[re.Pattern[bytes]] = None
         self._compile()
 
-    def _compile(self):
+    def _compile(self) -> None:
         """Compile the pattern to a regular expression."""
         regex_pattern = _translate_pattern(self.pattern)
         # Add anchors
@@ -305,7 +305,7 @@ class GitAttributes:
         """Return the number of patterns."""
         return len(self._patterns)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple["Pattern", Mapping[bytes, AttributeValue]]]:
         """Iterate over patterns."""
         return iter(self._patterns)
 

@@ -39,6 +39,7 @@ from dulwich.worktree import (
     move_worktree,
     prune_worktrees,
     remove_worktree,
+    temporary_worktree,
     unlock_worktree,
 )
 
@@ -719,3 +720,109 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         with self.assertRaises(ValueError) as cm:
             move_worktree(self.repo, wt_path, new_path)
         self.assertIn("Path already exists", str(cm.exception))
+
+
+class TemporaryWorktreeTests(TestCase):
+    """Tests for temporary_worktree context manager."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+        self.repo_path = os.path.join(self.tempdir, "repo")
+        self.repo = Repo.init(self.repo_path, mkdir=True)
+
+        # Create an initial commit so HEAD exists
+        readme_path = os.path.join(self.repo_path, "README.md")
+        with open(readme_path, "w") as f:
+            f.write("# Test Repository\n")
+        porcelain.add(self.repo, [readme_path])
+        porcelain.commit(self.repo, message=b"Initial commit")
+
+    def test_temporary_worktree_creates_and_cleans_up(self) -> None:
+        """Test that temporary worktree is created and cleaned up."""
+        worktree_path = None
+
+        # Use the context manager
+        with temporary_worktree(self.repo) as worktree:
+            worktree_path = worktree.path
+
+            # Check that worktree exists
+            self.assertTrue(os.path.exists(worktree_path))
+
+            # Check that it's in the list of worktrees
+            worktrees = list_worktrees(self.repo)
+            paths = [wt.path for wt in worktrees]
+            self.assertIn(worktree_path, paths)
+
+            # Check that .git file exists in worktree
+            gitdir_file = os.path.join(worktree_path, ".git")
+            self.assertTrue(os.path.exists(gitdir_file))
+
+        # After context manager exits, check cleanup
+        self.assertFalse(os.path.exists(worktree_path))
+
+        # Check that it's no longer in the list of worktrees
+        worktrees = list_worktrees(self.repo)
+        paths = [wt.path for wt in worktrees]
+        self.assertNotIn(worktree_path, paths)
+
+    def test_temporary_worktree_with_custom_prefix(self) -> None:
+        """Test temporary worktree with custom prefix."""
+        custom_prefix = "my-custom-prefix-"
+
+        with temporary_worktree(self.repo, prefix=custom_prefix) as worktree:
+            # Check that the directory name starts with our prefix
+            dirname = os.path.basename(worktree.path)
+            self.assertTrue(dirname.startswith(custom_prefix))
+
+    def test_temporary_worktree_cleanup_on_exception(self) -> None:
+        """Test that cleanup happens even when exception is raised."""
+        worktree_path = None
+
+        class TestException(Exception):
+            pass
+
+        try:
+            with temporary_worktree(self.repo) as worktree:
+                worktree_path = worktree.path
+                self.assertTrue(os.path.exists(worktree_path))
+                raise TestException("Test exception")
+        except TestException:
+            pass
+
+        # Cleanup should still happen
+        self.assertFalse(os.path.exists(worktree_path))
+
+        # Check that it's no longer in the list of worktrees
+        worktrees = list_worktrees(self.repo)
+        paths = [wt.path for wt in worktrees]
+        self.assertNotIn(worktree_path, paths)
+
+    def test_temporary_worktree_operations(self) -> None:
+        """Test that operations can be performed in temporary worktree."""
+        # Create a test file in main repo
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("Hello, world!")
+
+        porcelain.add(self.repo, [test_file])
+        porcelain.commit(self.repo, message=b"Initial commit")
+
+        with temporary_worktree(self.repo) as worktree:
+            # Check that the file exists in the worktree
+            wt_test_file = os.path.join(worktree.path, "test.txt")
+            self.assertTrue(os.path.exists(wt_test_file))
+
+            # Read and verify content
+            with open(wt_test_file) as f:
+                content = f.read()
+            self.assertEqual(content, "Hello, world!")
+
+            # Make changes in the worktree
+            with open(wt_test_file, "w") as f:
+                f.write("Modified content")
+
+            # Changes should be visible in status
+            status = porcelain.status(worktree)
+            self.assertIn(b"test.txt", status.unstaged)

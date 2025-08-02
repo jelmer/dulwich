@@ -876,6 +876,7 @@ class DiskRefsContainer(RefsContainer):
         self._check_refname(other)
         filename = self.refpath(name)
         f = GitFile(filename, "wb")
+        assert isinstance(f, _GitFile)  # GitFile in write mode always returns _GitFile
         try:
             f.write(SYMREF + other + b"\n")
             sha = self.follow(name)[-1]
@@ -935,6 +936,9 @@ class DiskRefsContainer(RefsContainer):
 
         ensure_dir_exists(os.path.dirname(filename))
         with GitFile(filename, "wb") as f:
+            assert isinstance(
+                f, _GitFile
+            )  # GitFile in write mode always returns _GitFile
             if old_ref is not None:
                 try:
                     # read again while holding the lock to handle race conditions
@@ -1006,6 +1010,9 @@ class DiskRefsContainer(RefsContainer):
         filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
         with GitFile(filename, "wb") as f:
+            assert isinstance(
+                f, _GitFile
+            )  # GitFile in write mode always returns _GitFile
             if os.path.exists(filename) or name in self.get_packed_refs():
                 f.abort()
                 return False
@@ -1051,6 +1058,7 @@ class DiskRefsContainer(RefsContainer):
         filename = self.refpath(name)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, "wb")
+        assert isinstance(f, _GitFile)  # GitFile in write mode always returns _GitFile
         try:
             if old_ref is not None:
                 orig_ref = self.read_loose_ref(name)
@@ -1401,7 +1409,9 @@ class locked_ref:
 
         filename = self._refs_container.refpath(self._realname)
         ensure_dir_exists(os.path.dirname(filename))
-        self._file = GitFile(filename, "wb")
+        f = GitFile(filename, "wb")
+        assert isinstance(f, _GitFile)  # GitFile in write mode always returns _GitFile
+        self._file = f
         return self
 
     def __exit__(

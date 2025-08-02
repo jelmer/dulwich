@@ -33,15 +33,22 @@ from typing import Optional, Union
 class ChecksumMismatch(Exception):
     """A checksum didn't match the expected contents."""
 
-    def __init__(self, expected: Union[bytes, str], got: Union[bytes, str], extra: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        expected: Union[bytes, str],
+        got: Union[bytes, str],
+        extra: Optional[str] = None,
+    ) -> None:
         if isinstance(expected, bytes) and len(expected) == 20:
-            expected_str = binascii.hexlify(expected).decode('ascii')
+            expected_str = binascii.hexlify(expected).decode("ascii")
         else:
-            expected_str = expected if isinstance(expected, str) else expected.decode('ascii')
+            expected_str = (
+                expected if isinstance(expected, str) else expected.decode("ascii")
+            )
         if isinstance(got, bytes) and len(got) == 20:
-            got_str = binascii.hexlify(got).decode('ascii')
+            got_str = binascii.hexlify(got).decode("ascii")
         else:
-            got_str = got if isinstance(got, str) else got.decode('ascii')
+            got_str = got if isinstance(got, str) else got.decode("ascii")
         self.expected = expected_str
         self.got = got_str
         self.extra = extra
@@ -148,7 +155,10 @@ class HangupException(GitProtocolError):
         self.stderr_lines = stderr_lines
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, HangupException) and self.stderr_lines == other.stderr_lines
+        return (
+            isinstance(other, HangupException)
+            and self.stderr_lines == other.stderr_lines
+        )
 
 
 class UnexpectedCommandError(GitProtocolError):

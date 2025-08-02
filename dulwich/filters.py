@@ -119,7 +119,9 @@ class ProcessFilterDriver:
 class FilterRegistry:
     """Registry for filter drivers."""
 
-    def __init__(self, config: Optional["StackedConfig"] = None, repo: Optional["Repo"] = None) -> None:
+    def __init__(
+        self, config: Optional["StackedConfig"] = None, repo: Optional["Repo"] = None
+    ) -> None:
         self.config = config
         self.repo = repo
         self._drivers: dict[str, FilterDriver] = {}

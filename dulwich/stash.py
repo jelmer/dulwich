@@ -299,7 +299,7 @@ class Stash:
         # TODO(jelmer): Just pass parents into do_commit()?
         self._repo.refs[self._ref] = self._repo.head()
 
-        cid = self._repo.get_worktree().commit(
+        cid: ObjectID = self._repo.get_worktree().commit(
             ref=self._ref,
             tree=stash_tree_id,
             message=message,

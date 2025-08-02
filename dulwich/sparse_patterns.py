@@ -168,7 +168,7 @@ def apply_included_paths(
         norm_data = normalizer.checkin_normalize(disk_data, full_path)
         if not isinstance(blob_obj, Blob):
             return True
-        return norm_data != blob_obj.data
+        return bool(norm_data != blob_obj.data)
 
     # 1) Update skip-worktree bits
 

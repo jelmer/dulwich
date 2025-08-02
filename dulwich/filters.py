@@ -30,6 +30,7 @@ from .objects import Blob
 
 if TYPE_CHECKING:
     from .config import StackedConfig
+    from .repo import Repo
 
 
 class FilterError(Exception):
@@ -118,7 +119,7 @@ class ProcessFilterDriver:
 class FilterRegistry:
     """Registry for filter drivers."""
 
-    def __init__(self, config: Optional["StackedConfig"] = None, repo=None) -> None:
+    def __init__(self, config: Optional["StackedConfig"] = None, repo: Optional["Repo"] = None) -> None:
         self.config = config
         self.repo = repo
         self._drivers: dict[str, FilterDriver] = {}
@@ -372,7 +373,7 @@ class FilterBlobNormalizer:
         config_stack: Optional["StackedConfig"],
         gitattributes: GitAttributes,
         filter_registry: Optional[FilterRegistry] = None,
-        repo=None,
+        repo: Optional["Repo"] = None,
     ) -> None:
         self.config_stack = config_stack
         self.gitattributes = gitattributes

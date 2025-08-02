@@ -45,7 +45,7 @@ else:
     from typing_extensions import Self
 
 if sys.version_info >= (3, 10):
-    from typing import TypeGuard  # type: ignore
+    from typing import TypeGuard
 else:
     from typing_extensions import TypeGuard
 
@@ -244,6 +244,13 @@ def check_identity(identity: Optional[bytes], error_msg: str) -> None:
         raise ObjectFormatException(error_msg)
 
 
+def _path_to_bytes(path: Union[str, bytes]) -> bytes:
+    """Convert a path to bytes for use in error messages."""
+    if isinstance(path, str):
+        return path.encode("utf-8", "surrogateescape")
+    return path
+
+
 def check_time(time_seconds: int) -> None:
     """Check if the specified time is not prone to overflow error.
 
@@ -270,7 +277,7 @@ class FixedSha:
 
     def __init__(self, hexsha: Union[str, bytes]) -> None:
         if isinstance(hexsha, str):
-            hexsha = hexsha.encode("ascii")  # type: ignore
+            hexsha = hexsha.encode("ascii")
         if not isinstance(hexsha, bytes):
             raise TypeError(f"Expected bytes for hexsha, got {hexsha!r}")
         self._hexsha = hexsha
@@ -432,7 +439,7 @@ class ShaFile:
         if sha is None:
             self._sha = None
         else:
-            self._sha = FixedSha(sha)  # type: ignore
+            self._sha = FixedSha(sha)
         self._needs_serialization = False
 
     @staticmethod
@@ -686,7 +693,7 @@ class Blob(ShaFile):
     def from_path(cls, path: Union[str, bytes]) -> "Blob":
         blob = ShaFile.from_path(path)
         if not isinstance(blob, cls):
-            raise NotBlobError(path)
+            raise NotBlobError(_path_to_bytes(path))
         return blob
 
     def check(self) -> None:
@@ -706,7 +713,7 @@ class Blob(ShaFile):
         if not chunks:
             return []
         if len(chunks) == 1:
-            return chunks[0].splitlines(True)
+            return chunks[0].splitlines(True)  # type: ignore[no-any-return]
         remaining = None
         ret = []
         for chunk in chunks:
@@ -834,7 +841,7 @@ class Tag(ShaFile):
     def from_path(cls, filename: Union[str, bytes]) -> "Tag":
         tag = ShaFile.from_path(filename)
         if not isinstance(tag, cls):
-            raise NotTagError(filename)
+            raise NotTagError(_path_to_bytes(filename))
         return tag
 
     def check(self) -> None:
@@ -1186,7 +1193,7 @@ class Tree(ShaFile):
     def from_path(cls, filename: Union[str, bytes]) -> "Tree":
         tree = ShaFile.from_path(filename)
         if not isinstance(tree, cls):
-            raise NotTreeError(filename)
+            raise NotTreeError(_path_to_bytes(filename))
         return tree
 
     def __contains__(self, name: bytes) -> bool:
@@ -1536,7 +1543,7 @@ class Commit(ShaFile):
     def from_path(cls, path: Union[str, bytes]) -> "Commit":
         commit = ShaFile.from_path(path)
         if not isinstance(commit, cls):
-            raise NotCommitError(path)
+            raise NotCommitError(_path_to_bytes(path))
         return commit
 
     def _deserialize(self, chunks: list[bytes]) -> None:

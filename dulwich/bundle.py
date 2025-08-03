@@ -21,9 +21,14 @@
 
 """Bundle format support."""
 
-from typing import BinaryIO, Callable, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Optional
 
 from .pack import PackData, write_pack_data
+
+if TYPE_CHECKING:
+    from .object_store import BaseObjectStore
+    from .repo import BaseRepo
 
 
 class Bundle:
@@ -58,8 +63,8 @@ class Bundle:
         return True
 
     def store_objects(
-        self, object_store, progress: Optional[Callable[[str], None]] = None
-    ):
+        self, object_store: "BaseObjectStore", progress: Optional[Callable[[str], None]] = None
+    ) -> None:
         """Store all objects from this bundle into an object store.
 
         Args:
@@ -178,7 +183,7 @@ def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
 
 
 def create_bundle_from_repo(
-    repo,
+    repo: "BaseRepo",
     refs: Optional[list[bytes]] = None,
     prerequisites: Optional[list[bytes]] = None,
     version: Optional[int] = None,
@@ -266,14 +271,14 @@ def create_bundle_from_repo(
     # Store the pack objects directly, we'll write them when saving the bundle
     # For now, create a simple wrapper to hold the data
     class _BundlePackData:
-        def __init__(self, count, objects):
+        def __init__(self, count: int, objects: Iterator[Any]) -> None:
             self._count = count
             self._objects = list(objects)  # Materialize the iterator
 
-        def __len__(self):
+        def __len__(self) -> int:
             return self._count
 
-        def iter_unpacked(self):
+        def iter_unpacked(self) -> Iterator[Any]:
             return iter(self._objects)
 
     pack_data = _BundlePackData(pack_count, pack_objects)

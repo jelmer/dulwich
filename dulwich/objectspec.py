@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Optional, Union
 from .objects import Commit, ShaFile, Tag, Tree
 
 if TYPE_CHECKING:
+    from .object_store import BaseObjectStore
     from .refs import Ref, RefsContainer
     from .repo import Repo
 
@@ -267,7 +268,7 @@ def parse_reftuples(
     rh_container: Union["Repo", "RefsContainer"],
     refspecs: Union[bytes, list[bytes]],
     force: bool = False,
-):
+) -> list[tuple[Optional["Ref"], Optional["Ref"], bool]]:
     """Parse a list of reftuple specs to a list of reftuples.
 
     Args:
@@ -288,7 +289,10 @@ def parse_reftuples(
     return ret
 
 
-def parse_refs(container, refspecs):
+def parse_refs(
+    container: Union["Repo", "RefsContainer"],
+    refspecs: Union[bytes, str, list[Union[bytes, str]]],
+) -> list["Ref"]:
     """Parse a list of refspecs to a list of refs.
 
     Args:
@@ -343,12 +347,14 @@ def parse_commit_range(
 class AmbiguousShortId(Exception):
     """The short id is ambiguous."""
 
-    def __init__(self, prefix, options) -> None:
+    def __init__(self, prefix: bytes, options: list[ShaFile]) -> None:
         self.prefix = prefix
         self.options = options
 
 
-def scan_for_short_id(object_store, prefix, tp):
+def scan_for_short_id(
+    object_store: "BaseObjectStore", prefix: bytes, tp: type[ShaFile]
+) -> ShaFile:
     """Scan an object store for a short id."""
     ret = []
     for object_id in object_store.iter_prefix(prefix):
@@ -374,7 +380,7 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit, Tag]) -> "C
       ValueError: If the range can not be parsed
     """
 
-    def dereference_tag(obj):
+    def dereference_tag(obj: ShaFile) -> "Commit":
         """Follow tag references until we reach a non-tag object."""
         while isinstance(obj, Tag):
             obj_type, obj_sha = obj.object
@@ -384,7 +390,9 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit, Tag]) -> "C
                 # Tag points to a missing object
                 raise KeyError(obj_sha)
         if not isinstance(obj, Commit):
-            raise ValueError(f"Expected commit, got {obj.type_name}")
+            raise ValueError(
+                f"Expected commit, got {obj.type_name.decode('ascii', 'replace')}"
+            )
         return obj
 
     # If already a Commit object, return it directly

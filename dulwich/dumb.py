@@ -26,7 +26,7 @@ import tempfile
 import zlib
 from collections.abc import Iterator
 from io import BytesIO
-from typing import Optional
+from typing import Any, Callable, Optional
 from urllib.parse import urljoin
 
 from .errors import NotGitRepository, ObjectFormatException
@@ -50,7 +50,7 @@ from .repo import BaseRepo
 class DumbHTTPObjectStore(BaseObjectStore):
     """Object store implementation that fetches objects over dumb HTTP."""
 
-    def __init__(self, base_url: str, http_request_func):
+    def __init__(self, base_url: str, http_request_func: Callable[[str, dict[str, str]], tuple[Any, Callable[..., bytes]]]) -> None:
         """Initialize a DumbHTTPObjectStore.
 
         Args:
@@ -62,9 +62,9 @@ class DumbHTTPObjectStore(BaseObjectStore):
         self._http_request = http_request_func
         self._packs: Optional[list[tuple[str, Optional[PackIndex]]]] = None
         self._cached_objects: dict[bytes, tuple[int, bytes]] = {}
-        self._temp_pack_dir = None
+        self._temp_pack_dir: Optional[str] = None
 
-    def _ensure_temp_pack_dir(self):
+    def _ensure_temp_pack_dir(self) -> None:
         """Ensure we have a temporary directory for storing pack files."""
         if self._temp_pack_dir is None:
             self._temp_pack_dir = tempfile.mkdtemp(prefix="dulwich-dumb-")
@@ -152,7 +152,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
         return type_map[obj_type], content
 
-    def _load_packs(self):
+    def _load_packs(self) -> None:
         """Load the list of available packs from the remote."""
         if self._packs is not None:
             return
@@ -320,22 +320,22 @@ class DumbHTTPObjectStore(BaseObjectStore):
                     yield sha_to_hex(sha)
 
     @property
-    def packs(self):
+    def packs(self) -> list[Any]:
         """Iterable of pack objects.
 
         Note: Returns empty list as we don't have actual Pack objects.
         """
         return []
 
-    def add_object(self, obj) -> None:
+    def add_object(self, obj: ShaFile) -> None:
         """Add a single object to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
 
-    def add_objects(self, objects, progress=None) -> None:
+    def add_objects(self, objects: Iterator[ShaFile], progress: Optional[Callable[[int], None]] = None) -> None:
         """Add a set of objects to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Clean up temporary directory on deletion."""
         if self._temp_pack_dir and os.path.exists(self._temp_pack_dir):
             import shutil
@@ -346,7 +346,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
 class DumbRemoteHTTPRepo(BaseRepo):
     """Repository implementation for dumb HTTP remotes."""
 
-    def __init__(self, base_url: str, http_request_func):
+    def __init__(self, base_url: str, http_request_func: Callable[[str, dict[str, str]], tuple[Any, Callable[..., bytes]]]) -> None:
         """Initialize a DumbRemoteHTTPRepo.
 
         Args:
@@ -357,12 +357,7 @@ class DumbRemoteHTTPRepo(BaseRepo):
         self._http_request = http_request_func
         self._refs: Optional[dict[Ref, ObjectID]] = None
         self._peeled: Optional[dict[Ref, ObjectID]] = None
-        self._object_store = DumbHTTPObjectStore(base_url, http_request_func)
-
-    @property
-    def object_store(self):
-        """ObjectStore for this repository."""
-        return self._object_store
+        self.object_store = DumbHTTPObjectStore(base_url, http_request_func)
 
     def _fetch_url(self, path: str) -> bytes:
         """Fetch content from a URL path relative to base_url."""
@@ -417,7 +412,7 @@ class DumbRemoteHTTPRepo(BaseRepo):
         sha = self.get_refs().get(ref, None)
         return sha if sha is not None else ZERO_SHA
 
-    def fetch_pack_data(self, graph_walker, determine_wants, progress=None, depth=None):
+    def fetch_pack_data(self, graph_walker: object, determine_wants: Callable[[dict[Ref, ObjectID]], list[ObjectID]], progress: Optional[Callable[[str], None]] = None, *, get_tagged: Optional[bool] = None, depth: Optional[int] = None) -> Iterator[UnpackedObject]:
         """Fetch pack data from the remote.
 
         This is the main method for fetching objects from a dumb HTTP remote.
@@ -451,7 +446,7 @@ class DumbRemoteHTTPRepo(BaseRepo):
 
             # Fetch the object
             try:
-                type_num, content = self._object_store.get_raw(sha)
+                type_num, content = self.object_store.get_raw(sha)
             except KeyError:
                 # Object not found, skip it
                 continue
@@ -473,4 +468,4 @@ class DumbRemoteHTTPRepo(BaseRepo):
                     to_fetch.add(item_sha)
 
             if progress:
-                progress(f"Fetching objects: {len(seen)} done\n".encode())
+                progress(f"Fetching objects: {len(seen)} done\n")

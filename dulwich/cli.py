@@ -631,7 +631,7 @@ class cmd_diff(Command):
             "--color",
             choices=["always", "never", "auto"],
             default="auto",
-            help="Use colored output (requires pygments)",
+            help="Use colored output (requires rich)",
         )
         parser.add_argument(
             "--", dest="separator", action="store_true", help=argparse.SUPPRESS
@@ -973,11 +973,48 @@ class cmd_show(Command):
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("objectish", type=str, nargs="*")
+        parser.add_argument(
+            "--color",
+            choices=["always", "never", "auto"],
+            default="auto",
+            help="Use colored output (requires rich)",
+        )
         args = parser.parse_args(argv)
+
+        # Determine if we should use color
+        def _should_use_color():
+            if args.color == "always":
+                return True
+            elif args.color == "never":
+                return False
+            else:  # auto
+                return sys.stdout.isatty()
+
+        def _create_output_stream(outstream):
+            """Create output stream, optionally with colorization."""
+            if not _should_use_color():
+                return outstream
+
+            from .diff import ColorizedDiffStream
+
+            if not ColorizedDiffStream.is_available():
+                if args.color == "always":
+                    raise ImportError(
+                        "Rich is required for colored output. Install with: pip install 'dulwich[colordiff]'"
+                    )
+                else:
+                    logging.warning(
+                        "Rich not available, disabling colored output. Install with: pip install 'dulwich[colordiff]'"
+                    )
+                    return outstream
+
+            return ColorizedDiffStream(outstream.buffer)
+
         with Repo(".") as repo:
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="show") as outstream:
-                porcelain.show(repo, args.objectish or None, outstream=outstream)
+                output_stream = _create_output_stream(outstream)
+                porcelain.show(repo, args.objectish or None, outstream=output_stream)
 
 
 class cmd_diff_tree(Command):

@@ -23,7 +23,7 @@
 import os
 import subprocess
 import tempfile
-from typing import Any, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol
 
 from .config import Config
 
@@ -149,12 +149,12 @@ class MergeDriverRegistry:
         # Register built-in drivers
         self._register_builtin_drivers()
 
-    def _register_builtin_drivers(self):
+    def _register_builtin_drivers(self) -> None:
         """Register built-in merge drivers."""
         # The "text" driver is the default three-way merge
         # We don't register it here as it's handled by the default merge code
 
-    def register_driver(self, name: str, driver: MergeDriver):
+    def register_driver(self, name: str, driver: MergeDriver) -> None:
         """Register a merge driver instance.
 
         Args:
@@ -163,7 +163,7 @@ class MergeDriverRegistry:
         """
         self._drivers[name] = driver
 
-    def register_factory(self, name: str, factory):
+    def register_factory(self, name: str, factory: Callable[[], MergeDriver]) -> None:
         """Register a factory function for creating merge drivers.
 
         Args:

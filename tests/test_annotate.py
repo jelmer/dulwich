@@ -21,6 +21,7 @@
 import os
 import tempfile
 import unittest
+from typing import Any, Optional
 from unittest import TestCase
 
 from dulwich.annotate import annotate_lines, update_lines
@@ -32,28 +33,28 @@ from dulwich.repo import Repo
 class UpdateLinesTestCase(TestCase):
     """Tests for update_lines function."""
 
-    def test_update_lines_equal(self):
+    def test_update_lines_equal(self) -> None:
         """Test update_lines when all lines are equal."""
-        old_lines = [
+        old_lines: list[tuple[tuple[Any, Any], bytes]] = [
             (("commit1", "entry1"), b"line1"),
             (("commit2", "entry2"), b"line2"),
         ]
         new_blob = b"line1\nline2"
         new_history_data = ("commit3", "entry3")
 
-        result = update_lines(old_lines, new_history_data, new_blob)
+        result = update_lines(old_lines, new_history_data, new_blob)  # type: ignore[arg-type]
         self.assertEqual(old_lines, result)
 
-    def test_update_lines_insert(self):
+    def test_update_lines_insert(self) -> None:
         """Test update_lines when new lines are inserted."""
-        old_lines = [
+        old_lines: list[tuple[tuple[Any, Any], bytes]] = [
             (("commit1", "entry1"), b"line1"),
             (("commit2", "entry2"), b"line3"),
         ]
         new_blob = b"line1\nline2\nline3"
         new_history_data = ("commit3", "entry3")
 
-        result = update_lines(old_lines, new_history_data, new_blob)
+        result = update_lines(old_lines, new_history_data, new_blob)  # type: ignore[arg-type]
         expected = [
             (("commit1", "entry1"), b"line1"),
             (("commit3", "entry3"), b"line2"),
@@ -61,9 +62,9 @@ class UpdateLinesTestCase(TestCase):
         ]
         self.assertEqual(expected, result)
 
-    def test_update_lines_delete(self):
+    def test_update_lines_delete(self) -> None:
         """Test update_lines when lines are deleted."""
-        old_lines = [
+        old_lines: list[tuple[tuple[Any, Any], bytes]] = [
             (("commit1", "entry1"), b"line1"),
             (("commit2", "entry2"), b"line2"),
             (("commit3", "entry3"), b"line3"),
@@ -71,66 +72,66 @@ class UpdateLinesTestCase(TestCase):
         new_blob = b"line1\nline3"
         new_history_data = ("commit4", "entry4")
 
-        result = update_lines(old_lines, new_history_data, new_blob)
+        result = update_lines(old_lines, new_history_data, new_blob)  # type: ignore[arg-type]
         expected = [
             (("commit1", "entry1"), b"line1"),
             (("commit3", "entry3"), b"line3"),
         ]
         self.assertEqual(expected, result)
 
-    def test_update_lines_replace(self):
+    def test_update_lines_replace(self) -> None:
         """Test update_lines when lines are replaced."""
-        old_lines = [
+        old_lines: list[tuple[tuple[Any, Any], bytes]] = [
             (("commit1", "entry1"), b"line1"),
             (("commit2", "entry2"), b"line2"),
         ]
         new_blob = b"line1\nline2_modified"
         new_history_data = ("commit3", "entry3")
 
-        result = update_lines(old_lines, new_history_data, new_blob)
+        result = update_lines(old_lines, new_history_data, new_blob)  # type: ignore[arg-type]
         expected = [
             (("commit1", "entry1"), b"line1"),
             (("commit3", "entry3"), b"line2_modified"),
         ]
         self.assertEqual(expected, result)
 
-    def test_update_lines_empty_old(self):
+    def test_update_lines_empty_old(self) -> None:
         """Test update_lines with empty old lines."""
-        old_lines = []
+        old_lines: list[tuple[tuple[Any, Any], bytes]] = []
         new_blob = b"line1\nline2"
         new_history_data = ("commit1", "entry1")
 
-        result = update_lines(old_lines, new_history_data, new_blob)
+        result = update_lines(old_lines, new_history_data, new_blob)  # type: ignore[arg-type]
         expected = [
             (("commit1", "entry1"), b"line1"),
             (("commit1", "entry1"), b"line2"),
         ]
         self.assertEqual(expected, result)
 
-    def test_update_lines_empty_new(self):
+    def test_update_lines_empty_new(self) -> None:
         """Test update_lines with empty new blob."""
-        old_lines = [(("commit1", "entry1"), b"line1")]
+        old_lines: list[tuple[tuple[Any, Any], bytes]] = [(("commit1", "entry1"), b"line1")]
         new_blob = b""
         new_history_data = ("commit2", "entry2")
 
-        result = update_lines(old_lines, new_history_data, new_blob)
+        result = update_lines(old_lines, new_history_data, new_blob)  # type: ignore[arg-type]
         self.assertEqual([], result)
 
 
 class AnnotateLinesTestCase(TestCase):
     """Tests for annotate_lines function."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp_dir = tempfile.mkdtemp()
         self.repo = Repo.init(self.temp_dir)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.repo.close()
         import shutil
 
         shutil.rmtree(self.temp_dir)
 
-    def _make_commit(self, blob_content, message, parent=None):
+    def _make_commit(self, blob_content: bytes, message: str, parent: Optional[bytes] = None) -> bytes:
         """Helper to create a commit with a single file."""
         # Create blob
         blob = Blob()
@@ -159,7 +160,7 @@ class AnnotateLinesTestCase(TestCase):
         self.repo.object_store.add_object(commit)
         return commit.id
 
-    def test_annotate_lines_single_commit(self):
+    def test_annotate_lines_single_commit(self) -> None:
         """Test annotating a file with a single commit."""
         commit_id = self._make_commit(b"line1\nline2\nline3\n", "Initial commit")
 
@@ -170,7 +171,7 @@ class AnnotateLinesTestCase(TestCase):
             self.assertEqual(commit_id, commit.id)
             self.assertIn(line, [b"line1\n", b"line2\n", b"line3\n"])
 
-    def test_annotate_lines_multiple_commits(self):
+    def test_annotate_lines_multiple_commits(self) -> None:
         """Test annotating a file with multiple commits."""
         # First commit
         commit1_id = self._make_commit(b"line1\nline2\n", "Initial commit")
@@ -200,7 +201,7 @@ class AnnotateLinesTestCase(TestCase):
         self.assertEqual(commit1_id, result[2][0][0].id)
         self.assertEqual(b"line2\n", result[2][1])
 
-    def test_annotate_lines_nonexistent_path(self):
+    def test_annotate_lines_nonexistent_path(self) -> None:
         """Test annotating a nonexistent file."""
         commit_id = self._make_commit(b"content\n", "Initial commit")
 
@@ -211,17 +212,17 @@ class AnnotateLinesTestCase(TestCase):
 class PorcelainAnnotateTestCase(TestCase):
     """Tests for the porcelain annotate function."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp_dir = tempfile.mkdtemp()
         self.repo = Repo.init(self.temp_dir)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.repo.close()
         import shutil
 
         shutil.rmtree(self.temp_dir)
 
-    def _make_commit_with_file(self, filename, content, message, parent=None):
+    def _make_commit_with_file(self, filename: str, content: bytes, message: str, parent: Optional[bytes] = None) -> bytes:
         """Helper to create a commit with a file."""
         # Create blob
         blob = Blob()
@@ -254,7 +255,7 @@ class PorcelainAnnotateTestCase(TestCase):
 
         return commit.id
 
-    def test_porcelain_annotate(self):
+    def test_porcelain_annotate(self) -> None:
         """Test the porcelain annotate function."""
         # Create commits
         commit1_id = self._make_commit_with_file(
@@ -274,7 +275,7 @@ class PorcelainAnnotateTestCase(TestCase):
             self.assertIsNotNone(entry)
             self.assertIn(line, [b"line1\n", b"line2\n", b"line3\n"])
 
-    def test_porcelain_annotate_with_committish(self):
+    def test_porcelain_annotate_with_committish(self) -> None:
         """Test porcelain annotate with specific commit."""
         # Create commits
         commit1_id = self._make_commit_with_file(
@@ -296,7 +297,7 @@ class PorcelainAnnotateTestCase(TestCase):
         self.assertEqual(1, len(result))
         self.assertEqual(b"modified\n", result[0][1])
 
-    def test_blame_alias(self):
+    def test_blame_alias(self) -> None:
         """Test that blame is an alias for annotate."""
         self.assertIs(blame, annotate)
 
@@ -304,17 +305,17 @@ class PorcelainAnnotateTestCase(TestCase):
 class IntegrationTestCase(TestCase):
     """Integration tests with more complex scenarios."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp_dir = tempfile.mkdtemp()
         self.repo = Repo.init(self.temp_dir)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.repo.close()
         import shutil
 
         shutil.rmtree(self.temp_dir)
 
-    def _create_file_commit(self, filename, content, message, parent=None):
+    def _create_file_commit(self, filename: str, content: bytes, message: str, parent: Optional[bytes] = None) -> bytes:
         """Helper to create a commit with file content."""
         # Write file to working directory
         filepath = os.path.join(self.temp_dir, filename)
@@ -337,7 +338,7 @@ class IntegrationTestCase(TestCase):
 
         return commit_id
 
-    def test_complex_file_history(self):
+    def test_complex_file_history(self) -> None:
         """Test annotating a file with complex history."""
         # Initial commit with 3 lines
         self._create_file_commit(

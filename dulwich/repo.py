@@ -1115,6 +1115,7 @@ class Repo(BaseRepo):
 
     path: str
     bare: bool
+    object_store: DiskObjectStore
 
     def __init__(
         self,

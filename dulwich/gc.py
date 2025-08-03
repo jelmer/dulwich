@@ -4,19 +4,18 @@ import collections
 import os
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from dulwich.object_store import (
     BaseObjectStore,
     DiskObjectStore,
-    PackBasedObjectStore,
 )
 from dulwich.objects import Commit, ObjectID, Tag, Tree
 from dulwich.refs import RefsContainer
 
 if TYPE_CHECKING:
     from .config import Config
-    from .repo import BaseRepo
+    from .repo import BaseRepo, Repo
 
 
 DEFAULT_GC_AUTO = 6700
@@ -39,7 +38,7 @@ def find_reachable_objects(
     object_store: BaseObjectStore,
     refs_container: RefsContainer,
     include_reflogs: bool = True,
-    progress=None,
+    progress: Optional[Callable[[str], None]] = None,
 ) -> set[bytes]:
     """Find all reachable objects in the repository.
 
@@ -112,7 +111,7 @@ def find_unreachable_objects(
     object_store: BaseObjectStore,
     refs_container: RefsContainer,
     include_reflogs: bool = True,
-    progress=None,
+    progress: Optional[Callable[[str], None]] = None,
 ) -> set[bytes]:
     """Find all unreachable objects in the repository.
 
@@ -138,11 +137,11 @@ def find_unreachable_objects(
 
 
 def prune_unreachable_objects(
-    object_store: PackBasedObjectStore,
+    object_store: DiskObjectStore,
     refs_container: RefsContainer,
     grace_period: Optional[int] = None,
     dry_run: bool = False,
-    progress=None,
+    progress: Optional[Callable[[str], None]] = None,
 ) -> tuple[set[bytes], int]:
     """Remove unreachable objects from the repository.
 
@@ -206,13 +205,13 @@ def prune_unreachable_objects(
 
 
 def garbage_collect(
-    repo,
+    repo: "Repo",
     auto: bool = False,
     aggressive: bool = False,
     prune: bool = True,
     grace_period: Optional[int] = 1209600,  # 2 weeks default
     dry_run: bool = False,
-    progress=None,
+    progress: Optional[Callable[[str], None]] = None,
 ) -> GCStats:
     """Run garbage collection on a repository.
 
@@ -368,7 +367,7 @@ def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
     return False
 
 
-def maybe_auto_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
+def maybe_auto_gc(repo: "Repo", config: Optional["Config"] = None) -> bool:
     """Run automatic garbage collection if needed.
 
     Args:

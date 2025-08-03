@@ -231,7 +231,7 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
         except KeyError:
             return False
 
-    def log_message(self, format, *args):
+    def log_message(self, format: str, *args: object) -> None:
         """Override to suppress request logging during tests."""
         if self.server.log_requests:
             super().log_message(format, *args)
@@ -240,7 +240,12 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
 class LFSServer(HTTPServer):
     """Simple LFS server for testing."""
 
-    def __init__(self, server_address, lfs_store: LFSStore, log_requests: bool = False):
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        lfs_store: LFSStore,
+        log_requests: bool = False,
+    ) -> None:
         super().__init__(server_address, LFSRequestHandler)
         self.lfs_store = lfs_store
         self.log_requests = log_requests

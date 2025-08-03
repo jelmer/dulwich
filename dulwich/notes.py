@@ -28,12 +28,14 @@ from .objects import Blob, Tree
 
 if TYPE_CHECKING:
     from .config import StackedConfig
+    from .object_store import BaseObjectStore
+    from .refs import RefsContainer
 
 NOTES_REF_PREFIX = b"refs/notes/"
 DEFAULT_NOTES_REF = NOTES_REF_PREFIX + b"commits"
 
 
-def get_note_fanout_level(tree: Tree, object_store) -> int:
+def get_note_fanout_level(tree: Tree, object_store: "BaseObjectStore") -> int:
     """Determine the fanout level for a note tree.
 
     Git uses a fanout directory structure for performance with large numbers
@@ -57,6 +59,7 @@ def get_note_fanout_level(tree: Tree, object_store) -> int:
             elif stat.S_ISDIR(mode) and level < 2:  # Only recurse 2 levels deep
                 try:
                     subtree = object_store[sha]
+                    assert isinstance(subtree, Tree)
                     count += count_notes(subtree, level + 1)
                 except KeyError:
                     pass
@@ -111,7 +114,7 @@ def get_note_path(object_sha: bytes, fanout_level: int = 0) -> bytes:
 class NotesTree:
     """Represents a Git notes tree."""
 
-    def __init__(self, tree: Tree, object_store):
+    def __init__(self, tree: Tree, object_store: "BaseObjectStore") -> None:
         """Initialize a notes tree.
 
         Args:
@@ -167,6 +170,7 @@ class NotesTree:
                 try:
                     sample_mode, sample_sha = self._tree[sample_dir_name]
                     sample_tree = self._object_store[sample_sha]
+                    assert isinstance(sample_tree, Tree)
 
                     # Check if this subtree also has 2-char hex directories
                     sub_has_dirs = False
@@ -236,6 +240,7 @@ class NotesTree:
                             # Update this subtree
                             if stat.S_ISDIR(mode):
                                 subtree = self._object_store[sha]
+                                assert isinstance(subtree, Tree)
                             else:
                                 # If not a directory, we need to replace it
                                 subtree = Tree()
@@ -303,7 +308,9 @@ class NotesTree:
                 mode, sha = current_tree[component]
                 if not stat.S_ISDIR(mode):  # Not a directory
                     return None
-                current_tree = self._object_store[sha]
+                obj = self._object_store[sha]
+                assert isinstance(obj, Tree)
+                current_tree = obj
             except KeyError:
                 return None
 
@@ -378,6 +385,7 @@ class NotesTree:
                         # Update this subtree
                         if stat.S_ISDIR(mode):
                             subtree = self._object_store[sha]
+                            assert isinstance(subtree, Tree)
                         else:
                             # If not a directory, we need to replace it
                             subtree = Tree()
@@ -444,6 +452,7 @@ class NotesTree:
                     if name == components[0] and stat.S_ISDIR(mode):
                         # Update this subtree
                         subtree = self._object_store[sha]
+                        assert isinstance(subtree, Tree)
                         new_subtree = remove_from_tree(subtree, components[1:])
                         if new_subtree is not None:
                             self._object_store.add_object(new_subtree)
@@ -478,6 +487,7 @@ class NotesTree:
             for name, mode, sha in tree.items():
                 if stat.S_ISDIR(mode):  # Directory
                     subtree = self._object_store[sha]
+                    assert isinstance(subtree, Tree)
                     yield from walk_tree(subtree, prefix + name)
                 elif stat.S_ISREG(mode):  # File
                     # Reconstruct the full hex SHA from the path
@@ -487,7 +497,7 @@ class NotesTree:
         yield from walk_tree(self._tree)
 
 
-def create_notes_tree(object_store) -> Tree:
+def create_notes_tree(object_store: "BaseObjectStore") -> Tree:
     """Create an empty notes tree.
 
     Args:
@@ -504,7 +514,9 @@ def create_notes_tree(object_store) -> Tree:
 class Notes:
     """High-level interface for Git notes operations."""
 
-    def __init__(self, object_store, refs_container):
+    def __init__(
+        self, object_store: "BaseObjectStore", refs_container: "RefsContainer"
+    ) -> None:
         """Initialize Notes.
 
         Args:

@@ -48,6 +48,7 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
@@ -176,7 +177,11 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
 
     @classmethod
     def make(
-        cls, dict_in=None, default_factory=None
+        cls,
+        dict_in: Optional[
+            Union[MutableMapping[K, V], "CaseInsensitiveOrderedMultiDict[K, V]"]
+        ] = None,
+        default_factory: Optional[Callable[[], V]] = None,
     ) -> "CaseInsensitiveOrderedMultiDict[K, V]":
         if isinstance(dict_in, cls):
             return dict_in
@@ -226,22 +231,22 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
     def values(self) -> ValuesView[V]:
         return self._keyed.values()
 
-    def __setitem__(self, key, value) -> None:
+    def __setitem__(self, key: K, value: V) -> None:
         self._real.append((key, value))
         self._keyed[lower_key(key)] = value
 
-    def set(self, key, value) -> None:
+    def set(self, key: K, value: V) -> None:
         # This method replaces all existing values for the key
         lower = lower_key(key)
         self._real = [(k, v) for k, v in self._real if lower_key(k) != lower]
         self._real.append((key, value))
         self._keyed[lower] = value
 
-    def __delitem__(self, key) -> None:
-        key = lower_key(key)
-        del self._keyed[key]
+    def __delitem__(self, key: K) -> None:
+        lower_k = lower_key(key)
+        del self._keyed[lower_k]
         for i, (actual, unused_value) in reversed(list(enumerate(self._real))):
-            if lower_key(actual) == key:
+            if lower_key(actual) == lower_k:
                 del self._real[i]
 
     def __getitem__(self, item: K) -> V:
@@ -394,7 +399,7 @@ class ConfigDict(Config):
     def __init__(
         self,
         values: Union[
-            MutableMapping[Section, MutableMapping[Name, Value]], None
+            MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]], None
         ] = None,
         encoding: Union[str, None] = None,
     ) -> None:
@@ -417,7 +422,9 @@ class ConfigDict(Config):
     def __getitem__(self, key: Section) -> CaseInsensitiveOrderedMultiDict[Name, Value]:
         return self._values.__getitem__(key)
 
-    def __setitem__(self, key: Section, value: MutableMapping[Name, Value]) -> None:
+    def __setitem__(
+        self, key: Section, value: CaseInsensitiveOrderedMultiDict[Name, Value]
+    ) -> None:
         return self._values.__setitem__(key, value)
 
     def __delitem__(self, key: Section) -> None:
@@ -739,7 +746,7 @@ class ConfigFile(ConfigDict):
     def __init__(
         self,
         values: Union[
-            MutableMapping[Section, MutableMapping[Name, Value]], None
+            MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]], None
         ] = None,
         encoding: Union[str, None] = None,
     ) -> None:
@@ -924,10 +931,11 @@ class ConfigFile(ConfigDict):
         # Load and merge the included file
         try:
             # Use provided file opener or default to GitFile
+            opener: FileOpener
             if file_opener is None:
 
-                def opener(path):
-                    return GitFile(path, "rb")
+                def opener(path: Union[str, os.PathLike]) -> BinaryIO:
+                    return cast(BinaryIO, GitFile(path, "rb"))
             else:
                 opener = file_opener
 
@@ -1084,10 +1092,11 @@ class ConfigFile(ConfigDict):
         config_dir = os.path.dirname(abs_path)
 
         # Use provided file opener or default to GitFile
+        opener: FileOpener
         if file_opener is None:
 
-            def opener(p):
-                return GitFile(p, "rb")
+            def opener(p: Union[str, os.PathLike]) -> BinaryIO:
+                return cast(BinaryIO, GitFile(p, "rb"))
         else:
             opener = file_opener
 

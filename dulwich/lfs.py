@@ -31,6 +31,8 @@ from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
+    import urllib3
+
     from .config import Config
     from .repo import Repo
 
@@ -289,7 +291,7 @@ class LFSFilterDriver:
         return content
 
 
-def _get_lfs_user_agent(config):
+def _get_lfs_user_agent(config: Optional["Config"]) -> str:
     """Get User-Agent string for LFS requests, respecting git config."""
     try:
         if config:
@@ -317,7 +319,7 @@ class LFSClient:
         """
         self._base_url = url.rstrip("/") + "/"  # Ensure trailing slash for urljoin
         self.config = config
-        self._pool_manager = None
+        self._pool_manager: Optional[urllib3.PoolManager] = None
 
     @classmethod
     def from_config(cls, config: "Config") -> Optional["LFSClient"]:
@@ -365,12 +367,12 @@ class LFSClient:
         """Get the LFS server URL without trailing slash."""
         return self._base_url.rstrip("/")
 
-    def _get_pool_manager(self):
+    def _get_pool_manager(self) -> "urllib3.PoolManager":
         """Get urllib3 pool manager with git config applied."""
         if self._pool_manager is None:
             from dulwich.client import default_urllib3_manager
 
-            self._pool_manager = default_urllib3_manager(self.config)
+            self._pool_manager = default_urllib3_manager(self.config)  # type: ignore[assignment]
         return self._pool_manager
 
     def _make_request(
@@ -397,7 +399,7 @@ class LFSClient:
             raise ValueError(
                 f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}"
             )
-        return response.data
+        return response.data  # type: ignore[return-value]
 
     def batch(
         self,
@@ -513,7 +515,7 @@ class LFSClient:
         if actual_oid != oid:
             raise LFSError(f"Downloaded OID {actual_oid} != expected {oid}")
 
-        return content
+        return content  # type: ignore[return-value]
 
     def upload(
         self, oid: str, size: int, content: bytes, ref: Optional[str] = None

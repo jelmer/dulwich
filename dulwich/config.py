@@ -177,8 +177,11 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
 
     @classmethod
     def make(
-        cls, dict_in: Optional[Union[MutableMapping[K, V], "CaseInsensitiveOrderedMultiDict[K, V]"]] = None, 
-        default_factory: Optional[Callable[[], V]] = None
+        cls,
+        dict_in: Optional[
+            Union[MutableMapping[K, V], "CaseInsensitiveOrderedMultiDict[K, V]"]
+        ] = None,
+        default_factory: Optional[Callable[[], V]] = None,
     ) -> "CaseInsensitiveOrderedMultiDict[K, V]":
         if isinstance(dict_in, cls):
             return dict_in
@@ -396,7 +399,7 @@ class ConfigDict(Config):
     def __init__(
         self,
         values: Union[
-            MutableMapping[Section, MutableMapping[Name, Value]], None
+            MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]], None
         ] = None,
         encoding: Union[str, None] = None,
     ) -> None:
@@ -419,7 +422,9 @@ class ConfigDict(Config):
     def __getitem__(self, key: Section) -> CaseInsensitiveOrderedMultiDict[Name, Value]:
         return self._values.__getitem__(key)
 
-    def __setitem__(self, key: Section, value: CaseInsensitiveOrderedMultiDict[Name, Value]) -> None:
+    def __setitem__(
+        self, key: Section, value: CaseInsensitiveOrderedMultiDict[Name, Value]
+    ) -> None:
         return self._values.__setitem__(key, value)
 
     def __delitem__(self, key: Section) -> None:
@@ -741,7 +746,7 @@ class ConfigFile(ConfigDict):
     def __init__(
         self,
         values: Union[
-            MutableMapping[Section, MutableMapping[Name, Value]], None
+            MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]], None
         ] = None,
         encoding: Union[str, None] = None,
     ) -> None:

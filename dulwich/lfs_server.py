@@ -240,7 +240,12 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
 class LFSServer(HTTPServer):
     """Simple LFS server for testing."""
 
-    def __init__(self, server_address: tuple[str, int], lfs_store: LFSStore, log_requests: bool = False) -> None:
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        lfs_store: LFSStore,
+        log_requests: bool = False,
+    ) -> None:
         super().__init__(server_address, LFSRequestHandler)
         self.lfs_store = lfs_store
         self.log_requests = log_requests

@@ -37,7 +37,13 @@ from .object_store import (
 from .objects import Commit, ObjectID, Tag
 
 
-def _split_commits_and_tags(obj_store: BaseObjectStore, lst: list[ObjectID], *, ignore_unknown: bool = False, pool: pool.Pool) -> tuple[set[ObjectID], set[ObjectID]]:
+def _split_commits_and_tags(
+    obj_store: BaseObjectStore,
+    lst: list[ObjectID],
+    *,
+    ignore_unknown: bool = False,
+    pool: pool.Pool,
+) -> tuple[set[ObjectID], set[ObjectID]]:
     """Split object id list into two list with commit SHA1s and tag SHA1s.
 
     Same implementation as object_store._split_commits_and_tags

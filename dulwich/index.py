@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from .diff_tree import TreeChange
     from .file import _GitFile
     from .line_ending import BlobNormalizer
+    from .object_store import BaseObjectStore
     from .repo import Repo
 
 from .file import GitFile
@@ -1324,7 +1325,7 @@ def _normalize_path_element_hfs(element: bytes) -> bytes:
     return normalized.lower().encode("utf-8", errors="strict")
 
 
-def get_path_element_normalizer(config) -> Callable[[bytes], bytes]:
+def get_path_element_normalizer(config: "Config") -> Callable[[bytes], bytes]:
     """Get the appropriate path element normalization function based on config.
 
     Args:
@@ -1645,7 +1646,7 @@ def _remove_empty_parents(path: bytes, stop_at: bytes) -> None:
 
 
 def _check_symlink_matches(
-    full_path: bytes, repo_object_store, entry_sha: bytes
+    full_path: bytes, repo_object_store: "BaseObjectStore", entry_sha: bytes
 ) -> bool:
     """Check if symlink target matches expected target.
 
@@ -1669,7 +1670,7 @@ def _check_symlink_matches(
 
 
 def _check_file_matches(
-    repo_object_store,
+    repo_object_store: "BaseObjectStore",
     full_path: bytes,
     entry_sha: bytes,
     entry_mode: int,
@@ -1724,6 +1725,7 @@ def _check_file_matches(
             current_content = f.read()
             expected_content = blob_obj.as_raw_string()
             if blob_normalizer and tree_path is not None:
+                assert isinstance(blob_obj, Blob)
                 normalized_blob = blob_normalizer.checkout_normalize(
                     blob_obj, tree_path
                 )
@@ -1733,7 +1735,14 @@ def _check_file_matches(
         return False
 
 
-def _transition_to_submodule(repo, path, full_path, current_stat, entry, index):
+def _transition_to_submodule(
+    repo: "Repo",
+    path: bytes,
+    full_path: bytes,
+    current_stat: Optional[os.stat_result],
+    entry: IndexEntry,
+    index: Index,
+) -> None:
     """Transition any type to submodule."""
     from .submodule import ensure_submodule_placeholder
 
@@ -1751,17 +1760,17 @@ def _transition_to_submodule(repo, path, full_path, current_stat, entry, index):
 
 
 def _transition_to_file(
-    object_store,
-    path,
-    full_path,
-    current_stat,
-    entry,
-    index,
-    honor_filemode,
-    symlink_fn,
-    blob_normalizer,
-    tree_encoding="utf-8",
-):
+    object_store: "BaseObjectStore",
+    path: bytes,
+    full_path: bytes,
+    current_stat: Optional[os.stat_result],
+    entry: IndexEntry,
+    index: Index,
+    honor_filemode: bool,
+    symlink_fn: Optional[Callable[[bytes, bytes], None]],
+    blob_normalizer: Optional["BlobNormalizer"],
+    tree_encoding: str = "utf-8",
+) -> None:
     """Transition any type to regular file or symlink."""
     # Check if we need to update
     if (
@@ -1794,6 +1803,7 @@ def _transition_to_file(
 
     if not needs_update:
         # Just update index - current_stat should always be valid here since we're not updating
+        assert current_stat is not None
         index[path] = index_entry_from_stat(current_stat, entry.sha)
         return
 
@@ -1840,7 +1850,13 @@ def _transition_to_file(
     index[path] = index_entry_from_stat(st, entry.sha)
 
 
-def _transition_to_absent(repo, path, full_path, current_stat, index):
+def _transition_to_absent(
+    repo: "Repo",
+    path: bytes,
+    full_path: bytes,
+    current_stat: Optional[os.stat_result],
+    index: Index,
+) -> None:
     """Remove any type of entry."""
     if current_stat is None:
         return

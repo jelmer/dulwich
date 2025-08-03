@@ -266,15 +266,15 @@ class _GitFile:
         if name in self.PROXY_PROPERTIES:
             return getattr(self._file, name)
         raise AttributeError(name)
-    
+
     def readable(self) -> bool:
         """Return whether the file is readable."""
         return self._file.readable()
-    
+
     def writable(self) -> bool:
         """Return whether the file is writable."""
         return self._file.writable()
-    
+
     def seekable(self) -> bool:
         """Return whether the file is seekable."""
         return self._file.seekable()

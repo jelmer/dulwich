@@ -289,7 +289,10 @@ def parse_reftuples(
     return ret
 
 
-def parse_refs(container: Union["Repo", "RefsContainer"], refspecs: Union[bytes, str, list[Union[bytes, str]]]) -> list["Ref"]:
+def parse_refs(
+    container: Union["Repo", "RefsContainer"],
+    refspecs: Union[bytes, str, list[Union[bytes, str]]],
+) -> list["Ref"]:
     """Parse a list of refspecs to a list of refs.
 
     Args:
@@ -349,7 +352,9 @@ class AmbiguousShortId(Exception):
         self.options = options
 
 
-def scan_for_short_id(object_store: "BaseObjectStore", prefix: bytes, tp: type[ShaFile]) -> ShaFile:
+def scan_for_short_id(
+    object_store: "BaseObjectStore", prefix: bytes, tp: type[ShaFile]
+) -> ShaFile:
     """Scan an object store for a short id."""
     ret = []
     for object_id in object_store.iter_prefix(prefix):
@@ -385,7 +390,9 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit, Tag]) -> "C
                 # Tag points to a missing object
                 raise KeyError(obj_sha)
         if not isinstance(obj, Commit):
-            raise ValueError(f"Expected commit, got {obj.type_name.decode('ascii', 'replace')}")
+            raise ValueError(
+                f"Expected commit, got {obj.type_name.decode('ascii', 'replace')}"
+            )
         return obj
 
     # If already a Commit object, return it directly

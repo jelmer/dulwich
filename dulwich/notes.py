@@ -514,7 +514,9 @@ def create_notes_tree(object_store: "BaseObjectStore") -> Tree:
 class Notes:
     """High-level interface for Git notes operations."""
 
-    def __init__(self, object_store: "BaseObjectStore", refs_container: "RefsContainer") -> None:
+    def __init__(
+        self, object_store: "BaseObjectStore", refs_container: "RefsContainer"
+    ) -> None:
         """Initialize Notes.
 
         Args:

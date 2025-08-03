@@ -91,7 +91,7 @@ from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
 from pathlib import Path
-from typing import Optional, TypeVar, Union, overload
+from typing import BinaryIO, Optional, TypeVar, Union, cast, overload
 
 from . import replace_me
 from .archive import tar_stream
@@ -1177,17 +1177,45 @@ def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
       decode: Function for decoding bytes to unicode string
       outstream: Stream to write to
     """
+    from .diff import ColorizedDiffStream
+
+    # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
+    class _StreamWrapper:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def write(self, data):
+            if isinstance(data, str):
+                # Convert string to bytes for ColorizedDiffStream
+                self.stream.write(data.encode("utf-8"))
+            else:
+                self.stream.write(data)
+
     with open_repo_closing(repo) as r:
-        print_commit(commit, decode=decode, outstream=outstream)
-        if commit.parents:
-            parent_commit = r[commit.parents[0]]
-            base_tree = parent_commit.tree
+        # Use wrapper for ColorizedDiffStream, direct stream for others
+        if isinstance(outstream, ColorizedDiffStream):
+            wrapped_stream = _StreamWrapper(outstream)
+            print_commit(commit, decode=decode, outstream=wrapped_stream)
+            # Write diff directly to the ColorizedDiffStream as bytes
+            # Type cast since ColorizedDiffStream implements the BinaryIO interface we need
+            write_tree_diff(
+                cast(BinaryIO, outstream),
+                r.object_store,
+                commit.parents[0] if commit.parents else None,
+                commit.tree,
+            )
         else:
-            base_tree = None
-        diffstream = BytesIO()
-        write_tree_diff(diffstream, r.object_store, base_tree, commit.tree)
-    diffstream.seek(0)
-    outstream.write(commit_decode(commit, diffstream.getvalue()))
+            print_commit(commit, decode=decode, outstream=outstream)
+            if commit.parents:
+                parent_commit = r[commit.parents[0]]
+                base_tree = parent_commit.tree
+            else:
+                base_tree = None
+            # Traditional path: buffer diff and write as decoded text
+            diffstream = BytesIO()
+            write_tree_diff(diffstream, r.object_store, base_tree, commit.tree)
+            diffstream.seek(0)
+            outstream.write(commit_decode(commit, diffstream.getvalue()))
 
 
 def show_tree(repo: RepoPath, tree, decode, outstream=sys.stdout) -> None:

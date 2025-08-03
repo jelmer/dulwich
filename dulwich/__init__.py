@@ -45,8 +45,8 @@ except ImportError:
     # if dissolve is not installed, then just provide a basic implementation
     # of its replace_me decorator
     def replace_me(
-        since: Optional[Union[str, tuple[int, ...]]] = None, 
-        remove_in: Optional[Union[str, tuple[int, ...]]] = None
+        since: Optional[Union[str, tuple[int, ...]]] = None,
+        remove_in: Optional[Union[str, tuple[int, ...]]] = None,
     ):
         def decorator(func):
             import functools
@@ -55,7 +55,7 @@ except ImportError:
             m = f"{func.__name__} is deprecated"
             since_str = str(since) if since is not None else None
             remove_in_str = str(remove_in) if remove_in is not None else None
-            
+
             if since_str is not None and remove_in_str is not None:
                 m += f" since {since_str} and will be removed in {remove_in_str}"
             elif since_str is not None:

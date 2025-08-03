@@ -23,8 +23,9 @@
 
 import collections
 from collections.abc import Generator
-from typing import BinaryIO, Optional, Union
+from typing import IO, BinaryIO, Optional, Union
 
+from .file import _GitFile
 from .objects import ZERO_SHA, format_timezone, parse_timezone
 
 Entry = collections.namedtuple(
@@ -89,7 +90,9 @@ def parse_reflog_line(line: bytes) -> Entry:
     )
 
 
-def read_reflog(f: BinaryIO) -> Generator[Entry, None, None]:
+def read_reflog(
+    f: Union[BinaryIO, IO[bytes], _GitFile],
+) -> Generator[Entry, None, None]:
     """Read reflog.
 
     Args:

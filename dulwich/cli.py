@@ -631,7 +631,7 @@ class cmd_diff(Command):
             "--color",
             choices=["always", "never", "auto"],
             default="auto",
-            help="Use colored output (requires pygments)",
+            help="Use colored output (requires rich)",
         )
         parser.add_argument(
             "--", dest="separator", action="store_true", help=argparse.SUPPRESS

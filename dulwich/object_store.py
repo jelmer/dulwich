@@ -41,7 +41,7 @@ from typing import (
 )
 
 from .errors import NotTreeError
-from .file import GitFile
+from .file import GitFile, _GitFile
 from .objects import (
     S_ISGITLINK,
     ZERO_SHA,
@@ -1505,6 +1505,9 @@ class DiskObjectStore(PackBasedObjectStore):
                 # Write using GitFile for atomic operation
                 graph_path = os.path.join(info_dir, "commit-graph")
                 with GitFile(graph_path, "wb") as f:
+                    assert isinstance(
+                        f, _GitFile
+                    )  # GitFile in write mode always returns _GitFile
                     graph.write_to_file(f)
 
             # Clear cached commit graph so it gets reloaded

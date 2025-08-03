@@ -1594,7 +1594,7 @@ class DeltaChainIteratorTests(TestCase):
             # Attempting to open this REF_DELTA object would loop forever
             pack[b1.id]
         except UnresolvedDeltas as e:
-            self.assertEqual((b1.id), e.shas)
+            self.assertEqual([hex_to_sha(b1.id)], e.shas)
 
 
 class DeltaEncodeSizeTests(TestCase):

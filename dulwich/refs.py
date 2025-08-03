@@ -1401,7 +1401,8 @@ class locked_ref:
 
         filename = self._refs_container.refpath(self._realname)
         ensure_dir_exists(os.path.dirname(filename))
-        self._file = GitFile(filename, "wb")
+        f = GitFile(filename, "wb")
+        self._file = f
         return self
 
     def __exit__(

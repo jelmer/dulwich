@@ -408,7 +408,8 @@ class BisectState:
         obj = self.repo.object_store[sha]
         if isinstance(obj, Commit):
             message = obj.message.decode("utf-8", errors="replace")
-            return message.split("\n")[0]
+            lines = message.split("\n")
+            return lines[0] if lines else ""
         return ""
 
     def _append_to_log(self, line: str) -> None:

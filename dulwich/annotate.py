@@ -27,11 +27,17 @@ Python's difflib.
 """
 
 import difflib
+from typing import TYPE_CHECKING, Optional, cast
 
 from dulwich.walk import (
     ORDER_DATE,
     Walker,
 )
+
+if TYPE_CHECKING:
+    from dulwich.diff_tree import TreeChange, TreeEntry
+    from dulwich.object_store import BaseObjectStore
+    from dulwich.objects import Blob, Commit
 
 # Walk over ancestry graph breadth-first
 # When checking each revision, find lines that according to difflib.Differ()
@@ -41,9 +47,13 @@ from dulwich.walk import (
 # graph.
 
 
-def update_lines(annotated_lines, new_history_data, new_blob):
+def update_lines(
+    annotated_lines: list[tuple[tuple["Commit", "TreeEntry"], bytes]],
+    new_history_data: tuple["Commit", "TreeEntry"],
+    new_blob: "Blob",
+) -> list[tuple[tuple["Commit", "TreeEntry"], bytes]]:
     """Update annotation lines with old blob lines."""
-    ret = []
+    ret: list[tuple[tuple[Commit, TreeEntry], bytes]] = []
     new_lines = new_blob.splitlines()
     matcher = difflib.SequenceMatcher(
         a=[line for (h, line) in annotated_lines], b=new_lines
@@ -60,7 +70,14 @@ def update_lines(annotated_lines, new_history_data, new_blob):
     return ret
 
 
-def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=True):
+def annotate_lines(
+    store: "BaseObjectStore",
+    commit_id: bytes,
+    path: bytes,
+    order: str = ORDER_DATE,
+    lines: Optional[list[tuple[tuple["Commit", "TreeEntry"], bytes]]] = None,
+    follow: bool = True,
+) -> list[tuple[tuple["Commit", "TreeEntry"], bytes]]:
     """Annotate the lines of a blob.
 
     :param store: Object store to retrieve objects from
@@ -75,18 +92,23 @@ def annotate_lines(store, commit_id, path, order=ORDER_DATE, lines=None, follow=
     walker = Walker(
         store, include=[commit_id], paths=[path], order=order, follow=follow
     )
-    revs = []
+    revs: list[tuple[Commit, TreeEntry]] = []
     for log_entry in walker:
         for tree_change in log_entry.changes():
-            if type(tree_change) is not list:
-                tree_change = [tree_change]
-            for change in tree_change:
+            changes: list[TreeChange]
+            if isinstance(tree_change, list):
+                changes = tree_change
+            else:
+                changes = [tree_change]
+            for change in changes:
                 if change.new.path == path:
                     path = change.old.path
                     revs.append((log_entry.commit, change.new))
                     break
 
-    lines = []
+    lines_annotated: list[tuple[tuple[Commit, TreeEntry], bytes]] = []
     for commit, entry in reversed(revs):
-        lines = update_lines(lines, (commit, entry), store[entry.sha])
-    return lines
+        lines_annotated = update_lines(
+            lines_annotated, (commit, entry), cast("Blob", store[entry.sha])
+        )
+    return lines_annotated

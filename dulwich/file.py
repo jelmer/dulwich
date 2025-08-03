@@ -24,10 +24,12 @@
 import os
 import sys
 import warnings
-from typing import ClassVar, Union
+from collections.abc import Iterator
+from types import TracebackType
+from typing import IO, Any, ClassVar, Literal, Optional, Union, overload
 
 
-def ensure_dir_exists(dirname) -> None:
+def ensure_dir_exists(dirname: Union[str, bytes, os.PathLike]) -> None:
     """Ensure a directory exists, creating if necessary."""
     try:
         os.makedirs(dirname)
@@ -35,7 +37,7 @@ def ensure_dir_exists(dirname) -> None:
         pass
 
 
-def _fancy_rename(oldname, newname) -> None:
+def _fancy_rename(oldname: Union[str, bytes], newname: Union[str, bytes]) -> None:
     """Rename file with temporary backup file to rollback if rename fails."""
     if not os.path.exists(newname):
         os.rename(oldname, newname)
@@ -45,7 +47,7 @@ def _fancy_rename(oldname, newname) -> None:
     import tempfile
 
     # destination file exists
-    (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=oldname, dir=".")
+    (fd, tmpfile) = tempfile.mkstemp(".tmp", prefix=str(oldname), dir=".")
     os.close(fd)
     os.remove(tmpfile)
     os.rename(newname, tmpfile)
@@ -57,9 +59,39 @@ def _fancy_rename(oldname, newname) -> None:
     os.remove(tmpfile)
 
 
+@overload
 def GitFile(
-    filename: Union[str, bytes, os.PathLike], mode="rb", bufsize=-1, mask=0o644
-):
+    filename: Union[str, bytes, os.PathLike],
+    mode: Literal["wb"],
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> "_GitFile": ...
+
+
+@overload
+def GitFile(
+    filename: Union[str, bytes, os.PathLike],
+    mode: Literal["rb"] = "rb",
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> IO[bytes]: ...
+
+
+@overload
+def GitFile(
+    filename: Union[str, bytes, os.PathLike],
+    mode: str = "rb",
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> Union[IO[bytes], "_GitFile"]: ...
+
+
+def GitFile(
+    filename: Union[str, bytes, os.PathLike],
+    mode: str = "rb",
+    bufsize: int = -1,
+    mask: int = 0o644,
+) -> Union[IO[bytes], "_GitFile"]:
     """Create a file object that obeys the git file locking protocol.
 
     Returns: a builtin file object or a _GitFile object
@@ -90,7 +122,9 @@ def GitFile(
 class FileLocked(Exception):
     """File is already locked."""
 
-    def __init__(self, filename, lockfilename) -> None:
+    def __init__(
+        self, filename: Union[str, bytes, os.PathLike], lockfilename: Union[str, bytes]
+    ) -> None:
         self.filename = filename
         self.lockfilename = lockfilename
         super().__init__(filename, lockfilename)
@@ -132,7 +166,11 @@ class _GitFile:
     }
 
     def __init__(
-        self, filename: Union[str, bytes, os.PathLike], mode, bufsize, mask
+        self,
+        filename: Union[str, bytes, os.PathLike],
+        mode: str,
+        bufsize: int,
+        mask: int,
     ) -> None:
         # Convert PathLike to str/bytes for our internal use
         self._filename: Union[str, bytes] = os.fspath(filename)
@@ -153,6 +191,10 @@ class _GitFile:
 
         for method in self.PROXY_METHODS:
             setattr(self, method, getattr(self._file, method))
+
+    def __iter__(self) -> Iterator[bytes]:
+        """Iterate over lines in the file."""
+        return iter(self._file)
 
     def abort(self) -> None:
         """Close and discard the lockfile without overwriting the target.
@@ -205,16 +247,21 @@ class _GitFile:
             warnings.warn(f"unclosed {self!r}", ResourceWarning, stacklevel=2)
             self.abort()
 
-    def __enter__(self):
+    def __enter__(self) -> "_GitFile":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         if exc_type is not None:
             self.abort()
         else:
             self.close()
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         """Proxy property calls to the underlying file."""
         if name in self.PROXY_PROPERTIES:
             return getattr(self._file, name)

@@ -44,7 +44,6 @@ from .objects import (
 )
 from .pack import Pack, PackData, PackIndex, UnpackedObject, load_pack_index_file
 from .refs import Ref, read_info_refs, split_peeled_refs
-from .repo import BaseRepo
 
 
 class DumbHTTPObjectStore(BaseObjectStore):
@@ -343,7 +342,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
             shutil.rmtree(self._temp_pack_dir, ignore_errors=True)
 
 
-class DumbRemoteHTTPRepo(BaseRepo):
+class DumbRemoteHTTPRepo:
     """Repository implementation for dumb HTTP remotes."""
 
     def __init__(self, base_url: str, http_request_func: Callable[[str, dict[str, str]], tuple[Any, Callable[..., bytes]]]) -> None:
@@ -412,7 +411,14 @@ class DumbRemoteHTTPRepo(BaseRepo):
         sha = self.get_refs().get(ref, None)
         return sha if sha is not None else ZERO_SHA
 
-    def fetch_pack_data(self, graph_walker: object, determine_wants: Callable[[dict[Ref, ObjectID]], list[ObjectID]], progress: Optional[Callable[[str], None]] = None, *, get_tagged: Optional[bool] = None, depth: Optional[int] = None) -> Iterator[UnpackedObject]:
+    def fetch_pack_data(
+        self,
+        graph_walker: object,
+        determine_wants: Callable[[dict[Ref, ObjectID]], list[ObjectID]],
+        progress: Optional[Callable[[bytes], None]] = None,
+        get_tagged: Optional[bool] = None,
+        depth: Optional[int] = None,
+    ) -> Iterator[UnpackedObject]:
         """Fetch pack data from the remote.
 
         This is the main method for fetching objects from a dumb HTTP remote.
@@ -468,4 +474,4 @@ class DumbRemoteHTTPRepo(BaseRepo):
                     to_fetch.add(item_sha)
 
             if progress:
-                progress(f"Fetching objects: {len(seen)} done\n")
+                progress(f"Fetching objects: {len(seen)} done\n".encode())

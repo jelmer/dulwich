@@ -1735,7 +1735,14 @@ def _check_file_matches(
         return False
 
 
-def _transition_to_submodule(repo: "Repo", path: bytes, full_path: bytes, current_stat: Optional[os.stat_result], entry: IndexEntry, index: Index) -> None:
+def _transition_to_submodule(
+    repo: "Repo",
+    path: bytes,
+    full_path: bytes,
+    current_stat: Optional[os.stat_result],
+    entry: IndexEntry,
+    index: Index,
+) -> None:
     """Transition any type to submodule."""
     from .submodule import ensure_submodule_placeholder
 
@@ -1843,7 +1850,13 @@ def _transition_to_file(
     index[path] = index_entry_from_stat(st, entry.sha)
 
 
-def _transition_to_absent(repo: "Repo", path: bytes, full_path: bytes, current_stat: Optional[os.stat_result], index: Index) -> None:
+def _transition_to_absent(
+    repo: "Repo",
+    path: bytes,
+    full_path: bytes,
+    current_stat: Optional[os.stat_result],
+    index: Index,
+) -> None:
     """Remove any type of entry."""
     if current_stat is None:
         return

@@ -281,7 +281,7 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
             return [blob_sha]
 
         def progress(msg):
-            assert isinstance(msg, str)
+            assert isinstance(msg, bytes)
 
         result = list(
             self.repo.fetch_pack_data(graph_walker, determine_wants, progress)

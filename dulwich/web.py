@@ -28,7 +28,7 @@ import sys
 import time
 from collections.abc import Iterator
 from io import BytesIO
-from typing import Callable, ClassVar, Optional
+from typing import BinaryIO, Callable, ClassVar, Optional, cast
 from urllib.parse import parse_qs
 from wsgiref.simple_server import (
     ServerHandler,
@@ -127,10 +127,10 @@ def url_prefix(mat: re.Match[str]) -> str:
 
 def get_repo(backend: 'Backend', mat: re.Match[str]) -> BaseRepo:
     """Get a Repo instance for the given backend and URL regex match."""
-    return backend.open_repository(url_prefix(mat))
+    return cast(BaseRepo, backend.open_repository(url_prefix(mat)))
 
 
-def send_file(req: 'HTTPGitRequest', f: BytesIO, content_type: str) -> Iterator[bytes]:
+def send_file(req: 'HTTPGitRequest', f: Optional[BinaryIO], content_type: str) -> Iterator[bytes]:
     """Send a file-like object to the request output.
 
     Args:
@@ -247,7 +247,7 @@ def get_info_packs(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]
     return generate_objects_info_packs(get_repo(backend, mat))
 
 
-def _chunk_iter(f: BytesIO) -> Iterator[bytes]:
+def _chunk_iter(f: BinaryIO) -> Iterator[bytes]:
     while True:
         line = f.readline()
         length = int(line.rstrip(), 16)
@@ -260,7 +260,7 @@ def _chunk_iter(f: BytesIO) -> Iterator[bytes]:
 class ChunkReader:
     """Reader for chunked transfer encoding streams."""
 
-    def __init__(self, f: BytesIO) -> None:
+    def __init__(self, f: BinaryIO) -> None:
         self._iter = _chunk_iter(f)
         self._buffer: list[bytes] = []
 
@@ -284,7 +284,7 @@ class _LengthLimitedFile:
     but not implemented in wsgiref as of 2.5.
     """
 
-    def __init__(self, input: BytesIO, max_bytes: int) -> None:
+    def __init__(self, input: BinaryIO, max_bytes: int) -> None:
         self._input = input
         self._bytes_avail = max_bytes
 

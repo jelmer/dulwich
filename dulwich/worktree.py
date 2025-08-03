@@ -31,7 +31,7 @@ import sys
 import tempfile
 import time
 import warnings
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -219,7 +219,7 @@ class WorkTreeContainer:
         """
         unlock_worktree(self._repo, path)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[WorkTreeInfo]:
         """Iterate over all worktrees."""
         yield from self.list()
 
@@ -374,17 +374,17 @@ class WorkTree:
         message: bytes | None = None,
         committer: bytes | None = None,
         author: bytes | None = None,
-        commit_timestamp=None,
-        commit_timezone=None,
-        author_timestamp=None,
-        author_timezone=None,
+        commit_timestamp: float | None = None,
+        commit_timezone: int | None = None,
+        author_timestamp: float | None = None,
+        author_timezone: int | None = None,
         tree: ObjectID | None = None,
         encoding: bytes | None = None,
         ref: Ref | None = b"HEAD",
         merge_heads: list[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool = False,
-    ):
+    ) -> ObjectID:
         """Create a new commit.
 
         If not specified, committer and author default to
@@ -569,7 +569,7 @@ class WorkTree:
 
         return c.id
 
-    def reset_index(self, tree: bytes | None = None):
+    def reset_index(self, tree: bytes | None = None) -> None:
         """Reset the index back to a specific tree.
 
         Args:
@@ -1157,7 +1157,7 @@ def move_worktree(
 
 
 @contextmanager
-def temporary_worktree(repo, prefix="tmp-worktree-"):
+def temporary_worktree(repo: Repo, prefix: str = "tmp-worktree-") -> Iterator[Repo]:
     """Create a temporary worktree that is automatically cleaned up.
 
     Args:

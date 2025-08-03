@@ -63,7 +63,9 @@ class Bundle:
         return True
 
     def store_objects(
-        self, object_store: "BaseObjectStore", progress: Optional[Callable[[str], None]] = None
+        self,
+        object_store: "BaseObjectStore",
+        progress: Optional[Callable[[str], None]] = None,
     ) -> None:
         """Store all objects from this bundle into an object store.
 

@@ -1311,7 +1311,7 @@ class Repo(BaseRepo):
             "No git repository was found at {path}".format(**dict(path=start))
         )
 
-    def controldir(self):
+    def controldir(self) -> str:
         """Return the path of the control directory."""
         return self._controldir
 

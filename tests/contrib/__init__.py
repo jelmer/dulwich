@@ -19,9 +19,10 @@
 # License, Version 2.0.
 #
 
+import unittest
 
-def test_suite():
-    import unittest
+
+def test_suite() -> unittest.TestSuite:
 
     names = [
         "diffstat",

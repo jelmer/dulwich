@@ -24,7 +24,7 @@
 import unittest
 
 
-def test_suite():
+def test_suite() -> unittest.TestSuite:
     names = [
         "bundle",
         "check_ignore",

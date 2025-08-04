@@ -790,15 +790,15 @@ class FilePackIndex(PackIndex):
         """
         raise NotImplementedError(self._unpack_entry)
 
-    def _unpack_name(self, i) -> bytes:
+    def _unpack_name(self, i: int) -> bytes:
         """Unpack the i-th name from the index file."""
         raise NotImplementedError(self._unpack_name)
 
-    def _unpack_offset(self, i) -> int:
+    def _unpack_offset(self, i: int) -> int:
         """Unpack the i-th object offset from the index file."""
         raise NotImplementedError(self._unpack_offset)
 
-    def _unpack_crc32_checksum(self, i) -> Optional[int]:
+    def _unpack_crc32_checksum(self, i: int) -> Optional[int]:
         """Unpack the crc32 checksum for the ith object from the index file."""
         raise NotImplementedError(self._unpack_crc32_checksum)
 
@@ -1112,9 +1112,9 @@ def chunks_length(chunks: Union[bytes, Iterable[bytes]]) -> int:
 def unpack_object(
     read_all: Callable[[int], bytes],
     read_some: Optional[Callable[[int], bytes]] = None,
-    compute_crc32=False,
-    include_comp=False,
-    zlib_bufsize=_ZLIB_BUFSIZE,
+    compute_crc32: bool = False,
+    include_comp: bool = False,
+    zlib_bufsize: int = _ZLIB_BUFSIZE,
 ) -> tuple[UnpackedObject, bytes]:
     """Unpack a Git object.
 
@@ -1186,13 +1186,8 @@ def unpack_object(
     return unpacked, unused
 
 
-def _compute_object_size(value):
-    """Compute the size of an unresolved object for use with LRUSizeCache.
-
-    Args:
-      value: Tuple of (type_num, object_chunks)
-    Returns: Size in bytes
-    """
+def _compute_object_size(value: tuple[int, Any]) -> int:
+    """Compute the size of a unresolved object for use with LRUSizeCache."""
     (num, obj) = value
     if num in DELTA_TYPES:
         return chunks_length(obj[1])
@@ -1206,14 +1201,7 @@ class PackStreamReader:
     appropriate.
     """
 
-    def __init__(self, read_all, read_some=None, zlib_bufsize=_ZLIB_BUFSIZE) -> None:
-        """Initialize a PackStreamReader.
-
-        Args:
-            read_all: Function to read all requested bytes
-            read_some: Function to read some bytes (defaults to read_all)
-            zlib_bufsize: Buffer size for zlib decompression
-        """
+    def __init__(self, read_all: Callable[[int], bytes], read_some: Optional[Callable[[int], bytes]] = None, zlib_bufsize: int = _ZLIB_BUFSIZE) -> None:
         self.read_all = read_all
         if read_some is None:
             self.read_some = read_all
@@ -1226,7 +1214,7 @@ class PackStreamReader:
         self._trailer: deque[bytes] = deque()
         self._zlib_bufsize = zlib_bufsize
 
-    def _read(self, read, size):
+    def _read(self, read: Callable[[int], bytes], size: int) -> bytes:
         """Read up to size bytes using the given callback.
 
         As a side effect, update the verifier's hash (excluding the last 20
@@ -1259,8 +1247,7 @@ class PackStreamReader:
         self.sha.update(data[:-to_add])
         return data
 
-    def _buf_len(self):
-        """Get the number of bytes in the read buffer."""
+    def _buf_len(self) -> int:
         buf = self._rbuf
         start = buf.tell()
         buf.seek(0, SEEK_END)
@@ -1269,11 +1256,10 @@ class PackStreamReader:
         return end - start
 
     @property
-    def offset(self):
-        """Return the current offset in the pack stream."""
+    def offset(self) -> int:
         return self._offset - self._buf_len()
 
-    def read(self, size):
+    def read(self, size: int) -> bytes:
         """Read, blocking until size bytes are read."""
         buf_len = self._buf_len()
         if buf_len >= size:
@@ -1282,7 +1268,7 @@ class PackStreamReader:
         self._rbuf = BytesIO()
         return buf_data + self._read(self.read_all, size - buf_len)
 
-    def recv(self, size):
+    def recv(self, size: int) -> bytes:
         """Read up to size bytes, blocking until one byte is read."""
         buf_len = self._buf_len()
         if buf_len:
@@ -1296,7 +1282,7 @@ class PackStreamReader:
         """Return the number of objects in this pack."""
         return self._num_objects
 
-    def read_objects(self, compute_crc32=False) -> Iterator[UnpackedObject]:
+    def read_objects(self, compute_crc32: bool = False) -> Iterator[UnpackedObject]:
         """Read the objects in this pack file.
 
         Args:

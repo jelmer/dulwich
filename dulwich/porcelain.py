@@ -3668,7 +3668,7 @@ def sparse_checkout(
             raise CheckoutError(*exc.args) from exc
 
 
-def cone_mode_init(repo: Union[str, os.PathLike, Repo]):
+def cone_mode_init(repo: Union[str, os.PathLike, Repo]) -> None:
     """Initialize a repository to use sparse checkout in 'cone' mode.
 
     Sets ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` in the config.
@@ -3691,7 +3691,7 @@ def cone_mode_init(repo: Union[str, os.PathLike, Repo]):
         sparse_checkout(repo_obj, patterns, force=True, cone=True)
 
 
-def cone_mode_set(repo: Union[str, os.PathLike, Repo], dirs, force=False):
+def cone_mode_set(repo: Union[str, os.PathLike, Repo], dirs: list[str], force: bool = False) -> None:
     """Overwrite the existing 'cone-mode' sparse patterns with a new set of directories.
 
     Ensures ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` are enabled.
@@ -3714,7 +3714,7 @@ def cone_mode_set(repo: Union[str, os.PathLike, Repo], dirs, force=False):
         sparse_checkout(repo_obj, new_patterns, force=force, cone=True)
 
 
-def cone_mode_add(repo: Union[str, os.PathLike, Repo], dirs, force=False):
+def cone_mode_add(repo: Union[str, os.PathLike, Repo], dirs: list[str], force: bool = False) -> None:
     """Add new directories to the existing 'cone-mode' sparse-checkout patterns.
 
     Reads the current patterns from ``.git/info/sparse-checkout``, adds pattern
@@ -3744,7 +3744,7 @@ def cone_mode_add(repo: Union[str, os.PathLike, Repo], dirs, force=False):
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
 
 
-def check_mailmap(repo: RepoPath, contact):
+def check_mailmap(repo: RepoPath, contact: Union[str, bytes]) -> tuple[Optional[bytes], Optional[bytes]]:
     """Check canonical name and email of contact.
 
     Args:
@@ -3762,7 +3762,7 @@ def check_mailmap(repo: RepoPath, contact):
         return mailmap.lookup(contact)
 
 
-def fsck(repo: RepoPath):
+def fsck(repo: RepoPath) -> Iterator[tuple[bytes, Exception]]:
     """Check a repository.
 
     Args:
@@ -3781,7 +3781,7 @@ def fsck(repo: RepoPath):
                 yield (sha, e)
 
 
-def stash_list(repo: Union[str, os.PathLike, Repo]):
+def stash_list(repo: Union[str, os.PathLike, Repo]) -> Iterator[tuple[int, tuple[bytes, bytes]]]:
     """List all stashes in a repository."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -3860,7 +3860,7 @@ def find_unique_abbrev(object_store: BaseObjectStore, object_id: Union[str, byte
     return hex_id
 
 
-def describe(repo: Union[str, os.PathLike, Repo], abbrev=None):
+def describe(repo: Union[str, os.PathLike, Repo], abbrev: Optional[int] = None) -> str:
     """Describe the repository version.
 
     Args:
@@ -3944,8 +3944,8 @@ def describe(repo: Union[str, os.PathLike, Repo], abbrev=None):
 
 
 def get_object_by_path(
-    repo, path, committish: Optional[Union[str, bytes, Commit, Tag]] = None
-):
+    repo: RepoPath, path: Union[str, bytes], committish: Optional[Union[str, bytes, Commit, Tag]] = None
+) -> Union[Blob, Tree, Commit, Tag]:
     """Get an object by path.
 
     Args:
@@ -3966,7 +3966,7 @@ def get_object_by_path(
         return r[sha]
 
 
-def write_tree(repo: RepoPath):
+def write_tree(repo: RepoPath) -> bytes:
     """Write a tree object from the index.
 
     Args:
@@ -3978,14 +3978,14 @@ def write_tree(repo: RepoPath):
 
 
 def _do_merge(
-    r,
-    merge_commit_id,
-    no_commit=False,
-    no_ff=False,
-    message=None,
-    author=None,
-    committer=None,
-):
+    r: Repo,
+    merge_commit_id: bytes,
+    no_commit: bool = False,
+    no_ff: bool = False,
+    message: Optional[bytes] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> tuple[Optional[bytes], list[tuple[bytes, bytes]]]:
     """Internal merge implementation that operates on an open repository.
 
     Args:
@@ -4100,12 +4100,12 @@ def _do_merge(
 def merge(
     repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag],
-    no_commit=False,
-    no_ff=False,
-    message=None,
-    author=None,
-    committer=None,
-):
+    no_commit: bool = False,
+    no_ff: bool = False,
+    message: Optional[bytes] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> tuple[Optional[bytes], list[tuple[bytes, bytes]]]:
     """Merge a commit into the current branch.
 
     Args:
@@ -4145,7 +4145,7 @@ def merge(
         return result
 
 
-def unpack_objects(pack_path, target="."):
+def unpack_objects(pack_path: Union[str, os.PathLike], target: Union[str, os.PathLike] = ".") -> int:
     """Unpack objects from a pack file into the repository.
 
     Args:
@@ -4169,11 +4169,11 @@ def unpack_objects(pack_path, target="."):
 
 
 def merge_tree(
-    repo,
+    repo: RepoPath,
     base_tree: Optional[Union[str, bytes, Tree, Commit, Tag]],
     our_tree: Union[str, bytes, Tree, Commit, Tag],
     their_tree: Union[str, bytes, Tree, Commit, Tag],
-):
+) -> tuple[bytes, list[bytes]]:
     """Perform a three-way tree merge without touching the working directory.
 
     This is similar to git merge-tree, performing a merge at the tree level
@@ -4216,10 +4216,10 @@ def merge_tree(
 def cherry_pick(  # noqa: D417
     repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag, None],
-    no_commit=False,
-    continue_=False,
-    abort=False,
-):
+    no_commit: bool = False,
+    continue_: bool = False,
+    abort: bool = False,
+) -> Optional[bytes]:
     r"""Cherry-pick a commit onto the current branch.
 
     Args:
@@ -4382,11 +4382,11 @@ def cherry_pick(  # noqa: D417
 def revert(
     repo: Union[str, os.PathLike, Repo],
     commits: Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]],
-    no_commit=False,
-    message=None,
-    author=None,
-    committer=None,
-):
+    no_commit: bool = False,
+    message: Optional[Union[str, bytes]] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> Optional[bytes]:
     """Revert one or more commits.
 
     This creates a new commit that undoes the changes introduced by the
@@ -4526,14 +4526,14 @@ def revert(
 
 
 def gc(
-    repo,
+    repo: RepoPath,
     auto: bool = False,
     aggressive: bool = False,
     prune: bool = True,
     grace_period: Optional[int] = 1209600,  # 2 weeks default
     dry_run: bool = False,
-    progress=None,
-):
+    progress: Optional[Callable[[str], None]] = None,
+) -> Any:
     """Run garbage collection on a repository.
 
     Args:
@@ -4563,11 +4563,11 @@ def gc(
 
 
 def prune(
-    repo,
+    repo: RepoPath,
     grace_period: Optional[int] = None,
     dry_run: bool = False,
-    progress=None,
-):
+    progress: Optional[Callable[[str], None]] = None,
+) -> None:
     """Prune/clean up a repository's object store.
 
     This removes temporary files that were left behind by interrupted
@@ -4587,7 +4587,7 @@ def prune(
             r.object_store.prune(grace_period=grace_period)
 
 
-def count_objects(repo: RepoPath = ".", verbose=False) -> CountObjectsResult:
+def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsResult:
     """Count unpacked objects and their disk usage.
 
     Args:
@@ -4819,9 +4819,9 @@ def rebase(
 
 def annotate(
     repo: RepoPath,
-    path,
+    path: Union[str, bytes],
     committish: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> list[tuple[tuple[Commit, TreeChange], bytes]]:
     """Annotate the history of a file.
 
     :param repo: Path to the repository
@@ -4845,24 +4845,24 @@ blame = annotate
 
 
 def filter_branch(
-    repo=".",
-    branch="HEAD",
+    repo: RepoPath = ".",
+    branch: Union[str, bytes] = "HEAD",
     *,
-    filter_fn=None,
-    filter_author=None,
-    filter_committer=None,
-    filter_message=None,
-    tree_filter=None,
-    index_filter=None,
-    parent_filter=None,
-    commit_filter=None,
-    subdirectory_filter=None,
-    prune_empty=False,
-    tag_name_filter=None,
-    force=False,
-    keep_original=True,
-    refs=None,
-):
+    filter_fn: Optional[Callable[[Commit], Optional[dict[str, bytes]]]] = None,
+    filter_author: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    filter_committer: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    filter_message: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    tree_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
+    index_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
+    parent_filter: Optional[Callable[[list[bytes]], list[bytes]]] = None,
+    commit_filter: Optional[Callable[[Commit, bytes], Optional[bytes]]] = None,
+    subdirectory_filter: Optional[Union[str, bytes]] = None,
+    prune_empty: bool = False,
+    tag_name_filter: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    force: bool = False,
+    keep_original: bool = True,
+    refs: Optional[list[bytes]] = None,
+) -> dict[bytes, bytes]:
     """Rewrite branch history by creating new commits with filtered properties.
 
     This is similar to git filter-branch, allowing you to rewrite commit
@@ -4952,7 +4952,7 @@ def filter_branch(
         )
 
         # Tag callback for renaming tags
-        def rename_tag(old_ref, new_ref):
+        def rename_tag(old_ref: bytes, new_ref: bytes) -> None:
             # Copy tag to new name
             r.refs[new_ref] = r.refs[old_ref]
             # Delete old tag
@@ -4974,13 +4974,13 @@ def filter_branch(
 
 
 def format_patch(
-    repo=".",
-    committish=None,
-    outstream=sys.stdout,
-    outdir=None,
-    n=1,
-    stdout=False,
-    version=None,
+    repo: RepoPath = ".",
+    committish: Optional[Union[bytes, tuple[bytes, bytes]]] = None,
+    outstream: TextIO = sys.stdout,
+    outdir: Optional[Union[str, os.PathLike]] = None,
+    n: int = 1,
+    stdout: bool = False,
+    version: Optional[str] = None,
 ) -> list[str]:
     """Generate patches suitable for git am.
 
@@ -5104,11 +5104,11 @@ def bisect_start(
     good: Optional[
         Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
     ] = None,
-    paths=None,
-    no_checkout=False,
-    term_bad="bad",
-    term_good="good",
-):
+    paths: Optional[list[Union[str, bytes]]] = None,
+    no_checkout: bool = False,
+    term_bad: str = "bad",
+    term_good: str = "good",
+) -> Optional[bytes]:
     """Start a new bisect session.
 
     Args:
@@ -5149,7 +5149,7 @@ def bisect_start(
 def bisect_bad(
     repo: Union[str, os.PathLike, Repo] = ".",
     rev: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> Optional[bytes]:
     """Mark a commit as bad.
 
     Args:
@@ -5178,7 +5178,7 @@ def bisect_bad(
 def bisect_good(
     repo: Union[str, os.PathLike, Repo] = ".",
     rev: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> Optional[bytes]:
     """Mark a commit as good.
 
     Args:
@@ -5209,7 +5209,7 @@ def bisect_skip(
     revs: Optional[
         Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
     ] = None,
-):
+) -> Optional[bytes]:
     """Skip one or more commits.
 
     Args:
@@ -5246,7 +5246,7 @@ def bisect_skip(
 def bisect_reset(
     repo: Union[str, os.PathLike, Repo] = ".",
     commit: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> None:
     """Reset bisect state and return to original branch/commit.
 
     Args:
@@ -5278,7 +5278,7 @@ def bisect_reset(
             pass
 
 
-def bisect_log(repo: Union[str, os.PathLike, Repo] = "."):
+def bisect_log(repo: Union[str, os.PathLike, Repo] = ".") -> str:
     """Get the bisect log.
 
     Args:
@@ -5292,7 +5292,7 @@ def bisect_log(repo: Union[str, os.PathLike, Repo] = "."):
         return state.get_log()
 
 
-def bisect_replay(repo: Union[str, os.PathLike, Repo], log_file):
+def bisect_replay(repo: Union[str, os.PathLike, Repo], log_file: Union[str, os.PathLike, BinaryIO]) -> None:
     """Replay a bisect log.
 
     Args:
@@ -5311,7 +5311,7 @@ def bisect_replay(repo: Union[str, os.PathLike, Repo], log_file):
         state.replay(log_content)
 
 
-def reflog(repo: RepoPath = ".", ref=b"HEAD", all=False):
+def reflog(repo: RepoPath = ".", ref: Union[str, bytes] = b"HEAD", all: bool = False) -> Iterator[Union[Any, tuple[bytes, Any]]]:
     """Show reflog entries for a reference or all references.
 
     Args:
@@ -5342,7 +5342,7 @@ def reflog(repo: RepoPath = ".", ref=b"HEAD", all=False):
                     yield (ref_bytes, entry)
 
 
-def lfs_track(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
+def lfs_track(repo: Union[str, os.PathLike, Repo] = ".", patterns: Optional[list[str]] = None) -> list[str]:
     """Track file patterns with Git LFS.
 
     Args:
@@ -5393,7 +5393,7 @@ def lfs_track(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
         return lfs_track(r)  # Return updated list
 
 
-def lfs_untrack(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
+def lfs_untrack(repo: Union[str, os.PathLike, Repo] = ".", patterns: Optional[list[str]] = None) -> list[str]:
     """Untrack file patterns from Git LFS.
 
     Args:

@@ -1490,7 +1490,7 @@ def diff(
             diff_module.diff_working_tree_to_index(r, outstream, paths)
 
 
-def rev_list(repo: RepoPath, commits, outstream=sys.stdout) -> None:
+def rev_list(repo: RepoPath, commits: list[Union[str, bytes]], outstream: BinaryIO = sys.stdout) -> None:
     """Lists commit objects in reverse chronological order.
 
     Args:
@@ -1511,7 +1511,7 @@ def _canonical_part(url: str) -> str:
 
 
 def submodule_add(
-    repo: Union[str, os.PathLike, Repo], url, path=None, name=None
+    repo: Union[str, os.PathLike, Repo], url: str, path: Optional[Union[str, os.PathLike]] = None, name: Optional[str] = None
 ) -> None:
     """Add a new submodule.
 
@@ -1554,7 +1554,7 @@ def submodule_init(repo: Union[str, os.PathLike, Repo]) -> None:
         config.write_to_path()
 
 
-def submodule_list(repo: RepoPath):
+def submodule_list(repo: RepoPath) -> Iterator[tuple[bytes, str]]:
     """List submodules.
 
     Args:
@@ -1569,10 +1569,10 @@ def submodule_list(repo: RepoPath):
 
 def submodule_update(
     repo: Union[str, os.PathLike, Repo],
-    paths=None,
-    init=False,
-    force=False,
-    errstream=None,
+    paths: Optional[list[Union[str, bytes, os.PathLike]]] = None,
+    init: bool = False,
+    force: bool = False,
+    errstream: Optional[BinaryIO] = None,
 ) -> None:
     """Update submodules.
 
@@ -1699,14 +1699,14 @@ def submodule_update(
 
 
 def tag_create(
-    repo,
+    repo: RepoPath,
     tag: Union[str, bytes],
     author: Optional[Union[str, bytes]] = None,
     message: Optional[Union[str, bytes]] = None,
-    annotated=False,
+    annotated: bool = False,
     objectish: Union[str, bytes] = "HEAD",
-    tag_time=None,
-    tag_timezone=None,
+    tag_time: Optional[int] = None,
+    tag_timezone: Optional[int] = None,
     sign: bool = False,
     encoding: str = DEFAULT_ENCODING,
 ) -> None:
@@ -1789,7 +1789,7 @@ def tag_create(
         r.refs[_make_tag_ref(tag)] = tag_id
 
 
-def tag_list(repo: RepoPath, outstream=sys.stdout):
+def tag_list(repo: RepoPath, outstream: TextIO = sys.stdout) -> list[bytes]:
     """List all tags.
 
     Args:
@@ -1801,7 +1801,7 @@ def tag_list(repo: RepoPath, outstream=sys.stdout):
         return tags
 
 
-def tag_delete(repo: RepoPath, name) -> None:
+def tag_delete(repo: RepoPath, name: Union[str, bytes]) -> None:
     """Remove a tag.
 
     Args:
@@ -1827,8 +1827,8 @@ def _make_notes_ref(name: bytes) -> bytes:
 
 
 def notes_add(
-    repo, object_sha, note, ref=b"commits", author=None, committer=None, message=None
-):
+    repo: RepoPath, object_sha: bytes, note: bytes, ref: bytes = b"commits", author: Optional[bytes] = None, committer: Optional[bytes] = None, message: Optional[bytes] = None
+) -> None:
     """Add or update a note for an object.
 
     Args:
@@ -1868,8 +1868,8 @@ def notes_add(
 
 
 def notes_remove(
-    repo, object_sha, ref=b"commits", author=None, committer=None, message=None
-):
+    repo: RepoPath, object_sha: bytes, ref: bytes = b"commits", author: Optional[bytes] = None, committer: Optional[bytes] = None, message: Optional[bytes] = None
+) -> None:
     """Remove a note for an object.
 
     Args:
@@ -1904,7 +1904,7 @@ def notes_remove(
         )
 
 
-def notes_show(repo: Union[str, os.PathLike, Repo], object_sha, ref=b"commits"):
+def notes_show(repo: Union[str, os.PathLike, Repo], object_sha: bytes, ref: bytes = b"commits") -> Optional[bytes]:
     """Show the note for an object.
 
     Args:
@@ -1929,7 +1929,7 @@ def notes_show(repo: Union[str, os.PathLike, Repo], object_sha, ref=b"commits"):
         return r.notes.get_note(object_sha, notes_ref, config=config)
 
 
-def notes_list(repo: RepoPath, ref=b"commits"):
+def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[bytes, bytes]]:
     """List all notes in a notes ref.
 
     Args:
@@ -1951,7 +1951,7 @@ def notes_list(repo: RepoPath, ref=b"commits"):
 
 def reset(
     repo: Union[str, os.PathLike, Repo],
-    mode,
+    mode: str,
     treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD",
 ) -> None:
     """Reset current HEAD to the specified state.

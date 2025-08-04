@@ -49,7 +49,13 @@ from .refs import Ref, read_info_refs, split_peeled_refs
 class DumbHTTPObjectStore(BaseObjectStore):
     """Object store implementation that fetches objects over dumb HTTP."""
 
-    def __init__(self, base_url: str, http_request_func: Callable[[str, dict[str, str]], tuple[Any, Callable[..., bytes]]]) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        http_request_func: Callable[
+            [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
+        ],
+    ) -> None:
         """Initialize a DumbHTTPObjectStore.
 
         Args:
@@ -330,7 +336,11 @@ class DumbHTTPObjectStore(BaseObjectStore):
         """Add a single object to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
 
-    def add_objects(self, objects: Iterator[ShaFile], progress: Optional[Callable[[int], None]] = None) -> None:
+    def add_objects(
+        self,
+        objects: Iterator[ShaFile],
+        progress: Optional[Callable[[int], None]] = None,
+    ) -> None:
         """Add a set of objects to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
 
@@ -345,7 +355,13 @@ class DumbHTTPObjectStore(BaseObjectStore):
 class DumbRemoteHTTPRepo:
     """Repository implementation for dumb HTTP remotes."""
 
-    def __init__(self, base_url: str, http_request_func: Callable[[str, dict[str, str]], tuple[Any, Callable[..., bytes]]]) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        http_request_func: Callable[
+            [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
+        ],
+    ) -> None:
         """Initialize a DumbRemoteHTTPRepo.
 
         Args:

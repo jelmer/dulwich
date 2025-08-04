@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from .config import ConditionMatcher, ConfigFile, StackedConfig
     from .index import Index
     from .notes import Notes
+    from .object_store import BaseObjectStore
     from .worktree import WorkTree
 
 from . import replace_me
@@ -138,12 +139,7 @@ DEFAULT_BRANCH = b"master"
 class InvalidUserIdentity(Exception):
     """User identity is not of the format 'user <email>'."""
 
-    def __init__(self, identity) -> None:
-        """Initialize InvalidUserIdentity exception.
-
-        Args:
-            identity: The invalid identity string
-        """
+    def __init__(self, identity: str) -> None:
         self.identity = identity
 
 
@@ -241,7 +237,7 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
     return user + b" <" + email + b">"
 
 
-def check_user_identity(identity) -> None:
+def check_user_identity(identity: bytes) -> None:
     """Verify that a user identity is formatted correctly.
 
     Args:
@@ -313,7 +309,7 @@ def serialize_graftpoints(graftpoints: dict[bytes, list[bytes]]) -> bytes:
     return b"\n".join(graft_lines)
 
 
-def _set_filesystem_hidden(path) -> None:
+def _set_filesystem_hidden(path: str) -> None:
     """Mark path as to be hidden if supported by platform and filesystem.
 
     On win32 uses SetFileAttributesW api:
@@ -337,16 +333,7 @@ def _set_filesystem_hidden(path) -> None:
 
 
 class ParentsProvider:
-    """Provides parents for commits, handling grafts and shallow commits."""
-
-    def __init__(self, store, grafts={}, shallows=[]) -> None:
-        """Initialize ParentsProvider.
-
-        Args:
-            store: Object store to get commits from
-            grafts: Dictionary mapping commit ids to parent ids
-            shallows: List of shallow commit ids
-        """
+    def __init__(self, store: "BaseObjectStore", grafts: dict = {}, shallows: list = []) -> None:
         self.store = store
         self.grafts = grafts
         self.shallows = set(shallows)
@@ -354,16 +341,7 @@ class ParentsProvider:
         # Get commit graph once at initialization for performance
         self.commit_graph = store.get_commit_graph()
 
-    def get_parents(self, commit_id, commit=None):
-        """Get the parents of a commit.
-
-        Args:
-          commit_id: The commit SHA to get parents for
-          commit: Optional commit object to avoid fetching
-
-        Returns:
-          List of parent commit SHAs
-        """
+    def get_parents(self, commit_id: bytes, commit=None) -> list[bytes]:
         try:
             return self.grafts[commit_id]
         except KeyError:
@@ -494,8 +472,8 @@ class BaseRepo:
         raise NotImplementedError(self.open_index)
 
     def fetch(
-        self, target, determine_wants=None, progress=None, depth: Optional[int] = None
-    ):
+        self, target: "BaseRepo", determine_wants: Optional[Callable] = None, progress: Optional[Callable] = None, depth: Optional[int] = None
+    ) -> dict:
         """Fetch objects into another repository.
 
         Args:
@@ -519,13 +497,13 @@ class BaseRepo:
 
     def fetch_pack_data(
         self,
-        determine_wants,
+        determine_wants: Callable,
         graph_walker,
-        progress,
+        progress: Optional[Callable],
         *,
-        get_tagged=None,
+        get_tagged: Optional[Callable] = None,
         depth: Optional[int] = None,
-    ):
+    ) -> tuple:
         """Fetch the pack data required for a set of revisions.
 
         Args:
@@ -1109,7 +1087,7 @@ class BaseRepo:
         )
 
 
-def read_gitfile(f):
+def read_gitfile(f: BinaryIO) -> str:
     """Read a ``.git`` file.
 
     The first line of the file should start with "gitdir: "
@@ -1368,7 +1346,7 @@ class Repo(BaseRepo):
         """Return the path of the control directory."""
         return self._controldir
 
-    def commondir(self):
+    def commondir(self) -> str:
         """Return the path of the common directory.
 
         For a main working tree, it is identical to controldir().

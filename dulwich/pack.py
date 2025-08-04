@@ -1239,7 +1239,7 @@ class PackStreamCopier(PackStreamReader):
             progress(f"copied {i} pack entries\n".encode("ascii"))
 
 
-def obj_sha(type, chunks):
+def obj_sha(type: int, chunks: Union[bytes, Iterable[bytes]]) -> bytes:
     """Compute the SHA for a numeric type and object chunks."""
     sha = sha1()
     sha.update(object_header(type, chunks_length(chunks)))
@@ -1251,7 +1251,7 @@ def obj_sha(type, chunks):
     return sha.digest()
 
 
-def compute_file_sha(f, start_ofs=0, end_ofs=0, buffer_size=1 << 16):
+def compute_file_sha(f: IO[bytes], start_ofs: int = 0, end_ofs: int = 0, buffer_size: int = 1 << 16) -> "sha1":
     """Hash a portion of a file into a new SHA.
 
     Args:

@@ -53,6 +53,7 @@ from io import BufferedReader, BytesIO
 from typing import (
     IO,
     TYPE_CHECKING,
+    Any,
     Callable,
     ClassVar,
     Optional,
@@ -149,7 +150,7 @@ logger = logging.getLogger(__name__)
 class InvalidWants(Exception):
     """Invalid wants."""
 
-    def __init__(self, wants) -> None:
+    def __init__(self, wants: Any) -> None:
         """Initialize InvalidWants exception.
 
         Args:
@@ -163,7 +164,7 @@ class InvalidWants(Exception):
 class HTTPUnauthorized(Exception):
     """Raised when authentication fails."""
 
-    def __init__(self, www_authenticate, url) -> None:
+    def __init__(self, www_authenticate: Any, url: str) -> None:
         """Initialize HTTPUnauthorized exception.
 
         Args:
@@ -178,7 +179,7 @@ class HTTPUnauthorized(Exception):
 class HTTPProxyUnauthorized(Exception):
     """Raised when proxy authentication fails."""
 
-    def __init__(self, proxy_authenticate, url) -> None:
+    def __init__(self, proxy_authenticate: Any, url: str) -> None:
         """Initialize HTTPProxyUnauthorized exception.
 
         Args:
@@ -190,12 +191,12 @@ class HTTPProxyUnauthorized(Exception):
         self.url = url
 
 
-def _fileno_can_read(fileno):
+def _fileno_can_read(fileno: int) -> bool:
     """Check if a file descriptor is readable."""
     return len(select.select([fileno], [], [], 0)[0]) > 0
 
 
-def _win32_peek_avail(handle):
+def _win32_peek_avail(handle: Any) -> int:
     """Wrapper around PeekNamedPipe to check how many bytes are available."""
     from ctypes import byref, windll, wintypes
 
@@ -233,7 +234,7 @@ class ReportStatusParser:
         self._pack_status = None
         self._ref_statuses: list[bytes] = []
 
-    def check(self):
+    def check(self) -> Any:
         """Check if there were any errors and, if so, raise exceptions.
 
         Raises:
@@ -257,7 +258,7 @@ class ReportStatusParser:
             else:
                 raise GitProtocolError(f"invalid ref status {status!r}")
 
-    def handle_packet(self, pkt) -> None:
+    def handle_packet(self, pkt: Optional[bytes]) -> None:
         """Handle a packet.
 
         Raises:
@@ -276,13 +277,7 @@ class ReportStatusParser:
             self._ref_statuses.append(ref_status)
 
 
-def negotiate_protocol_version(proto) -> int:
-    """Negotiate the protocol version to use.
-
-    Args:
-      proto: Protocol instance to negotiate with
-    Returns: Protocol version (0, 1, or 2)
-    """
+def negotiate_protocol_version(proto: Any) -> int:
     pkt = proto.read_pkt_line()
     if pkt is not None and pkt.strip() == b"version 2":
         return 2
@@ -290,13 +285,7 @@ def negotiate_protocol_version(proto) -> int:
     return 0
 
 
-def read_server_capabilities(pkt_seq):
-    """Read server capabilities from a packet sequence.
-
-    Args:
-      pkt_seq: Sequence of packets from server
-    Returns: Set of server capabilities
-    """
+def read_server_capabilities(pkt_seq: Any) -> set:
     server_capabilities = []
     for pkt in pkt_seq:
         server_capabilities.append(pkt)
@@ -304,7 +293,7 @@ def read_server_capabilities(pkt_seq):
 
 
 def read_pkt_refs_v2(
-    pkt_seq,
+    pkt_seq: Any,
 ) -> tuple[dict[bytes, bytes], dict[bytes, bytes], dict[bytes, bytes]]:
     """Read packet references in protocol v2 format.
 
@@ -334,13 +323,7 @@ def read_pkt_refs_v2(
     return refs, symrefs, peeled
 
 
-def read_pkt_refs_v1(pkt_seq) -> tuple[dict[bytes, bytes], set[bytes]]:
-    """Read packet references in protocol v1 format.
-
-    Args:
-      pkt_seq: Sequence of packets
-    Returns: Tuple of (refs dict, server capabilities set)
-    """
+def read_pkt_refs_v1(pkt_seq: Any) -> tuple[dict[bytes, bytes], set[bytes]]:
     server_capabilities = None
     refs = {}
     # Receive refs from server
@@ -389,11 +372,11 @@ class _DeprecatedDictProxy:
             stacklevel=3,
         )
 
-    def __contains__(self, name) -> bool:
+    def __contains__(self, name: bytes) -> bool:
         self._warn_deprecated()
         return name in self.refs
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: bytes) -> bytes:
         self._warn_deprecated()
         return self.refs[name]
 
@@ -401,11 +384,11 @@ class _DeprecatedDictProxy:
         self._warn_deprecated()
         return len(self.refs)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         self._warn_deprecated()
         return iter(self.refs)
 
-    def __getattribute__(self, name):
+    def __getattribute__(self, name: str) -> Any:
         # Avoid infinite recursion by checking against class variable directly
         if name != "_FORWARDED_ATTRS" and name in type(self)._FORWARDED_ATTRS:
             self._warn_deprecated()
@@ -425,7 +408,7 @@ class FetchPackResult(_DeprecatedDictProxy):
     """
 
     def __init__(
-        self, refs, symrefs, agent, new_shallow=None, new_unshallow=None
+        self, refs: dict, symrefs: dict, agent: Optional[bytes], new_shallow: Optional[Any] = None, new_unshallow: Optional[Any] = None
     ) -> None:
         """Initialize FetchPackResult.
 
@@ -442,8 +425,7 @@ class FetchPackResult(_DeprecatedDictProxy):
         self.new_shallow = new_shallow
         self.new_unshallow = new_unshallow
 
-    def __eq__(self, other):
-        """Check equality with another FetchPackResult."""
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
@@ -466,7 +448,7 @@ class LsRemoteResult(_DeprecatedDictProxy):
       symrefs: Dictionary with remote symrefs
     """
 
-    def __init__(self, refs, symrefs) -> None:
+    def __init__(self, refs: dict, symrefs: dict) -> None:
         """Initialize LsRemoteResult.
 
         Args:
@@ -486,8 +468,7 @@ class LsRemoteResult(_DeprecatedDictProxy):
             stacklevel=3,
         )
 
-    def __eq__(self, other):
-        """Check equality with another LsRemoteResult."""
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
@@ -508,7 +489,7 @@ class SendPackResult(_DeprecatedDictProxy):
         failed to update), or None if it was updated successfully
     """
 
-    def __init__(self, refs, agent=None, ref_status=None) -> None:
+    def __init__(self, refs: dict, agent: Optional[bytes] = None, ref_status: Optional[dict] = None) -> None:
         """Initialize SendPackResult.
 
         Args:
@@ -520,8 +501,7 @@ class SendPackResult(_DeprecatedDictProxy):
         self.agent = agent
         self.ref_status = ref_status
 
-    def __eq__(self, other):
-        """Check equality with another SendPackResult."""
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
@@ -532,13 +512,7 @@ class SendPackResult(_DeprecatedDictProxy):
         return f"{self.__class__.__name__}({self.refs!r}, {self.agent!r})"
 
 
-def _read_shallow_updates(pkt_seq):
-    """Read shallow/unshallow updates from a packet sequence.
-
-    Args:
-      pkt_seq: Sequence of packets
-    Returns: Tuple of (new_shallow set, new_unshallow set)
-    """
+def _read_shallow_updates(pkt_seq: Any) -> tuple[set, set]:
     new_shallow = set()
     new_unshallow = set()
     for pkt in pkt_seq:
@@ -558,19 +532,16 @@ def _read_shallow_updates(pkt_seq):
 
 
 class _v1ReceivePackHeader:
-    """Handler for v1 receive-pack header."""
-
-    def __init__(self, capabilities, old_refs, new_refs) -> None:
+    def __init__(self, capabilities: list, old_refs: dict, new_refs: dict) -> None:
         self.want: list[bytes] = []
         self.have: list[bytes] = []
         self._it = self._handle_receive_pack_head(capabilities, old_refs, new_refs)
         self.sent_capabilities = False
 
-    def __iter__(self):
-        """Iterate over the receive-pack header lines."""
+    def __iter__(self) -> Any:
         return self._it
 
-    def _handle_receive_pack_head(self, capabilities, old_refs, new_refs):
+    def _handle_receive_pack_head(self, capabilities: list, old_refs: dict, new_refs: dict) -> Any:
         """Handle the head of a 'git-receive-pack' request.
 
         Args:
@@ -632,15 +603,7 @@ def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[tuple[int, byt
         yield channel, pkt[1:]
 
 
-def find_capability(capabilities, key, value):
-    """Find a capability in the list of capabilities.
-
-    Args:
-      capabilities: List of capabilities
-      key: Capability key to search for
-      value: Optional specific value to match
-    Returns: The matching capability or None
-    """
+def find_capability(capabilities: list, key: bytes, value: Optional[bytes]) -> Optional[bytes]:
     for capability in capabilities:
         k, v = parse_capability(capability)
         if k != key:
@@ -651,14 +614,14 @@ def find_capability(capabilities, key, value):
 
 
 def _handle_upload_pack_head(
-    proto,
-    capabilities,
-    graph_walker,
-    wants,
-    can_read,
+    proto: Any,
+    capabilities: list,
+    graph_walker: Any,
+    wants: list,
+    can_read: Callable,
     depth: Optional[int],
-    protocol_version,
-):
+    protocol_version: Optional[int],
+) -> None:
     """Handle the head of a 'git-upload-pack' request.
 
     Args:
@@ -773,7 +736,7 @@ def _handle_upload_pack_tail(
         if progress is None:
             # Just ignore progress data
 
-            def progress(x) -> None:
+            def progress(x: bytes) -> None:
                 pass
 
         for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):

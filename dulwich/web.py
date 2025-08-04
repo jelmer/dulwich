@@ -28,7 +28,7 @@ import sys
 import time
 from collections.abc import Iterator
 from io import BytesIO
-from typing import BinaryIO, Callable, ClassVar, Optional, cast
+from typing import Any, BinaryIO, Callable, ClassVar, Optional, cast
 from urllib.parse import parse_qs
 from wsgiref.simple_server import (
     ServerHandler,
@@ -455,7 +455,7 @@ class HTTPGitRequest:
     """
 
     def __init__(
-        self, environ, start_response, dumb: bool = False, handlers=None
+        self, environ: dict[str, Any], start_response: Callable[[str, list[tuple[str, str]]], Any], dumb: bool = False, handlers: Optional[dict[bytes, Callable]] = None
     ) -> None:
         """Initialize HTTPGitRequest.
 
@@ -472,7 +472,7 @@ class HTTPGitRequest:
         self._cache_headers: list[tuple[str, str]] = []
         self._headers: list[tuple[str, str]] = []
 
-    def add_header(self, name, value) -> None:
+    def add_header(self, name: str, value: str) -> None:
         """Add a header to the response."""
         self._headers.append((name, value))
 
@@ -481,7 +481,7 @@ class HTTPGitRequest:
         status: str = HTTP_OK,
         content_type: Optional[str] = None,
         headers: Optional[list[tuple[str, str]]] = None,
-    ):
+    ) -> Any:
         """Begin a response with the given status and other headers."""
         if headers:
             self._headers.extend(headers)
@@ -556,7 +556,7 @@ class HTTPGitApplication:
     }
 
     def __init__(
-        self, backend, dumb: bool = False, handlers=None, fallback_app=None
+        self, backend: Backend, dumb: bool = False, handlers: Optional[dict[bytes, Callable]] = None, fallback_app: Optional[Callable[[dict[str, Any], Callable], Any]] = None
     ) -> None:
         """Initialize HTTPGitApplication.
 
@@ -573,8 +573,7 @@ class HTTPGitApplication:
         if handlers is not None:
             self.handlers.update(handlers)
 
-    def __call__(self, environ, start_response):
-        """Handle WSGI request."""
+    def __call__(self, environ: dict[str, Any], start_response: Callable[[str, list[tuple[str, str]]], Any]) -> list[bytes]:
         path = environ["PATH_INFO"]
         method = environ["REQUEST_METHOD"]
         req = HTTPGitRequest(
@@ -602,12 +601,10 @@ class HTTPGitApplication:
 class GunzipFilter:
     """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application."""
 
-    def __init__(self, application) -> None:
-        """Initialize GunzipFilter."""
+    def __init__(self, application: Any) -> None:
         self.app = application
 
-    def __call__(self, environ, start_response):
-        """Handle WSGI request."""
+    def __call__(self, environ: dict[str, Any], start_response: Callable[[str, list[tuple[str, str]]], Any]) -> Any:
         import gzip
 
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
@@ -615,8 +612,7 @@ class GunzipFilter:
                 filename=None, fileobj=environ["wsgi.input"], mode="rb"
             )
             del environ["HTTP_CONTENT_ENCODING"]
-            if "CONTENT_LENGTH" in environ:
-                del environ["CONTENT_LENGTH"]
+            environ.pop("CONTENT_LENGTH", None)
 
         return self.app(environ, start_response)
 
@@ -624,12 +620,10 @@ class GunzipFilter:
 class LimitedInputFilter:
     """WSGI middleware that limits the input length of a request to that specified in Content-Length."""
 
-    def __init__(self, application) -> None:
-        """Initialize LimitedInputFilter."""
+    def __init__(self, application: Any) -> None:
         self.app = application
 
-    def __call__(self, environ, start_response):
-        """Handle WSGI request."""
+    def __call__(self, environ: dict[str, Any], start_response: Callable[[str, list[tuple[str, str]]], Any]) -> Any:
         # This is not necessary if this app is run from a conforming WSGI
         # server. Unfortunately, there's no way to tell that at this point.
         # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
@@ -642,8 +636,10 @@ class LimitedInputFilter:
         return self.app(environ, start_response)
 
 
-def make_wsgi_chain(*args, **kwargs):
-    """Factory function to create an instance of HTTPGitApplication, correctly wrapped with needed middleware."""
+def make_wsgi_chain(*args: Any, **kwargs: Any) -> Any:
+    """Factory function to create an instance of HTTPGitApplication,
+    correctly wrapped with needed middleware.
+    """
     app = HTTPGitApplication(*args, **kwargs)
     wrapped_app = LimitedInputFilter(GunzipFilter(app))
     return wrapped_app
@@ -652,64 +648,32 @@ def make_wsgi_chain(*args, **kwargs):
 class ServerHandlerLogger(ServerHandler):
     """ServerHandler that uses dulwich's logger for logging exceptions."""
 
-    def log_exception(self, exc_info) -> None:
-        """Log an exception using dulwich's logger.
-
-        Args:
-          exc_info: Exception information tuple
-        """
+    def log_exception(self, exc_info: Any) -> None:
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
-    def log_message(self, format, *args) -> None:
-        """Log a message using dulwich's logger.
-
-        Args:
-          format: Format string for the message
-          *args: Arguments for the format string
-        """
+    def log_message(self, format: str, *args: Any) -> None:
         logger.info(format, *args)
 
-    def log_error(self, *args) -> None:
-        """Log an error using dulwich's logger.
-
-        Args:
-          *args: Error message components
-        """
+    def log_error(self, *args: Any) -> None:
         logger.error(*args)
 
 
 class WSGIRequestHandlerLogger(WSGIRequestHandler):
     """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
 
-    def log_exception(self, exc_info) -> None:
-        """Log an exception using dulwich's logger.
-
-        Args:
-          exc_info: Exception information tuple
-        """
+    def log_exception(self, exc_info: Any) -> None:
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
-    def log_message(self, format, *args) -> None:
-        """Log a message using dulwich's logger.
-
-        Args:
-          format: Format string for the message
-          *args: Arguments for the format string
-        """
+    def log_message(self, format: str, *args: Any) -> None:
         logger.info(format, *args)
 
-    def log_error(self, *args) -> None:
-        """Log an error using dulwich's logger.
-
-        Args:
-          *args: Error message components
-        """
+    def log_error(self, *args: Any) -> None:
         logger.error(*args)
 
     def handle(self) -> None:
@@ -731,14 +695,14 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
 class WSGIServerLogger(WSGIServer):
     """WSGIServer that uses dulwich's logger for error handling."""
 
-    def handle_error(self, request, client_address) -> None:
+    def handle_error(self, request: Any, client_address: Any) -> None:
         """Handle an error."""
         logger.exception(
             f"Exception happened during processing of request from {client_address!s}"
         )
 
 
-def main(argv=sys.argv) -> None:
+def main(argv: list[str] = sys.argv) -> None:
     """Entry point for starting an HTTP git server."""
     import optparse
 

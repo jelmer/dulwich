@@ -125,12 +125,14 @@ def url_prefix(mat: re.Match[str]) -> str:
     return "/" + mat.string[: mat.start()].strip("/")
 
 
-def get_repo(backend: 'Backend', mat: re.Match[str]) -> BaseRepo:
+def get_repo(backend: "Backend", mat: re.Match[str]) -> BaseRepo:
     """Get a Repo instance for the given backend and URL regex match."""
     return cast(BaseRepo, backend.open_repository(url_prefix(mat)))
 
 
-def send_file(req: 'HTTPGitRequest', f: Optional[BinaryIO], content_type: str) -> Iterator[bytes]:
+def send_file(
+    req: "HTTPGitRequest", f: Optional[BinaryIO], content_type: str
+) -> Iterator[bytes]:
     """Send a file-like object to the request output.
 
     Args:
@@ -159,14 +161,18 @@ def _url_to_path(url: str) -> str:
     return url.replace("/", os.path.sep)
 
 
-def get_text_file(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) -> Iterator[bytes]:
+def get_text_file(
+    req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
+) -> Iterator[bytes]:
     req.nocache()
     path = _url_to_path(mat.group())
     logger.info("Sending plain text file %s", path)
     return send_file(req, get_repo(backend, mat).get_named_file(path), "text/plain")
 
 
-def get_loose_object(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) -> Iterator[bytes]:
+def get_loose_object(
+    req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
+) -> Iterator[bytes]:
     sha = (mat.group(1) + mat.group(2)).encode("ascii")
     logger.info("Sending loose object %s", sha)
     object_store = get_repo(backend, mat).object_store
@@ -183,7 +189,9 @@ def get_loose_object(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[st
     yield data
 
 
-def get_pack_file(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) -> Iterator[bytes]:
+def get_pack_file(
+    req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
+) -> Iterator[bytes]:
     req.cache_forever()
     path = _url_to_path(mat.group())
     logger.info("Sending pack file %s", path)
@@ -194,7 +202,9 @@ def get_pack_file(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str])
     )
 
 
-def get_idx_file(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) -> Iterator[bytes]:
+def get_idx_file(
+    req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
+) -> Iterator[bytes]:
     req.cache_forever()
     path = _url_to_path(mat.group())
     logger.info("Sending pack file %s", path)
@@ -205,7 +215,9 @@ def get_idx_file(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) 
     )
 
 
-def get_info_refs(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) -> Iterator[bytes]:
+def get_info_refs(
+    req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
+) -> Iterator[bytes]:
     params = parse_qs(req.environ["QUERY_STRING"])
     service = params.get("service", [None])[0]
     try:
@@ -240,7 +252,9 @@ def get_info_refs(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str])
         yield from generate_info_refs(repo)
 
 
-def get_info_packs(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) -> Iterator[bytes]:
+def get_info_packs(
+    req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
+) -> Iterator[bytes]:
     req.nocache()
     req.respond(HTTP_OK, "text/plain")
     logger.info("Emulating dumb info/packs")
@@ -299,7 +313,9 @@ class _LengthLimitedFile:
     # TODO: support more methods as necessary
 
 
-def handle_service_request(req: 'HTTPGitRequest', backend: 'Backend', mat: re.Match[str]) -> Iterator[bytes]:
+def handle_service_request(
+    req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
+) -> Iterator[bytes]:
     service = mat.group().lstrip("/")
     logger.info("Handling service request for %s", service)
     handler_cls = req.handlers.get(service.encode("ascii"), None)

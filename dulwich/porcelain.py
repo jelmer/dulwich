@@ -91,7 +91,17 @@ from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
 from pathlib import Path
-from typing import BinaryIO, Callable, Optional, TypeVar, Union, cast, overload
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    Optional,
+    TextIO,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from . import replace_me
 from .archive import tar_stream
@@ -205,15 +215,7 @@ class CountObjectsResult:
 class NoneStream(RawIOBase):
     """Fallback if stdout or stderr are unavailable, does nothing."""
 
-    def read(self, size=-1) -> None:
-        """Read bytes (no-op for NoneStream).
-
-        Args:
-          size: Number of bytes to read
-
-        Returns:
-          None
-        """
+    def read(self, size: int = -1) -> None:
         return None
 
     def readall(self) -> bytes:
@@ -645,8 +647,8 @@ def commit_tree(
 
 
 def init(
-    path: Union[str, os.PathLike] = ".", *, bare=False, symlinks: Optional[bool] = None
-):
+    path: Union[str, os.PathLike] = ".", *, bare: bool = False, symlinks: Optional[bool] = None
+) -> Repo:
     """Create a new git repository.
 
     Args:
@@ -665,21 +667,21 @@ def init(
 
 
 def clone(
-    source,
+    source: Union[str, bytes, BaseRepo],
     target: Optional[Union[str, os.PathLike]] = None,
-    bare=False,
-    checkout=None,
-    errstream=default_bytes_err_stream,
-    outstream=None,
+    bare: bool = False,
+    checkout: Optional[bool] = None,
+    errstream: BinaryIO = default_bytes_err_stream,
+    outstream: Optional[BinaryIO] = None,
     origin: Optional[str] = "origin",
     depth: Optional[int] = None,
     branch: Optional[Union[str, bytes]] = None,
     config: Optional[Config] = None,
-    filter_spec=None,
+    filter_spec: Optional[bytes] = None,
     protocol_version: Optional[int] = None,
     recurse_submodules: bool = False,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Repo:
     """Clone a local or remote git repository.
 
     Args:
@@ -769,7 +771,7 @@ def clone(
     return repo
 
 
-def add(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
+def add(repo: Union[str, os.PathLike, Repo] = ".", paths: Optional[Union[list[Union[str, bytes, os.PathLike]], str, bytes, os.PathLike]] = None) -> tuple[set[str], set[str]]:
     """Add files to the staging area.
 
     Args:
@@ -882,7 +884,7 @@ def add(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
     return (relpaths, ignored)
 
 
-def _is_subdir(subdir, parentdir):
+def _is_subdir(subdir: Union[str, os.PathLike], parentdir: Union[str, os.PathLike]) -> bool:
     """Check whether subdir is parentdir or a subdir of parentdir.
 
     If parentdir or subdir is a relative path, it will be disamgibuated
@@ -894,7 +896,7 @@ def _is_subdir(subdir, parentdir):
 
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
-def clean(repo: Union[str, os.PathLike, Repo] = ".", target_dir=None) -> None:
+def clean(repo: Union[str, os.PathLike, Repo] = ".", target_dir: Optional[Union[str, os.PathLike]] = None) -> None:
     """Remove any untracked files from the target directory recursively.
 
     Equivalent to running ``git clean -fd`` in target_dir.
@@ -940,7 +942,7 @@ def clean(repo: Union[str, os.PathLike, Repo] = ".", target_dir=None) -> None:
                     os.remove(ap)
 
 
-def remove(repo: Union[str, os.PathLike, Repo] = ".", paths=None, cached=False) -> None:
+def remove(repo: Union[str, os.PathLike, Repo] = ".", paths: Optional[list[Union[str, bytes, os.PathLike]]] = None, cached: bool = False) -> None:
     """Remove files from the staging area.
 
     Args:
@@ -1109,17 +1111,7 @@ def mv(
 move = mv
 
 
-def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
-    """Decode commit message contents to unicode.
-
-    Args:
-      commit: Commit object
-      contents: Raw commit message bytes
-      default_encoding: Encoding to use if none specified in commit
-
-    Returns:
-      Decoded commit message as unicode string
-    """
+def commit_decode(commit: Commit, contents: bytes, default_encoding: str = DEFAULT_ENCODING) -> str:
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1127,17 +1119,7 @@ def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
     return contents.decode(encoding, "replace")
 
 
-def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
-    """Encode commit message contents to bytes.
-
-    Args:
-      commit: Commit object
-      contents: Commit message as unicode string
-      default_encoding: Encoding to use if none specified in commit
-
-    Returns:
-      Encoded commit message as bytes
-    """
+def commit_encode(commit: Commit, contents: str, default_encoding: str = DEFAULT_ENCODING) -> bytes:
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1145,7 +1127,7 @@ def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
     return contents.encode(encoding)
 
 
-def print_commit(commit, decode, outstream=sys.stdout) -> None:
+def print_commit(commit: Commit, decode: Callable[[Commit, bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Write a human-readable commit log entry.
 
     Args:
@@ -1175,7 +1157,7 @@ def print_commit(commit, decode, outstream=sys.stdout) -> None:
         outstream.write("\n")
 
 
-def print_tag(tag, decode, outstream=sys.stdout) -> None:
+def print_tag(tag: Tag, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Write a human-readable tag.
 
     Args:

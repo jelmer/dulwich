@@ -831,21 +831,51 @@ class DiskRefsContainer(RefsContainer):
         """Return string representation of DiskRefsContainer."""
         return f"{self.__class__.__name__}({self.path!r})"
 
+    def _iter_loose_refs(self, base: bytes = b"refs/") -> Iterator[bytes]:
+        base = base.rstrip(b"/") + b"/"
+        is_main_worktree = self.worktree_path == self.path
+
+        def _iter_path(path: bytes, base: bytes, worktree: bool) -> Iterator[bytes]:
+            refspath = os.path.join(path, base.rstrip(b"/"))
+            prefix_len = len(os.path.join(path, b""))
+            for root, dirs, files in os.walk(refspath):
+                directory = root[prefix_len:]
+                if os.path.sep != "/":
+                    directory = directory.replace(os.fsencode(os.path.sep), b"/")
+
+                if not is_main_worktree:
+                    dirs[:] = [
+                        d
+                        for d in dirs
+                        if is_per_worktree_ref(b"/".join([directory, d, b""]))
+                        == worktree
+                    ]
+
+                for filename in files:
+                    refname = b"/".join([directory, filename])
+                    if check_ref_format(refname):
+                        yield refname
+
+        if base == b"refs/":
+            paths = [(self.path, False)]
+            if not is_main_worktree:
+                paths.append((self.worktree_path, True))
+        else:
+            is_worktree = is_per_worktree_ref(base)
+            path = self.worktree_path if is_worktree else self.path
+            paths = [(path, is_worktree)]
+
+        for path, is_worktree in paths:
+            yield from _iter_path(path, base, is_worktree)
+
     def subkeys(self, base: bytes) -> set[bytes]:
         """Return subkeys under a given base reference path."""
         subkeys = set()
-        path = self.refpath(base)
-        for root, unused_dirs, files in os.walk(path):
-            directory = root[len(path) :]
-            if os.path.sep != "/":
-                directory = directory.replace(os.fsencode(os.path.sep), b"/")
-            directory = directory.strip(b"/")
-            for filename in files:
-                refname = b"/".join(([directory] if directory else []) + [filename])
-                # check_ref_format requires at least one /, so we prepend the
-                # base before calling it.
-                if check_ref_format(base + b"/" + refname):
-                    subkeys.add(refname)
+
+        for key in self._iter_loose_refs(base):
+            if key.startswith(base):
+                subkeys.add(key[len(base) :].strip(b"/"))
+
         for key in self.get_packed_refs():
             if key.startswith(base):
                 subkeys.add(key[len(base) :].strip(b"/"))
@@ -856,29 +886,19 @@ class DiskRefsContainer(RefsContainer):
         allkeys = set()
         if os.path.exists(self.refpath(HEADREF)):
             allkeys.add(HEADREF)
-        path = self.refpath(b"")
-        refspath = self.refpath(b"refs")
-        for root, unused_dirs, files in os.walk(refspath):
-            directory = root[len(path) :]
-            if os.path.sep != "/":
-                directory = directory.replace(os.fsencode(os.path.sep), b"/")
-            for filename in files:
-                refname = b"/".join([directory, filename])
-                if check_ref_format(refname):
-                    allkeys.add(refname)
+
+        allkeys.update(self._iter_loose_refs())
         allkeys.update(self.get_packed_refs())
         return allkeys
 
     def refpath(self, name: bytes) -> bytes:
         """Return the disk path of a ref."""
+        path = name
         if os.path.sep != "/":
-            name = name.replace(b"/", os.fsencode(os.path.sep))
-        # TODO: as the 'HEAD' reference is working tree specific, it
-        # should actually not be a part of RefsContainer
-        if name == HEADREF:
-            return os.path.join(self.worktree_path, name)
-        else:
-            return os.path.join(self.path, name)
+            path = path.replace(b"/", os.fsencode(os.path.sep))
+
+        root_dir = self.worktree_path if is_per_worktree_ref(name) else self.path
+        return os.path.join(root_dir, path)
 
     def get_packed_refs(self) -> dict[bytes, bytes]:
         """Get contents of the packed-refs file.
@@ -1741,3 +1761,9 @@ def filter_ref_prefix(refs: T, prefixes: Iterable[bytes]) -> T:
     """
     filtered = {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
     return cast(T, filtered)
+
+
+def is_per_worktree_ref(ref: bytes) -> bool:
+    return not ref.startswith(b"refs/") or ref.startswith(
+        (b"refs/bisect/", b"refs/worktree/", b"refs/rewritten/")
+    )

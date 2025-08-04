@@ -5327,7 +5327,7 @@ def lfs_untrack(repo: Union[str, os.PathLike, Repo] = ".", patterns: Optional[li
         return lfs_track(r)  # Return updated list
 
 
-def lfs_init(repo: Union[str, os.PathLike, Repo] = "."):
+def lfs_init(repo: Union[str, os.PathLike, Repo] = ".") -> None:
     """Initialize Git LFS in a repository.
 
     Args:
@@ -5351,7 +5351,7 @@ def lfs_init(repo: Union[str, os.PathLike, Repo] = "."):
         config.write_to_path()
 
 
-def lfs_clean(repo: Union[str, os.PathLike, Repo] = ".", path=None):
+def lfs_clean(repo: Union[str, os.PathLike, Repo] = ".", path: Optional[Union[str, os.PathLike]] = None) -> bytes:
     """Clean a file by converting it to an LFS pointer.
 
     Args:
@@ -5380,7 +5380,7 @@ def lfs_clean(repo: Union[str, os.PathLike, Repo] = ".", path=None):
         return filter_driver.clean(content)
 
 
-def lfs_smudge(repo: Union[str, os.PathLike, Repo] = ".", pointer_content=None):
+def lfs_smudge(repo: Union[str, os.PathLike, Repo] = ".", pointer_content: Optional[bytes] = None) -> bytes:
     """Smudge an LFS pointer by retrieving the actual content.
 
     Args:
@@ -5404,7 +5404,7 @@ def lfs_smudge(repo: Union[str, os.PathLike, Repo] = ".", pointer_content=None):
         return filter_driver.smudge(pointer_content)
 
 
-def lfs_ls_files(repo: Union[str, os.PathLike, Repo] = ".", ref=None):
+def lfs_ls_files(repo: Union[str, os.PathLike, Repo] = ".", ref: Optional[Union[str, bytes]] = None) -> list[tuple[bytes, str, int]]:
     """List files tracked by Git LFS.
 
     Args:
@@ -5450,10 +5450,10 @@ def lfs_ls_files(repo: Union[str, os.PathLike, Repo] = ".", ref=None):
 
 def lfs_migrate(
     repo: Union[str, os.PathLike, Repo] = ".",
-    include=None,
-    exclude=None,
-    everything=False,
-):
+    include: Optional[list[str]] = None,
+    exclude: Optional[list[str]] = None,
+    everything: bool = False,
+) -> int:
     """Migrate files to Git LFS.
 
     Args:
@@ -5550,7 +5550,7 @@ def lfs_migrate(
         return migrated
 
 
-def lfs_pointer_check(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
+def lfs_pointer_check(repo: Union[str, os.PathLike, Repo] = ".", paths: Optional[list[str]] = None) -> dict[str, Optional[Any]]:
     """Check if files are valid LFS pointers.
 
     Args:
@@ -5586,7 +5586,7 @@ def lfs_pointer_check(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
         return results
 
 
-def lfs_fetch(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=None):
+def lfs_fetch(repo: Union[str, os.PathLike, Repo] = ".", remote: str = "origin", refs: Optional[list[Union[str, bytes]]] = None) -> int:
     """Fetch LFS objects from remote.
 
     Args:
@@ -5666,7 +5666,7 @@ def lfs_fetch(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=N
         return fetched
 
 
-def lfs_pull(repo: Union[str, os.PathLike, Repo] = ".", remote="origin"):
+def lfs_pull(repo: Union[str, os.PathLike, Repo] = ".", remote: str = "origin") -> int:
     """Pull LFS objects for current checkout.
 
     Args:
@@ -5707,7 +5707,7 @@ def lfs_pull(repo: Union[str, os.PathLike, Repo] = ".", remote="origin"):
         return fetched
 
 
-def lfs_push(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=None):
+def lfs_push(repo: Union[str, os.PathLike, Repo] = ".", remote: str = "origin", refs: Optional[list[Union[str, bytes]]] = None) -> int:
     """Push LFS objects to remote.
 
     Args:
@@ -5792,7 +5792,7 @@ def lfs_push(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=No
         return pushed
 
 
-def lfs_status(repo: Union[str, os.PathLike, Repo] = "."):
+def lfs_status(repo: Union[str, os.PathLike, Repo] = ".") -> dict[str, list[str]]:
     """Show status of LFS files.
 
     Args:
@@ -5855,7 +5855,7 @@ def lfs_status(repo: Union[str, os.PathLike, Repo] = "."):
         return status
 
 
-def worktree_list(repo="."):
+def worktree_list(repo: RepoPath = ".") -> list[Any]:
     """List all worktrees for a repository.
 
     Args:
@@ -5871,8 +5871,8 @@ def worktree_list(repo="."):
 
 
 def worktree_add(
-    repo=".", path=None, branch=None, commit=None, detach=False, force=False
-):
+    repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None, branch: Optional[Union[str, bytes]] = None, commit: Optional[Union[str, bytes]] = None, detach: bool = False, force: bool = False
+) -> str:
     """Add a new worktree.
 
     Args:
@@ -5898,7 +5898,7 @@ def worktree_add(
         return wt_repo.path
 
 
-def worktree_remove(repo=".", path=None, force=False):
+def worktree_remove(repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None, force: bool = False) -> None:
     """Remove a worktree.
 
     Args:
@@ -5915,7 +5915,7 @@ def worktree_remove(repo=".", path=None, force=False):
         remove_worktree(r, path, force=force)
 
 
-def worktree_prune(repo=".", dry_run=False, expire=None):
+def worktree_prune(repo: RepoPath = ".", dry_run: bool = False, expire: Optional[int] = None) -> list[str]:
     """Prune worktree administrative files.
 
     Args:
@@ -5932,7 +5932,7 @@ def worktree_prune(repo=".", dry_run=False, expire=None):
         return prune_worktrees(r, expire=expire, dry_run=dry_run)
 
 
-def worktree_lock(repo=".", path=None, reason=None):
+def worktree_lock(repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None, reason: Optional[str] = None) -> None:
     """Lock a worktree to prevent it from being pruned.
 
     Args:
@@ -5949,7 +5949,7 @@ def worktree_lock(repo=".", path=None, reason=None):
         lock_worktree(r, path, reason=reason)
 
 
-def worktree_unlock(repo=".", path=None):
+def worktree_unlock(repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None) -> None:
     """Unlock a worktree.
 
     Args:
@@ -5965,7 +5965,7 @@ def worktree_unlock(repo=".", path=None):
         unlock_worktree(r, path)
 
 
-def worktree_move(repo=".", old_path=None, new_path=None):
+def worktree_move(repo: RepoPath = ".", old_path: Optional[Union[str, os.PathLike]] = None, new_path: Optional[Union[str, os.PathLike]] = None) -> None:
     """Move a worktree to a new location.
 
     Args:

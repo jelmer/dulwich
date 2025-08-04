@@ -91,12 +91,27 @@ from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
 from pathlib import Path
-from typing import BinaryIO, Optional, TypeVar, Union, cast, overload
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    Optional,
+    TextIO,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 from . import replace_me
 from .archive import tar_stream
 from .bisect import BisectState
-from .client import get_transport_and_path
+from .client import (
+    FetchPackResult,
+    LsRemoteResult,
+    SendPackResult,
+    get_transport_and_path,
+)
 from .config import Config, ConfigFile, StackedConfig, read_submodules
 from .diff_tree import (
     CHANGE_ADD,
@@ -113,6 +128,7 @@ from .graph import can_fast_forward
 from .ignore import IgnoreFilterManager
 from .index import (
     ConflictedIndexEntry,
+    Index,
     IndexEntry,
     _fs_to_tree_path,
     blob_from_path_and_stat,
@@ -126,7 +142,7 @@ from .index import (
     validate_path_element_hfs,
     validate_path_element_ntfs,
 )
-from .object_store import tree_lookup_path
+from .object_store import BaseObjectStore, tree_lookup_path
 from .objects import (
     Blob,
     Commit,
@@ -205,16 +221,16 @@ class CountObjectsResult:
 class NoneStream(RawIOBase):
     """Fallback if stdout or stderr are unavailable, does nothing."""
 
-    def read(self, size=-1) -> None:
+    def read(self, size: int = -1) -> None:
         return None
 
     def readall(self) -> bytes:
         return b""
 
-    def readinto(self, b) -> None:
+    def readinto(self, b: Union[bytearray, memoryview]) -> None:
         return None
 
-    def write(self, b) -> None:
+    def write(self, b: bytes) -> None:
         return None
 
 
@@ -228,7 +244,7 @@ DEFAULT_ENCODING = "utf-8"
 class Error(Exception):
     """Porcelain-based error."""
 
-    def __init__(self, msg) -> None:
+    def __init__(self, msg: str) -> None:
         super().__init__(msg)
 
 
@@ -244,7 +260,7 @@ class CheckoutError(Error):
     """Indicates that a checkout cannot be performed."""
 
 
-def parse_timezone_format(tz_str):
+def parse_timezone_format(tz_str: str) -> int:
     """Parse given string and attempt to return a timezone offset.
 
     Different formats are considered in the following order:
@@ -299,7 +315,7 @@ def parse_timezone_format(tz_str):
     raise TimezoneFormatError(tz_str)
 
 
-def get_user_timezones():
+def get_user_timezones() -> tuple[int, int]:
     """Retrieve local timezone as described in
     https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
     Returns: A tuple containing author timezone, committer timezone.
@@ -338,7 +354,7 @@ def open_repo(
 
 
 @contextmanager
-def _noop_context_manager(obj):
+def _noop_context_manager(obj: T) -> Iterator[T]:
     """Context manager that has the same api as closing but does nothing."""
     yield obj
 
@@ -366,8 +382,8 @@ def open_repo_closing(
 
 
 def path_to_tree_path(
-    repopath: Union[str, os.PathLike], path, tree_encoding=DEFAULT_ENCODING
-):
+    repopath: Union[str, os.PathLike], path: Union[str, os.PathLike], tree_encoding: str = DEFAULT_ENCODING
+) -> bytes:
     """Convert a path to a path usable in an index, e.g. bytes and relative to
     the repository root.
 
@@ -411,12 +427,12 @@ def path_to_tree_path(
 class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
-    def __init__(self, current_sha, new_sha) -> None:
+    def __init__(self, current_sha: bytes, new_sha: bytes) -> None:
         self.current_sha = current_sha
         self.new_sha = new_sha
 
 
-def check_diverged(repo, current_sha, new_sha) -> None:
+def check_diverged(repo: BaseRepo, current_sha: bytes, new_sha: bytes) -> None:
     """Check if updating to a sha can be done with fast forwarding.
 
     Args:
@@ -433,10 +449,10 @@ def check_diverged(repo, current_sha, new_sha) -> None:
 
 
 def archive(
-    repo,
+    repo: Union[str, BaseRepo],
     committish: Optional[Union[str, bytes, Commit, Tag]] = None,
-    outstream=default_bytes_out_stream,
-    errstream=default_bytes_err_stream,
+    outstream: BinaryIO = default_bytes_out_stream,
+    errstream: BinaryIO = default_bytes_err_stream,
 ) -> None:
     """Create an archive.
 
@@ -466,7 +482,7 @@ def update_server_info(repo: RepoPath = ".") -> None:
         server_update_server_info(r)
 
 
-def write_commit_graph(repo: RepoPath = ".", reachable=True) -> None:
+def write_commit_graph(repo: RepoPath = ".", reachable: bool = True) -> None:
     """Write a commit graph file for a repository.
 
     Args:
@@ -481,7 +497,7 @@ def write_commit_graph(repo: RepoPath = ".", reachable=True) -> None:
             r.object_store.write_commit_graph(refs, reachable=reachable)
 
 
-def symbolic_ref(repo: RepoPath, ref_name, force=False) -> None:
+def symbolic_ref(repo: RepoPath, ref_name: Union[str, bytes], force: bool = False) -> None:
     """Set git symbolic ref into HEAD.
 
     Args:
@@ -496,24 +512,24 @@ def symbolic_ref(repo: RepoPath, ref_name, force=False) -> None:
         repo_obj.refs.set_symbolic_ref(b"HEAD", ref_path)
 
 
-def pack_refs(repo: RepoPath, all=False) -> None:
+def pack_refs(repo: RepoPath, all: bool = False) -> None:
     with open_repo_closing(repo) as repo_obj:
         repo_obj.refs.pack_refs(all=all)
 
 
 def commit(
-    repo=".",
-    message=None,
-    author=None,
-    author_timezone=None,
-    committer=None,
-    commit_timezone=None,
-    encoding=None,
-    no_verify=False,
-    signoff=False,
-    all=False,
-    amend=False,
-):
+    repo: RepoPath = ".",
+    message: Optional[Union[str, bytes, Callable]] = None,
+    author: Optional[bytes] = None,
+    author_timezone: Optional[int] = None,
+    committer: Optional[bytes] = None,
+    commit_timezone: Optional[int] = None,
+    encoding: Optional[bytes] = None,
+    no_verify: bool = False,
+    signoff: bool = False,
+    all: bool = False,
+    amend: bool = False,
+) -> bytes:
     """Create a new commit.
 
     Args:
@@ -608,11 +624,11 @@ def commit(
 
 def commit_tree(
     repo: RepoPath,
-    tree,
-    message=None,
-    author=None,
-    committer=None,
-):
+    tree: bytes,
+    message: Optional[Union[str, bytes]] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> bytes:
     """Create a new commit object.
 
     Args:
@@ -628,8 +644,8 @@ def commit_tree(
 
 
 def init(
-    path: Union[str, os.PathLike] = ".", *, bare=False, symlinks: Optional[bool] = None
-):
+    path: Union[str, os.PathLike] = ".", *, bare: bool = False, symlinks: Optional[bool] = None
+) -> Repo:
     """Create a new git repository.
 
     Args:
@@ -648,21 +664,21 @@ def init(
 
 
 def clone(
-    source,
+    source: Union[str, bytes, BaseRepo],
     target: Optional[Union[str, os.PathLike]] = None,
-    bare=False,
-    checkout=None,
-    errstream=default_bytes_err_stream,
-    outstream=None,
+    bare: bool = False,
+    checkout: Optional[bool] = None,
+    errstream: BinaryIO = default_bytes_err_stream,
+    outstream: Optional[BinaryIO] = None,
     origin: Optional[str] = "origin",
     depth: Optional[int] = None,
     branch: Optional[Union[str, bytes]] = None,
     config: Optional[Config] = None,
-    filter_spec=None,
+    filter_spec: Optional[bytes] = None,
     protocol_version: Optional[int] = None,
     recurse_submodules: bool = False,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Repo:
     """Clone a local or remote git repository.
 
     Args:
@@ -754,7 +770,7 @@ def clone(
     return repo
 
 
-def add(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
+def add(repo: Union[str, os.PathLike, Repo] = ".", paths: Optional[Union[list[Union[str, bytes, os.PathLike]], str, bytes, os.PathLike]] = None) -> tuple[set[str], set[str]]:
     """Add files to the staging area.
 
     Args:
@@ -867,7 +883,7 @@ def add(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
     return (relpaths, ignored)
 
 
-def _is_subdir(subdir, parentdir):
+def _is_subdir(subdir: Union[str, os.PathLike], parentdir: Union[str, os.PathLike]) -> bool:
     """Check whether subdir is parentdir or a subdir of parentdir.
 
     If parentdir or subdir is a relative path, it will be disamgibuated
@@ -879,7 +895,7 @@ def _is_subdir(subdir, parentdir):
 
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
-def clean(repo: Union[str, os.PathLike, Repo] = ".", target_dir=None) -> None:
+def clean(repo: Union[str, os.PathLike, Repo] = ".", target_dir: Optional[Union[str, os.PathLike]] = None) -> None:
     """Remove any untracked files from the target directory recursively.
 
     Equivalent to running ``git clean -fd`` in target_dir.
@@ -925,7 +941,7 @@ def clean(repo: Union[str, os.PathLike, Repo] = ".", target_dir=None) -> None:
                     os.remove(ap)
 
 
-def remove(repo: Union[str, os.PathLike, Repo] = ".", paths=None, cached=False) -> None:
+def remove(repo: Union[str, os.PathLike, Repo] = ".", paths: Optional[list[Union[str, bytes, os.PathLike]]] = None, cached: bool = False) -> None:
     """Remove files from the staging area.
 
     Args:
@@ -1093,7 +1109,7 @@ def mv(
 move = mv
 
 
-def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
+def commit_decode(commit: Commit, contents: bytes, default_encoding: str = DEFAULT_ENCODING) -> str:
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1101,7 +1117,7 @@ def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
     return contents.decode(encoding, "replace")
 
 
-def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
+def commit_encode(commit: Commit, contents: str, default_encoding: str = DEFAULT_ENCODING) -> bytes:
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1109,7 +1125,7 @@ def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
     return contents.encode(encoding)
 
 
-def print_commit(commit, decode, outstream=sys.stdout) -> None:
+def print_commit(commit: Commit, decode: Callable[[Commit, bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Write a human-readable commit log entry.
 
     Args:
@@ -1138,7 +1154,7 @@ def print_commit(commit, decode, outstream=sys.stdout) -> None:
         outstream.write("\n")
 
 
-def print_tag(tag, decode, outstream=sys.stdout) -> None:
+def print_tag(tag: Tag, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Write a human-readable tag.
 
     Args:
@@ -1156,7 +1172,7 @@ def print_tag(tag, decode, outstream=sys.stdout) -> None:
     outstream.write("\n")
 
 
-def show_blob(repo: RepoPath, blob, decode, outstream=sys.stdout) -> None:
+def show_blob(repo: RepoPath, blob: Blob, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Write a blob to a stream.
 
     Args:
@@ -1168,7 +1184,7 @@ def show_blob(repo: RepoPath, blob, decode, outstream=sys.stdout) -> None:
     outstream.write(decode(blob.data))
 
 
-def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
+def show_commit(repo: RepoPath, commit: Commit, decode: Callable[[Commit, bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Show a commit to a stream.
 
     Args:
@@ -1181,10 +1197,10 @@ def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
 
     # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
     class _StreamWrapper:
-        def __init__(self, stream):
+        def __init__(self, stream: Any) -> None:
             self.stream = stream
 
-        def write(self, data):
+        def write(self, data: Union[str, bytes]) -> None:
             if isinstance(data, str):
                 # Convert string to bytes for ColorizedDiffStream
                 self.stream.write(data.encode("utf-8"))
@@ -1218,7 +1234,7 @@ def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
             outstream.write(commit_decode(commit, diffstream.getvalue()))
 
 
-def show_tree(repo: RepoPath, tree, decode, outstream=sys.stdout) -> None:
+def show_tree(repo: RepoPath, tree: Tree, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Print a tree to a stream.
 
     Args:
@@ -1231,7 +1247,7 @@ def show_tree(repo: RepoPath, tree, decode, outstream=sys.stdout) -> None:
         outstream.write(decode(n) + "\n")
 
 
-def show_tag(repo: RepoPath, tag, decode, outstream=sys.stdout) -> None:
+def show_tag(repo: RepoPath, tag: Tag, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Print a tag to a stream.
 
     Args:
@@ -1245,7 +1261,7 @@ def show_tag(repo: RepoPath, tag, decode, outstream=sys.stdout) -> None:
         show_object(repo, r[tag.object[1]], decode, outstream)
 
 
-def show_object(repo: RepoPath, obj, decode, outstream):
+def show_object(repo: RepoPath, obj: Union[Tree, Blob, Commit, Tag], decode: Callable[[bytes], str], outstream: TextIO) -> None:
     return {
         b"tree": show_tree,
         b"blob": show_blob,
@@ -1254,7 +1270,7 @@ def show_object(repo: RepoPath, obj, decode, outstream):
     }[obj.type_name](repo, obj, decode, outstream)
 
 
-def print_name_status(changes):
+def print_name_status(changes: Iterator[TreeChange]) -> None:
     """Print a simple status summary, listing changed files."""
     for change in changes:
         if not change:
@@ -1284,12 +1300,12 @@ def print_name_status(changes):
 
 
 def log(
-    repo=".",
-    paths=None,
-    outstream=sys.stdout,
-    max_entries=None,
-    reverse=False,
-    name_status=False,
+    repo: RepoPath = ".",
+    paths: Optional[list[Union[str, bytes]]] = None,
+    outstream: TextIO = sys.stdout,
+    max_entries: Optional[int] = None,
+    reverse: bool = False,
+    name_status: bool = False,
 ) -> None:
     """Write commit logs.
 
@@ -1311,7 +1327,7 @@ def log(
         )
         for entry in walker:
 
-            def decode(x):
+            def decode(x: bytes) -> str:
                 return commit_decode(entry.commit, x)
 
             print_commit(entry.commit, decode, outstream)
@@ -1323,10 +1339,10 @@ def log(
 
 # TODO(jelmer): better default for encoding?
 def show(
-    repo=".",
-    objects=None,
-    outstream=sys.stdout,
-    default_encoding=DEFAULT_ENCODING,
+    repo: RepoPath = ".",
+    objects: Optional[list[Union[str, bytes]]] = None,
+    outstream: TextIO = sys.stdout,
+    default_encoding: str = DEFAULT_ENCODING,
 ) -> None:
     """Print the changes in a commit.
 
@@ -1346,12 +1362,12 @@ def show(
             o = parse_object(r, objectish)
             if isinstance(o, Commit):
 
-                def decode(x):
+                def decode(x: bytes) -> str:
                     return commit_decode(o, x, default_encoding)
 
             else:
 
-                def decode(x):
+                def decode(x: bytes) -> str:
                     return x.decode(default_encoding)
 
             show_object(r, o, decode, outstream)
@@ -1359,9 +1375,9 @@ def show(
 
 def diff_tree(
     repo: RepoPath,
-    old_tree,
-    new_tree,
-    outstream=default_bytes_out_stream,
+    old_tree: Union[str, bytes, Tree],
+    new_tree: Union[str, bytes, Tree],
+    outstream: BinaryIO = default_bytes_out_stream,
 ) -> None:
     """Compares the content and mode of blobs found via two tree objects.
 
@@ -1376,12 +1392,12 @@ def diff_tree(
 
 
 def diff(
-    repo=".",
-    commit=None,
-    commit2=None,
-    staged=False,
-    paths=None,
-    outstream=default_bytes_out_stream,
+    repo: RepoPath = ".",
+    commit: Optional[Union[str, bytes]] = None,
+    commit2: Optional[Union[str, bytes]] = None,
+    staged: bool = False,
+    paths: Optional[list[Union[str, bytes]]] = None,
+    outstream: BinaryIO = default_bytes_out_stream,
 ) -> None:
     """Show diff.
 
@@ -1471,7 +1487,7 @@ def diff(
             diff_module.diff_working_tree_to_index(r, outstream, paths)
 
 
-def rev_list(repo: RepoPath, commits, outstream=sys.stdout) -> None:
+def rev_list(repo: RepoPath, commits: list[Union[str, bytes]], outstream: BinaryIO = sys.stdout) -> None:
     """Lists commit objects in reverse chronological order.
 
     Args:
@@ -1492,7 +1508,7 @@ def _canonical_part(url: str) -> str:
 
 
 def submodule_add(
-    repo: Union[str, os.PathLike, Repo], url, path=None, name=None
+    repo: Union[str, os.PathLike, Repo], url: str, path: Optional[Union[str, os.PathLike]] = None, name: Optional[str] = None
 ) -> None:
     """Add a new submodule.
 
@@ -1535,7 +1551,7 @@ def submodule_init(repo: Union[str, os.PathLike, Repo]) -> None:
         config.write_to_path()
 
 
-def submodule_list(repo: RepoPath):
+def submodule_list(repo: RepoPath) -> Iterator[tuple[bytes, str]]:
     """List submodules.
 
     Args:
@@ -1550,10 +1566,10 @@ def submodule_list(repo: RepoPath):
 
 def submodule_update(
     repo: Union[str, os.PathLike, Repo],
-    paths=None,
-    init=False,
-    force=False,
-    errstream=None,
+    paths: Optional[list[Union[str, bytes, os.PathLike]]] = None,
+    init: bool = False,
+    force: bool = False,
+    errstream: Optional[BinaryIO] = None,
 ) -> None:
     """Update submodules.
 
@@ -1679,14 +1695,14 @@ def submodule_update(
 
 
 def tag_create(
-    repo,
+    repo: RepoPath,
     tag: Union[str, bytes],
     author: Optional[Union[str, bytes]] = None,
     message: Optional[Union[str, bytes]] = None,
-    annotated=False,
+    annotated: bool = False,
     objectish: Union[str, bytes] = "HEAD",
-    tag_time=None,
-    tag_timezone=None,
+    tag_time: Optional[int] = None,
+    tag_timezone: Optional[int] = None,
     sign: bool = False,
     encoding: str = DEFAULT_ENCODING,
 ) -> None:
@@ -1768,7 +1784,7 @@ def tag_create(
         r.refs[_make_tag_ref(tag)] = tag_id
 
 
-def tag_list(repo: RepoPath, outstream=sys.stdout):
+def tag_list(repo: RepoPath, outstream: TextIO = sys.stdout) -> list[bytes]:
     """List all tags.
 
     Args:
@@ -1780,7 +1796,7 @@ def tag_list(repo: RepoPath, outstream=sys.stdout):
         return tags
 
 
-def tag_delete(repo: RepoPath, name) -> None:
+def tag_delete(repo: RepoPath, name: Union[str, bytes]) -> None:
     """Remove a tag.
 
     Args:
@@ -1806,8 +1822,8 @@ def _make_notes_ref(name: bytes) -> bytes:
 
 
 def notes_add(
-    repo, object_sha, note, ref=b"commits", author=None, committer=None, message=None
-):
+    repo: RepoPath, object_sha: bytes, note: bytes, ref: bytes = b"commits", author: Optional[bytes] = None, committer: Optional[bytes] = None, message: Optional[bytes] = None
+) -> None:
     """Add or update a note for an object.
 
     Args:
@@ -1847,8 +1863,8 @@ def notes_add(
 
 
 def notes_remove(
-    repo, object_sha, ref=b"commits", author=None, committer=None, message=None
-):
+    repo: RepoPath, object_sha: bytes, ref: bytes = b"commits", author: Optional[bytes] = None, committer: Optional[bytes] = None, message: Optional[bytes] = None
+) -> None:
     """Remove a note for an object.
 
     Args:
@@ -1883,7 +1899,7 @@ def notes_remove(
         )
 
 
-def notes_show(repo: Union[str, os.PathLike, Repo], object_sha, ref=b"commits"):
+def notes_show(repo: Union[str, os.PathLike, Repo], object_sha: bytes, ref: bytes = b"commits") -> Optional[bytes]:
     """Show the note for an object.
 
     Args:
@@ -1908,7 +1924,7 @@ def notes_show(repo: Union[str, os.PathLike, Repo], object_sha, ref=b"commits"):
         return r.notes.get_note(object_sha, notes_ref, config=config)
 
 
-def notes_list(repo: RepoPath, ref=b"commits"):
+def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[bytes, bytes]]:
     """List all notes in a notes ref.
 
     Args:
@@ -1930,7 +1946,7 @@ def notes_list(repo: RepoPath, ref=b"commits"):
 
 def reset(
     repo: Union[str, os.PathLike, Repo],
-    mode,
+    mode: str,
     treeish: Union[str, bytes, Commit, Tree, Tag] = "HEAD",
 ) -> None:
     """Reset current HEAD to the specified state.
@@ -2069,14 +2085,14 @@ def get_remote_repo(
 
 
 def push(
-    repo,
-    remote_location=None,
-    refspecs=None,
-    outstream=default_bytes_out_stream,
-    errstream=default_bytes_err_stream,
-    force=False,
-    **kwargs,
-):
+    repo: RepoPath,
+    remote_location: Optional[Union[str, bytes]] = None,
+    refspecs: Optional[Union[Union[str, bytes], list[Union[str, bytes]]]] = None,
+    outstream: BinaryIO = default_bytes_out_stream,
+    errstream: BinaryIO = default_bytes_err_stream,
+    force: bool = False,
+    **kwargs: Any,
+) -> SendPackResult:
     """Remote push with dulwich via dulwich.client.
 
     Args:
@@ -2117,7 +2133,7 @@ def push(
         selected_refs = []
         remote_changed_refs = {}
 
-        def update_refs(refs):
+        def update_refs(refs: dict[bytes, bytes]) -> dict[bytes, bytes]:
             selected_refs.extend(parse_reftuples(r.refs, refs, refspecs, force=force))
             new_refs = {}
 
@@ -2183,17 +2199,17 @@ def push(
 
 
 def pull(
-    repo,
-    remote_location=None,
-    refspecs=None,
-    outstream=default_bytes_out_stream,
-    errstream=default_bytes_err_stream,
-    fast_forward=True,
-    ff_only=False,
-    force=False,
-    filter_spec=None,
-    protocol_version=None,
-    **kwargs,
+    repo: RepoPath,
+    remote_location: Optional[Union[str, bytes]] = None,
+    refspecs: Optional[Union[Union[str, bytes], list[Union[str, bytes]]]] = None,
+    outstream: BinaryIO = default_bytes_out_stream,
+    errstream: BinaryIO = default_bytes_err_stream,
+    fast_forward: bool = True,
+    ff_only: bool = False,
+    force: bool = False,
+    filter_spec: Optional[str] = None,
+    protocol_version: Optional[int] = None,
+    **kwargs: Any,
 ) -> None:
     """Pull from remote via dulwich.client.
 
@@ -2224,7 +2240,7 @@ def pull(
         if refspecs is None:
             refspecs = [b"HEAD"]
 
-        def determine_wants(remote_refs, *args, **kwargs):
+        def determine_wants(remote_refs: dict[bytes, bytes], *args: Any, **kwargs: Any) -> list[bytes]:
             selected_refs.extend(
                 parse_reftuples(remote_refs, r.refs, refspecs, force=force)
             )
@@ -2305,9 +2321,9 @@ def pull(
 
 def status(
     repo: Union[str, os.PathLike, Repo] = ".",
-    ignored=False,
-    untracked_files="normal",
-):
+    ignored: bool = False,
+    untracked_files: str = "normal",
+) -> GitStatus:
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
     Args:
@@ -2353,7 +2369,11 @@ def status(
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
 
-def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
+def _walk_working_dir_paths(
+    frompath: Union[str, bytes, os.PathLike],
+    basepath: Union[str, bytes, os.PathLike],
+    prune_dirnames: Optional[Callable[[str, list[str]], list[str]]] = None,
+) -> Iterator[tuple[str, bool]]:
     """Get path, is_dir for files in working dir from frompath.
 
     Args:
@@ -2386,8 +2406,12 @@ def _walk_working_dir_paths(frompath, basepath, prune_dirnames=None):
 
 
 def get_untracked_paths(
-    frompath, basepath, index, exclude_ignored=False, untracked_files="all"
-):
+    frompath: Union[str, bytes, os.PathLike],
+    basepath: Union[str, bytes, os.PathLike],
+    index: Index,
+    exclude_ignored: bool = False,
+    untracked_files: str = "all",
+) -> Iterator[str]:
     """Get untracked paths.
 
     Args:
@@ -2417,7 +2441,7 @@ def get_untracked_paths(
     # List to store untracked directories found during traversal
     untracked_dir_list = []
 
-    def directory_has_non_ignored_files(dir_path, base_rel_path):
+    def directory_has_non_ignored_files(dir_path: str, base_rel_path: str) -> bool:
         """Recursively check if directory contains any non-ignored files."""
         try:
             for entry in os.listdir(dir_path):
@@ -2435,7 +2459,7 @@ def get_untracked_paths(
             # If we can't read the directory, assume it has non-ignored files
             return True
 
-    def prune_dirnames(dirpath, dirnames):
+    def prune_dirnames(dirpath: str, dirnames: list[str]) -> list[str]:
         for i in range(len(dirnames) - 1, -1, -1):
             path = os.path.join(dirpath, dirnames[i])
             ip = os.path.join(os.path.relpath(path, basepath), "")
@@ -2521,7 +2545,7 @@ def get_untracked_paths(
     yield from ignored_dirs
 
 
-def get_tree_changes(repo: RepoPath):
+def get_tree_changes(repo: RepoPath) -> dict[str, list[Union[str, bytes]]]:
     """Return add/delete/modify changes to tree by comparing index to HEAD.
 
     Args:
@@ -2559,7 +2583,7 @@ def get_tree_changes(repo: RepoPath):
         return tracked_changes
 
 
-def daemon(path=".", address=None, port=None) -> None:
+def daemon(path: Union[str, os.PathLike] = ".", address: Optional[str] = None, port: Optional[int] = None) -> None:
     """Run a daemon serving Git requests over TCP/IP.
 
     Args:
@@ -2573,7 +2597,7 @@ def daemon(path=".", address=None, port=None) -> None:
     server.serve_forever()
 
 
-def web_daemon(path=".", address=None, port=None) -> None:
+def web_daemon(path: Union[str, os.PathLike] = ".", address: Optional[str] = None, port: Optional[int] = None) -> None:
     """Run a daemon serving Git requests over HTTP.
 
     Args:
@@ -2600,7 +2624,7 @@ def web_daemon(path=".", address=None, port=None) -> None:
     server.serve_forever()
 
 
-def upload_pack(path=".", inf=None, outf=None) -> int:
+def upload_pack(path: Union[str, os.PathLike] = ".", inf: Optional[BinaryIO] = None, outf: Optional[BinaryIO] = None) -> int:
     """Upload a pack file after negotiating its contents using smart protocol.
 
     Args:
@@ -2615,7 +2639,7 @@ def upload_pack(path=".", inf=None, outf=None) -> int:
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
 
-    def send_fn(data) -> None:
+    def send_fn(data: bytes) -> None:
         outf.write(data)
         outf.flush()
 
@@ -2626,7 +2650,7 @@ def upload_pack(path=".", inf=None, outf=None) -> int:
     return 0
 
 
-def receive_pack(path=".", inf=None, outf=None) -> int:
+def receive_pack(path: Union[str, os.PathLike] = ".", inf: Optional[BinaryIO] = None, outf: Optional[BinaryIO] = None) -> int:
     """Receive a pack file after negotiating its contents using smart protocol.
 
     Args:
@@ -2641,7 +2665,7 @@ def receive_pack(path=".", inf=None, outf=None) -> int:
     path = os.path.expanduser(path)
     backend = FileSystemBackend(path)
 
-    def send_fn(data) -> None:
+    def send_fn(data: bytes) -> None:
         outf.write(data)
         outf.flush()
 
@@ -2664,7 +2688,7 @@ def _make_tag_ref(name: Union[str, bytes]) -> Ref:
     return LOCAL_TAG_PREFIX + name
 
 
-def branch_delete(repo: RepoPath, name) -> None:
+def branch_delete(repo: RepoPath, name: Union[str, bytes, list[Union[str, bytes]]]) -> None:
     """Delete a branch.
 
     Args:
@@ -2681,7 +2705,7 @@ def branch_delete(repo: RepoPath, name) -> None:
 
 
 def branch_create(
-    repo: Union[str, os.PathLike, Repo], name, objectish=None, force=False
+    repo: Union[str, os.PathLike, Repo], name: Union[str, bytes], objectish: Optional[Union[str, bytes]] = None, force: bool = False
 ) -> None:
     """Create a branch.
 
@@ -2777,7 +2801,7 @@ def branch_create(
                     repo_config.write_to_path()
 
 
-def branch_list(repo: RepoPath):
+def branch_list(repo: RepoPath) -> list[bytes]:
     """List all branches.
 
     Args:
@@ -2808,7 +2832,7 @@ def branch_list(repo: RepoPath):
             branches.sort(reverse=reverse)
         elif sort_key in ("committerdate", "authordate"):
             # Sort by date
-            def get_commit_date(branch_name):
+            def get_commit_date(branch_name: bytes) -> int:
                 ref = LOCAL_BRANCH_PREFIX + branch_name
                 sha = r.refs[ref]
                 commit = r.object_store[sha]
@@ -2833,7 +2857,7 @@ def branch_list(repo: RepoPath):
         return branches
 
 
-def active_branch(repo: RepoPath):
+def active_branch(repo: RepoPath) -> bytes:
     """Return the active branch in the repository, if any.
 
     Args:
@@ -2851,7 +2875,7 @@ def active_branch(repo: RepoPath):
         return active_ref[len(LOCAL_BRANCH_PREFIX) :]
 
 
-def get_branch_remote(repo: Union[str, os.PathLike, Repo]):
+def get_branch_remote(repo: Union[str, os.PathLike, Repo]) -> bytes:
     """Return the active branch's remote name, if any.
 
     Args:
@@ -2871,7 +2895,7 @@ def get_branch_remote(repo: Union[str, os.PathLike, Repo]):
     return remote_name
 
 
-def get_branch_merge(repo: RepoPath, branch_name=None):
+def get_branch_merge(repo: RepoPath, branch_name: Optional[bytes] = None) -> bytes:
     """Return the branch's merge reference (upstream branch), if any.
 
     Args:
@@ -2892,8 +2916,8 @@ def get_branch_merge(repo: RepoPath, branch_name=None):
 
 
 def set_branch_tracking(
-    repo: Union[str, os.PathLike, Repo], branch_name, remote_name, remote_ref
-):
+    repo: Union[str, os.PathLike, Repo], branch_name: bytes, remote_name: bytes, remote_ref: bytes
+) -> None:
     """Set up branch tracking configuration.
 
     Args:
@@ -2910,17 +2934,17 @@ def set_branch_tracking(
 
 
 def fetch(
-    repo,
-    remote_location=None,
-    outstream=sys.stdout,
-    errstream=default_bytes_err_stream,
-    message=None,
-    depth=None,
-    prune=False,
-    prune_tags=False,
-    force=False,
-    **kwargs,
-):
+    repo: RepoPath,
+    remote_location: Optional[Union[str, bytes]] = None,
+    outstream: TextIO = sys.stdout,
+    errstream: BinaryIO = default_bytes_err_stream,
+    message: Optional[bytes] = None,
+    depth: Optional[int] = None,
+    prune: bool = False,
+    prune_tags: bool = False,
+    force: bool = False,
+    **kwargs: Any,
+) -> FetchPackResult:
     """Fetch objects from a remote server.
 
     Args:
@@ -3015,7 +3039,7 @@ def for_each_ref(
     return ret
 
 
-def ls_remote(remote, config: Optional[Config] = None, **kwargs):
+def ls_remote(remote: Union[str, bytes], config: Optional[Config] = None, **kwargs: Any) -> LsRemoteResult:
     """List the refs in a remote.
 
     Args:
@@ -3043,14 +3067,14 @@ def repack(repo: RepoPath) -> None:
 
 
 def pack_objects(
-    repo,
-    object_ids,
-    packf,
-    idxf,
-    delta_window_size=None,
-    deltify=None,
-    reuse_deltas=True,
-    pack_index_version=None,
+    repo: RepoPath,
+    object_ids: list[bytes],
+    packf: BinaryIO,
+    idxf: Optional[BinaryIO],
+    delta_window_size: Optional[int] = None,
+    deltify: Optional[bool] = None,
+    reuse_deltas: bool = True,
+    pack_index_version: Optional[int] = None,
 ) -> None:
     """Pack objects into a file.
 
@@ -3080,11 +3104,11 @@ def pack_objects(
 
 
 def ls_tree(
-    repo,
+    repo: RepoPath,
     treeish: Union[str, bytes, Commit, Tree, Tag] = b"HEAD",
-    outstream=sys.stdout,
-    recursive=False,
-    name_only=False,
+    outstream: TextIO = sys.stdout,
+    recursive: bool = False,
+    name_only: bool = False,
 ) -> None:
     """List contents of a tree.
 
@@ -3096,7 +3120,7 @@ def ls_tree(
       name_only: Only print item name
     """
 
-    def list_tree(store, treeid, base) -> None:
+    def list_tree(store: BaseObjectStore, treeid: bytes, base: bytes) -> None:
         for name, mode, sha in store[treeid].iteritems():
             if base:
                 name = posixpath.join(base, name)
@@ -3190,7 +3214,7 @@ def _quote_path(path: str) -> str:
     return quoted
 
 
-def check_ignore(repo: RepoPath, paths, no_index=False, quote_path=True):
+def check_ignore(repo: RepoPath, paths: list[Union[str, bytes, os.PathLike]], no_index: bool = False, quote_path: bool = True) -> Iterator[str]:
     r"""Debug gitignore files.
 
     Args:
@@ -3242,7 +3266,7 @@ def check_ignore(repo: RepoPath, paths, no_index=False, quote_path=True):
                 yield _quote_path(output_path) if quote_path else output_path
 
 
-def update_head(repo: RepoPath, target, detached=False, new_branch=None) -> None:
+def update_head(repo: RepoPath, target: Union[str, bytes], detached: bool = False, new_branch: Optional[Union[str, bytes]] = None) -> None:
     """Update HEAD to point at a new branch/commit.
 
     Note that this does not actually update the working tree.
@@ -3518,10 +3542,10 @@ def checkout(
 
 
 def reset_file(
-    repo,
+    repo: Repo,
     file_path: str,
     target: Union[str, bytes, Commit, Tree, Tag] = b"HEAD",
-    symlink_fn=None,
+    symlink_fn: Optional[Callable[[bytes, bytes], None]] = None,
 ) -> None:
     """Reset the file to specific commit or branch.
 
@@ -3562,10 +3586,10 @@ def checkout_branch(
 
 def sparse_checkout(
     repo: Union[str, os.PathLike, Repo],
-    patterns=None,
+    patterns: Optional[list[str]] = None,
     force: bool = False,
-    cone: Union[bool, None] = None,
-):
+    cone: Optional[bool] = None,
+) -> None:
     """Perform a sparse checkout in the repository (either 'full' or 'cone mode').
 
     Perform sparse checkout in either 'cone' (directory-based) mode or
@@ -3617,7 +3641,7 @@ def sparse_checkout(
             raise CheckoutError(*exc.args) from exc
 
 
-def cone_mode_init(repo: Union[str, os.PathLike, Repo]):
+def cone_mode_init(repo: Union[str, os.PathLike, Repo]) -> None:
     """Initialize a repository to use sparse checkout in 'cone' mode.
 
     Sets ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` in the config.
@@ -3640,7 +3664,7 @@ def cone_mode_init(repo: Union[str, os.PathLike, Repo]):
         sparse_checkout(repo_obj, patterns, force=True, cone=True)
 
 
-def cone_mode_set(repo: Union[str, os.PathLike, Repo], dirs, force=False):
+def cone_mode_set(repo: Union[str, os.PathLike, Repo], dirs: list[str], force: bool = False) -> None:
     """Overwrite the existing 'cone-mode' sparse patterns with a new set of directories.
 
     Ensures ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` are enabled.
@@ -3663,7 +3687,7 @@ def cone_mode_set(repo: Union[str, os.PathLike, Repo], dirs, force=False):
         sparse_checkout(repo_obj, new_patterns, force=force, cone=True)
 
 
-def cone_mode_add(repo: Union[str, os.PathLike, Repo], dirs, force=False):
+def cone_mode_add(repo: Union[str, os.PathLike, Repo], dirs: list[str], force: bool = False) -> None:
     """Add new directories to the existing 'cone-mode' sparse-checkout patterns.
 
     Reads the current patterns from ``.git/info/sparse-checkout``, adds pattern
@@ -3693,7 +3717,7 @@ def cone_mode_add(repo: Union[str, os.PathLike, Repo], dirs, force=False):
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
 
 
-def check_mailmap(repo: RepoPath, contact):
+def check_mailmap(repo: RepoPath, contact: Union[str, bytes]) -> tuple[Optional[bytes], Optional[bytes]]:
     """Check canonical name and email of contact.
 
     Args:
@@ -3711,7 +3735,7 @@ def check_mailmap(repo: RepoPath, contact):
         return mailmap.lookup(contact)
 
 
-def fsck(repo: RepoPath):
+def fsck(repo: RepoPath) -> Iterator[tuple[bytes, Exception]]:
     """Check a repository.
 
     Args:
@@ -3730,7 +3754,7 @@ def fsck(repo: RepoPath):
                 yield (sha, e)
 
 
-def stash_list(repo: Union[str, os.PathLike, Repo]):
+def stash_list(repo: Union[str, os.PathLike, Repo]) -> Iterator[tuple[int, tuple[bytes, bytes]]]:
     """List all stashes in a repository."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -3757,7 +3781,7 @@ def stash_pop(repo: Union[str, os.PathLike, Repo]) -> None:
         stash.pop(0)
 
 
-def stash_drop(repo: Union[str, os.PathLike, Repo], index) -> None:
+def stash_drop(repo: Union[str, os.PathLike, Repo], index: int) -> None:
     """Drop a stash from the stack."""
     with open_repo_closing(repo) as r:
         from .stash import Stash
@@ -3766,13 +3790,13 @@ def stash_drop(repo: Union[str, os.PathLike, Repo], index) -> None:
         stash.drop(index)
 
 
-def ls_files(repo: RepoPath):
+def ls_files(repo: RepoPath) -> list[bytes]:
     """List all files in an index."""
     with open_repo_closing(repo) as r:
         return sorted(r.open_index())
 
 
-def find_unique_abbrev(object_store, object_id, min_length=7):
+def find_unique_abbrev(object_store: BaseObjectStore, object_id: Union[str, bytes], min_length: int = 7) -> str:
     """Find the shortest unique abbreviation for an object ID.
 
     Args:
@@ -3809,7 +3833,7 @@ def find_unique_abbrev(object_store, object_id, min_length=7):
     return hex_id
 
 
-def describe(repo: Union[str, os.PathLike, Repo], abbrev=None):
+def describe(repo: Union[str, os.PathLike, Repo], abbrev: Optional[int] = None) -> str:
     """Describe the repository version.
 
     Args:
@@ -3893,8 +3917,8 @@ def describe(repo: Union[str, os.PathLike, Repo], abbrev=None):
 
 
 def get_object_by_path(
-    repo, path, committish: Optional[Union[str, bytes, Commit, Tag]] = None
-):
+    repo: RepoPath, path: Union[str, bytes], committish: Optional[Union[str, bytes, Commit, Tag]] = None
+) -> Union[Blob, Tree, Commit, Tag]:
     """Get an object by path.
 
     Args:
@@ -3915,7 +3939,7 @@ def get_object_by_path(
         return r[sha]
 
 
-def write_tree(repo: RepoPath):
+def write_tree(repo: RepoPath) -> bytes:
     """Write a tree object from the index.
 
     Args:
@@ -3927,14 +3951,14 @@ def write_tree(repo: RepoPath):
 
 
 def _do_merge(
-    r,
-    merge_commit_id,
-    no_commit=False,
-    no_ff=False,
-    message=None,
-    author=None,
-    committer=None,
-):
+    r: Repo,
+    merge_commit_id: bytes,
+    no_commit: bool = False,
+    no_ff: bool = False,
+    message: Optional[bytes] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> tuple[Optional[bytes], list[tuple[bytes, bytes]]]:
     """Internal merge implementation that operates on an open repository.
 
     Args:
@@ -4049,12 +4073,12 @@ def _do_merge(
 def merge(
     repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag],
-    no_commit=False,
-    no_ff=False,
-    message=None,
-    author=None,
-    committer=None,
-):
+    no_commit: bool = False,
+    no_ff: bool = False,
+    message: Optional[bytes] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> tuple[Optional[bytes], list[tuple[bytes, bytes]]]:
     """Merge a commit into the current branch.
 
     Args:
@@ -4094,7 +4118,7 @@ def merge(
         return result
 
 
-def unpack_objects(pack_path, target="."):
+def unpack_objects(pack_path: Union[str, os.PathLike], target: Union[str, os.PathLike] = ".") -> int:
     """Unpack objects from a pack file into the repository.
 
     Args:
@@ -4118,11 +4142,11 @@ def unpack_objects(pack_path, target="."):
 
 
 def merge_tree(
-    repo,
+    repo: RepoPath,
     base_tree: Optional[Union[str, bytes, Tree, Commit, Tag]],
     our_tree: Union[str, bytes, Tree, Commit, Tag],
     their_tree: Union[str, bytes, Tree, Commit, Tag],
-):
+) -> tuple[bytes, list[bytes]]:
     """Perform a three-way tree merge without touching the working directory.
 
     This is similar to git merge-tree, performing a merge at the tree level
@@ -4165,10 +4189,10 @@ def merge_tree(
 def cherry_pick(
     repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag, None],
-    no_commit=False,
-    continue_=False,
-    abort=False,
-):
+    no_commit: bool = False,
+    continue_: bool = False,
+    abort: bool = False,
+) -> Optional[bytes]:
     r"""Cherry-pick a commit onto the current branch.
 
     Args:
@@ -4331,11 +4355,11 @@ def cherry_pick(
 def revert(
     repo: Union[str, os.PathLike, Repo],
     commits: Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]],
-    no_commit=False,
-    message=None,
-    author=None,
-    committer=None,
-):
+    no_commit: bool = False,
+    message: Optional[Union[str, bytes]] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> Optional[bytes]:
     """Revert one or more commits.
 
     This creates a new commit that undoes the changes introduced by the
@@ -4475,14 +4499,14 @@ def revert(
 
 
 def gc(
-    repo,
+    repo: RepoPath,
     auto: bool = False,
     aggressive: bool = False,
     prune: bool = True,
     grace_period: Optional[int] = 1209600,  # 2 weeks default
     dry_run: bool = False,
-    progress=None,
-):
+    progress: Optional[Callable[[str], None]] = None,
+) -> Any:
     """Run garbage collection on a repository.
 
     Args:
@@ -4512,11 +4536,11 @@ def gc(
 
 
 def prune(
-    repo,
+    repo: RepoPath,
     grace_period: Optional[int] = None,
     dry_run: bool = False,
-    progress=None,
-):
+    progress: Optional[Callable[[str], None]] = None,
+) -> None:
     """Prune/clean up a repository's object store.
 
     This removes temporary files that were left behind by interrupted
@@ -4536,7 +4560,7 @@ def prune(
             r.object_store.prune(grace_period=grace_period)
 
 
-def count_objects(repo: RepoPath = ".", verbose=False) -> CountObjectsResult:
+def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsResult:
     """Count unpacked objects and their disk usage.
 
     Args:
@@ -4685,9 +4709,9 @@ def rebase(
 
 def annotate(
     repo: RepoPath,
-    path,
+    path: Union[str, bytes],
     committish: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> list[tuple[tuple[Commit, TreeChange], bytes]]:
     """Annotate the history of a file.
 
     :param repo: Path to the repository
@@ -4711,24 +4735,24 @@ blame = annotate
 
 
 def filter_branch(
-    repo=".",
-    branch="HEAD",
+    repo: RepoPath = ".",
+    branch: Union[str, bytes] = "HEAD",
     *,
-    filter_fn=None,
-    filter_author=None,
-    filter_committer=None,
-    filter_message=None,
-    tree_filter=None,
-    index_filter=None,
-    parent_filter=None,
-    commit_filter=None,
-    subdirectory_filter=None,
-    prune_empty=False,
-    tag_name_filter=None,
-    force=False,
-    keep_original=True,
-    refs=None,
-):
+    filter_fn: Optional[Callable[[Commit], Optional[dict[str, bytes]]]] = None,
+    filter_author: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    filter_committer: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    filter_message: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    tree_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
+    index_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
+    parent_filter: Optional[Callable[[list[bytes]], list[bytes]]] = None,
+    commit_filter: Optional[Callable[[Commit, bytes], Optional[bytes]]] = None,
+    subdirectory_filter: Optional[Union[str, bytes]] = None,
+    prune_empty: bool = False,
+    tag_name_filter: Optional[Callable[[bytes], Optional[bytes]]] = None,
+    force: bool = False,
+    keep_original: bool = True,
+    refs: Optional[list[bytes]] = None,
+) -> dict[bytes, bytes]:
     """Rewrite branch history by creating new commits with filtered properties.
 
     This is similar to git filter-branch, allowing you to rewrite commit
@@ -4818,7 +4842,7 @@ def filter_branch(
         )
 
         # Tag callback for renaming tags
-        def rename_tag(old_ref, new_ref):
+        def rename_tag(old_ref: bytes, new_ref: bytes) -> None:
             # Copy tag to new name
             r.refs[new_ref] = r.refs[old_ref]
             # Delete old tag
@@ -4840,13 +4864,13 @@ def filter_branch(
 
 
 def format_patch(
-    repo=".",
-    committish=None,
-    outstream=sys.stdout,
-    outdir=None,
-    n=1,
-    stdout=False,
-    version=None,
+    repo: RepoPath = ".",
+    committish: Optional[Union[bytes, tuple[bytes, bytes]]] = None,
+    outstream: TextIO = sys.stdout,
+    outdir: Optional[Union[str, os.PathLike]] = None,
+    n: int = 1,
+    stdout: bool = False,
+    version: Optional[str] = None,
 ) -> list[str]:
     """Generate patches suitable for git am.
 
@@ -4970,11 +4994,11 @@ def bisect_start(
     good: Optional[
         Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
     ] = None,
-    paths=None,
-    no_checkout=False,
-    term_bad="bad",
-    term_good="good",
-):
+    paths: Optional[list[Union[str, bytes]]] = None,
+    no_checkout: bool = False,
+    term_bad: str = "bad",
+    term_good: str = "good",
+) -> Optional[bytes]:
     """Start a new bisect session.
 
     Args:
@@ -5015,7 +5039,7 @@ def bisect_start(
 def bisect_bad(
     repo: Union[str, os.PathLike, Repo] = ".",
     rev: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> Optional[bytes]:
     """Mark a commit as bad.
 
     Args:
@@ -5044,7 +5068,7 @@ def bisect_bad(
 def bisect_good(
     repo: Union[str, os.PathLike, Repo] = ".",
     rev: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> Optional[bytes]:
     """Mark a commit as good.
 
     Args:
@@ -5075,7 +5099,7 @@ def bisect_skip(
     revs: Optional[
         Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
     ] = None,
-):
+) -> Optional[bytes]:
     """Skip one or more commits.
 
     Args:
@@ -5112,7 +5136,7 @@ def bisect_skip(
 def bisect_reset(
     repo: Union[str, os.PathLike, Repo] = ".",
     commit: Optional[Union[str, bytes, Commit, Tag]] = None,
-):
+) -> None:
     """Reset bisect state and return to original branch/commit.
 
     Args:
@@ -5144,7 +5168,7 @@ def bisect_reset(
             pass
 
 
-def bisect_log(repo: Union[str, os.PathLike, Repo] = "."):
+def bisect_log(repo: Union[str, os.PathLike, Repo] = ".") -> str:
     """Get the bisect log.
 
     Args:
@@ -5158,7 +5182,7 @@ def bisect_log(repo: Union[str, os.PathLike, Repo] = "."):
         return state.get_log()
 
 
-def bisect_replay(repo: Union[str, os.PathLike, Repo], log_file):
+def bisect_replay(repo: Union[str, os.PathLike, Repo], log_file: Union[str, os.PathLike, BinaryIO]) -> None:
     """Replay a bisect log.
 
     Args:
@@ -5177,7 +5201,7 @@ def bisect_replay(repo: Union[str, os.PathLike, Repo], log_file):
         state.replay(log_content)
 
 
-def reflog(repo: RepoPath = ".", ref=b"HEAD", all=False):
+def reflog(repo: RepoPath = ".", ref: Union[str, bytes] = b"HEAD", all: bool = False) -> Iterator[Union[Any, tuple[bytes, Any]]]:
     """Show reflog entries for a reference or all references.
 
     Args:
@@ -5208,7 +5232,7 @@ def reflog(repo: RepoPath = ".", ref=b"HEAD", all=False):
                     yield (ref_bytes, entry)
 
 
-def lfs_track(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
+def lfs_track(repo: Union[str, os.PathLike, Repo] = ".", patterns: Optional[list[str]] = None) -> list[str]:
     """Track file patterns with Git LFS.
 
     Args:
@@ -5259,7 +5283,7 @@ def lfs_track(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
         return lfs_track(r)  # Return updated list
 
 
-def lfs_untrack(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
+def lfs_untrack(repo: Union[str, os.PathLike, Repo] = ".", patterns: Optional[list[str]] = None) -> list[str]:
     """Untrack file patterns from Git LFS.
 
     Args:
@@ -5303,7 +5327,7 @@ def lfs_untrack(repo: Union[str, os.PathLike, Repo] = ".", patterns=None):
         return lfs_track(r)  # Return updated list
 
 
-def lfs_init(repo: Union[str, os.PathLike, Repo] = "."):
+def lfs_init(repo: Union[str, os.PathLike, Repo] = ".") -> None:
     """Initialize Git LFS in a repository.
 
     Args:
@@ -5327,7 +5351,7 @@ def lfs_init(repo: Union[str, os.PathLike, Repo] = "."):
         config.write_to_path()
 
 
-def lfs_clean(repo: Union[str, os.PathLike, Repo] = ".", path=None):
+def lfs_clean(repo: Union[str, os.PathLike, Repo] = ".", path: Optional[Union[str, os.PathLike]] = None) -> bytes:
     """Clean a file by converting it to an LFS pointer.
 
     Args:
@@ -5356,7 +5380,7 @@ def lfs_clean(repo: Union[str, os.PathLike, Repo] = ".", path=None):
         return filter_driver.clean(content)
 
 
-def lfs_smudge(repo: Union[str, os.PathLike, Repo] = ".", pointer_content=None):
+def lfs_smudge(repo: Union[str, os.PathLike, Repo] = ".", pointer_content: Optional[bytes] = None) -> bytes:
     """Smudge an LFS pointer by retrieving the actual content.
 
     Args:
@@ -5380,7 +5404,7 @@ def lfs_smudge(repo: Union[str, os.PathLike, Repo] = ".", pointer_content=None):
         return filter_driver.smudge(pointer_content)
 
 
-def lfs_ls_files(repo: Union[str, os.PathLike, Repo] = ".", ref=None):
+def lfs_ls_files(repo: Union[str, os.PathLike, Repo] = ".", ref: Optional[Union[str, bytes]] = None) -> list[tuple[bytes, str, int]]:
     """List files tracked by Git LFS.
 
     Args:
@@ -5426,10 +5450,10 @@ def lfs_ls_files(repo: Union[str, os.PathLike, Repo] = ".", ref=None):
 
 def lfs_migrate(
     repo: Union[str, os.PathLike, Repo] = ".",
-    include=None,
-    exclude=None,
-    everything=False,
-):
+    include: Optional[list[str]] = None,
+    exclude: Optional[list[str]] = None,
+    everything: bool = False,
+) -> int:
     """Migrate files to Git LFS.
 
     Args:
@@ -5526,7 +5550,7 @@ def lfs_migrate(
         return migrated
 
 
-def lfs_pointer_check(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
+def lfs_pointer_check(repo: Union[str, os.PathLike, Repo] = ".", paths: Optional[list[str]] = None) -> dict[str, Optional[Any]]:
     """Check if files are valid LFS pointers.
 
     Args:
@@ -5562,7 +5586,7 @@ def lfs_pointer_check(repo: Union[str, os.PathLike, Repo] = ".", paths=None):
         return results
 
 
-def lfs_fetch(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=None):
+def lfs_fetch(repo: Union[str, os.PathLike, Repo] = ".", remote: str = "origin", refs: Optional[list[Union[str, bytes]]] = None) -> int:
     """Fetch LFS objects from remote.
 
     Args:
@@ -5642,7 +5666,7 @@ def lfs_fetch(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=N
         return fetched
 
 
-def lfs_pull(repo: Union[str, os.PathLike, Repo] = ".", remote="origin"):
+def lfs_pull(repo: Union[str, os.PathLike, Repo] = ".", remote: str = "origin") -> int:
     """Pull LFS objects for current checkout.
 
     Args:
@@ -5683,7 +5707,7 @@ def lfs_pull(repo: Union[str, os.PathLike, Repo] = ".", remote="origin"):
         return fetched
 
 
-def lfs_push(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=None):
+def lfs_push(repo: Union[str, os.PathLike, Repo] = ".", remote: str = "origin", refs: Optional[list[Union[str, bytes]]] = None) -> int:
     """Push LFS objects to remote.
 
     Args:
@@ -5768,7 +5792,7 @@ def lfs_push(repo: Union[str, os.PathLike, Repo] = ".", remote="origin", refs=No
         return pushed
 
 
-def lfs_status(repo: Union[str, os.PathLike, Repo] = "."):
+def lfs_status(repo: Union[str, os.PathLike, Repo] = ".") -> dict[str, list[str]]:
     """Show status of LFS files.
 
     Args:
@@ -5831,7 +5855,7 @@ def lfs_status(repo: Union[str, os.PathLike, Repo] = "."):
         return status
 
 
-def worktree_list(repo="."):
+def worktree_list(repo: RepoPath = ".") -> list[Any]:
     """List all worktrees for a repository.
 
     Args:
@@ -5847,8 +5871,8 @@ def worktree_list(repo="."):
 
 
 def worktree_add(
-    repo=".", path=None, branch=None, commit=None, detach=False, force=False
-):
+    repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None, branch: Optional[Union[str, bytes]] = None, commit: Optional[Union[str, bytes]] = None, detach: bool = False, force: bool = False
+) -> str:
     """Add a new worktree.
 
     Args:
@@ -5874,7 +5898,7 @@ def worktree_add(
         return wt_repo.path
 
 
-def worktree_remove(repo=".", path=None, force=False):
+def worktree_remove(repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None, force: bool = False) -> None:
     """Remove a worktree.
 
     Args:
@@ -5891,7 +5915,7 @@ def worktree_remove(repo=".", path=None, force=False):
         remove_worktree(r, path, force=force)
 
 
-def worktree_prune(repo=".", dry_run=False, expire=None):
+def worktree_prune(repo: RepoPath = ".", dry_run: bool = False, expire: Optional[int] = None) -> list[str]:
     """Prune worktree administrative files.
 
     Args:
@@ -5908,7 +5932,7 @@ def worktree_prune(repo=".", dry_run=False, expire=None):
         return prune_worktrees(r, expire=expire, dry_run=dry_run)
 
 
-def worktree_lock(repo=".", path=None, reason=None):
+def worktree_lock(repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None, reason: Optional[str] = None) -> None:
     """Lock a worktree to prevent it from being pruned.
 
     Args:
@@ -5925,7 +5949,7 @@ def worktree_lock(repo=".", path=None, reason=None):
         lock_worktree(r, path, reason=reason)
 
 
-def worktree_unlock(repo=".", path=None):
+def worktree_unlock(repo: RepoPath = ".", path: Optional[Union[str, os.PathLike]] = None) -> None:
     """Unlock a worktree.
 
     Args:
@@ -5941,7 +5965,7 @@ def worktree_unlock(repo=".", path=None):
         unlock_worktree(r, path)
 
 
-def worktree_move(repo=".", old_path=None, new_path=None):
+def worktree_move(repo: RepoPath = ".", old_path: Optional[Union[str, os.PathLike]] = None, new_path: Optional[Union[str, os.PathLike]] = None) -> None:
     """Move a worktree to a new location.
 
     Args:

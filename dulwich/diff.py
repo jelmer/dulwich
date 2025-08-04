@@ -515,7 +515,7 @@ class ColorizedDiffStream:
     """
 
     @staticmethod
-    def is_available():
+    def is_available() -> bool:
         """Check if Rich is available for colorization.
 
         Returns:
@@ -528,7 +528,7 @@ class ColorizedDiffStream:
         except ImportError:
             return False
 
-    def __init__(self, output_stream):
+    def __init__(self, output_stream: BinaryIO) -> None:
         """Initialize the colorized stream wrapper.
 
         Args:
@@ -546,7 +546,7 @@ class ColorizedDiffStream:
         self.console = Console(file=self.text_wrapper, force_terminal=True)
         self.buffer = b""
 
-    def write(self, data):
+    def write(self, data: bytes) -> None:
         """Write data to the stream, applying colorization.
 
         Args:
@@ -560,7 +560,7 @@ class ColorizedDiffStream:
             line, self.buffer = self.buffer.split(b"\n", 1)
             self._colorize_and_write_line(line + b"\n")
 
-    def writelines(self, lines):
+    def writelines(self, lines: list[bytes]) -> None:
         """Write a list of lines to the stream.
 
         Args:
@@ -569,7 +569,7 @@ class ColorizedDiffStream:
         for line in lines:
             self.write(line)
 
-    def _colorize_and_write_line(self, line_bytes):
+    def _colorize_and_write_line(self, line_bytes: bytes) -> None:
         """Apply color formatting to a single line and write it.
 
         Args:
@@ -593,7 +593,7 @@ class ColorizedDiffStream:
             # Fallback to raw output if we can't decode/encode the text
             self.output_stream.write(line_bytes)
 
-    def flush(self):
+    def flush(self) -> None:
         """Flush any remaining buffered content and the underlying stream."""
         # Write any remaining buffer content
         if self.buffer:

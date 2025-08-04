@@ -1424,26 +1424,18 @@ def write_info_refs(refs, store: ObjectContainer):
             yield peeled.id + b"\t" + name + PEELED_TAG_SUFFIX + b"\n"
 
 
-def is_local_branch(x):
-    """Check if a ref name refers to a local branch.
-
-    Args:
-      x: Ref name to check
-
-    Returns:
-      True if ref is a local branch (refs/heads/...)
-    """
+def is_local_branch(x: bytes) -> bool:
     return x.startswith(LOCAL_BRANCH_PREFIX)
 
 
-def strip_peeled_refs(refs):
+def strip_peeled_refs(refs: dict[bytes, bytes]) -> dict[bytes, bytes]:
     """Remove all peeled refs."""
     return {
         ref: sha for (ref, sha) in refs.items() if not ref.endswith(PEELED_TAG_SUFFIX)
     }
 
 
-def split_peeled_refs(refs):
+def split_peeled_refs(refs: dict[bytes, bytes]) -> tuple[dict[bytes, bytes], dict[bytes, bytes]]:
     """Split peeled refs from regular refs."""
     peeled = {}
     regular = {}

@@ -55,7 +55,7 @@ class CommitMessageError(Exception):
     """Raised when there's an issue with the commit message."""
 
 
-def signal_int(signal, frame) -> None:
+def signal_int(signal: int, frame) -> None:
     """Handle interrupt signal by exiting.
 
     Args:
@@ -65,7 +65,7 @@ def signal_int(signal, frame) -> None:
     sys.exit(1)
 
 
-def signal_quit(signal, frame) -> None:
+def signal_quit(signal: int, frame) -> None:
     """Handle quit signal by entering debugger.
 
     Args:
@@ -77,7 +77,7 @@ def signal_quit(signal, frame) -> None:
     pdb.set_trace()
 
 
-def parse_relative_time(time_str):
+def parse_relative_time(time_str: str) -> int:
     """Parse a relative time string like '2 weeks ago' into seconds.
 
     Args:
@@ -126,7 +126,7 @@ def parse_relative_time(time_str):
         raise
 
 
-def format_bytes(bytes):
+def format_bytes(bytes: int) -> str:
     """Format bytes as human-readable string.
 
     Args:
@@ -142,7 +142,7 @@ def format_bytes(bytes):
     return f"{bytes:.1f} TB"
 
 
-def launch_editor(template_content=b""):
+def launch_editor(template_content: bytes = b"") -> bytes:
     """Launch an editor for the user to enter text.
 
     Args:
@@ -176,7 +176,7 @@ def launch_editor(template_content=b""):
 class PagerBuffer:
     """Binary buffer wrapper for Pager to mimic sys.stdout.buffer."""
 
-    def __init__(self, pager):
+    def __init__(self, pager: "Pager") -> None:
         """Initialize PagerBuffer.
 
         Args:
@@ -184,40 +184,40 @@ class PagerBuffer:
         """
         self.pager = pager
 
-    def write(self, data: bytes):
+    def write(self, data: bytes) -> int:
         """Write bytes to pager."""
         if isinstance(data, bytes):
             text = data.decode("utf-8", errors="replace")
             return self.pager.write(text)
         return self.pager.write(data)
 
-    def flush(self):
+    def flush(self) -> None:
         """Flush the pager."""
         return self.pager.flush()
 
-    def writelines(self, lines):
+    def writelines(self, lines) -> None:
         """Write multiple lines to pager."""
         for line in lines:
             self.write(line)
 
-    def readable(self):
+    def readable(self) -> bool:
         """Return whether the buffer is readable (it's not)."""
         return False
 
-    def writable(self):
+    def writable(self) -> bool:
         """Return whether the buffer is writable."""
         return not self.pager._closed
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """Return whether the buffer is seekable (it's not)."""
         return False
 
-    def close(self):
+    def close(self) -> None:
         """Close the pager."""
         return self.pager.close()
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Return whether the buffer is closed."""
         return self.pager.closed
 
@@ -225,7 +225,7 @@ class PagerBuffer:
 class Pager:
     """File-like object that pages output through external pager programs."""
 
-    def __init__(self, pager_cmd="cat"):
+    def __init__(self, pager_cmd: str = "cat") -> None:
         """Initialize Pager.
 
         Args:
@@ -241,7 +241,7 @@ class Pager:
         """Get the pager command to use."""
         return self.pager_cmd
 
-    def _ensure_pager_started(self):
+    def _ensure_pager_started(self) -> None:
         """Start the pager process if not already started."""
         if self.pager_process is None and not self._closed:
             try:
@@ -280,7 +280,7 @@ class Pager:
             # No pager available, write directly to stdout
             return sys.stdout.write(text)
 
-    def flush(self):
+    def flush(self) -> None:
         """Flush the pager."""
         if self._closed or self._pager_died:
             return
@@ -293,7 +293,7 @@ class Pager:
         else:
             sys.stdout.flush()
 
-    def close(self):
+    def close(self) -> None:
         """Close the pager."""
         if self._closed:
             return
@@ -308,16 +308,16 @@ class Pager:
                 pass
             self.pager_process = None
 
-    def __enter__(self):
+    def __enter__(self) -> "Pager":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         self.close()
 
     # Additional file-like methods for compatibility
-    def writelines(self, lines):
+    def writelines(self, lines) -> None:
         """Write a list of lines to the pager."""
         if self._pager_died:
             return
@@ -325,19 +325,19 @@ class Pager:
             self.write(line)
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """Return whether the pager is closed."""
         return self._closed
 
-    def readable(self):
+    def readable(self) -> bool:
         """Return whether the pager is readable (it's not)."""
         return False
 
-    def writable(self):
+    def writable(self) -> bool:
         """Return whether the pager is writable."""
         return not self._closed
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """Return whether the pager is seekable (it's not)."""
         return False
 
@@ -345,7 +345,7 @@ class Pager:
 class _StreamContextAdapter:
     """Adapter to make streams work with context manager protocol."""
 
-    def __init__(self, stream):
+    def __init__(self, stream) -> None:
         self.stream = stream
         # Expose buffer if it exists
         if hasattr(stream, "buffer"):
@@ -356,15 +356,15 @@ class _StreamContextAdapter:
     def __enter__(self):
         return self.stream
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         # For stdout/stderr, we don't close them
         pass
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str):
         return getattr(self.stream, name)
 
 
-def get_pager(config=None, cmd_name=None):
+def get_pager(config=None, cmd_name: Optional[str] = None):
     """Get a pager instance if paging should be used, otherwise return sys.stdout.
 
     Args:
@@ -447,12 +447,12 @@ def get_pager(config=None, cmd_name=None):
     return Pager(pager_cmd)
 
 
-def disable_pager():
+def disable_pager() -> None:
     """Disable pager for this session."""
     get_pager._disabled = True
 
 
-def enable_pager():
+def enable_pager() -> None:
     """Enable pager for this session."""
     get_pager._disabled = False
 

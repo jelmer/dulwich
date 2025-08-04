@@ -95,7 +95,7 @@ PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
 DEFAULT_TEMPFILE_GRACE_PERIOD = 14 * 24 * 60 * 60  # 2 weeks
 
 
-def find_shallow(store, heads, depth):
+def find_shallow(store: 'BaseObjectStore', heads: Any, depth: int) -> tuple:
     """Find shallow commits according to a given depth.
 
     Args:
@@ -110,7 +110,7 @@ def find_shallow(store, heads, depth):
     parents = {}
     commit_graph = store.get_commit_graph()
 
-    def get_parents(sha):
+    def get_parents(sha: bytes) -> list[bytes]:
         result = parents.get(sha, None)
         if not result:
             # Try to use commit graph first if available
@@ -150,11 +150,11 @@ def find_shallow(store, heads, depth):
 
 
 def get_depth(
-    store,
-    head,
-    get_parents=lambda commit: commit.parents,
-    max_depth=None,
-):
+    store: 'BaseObjectStore',
+    head: bytes,
+    get_parents: Callable = lambda commit: commit.parents,
+    max_depth: Optional[int] = None,
+) -> int:
     """Return the current available depth for the given head.
 
     For commits with multiple parents, the largest possible depth will be
@@ -206,17 +206,7 @@ class BaseObjectStore:
     def determine_wants_all(
         self, refs: dict[Ref, ObjectID], depth: Optional[int] = None
     ) -> list[ObjectID]:
-        """Determine all objects that are wanted by the client.
-
-        Args:
-          refs: Dictionary mapping ref names to object IDs
-          depth: Shallow fetch depth (None for full fetch)
-
-        Returns:
-          List of object IDs that are wanted
-        """
-
-        def _want_deepen(sha):
+        def _want_deepen(sha: bytes) -> bool:
             if not depth:
                 return False
             if depth == DEPTH_INFINITE:
@@ -231,7 +221,7 @@ class BaseObjectStore:
             and not sha == ZERO_SHA
         ]
 
-    def contains_loose(self, sha) -> bool:
+    def contains_loose(self, sha: bytes) -> bool:
         """Check if a particular object is present by SHA1 and is loose."""
         raise NotImplementedError(self.contains_loose)
 
@@ -243,11 +233,11 @@ class BaseObjectStore:
         return self.contains_loose(sha1)
 
     @property
-    def packs(self):
+    def packs(self) -> Any:
         """Iterable of pack objects."""
         raise NotImplementedError
 
-    def get_raw(self, name) -> tuple[int, bytes]:
+    def get_raw(self, name: bytes) -> tuple[int, bytes]:
         """Obtain the raw text for an object.
 
         Args:
@@ -261,15 +251,15 @@ class BaseObjectStore:
         type_num, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type_num, uncomp, sha=sha1)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         """Iterate over the SHAs that are present in this store."""
         raise NotImplementedError(self.__iter__)
 
-    def add_object(self, obj) -> None:
+    def add_object(self, obj: Any) -> None:
         """Add a single object to this object store."""
         raise NotImplementedError(self.add_object)
 
-    def add_objects(self, objects, progress=None) -> None:
+    def add_objects(self, objects: Any, progress: Optional[Callable] = None) -> None:
         """Add a set of objects to this object store.
 
         Args:
@@ -280,14 +270,14 @@ class BaseObjectStore:
 
     def tree_changes(
         self,
-        source,
-        target,
-        want_unchanged=False,
-        include_trees=False,
-        change_type_same=False,
-        rename_detector=None,
-        paths=None,
-    ):
+        source: Optional[bytes],
+        target: Optional[bytes],
+        want_unchanged: bool = False,
+        include_trees: bool = False,
+        change_type_same: bool = False,
+        rename_detector: Optional[Any] = None,
+        paths: Optional[Any] = None,
+    ) -> Any:
         """Find the differences between the contents of two trees.
 
         Args:
@@ -320,7 +310,7 @@ class BaseObjectStore:
                 (change.old.sha, change.new.sha),
             )
 
-    def iter_tree_contents(self, tree_id, include_trees=False):
+    def iter_tree_contents(self, tree_id: bytes, include_trees: bool = False) -> Any:
         """Iterate the contents of a tree and all subtrees.
 
         Iteration is depth-first pre-order, as in e.g. os.walk.
@@ -362,13 +352,13 @@ class BaseObjectStore:
 
     def find_missing_objects(
         self,
-        haves,
-        wants,
-        shallow=None,
-        progress=None,
-        get_tagged=None,
-        get_parents=lambda commit: commit.parents,
-    ):
+        haves: Any,
+        wants: Any,
+        shallow: Optional[Any] = None,
+        progress: Optional[Callable] = None,
+        get_tagged: Optional[Callable] = None,
+        get_parents: Callable = lambda commit: commit.parents,
+    ) -> Any:
         """Find the missing objects required for a set of revisions.
 
         Args:
@@ -395,7 +385,7 @@ class BaseObjectStore:
         )
         return iter(finder)
 
-    def find_common_revisions(self, graphwalker):
+    def find_common_revisions(self, graphwalker: Any) -> list[bytes]:
         """Find which revisions this store has in common using graphwalker.
 
         Args:
@@ -412,7 +402,7 @@ class BaseObjectStore:
         return haves
 
     def generate_pack_data(
-        self, have, want, shallow=None, progress=None, ofs_delta=True
+        self, have: Any, want: Any, shallow: Optional[Any] = None, progress: Optional[Callable] = None, ofs_delta: bool = True
     ) -> tuple[int, Iterator[UnpackedObject]]:
         """Generate pack data objects for a set of wants/haves.
 
@@ -435,7 +425,7 @@ class BaseObjectStore:
             progress=progress,
         )
 
-    def peel_sha(self, sha):
+    def peel_sha(self, sha: bytes) -> bytes:
         """Peel all tags from a SHA.
 
         Args:
@@ -453,10 +443,10 @@ class BaseObjectStore:
 
     def _get_depth(
         self,
-        head,
-        get_parents=lambda commit: commit.parents,
-        max_depth=None,
-    ):
+        head: bytes,
+        get_parents: Callable = lambda commit: commit.parents,
+        max_depth: Optional[int] = None,
+    ) -> int:
         """Return the current available depth for the given head.
 
         For commits with multiple parents, the largest possible depth will be
@@ -496,7 +486,7 @@ class BaseObjectStore:
             if sha.startswith(prefix):
                 yield sha
 
-    def get_commit_graph(self):
+    def get_commit_graph(self) -> Optional[Any]:
         """Get the commit graph for this object store.
 
         Returns:
@@ -504,7 +494,7 @@ class BaseObjectStore:
         """
         return None
 
-    def write_commit_graph(self, refs=None, reachable=True) -> None:
+    def write_commit_graph(self, refs: Optional[Any] = None, reachable: bool = True) -> None:
         """Write a commit graph file for this object store.
 
         Args:
@@ -518,7 +508,7 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.write_commit_graph)
 
-    def get_object_mtime(self, sha):
+    def get_object_mtime(self, sha: bytes) -> float:
         """Get the modification time of an object.
 
         Args:
@@ -545,14 +535,14 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
     def __init__(
         self,
-        pack_compression_level=-1,
-        pack_index_version=None,
-        pack_delta_window_size=None,
-        pack_window_memory=None,
-        pack_delta_cache_size=None,
-        pack_depth=None,
-        pack_threads=None,
-        pack_big_file_threshold=None,
+        pack_compression_level: int = -1,
+        pack_index_version: Optional[int] = None,
+        pack_delta_window_size: Optional[int] = None,
+        pack_window_memory: Optional[int] = None,
+        pack_delta_cache_size: Optional[int] = None,
+        pack_depth: Optional[int] = None,
+        pack_threads: Optional[int] = None,
+        pack_big_file_threshold: Optional[int] = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -581,7 +571,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         raise NotImplementedError(self.add_pack)
 
     def add_pack_data(
-        self, count: int, unpacked_objects: Iterator[UnpackedObject], progress=None
+        self, count: int, unpacked_objects: Iterator[UnpackedObject], progress: Optional[Callable] = None
     ) -> None:
         """Add pack data to this object store.
 
@@ -609,15 +599,10 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
             return commit()
 
     @property
-    def alternates(self):
-        """Get the list of alternate object stores.
-
-        Returns:
-          List of alternate BaseObjectStore instances
-        """
+    def alternates(self) -> list:
         return []
 
-    def contains_packed(self, sha) -> bool:
+    def contains_packed(self, sha: bytes) -> bool:
         """Check if a particular object is present by SHA1 and is packed.
 
         This does not check alternates.
@@ -642,7 +627,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
                 return True
         return False
 
-    def _add_cached_pack(self, base_name, pack) -> None:
+    def _add_cached_pack(self, base_name: str, pack: Any) -> None:
         """Add a newly appeared pack to the cache by path."""
         prev_pack = self._pack_cache.get(base_name)
         if prev_pack is not pack:
@@ -682,7 +667,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
             (name, pack) = pack_cache.popitem()
             pack.close()
 
-    def _iter_cached_packs(self):
+    def _iter_cached_packs(self) -> Any:
         return self._pack_cache.values()
 
     def _update_pack_cache(self) -> list[Pack]:
@@ -696,7 +681,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         self._clear_cached_packs()
 
     @property
-    def packs(self):
+    def packs(self) -> Any:
         """List with pack objects."""
         return list(self._iter_cached_packs()) + list(self._update_pack_cache())
 
@@ -714,19 +699,19 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
                 count += 1
         return count
 
-    def _iter_alternate_objects(self):
+    def _iter_alternate_objects(self) -> Any:
         """Iterate over the SHAs of all the objects in alternate stores."""
         for alternate in self.alternates:
             yield from alternate
 
-    def _iter_loose_objects(self):
+    def _iter_loose_objects(self) -> Any:
         """Iterate over the SHAs of all loose objects."""
         raise NotImplementedError(self._iter_loose_objects)
 
-    def _get_loose_object(self, sha) -> Optional[ShaFile]:
+    def _get_loose_object(self, sha: bytes) -> Optional[ShaFile]:
         raise NotImplementedError(self._get_loose_object)
 
-    def delete_loose_object(self, sha) -> None:
+    def delete_loose_object(self, sha: bytes) -> None:
         """Delete a loose object.
 
         This method only handles loose objects. For packed objects,
@@ -734,10 +719,10 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         """
         raise NotImplementedError(self.delete_loose_object)
 
-    def _remove_pack(self, name) -> None:
+    def _remove_pack(self, name: str) -> None:
         raise NotImplementedError(self._remove_pack)
 
-    def pack_loose_objects(self):
+    def pack_loose_objects(self) -> int:
         """Pack loose objects.
 
         Returns: Number of objects packed
@@ -750,7 +735,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
             self.delete_loose_object(obj.id)
         return len(objects)
 
-    def repack(self, exclude=None):
+    def repack(self, exclude: Optional[set] = None) -> None:
         """Repack the packs in this repository.
 
         Note that this implementation is fairly naive and currently keeps all

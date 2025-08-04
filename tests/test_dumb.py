@@ -268,7 +268,7 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         blob.data = b"Test content"
         blob_sha = blob.id
         # Add blob response
-        self.repo._object_store._cached_objects[blob_sha] = (
+        self.repo.object_store._cached_objects[blob_sha] = (
             Blob.type_num,
             blob.as_raw_string(),
         )

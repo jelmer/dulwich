@@ -341,7 +341,7 @@ class ParentsProvider:
         # Get commit graph once at initialization for performance
         self.commit_graph = store.get_commit_graph()
 
-    def get_parents(self, commit_id: bytes, commit=None) -> list[bytes]:
+    def get_parents(self, commit_id: bytes, commit: Optional[Any] = None) -> list[bytes]:
         try:
             return self.grafts[commit_id]
         except KeyError:
@@ -498,7 +498,7 @@ class BaseRepo:
     def fetch_pack_data(
         self,
         determine_wants: Callable,
-        graph_walker,
+        graph_walker: Any,
         progress: Optional[Callable],
         *,
         get_tagged: Optional[Callable] = None,
@@ -532,11 +532,11 @@ class BaseRepo:
 
     def find_missing_objects(
         self,
-        determine_wants,
-        graph_walker,
-        progress,
+        determine_wants: Callable,
+        graph_walker: Any,
+        progress: Optional[Callable],
         *,
-        get_tagged=None,
+        get_tagged: Optional[Callable] = None,
         depth: Optional[int] = None,
     ) -> Optional[MissingObjectFinder]:
         """Fetch the missing objects required for a set of revisions.
@@ -596,7 +596,7 @@ class BaseRepo:
                 def __len__(self) -> int:
                     return 0
 
-                def __iter__(self):
+                def __iter__(self) -> Any:
                     yield from []
 
             return DummyMissingObjectFinder()  # type: ignore
@@ -615,7 +615,7 @@ class BaseRepo:
 
         parents_provider = ParentsProvider(self.object_store, shallows=current_shallow)
 
-        def get_parents(commit):
+        def get_parents(commit: Any) -> list[bytes]:
             """Get parents for a commit using the parents provider.
 
             Args:
@@ -642,7 +642,7 @@ class BaseRepo:
         want: list[ObjectID],
         progress: Optional[Callable[[str], None]] = None,
         ofs_delta: Optional[bool] = None,
-    ):
+    ) -> Any:
         """Generate pack data objects for a set of wants/haves.
 
         Args:
@@ -697,7 +697,7 @@ class BaseRepo:
         # TODO: move this method to WorkTree
         return self.refs[b"HEAD"]
 
-    def _get_object(self, sha, cls):
+    def _get_object(self, sha: bytes, cls: Any) -> Any:
         assert len(sha) in (20, 40)
         ret = self.get_object(sha)
         if not isinstance(ret, cls):
@@ -768,7 +768,7 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_description)
 
-    def set_description(self, description) -> None:
+    def set_description(self, description: bytes) -> None:
         """Set the description for this repository.
 
         Args:
@@ -776,14 +776,14 @@ class BaseRepo:
         """
         raise NotImplementedError(self.set_description)
 
-    def get_rebase_state_manager(self):
+    def get_rebase_state_manager(self) -> Any:
         """Get the appropriate rebase state manager for this repository.
 
         Returns: RebaseStateManager instance
         """
         raise NotImplementedError(self.get_rebase_state_manager)
 
-    def get_blob_normalizer(self):
+    def get_blob_normalizer(self) -> Any:
         """Return a BlobNormalizer object for checkin/checkout operations.
 
         Returns: BlobNormalizer instance
@@ -831,7 +831,7 @@ class BaseRepo:
         with f:
             return {line.strip() for line in f}
 
-    def update_shallow(self, new_shallow, new_unshallow) -> None:
+    def update_shallow(self, new_shallow: Any, new_unshallow: Any) -> None:
         """Update the list of shallow objects.
 
         Args:
@@ -873,7 +873,7 @@ class BaseRepo:
 
         return Notes(self.object_store, self.refs)
 
-    def get_walker(self, include: Optional[list[bytes]] = None, **kwargs):
+    def get_walker(self, include: Optional[list[bytes]] = None, **kwargs) -> Any:
         """Obtain a walker for this repository.
 
         Args:
@@ -910,7 +910,7 @@ class BaseRepo:
 
         return Walker(self.object_store, include, **kwargs)
 
-    def __getitem__(self, name: Union[ObjectID, Ref]):
+    def __getitem__(self, name: Union[ObjectID, Ref]) -> Any:
         """Retrieve a Git object by SHA1 or ref.
 
         Args:
@@ -1002,7 +1002,7 @@ class BaseRepo:
         for sha in to_remove:
             del self._graftpoints[sha]
 
-    def _read_heads(self, name):
+    def _read_heads(self, name: str) -> Any:
         f = self.get_named_file(name)
         if f is None:
             return []
@@ -1028,17 +1028,17 @@ class BaseRepo:
         message: Optional[bytes] = None,
         committer: Optional[bytes] = None,
         author: Optional[bytes] = None,
-        commit_timestamp=None,
-        commit_timezone=None,
-        author_timestamp=None,
-        author_timezone=None,
+        commit_timestamp: Optional[Any] = None,
+        commit_timezone: Optional[Any] = None,
+        author_timestamp: Optional[Any] = None,
+        author_timezone: Optional[Any] = None,
         tree: Optional[ObjectID] = None,
         encoding: Optional[bytes] = None,
         ref: Optional[Ref] = b"HEAD",
         merge_heads: Optional[list[ObjectID]] = None,
         no_verify: bool = False,
         sign: bool = False,
-    ):
+    ) -> Any:
         """Create a new commit.
 
         If not specified, committer and author default to
@@ -1356,7 +1356,7 @@ class Repo(BaseRepo):
         """
         return self._commondir
 
-    def _determine_file_mode(self):
+    def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
 
         Returns: True if permissions can be trusted, False otherwise.
@@ -1379,7 +1379,7 @@ class Repo(BaseRepo):
 
         return mode_differs and st2_has_exec
 
-    def _determine_symlinks(self):
+    def _determine_symlinks(self) -> bool:
         """Probe the filesystem to determine whether symlinks can be created.
 
         Returns: True if symlinks can be created, False otherwise.
@@ -1387,7 +1387,7 @@ class Repo(BaseRepo):
         # TODO(jelmer): Actually probe disk / look at filesystem
         return sys.platform != "win32"
 
-    def _put_named_file(self, path, contents) -> None:
+    def _put_named_file(self, path: str, contents: bytes) -> None:
         """Write a file to the control dir with the given name and contents.
 
         Args:
@@ -1398,7 +1398,7 @@ class Repo(BaseRepo):
         with GitFile(os.path.join(self.controldir(), path), "wb") as f:
             f.write(contents)
 
-    def _del_named_file(self, path) -> None:
+    def _del_named_file(self, path: str) -> None:
         try:
             os.unlink(os.path.join(self.controldir(), path))
         except FileNotFoundError:

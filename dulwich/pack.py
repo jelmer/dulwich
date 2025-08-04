@@ -814,25 +814,25 @@ class PackIndex1(FilePackIndex):
     """Version 1 Pack Index file."""
 
     def __init__(
-        self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
+        self, filename: Union[str, os.PathLike], file: Optional[BinaryIO] = None, contents: Optional[bytes] = None, size: Optional[int] = None
     ) -> None:
         super().__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
 
-    def _unpack_entry(self, i):
+    def _unpack_entry(self, i: int) -> tuple[bytes, int, None]:
         (offset, name) = unpack_from(">L20s", self._contents, (0x100 * 4) + (i * 24))
         return (name, offset, None)
 
-    def _unpack_name(self, i):
+    def _unpack_name(self, i: int) -> bytes:
         offset = (0x100 * 4) + (i * 24) + 4
         return self._contents[offset : offset + 20]
 
-    def _unpack_offset(self, i):
+    def _unpack_offset(self, i: int) -> int:
         offset = (0x100 * 4) + (i * 24)
         return unpack_from(">L", self._contents, offset)[0]
 
-    def _unpack_crc32_checksum(self, i) -> None:
+    def _unpack_crc32_checksum(self, i: int) -> None:
         # Not stored in v1 index files
         return None
 
@@ -841,7 +841,7 @@ class PackIndex2(FilePackIndex):
     """Version 2 Pack Index file."""
 
     def __init__(
-        self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
+        self, filename: Union[str, os.PathLike], file: Optional[BinaryIO] = None, contents: Optional[bytes] = None, size: Optional[int] = None
     ) -> None:
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
@@ -857,18 +857,18 @@ class PackIndex2(FilePackIndex):
             self
         )
 
-    def _unpack_entry(self, i):
+    def _unpack_entry(self, i: int) -> tuple[bytes, int, int]:
         return (
             self._unpack_name(i),
             self._unpack_offset(i),
             self._unpack_crc32_checksum(i),
         )
 
-    def _unpack_name(self, i):
+    def _unpack_name(self, i: int) -> bytes:
         offset = self._name_table_offset + i * 20
         return self._contents[offset : offset + 20]
 
-    def _unpack_offset(self, i):
+    def _unpack_offset(self, i: int) -> int:
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from(">L", self._contents, offset)[0]
         if offset & (2**31):
@@ -876,7 +876,7 @@ class PackIndex2(FilePackIndex):
             offset = unpack_from(">Q", self._contents, offset)[0]
         return offset
 
-    def _unpack_crc32_checksum(self, i):
+    def _unpack_crc32_checksum(self, i: int) -> int:
         return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
 
 
@@ -887,7 +887,7 @@ class PackIndex3(FilePackIndex):
     """
 
     def __init__(
-        self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
+        self, filename: Union[str, os.PathLike], file: Optional[BinaryIO] = None, contents: Optional[bytes] = None, size: Optional[int] = None
     ) -> None:
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
@@ -919,18 +919,18 @@ class PackIndex3(FilePackIndex):
             self
         )
 
-    def _unpack_entry(self, i):
+    def _unpack_entry(self, i: int) -> tuple[bytes, int, int]:
         return (
             self._unpack_name(i),
             self._unpack_offset(i),
             self._unpack_crc32_checksum(i),
         )
 
-    def _unpack_name(self, i):
+    def _unpack_name(self, i: int) -> bytes:
         offset = self._name_table_offset + i * self.hash_size
         return self._contents[offset : offset + self.hash_size]
 
-    def _unpack_offset(self, i):
+    def _unpack_offset(self, i: int) -> int:
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from(">L", self._contents, offset)[0]
         if offset & (2**31):
@@ -938,11 +938,11 @@ class PackIndex3(FilePackIndex):
             offset = unpack_from(">Q", self._contents, offset)[0]
         return offset
 
-    def _unpack_crc32_checksum(self, i):
+    def _unpack_crc32_checksum(self, i: int) -> int:
         return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
 
 
-def read_pack_header(read) -> tuple[int, int]:
+def read_pack_header(read: Callable[[int], bytes]) -> tuple[int, int]:
     """Read the header of a pack file.
 
     Args:

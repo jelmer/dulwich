@@ -1175,7 +1175,7 @@ def print_tag(tag: Tag, decode: Callable[[bytes], str], outstream: TextIO = sys.
     outstream.write("\n")
 
 
-def show_blob(repo: RepoPath, blob, decode, outstream=sys.stdout) -> None:
+def show_blob(repo: RepoPath, blob: Blob, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Write a blob to a stream.
 
     Args:
@@ -1187,7 +1187,7 @@ def show_blob(repo: RepoPath, blob, decode, outstream=sys.stdout) -> None:
     outstream.write(decode(blob.data))
 
 
-def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
+def show_commit(repo: RepoPath, commit: Commit, decode: Callable[[Commit, bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Show a commit to a stream.
 
     Args:
@@ -1200,22 +1200,10 @@ def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
 
     # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
     class _StreamWrapper:
-        """Wrapper for ColorizedDiffStream to handle string/bytes conversion."""
-
-        def __init__(self, stream):
-            """Initialize a _StreamWrapper.
-
-            Args:
-              stream: The underlying stream to wrap
-            """
+        def __init__(self, stream: Any) -> None:
             self.stream = stream
 
-        def write(self, data):
-            """Write data to the stream, converting strings to bytes if needed.
-
-            Args:
-              data: Data to write (str or bytes)
-            """
+        def write(self, data: Union[str, bytes]) -> None:
             if isinstance(data, str):
                 # Convert string to bytes for ColorizedDiffStream
                 self.stream.write(data.encode("utf-8"))
@@ -1249,7 +1237,7 @@ def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
             outstream.write(commit_decode(commit, diffstream.getvalue()))
 
 
-def show_tree(repo: RepoPath, tree, decode, outstream=sys.stdout) -> None:
+def show_tree(repo: RepoPath, tree: Tree, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Print a tree to a stream.
 
     Args:
@@ -1262,7 +1250,7 @@ def show_tree(repo: RepoPath, tree, decode, outstream=sys.stdout) -> None:
         outstream.write(decode(n) + "\n")
 
 
-def show_tag(repo: RepoPath, tag, decode, outstream=sys.stdout) -> None:
+def show_tag(repo: RepoPath, tag: Tag, decode: Callable[[bytes], str], outstream: TextIO = sys.stdout) -> None:
     """Print a tag to a stream.
 
     Args:
@@ -1276,18 +1264,7 @@ def show_tag(repo: RepoPath, tag, decode, outstream=sys.stdout) -> None:
         show_object(repo, r[tag.object[1]], decode, outstream)
 
 
-def show_object(repo: RepoPath, obj, decode, outstream):
-    """Display a git object.
-
-    Args:
-      repo: Path to the repository
-      obj: Git object to display (blob, tree, commit, or tag)
-      decode: Function for decoding bytes to unicode string
-      outstream: Stream to write output to
-
-    Returns:
-      Result of the appropriate show_* function
-    """
+def show_object(repo: RepoPath, obj: Union[Tree, Blob, Commit, Tag], decode: Callable[[bytes], str], outstream: TextIO) -> None:
     return {
         b"tree": show_tree,
         b"blob": show_blob,
@@ -1296,7 +1273,7 @@ def show_object(repo: RepoPath, obj, decode, outstream):
     }[obj.type_name](repo, obj, decode, outstream)
 
 
-def print_name_status(changes):
+def print_name_status(changes: Iterator[TreeChange]) -> None:
     """Print a simple status summary, listing changed files."""
     for change in changes:
         if not change:
@@ -1326,12 +1303,12 @@ def print_name_status(changes):
 
 
 def log(
-    repo=".",
-    paths=None,
-    outstream=sys.stdout,
-    max_entries=None,
-    reverse=False,
-    name_status=False,
+    repo: RepoPath = ".",
+    paths: Optional[list[Union[str, bytes]]] = None,
+    outstream: TextIO = sys.stdout,
+    max_entries: Optional[int] = None,
+    reverse: bool = False,
+    name_status: bool = False,
 ) -> None:
     """Write commit logs.
 
@@ -1353,7 +1330,7 @@ def log(
         )
         for entry in walker:
 
-            def decode(x):
+            def decode(x: bytes) -> str:
                 return commit_decode(entry.commit, x)
 
             print_commit(entry.commit, decode, outstream)
@@ -1365,10 +1342,10 @@ def log(
 
 # TODO(jelmer): better default for encoding?
 def show(
-    repo=".",
-    objects=None,
-    outstream=sys.stdout,
-    default_encoding=DEFAULT_ENCODING,
+    repo: RepoPath = ".",
+    objects: Optional[list[Union[str, bytes]]] = None,
+    outstream: TextIO = sys.stdout,
+    default_encoding: str = DEFAULT_ENCODING,
 ) -> None:
     """Print the changes in a commit.
 
@@ -1388,12 +1365,12 @@ def show(
             o = parse_object(r, objectish)
             if isinstance(o, Commit):
 
-                def decode(x):
+                def decode(x: bytes) -> str:
                     return commit_decode(o, x, default_encoding)
 
             else:
 
-                def decode(x):
+                def decode(x: bytes) -> str:
                     return x.decode(default_encoding)
 
             show_object(r, o, decode, outstream)
@@ -1401,9 +1378,9 @@ def show(
 
 def diff_tree(
     repo: RepoPath,
-    old_tree,
-    new_tree,
-    outstream=default_bytes_out_stream,
+    old_tree: Union[str, bytes, Tree],
+    new_tree: Union[str, bytes, Tree],
+    outstream: BinaryIO = default_bytes_out_stream,
 ) -> None:
     """Compares the content and mode of blobs found via two tree objects.
 
@@ -1418,12 +1395,12 @@ def diff_tree(
 
 
 def diff(
-    repo=".",
-    commit=None,
-    commit2=None,
-    staged=False,
-    paths=None,
-    outstream=default_bytes_out_stream,
+    repo: RepoPath = ".",
+    commit: Optional[Union[str, bytes]] = None,
+    commit2: Optional[Union[str, bytes]] = None,
+    staged: bool = False,
+    paths: Optional[list[Union[str, bytes]]] = None,
+    outstream: BinaryIO = default_bytes_out_stream,
 ) -> None:
     """Show diff.
 

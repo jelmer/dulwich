@@ -112,6 +112,7 @@ from .refs import (
     _set_head,
     _set_origin_head,
     check_ref_format,  # noqa: F401
+    is_per_worktree_ref,
     read_packed_refs,  # noqa: F401
     read_packed_refs_with_peeled,  # noqa: F401
     serialize_refs,
@@ -1315,7 +1316,7 @@ class Repo(BaseRepo):
     ) -> None:
         from .reflog import format_reflog_line
 
-        path = os.path.join(self.controldir(), "logs", os.fsdecode(ref))
+        path = self._reflog_path(ref)
         try:
             os.makedirs(os.path.dirname(path))
         except FileExistsError:
@@ -1336,6 +1337,13 @@ class Repo(BaseRepo):
                 + b"\n"
             )
 
+    def _reflog_path(self, ref: bytes) -> str:
+        assert not ref.startswith((b"main-worktree/", b"worktrees/")), (
+            "special paths are not supported"
+        )
+        base = self.controldir() if is_per_worktree_ref(ref) else self.commondir()
+        return os.path.join(base, "logs", os.fsdecode(ref))
+
     def read_reflog(self, ref):
         """Read reflog entries for a reference.
 
@@ -1347,7 +1355,7 @@ class Repo(BaseRepo):
         """
         from .reflog import read_reflog
 
-        path = os.path.join(self.controldir(), "logs", os.fsdecode(ref))
+        path = self._reflog_path(ref)
         try:
             with open(path, "rb") as f:
                 yield from read_reflog(f)

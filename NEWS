@@ -12,6 +12,9 @@
  * Add colorized diff support for the ``show`` command with ``--color``
    argument. (Jelmer Vernooĳ, #1741)
 
+ * Fix Windows path handling in ``_ensure_parent_dir_exists`` to correctly
+   handle drive letters during checkout operations. (Jelmer Vernooĳ, #1751)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

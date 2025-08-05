@@ -1595,19 +1595,31 @@ def _ensure_parent_dir_exists(full_path: bytes) -> None:
     """Ensure parent directory exists, checking no parent is a file."""
     parent_dir = os.path.dirname(full_path)
     if parent_dir and not os.path.exists(parent_dir):
-        # Check if any parent in the path is a file
-        parts = parent_dir.split(os_sep_bytes)
-        for i in range(len(parts)):
-            partial_path = os_sep_bytes.join(parts[: i + 1])
-            if (
-                partial_path
-                and os.path.exists(partial_path)
-                and not os.path.isdir(partial_path)
-            ):
-                # Parent path is a file, this is an error
+        # Walk up the directory tree to find the first existing parent
+        current = parent_dir
+        parents_to_check: list[bytes] = []
+
+        while current and not os.path.exists(current):
+            parents_to_check.insert(0, current)
+            new_parent = os.path.dirname(current)
+            if new_parent == current:
+                # Reached the root or can't go up further
+                break
+            current = new_parent
+
+        # Check if the existing parent (if any) is a directory
+        if current and os.path.exists(current) and not os.path.isdir(current):
+            raise OSError(
+                f"Cannot create directory, parent path is a file: {current!r}"
+            )
+
+        # Now check each parent we need to create isn't blocked by an existing file
+        for parent_path in parents_to_check:
+            if os.path.exists(parent_path) and not os.path.isdir(parent_path):
                 raise OSError(
-                    f"Cannot create directory, parent path is a file: {partial_path!r}"
+                    f"Cannot create directory, parent path is a file: {parent_path!r}"
                 )
+
         os.makedirs(parent_dir)
 
 

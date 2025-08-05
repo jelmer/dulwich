@@ -167,6 +167,8 @@ class PackedObjectContainer(ObjectContainer):
 
 
 class UnpackedObjectStream:
+    """Abstract base class for a stream of unpacked objects."""
+
     def __iter__(self) -> Iterator["UnpackedObject"]:
         raise NotImplementedError(self.__iter__)
 
@@ -192,6 +194,8 @@ def take_msb_bytes(
 
 
 class PackFileDisappeared(Exception):
+    """Raised when a pack file unexpectedly disappears."""
+
     def __init__(self, obj: object) -> None:
         self.obj = obj
 
@@ -294,9 +298,11 @@ class UnpackedObject:
         return True
 
     def __ne__(self, other: object) -> bool:
+        """Check inequality with another UnpackedObject."""
         return not (self == other)
 
     def __repr__(self) -> str:
+        """Return string representation of this UnpackedObject."""
         data = [f"{s}={getattr(self, s)!r}" for s in self.__slots__]
         return "{}({})".format(self.__class__.__name__, ", ".join(data))
 
@@ -399,6 +405,13 @@ def load_pack_index(path: Union[str, os.PathLike]) -> "PackIndex":
 def _load_file_contents(
     f: Union[IO[bytes], _GitFile], size: Optional[int] = None
 ) -> tuple[Union[bytes, Any], int]:
+    """Load contents from a file, preferring mmap when possible.
+
+    Args:
+      f: File-like object to load
+      size: Expected size, or None to determine from file
+    Returns: Tuple of (contents, size)
+    """
     try:
         fd = f.fileno()
     except (UnsupportedOperation, AttributeError):
@@ -494,6 +507,7 @@ class PackIndex:
         return True
 
     def __ne__(self, other: object) -> bool:
+        """Check if this pack index is not equal to another."""
         return not self.__eq__(other)
 
     def __len__(self) -> int:
@@ -560,10 +574,10 @@ class PackIndex:
         raise NotImplementedError(self._itersha)
 
     def close(self) -> None:
-        pass
+        """Close any open files."""
 
     def check(self) -> None:
-        pass
+        """Check the consistency of this pack index."""
 
 
 class MemoryPackIndex(PackIndex):
@@ -589,33 +603,46 @@ class MemoryPackIndex(PackIndex):
         self._pack_checksum = pack_checksum
 
     def get_pack_checksum(self) -> Optional[bytes]:
+        """Return the SHA checksum stored for the corresponding packfile."""
         return self._pack_checksum
 
     def __len__(self) -> int:
+        """Return the number of entries in this pack index."""
         return len(self._entries)
 
     def object_offset(self, sha: bytes) -> int:
+        """Return the offset for the given SHA.
+
+        Args:
+          sha: SHA to look up (binary or hex)
+        Returns: Offset in the pack file
+        """
         if len(sha) == 40:
             sha = hex_to_sha(sha)
         return self._by_sha[sha]
 
     def object_sha1(self, offset: int) -> bytes:
+        """Return the SHA1 for the object at the given offset."""
         return self._by_offset[offset]
 
     def _itersha(self) -> Iterator[bytes]:
+        """Iterate over all SHA1s in the index."""
         return iter(self._by_sha)
 
     def iterentries(self) -> Iterator[PackIndexEntry]:
+        """Iterate over all index entries."""
         return iter(self._entries)
 
     @classmethod
     def for_pack(cls, pack_data: "PackData") -> "MemoryPackIndex":
+        """Create a MemoryPackIndex from a PackData object."""
         return MemoryPackIndex(
             list(pack_data.sorted_entries()), pack_data.get_stored_checksum()
         )
 
     @classmethod
     def clone(cls, other_index: "PackIndex") -> "MemoryPackIndex":
+        """Create a copy of another PackIndex in memory."""
         return cls(list(other_index.iterentries()), other_index.get_pack_checksum())
 
 
@@ -660,6 +687,7 @@ class FilePackIndex(PackIndex):
 
     @property
     def path(self) -> str:
+        """Return the path to this index file."""
         return os.fspath(self._filename)
 
     def __eq__(self, other: object) -> bool:
@@ -673,6 +701,7 @@ class FilePackIndex(PackIndex):
         return super().__eq__(other)
 
     def close(self) -> None:
+        """Close the underlying file and any mmap."""
         self._file.close()
         close_fn = getattr(self._contents, "close", None)
         if close_fn is not None:
@@ -703,6 +732,7 @@ class FilePackIndex(PackIndex):
         raise NotImplementedError(self._unpack_crc32_checksum)
 
     def _itersha(self) -> Iterator[bytes]:
+        """Iterate over all SHA1s in the index."""
         for i in range(len(self)):
             yield self._unpack_name(i)
 
@@ -716,6 +746,15 @@ class FilePackIndex(PackIndex):
             yield self._unpack_entry(i)
 
     def _read_fan_out_table(self, start_offset: int) -> list[int]:
+        """Read the fan-out table from the index.
+
+        The fan-out table contains 256 entries mapping first byte values
+        to the number of objects with SHA1s less than or equal to that byte.
+
+        Args:
+          start_offset: Offset in the file where the fan-out table starts
+        Returns: List of 256 integers
+        """
         ret = []
         for i in range(0x100):
             fanout_entry = self._contents[
@@ -821,18 +860,22 @@ class PackIndex1(FilePackIndex):
         self._fan_out_table = self._read_fan_out_table(0)
 
     def _unpack_entry(self, i):
+        """Unpack the i-th entry from the v1 index."""
         (offset, name) = unpack_from(">L20s", self._contents, (0x100 * 4) + (i * 24))
         return (name, offset, None)
 
     def _unpack_name(self, i):
+        """Unpack the i-th SHA1 from the v1 index."""
         offset = (0x100 * 4) + (i * 24) + 4
         return self._contents[offset : offset + 20]
 
     def _unpack_offset(self, i):
+        """Unpack the i-th offset from the v1 index."""
         offset = (0x100 * 4) + (i * 24)
         return unpack_from(">L", self._contents, offset)[0]
 
     def _unpack_crc32_checksum(self, i) -> None:
+        """Return None as v1 indexes don't store CRC32 checksums."""
         # Not stored in v1 index files
         return None
 
@@ -858,6 +901,7 @@ class PackIndex2(FilePackIndex):
         )
 
     def _unpack_entry(self, i):
+        """Unpack the i-th entry from the v2 index."""
         return (
             self._unpack_name(i),
             self._unpack_offset(i),
@@ -865,10 +909,15 @@ class PackIndex2(FilePackIndex):
         )
 
     def _unpack_name(self, i):
+        """Unpack the i-th SHA1 from the v2 index."""
         offset = self._name_table_offset + i * 20
         return self._contents[offset : offset + 20]
 
     def _unpack_offset(self, i):
+        """Unpack the i-th offset from the v2 index.
+
+        Handles large offsets (>2GB) by reading from the large offset table.
+        """
         offset = self._pack_offset_table_offset + i * 4
         offset = unpack_from(">L", self._contents, offset)[0]
         if offset & (2**31):
@@ -877,6 +926,7 @@ class PackIndex2(FilePackIndex):
         return offset
 
     def _unpack_crc32_checksum(self, i):
+        """Unpack the i-th CRC32 checksum from the v2 index."""
         return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
 
 
@@ -963,6 +1013,12 @@ def read_pack_header(read) -> tuple[int, int]:
 
 
 def chunks_length(chunks: Union[bytes, Iterable[bytes]]) -> int:
+    """Get the total length of a sequence of chunks.
+
+    Args:
+      chunks: Either a single bytes object or an iterable of bytes
+    Returns: Total length in bytes
+    """
     if isinstance(chunks, bytes):
         return len(chunks)
     else:
@@ -1047,7 +1103,12 @@ def unpack_object(
 
 
 def _compute_object_size(value):
-    """Compute the size of a unresolved object for use with LRUSizeCache."""
+    """Compute the size of an unresolved object for use with LRUSizeCache.
+
+    Args:
+      value: Tuple of (type_num, object_chunks)
+    Returns: Size in bytes
+    """
     (num, obj) = value
     if num in DELTA_TYPES:
         return chunks_length(obj[1])
@@ -1084,6 +1145,7 @@ class PackStreamReader:
           read: The read callback to read from.
           size: The maximum number of bytes to read; the particular
             behavior is callback-specific.
+        Returns: Bytes read
         """
         data = read(size)
 
@@ -1107,6 +1169,7 @@ class PackStreamReader:
         return data
 
     def _buf_len(self):
+        """Get the number of bytes in the read buffer."""
         buf = self._rbuf
         start = buf.tell()
         buf.seek(0, SEEK_END)
@@ -1116,6 +1179,7 @@ class PackStreamReader:
 
     @property
     def offset(self):
+        """Return the current offset in the pack stream."""
         return self._offset - self._buf_len()
 
     def read(self, size):
@@ -1218,7 +1282,13 @@ class PackStreamCopier(PackStreamReader):
         self._delta_iter = delta_iter
 
     def _read(self, read, size):
-        """Read data from the read callback and write it to the file."""
+        """Read data from the read callback and write it to the file.
+
+        Args:
+          read: Read callback function
+          size: Number of bytes to read
+        Returns: Data read
+        """
         data = super()._read(read, size)
         self.outfile.write(data)
         return data
@@ -1240,7 +1310,13 @@ class PackStreamCopier(PackStreamReader):
 
 
 def obj_sha(type, chunks):
-    """Compute the SHA for a numeric type and object chunks."""
+    """Compute the SHA for a numeric type and object chunks.
+
+    Args:
+      type: Numeric type of the object
+      chunks: Object data as bytes or iterable of bytes
+    Returns: SHA-1 digest (20 bytes)
+    """
     sha = sha1()
     sha.update(object_header(type, chunks_length(chunks)))
     if isinstance(chunks, bytes):
@@ -1365,6 +1441,7 @@ class PackData:
         return cls(filename=path)
 
     def close(self) -> None:
+        """Close the underlying pack file."""
         self._file.close()
 
     def __enter__(self):
@@ -1374,11 +1451,17 @@ class PackData:
         self.close()
 
     def __eq__(self, other):
+        """Check equality based on pack checksum."""
         if isinstance(other, PackData):
             return self.get_stored_checksum() == other.get_stored_checksum()
         return False
 
     def _get_size(self):
+        """Get the size of the pack file.
+
+        Returns: Size in bytes
+        Raises: AssertionError if file is too small to be a pack
+        """
         if self._size is not None:
             return self._size
         self._size = os.path.getsize(self._filename)
@@ -1399,6 +1482,12 @@ class PackData:
         return compute_file_sha(self._file, end_ofs=-20).digest()
 
     def iter_unpacked(self, *, include_comp: bool = False):
+        """Iterate over unpacked objects in the pack.
+
+        Args:
+          include_comp: If True, include compressed object data
+        Yields: UnpackedObject instances
+        """
         self._file.seek(self._header_size)
 
         if self._num_objects is None:

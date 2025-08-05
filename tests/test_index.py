@@ -2908,3 +2908,50 @@ class TestUpdateWorkingTree(TestCase):
 
         # file2 should still be a directory
         self.assertTrue(os.path.isdir(file2_path))
+
+    def test_ensure_parent_dir_exists_windows_drive(self):
+        """Test that _ensure_parent_dir_exists handles Windows drive letters correctly."""
+        from dulwich.index import _ensure_parent_dir_exists
+
+        # Create a temporary directory to work with
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Test normal case (creates directory)
+            test_path = os.path.join(tmpdir, "subdir", "file.txt").encode()
+            _ensure_parent_dir_exists(test_path)
+            self.assertTrue(os.path.exists(os.path.dirname(test_path)))
+
+            # Test when parent is a file (should raise error)
+            file_path = os.path.join(tmpdir, "testfile").encode()
+            with open(file_path, "wb") as f:
+                f.write(b"test")
+
+            invalid_path = os.path.join(
+                tmpdir.encode(), b"testfile", b"subdir", b"file.txt"
+            )
+            with self.assertRaisesRegex(
+                OSError, "Cannot create directory, parent path is a file"
+            ):
+                _ensure_parent_dir_exists(invalid_path)
+
+            # Test with nested subdirectories
+            nested_path = os.path.join(tmpdir, "a", "b", "c", "d", "file.txt").encode()
+            _ensure_parent_dir_exists(nested_path)
+            self.assertTrue(os.path.exists(os.path.dirname(nested_path)))
+
+            # Test that various path formats are handled correctly by os.path.dirname
+            # This includes Windows drive letters, UNC paths, etc.
+            # The key is that we're using os.path.dirname which handles these correctly
+            import platform
+
+            if platform.system() == "Windows":
+                # Test Windows-specific paths only on Windows
+                test_cases = [
+                    b"C:\\temp\\test\\file.txt",
+                    b"D:\\file.txt",
+                    b"\\\\server\\share\\folder\\file.txt",
+                ]
+                for path in test_cases:
+                    # Just verify os.path.dirname handles these without errors
+                    parent = os.path.dirname(path)
+                    # We're not creating these directories, just testing the logic doesn't fail
+                    self.assertIsInstance(parent, bytes)

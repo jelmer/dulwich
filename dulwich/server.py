@@ -183,6 +183,11 @@ class DictBackend(Backend):
     """Trivial backend that looks up Git repositories in a dictionary."""
 
     def __init__(self, repos) -> None:
+        """Initialize a DictBackend.
+
+        Args:
+          repos: Dictionary mapping repository paths to BackendRepo instances
+        """
         self.repos = repos
 
     def open_repository(self, path: str) -> BackendRepo:
@@ -199,10 +204,23 @@ class FileSystemBackend(Backend):
     """Simple backend looking up Git repositories in the local file system."""
 
     def __init__(self, root=os.sep) -> None:
+        """Initialize a FileSystemBackend.
+
+        Args:
+          root: Root directory to serve repositories from
+        """
         super().__init__()
         self.root = (os.path.abspath(root) + os.sep).replace(os.sep * 2, os.sep)
 
     def open_repository(self, path):
+        """Open a repository from the filesystem.
+
+        Args:
+          path: Path to the repository relative to the root
+        Returns: Repo instance
+        Raises:
+          NotGitRepository: If path is outside the root or not a git repository
+        """
         logger.debug("opening repository at %s", path)
         # Ensure path is a string to avoid TypeError when joining with self.root
         path = os.fspath(path)
@@ -220,11 +238,19 @@ class Handler:
     """Smart protocol command handler base class."""
 
     def __init__(self, backend, proto, stateless_rpc=False) -> None:
+        """Initialize a Handler.
+
+        Args:
+          backend: Backend instance for repository access
+          proto: Protocol instance for communication
+          stateless_rpc: Whether this is a stateless RPC session
+        """
         self.backend = backend
         self.proto = proto
         self.stateless_rpc = stateless_rpc
 
     def handle(self) -> None:
+        """Handle a request."""
         raise NotImplementedError(self.handle)
 
 
@@ -232,6 +258,13 @@ class PackHandler(Handler):
     """Protocol handler for packs."""
 
     def __init__(self, backend, proto, stateless_rpc=False) -> None:
+        """Initialize a PackHandler.
+
+        Args:
+          backend: Backend instance for repository access
+          proto: Protocol instance for communication
+          stateless_rpc: Whether this is a stateless RPC session
+        """
         super().__init__(backend, proto, stateless_rpc)
         self._client_capabilities: Optional[set[bytes]] = None
         # Flags needed for the no-done capability
@@ -239,6 +272,7 @@ class PackHandler(Handler):
 
     @classmethod
     def capabilities(cls) -> Iterable[bytes]:
+        """Return a list of capabilities supported by this handler."""
         raise NotImplementedError(cls.capabilities)
 
     @classmethod
@@ -257,6 +291,13 @@ class PackHandler(Handler):
         return []
 
     def set_client_capabilities(self, caps: Iterable[bytes]) -> None:
+        """Set the client capabilities and validate them.
+
+        Args:
+          caps: List of capabilities requested by the client
+        Raises:
+          GitProtocolError: If client requests unsupported capability or lacks required ones
+        """
         allowable_caps = set(self.innocuous_capabilities())
         allowable_caps.update(self.capabilities())
         for cap in caps:
@@ -275,6 +316,14 @@ class PackHandler(Handler):
         logger.info("Client capabilities: %s", caps)
 
     def has_capability(self, cap: bytes) -> bool:
+        """Check if the client supports a specific capability.
+
+        Args:
+          cap: Capability name to check
+        Returns: True if the client supports the capability
+        Raises:
+          GitProtocolError: If called before client capabilities are set
+        """
         if self._client_capabilities is None:
             raise GitProtocolError(
                 f"Server attempted to access capability {cap!r} before asking client"
@@ -282,6 +331,7 @@ class PackHandler(Handler):
         return cap in self._client_capabilities
 
     def notify_done(self) -> None:
+        """Notify that the 'done' command has been received from the client."""
         self._done_received = True
 
 
@@ -291,6 +341,15 @@ class UploadPackHandler(PackHandler):
     def __init__(
         self, backend, args, proto, stateless_rpc=False, advertise_refs=False
     ) -> None:
+        """Initialize an UploadPackHandler.
+
+        Args:
+          backend: Backend instance for repository access
+          args: Command arguments (first arg is repository path)
+          proto: Protocol instance for communication
+          stateless_rpc: Whether this is a stateless RPC session
+          advertise_refs: Whether to advertise refs
+        """
         super().__init__(backend, proto, stateless_rpc=stateless_rpc)
         self.repo = backend.open_repository(args[0])
         self._graph_walker = None
@@ -302,6 +361,7 @@ class UploadPackHandler(PackHandler):
 
     @classmethod
     def capabilities(cls):
+        """Return the list of capabilities supported by upload-pack."""
         return [
             CAPABILITY_MULTI_ACK_DETAILED,
             CAPABILITY_MULTI_ACK,
@@ -316,6 +376,7 @@ class UploadPackHandler(PackHandler):
 
     @classmethod
     def required_capabilities(cls):
+        """Return the list of capabilities required for upload-pack."""
         return (
             CAPABILITY_SIDE_BAND_64K,
             CAPABILITY_THIN_PACK,
@@ -323,9 +384,14 @@ class UploadPackHandler(PackHandler):
         )
 
     def progress(self, message: bytes) -> None:
-        pass
+        """Send a progress message to the client.
+
+        Args:
+          message: Progress message to send
+        """
 
     def _start_pack_send_phase(self) -> None:
+        """Start the pack sending phase, setting up sideband if supported."""
         if self.has_capability(CAPABILITY_SIDE_BAND_64K):
             # The provided haves are processed, and it is safe to send side-
             # band data now.
@@ -373,6 +439,11 @@ class UploadPackHandler(PackHandler):
         return tagged
 
     def handle(self) -> None:
+        """Handle an upload-pack request.
+
+        This method processes the client's wants and haves, determines which
+        objects to send, and writes the pack data to the client.
+        """
         # Note the fact that client is only processing responses related
         # to the have lines it sent, and any other data (including side-
         # band) will be be considered a fatal error.
@@ -471,6 +542,15 @@ def _split_proto_line(line, allowed):
 
 
 def _want_satisfied(store: ObjectContainer, haves, want, earliest) -> bool:
+    """Check if a specific want is satisfied by a set of haves.
+
+    Args:
+      store: Object store to retrieve objects from
+      haves: Set of commit IDs the client has
+      want: Commit ID the client wants
+      earliest: Earliest commit time to consider
+    Returns: True if the want is satisfied by the haves
+    """
     o = store[want]
     pending = collections.deque([o])
     known = {want}
@@ -517,10 +597,17 @@ def _all_wants_satisfied(store: ObjectContainer, haves, wants) -> bool:
 
 
 class AckGraphWalkerImpl:
+    """Base class for acknowledgment graph walker implementations."""
+
     def __init__(self, graph_walker):
         raise NotImplementedError
 
     def ack(self, have_ref: ObjectID) -> None:
+        """Acknowledge a have reference.
+
+        Args:
+          have_ref: Object ID to acknowledge
+        """
         raise NotImplementedError
 
 
@@ -541,6 +628,14 @@ class _ProtocolGraphWalker:
     def __init__(
         self, handler, object_store: ObjectContainer, get_peeled, get_symrefs
     ) -> None:
+        """Initialize a ProtocolGraphWalker.
+
+        Args:
+          handler: Protocol handler instance
+          object_store: Object store for retrieving objects
+          get_peeled: Function to get peeled refs
+          get_symrefs: Function to get symbolic refs
+        """
         self.handler = handler
         self.store: ObjectContainer = object_store
         self.get_peeled = get_peeled
@@ -640,23 +735,42 @@ class _ProtocolGraphWalker:
         return want_revs
 
     def unread_proto_line(self, command, value) -> None:
+        """Push a command back to be read again.
+
+        Args:
+          command: Command name
+          value: Command value
+        """
         if isinstance(value, int):
             value = str(value).encode("ascii")
         self.proto.unread_pkt_line(command + b" " + value)
 
     def nak(self) -> None:
-        pass
+        """Send a NAK response."""
 
     def ack(self, have_ref):
+        """Acknowledge a have reference.
+
+        Args:
+          have_ref: SHA to acknowledge (40 bytes hex)
+
+        Raises:
+          ValueError: If have_ref is not 40 bytes
+        """
         if len(have_ref) != 40:
             raise ValueError(f"invalid sha {have_ref!r}")
         return self._impl.ack(have_ref)
 
     def reset(self) -> None:
+        """Reset the graph walker cache."""
         self._cached = True
         self._cache_index = 0
 
     def next(self):
+        """Get the next SHA from the graph walker.
+
+        Returns: Next SHA or None if done
+        """
         if not self._cached:
             if not self._impl and self.stateless_rpc:
                 return None
@@ -681,6 +795,11 @@ class _ProtocolGraphWalker:
         return _split_proto_line(self.proto.read_pkt_line(), allowed)
 
     def _handle_shallow_request(self, wants) -> None:
+        """Handle shallow clone requests from the client.
+
+        Args:
+          wants: List of wanted object SHAs
+        """
         while True:
             command, val = self.read_proto_line((COMMAND_DEEPEN, COMMAND_SHALLOW))
             if command == COMMAND_DEEPEN:
@@ -700,6 +819,12 @@ class _ProtocolGraphWalker:
         self.update_shallow(new_shallow, unshallow)
 
     def update_shallow(self, new_shallow, unshallow):
+        """Update shallow/unshallow information to the client.
+
+        Args:
+          new_shallow: Set of newly shallow commits
+          unshallow: Set of commits to unshallow
+        """
         for sha in sorted(new_shallow):
             self.proto.write_pkt_line(format_shallow_line(sha))
         for sha in sorted(unshallow):
@@ -708,20 +833,40 @@ class _ProtocolGraphWalker:
         self.proto.write_pkt_line(None)
 
     def notify_done(self) -> None:
+        """Notify that the client sent 'done'."""
         # relay the message down to the handler.
         self.handler.notify_done()
 
     def send_ack(self, sha, ack_type=b"") -> None:
+        """Send an ACK to the client.
+
+        Args:
+          sha: SHA to acknowledge
+          ack_type: Type of ACK (e.g., b'continue', b'ready')
+        """
         self.proto.write_pkt_line(format_ack_line(sha, ack_type))
 
     def send_nak(self) -> None:
+        """Send a NAK to the client."""
         self.proto.write_pkt_line(NAK_LINE)
 
     def handle_done(self, done_required, done_received):
+        """Handle the 'done' command.
+
+        Args:
+          done_required: Whether done is required
+          done_received: Whether done was received
+        Returns: True if done handling succeeded
+        """
         # Delegate this to the implementation.
         return self._impl.handle_done(done_required, done_received)
 
     def set_wants(self, wants) -> None:
+        """Set the list of wanted objects.
+
+        Args:
+          wants: List of wanted object SHAs
+        """
         self._wants = wants
 
     def all_wants_satisfied(self, haves):
@@ -735,6 +880,11 @@ class _ProtocolGraphWalker:
         return _all_wants_satisfied(self.store, haves, self._wants)
 
     def set_ack_type(self, ack_type) -> None:
+        """Set the acknowledgment type for the graph walker.
+
+        Args:
+          ack_type: One of SINGLE_ACK, MULTI_ACK, or MULTI_ACK_DETAILED
+        """
         impl_classes: dict[int, type[AckGraphWalkerImpl]] = {
             MULTI_ACK: MultiAckGraphWalkerImpl,
             MULTI_ACK_DETAILED: MultiAckDetailedGraphWalkerImpl,
@@ -750,6 +900,11 @@ class SingleAckGraphWalkerImpl(AckGraphWalkerImpl):
     """Graph walker implementation that speaks the single-ack protocol."""
 
     def __init__(self, walker) -> None:
+        """Initialize a SingleAckGraphWalkerImpl.
+
+        Args:
+          walker: Parent ProtocolGraphWalker instance
+        """
         self.walker = walker
         self._common: list[bytes] = []
 

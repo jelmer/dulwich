@@ -444,6 +444,8 @@ class Command:
 
 
 class cmd_archive(Command):
+    """Create an archive of files from a named tree."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -470,6 +472,8 @@ class cmd_archive(Command):
 
 
 class cmd_add(Command):
+    """Add file contents to the index."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("path", nargs="+")
@@ -484,6 +488,8 @@ class cmd_add(Command):
 
 
 class cmd_annotate(Command):
+    """Annotate each line in a file with commit information."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("path", help="Path to file to annotate")
@@ -501,12 +507,16 @@ class cmd_annotate(Command):
 
 
 class cmd_blame(Command):
+    """Show what revision and author last modified each line of a file."""
+
     def run(self, argv) -> None:
         # blame is an alias for annotate
         cmd_annotate().run(argv)
 
 
 class cmd_rm(Command):
+    """Remove files from the working tree and from the index."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -519,6 +529,8 @@ class cmd_rm(Command):
 
 
 class cmd_mv(Command):
+    """Move or rename a file, a directory, or a symlink."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -535,6 +547,8 @@ class cmd_mv(Command):
 
 
 class cmd_fetch_pack(Command):
+    """Receive missing objects from another repository."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("--all", action="store_true")
@@ -554,6 +568,8 @@ class cmd_fetch_pack(Command):
 
 
 class cmd_fetch(Command):
+    """Download objects and refs from another repository."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("location", help="Remote location to fetch from")
@@ -571,6 +587,8 @@ class cmd_fetch(Command):
 
 
 class cmd_for_each_ref(Command):
+    """Output information on each ref."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("pattern", type=str, nargs="?")
@@ -580,6 +598,8 @@ class cmd_for_each_ref(Command):
 
 
 class cmd_fsck(Command):
+    """Verify the connectivity and validity of objects in the database."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -588,6 +608,8 @@ class cmd_fsck(Command):
 
 
 class cmd_log(Command):
+    """Show commit logs."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -616,6 +638,8 @@ class cmd_log(Command):
 
 
 class cmd_diff(Command):
+    """Show changes between commits, commit and working tree, etc."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -718,6 +742,8 @@ class cmd_diff(Command):
 
 
 class cmd_dump_pack(Command):
+    """Dump the contents of a pack file for debugging."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("filename", help="Pack file to dump")
@@ -739,6 +765,8 @@ class cmd_dump_pack(Command):
 
 
 class cmd_dump_index(Command):
+    """Show information about a pack index file."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("filename", help="Index file to dump")
@@ -751,6 +779,8 @@ class cmd_dump_index(Command):
 
 
 class cmd_init(Command):
+    """Create an empty Git repository or reinitialize an existing one."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -765,6 +795,8 @@ class cmd_init(Command):
 
 
 class cmd_clone(Command):
+    """Clone a repository into a new directory."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -864,6 +896,8 @@ def _get_commit_message_with_template(initial_message, repo=None, commit=None):
 
 
 class cmd_commit(Command):
+    """Record changes to the repository."""
+
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument("--message", "-m", help="Commit message")
@@ -914,6 +948,8 @@ class cmd_commit(Command):
 
 
 class cmd_commit_tree(Command):
+    """Create a new commit object from a tree."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("--message", "-m", required=True, help="Commit message")
@@ -923,11 +959,15 @@ class cmd_commit_tree(Command):
 
 
 class cmd_update_server_info(Command):
+    """Update auxiliary info file to help dumb servers."""
+
     def run(self, args) -> None:
         porcelain.update_server_info(".")
 
 
 class cmd_symbolic_ref(Command):
+    """Read, modify and delete symbolic refs."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("name", help="Symbolic reference name")
@@ -958,6 +998,8 @@ class cmd_symbolic_ref(Command):
 
 
 class cmd_pack_refs(Command):
+    """Pack heads and tags for efficient repository access."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("--all", action="store_true")
@@ -970,6 +1012,8 @@ class cmd_pack_refs(Command):
 
 
 class cmd_show(Command):
+    """Show various types of objects."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("objectish", type=str, nargs="*")
@@ -1018,6 +1062,8 @@ class cmd_show(Command):
 
 
 class cmd_diff_tree(Command):
+    """Compare the content and mode of trees."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("old_tree", help="Old tree SHA")
@@ -1027,6 +1073,8 @@ class cmd_diff_tree(Command):
 
 
 class cmd_rev_list(Command):
+    """List commit objects in reverse chronological order."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("commits", nargs="+", help="Commit IDs to list")
@@ -1035,6 +1083,8 @@ class cmd_rev_list(Command):
 
 
 class cmd_tag(Command):
+    """Create, list, delete or verify a tag object."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1054,6 +1104,8 @@ class cmd_tag(Command):
 
 
 class cmd_repack(Command):
+    """Pack unpacked objects in a repository."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -1061,6 +1113,8 @@ class cmd_repack(Command):
 
 
 class cmd_reflog(Command):
+    """Manage reflog information."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1098,6 +1152,8 @@ class cmd_reflog(Command):
 
 
 class cmd_reset(Command):
+    """Reset current HEAD to the specified state."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         mode_group = parser.add_mutually_exclusive_group()
@@ -1126,6 +1182,8 @@ class cmd_reset(Command):
 
 
 class cmd_revert(Command):
+    """Revert some existing commits."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1147,6 +1205,8 @@ class cmd_revert(Command):
 
 
 class cmd_daemon(Command):
+    """Run a simple Git protocol server."""
+
     def run(self, args) -> None:
         from dulwich import log_utils
 
@@ -1176,6 +1236,8 @@ class cmd_daemon(Command):
 
 
 class cmd_web_daemon(Command):
+    """Run a simple HTTP server for Git repositories."""
+
     def run(self, args) -> None:
         from dulwich import log_utils
 
@@ -1203,6 +1265,8 @@ class cmd_web_daemon(Command):
 
 
 class cmd_write_tree(Command):
+    """Create a tree object from the current index."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -1210,6 +1274,8 @@ class cmd_write_tree(Command):
 
 
 class cmd_receive_pack(Command):
+    """Receive what is pushed into the repository."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
@@ -1218,6 +1284,8 @@ class cmd_receive_pack(Command):
 
 
 class cmd_upload_pack(Command):
+    """Send objects packed back to git-fetch-pack."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
@@ -1226,6 +1294,8 @@ class cmd_upload_pack(Command):
 
 
 class cmd_status(Command):
+    """Show the working tree status."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
@@ -1252,6 +1322,8 @@ class cmd_status(Command):
 
 
 class cmd_ls_remote(Command):
+    """List references in a remote repository."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1272,6 +1344,8 @@ class cmd_ls_remote(Command):
 
 
 class cmd_ls_tree(Command):
+    """List the contents of a tree object."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1298,6 +1372,8 @@ class cmd_ls_tree(Command):
 
 
 class cmd_pack_objects(Command):
+    """Create a packed archive of objects."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1334,6 +1410,8 @@ class cmd_pack_objects(Command):
 
 
 class cmd_unpack_objects(Command):
+    """Unpack objects from a packed archive."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("pack_file", help="Pack file to unpack")
@@ -1344,6 +1422,8 @@ class cmd_unpack_objects(Command):
 
 
 class cmd_prune(Command):
+    """Prune all unreachable objects from the object database."""
+
     def run(self, args) -> Optional[int]:
         import datetime
         import time
@@ -1406,6 +1486,8 @@ class cmd_prune(Command):
 
 
 class cmd_pull(Command):
+    """Fetch from and integrate with another repository or a local branch."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("from_location", type=str)
@@ -1423,6 +1505,8 @@ class cmd_pull(Command):
 
 
 class cmd_push(Command):
+    """Update remote refs along with associated objects."""
+
     def run(self, argv) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument("-f", "--force", action="store_true", help="Force")
@@ -1441,6 +1525,8 @@ class cmd_push(Command):
 
 
 class cmd_remote_add(Command):
+    """Add a remote repository."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("name", help="Name of the remote")
@@ -1450,6 +1536,8 @@ class cmd_remote_add(Command):
 
 
 class SuperCommand(Command):
+    """Base class for commands that have subcommands."""
+
     subcommands: ClassVar[dict[str, type[Command]]] = {}
     default_command: ClassVar[Optional[type[Command]]] = None
 
@@ -1474,12 +1562,16 @@ class SuperCommand(Command):
 
 
 class cmd_remote(SuperCommand):
+    """Manage set of tracked repositories."""
+
     subcommands: ClassVar[dict[str, type[Command]]] = {
         "add": cmd_remote_add,
     }
 
 
 class cmd_submodule_list(Command):
+    """List submodules."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(argv)
@@ -1488,6 +1580,8 @@ class cmd_submodule_list(Command):
 
 
 class cmd_submodule_init(Command):
+    """Initialize submodules."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(argv)
@@ -1495,6 +1589,8 @@ class cmd_submodule_init(Command):
 
 
 class cmd_submodule_add(Command):
+    """Add a submodule."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("url", help="URL of repository to add as submodule")
@@ -1505,6 +1601,8 @@ class cmd_submodule_add(Command):
 
 
 class cmd_submodule_update(Command):
+    """Update submodules."""
+
     def run(self, argv) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1524,6 +1622,8 @@ class cmd_submodule_update(Command):
 
 
 class cmd_submodule(SuperCommand):
+    """Initialize, update or inspect submodules."""
+
     subcommands: ClassVar[dict[str, type[Command]]] = {
         "add": cmd_submodule_add,
         "init": cmd_submodule_init,
@@ -1535,6 +1635,8 @@ class cmd_submodule(SuperCommand):
 
 
 class cmd_check_ignore(Command):
+    """Check whether files are excluded by gitignore."""
+
     def run(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument("paths", nargs="+", help="Paths to check")
@@ -1547,6 +1649,8 @@ class cmd_check_ignore(Command):
 
 
 class cmd_check_mailmap(Command):
+    """Show canonical names and email addresses of contacts."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("identities", nargs="+", help="Identities to check")
@@ -1557,6 +1661,8 @@ class cmd_check_mailmap(Command):
 
 
 class cmd_branch(Command):
+    """List, create, or delete branches."""
+
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1587,6 +1693,8 @@ class cmd_branch(Command):
 
 
 class cmd_checkout(Command):
+    """Switch branches or restore working tree files."""
+
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1622,6 +1730,8 @@ class cmd_checkout(Command):
 
 
 class cmd_stash_list(Command):
+    """List stash entries."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -1630,6 +1740,8 @@ class cmd_stash_list(Command):
 
 
 class cmd_stash_push(Command):
+    """Save your local modifications to a new stash."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -1638,6 +1750,8 @@ class cmd_stash_push(Command):
 
 
 class cmd_stash_pop(Command):
+    """Apply a stash and remove it from the stash list."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -1646,7 +1760,7 @@ class cmd_stash_pop(Command):
 
 
 class cmd_bisect(SuperCommand):
-    """Git bisect command implementation."""
+    """Use binary search to find the commit that introduced a bug."""
 
     subcommands: ClassVar[dict[str, type[Command]]] = {}
 
@@ -1774,6 +1888,8 @@ class cmd_bisect(SuperCommand):
 
 
 class cmd_stash(SuperCommand):
+    """Stash the changes in a dirty working directory away."""
+
     subcommands: ClassVar[dict[str, type[Command]]] = {
         "list": cmd_stash_list,
         "pop": cmd_stash_pop,
@@ -1782,6 +1898,8 @@ class cmd_stash(SuperCommand):
 
 
 class cmd_ls_files(Command):
+    """Show information about files in the index and working tree."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -1790,6 +1908,8 @@ class cmd_ls_files(Command):
 
 
 class cmd_describe(Command):
+    """Give an object a human readable name based on an available ref."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
@@ -1797,6 +1917,8 @@ class cmd_describe(Command):
 
 
 class cmd_merge(Command):
+    """Join two or more development histories together."""
+
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser()
         parser.add_argument("commit", type=str, help="Commit to merge")
@@ -1841,6 +1963,8 @@ class cmd_merge(Command):
 
 
 class cmd_notes_add(Command):
+    """Add notes to a commit."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("object", help="Object to annotate")
@@ -1854,6 +1978,8 @@ class cmd_notes_add(Command):
 
 
 class cmd_notes_show(Command):
+    """Show notes for a commit."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("object", help="Object to show notes for")
@@ -1870,6 +1996,8 @@ class cmd_notes_show(Command):
 
 
 class cmd_notes_remove(Command):
+    """Remove notes for a commit."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument("object", help="Object to remove notes from")
@@ -1886,6 +2014,8 @@ class cmd_notes_remove(Command):
 
 
 class cmd_notes_list(Command):
+    """List all note objects."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -1899,6 +2029,8 @@ class cmd_notes_list(Command):
 
 
 class cmd_notes(SuperCommand):
+    """Add or inspect object notes."""
+
     subcommands: ClassVar[dict[str, type[Command]]] = {
         "add": cmd_notes_add,
         "show": cmd_notes_show,
@@ -1910,6 +2042,8 @@ class cmd_notes(SuperCommand):
 
 
 class cmd_cherry_pick(Command):
+    """Apply the changes introduced by some existing commits."""
+
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser(
             description="Apply the changes introduced by some existing commits"
@@ -1978,6 +2112,8 @@ class cmd_cherry_pick(Command):
 
 
 class cmd_merge_tree(Command):
+    """Show three-way merge without touching index."""
+
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser(
             description="Perform a tree-level merge without touching the working directory"
@@ -2040,6 +2176,8 @@ class cmd_merge_tree(Command):
 
 
 class cmd_gc(Command):
+    """Cleanup unnecessary files and optimize the local repository."""
+
     def run(self, args) -> Optional[int]:
         import datetime
         import time
@@ -2136,6 +2274,8 @@ class cmd_gc(Command):
 
 
 class cmd_count_objects(Command):
+    """Count unpacked number of objects and their disk consumption."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -2164,6 +2304,8 @@ class cmd_count_objects(Command):
 
 
 class cmd_rebase(Command):
+    """Reapply commits on top of another base tip."""
+
     def run(self, args) -> int:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -2233,6 +2375,8 @@ class cmd_rebase(Command):
 
 
 class cmd_filter_branch(Command):
+    """Rewrite branches."""
+
     def run(self, args) -> Optional[int]:
         import subprocess
 
@@ -2467,6 +2611,8 @@ class cmd_filter_branch(Command):
 
 
 class cmd_lfs(Command):
+    """Git Large File Storage management."""
+
     """Git LFS management commands."""
 
     def run(self, argv) -> None:
@@ -2641,6 +2787,8 @@ class cmd_lfs(Command):
 
 
 class cmd_help(Command):
+    """Display help information about git."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -2667,6 +2815,8 @@ For a list of supported commands, see 'dulwich help -a'.
 
 
 class cmd_format_patch(Command):
+    """Prepare patches for e-mail submission."""
+
     def run(self, args) -> None:
         parser = argparse.ArgumentParser()
         parser.add_argument(
@@ -2719,6 +2869,8 @@ class cmd_format_patch(Command):
 
 
 class cmd_bundle(Command):
+    """Create, unpack, and manipulate bundle files."""
+
     def run(self, args) -> int:
         if not args:
             print("Usage: bundle <create|verify|list-heads|unbundle> <options>")
@@ -2918,6 +3070,8 @@ class cmd_bundle(Command):
 
 
 class cmd_worktree_add(Command):
+    """Create a new worktree."""
+
     """Add a new worktree to the repository."""
 
     def run(self, args) -> Optional[int]:
@@ -2966,6 +3120,8 @@ class cmd_worktree_add(Command):
 
 
 class cmd_worktree_list(Command):
+    """List worktrees."""
+
     """List details of each worktree."""
 
     def run(self, args) -> Optional[int]:
@@ -3018,6 +3174,8 @@ class cmd_worktree_list(Command):
 class cmd_worktree_remove(Command):
     """Remove a worktree."""
 
+    """Remove a worktree."""
+
     def run(self, args) -> Optional[int]:
         parser = argparse.ArgumentParser(
             description="Remove a worktree", prog="dulwich worktree remove"
@@ -3037,6 +3195,8 @@ class cmd_worktree_remove(Command):
 
 
 class cmd_worktree_prune(Command):
+    """Prune worktree information."""
+
     """Prune worktree information."""
 
     def run(self, args) -> Optional[int]:
@@ -3075,6 +3235,8 @@ class cmd_worktree_prune(Command):
 
 
 class cmd_worktree_lock(Command):
+    """Lock a worktree to prevent it from being pruned."""
+
     """Lock a worktree."""
 
     def run(self, args) -> Optional[int]:
@@ -3096,6 +3258,8 @@ class cmd_worktree_lock(Command):
 
 
 class cmd_worktree_unlock(Command):
+    """Unlock a locked worktree."""
+
     """Unlock a worktree."""
 
     def run(self, args) -> Optional[int]:
@@ -3114,6 +3278,8 @@ class cmd_worktree_unlock(Command):
 
 
 class cmd_worktree_move(Command):
+    """Move a worktree to a new location."""
+
     """Move a worktree."""
 
     def run(self, args) -> Optional[int]:
@@ -3135,6 +3301,8 @@ class cmd_worktree_move(Command):
 
 
 class cmd_worktree(SuperCommand):
+    """Manage multiple working trees."""
+
     """Manage multiple working trees."""
 
     subcommands: ClassVar[dict[str, type[Command]]] = {

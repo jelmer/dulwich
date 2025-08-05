@@ -206,15 +206,44 @@ class NoneStream(RawIOBase):
     """Fallback if stdout or stderr are unavailable, does nothing."""
 
     def read(self, size=-1) -> None:
+        """Read bytes (no-op for NoneStream).
+
+        Args:
+          size: Number of bytes to read
+
+        Returns:
+          None
+        """
         return None
 
     def readall(self) -> bytes:
+        """Read all bytes (returns empty bytes).
+
+        Returns:
+          Empty bytes object
+        """
         return b""
 
     def readinto(self, b) -> None:
+        """Read bytes into buffer (no-op for NoneStream).
+
+        Args:
+          b: Buffer to read into
+
+        Returns:
+          None
+        """
         return None
 
     def write(self, b) -> None:
+        """Write bytes (no-op for NoneStream).
+
+        Args:
+          b: Bytes to write
+
+        Returns:
+          None
+        """
         return None
 
 
@@ -229,6 +258,11 @@ class Error(Exception):
     """Porcelain-based error."""
 
     def __init__(self, msg) -> None:
+        """Initialize an Error.
+
+        Args:
+          msg: Error message
+        """
         super().__init__(msg)
 
 
@@ -412,6 +446,12 @@ class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
     def __init__(self, current_sha, new_sha) -> None:
+        """Initialize a DivergedBranches error.
+
+        Args:
+          current_sha: SHA of the current branch head
+          new_sha: SHA of the new branch head
+        """
         self.current_sha = current_sha
         self.new_sha = new_sha
 
@@ -497,6 +537,12 @@ def symbolic_ref(repo: RepoPath, ref_name, force=False) -> None:
 
 
 def pack_refs(repo: RepoPath, all=False) -> None:
+    """Pack loose refs into a single file.
+
+    Args:
+      repo: Path to the repository
+      all: If True, pack all refs; if False, only pack already-packed refs
+    """
     with open_repo_closing(repo) as repo_obj:
         repo_obj.refs.pack_refs(all=all)
 
@@ -1094,6 +1140,16 @@ move = mv
 
 
 def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
+    """Decode commit message contents to unicode.
+
+    Args:
+      commit: Commit object
+      contents: Raw commit message bytes
+      default_encoding: Encoding to use if none specified in commit
+
+    Returns:
+      Decoded commit message as unicode string
+    """
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1102,6 +1158,16 @@ def commit_decode(commit, contents, default_encoding=DEFAULT_ENCODING):
 
 
 def commit_encode(commit, contents, default_encoding=DEFAULT_ENCODING):
+    """Encode commit message contents to bytes.
+
+    Args:
+      commit: Commit object
+      contents: Commit message as unicode string
+      default_encoding: Encoding to use if none specified in commit
+
+    Returns:
+      Encoded commit message as bytes
+    """
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1246,6 +1312,17 @@ def show_tag(repo: RepoPath, tag, decode, outstream=sys.stdout) -> None:
 
 
 def show_object(repo: RepoPath, obj, decode, outstream):
+    """Display a git object.
+
+    Args:
+      repo: Path to the repository
+      obj: Git object to display (blob, tree, commit, or tag)
+      decode: Function for decoding bytes to unicode string
+      outstream: Stream to write output to
+
+    Returns:
+      Result of the appropriate show_* function
+    """
     return {
         b"tree": show_tree,
         b"blob": show_blob,
@@ -2047,6 +2124,16 @@ def reset(
 def get_remote_repo(
     repo: Repo, remote_location: Optional[Union[str, bytes]] = None
 ) -> tuple[Optional[str], str]:
+    """Get the remote repository information.
+
+    Args:
+      repo: Local repository object
+      remote_location: Optional remote name or URL; defaults to branch remote
+
+    Returns:
+      Tuple of (remote_name, remote_url) where remote_name may be None
+      if remote_location is a URL rather than a configured remote
+    """
     config = repo.get_config()
     if remote_location is None:
         remote_location = get_branch_remote(repo)

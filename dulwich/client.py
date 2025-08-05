@@ -259,6 +259,12 @@ class ReportStatusParser:
 
 
 def negotiate_protocol_version(proto) -> int:
+    """Negotiate the protocol version to use.
+
+    Args:
+      proto: Protocol instance to negotiate with
+    Returns: Protocol version (0, 1, or 2)
+    """
     pkt = proto.read_pkt_line()
     if pkt is not None and pkt.strip() == b"version 2":
         return 2
@@ -267,6 +273,12 @@ def negotiate_protocol_version(proto) -> int:
 
 
 def read_server_capabilities(pkt_seq):
+    """Read server capabilities from a packet sequence.
+
+    Args:
+      pkt_seq: Sequence of packets from server
+    Returns: Set of server capabilities
+    """
     server_capabilities = []
     for pkt in pkt_seq:
         server_capabilities.append(pkt)
@@ -276,6 +288,12 @@ def read_server_capabilities(pkt_seq):
 def read_pkt_refs_v2(
     pkt_seq,
 ) -> tuple[dict[bytes, bytes], dict[bytes, bytes], dict[bytes, bytes]]:
+    """Read packet references in protocol v2 format.
+
+    Args:
+      pkt_seq: Sequence of packets
+    Returns: Tuple of (refs dict, symrefs dict, peeled dict)
+    """
     refs = {}
     symrefs = {}
     peeled = {}
@@ -299,6 +317,12 @@ def read_pkt_refs_v2(
 
 
 def read_pkt_refs_v1(pkt_seq) -> tuple[dict[bytes, bytes], set[bytes]]:
+    """Read packet references in protocol v1 format.
+
+    Args:
+      pkt_seq: Sequence of packets
+    Returns: Tuple of (refs dict, server capabilities set)
+    """
     server_capabilities = None
     refs = {}
     # Receive refs from server
@@ -392,6 +416,7 @@ class FetchPackResult(_DeprecatedDictProxy):
         self.new_unshallow = new_unshallow
 
     def __eq__(self, other):
+        """Check equality with another FetchPackResult."""
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
@@ -402,6 +427,7 @@ class FetchPackResult(_DeprecatedDictProxy):
         )
 
     def __repr__(self) -> str:
+        """Return string representation of FetchPackResult."""
         return f"{self.__class__.__name__}({self.refs!r}, {self.symrefs!r}, {self.agent!r})"
 
 
@@ -428,12 +454,14 @@ class LsRemoteResult(_DeprecatedDictProxy):
         )
 
     def __eq__(self, other):
+        """Check equality with another LsRemoteResult."""
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
         return self.refs == other.refs and self.symrefs == other.symrefs
 
     def __repr__(self) -> str:
+        """Return string representation of LsRemoteResult."""
         return f"{self.__class__.__name__}({self.refs!r}, {self.symrefs!r})"
 
 
@@ -453,16 +481,24 @@ class SendPackResult(_DeprecatedDictProxy):
         self.ref_status = ref_status
 
     def __eq__(self, other):
+        """Check equality with another SendPackResult."""
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
         return self.refs == other.refs and self.agent == other.agent
 
     def __repr__(self) -> str:
+        """Return string representation of SendPackResult."""
         return f"{self.__class__.__name__}({self.refs!r}, {self.agent!r})"
 
 
 def _read_shallow_updates(pkt_seq):
+    """Read shallow/unshallow updates from a packet sequence.
+
+    Args:
+      pkt_seq: Sequence of packets
+    Returns: Tuple of (new_shallow set, new_unshallow set)
+    """
     new_shallow = set()
     new_unshallow = set()
     for pkt in pkt_seq:
@@ -482,6 +518,8 @@ def _read_shallow_updates(pkt_seq):
 
 
 class _v1ReceivePackHeader:
+    """Handler for v1 receive-pack header."""
+
     def __init__(self, capabilities, old_refs, new_refs) -> None:
         self.want: list[bytes] = []
         self.have: list[bytes] = []
@@ -489,6 +527,7 @@ class _v1ReceivePackHeader:
         self.sent_capabilities = False
 
     def __iter__(self):
+        """Iterate over the receive-pack header lines."""
         return self._it
 
     def _handle_receive_pack_head(self, capabilities, old_refs, new_refs):
@@ -554,6 +593,14 @@ def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[tuple[int, byt
 
 
 def find_capability(capabilities, key, value):
+    """Find a capability in the list of capabilities.
+
+    Args:
+      capabilities: List of capabilities
+      key: Capability key to search for
+      value: Optional specific value to match
+    Returns: The matching capability or None
+    """
     for capability in capabilities:
         k, v = parse_capability(capability)
         if k != key:
@@ -1553,6 +1600,13 @@ class TCPGitClient(TraditionalGitClient):
     """A Git Client that works over TCP directly (i.e. git://)."""
 
     def __init__(self, host, port=None, **kwargs) -> None:
+        """Initialize a TCPGitClient.
+
+        Args:
+          host: Hostname or IP address to connect to
+          port: Port number (defaults to TCP_GIT_PORT)
+          **kwargs: Additional arguments for GitClient
+        """
         if port is None:
             port = TCP_GIT_PORT
         self._host = host
@@ -1561,9 +1615,26 @@ class TCPGitClient(TraditionalGitClient):
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an instance of TCPGitClient from a parsed URL.
+
+        Args:
+          parsedurl: Result of urlparse()
+          **kwargs: Additional arguments for the client
+
+        Returns:
+          A TCPGitClient instance
+        """
         return cls(parsedurl.hostname, port=parsedurl.port, **kwargs)
 
     def get_url(self, path):
+        """Get the URL for a TCP git connection.
+
+        Args:
+          path: Repository path
+
+        Returns:
+          git:// URL for the path
+        """
         netloc = self._host
         if self._port is not None and self._port != TCP_GIT_PORT:
             netloc += f":{self._port}"
@@ -1642,15 +1713,25 @@ class SubprocessWrapper:
     """A socket-like object that talks to a subprocess via pipes."""
 
     def __init__(self, proc) -> None:
+        """Initialize a SubprocessWrapper.
+
+        Args:
+          proc: Subprocess.Popen instance to wrap
+        """
         self.proc = proc
         self.read = BufferedReader(proc.stdout).read
         self.write = proc.stdin.write
 
     @property
     def stderr(self):
+        """Return the stderr stream of the subprocess."""
         return self.proc.stderr
 
     def can_read(self):
+        """Check if there is data available to read.
+
+        Returns: True if data is available, False otherwise
+        """
         if sys.platform == "win32":
             from msvcrt import get_osfhandle
 
@@ -1660,6 +1741,14 @@ class SubprocessWrapper:
             return _fileno_can_read(self.proc.stdout.fileno())
 
     def close(self, timeout: Optional[int] = 60) -> None:
+        """Close the subprocess and wait for it to terminate.
+
+        Args:
+          timeout: Maximum time to wait for subprocess to terminate (seconds)
+
+        Raises:
+          GitProtocolError: If subprocess doesn't terminate within timeout
+        """
         self.proc.stdin.close()
         self.proc.stdout.close()
         if self.proc.stderr:
@@ -1697,6 +1786,15 @@ class SubprocessGitClient(TraditionalGitClient):
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an instance of SubprocessGitClient from a parsed URL.
+
+        Args:
+          parsedurl: Result of urlparse()
+          **kwargs: Additional arguments for the client
+
+        Returns:
+          A SubprocessGitClient instance
+        """
         return cls(**kwargs)
 
     git_command: Optional[str] = None
@@ -1754,14 +1852,39 @@ class LocalGitClient(GitClient):
         # Ignore the thin_packs argument
 
     def get_url(self, path):
+        """Get the URL for a local file path.
+
+        Args:
+          path: Local file path
+
+        Returns:
+          file:// URL for the path
+        """
         return urlunsplit(("file", "", path, "", ""))
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an instance of LocalGitClient from a parsed URL.
+
+        Args:
+          parsedurl: Result of urlparse()
+          **kwargs: Additional arguments for the client
+
+        Returns:
+          A LocalGitClient instance
+        """
         return cls(**kwargs)
 
     @classmethod
     def _open_repo(cls, path):
+        """Open a local repository.
+
+        Args:
+          path: Repository path (as bytes or str)
+
+        Returns:
+          Repo instance wrapped in a closing context manager
+        """
         if not isinstance(path, str):
             path = os.fsdecode(path)
         return closing(Repo(path))
@@ -1965,10 +2088,27 @@ class BundleClient(GitClient):
         self._report_activity = report_activity
 
     def get_url(self, path):
+        """Get the URL for a bundle file path.
+
+        Args:
+          path: Bundle file path
+
+        Returns:
+          The path unchanged (bundle files use local paths)
+        """
         return path
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an instance of BundleClient from a parsed URL.
+
+        Args:
+          parsedurl: Result of urlparse()
+          **kwargs: Additional arguments for the client
+
+        Returns:
+          A BundleClient instance
+        """
         return cls(**kwargs)
 
     @classmethod
@@ -1983,6 +2123,17 @@ class BundleClient(GitClient):
 
     @classmethod
     def _open_bundle(cls, path):
+        """Open and parse a bundle file.
+
+        Args:
+          path: Path to the bundle file (bytes or str)
+
+        Returns:
+          Bundle object with parsed metadata
+
+        Raises:
+          AssertionError: If bundle format is unsupported
+        """
         if not isinstance(path, str):
             path = os.fsdecode(path)
         # Read bundle metadata without PackData to avoid file handle issues
@@ -2037,7 +2188,15 @@ class BundleClient(GitClient):
 
     @staticmethod
     def _skip_to_pack_data(f, version):
-        """Skip to the pack data section in a bundle file."""
+        """Skip to the pack data section in a bundle file.
+
+        Args:
+          f: File object positioned at the beginning of the bundle
+          version: Bundle format version (2 or 3)
+
+        Raises:
+          AssertionError: If bundle header is invalid
+        """
         # Skip header
         header = f.readline()
         if header not in (b"# v2 git bundle\n", b"# v3 git bundle\n"):

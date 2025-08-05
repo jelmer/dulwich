@@ -33,6 +33,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+"""Generate diff statistics similar to git's --stat option.
+
+This module provides functionality to parse unified diff output and generate
+statistics about changes, including:
+- Number of lines added and removed per file
+- Binary file detection
+- File rename detection
+- Formatted output similar to git diff --stat
+"""
+
 import re
 import sys
 from typing import Optional

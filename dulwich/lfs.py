@@ -19,6 +19,19 @@
 # License, Version 2.0.
 #
 
+"""Git Large File Storage (LFS) support.
+
+This module provides support for Git LFS, which is a Git extension for
+versioning large files. It replaces large files with text pointers inside Git,
+while storing the file contents on a remote server.
+
+Key components:
+- LFS pointer file parsing and creation
+- LFS object storage and retrieval
+- HTTP client for LFS server communication
+- Integration with dulwich repositories
+"""
+
 import hashlib
 import json
 import logging

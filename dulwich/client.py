@@ -150,6 +150,11 @@ class InvalidWants(Exception):
     """Invalid wants."""
 
     def __init__(self, wants) -> None:
+        """Initialize InvalidWants exception.
+
+        Args:
+            wants: List of invalid wants
+        """
         Exception.__init__(
             self, f"requested wants not in server provided refs: {wants!r}"
         )
@@ -159,6 +164,12 @@ class HTTPUnauthorized(Exception):
     """Raised when authentication fails."""
 
     def __init__(self, www_authenticate, url) -> None:
+        """Initialize HTTPUnauthorized exception.
+
+        Args:
+            www_authenticate: WWW-Authenticate header value
+            url: URL that requires authentication
+        """
         Exception.__init__(self, "No valid credentials provided")
         self.www_authenticate = www_authenticate
         self.url = url
@@ -168,6 +179,12 @@ class HTTPProxyUnauthorized(Exception):
     """Raised when proxy authentication fails."""
 
     def __init__(self, proxy_authenticate, url) -> None:
+        """Initialize HTTPProxyUnauthorized exception.
+
+        Args:
+            proxy_authenticate: Proxy-Authenticate header value
+            url: URL that requires proxy authentication
+        """
         Exception.__init__(self, "No valid proxy credentials provided")
         self.proxy_authenticate = proxy_authenticate
         self.url = url
@@ -211,6 +228,7 @@ class ReportStatusParser:
     """Handle status as reported by servers with 'report-status' capability."""
 
     def __init__(self) -> None:
+        """Initialize ReportStatusParser."""
         self._done = False
         self._pack_status = None
         self._ref_statuses: list[bytes] = []
@@ -409,6 +427,15 @@ class FetchPackResult(_DeprecatedDictProxy):
     def __init__(
         self, refs, symrefs, agent, new_shallow=None, new_unshallow=None
     ) -> None:
+        """Initialize FetchPackResult.
+
+        Args:
+            refs: Dictionary with all remote refs
+            symrefs: Dictionary with remote symrefs
+            agent: User agent string
+            new_shallow: New shallow commits
+            new_unshallow: New unshallow commits
+        """
         self.refs = refs
         self.symrefs = symrefs
         self.agent = agent
@@ -440,6 +467,12 @@ class LsRemoteResult(_DeprecatedDictProxy):
     """
 
     def __init__(self, refs, symrefs) -> None:
+        """Initialize LsRemoteResult.
+
+        Args:
+            refs: Dictionary with all remote refs
+            symrefs: Dictionary with remote symrefs
+        """
         self.refs = refs
         self.symrefs = symrefs
 
@@ -476,6 +509,13 @@ class SendPackResult(_DeprecatedDictProxy):
     """
 
     def __init__(self, refs, agent=None, ref_status=None) -> None:
+        """Initialize SendPackResult.
+
+        Args:
+            refs: Dictionary with all remote refs
+            agent: User agent string
+            ref_status: Optional dictionary mapping ref name to error message
+        """
         self.refs = refs
         self.agent = agent
         self.ref_status = ref_status
@@ -1559,6 +1599,18 @@ class TraditionalGitClient(GitClient):
         subdirs=None,
         prefix=None,
     ) -> None:
+        """Request an archive of a specific commit.
+
+        Args:
+            path: Repository path
+            committish: Commit ID or ref to archive
+            write_data: Function to write archive data
+            progress: Optional progress callback
+            write_error: Optional error callback
+            format: Optional archive format
+            subdirs: Optional subdirectories to include
+            prefix: Optional prefix for archived files
+        """
         proto, can_read, stderr = self._connect(b"upload-archive", path)
         with proto:
             if format is not None:

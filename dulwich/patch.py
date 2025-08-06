@@ -147,8 +147,7 @@ def unified_diff(
     tree_encoding: str = "utf-8",
     output_encoding: str = "utf-8",
 ) -> Generator[bytes, None, None]:
-    """difflib.unified_diff that can detect "No newline at end of file" as
-    original "git diff" does.
+    """difflib.unified_diff that can detect "No newline at end of file" as original "git diff" does.
 
     Based on the same function in Python2.7 difflib.py
     """

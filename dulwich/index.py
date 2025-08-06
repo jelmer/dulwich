@@ -495,6 +495,7 @@ class IndexEntry:
 
     def set_skip_worktree(self, skip: bool = True) -> None:
         """Helper method to set or clear the skip-worktree bit in extended_flags.
+
         Also sets FLAG_EXTENDED in self.flags if needed.
         """
         if skip:
@@ -815,6 +816,7 @@ def read_index_dict(
     f: BinaryIO,
 ) -> dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
     """Read an index file and return it as a dictionary.
+
        Dict Key is tuple of path and stage number, as
             path alone is not unique
     Args:
@@ -886,6 +888,7 @@ def write_index_dict(
     extensions: Optional[list[IndexExtension]] = None,
 ) -> None:
     """Write an index file based on the contents of a dictionary.
+
     being careful to sort by path and then by stage.
     """
     entries_list = []
@@ -1252,8 +1255,7 @@ def changes_from_tree(
         tuple[Optional[bytes], Optional[bytes]],
     ]
 ]:
-    """Find the differences between the contents of a tree and
-    a working copy.
+    """Find the differences between the contents of a tree and a working copy.
 
     Args:
       names: Iterable of names in the working copy

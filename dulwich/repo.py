@@ -1491,6 +1491,7 @@ class Repo(BaseRepo):
     @replace_me(remove_in="0.26.0")
     def unstage(self, fs_paths: list[str]) -> None:
         """Unstage specific file in the index
+
         Args:
           fs_paths: a list of files to unstage,
             relative to the repository path.

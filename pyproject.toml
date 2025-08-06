@@ -98,21 +98,19 @@ ignore = [
     "ANN204",
     "ANN205",
     "ANN206",
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
-    "D105",
-    "D107",
-    "D204",
-    "D205",
-    "D417",
     "E501",  # line too long
 ]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D"]  # Don't require docstrings in tests
+"fuzzing/**/*.py" = ["D"]  # Don't require docstrings in fuzzing
+"examples/**/*.py" = ["D"]  # Don't require docstrings in examples
+"devscripts/**/*.py" = ["D"]  # Don't require docstrings in devscripts
+"docs/conf.py" = ["D"]  # Don't require docstrings in docs config
+"setup.py" = ["D"]  # Don't require docstrings in setup.py
 
 [tool.cibuildwheel]
 skip = "cp314-*"

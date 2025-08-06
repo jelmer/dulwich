@@ -334,8 +334,8 @@ def parse_timezone_format(tz_str):
 
 
 def get_user_timezones():
-    """Retrieve local timezone as described in
-    https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
+    """Retrieve local timezone as described in https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
+
     Returns: A tuple containing author timezone, committer timezone.
     """
     local_timezone = time.localtime().tm_gmtoff
@@ -391,6 +391,7 @@ def open_repo_closing(
     path_or_repo: Union[str, os.PathLike, T],
 ) -> AbstractContextManager[Union[T, Repo]]:
     """Open an argument that can be a repository or a path for a repository.
+
     returns a context manager that will close the repo on exit if the argument
     is a path, else does nothing if the argument is a repo.
     """
@@ -402,8 +403,7 @@ def open_repo_closing(
 def path_to_tree_path(
     repopath: Union[str, os.PathLike], path, tree_encoding=DEFAULT_ENCODING
 ):
-    """Convert a path to a path usable in an index, e.g. bytes and relative to
-    the repository root.
+    """Convert a path to a path usable in an index, e.g. bytes and relative to the repository root.
 
     Args:
       repopath: Repository path, absolute or relative to the cwd

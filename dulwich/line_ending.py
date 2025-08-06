@@ -323,8 +323,7 @@ def get_checkin_filter_autocrlf(
 
 
 class BlobNormalizer(FilterBlobNormalizer):
-    """An object to store computation result of which filter to apply based
-    on configuration, gitattributes, path and operation (checkin or checkout).
+    """An object to store computation result of which filter to apply based on configuration, gitattributes, path and operation (checkin or checkout).
 
     This class maintains backward compatibility while using the filter infrastructure.
     """
@@ -432,9 +431,8 @@ class BlobNormalizer(FilterBlobNormalizer):
 def normalize_blob(
     blob: Blob, conversion: Callable[[bytes], bytes], binary_detection: bool
 ) -> Blob:
-    """Takes a blob as input returns either the original blob if
-    binary_detection is True and the blob content looks like binary, else
-    return a new blob with converted data.
+    """Takes a blob as input returns either the original blob if binary_detection is True and the blob content looks like binary, else return a new blob with converted data.
+
     """
     # Read the original blob
     data = blob.data

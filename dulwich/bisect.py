@@ -32,6 +32,11 @@ class BisectState:
     """Manages the state of a bisect session."""
 
     def __init__(self, repo: Repo) -> None:
+        """Initialize BisectState.
+        
+        Args:
+            repo: Repository to perform bisect on
+        """
         self.repo = repo
         self._bisect_dir = os.path.join(repo.controldir(), "BISECT_START")
 

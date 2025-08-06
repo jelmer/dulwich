@@ -156,6 +156,7 @@ def get_depth(
     max_depth=None,
 ):
     """Return the current available depth for the given head.
+
     For commits with multiple parents, the largest possible depth will be
     returned.
 
@@ -455,6 +456,7 @@ class BaseObjectStore:
         max_depth=None,
     ):
         """Return the current available depth for the given head.
+
         For commits with multiple parents, the largest possible depth will be
         returned.
 

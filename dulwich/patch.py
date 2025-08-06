@@ -197,6 +197,14 @@ def is_binary(content: bytes) -> bool:
 
 
 def shortid(hexsha: Optional[bytes]) -> bytes:
+    """Get short object ID.
+
+    Args:
+        hexsha: Full hex SHA or None
+
+    Returns:
+        7-character short ID
+    """
     if hexsha is None:
         return b"0" * 7
     else:
@@ -204,6 +212,15 @@ def shortid(hexsha: Optional[bytes]) -> bytes:
 
 
 def patch_filename(p: Optional[bytes], root: bytes) -> bytes:
+    """Generate patch filename.
+
+    Args:
+        p: Path or None
+        root: Root directory
+
+    Returns:
+        Full patch filename
+    """
     if p is None:
         return b"/dev/null"
     else:
@@ -235,6 +252,15 @@ def write_object_diff(
     patched_new_path = patch_filename(new_path, b"b")
 
     def content(mode: Optional[int], hexsha: Optional[bytes]) -> Blob:
+        """Get blob content for a file.
+
+        Args:
+            mode: File mode
+            hexsha: Object SHA
+
+        Returns:
+            Blob object
+        """
         from typing import cast
 
         if hexsha is None:
@@ -250,6 +276,14 @@ def write_object_diff(
                 return cast(Blob, Blob.from_string(obj.as_raw_string()))
 
     def lines(content: "Blob") -> list[bytes]:
+        """Split blob content into lines.
+
+        Args:
+            content: Blob content
+
+        Returns:
+            List of lines
+        """
         if not content:
             return []
         else:
@@ -338,6 +372,14 @@ def write_blob_diff(
     patched_new_path = patch_filename(new_path, b"b")
 
     def lines(blob: Optional["Blob"]) -> list[bytes]:
+        """Split blob content into lines.
+
+        Args:
+            blob: Blob object or None
+
+        Returns:
+            List of lines
+        """
         if blob is not None:
             return blob.splitlines()
         else:

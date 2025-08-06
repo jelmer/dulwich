@@ -40,6 +40,14 @@ if TYPE_CHECKING:
 
 
 def split_email(text: bytes) -> tuple[bytes, bytes]:
+    """Split email address from name.
+
+    Args:
+        text: Full name and email (e.g. b"John Doe <john@example.com>")
+
+    Returns:
+        Tuple of (name, email)
+    """
     # TODO(jelmer): Dedupe this and the same functionality in
     # format_annotate_line.
     (name, email) = text.rsplit(b" <", 1)
@@ -50,12 +58,23 @@ class GitFastExporter:
     """Generate a fast-export output stream for Git objects."""
 
     def __init__(self, outf: BinaryIO, store: "BaseObjectStore") -> None:
+        """Initialize the fast exporter.
+
+        Args:
+            outf: Output file to write to
+            store: Object store to export from
+        """
         self.outf = outf
         self.store = store
         self.markers: dict[bytes, bytes] = {}
         self._marker_idx = 0
 
     def print_cmd(self, cmd: object) -> None:
+        """Print a command to the output stream.
+
+        Args:
+            cmd: Command object to print
+        """
         if hasattr(cmd, "__bytes__"):
             output = cmd.__bytes__()
         else:
@@ -63,15 +82,36 @@ class GitFastExporter:
         self.outf.write(output + b"\n")
 
     def _allocate_marker(self) -> bytes:
+        """Allocate a new marker.
+
+        Returns:
+            New marker as bytes
+        """
         self._marker_idx += 1
         return str(self._marker_idx).encode("ascii")
 
     def _export_blob(self, blob: Blob) -> tuple[Any, bytes]:
+        """Export a blob object.
+
+        Args:
+            blob: Blob object to export
+
+        Returns:
+            Tuple of (BlobCommand, marker)
+        """
         marker = self._allocate_marker()
         self.markers[marker] = blob.id
         return (commands.BlobCommand(marker, blob.data), marker)
 
     def emit_blob(self, blob: Blob) -> bytes:
+        """Emit a blob to the output stream.
+
+        Args:
+            blob: Blob object to emit
+
+        Returns:
+            Marker for the blob
+        """
         (cmd, marker) = self._export_blob(blob)
         self.print_cmd(cmd)
         return marker

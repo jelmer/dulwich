@@ -1247,10 +1247,22 @@ def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
 
     # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
     class _StreamWrapper:
+        """Wrapper for ColorizedDiffStream to handle string/bytes conversion."""
+
         def __init__(self, stream):
+            """Initialize a _StreamWrapper.
+
+            Args:
+              stream: The underlying stream to wrap
+            """
             self.stream = stream
 
         def write(self, data):
+            """Write data to the stream, converting strings to bytes if needed.
+
+            Args:
+              data: Data to write (str or bytes)
+            """
             if isinstance(data, str):
                 # Convert string to bytes for ColorizedDiffStream
                 self.stream.write(data.encode("utf-8"))

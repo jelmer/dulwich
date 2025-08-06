@@ -149,6 +149,17 @@ def match_glob_pattern(value: str, pattern: str) -> bool:
 
 
 def lower_key(key: ConfigKey) -> ConfigKey:
+    """Convert a config key to lowercase, preserving subsection case.
+
+    Args:
+      key: Configuration key (str, bytes, or tuple)
+
+    Returns:
+      Key with section names lowercased, subsection names preserved
+
+    Raises:
+      TypeError: If key is not str, bytes, or tuple
+    """
     if isinstance(key, (bytes, str)):
         return key.lower()
 
@@ -170,7 +181,18 @@ _T = TypeVar("_T")  # For get() default parameter
 
 
 class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
+    """A case-insensitive ordered dictionary that can store multiple values per key.
+
+    This class maintains the order of insertions and allows multiple values
+    for the same key. Keys are compared case-insensitively.
+    """
+
     def __init__(self, default_factory: Optional[Callable[[], V]] = None) -> None:
+        """Initialize a CaseInsensitiveOrderedMultiDict.
+
+        Args:
+          default_factory: Optional factory function for default values
+        """
         self._real: list[tuple[K, V]] = []
         self._keyed: dict[Any, V] = {}
         self._default_factory = default_factory
@@ -183,6 +205,18 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
         ] = None,
         default_factory: Optional[Callable[[], V]] = None,
     ) -> "CaseInsensitiveOrderedMultiDict[K, V]":
+        """Create a CaseInsensitiveOrderedMultiDict from an existing mapping.
+
+        Args:
+          dict_in: Optional mapping to initialize from
+          default_factory: Optional factory function for default values
+
+        Returns:
+          New CaseInsensitiveOrderedMultiDict instance
+
+        Raises:
+          TypeError: If dict_in is not a mapping or None
+        """
         if isinstance(dict_in, cls):
             return dict_in
 
@@ -200,14 +234,20 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
         return out
 
     def __len__(self) -> int:
+        """Return the number of unique keys in the dictionary."""
         return len(self._keyed)
 
     def keys(self) -> KeysView[K]:
+        """Return a view of the dictionary's keys."""
         return self._keyed.keys()  # type: ignore[return-value]
 
     def items(self) -> ItemsView[K, V]:
+        """Return a view of the dictionary's (key, value) pairs in insertion order."""
+
         # Return a view that iterates over the real list to preserve order
         class OrderedItemsView(ItemsView[K, V]):
+            """Items view that preserves insertion order."""
+
             def __init__(self, mapping: CaseInsensitiveOrderedMultiDict[K, V]):
                 self._mapping = mapping
 
@@ -226,16 +266,25 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
         return OrderedItemsView(self)
 
     def __iter__(self) -> Iterator[K]:
+        """Iterate over the dictionary's keys."""
         return iter(self._keyed)
 
     def values(self) -> ValuesView[V]:
+        """Return a view of the dictionary's values."""
         return self._keyed.values()
 
     def __setitem__(self, key: K, value: V) -> None:
+        """Set a value for a key, appending to existing values."""
         self._real.append((key, value))
         self._keyed[lower_key(key)] = value
 
     def set(self, key: K, value: V) -> None:
+        """Set a value for a key, replacing all existing values.
+
+        Args:
+          key: The key to set
+          value: The value to set
+        """
         # This method replaces all existing values for the key
         lower = lower_key(key)
         self._real = [(k, v) for k, v in self._real if lower_key(k) != lower]
@@ -243,6 +292,11 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
         self._keyed[lower] = value
 
     def __delitem__(self, key: K) -> None:
+        """Delete all values for a key.
+
+        Raises:
+          KeyError: If the key is not found
+        """
         lower_k = lower_key(key)
         del self._keyed[lower_k]
         for i, (actual, unused_value) in reversed(list(enumerate(self._real))):
@@ -250,9 +304,23 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
                 del self._real[i]
 
     def __getitem__(self, item: K) -> V:
+        """Get the last value for a key.
+
+        Raises:
+          KeyError: If the key is not found
+        """
         return self._keyed[lower_key(item)]
 
     def get(self, key: K, /, default: Union[V, _T, None] = None) -> Union[V, _T, None]:  # type: ignore[override]
+        """Get the last value for a key, or a default if not found.
+
+        Args:
+          key: The key to look up
+          default: Default value to return if key not found
+
+        Returns:
+          The value for the key, or default/default_factory result if not found
+        """
         try:
             return self[key]
         except KeyError:
@@ -264,12 +332,32 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
                 return None
 
     def get_all(self, key: K) -> Iterator[V]:
+        """Get all values for a key in insertion order.
+
+        Args:
+          key: The key to look up
+
+        Returns:
+          Iterator of all values for the key
+        """
         lowered_key = lower_key(key)
         for actual, value in self._real:
             if lower_key(actual) == lowered_key:
                 yield value
 
     def setdefault(self, key: K, default: Optional[V] = None) -> V:
+        """Get value for key, setting it to default if not present.
+
+        Args:
+          key: The key to look up
+          default: Default value to set if key not found
+
+        Returns:
+          The existing value or the newly set default
+
+        Raises:
+          KeyError: If key not found and no default or default_factory
+        """
         try:
             return self[key]
         except KeyError:
@@ -414,29 +502,45 @@ class ConfigDict(Config):
         )
 
     def __repr__(self) -> str:
+        """Return string representation of ConfigDict."""
         return f"{self.__class__.__name__}({self._values!r})"
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another ConfigDict."""
         return isinstance(other, self.__class__) and other._values == self._values
 
     def __getitem__(self, key: Section) -> CaseInsensitiveOrderedMultiDict[Name, Value]:
+        """Get configuration values for a section.
+
+        Raises:
+          KeyError: If section not found
+        """
         return self._values.__getitem__(key)
 
     def __setitem__(
         self, key: Section, value: CaseInsensitiveOrderedMultiDict[Name, Value]
     ) -> None:
+        """Set configuration values for a section."""
         return self._values.__setitem__(key, value)
 
     def __delitem__(self, key: Section) -> None:
+        """Delete a configuration section.
+
+        Raises:
+          KeyError: If section not found
+        """
         return self._values.__delitem__(key)
 
     def __iter__(self) -> Iterator[Section]:
+        """Iterate over configuration sections."""
         return self._values.__iter__()
 
     def __len__(self) -> int:
+        """Return the number of sections."""
         return self._values.__len__()
 
     def keys(self) -> KeysView[Section]:
+        """Return a view of section names."""
         return self._values.keys()
 
     @classmethod
@@ -750,6 +854,12 @@ class ConfigFile(ConfigDict):
         ] = None,
         encoding: Union[str, None] = None,
     ) -> None:
+        """Initialize a ConfigFile.
+
+        Args:
+          values: Optional mapping of configuration values
+          encoding: Optional encoding for the file (defaults to system encoding)
+        """
         super().__init__(values=values, encoding=encoding)
         self.path: Optional[str] = None
         self._included_paths: set[str] = set()  # Track included files to prevent cycles
@@ -1140,6 +1250,14 @@ class ConfigFile(ConfigDict):
 
 
 def get_xdg_config_home_path(*path_segments: str) -> str:
+    """Get a path in the XDG config home directory.
+
+    Args:
+      *path_segments: Path segments to join to the XDG config home
+
+    Returns:
+      Full path in XDG config home directory
+    """
     xdg_config_home = os.environ.get(
         "XDG_CONFIG_HOME",
         os.path.expanduser("~/.config/"),
@@ -1227,14 +1345,26 @@ class StackedConfig(Config):
     def __init__(
         self, backends: list[ConfigFile], writable: Optional[ConfigFile] = None
     ) -> None:
+        """Initialize a StackedConfig.
+
+        Args:
+          backends: List of config files to read from (in order of precedence)
+          writable: Optional config file to write changes to
+        """
         self.backends = backends
         self.writable = writable
 
     def __repr__(self) -> str:
+        """Return string representation of StackedConfig."""
         return f"<{self.__class__.__name__} for {self.backends!r}>"
 
     @classmethod
     def default(cls) -> "StackedConfig":
+        """Create a StackedConfig with default system/user config files.
+
+        Returns:
+          StackedConfig with default configuration files loaded
+        """
         return cls(cls.default_backends())
 
     @classmethod

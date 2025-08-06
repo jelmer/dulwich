@@ -259,6 +259,8 @@ def _decompress_path_from_stream(
 
 
 class Stage(Enum):
+    """Represents the stage of an index entry during merge conflicts."""
+
     NORMAL = 0
     MERGE_CONFLICT_ANCESTOR = 1
     MERGE_CONFLICT_THIS = 2
@@ -267,6 +269,12 @@ class Stage(Enum):
 
 @dataclass
 class SerializedIndexEntry:
+    """Represents a serialized index entry as stored in the index file.
+
+    This dataclass holds the raw data for an index entry before it's
+    parsed into the more user-friendly IndexEntry format.
+    """
+
     name: bytes
     ctime: Union[int, float, tuple[int, int]]
     mtime: Union[int, float, tuple[int, int]]
@@ -281,6 +289,11 @@ class SerializedIndexEntry:
     extended_flags: int
 
     def stage(self) -> Stage:
+        """Extract the stage from the flags field.
+
+        Returns:
+          Stage enum value indicating merge conflict state
+        """
         return Stage((self.flags & FLAG_STAGEMASK) >> FLAG_STAGESHIFT)
 
 
@@ -325,10 +338,23 @@ class TreeExtension(IndexExtension):
 
     @classmethod
     def from_bytes(cls, data: bytes) -> "TreeExtension":
+        """Parse TreeExtension from bytes.
+
+        Args:
+          data: Raw bytes to parse
+
+        Returns:
+          TreeExtension instance
+        """
         # TODO: Implement tree cache parsing
         return cls([])
 
     def to_bytes(self) -> bytes:
+        """Serialize TreeExtension to bytes.
+
+        Returns:
+          Serialized extension data
+        """
         # TODO: Implement tree cache serialization
         return b""
 
@@ -342,10 +368,23 @@ class ResolveUndoExtension(IndexExtension):
 
     @classmethod
     def from_bytes(cls, data: bytes) -> "ResolveUndoExtension":
+        """Parse ResolveUndoExtension from bytes.
+
+        Args:
+          data: Raw bytes to parse
+
+        Returns:
+          ResolveUndoExtension instance
+        """
         # TODO: Implement resolve undo parsing
         return cls([])
 
     def to_bytes(self) -> bytes:
+        """Serialize ResolveUndoExtension to bytes.
+
+        Returns:
+          Serialized extension data
+        """
         # TODO: Implement resolve undo serialization
         return b""
 
@@ -358,11 +397,25 @@ class UntrackedExtension(IndexExtension):
 
     @classmethod
     def from_bytes(cls, data: bytes) -> "UntrackedExtension":
+        """Parse UntrackedExtension from bytes.
+
+        Args:
+          data: Raw bytes to parse
+
+        Returns:
+          UntrackedExtension instance
+        """
         return cls(data)
 
 
 @dataclass
 class IndexEntry:
+    """Represents an entry in the Git index.
+
+    This is a higher-level representation of an index entry that includes
+    parsed data and convenience methods.
+    """
+
     ctime: Union[int, float, tuple[int, int]]
     mtime: Union[int, float, tuple[int, int]]
     dev: int
@@ -377,6 +430,14 @@ class IndexEntry:
 
     @classmethod
     def from_serialized(cls, serialized: SerializedIndexEntry) -> "IndexEntry":
+        """Create an IndexEntry from a SerializedIndexEntry.
+
+        Args:
+          serialized: SerializedIndexEntry to convert
+
+        Returns:
+          New IndexEntry instance
+        """
         return cls(
             ctime=serialized.ctime,
             mtime=serialized.mtime,
@@ -392,6 +453,15 @@ class IndexEntry:
         )
 
     def serialize(self, name: bytes, stage: Stage) -> SerializedIndexEntry:
+        """Serialize this entry with a given name and stage.
+
+        Args:
+          name: Path name for the entry
+          stage: Merge conflict stage
+
+        Returns:
+          SerializedIndexEntry ready for writing to disk
+        """
         # Clear out any existing stage bits, then set them from the Stage.
         new_flags = self.flags & ~FLAG_STAGEMASK
         new_flags |= stage.value << FLAG_STAGESHIFT
@@ -411,6 +481,11 @@ class IndexEntry:
         )
 
     def stage(self) -> Stage:
+        """Get the merge conflict stage of this entry.
+
+        Returns:
+          Stage enum value
+        """
         return Stage((self.flags & FLAG_STAGEMASK) >> FLAG_STAGESHIFT)
 
     @property
@@ -889,6 +964,11 @@ class Index:
 
     @property
     def path(self) -> Union[bytes, str]:
+        """Get the path to the index file.
+
+        Returns:
+          Path to the index file
+        """
         return self._filename
 
     def __repr__(self) -> str:
@@ -992,6 +1072,11 @@ class Index:
             yield path, entry.sha, cleanup_mode(entry.mode)
 
     def has_conflicts(self) -> bool:
+        """Check if the index contains any conflicted entries.
+
+        Returns:
+          True if any entries are conflicted, False otherwise
+        """
         for value in self._byname.values():
             if isinstance(value, ConflictedIndexEntry):
                 return True
@@ -1013,18 +1098,38 @@ class Index:
     def iteritems(
         self,
     ) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
+        """Iterate over (path, entry) pairs in the index.
+
+        Returns:
+          Iterator of (path, entry) tuples
+        """
         return iter(self._byname.items())
 
     def items(self) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
+        """Get an iterator over (path, entry) pairs.
+
+        Returns:
+          Iterator of (path, entry) tuples
+        """
         return iter(self._byname.items())
 
     def update(
         self, entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
     ) -> None:
+        """Update the index with multiple entries.
+
+        Args:
+          entries: Dictionary mapping paths to index entries
+        """
         for key, value in entries.items():
             self[key] = value
 
     def paths(self) -> Generator[bytes, None, None]:
+        """Generate all paths in the index.
+
+        Yields:
+          Path names as bytes
+        """
         yield from self._byname.keys()
 
     def changes_from_tree(
@@ -1221,6 +1326,12 @@ if sys.platform == "win32":
     # https://github.com/jelmer/dulwich/issues/1005
 
     class WindowsSymlinkPermissionError(PermissionError):
+        """Windows-specific error for symlink creation failures.
+
+        This error is raised when symlink creation fails on Windows,
+        typically due to lack of developer mode or administrator privileges.
+        """
+
         def __init__(self, errno: int, msg: str, filename: Optional[str]) -> None:
             super(PermissionError, self).__init__(
                 errno,
@@ -1235,6 +1346,17 @@ if sys.platform == "win32":
         *,
         dir_fd: Optional[int] = None,
     ) -> None:
+        """Create a symbolic link on Windows with better error handling.
+
+        Args:
+          src: Source path for the symlink
+          dst: Destination path where symlink will be created
+          target_is_directory: Whether the target is a directory
+          dir_fd: Optional directory file descriptor
+
+        Raises:
+          WindowsSymlinkPermissionError: If symlink creation fails due to permissions
+        """
         try:
             return os.symlink(
                 src, dst, target_is_directory=target_is_directory, dir_fd=dir_fd
@@ -1346,10 +1468,26 @@ def get_path_element_normalizer(config: "Config") -> Callable[[bytes], bytes]:
 
 
 def validate_path_element_default(element: bytes) -> bool:
+    """Validate a path element using default rules.
+
+    Args:
+      element: Path element to validate
+
+    Returns:
+      True if path element is valid, False otherwise
+    """
     return _normalize_path_element_default(element) not in INVALID_DOTNAMES
 
 
 def validate_path_element_ntfs(element: bytes) -> bool:
+    """Validate a path element using NTFS filesystem rules.
+
+    Args:
+      element: Path element to validate
+
+    Returns:
+      True if path element is valid for NTFS, False otherwise
+    """
     normalized = _normalize_path_element_ntfs(element)
     if normalized in INVALID_DOTNAMES:
         return False
@@ -2368,6 +2506,17 @@ def _fs_to_tree_path(fs_path: Union[str, bytes], tree_encoding: str = "utf-8") -
 
 
 def index_entry_from_directory(st: os.stat_result, path: bytes) -> Optional[IndexEntry]:
+    """Create an index entry for a directory.
+
+    This is only used for submodules (directories containing .git).
+
+    Args:
+      st: Stat result for the directory
+      path: Path to the directory
+
+    Returns:
+      IndexEntry for a submodule, or None if not a submodule
+    """
     if os.path.exists(os.path.join(path, b".git")):
         head = read_submodule_head(path)
         if head is None:

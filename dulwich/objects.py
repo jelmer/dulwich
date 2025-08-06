@@ -135,6 +135,14 @@ def hex_to_sha(hex: Union[bytes, str]) -> bytes:
 
 
 def valid_hexsha(hex: Union[bytes, str]) -> bool:
+    """Check if a string is a valid hex SHA.
+
+    Args:
+      hex: Hex string to check
+
+    Returns:
+      True if valid hex SHA, False otherwise
+    """
     if len(hex) != 40:
         return False
     try:
@@ -185,10 +193,24 @@ def serializable_property(name: str, docstring: Optional[str] = None) -> propert
     """A property that helps tracking whether serialization is necessary."""
 
     def set(obj: "ShaFile", value: object) -> None:
+        """Set the property value and mark the object as needing serialization.
+
+        Args:
+          obj: The ShaFile object
+          value: The value to set
+        """
         setattr(obj, "_" + name, value)
         obj._needs_serialization = True
 
     def get(obj: "ShaFile") -> object:
+        """Get the property value.
+
+        Args:
+          obj: The ShaFile object
+
+        Returns:
+          The property value
+        """
         return getattr(obj, "_" + name)
 
     return property(get, set, doc=docstring)
@@ -691,6 +713,17 @@ class Blob(ShaFile):
 
     @classmethod
     def from_path(cls, path: Union[str, bytes]) -> "Blob":
+        """Read a blob from a file on disk.
+
+        Args:
+          path: Path to the blob file
+
+        Returns:
+          A Blob object
+
+        Raises:
+          NotBlobError: If the file is not a blob
+        """
         blob = ShaFile.from_path(path)
         if not isinstance(blob, cls):
             raise NotBlobError(_path_to_bytes(path))
@@ -839,6 +872,17 @@ class Tag(ShaFile):
 
     @classmethod
     def from_path(cls, filename: Union[str, bytes]) -> "Tag":
+        """Read a tag from a file on disk.
+
+        Args:
+          filename: Path to the tag file
+
+        Returns:
+          A Tag object
+
+        Raises:
+          NotTagError: If the file is not a tag
+        """
         tag = ShaFile.from_path(filename)
         if not isinstance(tag, cls):
             raise NotTagError(_path_to_bytes(filename))
@@ -991,6 +1035,12 @@ class Tag(ShaFile):
     signature = serializable_property("signature", "Optional detached GPG signature")
 
     def sign(self, keyid: Optional[str] = None) -> None:
+        """Sign this tag with a GPG key.
+
+        Args:
+          keyid: Optional GPG key ID to use for signing. If not specified,
+                 the default GPG key will be used.
+        """
         import gpg
 
         with gpg.Context(armor=True) as c:
@@ -1191,6 +1241,17 @@ class Tree(ShaFile):
 
     @classmethod
     def from_path(cls, filename: Union[str, bytes]) -> "Tree":
+        """Read a tree from a file on disk.
+
+        Args:
+          filename: Path to the tree file
+
+        Returns:
+          A Tree object
+
+        Raises:
+          NotTreeError: If the file is not a tree
+        """
         tree = ShaFile.from_path(filename)
         if not isinstance(tree, cls):
             raise NotTreeError(_path_to_bytes(filename))
@@ -1305,6 +1366,11 @@ class Tree(ShaFile):
         return list(serialize_tree(self.iteritems()))
 
     def as_pretty_string(self) -> str:
+        """Return a human-readable string representation of this tree.
+
+        Returns:
+          Pretty-printed tree entries
+        """
         text: list[str] = []
         for name, mode, hexsha in self.iteritems():
             text.append(pretty_format_tree_entry(name, mode, hexsha))
@@ -1541,6 +1607,17 @@ class Commit(ShaFile):
 
     @classmethod
     def from_path(cls, path: Union[str, bytes]) -> "Commit":
+        """Read a commit from a file on disk.
+
+        Args:
+          path: Path to the commit file
+
+        Returns:
+          A Commit object
+
+        Raises:
+          NotCommitError: If the file is not a commit
+        """
         commit = ShaFile.from_path(path)
         if not isinstance(commit, cls):
             raise NotCommitError(_path_to_bytes(path))
@@ -1653,6 +1730,12 @@ class Commit(ShaFile):
         # TODO: optionally check for duplicate parents
 
     def sign(self, keyid: Optional[str] = None) -> None:
+        """Sign this commit with a GPG key.
+
+        Args:
+          keyid: Optional GPG key ID to use for signing. If not specified,
+                 the default GPG key will be used.
+        """
         import gpg
 
         with gpg.Context(armor=True) as c:

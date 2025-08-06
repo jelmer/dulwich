@@ -331,6 +331,8 @@ def _set_filesystem_hidden(path) -> None:
 
 
 class ParentsProvider:
+    """Provides parents for commits, handling grafts and shallow commits."""
+
     def __init__(self, store, grafts={}, shallows=[]) -> None:
         self.store = store
         self.grafts = grafts
@@ -340,6 +342,15 @@ class ParentsProvider:
         self.commit_graph = store.get_commit_graph()
 
     def get_parents(self, commit_id, commit=None):
+        """Get the parents of a commit.
+
+        Args:
+          commit_id: The commit SHA to get parents for
+          commit: Optional commit object to avoid fetching
+
+        Returns:
+          List of parent commit SHAs
+        """
         try:
             return self.grafts[commit_id]
         except KeyError:
@@ -581,7 +592,14 @@ class BaseRepo:
                 return None
 
             class DummyMissingObjectFinder:
+                """Dummy finder that returns no missing objects."""
+
                 def get_remote_has(self) -> None:
+                    """Get remote has (always returns None).
+
+                    Returns:
+                      None
+                    """
                     return None
 
                 def __len__(self) -> int:
@@ -607,6 +625,14 @@ class BaseRepo:
         parents_provider = ParentsProvider(self.object_store, shallows=current_shallow)
 
         def get_parents(commit):
+            """Get parents for a commit using the parents provider.
+
+            Args:
+              commit: Commit object
+
+            Returns:
+              List of parent commit SHAs
+            """
             return parents_provider.get_parents(commit.id, commit)
 
         return MissingObjectFinder(
@@ -708,6 +734,11 @@ class BaseRepo:
         return self.object_store[sha]
 
     def parents_provider(self) -> ParentsProvider:
+        """Get a parents provider for this repository.
+
+        Returns:
+          ParentsProvider instance configured with grafts and shallows
+        """
         return ParentsProvider(
             self.object_store,
             grafts=self._graftpoints,
@@ -1581,6 +1612,15 @@ class Repo(BaseRepo):
 
         # Add gitdir matchers
         def match_gitdir(pattern: str, case_sensitive: bool = True) -> bool:
+            """Match gitdir against a pattern.
+
+            Args:
+              pattern: Pattern to match against
+              case_sensitive: Whether to match case-sensitively
+
+            Returns:
+              True if gitdir matches pattern
+            """
             # Handle relative patterns (starting with ./)
             if pattern.startswith("./"):
                 # Can't handle relative patterns without config directory context
@@ -1618,6 +1658,14 @@ class Repo(BaseRepo):
 
         # Add onbranch matcher
         def match_onbranch(pattern: str) -> bool:
+            """Match current branch against a pattern.
+
+            Args:
+              pattern: Pattern to match against
+
+            Returns:
+              True if current branch matches pattern
+            """
             try:
                 # Get the current branch using refs
                 ref_chain, _ = self.refs.follow(b"HEAD")
@@ -1640,6 +1688,11 @@ class Repo(BaseRepo):
         return matchers
 
     def get_worktree_config(self) -> "ConfigFile":
+        """Get the worktree-specific config.
+
+        Returns:
+          ConfigFile object for the worktree config
+        """
         from .config import ConfigFile
 
         path = os.path.join(self.commondir(), "config.worktree")
@@ -2060,9 +2113,19 @@ class MemoryRepo(BaseRepo):
         self._reflog.append(args)
 
     def set_description(self, description) -> None:
+        """Set the description for this repository.
+
+        Args:
+          description: Text to set as description
+        """
         self._description = description
 
     def get_description(self):
+        """Get the description of this repository.
+
+        Returns:
+          Repository description as bytes
+        """
         return self._description
 
     def _determine_file_mode(self):

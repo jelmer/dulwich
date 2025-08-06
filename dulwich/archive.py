@@ -51,10 +51,23 @@ class ChunkedBytesIO:
     """
 
     def __init__(self, contents: list[bytes]) -> None:
+        """Initialize ChunkedBytesIO.
+        
+        Args:
+            contents: List of byte chunks
+        """
         self.contents = contents
         self.pos = (0, 0)
 
     def read(self, maxbytes: Optional[int] = None) -> bytes:
+        """Read bytes from the chunked stream.
+        
+        Args:
+            maxbytes: Maximum number of bytes to read (None for all)
+        
+        Returns:
+            Bytes read
+        """
         if maxbytes is None or maxbytes < 0:
             remaining = None
         else:
@@ -98,6 +111,7 @@ def tar_stream(
       tree: Tree object for the tree root
       mtime: UNIX timestamp that is assigned as the modification time for
         all files, and the gzip header modification time if format='gz'
+      prefix: Optional prefix to prepend to all paths in the archive
       format: Optional compression format for tarball
     Returns:
       Bytestrings
@@ -150,8 +164,8 @@ def tar_stream(
 def _walk_tree(
     store: "BaseObjectStore", tree: "Tree", root: bytes = b""
 ) -> Generator[tuple[bytes, "TreeEntry"], None, None]:
-    """Recursively walk a dulwich Tree, yielding tuples of
-    (absolute path, TreeEntry) along the way.
+    """Recursively walk a dulwich Tree, yielding tuples of (absolute path, TreeEntry) along the way.
+
     """
     for entry in tree.iteritems():
         entry_abspath = posixpath.join(root, entry.path)

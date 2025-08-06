@@ -111,10 +111,17 @@ class UnresolvedDeltas(Exception):
     """Delta objects could not be resolved."""
 
     def __init__(self, shas: list[bytes]) -> None:
+        """Initialize UnresolvedDeltas exception.
+
+        Args:
+            shas: List of SHA hashes for unresolved delta objects
+        """
         self.shas = shas
 
 
 class ObjectContainer(Protocol):
+    """Protocol for objects that can contain git objects."""
+
     def add_object(self, obj: ShaFile) -> None:
         """Add a single object to this object store."""
 
@@ -127,6 +134,7 @@ class ObjectContainer(Protocol):
 
         Args:
           objects: Iterable over a list of (object, path) tuples
+          progress: Progress callback for object insertion
         """
 
     def __contains__(self, sha1: bytes) -> bool:
@@ -145,15 +153,34 @@ class ObjectContainer(Protocol):
 
 
 class PackedObjectContainer(ObjectContainer):
+    """Container for objects packed in a pack file."""
+
     def get_unpacked_object(
         self, sha1: bytes, *, include_comp: bool = False
     ) -> "UnpackedObject":
-        """Get a raw unresolved object."""
+        """Get a raw unresolved object.
+
+        Args:
+            sha1: SHA-1 hash of the object
+            include_comp: Whether to include compressed data
+
+        Returns:
+            UnpackedObject instance
+        """
         raise NotImplementedError(self.get_unpacked_object)
 
     def iterobjects_subset(
         self, shas: Iterable[bytes], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
+        """Iterate over a subset of objects.
+
+        Args:
+            shas: Iterable of object SHAs to retrieve
+            allow_missing: If True, skip missing objects
+
+        Returns:
+            Iterator of ShaFile objects
+        """
         raise NotImplementedError(self.iterobjects_subset)
 
     def iter_unpacked_subset(
@@ -181,9 +208,11 @@ class UnpackedObjectStream:
     """Abstract base class for a stream of unpacked objects."""
 
     def __iter__(self) -> Iterator["UnpackedObject"]:
+        """Iterate over unpacked objects."""
         raise NotImplementedError(self.__iter__)
 
     def __len__(self) -> int:
+        """Return the number of objects in the stream."""
         raise NotImplementedError(self.__len__)
 
 
@@ -194,6 +223,10 @@ def take_msb_bytes(
 
     Args:
       read: Read function
+      crc32: Optional CRC32 checksum to update
+
+    Returns:
+      Tuple of (list of bytes read, updated CRC32 or None)
     """
     ret: list[int] = []
     while len(ret) == 0 or ret[-1] & 0x80:
@@ -208,6 +241,11 @@ class PackFileDisappeared(Exception):
     """Raised when a pack file unexpectedly disappears."""
 
     def __init__(self, obj: object) -> None:
+        """Initialize PackFileDisappeared exception.
+
+        Args:
+            obj: The object that triggered the exception
+        """
         self.obj = obj
 
 
@@ -259,6 +297,17 @@ class UnpackedObject:
         decomp_chunks: Optional[list[bytes]] = None,
         offset: Optional[int] = None,
     ) -> None:
+        """Initialize an UnpackedObject.
+
+        Args:
+            pack_type_num: Type number of this object in the pack
+            delta_base: Delta base (offset or SHA) if this is a delta object
+            decomp_len: Decompressed length of this object
+            crc32: CRC32 checksum
+            sha: SHA-1 hash of the object
+            decomp_chunks: Decompressed chunks
+            offset: Offset in the pack file
+        """
         self.offset = offset
         self._sha = sha
         self.pack_type_num = pack_type_num
@@ -301,6 +350,7 @@ class UnpackedObject:
             return self.decomp_chunks
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another UnpackedObject."""
         if not isinstance(other, UnpackedObject):
             return False
         for slot in self.__slots__:
@@ -507,6 +557,7 @@ class PackIndex:
     hash_size = 20
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another PackIndex."""
         if not isinstance(other, PackIndex):
             return False
 
@@ -546,6 +597,14 @@ class PackIndex:
 
     @replace_me(since="0.21.0", remove_in="0.23.0")
     def object_index(self, sha: bytes) -> int:
+        """Return the index for the given SHA.
+
+        Args:
+            sha: SHA-1 hash
+
+        Returns:
+            Index position
+        """
         return self.object_offset(sha)
 
     def object_offset(self, sha: bytes) -> int:
@@ -702,6 +761,7 @@ class FilePackIndex(PackIndex):
         return os.fspath(self._filename)
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another FilePackIndex."""
         # Quick optimization:
         if (
             isinstance(other, FilePackIndex)
@@ -866,6 +926,14 @@ class PackIndex1(FilePackIndex):
     def __init__(
         self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
     ) -> None:
+        """Initialize a version 1 pack index.
+
+        Args:
+            filename: Path to the index file
+            file: Optional file object
+            contents: Optional mmap'd contents
+            size: Optional size of the index
+        """
         super().__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
@@ -897,6 +965,14 @@ class PackIndex2(FilePackIndex):
     def __init__(
         self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
     ) -> None:
+        """Initialize a version 2 pack index.
+
+        Args:
+            filename: Path to the index file
+            file: Optional file object
+            contents: Optional mmap'd contents
+            size: Optional size of the index
+        """
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
             raise AssertionError("Not a v2 pack index file")
@@ -950,6 +1026,14 @@ class PackIndex3(FilePackIndex):
     def __init__(
         self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
     ) -> None:
+        """Initialize a version 3 pack index.
+
+        Args:
+            filename: Path to the index file
+            file: Optional file object
+            contents: Optional mmap'd contents
+            size: Optional size of the index
+        """
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
             raise AssertionError("Not a v3 pack index file")
@@ -1134,6 +1218,13 @@ class PackStreamReader:
     """
 
     def __init__(self, read_all, read_some=None, zlib_bufsize=_ZLIB_BUFSIZE) -> None:
+        """Initialize a PackStreamReader.
+
+        Args:
+            read_all: Function to read all requested bytes
+            read_some: Function to read some bytes (defaults to read_all)
+            zlib_bufsize: Buffer size for zlib decompression
+        """
         self.read_all = read_all
         if read_some is None:
             self.read_some = read_all
@@ -1213,6 +1304,7 @@ class PackStreamReader:
         return self._read(self.read_some, size)
 
     def __len__(self) -> int:
+        """Return the number of objects in this pack."""
         return self._num_objects
 
     def read_objects(self, compute_crc32=False) -> Iterator[UnpackedObject]:
@@ -1483,9 +1575,11 @@ class PackData:
         self._file.close()
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager."""
         self.close()
 
     def __eq__(self, other):
@@ -1549,6 +1643,7 @@ class PackData:
         Args:
           progress: Progress function, called with current and total
             object count.
+          resolve_ext_ref: Optional function to resolve external references
         Returns: iterator of tuples with (sha, offset, crc32)
         """
         num_objects = self._num_objects
@@ -1568,6 +1663,7 @@ class PackData:
         Args:
           progress: Progress function, called with current and total
             object count
+          resolve_ext_ref: Optional function to resolve external references
         Returns: Iterator of tuples with (sha, offset, crc32)
         """
         return sorted(
@@ -1580,6 +1676,7 @@ class PackData:
         Args:
           filename: Index filename.
           progress: Progress report function
+          resolve_ext_ref: Optional function to resolve external references
         Returns: Checksum of index file
         """
         entries = self.sorted_entries(
@@ -1594,6 +1691,7 @@ class PackData:
         Args:
           filename: Index filename.
           progress: Progress report function
+          resolve_ext_ref: Optional function to resolve external references
         Returns: Checksum of index file
         """
         entries = self.sorted_entries(
@@ -1898,6 +1996,7 @@ class DeltaChainIterator(Generic[T]):
         return self._walk_all_chains()
 
     def ext_refs(self):
+        """Return external references."""
         return self._ext_refs
 
 
@@ -3168,8 +3267,8 @@ class Pack:
 
     @classmethod
     def from_lazy_objects(cls, data_fn, idx_fn):
-        """Create a new pack object from callables to load pack data and
-        index objects.
+        """Create a new pack object from callables to load pack data and index objects.
+
         """
         ret = cls("")
         ret._data_load = data_fn

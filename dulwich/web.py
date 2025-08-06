@@ -578,8 +578,8 @@ class HTTPGitApplication:
 
 
 class GunzipFilter:
-    """WSGI middleware that unzips gzip-encoded requests before
-    passing on to the underlying application.
+    """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application.
+
     """
 
     def __init__(self, application) -> None:
@@ -600,8 +600,8 @@ class GunzipFilter:
 
 
 class LimitedInputFilter:
-    """WSGI middleware that limits the input length of a request to that
-    specified in Content-Length.
+    """WSGI middleware that limits the input length of a request to that specified in Content-Length.
+
     """
 
     def __init__(self, application) -> None:
@@ -621,8 +621,8 @@ class LimitedInputFilter:
 
 
 def make_wsgi_chain(*args, **kwargs):
-    """Factory function to create an instance of HTTPGitApplication,
-    correctly wrapped with needed middleware.
+    """Factory function to create an instance of HTTPGitApplication, correctly wrapped with needed middleware.
+
     """
     app = HTTPGitApplication(*args, **kwargs)
     wrapped_app = LimitedInputFilter(GunzipFilter(app))

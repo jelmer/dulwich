@@ -97,7 +97,14 @@ cache_length = 20
 
 
 class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
+    """Find missing objects required for pack generation."""
+
     def next(self) -> Optional[tuple[bytes, int, Union[bytes, None]]]:
+        """Get the next missing object.
+
+        Returns:
+          Tuple of (sha, pack_type_num, name) or None if no more objects
+        """
         while True:
             if not self.objects_to_send:
                 return None
@@ -179,6 +186,15 @@ def swift_load_pack_index(scon: "SwiftConnector", filename: str) -> "PackIndex":
 
 
 def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
+    """Create pack info file contents.
+
+    Args:
+      pack_data: The pack data object
+      pack_index: The pack index object
+
+    Returns:
+      Compressed JSON bytes containing pack information
+    """
     pack = Pack.from_objects(pack_data, pack_index)
     info: dict = {}
     for obj in pack.iterobjects():
@@ -213,6 +229,16 @@ def load_pack_info(
     scon: Optional["SwiftConnector"] = None,
     file: Optional[BinaryIO] = None,
 ) -> Optional[dict]:
+    """Load pack info from Swift or file.
+
+    Args:
+      filename: The pack info filename
+      scon: Optional Swift connector to use for loading
+      file: Optional file object to read from instead
+
+    Returns:
+      Dictionary containing pack information or None if not found
+    """
     if not file:
         if scon is None:
             return None
@@ -233,7 +259,7 @@ def load_pack_info(
 
 
 class SwiftException(Exception):
-    pass
+    """Exception raised for Swift-related errors."""
 
 
 class SwiftConnector:
@@ -281,6 +307,14 @@ class SwiftConnector:
         )
 
     def swift_auth_v1(self) -> tuple[str, str]:
+        """Authenticate with Swift using v1 authentication.
+
+        Returns:
+          Tuple of (storage_url, auth_token)
+
+        Raises:
+          SwiftException: If authentication fails
+        """
         self.user = self.user.replace(";", ":")
         auth_httpclient = HTTPClient.from_url(
             self.auth_url,
@@ -304,6 +338,14 @@ class SwiftConnector:
         return storage_url, token
 
     def swift_auth_v2(self) -> tuple[str, str]:
+        """Authenticate with Swift using v2 authentication.
+
+        Returns:
+          Tuple of (storage_url, auth_token)
+
+        Raises:
+          SwiftException: If authentication fails
+        """
         self.tenant, self.user = self.user.split(";")
         auth_dict = {}
         auth_dict["auth"] = {
@@ -615,6 +657,14 @@ class SwiftPackData(PackData):
     def get_object_at(
         self, offset: int
     ) -> tuple[int, Union[tuple[Union[bytes, int], list[bytes]], list[bytes]]]:
+        """Get the object at a specific offset in the pack.
+
+        Args:
+          offset: The offset in the pack file
+
+        Returns:
+          Tuple of (pack_type_num, object_data)
+        """
         if offset in self._offset_cache:
             return self._offset_cache[offset]
         assert offset >= self._header_size
@@ -625,11 +675,16 @@ class SwiftPackData(PackData):
         return (unpacked.pack_type_num, obj_data)
 
     def get_stored_checksum(self) -> bytes:
+        """Get the stored checksum for this pack.
+
+        Returns:
+          The pack checksum as bytes
+        """
         pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
         return pack_reader.read_checksum()
 
     def close(self) -> None:
-        pass
+        """Close the pack data (no-op for Swift)."""
 
 
 class SwiftPack(Pack):
@@ -698,6 +753,14 @@ class SwiftObjectStore(PackBasedObjectStore):
         return iter([])
 
     def pack_info_get(self, sha: bytes) -> Optional[tuple]:
+        """Get pack info for a specific SHA.
+
+        Args:
+          sha: The SHA to look up
+
+        Returns:
+          Pack info tuple or None if not found
+        """
         for pack in self.packs:
             if sha in pack:
                 if hasattr(pack, "pack_info"):
@@ -748,6 +811,11 @@ class SwiftObjectStore(PackBasedObjectStore):
         f = BytesIO()
 
         def commit() -> Optional["SwiftPack"]:
+            """Commit the pack to Swift storage.
+
+            Returns:
+              The created SwiftPack or None if empty
+            """
             f.seek(0)
             pack = PackData(file=f, filename="")
             entries = pack.sorted_entries()
@@ -770,11 +838,16 @@ class SwiftObjectStore(PackBasedObjectStore):
                 return None
 
         def abort() -> None:
-            pass
+            """Abort the pack operation (no-op)."""
 
         return f, commit, abort
 
     def add_object(self, obj: object) -> None:
+        """Add a single object to the store.
+
+        Args:
+          obj: The object to add
+        """
         self.add_objects(
             [
                 (obj, None),  # type: ignore
@@ -946,6 +1019,11 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         return True
 
     def allkeys(self) -> Iterator[bytes]:
+        """Get all reference names.
+
+        Returns:
+          Iterator of reference names as bytes
+        """
         try:
             self._refs[b"HEAD"] = self._refs[b"refs/heads/master"]
         except KeyError:
@@ -954,6 +1032,8 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
 
 class SwiftRepo(BaseRepo):
+    """A Git repository backed by Swift object storage."""
+
     def __init__(self, root: str, conf: ConfigParser) -> None:
         """Init a Git bare Repository on top of a Swift container.
 
@@ -1020,17 +1100,31 @@ class SwiftRepo(BaseRepo):
 
 
 class SwiftSystemBackend(Backend):
+    """Backend for serving Git repositories from Swift."""
+
     def __init__(self, logger: "logging.Logger", conf: ConfigParser) -> None:
         self.conf = conf
         self.logger = logger
 
     def open_repository(self, path: str) -> "BackendRepo":
+        """Open a repository at the given path.
+
+        Args:
+          path: Path to the repository in Swift
+
+        Returns:
+          SwiftRepo instance
+        """
         self.logger.info("opening repository at %s", path)
         return cast("BackendRepo", SwiftRepo(path, self.conf))
 
 
 def cmd_daemon(args: list) -> None:
-    """Entry point for starting a TCP git server."""
+    """Start a TCP git server for Swift repositories.
+
+    Args:
+      args: Command line arguments
+    """
     import optparse
 
     parser = optparse.OptionParser()
@@ -1082,6 +1176,11 @@ def cmd_daemon(args: list) -> None:
 
 
 def cmd_init(args: list) -> None:
+    """Initialize a new Git repository in Swift.
+
+    Args:
+      args: Command line arguments
+    """
     import optparse
 
     parser = optparse.OptionParser()
@@ -1103,6 +1202,11 @@ def cmd_init(args: list) -> None:
 
 
 def main(argv: list = sys.argv) -> None:
+    """Main entry point for Swift Git command line interface.
+
+    Args:
+      argv: Command line arguments
+    """
     commands = {
         "init": cmd_init,
         "daemon": cmd_daemon,

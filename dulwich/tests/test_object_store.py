@@ -125,8 +125,8 @@ class ObjectStoreTests:
         self.store.add_objects([])
 
     def test_store_resilience(self) -> None:
-        """Test if updating an existing stored object doesn't erase the
-        object from the store.
+        """Test if updating an existing stored object doesn't erase the object from the store.
+
         """
         test_object = make_object(Blob, data=b"data")
 

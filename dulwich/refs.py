@@ -530,6 +530,7 @@ class DictRefsContainer(RefsContainer):
     """
 
     def __init__(self, refs, logger=None) -> None:
+        """Initialize DictRefsContainer."""
         super().__init__(logger=logger)
         self._refs = refs
         self._peeled: dict[bytes, ObjectID] = {}
@@ -818,6 +819,7 @@ class DiskRefsContainer(RefsContainer):
         worktree_path: Optional[Union[str, bytes, os.PathLike]] = None,
         logger=None,
     ) -> None:
+        """Initialize DiskRefsContainer."""
         super().__init__(logger=logger)
         # Convert path-like objects to strings, then to bytes for Git compatibility
         self.path = os.fsencode(os.fspath(path))
@@ -1046,6 +1048,9 @@ class DiskRefsContainer(RefsContainer):
         Args:
           name: Name of the ref to set
           other: Name of the ref to point at
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message to describe the change
         """
         self._check_refname(name)
@@ -1090,6 +1095,9 @@ class DiskRefsContainer(RefsContainer):
           old_ref: The old sha the refname must refer to, or None to set
             unconditionally.
           new_ref: The new sha the refname will refer to.
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Set message for reflog
         Returns: True if the set was successful, False otherwise.
         """
@@ -1168,6 +1176,9 @@ class DiskRefsContainer(RefsContainer):
         Args:
           name: The refname to set.
           ref: The new sha the refname will refer to.
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message for reflog
         Returns: True if the add was successful, False otherwise.
         """
@@ -1220,6 +1231,9 @@ class DiskRefsContainer(RefsContainer):
           name: The refname to delete.
           old_ref: The old sha the refname must refer to, or None to
             delete unconditionally.
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message
         Returns: True if the delete was successful, False otherwise.
         """

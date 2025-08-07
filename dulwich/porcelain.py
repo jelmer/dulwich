@@ -1182,6 +1182,7 @@ def print_commit(commit, decode, outstream=sys.stdout) -> None:
 
     Args:
       commit: A `Commit` object
+      decode: Function to decode commit data
       outstream: A stream file to write to
     """
     outstream.write("-" * 50 + "\n")
@@ -1653,6 +1654,7 @@ def submodule_update(
       paths: Optional list of specific submodule paths to update. If None, updates all.
       init: If True, initialize submodules first
       force: Force update even if local changes exist
+      errstream: Error stream for error messages
     """
     from .submodule import iter_cached_submodules
 
@@ -1795,6 +1797,7 @@ def tag_create(
       sign: GPG Sign the tag (bool, defaults to False,
         pass True to use default GPG key,
         pass a str containing Key ID to use a specific GPG key)
+      encoding: Encoding to use for tag messages
     """
     with open_repo_closing(repo) as r:
         object = parse_object(r, objectish)
@@ -2187,6 +2190,7 @@ def push(
       outstream: A stream file to write output
       errstream: A stream file to write errors
       force: Force overwriting refs
+      **kwargs: Additional keyword arguments for the client
     """
     # Open the repo
     with open_repo_closing(repo) as r:
@@ -2315,6 +2319,7 @@ def pull(
         feature, and ignored otherwise.
       protocol_version: desired Git protocol version. By default the highest
         mutually supported protocol version will be used
+      **kwargs: Additional keyword arguments for the client
     """
     # Open the repo
     with open_repo_closing(repo) as r:
@@ -3033,6 +3038,8 @@ def fetch(
       depth: Depth to fetch at
       prune: Prune remote removed refs
       prune_tags: Prune reomte removed tags
+      force: Force fetching even if it would overwrite local changes
+      **kwargs: Additional keyword arguments for the client
     Returns:
       Dictionary with refs on the remote
     """
@@ -3122,6 +3129,7 @@ def ls_remote(remote, config: Optional[Config] = None, **kwargs):
     Args:
       remote: Remote repository location
       config: Configuration to use
+      **kwargs: Additional keyword arguments for the client
     Returns:
       LsRemoteResult object with refs and symrefs
     """
@@ -3630,6 +3638,7 @@ def reset_file(
       repo: dulwich Repo object
       file_path: file to reset, relative to the repository path
       target: branch or commit or b'HEAD' to reset
+      symlink_fn: Function to use for creating symlinks
     """
     tree = parse_tree(repo, treeish=target)
     tree_path = _fs_to_tree_path(file_path)
@@ -4276,7 +4285,7 @@ def cherry_pick(
       repo: Repository to cherry-pick into
       committish: Commit to cherry-pick (can be None only when ``continue_`` or abort is True)
       no_commit: If True, do not create a commit after applying changes
-      ``continue_``: Continue an in-progress cherry-pick after resolving conflicts
+      continue_: Continue an in-progress cherry-pick after resolving conflicts
       abort: Abort an in-progress cherry-pick
 
     Returns:

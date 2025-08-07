@@ -38,6 +38,11 @@ class RebaseConflict(RebaseError):
     """Raised when a rebase conflict occurs."""
 
     def __init__(self, conflicted_files: list[bytes]):
+        """Initialize RebaseConflict.
+
+        Args:
+          conflicted_files: List of conflicted file paths
+        """
         self.conflicted_files = conflicted_files
         super().__init__(
             f"Conflicts in: {', '.join(f.decode('utf-8', 'replace') for f in conflicted_files)}"
@@ -197,6 +202,11 @@ class MemoryRebaseStateManager:
     """Manages rebase state in memory for MemoryRepo."""
 
     def __init__(self, repo: Repo) -> None:
+        """Initialize MemoryRebaseStateManager.
+
+        Args:
+          repo: Repository instance
+        """
         self.repo = repo
         self._state: Optional[dict] = None
 

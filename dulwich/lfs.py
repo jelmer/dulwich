@@ -91,10 +91,12 @@ class LFSStore:
     """Stores objects on disk, indexed by SHA256."""
 
     def __init__(self, path: str) -> None:
+        """Initialize LFSStore."""
         self.path = path
 
     @classmethod
     def create(cls, lfs_dir: str) -> "LFSStore":
+        """Create a new LFS store."""
         if not os.path.isdir(lfs_dir):
             os.mkdir(lfs_dir)
         tmp_dir = os.path.join(lfs_dir, "tmp")
@@ -107,6 +109,7 @@ class LFSStore:
 
     @classmethod
     def from_repo(cls, repo: "Repo", create: bool = False) -> "LFSStore":
+        """Create LFS store from repository."""
         lfs_dir = os.path.join(repo.controldir(), "lfs")
         if create:
             return cls.create(lfs_dir)
@@ -114,6 +117,7 @@ class LFSStore:
 
     @classmethod
     def from_controldir(cls, controldir: str, create: bool = False) -> "LFSStore":
+        """Create LFS store from control directory."""
         lfs_dir = os.path.join(controldir, "lfs")
         if create:
             return cls.create(lfs_dir)
@@ -158,6 +162,7 @@ class LFSPointer:
     """Represents an LFS pointer file."""
 
     def __init__(self, oid: str, size: int) -> None:
+        """Initialize LFSPointer."""
         self.oid = oid
         self.size = size
 
@@ -226,6 +231,7 @@ class LFSFilterDriver:
     def __init__(
         self, lfs_store: "LFSStore", config: Optional["Config"] = None
     ) -> None:
+        """Initialize LFSFilterDriver."""
         self.lfs_store = lfs_store
         self.config = config
 

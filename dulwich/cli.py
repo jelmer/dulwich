@@ -57,7 +57,7 @@ class CommitMessageError(Exception):
 
 def signal_int(signal, frame) -> None:
     """Handle interrupt signal by exiting.
-    
+
     Args:
         signal: Signal number
         frame: Current stack frame
@@ -67,7 +67,7 @@ def signal_int(signal, frame) -> None:
 
 def signal_quit(signal, frame) -> None:
     """Handle quit signal by entering debugger.
-    
+
     Args:
         signal: Signal number
         frame: Current stack frame
@@ -178,7 +178,7 @@ class PagerBuffer:
 
     def __init__(self, pager):
         """Initialize PagerBuffer.
-        
+
         Args:
             pager: Pager instance to wrap
         """
@@ -227,7 +227,7 @@ class Pager:
 
     def __init__(self, pager_cmd="cat"):
         """Initialize Pager.
-        
+
         Args:
             pager_cmd: Command to use for paging (default: "cat")
         """
@@ -470,7 +470,7 @@ class cmd_archive(Command):
 
     def run(self, args) -> None:
         """Execute the archive command.
-        
+
         Args:
             args: Command line arguments
         """
@@ -503,7 +503,7 @@ class cmd_add(Command):
 
     def run(self, argv) -> None:
         """Execute the add command.
-        
+
         Args:
             argv: Command line arguments
         """

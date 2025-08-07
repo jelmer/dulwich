@@ -2436,6 +2436,7 @@ def write_pack_object(write, type, object, sha=None, compression_level=-1):
       write: Write function to use
       type: Numeric type of the object
       object: Object to write
+      sha: Optional SHA-1 hasher to update
       compression_level: the zlib compression level
     Returns: Tuple with offset at which the object was written, and crc32
     """
@@ -2460,6 +2461,7 @@ def write_pack(
 
     Args:
       filename: Path to the new pack file (without .pack extension)
+      objects: Objects to write to the pack
       delta_window_size: Delta window size
       deltify: Whether to deltify pack objects
       compression_level: the zlib compression level
@@ -2505,6 +2507,17 @@ def find_reusable_deltas(
     other_haves: Optional[set[bytes]] = None,
     progress=None,
 ) -> Iterator[UnpackedObject]:
+    """Find deltas in a pack that can be reused.
+
+    Args:
+      container: Pack container to search for deltas
+      object_ids: Set of object IDs to find deltas for
+      other_haves: Set of other object IDs we have
+      progress: Optional progress reporting callback
+
+    Returns:
+      Iterator of UnpackedObject entries that can be reused
+    """
     if other_haves is None:
         other_haves = set()
     reused = 0
@@ -2535,6 +2548,7 @@ def deltify_pack_objects(
     Args:
       objects: An iterable of (object, path) tuples to deltify.
       window_size: Window size; None for default
+      progress: Optional progress reporting callback
     Returns: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
     """
@@ -2556,6 +2570,14 @@ def deltify_pack_objects(
 def sort_objects_for_delta(
     objects: Union[Iterator[ShaFile], Iterator[tuple[ShaFile, Optional[PackHint]]]],
 ) -> Iterator[ShaFile]:
+    """Sort objects for optimal delta compression.
+
+    Args:
+      objects: Iterator of objects or (object, hint) tuples
+
+    Returns:
+      Iterator of sorted ShaFile objects
+    """
     magic = []
     for entry in objects:
         if isinstance(entry, tuple):
@@ -2577,6 +2599,16 @@ def sort_objects_for_delta(
 def deltas_from_sorted_objects(
     objects, window_size: Optional[int] = None, progress=None
 ):
+    """Create deltas from sorted objects.
+
+    Args:
+      objects: Iterator of sorted objects to deltify
+      window_size: Delta window size; None for default
+      progress: Optional progress reporting callback
+
+    Returns:
+      Iterator of UnpackedObject entries
+    """
     # TODO(jelmer): Use threads
     if window_size is None:
         window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
@@ -2627,6 +2659,10 @@ def pack_objects_to_data(
 
     Args:
       objects: Pack objects
+      deltify: Whether to deltify pack objects
+      delta_window_size: Delta window size
+      ofs_delta: Whether to use offset deltas
+      progress: Optional progress reporting callback
     Returns: Tuples with (type_num, hexdigest, delta base, object chunks)
     """
     # TODO(jelmer): support deltaifying
@@ -2728,10 +2764,13 @@ def write_pack_from_container(
     Args:
       write: write function to use
       container: PackedObjectContainer
+      object_ids: Sequence of (object_id, hint) tuples to write
       delta_window_size: Sliding window size for searching for deltas;
                          Set to None for default window size.
       deltify: Whether to deltify objects
+      reuse_deltas: Whether to reuse existing deltas
       compression_level: the zlib compression level to use
+      other_haves: Set of additional object IDs the receiver has
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     pack_contents_count = len(object_ids)
@@ -2835,6 +2874,7 @@ class PackChunkGenerator:
           num_records: Number of records (defaults to len(records) if not specified)
           progress: Function to report progress to
           compression_level: the zlib compression level
+          reuse_compressed: Whether to reuse compressed chunks
         Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
         """
         # Write the pack
@@ -3260,6 +3300,18 @@ class Pack:
         threads=None,
         big_file_threshold=None,
     ) -> None:
+        """Initialize a Pack object.
+
+        Args:
+          basename: Base path for pack files (without .pack/.idx extension)
+          resolve_ext_ref: Optional function to resolve external references
+          delta_window_size: Size of the delta compression window
+          window_memory: Memory limit for delta compression window
+          delta_cache_size: Size of the delta cache
+          depth: Maximum depth for delta chains
+          threads: Number of threads to use for operations
+          big_file_threshold: Size threshold for big file handling
+        """
         self._basename = basename
         self._data = None
         self._idx = None
@@ -3285,9 +3337,7 @@ class Pack:
 
     @classmethod
     def from_lazy_objects(cls, data_fn, idx_fn):
-        """Create a new pack object from callables to load pack data and index objects.
-
-        """
+        """Create a new pack object from callables to load pack data and index objects."""
         ret = cls("")
         ret._data_load = data_fn
         ret._idx_load = idx_fn
@@ -3329,18 +3379,22 @@ class Pack:
         return self._idx
 
     def close(self) -> None:
+        """Close the pack file and index."""
         if self._data is not None:
             self._data.close()
         if self._idx is not None:
             self._idx.close()
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager."""
         self.close()
 
     def __eq__(self, other):
+        """Check equality with another pack."""
         return isinstance(self, type(other)) and self.index == other.index
 
     def __len__(self) -> int:
@@ -3348,6 +3402,7 @@ class Pack:
         return len(self.index)
 
     def __repr__(self) -> str:
+        """Return string representation of this pack."""
         return f"{self.__class__.__name__}({self._basename!r})"
 
     def __iter__(self):
@@ -3383,9 +3438,11 @@ class Pack:
         # TODO: object connectivity checks
 
     def get_stored_checksum(self) -> bytes:
+        """Return the stored checksum of the pack data."""
         return self.data.get_stored_checksum()
 
     def pack_tuples(self):
+        """Return pack tuples for all objects in pack."""
         return [(o, None) for o in self.iterobjects()]
 
     def __contains__(self, sha1: bytes) -> bool:
@@ -3397,6 +3454,7 @@ class Pack:
             return False
 
     def get_raw(self, sha1: bytes) -> tuple[int, bytes]:
+        """Get raw object data by SHA1."""
         offset = self.index.object_offset(sha1)
         obj_type, obj = self.data.get_object_at(offset)
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
@@ -3416,6 +3474,7 @@ class Pack:
     def iterobjects_subset(
         self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
+        """Iterate over a subset of objects in this pack."""
         return (
             uo
             for uo in PackInflater.for_pack_subset(
@@ -3435,6 +3494,7 @@ class Pack:
         allow_missing: bool = False,
         convert_ofs_delta: bool = False,
     ) -> Iterator[UnpackedObject]:
+        """Iterate over unpacked objects in subset."""
         ofs_pending: dict[int, list[UnpackedObject]] = defaultdict(list)
         ofs: dict[bytes, int] = {}
         todo = set(shas)
@@ -3464,6 +3524,7 @@ class Pack:
             raise UnresolvedDeltas(list(todo))
 
     def iter_unpacked(self, include_comp=False):
+        """Iterate over all unpacked objects in this pack."""
         ofs_to_entries = {
             ofs: (sha, crc32) for (sha, ofs, crc32) in self.index.iterentries()
         }
@@ -3580,6 +3641,7 @@ class Pack:
         Args:
           sha: SHA of object to fetch
           include_comp: Whether to include compression data in UnpackedObject
+          convert_ofs_delta: Whether to convert offset deltas to ref deltas
         """
         offset = self.index.object_offset(sha)
         unpacked = self.data.get_unpacked_object_at(offset, include_comp=include_comp)

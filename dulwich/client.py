@@ -2151,6 +2151,7 @@ class BundleClient(GitClient):
           thin_packs: Whether or not thin packs should be retrieved
           report_activity: Optional callback for reporting transport
             activity.
+          config: Optional configuration object
         """
         self._report_activity = report_activity
 
@@ -2608,6 +2609,7 @@ class PLinkSSHVendor(SSHVendor):
 
 
 def ParamikoSSHVendor(**kwargs):
+    """Create a ParamikoSSHVendor (deprecated)."""
     import warnings
 
     warnings.warn(
@@ -2638,6 +2640,19 @@ class SSHGitClient(TraditionalGitClient):
         ssh_command=None,
         **kwargs,
     ) -> None:
+        """Initialize SSHGitClient.
+
+        Args:
+            host: SSH hostname
+            port: Optional SSH port
+            username: Optional username
+            vendor: Optional SSH vendor
+            config: Optional configuration
+            password: Optional password
+            key_filename: Optional SSH key file
+            ssh_command: Optional custom SSH command
+            **kwargs: Additional keyword arguments
+        """
         self.host = host
         self.port = port
         self.username = username
@@ -2670,6 +2685,7 @@ class SSHGitClient(TraditionalGitClient):
             self.ssh_vendor = get_ssh_vendor()
 
     def get_url(self, path):
+        """Get the SSH URL for a path."""
         netloc = self.host
         if self.port is not None:
             netloc += f":{self.port}"
@@ -2681,6 +2697,7 @@ class SSHGitClient(TraditionalGitClient):
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an SSHGitClient from a parsed URL."""
         return cls(
             host=parsedurl.hostname,
             port=parsedurl.port,
@@ -2740,6 +2757,7 @@ class SSHGitClient(TraditionalGitClient):
 
 
 def default_user_agent_string():
+    """Return the default user agent string for Dulwich."""
     # Start user agent with "git/", because GitHub requires this. :-( See
     # https://github.com/jelmer/dulwich/issues/562 for details.
     return "git/dulwich/{}".format(".".join([str(x) for x in dulwich.__version__]))
@@ -2759,6 +2777,9 @@ def default_urllib3_manager(
 
     Args:
       config: `dulwich.config.ConfigDict` instance with Git configuration.
+      pool_manager_cls: Pool manager class to use
+      proxy_manager_cls: Proxy manager class to use
+      base_url: Base URL for proxy bypass checks
       timeout: Timeout for HTTP requests in seconds
       override_kwargs: Additional arguments for `urllib3.ProxyManager`
 
@@ -2860,6 +2881,7 @@ def default_urllib3_manager(
 
 
 def check_for_proxy_bypass(base_url) -> bool:
+    """Check if proxy should be bypassed for the given URL."""
     # Check if a proxy bypass is defined with the no_proxy environment variable
     if base_url:  # only check if base_url is provided
         no_proxy_str = os.environ.get("no_proxy")
@@ -2923,6 +2945,7 @@ class AbstractHttpGitClient(GitClient):
     """
 
     def __init__(self, base_url, dumb=False, **kwargs) -> None:
+        """Initialize AbstractHttpGitClient."""
         self._base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         GitClient.__init__(self, **kwargs)
@@ -2934,6 +2957,7 @@ class AbstractHttpGitClient(GitClient):
           url: Request URL.
           headers: Optional custom headers to override defaults.
           data: Request data.
+          raise_for_status: Whether to raise an exception for HTTP errors.
 
         Returns:
           Tuple (response, read), where response is an urllib3
@@ -3334,6 +3358,7 @@ class AbstractHttpGitClient(GitClient):
         return LsRemoteResult(refs, symrefs)
 
     def get_url(self, path):
+        """Get the HTTP URL for a path."""
         return self._get_url(path).rstrip("/")
 
     def _get_url(self, path):
@@ -3341,6 +3366,7 @@ class AbstractHttpGitClient(GitClient):
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an AbstractHttpGitClient from a parsed URL."""
         password = parsedurl.password
         if password is not None:
             kwargs["password"] = urlunquote(password)
@@ -3350,6 +3376,7 @@ class AbstractHttpGitClient(GitClient):
         return cls(urlunparse(parsedurl), **kwargs)
 
     def __repr__(self) -> str:
+        """Return string representation of this client."""
         return f"{type(self).__name__}({self._base_url!r}, dumb={self.dumb!r})"
 
 
@@ -3379,6 +3406,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         timeout=None,
         **kwargs,
     ) -> None:
+        """Initialize Urllib3HttpGitClient."""
         self._username = username
         self._password = password
         self._timeout = timeout
@@ -3495,6 +3523,7 @@ def get_transport_and_path_from_url(
       url: URL to open (a unicode string)
       config: Optional config object
       operation: Kind of operation that'll be performed; "pull" or "push"
+      **kwargs: Additional keyword arguments
 
     Keyword Args:
       thin_packs: Whether or not thin packs should be retrieved
@@ -3566,6 +3595,7 @@ def get_transport_and_path(
       location: URL or path (a string)
       config: Optional config object
       operation: Kind of operation that'll be performed; "pull" or "push"
+      **kwargs: Additional keyword arguments
 
     Keyword Args:
       thin_packs: Whether or not thin packs should be retrieved
@@ -3614,6 +3644,7 @@ DEFAULT_GIT_CREDENTIALS_PATHS = [
 def get_credentials_from_store(
     scheme, hostname, username=None, fnames=DEFAULT_GIT_CREDENTIALS_PATHS
 ):
+    """Read credentials from a Git credential store."""
     for fname in fnames:
         try:
             with open(fname, "rb") as f:

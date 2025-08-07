@@ -177,6 +177,16 @@ class GitFastExporter:
     def emit_commit(
         self, commit: Commit, ref: Ref, base_tree: Optional[ObjectID] = None
     ) -> bytes:
+        """Emit a commit in fast-export format.
+
+        Args:
+          commit: Commit object to export
+          ref: Reference name for the commit
+          base_tree: Base tree for incremental export
+
+        Returns:
+          Marker for the commit
+        """
         cmd, marker = self._export_commit(commit, ref, base_tree)
         self.print_cmd(cmd)
         return marker
@@ -194,6 +204,14 @@ class GitImportProcessor(processor.ImportProcessor):
         verbose: bool = False,
         outf: Optional[BinaryIO] = None,
     ) -> None:
+        """Initialize GitImportProcessor.
+
+        Args:
+          repo: Repository to import into
+          params: Import parameters
+          verbose: Whether to enable verbose output
+          outf: Output file for verbose messages
+        """
         processor.ImportProcessor.__init__(self, params, verbose)
         self.repo = repo
         self.last_commit = ZERO_SHA
@@ -201,11 +219,27 @@ class GitImportProcessor(processor.ImportProcessor):
         self._contents: dict[bytes, tuple[int, bytes]] = {}
 
     def lookup_object(self, objectish: bytes) -> ObjectID:
+        """Look up an object by reference or marker.
+
+        Args:
+          objectish: Object reference or marker
+
+        Returns:
+          Object ID
+        """
         if objectish.startswith(b":"):
             return self.markers[objectish[1:]]
         return objectish
 
     def import_stream(self, stream: BinaryIO) -> dict[bytes, bytes]:
+        """Import from a fast-import stream.
+
+        Args:
+          stream: Stream to import from
+
+        Returns:
+          Dictionary of markers to object IDs
+        """
         p = parser.ImportParser(stream)
         self.process(p.iter_commands)
         return self.markers

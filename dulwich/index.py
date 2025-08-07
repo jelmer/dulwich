@@ -1332,6 +1332,7 @@ def index_entry_from_stat(
     Args:
       stat_val: POSIX stat_result instance
       hex_sha: Hex sha of the object
+      mode: Optional file mode, will be derived from stat if not provided
     """
     if mode is None:
         mode = cleanup_mode(stat_val.st_mode)
@@ -1366,6 +1367,7 @@ if sys.platform == "win32":
         """
 
         def __init__(self, errno: int, msg: str, filename: Optional[str]) -> None:
+            """Initialize WindowsSymlinkPermissionError."""
             super(PermissionError, self).__init__(
                 errno,
                 f"Unable to create symlink; do you have developer mode enabled? {msg}",
@@ -1419,6 +1421,7 @@ def build_file_from_blob(
       target_path: Path to write to
       honor_filemode: An optional flag to honor core.filemode setting in
         config file, default is core.filemode=True, change executable bit
+      tree_encoding: Encoding to use for tree contents
       symlink_fn: Function to use for creating symlinks
     Returns: stat object for the file
     """
@@ -1608,6 +1611,7 @@ def build_index_from_tree(
         config file, default is core.filemode=True, change executable bit
       validate_path_element: Function to validate path elements to check
         out; default just refuses .git and .. directories.
+      symlink_fn: Function to use for creating symlinks
       blob_normalizer: An optional BlobNormalizer to use for converting line
         endings when writing blobs to the working directory.
       tree_encoding: Encoding used for tree paths (default: utf-8)
@@ -1681,6 +1685,7 @@ def blob_from_path_and_mode(
     Args:
       fs_path: Full file system path to file
       mode: File mode
+      tree_encoding: Encoding to use for tree contents
     Returns: A `Blob` object
     """
     assert isinstance(fs_path, bytes)
@@ -1705,6 +1710,7 @@ def blob_from_path_and_stat(
     Args:
       fs_path: Full file system path to file
       st: A stat object
+      tree_encoding: Encoding to use for tree contents
     Returns: A `Blob` object
     """
     return blob_from_path_and_mode(fs_path, st.st_mode, tree_encoding)
@@ -2440,6 +2446,7 @@ def get_unstaged_changes(
     Args:
       index: index to check
       root_path: path in which to find files
+      filter_blob_callback: Optional callback to filter blobs
     Returns: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
@@ -2618,6 +2625,7 @@ def iter_fresh_objects(
     """Iterate over versions of objects on disk referenced by index.
 
     Args:
+      paths: Paths to check
       root_path: Root path to access from
       include_deleted: Include deleted entries with sha and
         mode set to None
@@ -2655,9 +2663,11 @@ class locked_index:
     _file: "_GitFile"
 
     def __init__(self, path: Union[bytes, str]) -> None:
+        """Initialize locked_index."""
         self._path = path
 
     def __enter__(self) -> Index:
+        """Enter context manager and lock index."""
         f = GitFile(self._path, "wb")
         assert isinstance(f, _GitFile)  # GitFile in write mode always returns _GitFile
         self._file = f
@@ -2670,6 +2680,7 @@ class locked_index:
         exc_value: Optional[BaseException],
         traceback: Optional[types.TracebackType],
     ) -> None:
+        """Exit context manager and unlock index."""
         if exc_type is not None:
             self._file.abort()
             return

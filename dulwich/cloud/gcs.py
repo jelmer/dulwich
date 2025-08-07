@@ -32,12 +32,21 @@ from ..pack import PACK_SPOOL_FILE_MAX_SIZE, Pack, PackData, load_pack_index_fil
 
 
 class GcsObjectStore(BucketBasedObjectStore):
+    """Object store implementation for Google Cloud Storage."""
+
     def __init__(self, bucket, subpath="") -> None:
+        """Initialize GcsObjectStore.
+
+        Args:
+          bucket: GCS bucket instance
+          subpath: Subpath within the bucket
+        """
         super().__init__()
         self.bucket = bucket
         self.subpath = subpath
 
     def __repr__(self) -> str:
+        """Return string representation of GcsObjectStore."""
         return f"{type(self).__name__}({self.bucket!r}, subpath={self.subpath!r})"
 
     def _remove_pack(self, name) -> None:

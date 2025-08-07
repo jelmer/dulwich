@@ -54,10 +54,26 @@ class TreeChange(namedtuple("TreeChange", ["type", "old", "new"])):
 
     @classmethod
     def add(cls, new: TreeEntry) -> "TreeChange":
+        """Create a TreeChange for an added entry.
+
+        Args:
+          new: New tree entry
+
+        Returns:
+          TreeChange instance
+        """
         return cls(CHANGE_ADD, _NULL_ENTRY, new)
 
     @classmethod
     def delete(cls, old: TreeEntry) -> "TreeChange":
+        """Create a TreeChange for a deleted entry.
+
+        Args:
+          old: Old tree entry
+
+        Returns:
+          TreeChange instance
+        """
         return cls(CHANGE_DELETE, old, _NULL_ENTRY)
 
 

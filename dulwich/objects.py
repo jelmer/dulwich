@@ -650,6 +650,7 @@ class ShaFile:
         return self.sha().hexdigest().encode("ascii")
 
     def __repr__(self) -> str:
+        """Return string representation of this object."""
         return f"<{self.__class__.__name__} {self.id!r}>"
 
     def __ne__(self, other: object) -> bool:
@@ -1251,6 +1252,7 @@ class Tree(ShaFile):
     __slots__ = "_entries"
 
     def __init__(self) -> None:
+        """Initialize an empty Tree."""
         super().__init__()
         self._entries: dict[bytes, tuple[int, bytes]] = {}
 
@@ -1273,9 +1275,11 @@ class Tree(ShaFile):
         return tree
 
     def __contains__(self, name: bytes) -> bool:
+        """Check if name exists in tree."""
         return name in self._entries
 
     def __getitem__(self, name: bytes) -> tuple[int, ObjectID]:
+        """Get tree entry by name."""
         return self._entries[name]
 
     def __setitem__(self, name: bytes, value: tuple[int, ObjectID]) -> None:
@@ -1292,13 +1296,16 @@ class Tree(ShaFile):
         self._needs_serialization = True
 
     def __delitem__(self, name: bytes) -> None:
+        """Delete tree entry by name."""
         del self._entries[name]
         self._needs_serialization = True
 
     def __len__(self) -> int:
+        """Return number of entries in tree."""
         return len(self._entries)
 
     def __iter__(self) -> Iterator[bytes]:
+        """Iterate over tree entry names."""
         return iter(self._entries)
 
     def add(self, name: bytes, mode: int, hexsha: bytes) -> None:
@@ -1611,6 +1618,7 @@ class Commit(ShaFile):
     )
 
     def __init__(self) -> None:
+        """Initialize an empty Commit."""
         super().__init__()
         self._parents: list[bytes] = []
         self._encoding: Optional[bytes] = None

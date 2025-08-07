@@ -956,6 +956,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
         Args:
           sha1: sha for the object.
+          include_comp: Whether to include compression metadata.
         """
         if sha1 == ZERO_SHA:
             raise KeyError(sha1)
@@ -998,6 +999,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         Args:
           objects: Iterable over (object, path) tuples, should support
             __len__.
+          progress: Optional progress reporting function.
         Returns: Pack object of the objects written.
         """
         count = len(objects)
@@ -1357,7 +1359,9 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           f: Open file object for the pack.
           path: Path to the pack file.
+          num_objects: Number of objects in the pack.
           indexer: A PackIndexer for indexing the pack.
+          progress: Optional progress reporting function.
         """
         entries = []
         for i, entry in enumerate(indexer):
@@ -1432,6 +1436,7 @@ class DiskObjectStore(PackBasedObjectStore):
             requested bytes are read.
           read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
+          progress: Optional progress reporting function.
         Returns: A Pack object pointing at the now-completed thin pack in the
             objects/pack directory.
         """
@@ -1771,6 +1776,7 @@ class MemoryObjectStore(BaseObjectStore):
 
         Args:
           objects: Iterable over a list of (object, path) tuples
+          progress: Optional progress reporting function.
         """
         for obj, path in objects:
             self.add_object(obj)
@@ -1812,6 +1818,8 @@ class MemoryObjectStore(BaseObjectStore):
 
         Args:
           count: Number of items to add
+          unpacked_objects: Iterator of UnpackedObject instances
+          progress: Optional progress reporting function.
         """
         if count == 0:
             return
@@ -1845,6 +1853,7 @@ class MemoryObjectStore(BaseObjectStore):
             requested bytes are read.
           read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
+          progress: Optional progress reporting function.
         """
         f, commit, abort = self.add_pack()
         try:
@@ -2142,6 +2151,8 @@ class ObjectStoreGraphWalker:
         Args:
           local_heads: Heads to start search with
           get_parents: Function for finding the parents of a SHA1.
+          shallow: Set of shallow commits.
+          update_shallow: Function to update shallow commits.
         """
         self.heads = set(local_heads)
         self.get_parents = get_parents
@@ -2539,9 +2550,11 @@ def _collect_ancestors(
     """Collect all ancestors of heads up to (excluding) those in common.
 
     Args:
+      store: Object store to get commits from
       heads: commits to start from
       common: commits to end at, or empty set to walk repository
         completely
+      shallow: Set of shallow commits
       get_parents: Optional function for getting the parents of a
         commit.
     Returns: a tuple (A, B) where A - all commits reachable
@@ -2587,6 +2600,7 @@ def iter_tree_contents(
     Iteration is depth-first pre-order, as in e.g. os.walk.
 
     Args:
+      store: Object store to get trees from
       tree_id: SHA1 of the tree.
       include_trees: If True, include tree objects in the iteration.
     Returns: Iterator over TreeEntry namedtuples for all the objects in a
@@ -2614,6 +2628,7 @@ def peel_sha(store: ObjectContainer, sha: bytes) -> tuple[ShaFile, ShaFile]:
     """Peel all tags from a SHA.
 
     Args:
+      store: Object store to get objects from
       sha: The object SHA to peel.
     Returns: The fully-peeled SHA1 of a tag object, after peeling all
         intermediate tags; if the original ref does not point to a tag,

@@ -685,16 +685,14 @@ class _ProtocolGraphWalker:
 
         If the client has the 'shallow' capability, this method also reads and
         responds to the 'shallow' and 'deepen' lines from the client. These are
-
-        Args:
-          heads: Dictionary of heads to advertise
-          depth: Maximum depth for shallow clones
         not part of the wants per se, but they set up necessary state for
         walking the graph. Additionally, later code depends on this method
         consuming everything up to the first 'have' line.
 
         Args:
           heads: a dict of refname->SHA1 to advertise
+          depth: Maximum depth for shallow clones
+
         Returns: a list of SHA1s requested by the client
         """
         symrefs = self.get_symrefs()

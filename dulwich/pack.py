@@ -1816,6 +1816,12 @@ class DeltaChainIterator(Generic[T]):
     _include_comp = False
 
     def __init__(self, file_obj, *, resolve_ext_ref=None) -> None:
+        """Initialize DeltaChainIterator.
+
+        Args:
+            file_obj: File object to read pack data from
+            resolve_ext_ref: Optional function to resolve external references
+        """
         self._file = file_obj
         self._resolve_ext_ref = resolve_ext_ref
         self._pending_ofs: dict[int, list[int]] = defaultdict(list)
@@ -1993,6 +1999,7 @@ class DeltaChainIterator(Generic[T]):
             )
 
     def __iter__(self) -> Iterator[T]:
+        """Iterate over objects in the pack."""
         return self._walk_all_chains()
 
     def ext_refs(self):
@@ -2785,6 +2792,15 @@ class PackChunkGenerator:
         compression_level=-1,
         reuse_compressed=True,
     ) -> None:
+        """Initialize PackChunkGenerator.
+
+        Args:
+            num_records: Expected number of records
+            records: Iterator of pack records
+            progress: Optional progress callback
+            compression_level: Compression level (-1 for default)
+            reuse_compressed: Whether to reuse compressed chunks
+        """
         self.cs = sha1(b"")
         self.entries: dict[Union[int, bytes], tuple[int, int]] = {}
         self._it = self._pack_data_chunks(
@@ -2796,9 +2812,11 @@ class PackChunkGenerator:
         )
 
     def sha1digest(self):
+        """Return the SHA1 digest of the pack data."""
         return self.cs.digest()
 
     def __iter__(self):
+        """Iterate over pack data chunks."""
         return self._it
 
     def _pack_data_chunks(

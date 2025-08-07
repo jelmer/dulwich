@@ -868,6 +868,7 @@ class GitClient:
 
         Args:
           parsedurl: Result of urlparse()
+          **kwargs: Additional keyword arguments passed to the client constructor
 
         Returns:
           A `GitClient` object
@@ -1907,6 +1908,7 @@ class LocalGitClient(GitClient):
           thin_packs: Whether or not thin packs should be retrieved
           report_activity: Optional callback for reporting transport
             activity.
+          config: Optional configuration object
         """
         self._report_activity = report_activity
         # Ignore the thin_packs argument
@@ -1958,6 +1960,8 @@ class LocalGitClient(GitClient):
             Receive dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
             with number of items and pack data to upload.
+          generate_pack_data: Function that generates pack data given
+            have and want object sets
           progress: Optional progress function
 
         Returns:
@@ -2039,6 +2043,8 @@ class LocalGitClient(GitClient):
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
+          protocol_version: Optional Git protocol version
+          **kwargs: Additional keyword arguments
 
         Returns:
           FetchPackResult object
@@ -2082,6 +2088,7 @@ class LocalGitClient(GitClient):
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
+          protocol_version: Optional Git protocol version
 
         Returns:
           FetchPackResult object

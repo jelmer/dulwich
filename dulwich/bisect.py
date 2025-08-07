@@ -33,7 +33,7 @@ class BisectState:
 
     def __init__(self, repo: Repo) -> None:
         """Initialize BisectState.
-        
+
         Args:
             repo: Repository to perform bisect on
         """

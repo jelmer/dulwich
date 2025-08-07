@@ -1512,7 +1512,7 @@ class Repo(BaseRepo):
 
     @replace_me(remove_in="0.26.0")
     def unstage(self, fs_paths: list[str]) -> None:
-        """Unstage specific file in the index
+        """Unstage specific file in the index.
 
         Args:
           fs_paths: a list of files to unstage,
@@ -1770,6 +1770,7 @@ class Repo(BaseRepo):
             return None
 
     def __repr__(self) -> str:
+        """Return string representation of this repository."""
         return f"<Repo at {self.path!r}>"
 
     def set_description(self, description) -> None:
@@ -1832,6 +1833,9 @@ class Repo(BaseRepo):
         Args:
           path: Path in which to create the repository
           mkdir: Whether to create the directory
+          config: Configuration object
+          default_branch: Default branch name
+          symlinks: Whether to support symlinks
           format: Repository format version (defaults to 0)
         Returns: `Repo` instance
         """
@@ -1919,6 +1923,10 @@ class Repo(BaseRepo):
 
         Args:
           path: Path to create bare repository in
+          mkdir: Whether to create the directory
+          object_store: Object store to use
+          config: Configuration object
+          default_branch: Default branch name
           format: Repository format version (defaults to 0)
         Returns: a `Repo` instance
         """
@@ -1944,9 +1952,11 @@ class Repo(BaseRepo):
         self.object_store.close()
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager and close repository."""
         self.close()
 
     def _read_gitattributes(self) -> dict[bytes, dict[bytes, bytes]]:
@@ -2189,6 +2199,7 @@ class MemoryRepo(BaseRepo):
 
         Args:
           path: The path to the file, relative to the control dir.
+          basedir: Optional base directory for the path
         Returns: An open file object, or None if the file does not exist.
         """
         contents = self._named_files.get(path, None)

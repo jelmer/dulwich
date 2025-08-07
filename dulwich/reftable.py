@@ -225,6 +225,13 @@ class RefUpdate:
     """A reference update operation."""
 
     def __init__(self, name: bytes, value_type: int, value: bytes):
+        """Initialize RefUpdate.
+
+        Args:
+          name: Reference name
+          value_type: Type of reference value
+          value: Reference value
+        """
         self.name = name
         self.value_type = value_type
         self.value = value
@@ -236,6 +243,14 @@ class RefRecord:
     def __init__(
         self, refname: bytes, value_type: int, value: bytes, update_index: int = 0
     ):
+        """Initialize RefRecord.
+
+        Args:
+          refname: Reference name
+          value_type: Type of reference value
+          value: Reference value
+          update_index: Update index for the reference
+        """
         self.refname = refname
         self.value_type = value_type
         self.value = value
@@ -323,6 +338,7 @@ class RefBlock:
     """A block containing reference records."""
 
     def __init__(self):
+        """Initialize RefBlock."""
         self.refs = []
 
     def add_ref(
@@ -478,6 +494,13 @@ class ReftableWriter:
         auto_create_head: bool = True,
         is_batch_operation: bool = False,
     ):
+        """Initialize ReftableWriter.
+
+        Args:
+          f: Binary file object to write to
+          auto_create_head: Whether to automatically create HEAD reference
+          is_batch_operation: Whether this is a batch operation
+        """
         self.f = f
         self.refs: dict[bytes, tuple[int, bytes]] = {}
         self.refs_order: list[bytes] = []  # Track insertion order for update indices
@@ -662,6 +685,11 @@ class ReftableReader:
     """Reader for reftable files."""
 
     def __init__(self, f: BinaryIO):
+        """Initialize ReftableReader.
+
+        Args:
+          f: Binary file object to read from
+        """
         self.f = f
         self._read_header()
         self.refs: dict[bytes, tuple[int, bytes]] = {}

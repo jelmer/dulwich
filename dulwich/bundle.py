@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 class Bundle:
     """Git bundle object representation."""
-    
+
     version: Optional[int]
 
     capabilities: dict[str, Optional[str]]
@@ -159,7 +159,7 @@ def read_bundle(f: BinaryIO) -> Bundle:
 
 def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
     """Write a bundle to a file.
-    
+
     Args:
         f: File-like object to write to
         bundle: Bundle object to write

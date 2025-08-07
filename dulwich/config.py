@@ -664,6 +664,7 @@ class ConfigDict(Config):
         self._values.setdefault(section)[name] = value
 
     def items(self, section: SectionLike) -> Iterator[tuple[Name, Value]]:
+        """Get items in a section."""
         section_bytes, _ = self._check_section_and_name(section, b"")
         section_dict = self._values.get(section_bytes)
         if section_dict is not None:
@@ -671,6 +672,7 @@ class ConfigDict(Config):
         return iter([])
 
     def sections(self) -> Iterator[Section]:
+        """Get all sections."""
         return iter(self._values.keys())
 
 
@@ -1434,6 +1436,7 @@ class StackedConfig(Config):
         return backends
 
     def get(self, section: SectionLike, name: NameLike) -> Value:
+        """Get value from configuration."""
         if not isinstance(section, tuple):
             section = (section,)
         for backend in self.backends:
@@ -1444,6 +1447,7 @@ class StackedConfig(Config):
         raise KeyError(name)
 
     def get_multivar(self, section: SectionLike, name: NameLike) -> Iterator[Value]:
+        """Get multiple values from configuration."""
         if not isinstance(section, tuple):
             section = (section,)
         for backend in self.backends:
@@ -1455,11 +1459,13 @@ class StackedConfig(Config):
     def set(
         self, section: SectionLike, name: NameLike, value: Union[ValueLike, bool]
     ) -> None:
+        """Set value in configuration."""
         if self.writable is None:
             raise NotImplementedError(self.set)
         return self.writable.set(section, name, value)
 
     def sections(self) -> Iterator[Section]:
+        """Get all sections."""
         seen = set()
         for backend in self.backends:
             for section in backend.sections():

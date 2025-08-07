@@ -696,6 +696,12 @@ class SwiftPack(Pack):
     """
 
     def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize SwiftPack.
+
+        Args:
+          *args: Arguments to pass to parent class
+          **kwargs: Keyword arguments, must include 'scon' (SwiftConnector)
+        """
         self.scon = kwargs["scon"]
         del kwargs["scon"]
         super().__init__(*args, **kwargs)  # type: ignore
@@ -944,6 +950,12 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
     """Manage references in info/refs object."""
 
     def __init__(self, scon: SwiftConnector, store: object) -> None:
+        """Initialize SwiftInfoRefsContainer.
+
+        Args:
+          scon: Swift connector instance
+          store: Object store instance
+        """
         self.scon = scon
         self.filename = "info/refs"
         self.store = store
@@ -1103,6 +1115,12 @@ class SwiftSystemBackend(Backend):
     """Backend for serving Git repositories from Swift."""
 
     def __init__(self, logger: "logging.Logger", conf: ConfigParser) -> None:
+        """Initialize SwiftSystemBackend.
+
+        Args:
+          logger: Logger instance
+          conf: Configuration parser instance
+        """
         self.conf = conf
         self.logger = logger
 

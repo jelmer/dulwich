@@ -334,7 +334,7 @@ def parse_timezone_format(tz_str):
 
 
 def get_user_timezones():
-    """Retrieve local timezone as described in https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
+    """Retrieve local timezone as described in https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt.
 
     Returns: A tuple containing author timezone, committer timezone.
     """
@@ -408,6 +408,7 @@ def path_to_tree_path(
     Args:
       repopath: Repository path, absolute or relative to the cwd
       path: A path, absolute or relative to the cwd
+      tree_encoding: Encoding to use for tree paths
     Returns: A path formatted for use in e.g. an index
     """
     # Resolve might returns a relative path on Windows
@@ -570,6 +571,7 @@ def commit(
       author_timezone: Author timestamp timezone
       committer: Optional committer name and email
       commit_timezone: Commit timestamp timezone
+      encoding: Encoding to use for commit message
       no_verify: Skip pre-commit and commit-msg hooks
       signoff: GPG Sign the commit (bool, defaults to False,
         pass True to use default GPG key,
@@ -664,6 +666,7 @@ def commit_tree(
     Args:
       repo: Path to repository
       tree: An existing tree object
+      message: Commit message
       author: Optional author name and email
       committer: Optional committer name and email
     """
@@ -729,10 +732,8 @@ def clone(
       protocol_version: desired Git protocol version. By default the highest
         mutually supported protocol version will be used.
       recurse_submodules: Whether to initialize and clone submodules
-
-    Keyword Args:
-      refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
-        bytestring/string.
+      **kwargs: Additional keyword arguments including refspecs to fetch.
+        Can be a bytestring, a string, or a list of bytestring/string.
 
     Returns: The new repository
     """
@@ -977,6 +978,7 @@ def remove(repo: Union[str, os.PathLike, Repo] = ".", paths=None, cached=False) 
     Args:
       repo: Repository for the files
       paths: Paths to remove. Can be absolute or relative to the repository root.
+      cached: Only remove from index, not from working directory
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()

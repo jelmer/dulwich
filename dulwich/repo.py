@@ -902,24 +902,24 @@ class BaseRepo:
           include: Iterable of SHAs of commits to include along with their
             ancestors. Defaults to [HEAD]
           **kwargs: Additional keyword arguments including:
-            exclude: Iterable of SHAs of commits to exclude along with their
+
+            * exclude: Iterable of SHAs of commits to exclude along with their
               ancestors, overriding includes.
-            order: ORDER_* constant specifying the order of results.
+            * order: ORDER_* constant specifying the order of results.
               Anything other than ORDER_DATE may result in O(n) memory usage.
-            reverse: If True, reverse the order of output, requiring O(n)
+            * reverse: If True, reverse the order of output, requiring O(n)
               memory.
-            max_entries: The maximum number of entries to yield, or None for
+            * max_entries: The maximum number of entries to yield, or None for
               no limit.
-            paths: Iterable of file or subtree paths to show entries for.
-            rename_detector: diff.RenameDetector object for detecting
+            * paths: Iterable of file or subtree paths to show entries for.
+            * rename_detector: diff.RenameDetector object for detecting
               renames.
-            follow: If True, follow path across renames/copies. Forces a
+            * follow: If True, follow path across renames/copies. Forces a
               default rename_detector.
-            since: Timestamp to list commits after.
-            until: Timestamp to list commits before.
-            queue_cls: A class to use for a queue of commits, supporting the
-              iterator protocol. The constructor takes a single argument, the
-            Walker.
+            * since: Timestamp to list commits after.
+            * until: Timestamp to list commits before.
+            * queue_cls: A class to use for a queue of commits, supporting the
+              iterator protocol. The constructor takes a single argument, the Walker.
 
         Returns: A `Walker` object
         """

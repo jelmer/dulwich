@@ -1688,13 +1688,13 @@ class TCPGitClient(TraditionalGitClient):
         return cls(parsedurl.hostname, port=parsedurl.port, **kwargs)
 
     def get_url(self, path):
-        """Get the URL for a TCP git connection.
+        r"""Get the URL for a TCP git connection.
 
         Args:
           path: Repository path
 
         Returns:
-          git:// URL for the path
+          ``git://`` URL for the path
         """
         netloc = self._host
         if self._port is not None and self._port != TCP_GIT_PORT:

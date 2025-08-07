@@ -333,6 +333,11 @@ class TreeExtension(IndexExtension):
     """Tree cache extension."""
 
     def __init__(self, entries: list[tuple[bytes, bytes, int]]) -> None:
+        """Initialize TreeExtension.
+
+        Args:
+            entries: List of tree cache entries (path, sha, flags)
+        """
         self.entries = entries
         super().__init__(TREE_EXTENSION, b"")
 
@@ -363,6 +368,11 @@ class ResolveUndoExtension(IndexExtension):
     """Resolve undo extension for recording merge conflicts."""
 
     def __init__(self, entries: list[tuple[bytes, list[tuple[int, bytes]]]]) -> None:
+        """Initialize ResolveUndoExtension.
+
+        Args:
+            entries: List of (path, stages) where stages is a list of (stage, sha) tuples
+        """
         self.entries = entries
         super().__init__(REUC_EXTENSION, b"")
 
@@ -393,6 +403,11 @@ class UntrackedExtension(IndexExtension):
     """Untracked cache extension."""
 
     def __init__(self, data: bytes) -> None:
+        """Initialize UntrackedExtension.
+
+        Args:
+            data: Raw untracked cache data
+        """
         super().__init__(UNTR_EXTENSION, data)
 
     @classmethod
@@ -524,6 +539,13 @@ class ConflictedIndexEntry:
         this: Optional[IndexEntry] = None,
         other: Optional[IndexEntry] = None,
     ) -> None:
+        """Initialize ConflictedIndexEntry.
+
+        Args:
+            ancestor: The common ancestor entry
+            this: The current branch entry
+            other: The other branch entry
+        """
         self.ancestor = ancestor
         self.this = this
         self.other = other

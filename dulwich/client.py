@@ -831,8 +831,10 @@ class GitClient:
           thin_packs: Whether or not thin packs should be retrieved
           report_activity: Optional callback for reporting transport
             activity.
+          quiet: Whether to suppress output
           include_tags: send annotated tags when sending the objects they point
             to
+          **kwargs: Additional keyword arguments
         """
         self._report_activity = report_activity
         self._report_status_parser: Optional[ReportStatusParser] = None
@@ -1273,6 +1275,12 @@ class TraditionalGitClient(GitClient):
     DEFAULT_ENCODING = "utf-8"
 
     def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs) -> None:
+        """Initialize a TraditionalGitClient.
+
+        Args:
+            path_encoding: Encoding for paths (default: utf-8)
+            **kwargs: Additional arguments passed to parent class
+        """
         self._remote_path_encoding = path_encoding
         super().__init__(**kwargs)
 
@@ -2435,6 +2443,11 @@ class StrangeHostname(Exception):
     """Refusing to connect to strange SSH hostname."""
 
     def __init__(self, hostname) -> None:
+        """Initialize StrangeHostname exception.
+
+        Args:
+            hostname: The strange hostname that was rejected
+        """
         super().__init__(hostname)
 
 
@@ -2452,6 +2465,21 @@ class SubprocessSSHVendor(SSHVendor):
         ssh_command=None,
         protocol_version: Optional[int] = None,
     ):
+        """Run a git command over SSH.
+
+        Args:
+            host: SSH host to connect to
+            command: Git command to run
+            username: Optional username
+            port: Optional port number
+            password: Optional password (not supported)
+            key_filename: Optional SSH key file
+            ssh_command: Optional custom SSH command
+            protocol_version: Optional Git protocol version
+
+        Returns:
+            Tuple of (subprocess.Popen, Protocol, stderr_stream)
+        """
         if password is not None:
             raise NotImplementedError(
                 "Setting password not supported by SubprocessSSHVendor."
@@ -2505,6 +2533,21 @@ class PLinkSSHVendor(SSHVendor):
         ssh_command=None,
         protocol_version: Optional[int] = None,
     ):
+        """Run a git command over SSH using PLink.
+
+        Args:
+            host: SSH host to connect to
+            command: Git command to run
+            username: Optional username
+            port: Optional port number
+            password: Optional password
+            key_filename: Optional SSH key file
+            ssh_command: Optional custom SSH command
+            protocol_version: Optional Git protocol version
+
+        Returns:
+            Tuple of (subprocess.Popen, Protocol, stderr_stream)
+        """
         if ssh_command:
             import shlex
 
@@ -2574,6 +2617,8 @@ get_ssh_vendor: Callable[[], SSHVendor] = SubprocessSSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):
+    """Git client that connects over SSH."""
+
     def __init__(
         self,
         host,
@@ -3314,6 +3359,8 @@ def _wrap_urllib3_exceptions(func):
 
 
 class Urllib3HttpGitClient(AbstractHttpGitClient):
+    """Git client that uses urllib3 for HTTP(S) connections."""
+
     def __init__(
         self,
         base_url,

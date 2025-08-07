@@ -172,6 +172,8 @@ class BackendRepo(TypingProtocol):
         """Yield the objects required for a list of commits.
 
         Args:
+          determine_wants: Function to determine which objects the client wants
+          graph_walker: Object used to walk the commit graph
           progress: is a callback to send progress messages to the client
           get_tagged: Function that returns a dict of pointed-to sha ->
             tag sha for including tags.
@@ -191,6 +193,17 @@ class DictBackend(Backend):
         self.repos = repos
 
     def open_repository(self, path: str) -> BackendRepo:
+        """Open repository at given path.
+
+        Args:
+          path: Path to the repository
+
+        Returns:
+          Repository object
+
+        Raises:
+          NotGitRepository: If no repository found at path
+        """
         logger.debug("Opening repository at %s", path)
         try:
             return self.repos[path]
@@ -672,6 +685,10 @@ class _ProtocolGraphWalker:
 
         If the client has the 'shallow' capability, this method also reads and
         responds to the 'shallow' and 'deepen' lines from the client. These are
+
+        Args:
+          heads: Dictionary of heads to advertise
+          depth: Maximum depth for shallow clones
         not part of the wants per se, but they set up necessary state for
         walking the graph. Additionally, later code depends on this method
         consuming everything up to the first 'have' line.

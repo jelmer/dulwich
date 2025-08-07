@@ -289,6 +289,14 @@ class Protocol:
         close: Optional[Callable[[], None]] = None,
         report_activity: Optional[Callable[[int, str], None]] = None,
     ) -> None:
+        """Initialize Protocol.
+
+        Args:
+          read: Function to read bytes from the transport
+          write: Function to write bytes to the transport
+          close: Optional function to close the transport
+          report_activity: Optional function to report activity
+        """
         self.read = read
         self.write = write
         self._close = close
@@ -301,6 +309,7 @@ class Protocol:
             self._close()
 
     def __enter__(self) -> "Protocol":
+        """Enter context manager."""
         return self
 
     def __exit__(
@@ -309,6 +318,7 @@ class Protocol:
         exc_val: Optional[BaseException],
         exc_tb: Optional[types.TracebackType],
     ) -> None:
+        """Exit context manager and close transport."""
         self.close()
 
     def read_pkt_line(self) -> Optional[bytes]:
@@ -466,6 +476,15 @@ class ReceivableProtocol(Protocol):
         report_activity: Optional[Callable[[int, str], None]] = None,
         rbufsize: int = _RBUFSIZE,
     ) -> None:
+        """Initialize ReceivableProtocol.
+
+        Args:
+          recv: Function to receive bytes from the transport
+          write: Function to write bytes to the transport
+          close: Optional function to close the transport
+          report_activity: Optional function to report activity
+          rbufsize: Read buffer size
+        """
         super().__init__(self.read, write, close=close, report_activity=report_activity)
         self._recv = recv
         self._rbuf = BytesIO()
@@ -662,6 +681,11 @@ class PktLineParser:
     """Packet line parser that hands completed packets off to a callback."""
 
     def __init__(self, handle_pkt: Callable[[Optional[bytes]], None]) -> None:
+        """Initialize PktLineParser.
+
+        Args:
+          handle_pkt: Callback function to handle completed packets
+        """
         self.handle_pkt = handle_pkt
         self._readahead = BytesIO()
 

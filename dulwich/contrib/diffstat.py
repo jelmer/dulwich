@@ -199,6 +199,11 @@ def diffstat(lines: list[bytes], max_width: int = 80) -> bytes:
 
 
 def main() -> int:
+    """Main entry point for diffstat command line tool.
+
+    Returns:
+      Exit code (0 for success)
+    """
     argv = sys.argv
     # allow diffstat.py to also be used from the command line
     if len(sys.argv) > 1:

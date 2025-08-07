@@ -58,8 +58,12 @@ def write_commit_patch(
     """Write a individual file patch.
 
     Args:
+      f: File-like object to write to
       commit: Commit object
+      contents: Contents of the patch
       progress: tuple with current patch number and total.
+      version: Version string to include in patch header
+      encoding: Encoding to use for the patch
 
     Returns:
       tuple with filename and contents
@@ -409,6 +413,7 @@ def write_tree_diff(
 
     Args:
       f: File-like object to write to.
+      store: Object store to read from
       old_tree: Old tree id
       new_tree: New tree id
       diff_binary: Whether to diff files even if they

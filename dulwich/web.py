@@ -574,6 +574,7 @@ class HTTPGitApplication:
             self.handlers.update(handlers)
 
     def __call__(self, environ, start_response):
+        """Handle WSGI request."""
         path = environ["PATH_INFO"]
         method = environ["REQUEST_METHOD"]
         req = HTTPGitRequest(
@@ -599,14 +600,14 @@ class HTTPGitApplication:
 
 
 class GunzipFilter:
-    """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application.
-
-    """
+    """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application."""
 
     def __init__(self, application) -> None:
+        """Initialize GunzipFilter."""
         self.app = application
 
     def __call__(self, environ, start_response):
+        """Handle WSGI request."""
         import gzip
 
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
@@ -621,14 +622,14 @@ class GunzipFilter:
 
 
 class LimitedInputFilter:
-    """WSGI middleware that limits the input length of a request to that specified in Content-Length.
-
-    """
+    """WSGI middleware that limits the input length of a request to that specified in Content-Length."""
 
     def __init__(self, application) -> None:
+        """Initialize LimitedInputFilter."""
         self.app = application
 
     def __call__(self, environ, start_response):
+        """Handle WSGI request."""
         # This is not necessary if this app is run from a conforming WSGI
         # server. Unfortunately, there's no way to tell that at this point.
         # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
@@ -642,9 +643,7 @@ class LimitedInputFilter:
 
 
 def make_wsgi_chain(*args, **kwargs):
-    """Factory function to create an instance of HTTPGitApplication, correctly wrapped with needed middleware.
-
-    """
+    """Factory function to create an instance of HTTPGitApplication, correctly wrapped with needed middleware."""
     app = HTTPGitApplication(*args, **kwargs)
     wrapped_app = LimitedInputFilter(GunzipFilter(app))
     return wrapped_app

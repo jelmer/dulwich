@@ -28,6 +28,7 @@ import tempfile
 from dulwich.objects import Blob, Tree
 from dulwich.repo import Repo
 from dulwich.stash import DEFAULT_STASH_REF, Stash
+from dulwich.worktree import add_worktree
 
 from . import TestCase
 
@@ -221,3 +222,12 @@ class StashTests(TestCase):
         # Verify index has the staged changes
         index = self.repo.open_index()
         self.assertIn(b"new.txt", index)
+
+
+class StashInWorktreeTest(StashTests):
+    """Tests for stash in a worktree."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.repo_dir = os.path.join(self.test_dir, "wt")
+        self.repo = add_worktree(self.repo, self.repo_dir, "worktree")

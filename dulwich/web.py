@@ -351,6 +351,11 @@ class ChunkReader:
     """Reader for chunked transfer encoding streams."""
 
     def __init__(self, f: BinaryIO) -> None:
+        """Initialize ChunkReader.
+
+        Args:
+            f: Binary file-like object to read from
+        """
         self._iter = _chunk_iter(f)
         self._buffer: list[bytes] = []
 
@@ -452,6 +457,14 @@ class HTTPGitRequest:
     def __init__(
         self, environ, start_response, dumb: bool = False, handlers=None
     ) -> None:
+        """Initialize HTTPGitRequest.
+
+        Args:
+            environ: WSGI environment dictionary
+            start_response: WSGI start_response callable
+            dumb: Whether to use dumb HTTP protocol
+            handlers: Optional handler overrides
+        """
         self.environ = environ
         self.dumb = dumb
         self.handlers = handlers
@@ -545,6 +558,14 @@ class HTTPGitApplication:
     def __init__(
         self, backend, dumb: bool = False, handlers=None, fallback_app=None
     ) -> None:
+        """Initialize HTTPGitApplication.
+
+        Args:
+            backend: Backend object for git operations
+            dumb: Whether to use dumb HTTP protocol
+            handlers: Optional handler overrides
+            fallback_app: Optional fallback WSGI application
+        """
         self.backend = backend
         self.dumb = dumb
         self.handlers = dict(DEFAULT_HANDLERS)

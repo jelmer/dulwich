@@ -426,6 +426,7 @@ class Config:
           section: Tuple with section name and optional subsection name
           name: Name of the setting, including section and possible
             subsection.
+          default: Default value if setting is not found
 
         Returns:
           Contents of the setting
@@ -572,6 +573,15 @@ class ConfigDict(Config):
         return checked_section, name
 
     def get_multivar(self, section: SectionLike, name: NameLike) -> Iterator[Value]:
+        """Get multiple values for a configuration setting.
+
+        Args:
+            section: Section name
+            name: Setting name
+
+        Returns:
+            Iterator of configuration values
+        """
         section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
@@ -587,6 +597,18 @@ class ConfigDict(Config):
         section: SectionLike,
         name: NameLike,
     ) -> Value:
+        """Get a configuration value.
+
+        Args:
+            section: Section name
+            name: Setting name
+
+        Returns:
+            Configuration value
+
+        Raises:
+            KeyError: if the value is not set
+        """
         section, name = self._check_section_and_name(section, name)
 
         if len(section) > 1:
@@ -603,6 +625,13 @@ class ConfigDict(Config):
         name: NameLike,
         value: Union[ValueLike, bool],
     ) -> None:
+        """Set a configuration value.
+
+        Args:
+            section: Section name
+            name: Setting name
+            value: Configuration value
+        """
         section, name = self._check_section_and_name(section, name)
 
         if isinstance(value, bool):

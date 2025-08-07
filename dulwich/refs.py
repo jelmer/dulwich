@@ -180,6 +180,9 @@ class RefsContainer:
         Args:
           name: Name of the ref to set
           other: Name of the ref to point at
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message
         """
         raise NotImplementedError(self.set_symbolic_ref)
@@ -412,6 +415,9 @@ class RefsContainer:
           old_ref: The old sha the refname must refer to, or None to set
             unconditionally.
           new_ref: The new sha the refname will refer to.
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Message for reflog
         Returns: True if the set was successful, False otherwise.
         """
@@ -425,6 +431,10 @@ class RefsContainer:
         Args:
           name: Ref name
           ref: Ref value
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
+          message: Optional message for reflog
         """
         raise NotImplementedError(self.add_if_new)
 
@@ -465,6 +475,9 @@ class RefsContainer:
           name: The refname to delete.
           old_ref: The old sha the refname must refer to, or None to
             delete unconditionally.
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Message for reflog
         Returns: True if the delete was successful, False otherwise.
         """

@@ -161,6 +161,7 @@ def get_depth(
     returned.
 
     Args:
+        store: Object store to search in
         head: commit to start from
         get_parents: optional function for getting the parents of a commit
         max_depth: maximum depth to search
@@ -273,6 +274,7 @@ class BaseObjectStore:
 
         Args:
           objects: Iterable over a list of (object, path) tuples
+          progress: Optional progress callback
         """
         raise NotImplementedError(self.add_objects)
 
@@ -585,6 +587,8 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
         Args:
           count: Number of items to add
+          unpacked_objects: Iterator of UnpackedObject instances
+          progress: Optional progress callback
         """
         if count == 0:
             # Don't bother writing an empty pack file

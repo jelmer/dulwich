@@ -900,6 +900,9 @@ class DiskRefsContainerWorktreeRefsTest(TestCase):
         self.assertEqual(expected, self.refs.keys())
         self.assertEqual(expected, self.wt_refs.keys())
 
+        self.assertEqual({b"main", b"wt-main"}, set(self.refs.keys(b"refs/heads/")))
+        self.assertEqual({b"main", b"wt-main"}, set(self.wt_refs.keys(b"refs/heads/")))
+
         ref_path = os.path.join(self.refs.path, b"refs", b"heads", b"main")
         self.assertTrue(os.path.exists(ref_path))
 
@@ -953,6 +956,7 @@ class DiskRefsContainerWorktreeRefsTest(TestCase):
             b"refs/bisect/start",
         }
         self.assertEqual(self.refs.keys(), expected_refs)
+        self.assertEqual({b"good", b"start"}, self.refs.keys(b"refs/bisect/"))
 
         expected_wt_refs = {
             b"HEAD",
@@ -962,6 +966,7 @@ class DiskRefsContainerWorktreeRefsTest(TestCase):
             b"refs/bisect/bad",
         }
         self.assertEqual(self.wt_refs.keys(), expected_wt_refs)
+        self.assertEqual({b"good", b"bad"}, self.wt_refs.keys(b"refs/bisect/"))
 
     def test_delete_per_worktree_ref(self) -> None:
         self.refs[b"refs/worktree/foo"] = self.first_commit

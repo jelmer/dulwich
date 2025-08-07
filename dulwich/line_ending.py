@@ -163,6 +163,7 @@ class LineEndingFilter(FilterDriver):
         smudge_conversion: Optional[Callable[[bytes], bytes]] = None,
         binary_detection: bool = True,
     ):
+        """Initialize LineEndingFilter."""
         self.clean_conversion = clean_conversion
         self.smudge_conversion = smudge_conversion
         self.binary_detection = binary_detection
@@ -335,6 +336,7 @@ class BlobNormalizer(FilterBlobNormalizer):
         core_eol: str = "native",
         autocrlf: bytes = b"false",
     ) -> None:
+        """Initialize FilteringBlobNormalizer."""
         # Set up a filter registry with line ending filters
         filter_registry = FilterRegistry(config_stack)
 
@@ -431,9 +433,7 @@ class BlobNormalizer(FilterBlobNormalizer):
 def normalize_blob(
     blob: Blob, conversion: Callable[[bytes], bytes], binary_detection: bool
 ) -> Blob:
-    """Takes a blob as input returns either the original blob if binary_detection is True and the blob content looks like binary, else return a new blob with converted data.
-
-    """
+    """Normalize blob by applying line ending conversion."""
     # Read the original blob
     data = blob.data
 
@@ -454,6 +454,8 @@ def normalize_blob(
 
 
 class TreeBlobNormalizer(BlobNormalizer):
+    """Blob normalizer that tracks existing files in a tree."""
+
     def __init__(
         self,
         config_stack: "StackedConfig",
@@ -463,6 +465,7 @@ class TreeBlobNormalizer(BlobNormalizer):
         core_eol: str = "native",
         autocrlf: bytes = b"false",
     ) -> None:
+        """Initialize TreeBlobNormalizer."""
         super().__init__(config_stack, git_attributes, core_eol, autocrlf)
         if tree:
             self.existing_paths = {
@@ -472,6 +475,7 @@ class TreeBlobNormalizer(BlobNormalizer):
             self.existing_paths = set()
 
     def checkin_normalize(self, blob: Blob, tree_path: bytes) -> Blob:
+        """Normalize blob for checkin, considering existing tree state."""
         # Existing files should only be normalized on checkin if it was
         # previously normalized on checkout
         if (

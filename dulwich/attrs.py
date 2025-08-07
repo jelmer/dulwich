@@ -165,7 +165,7 @@ class Pattern:
 
     def __init__(self, pattern: bytes):
         """Initialize GitAttributesPattern.
-        
+
         Args:
             pattern: Attribute pattern as bytes
         """

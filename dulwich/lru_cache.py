@@ -78,6 +78,12 @@ class LRUCache(Generic[K, V]):
     def __init__(
         self, max_cache: int = 100, after_cleanup_count: Optional[int] = None
     ) -> None:
+        """Initialize LRUCache.
+
+        Args:
+          max_cache: Maximum number of entries to cache
+          after_cleanup_count: Number of entries to keep after cleanup
+        """
         self._cache: dict[K, _LRUNode[K, V]] = {}
         # The "HEAD" of the lru linked list
         self._most_recently_used = None
@@ -86,9 +92,11 @@ class LRUCache(Generic[K, V]):
         self._update_max_cache(max_cache, after_cleanup_count)
 
     def __contains__(self, key: K) -> bool:
+        """Check if key is in cache."""
         return key in self._cache
 
     def __getitem__(self, key: K) -> V:
+        """Get item from cache and mark as recently used."""
         cache = self._cache
         node = cache[key]
         # Inlined from _record_access to decrease the overhead of __getitem__
@@ -122,6 +130,7 @@ class LRUCache(Generic[K, V]):
         return node.value
 
     def __len__(self) -> int:
+        """Return number of items in cache."""
         return len(self._cache)
 
     def _walk_lru(self) -> Iterator[_LRUNode[K, V]]:
@@ -196,6 +205,15 @@ class LRUCache(Generic[K, V]):
         return self._max_cache
 
     def get(self, key: K, default: Optional[V] = None) -> Optional[V]:
+        """Get value from cache with default if not found.
+
+        Args:
+          key: Key to look up
+          default: Default value if key not found
+
+        Returns:
+          Value from cache or default
+        """
         node = self._cache.get(key, None)
         if node is None:
             return default

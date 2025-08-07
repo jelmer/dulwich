@@ -41,7 +41,15 @@ import paramiko.config
 
 
 class _ParamikoWrapper:
+    """Wrapper for paramiko SSH channel to provide a file-like interface."""
+
     def __init__(self, client: paramiko.SSHClient, channel: paramiko.Channel) -> None:
+        """Initialize the paramiko wrapper.
+
+        Args:
+            client: The SSH client instance
+            channel: The SSH channel for communication
+        """
         self.client = client
         self.channel = channel
 
@@ -50,15 +58,38 @@ class _ParamikoWrapper:
 
     @property
     def stderr(self) -> BinaryIO:
+        """Get stderr stream from the channel.
+
+        Returns:
+            Binary IO stream for stderr
+        """
         return cast(BinaryIO, self.channel.makefile_stderr("rb"))
 
     def can_read(self) -> bool:
+        """Check if data is available to read.
+
+        Returns:
+            True if data is available
+        """
         return self.channel.recv_ready()
 
     def write(self, data: bytes) -> None:
+        """Write data to the channel.
+
+        Args:
+            data: Bytes to write
+        """
         return self.channel.sendall(data)
 
     def read(self, n: Optional[int] = None) -> bytes:
+        """Read data from the channel.
+
+        Args:
+            n: Number of bytes to read (default: 4096)
+
+        Returns:
+            Bytes read from the channel
+        """
         data = self.channel.recv(n or 4096)
         data_len = len(data)
 
@@ -73,13 +104,21 @@ class _ParamikoWrapper:
         return data
 
     def close(self) -> None:
+        """Close the SSH channel."""
         self.channel.close()
 
 
 class ParamikoSSHVendor:
+    """SSH vendor implementation using paramiko."""
+
     # http://docs.paramiko.org/en/2.4/api/client.html
 
     def __init__(self, **kwargs: object) -> None:
+        """Initialize the paramiko SSH vendor.
+
+        Args:
+            **kwargs: Additional keyword arguments passed to SSHClient
+        """
         self.kwargs = kwargs
         self.ssh_config = self._load_ssh_config()
 
@@ -110,6 +149,22 @@ class ParamikoSSHVendor:
         protocol_version: Optional[int] = None,
         **kwargs: object,
     ) -> _ParamikoWrapper:
+        """Run a command on a remote host via SSH.
+
+        Args:
+            host: Hostname to connect to
+            command: Command to execute
+            username: SSH username (optional)
+            port: SSH port (optional)
+            password: SSH password (optional)
+            pkey: Private key for authentication (optional)
+            key_filename: Path to private key file (optional)
+            protocol_version: SSH protocol version (optional)
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            _ParamikoWrapper instance for the SSH channel
+        """
         client = paramiko.SSHClient()
 
         # Get SSH config for this host

@@ -68,6 +68,12 @@ class Stash:
     """
 
     def __init__(self, repo: "Repo", ref: Ref = DEFAULT_STASH_REF) -> None:
+        """Initialize Stash.
+
+        Args:
+          repo: Repository object
+          ref: Stash reference name
+        """
         self._ref = ref
         self._repo = repo
 
@@ -76,6 +82,11 @@ class Stash:
         return os.path.join(self._repo.commondir(), "logs", os.fsdecode(self._ref))
 
     def stashes(self) -> list["Entry"]:
+        """Get list of stash entries.
+
+        Returns:
+          List of stash entries in chronological order
+        """
         try:
             with GitFile(self._reflog_path, "rb") as f:
                 return list(reversed(list(read_reflog(f))))
@@ -330,7 +341,9 @@ class Stash:
         return cid
 
     def __getitem__(self, index: int) -> "Entry":
+        """Get stash entry by index."""
         return list(self.stashes())[index]
 
     def __len__(self) -> int:
+        """Return number of stash entries."""
         return len(list(self.stashes()))

@@ -139,6 +139,11 @@ class InvalidUserIdentity(Exception):
     """User identity is not of the format 'user <email>'."""
 
     def __init__(self, identity) -> None:
+        """Initialize InvalidUserIdentity exception.
+
+        Args:
+            identity: The invalid identity string
+        """
         self.identity = identity
 
 
@@ -200,6 +205,7 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
     system (e.g. the gecos field, $EMAIL, $USER@$(hostname -f).
 
     Args:
+      config: Configuration stack to read from
       kind: Optional kind to return identity for,
         usually either "AUTHOR" or "COMMITTER".
 
@@ -331,7 +337,16 @@ def _set_filesystem_hidden(path) -> None:
 
 
 class ParentsProvider:
+    """Provides parents for commits, handling grafts and shallow commits."""
+
     def __init__(self, store, grafts={}, shallows=[]) -> None:
+        """Initialize ParentsProvider.
+
+        Args:
+            store: Object store to get commits from
+            grafts: Dictionary mapping commit ids to parent ids
+            shallows: List of shallow commit ids
+        """
         self.store = store
         self.grafts = grafts
         self.shallows = set(shallows)
@@ -340,6 +355,15 @@ class ParentsProvider:
         self.commit_graph = store.get_commit_graph()
 
     def get_parents(self, commit_id, commit=None):
+        """Get the parents of a commit.
+
+        Args:
+          commit_id: The commit SHA to get parents for
+          commit: Optional commit object to avoid fetching
+
+        Returns:
+          List of parent commit SHAs
+        """
         try:
             return self.grafts[commit_id]
         except KeyError:
@@ -581,7 +605,14 @@ class BaseRepo:
                 return None
 
             class DummyMissingObjectFinder:
+                """Dummy finder that returns no missing objects."""
+
                 def get_remote_has(self) -> None:
+                    """Get remote has (always returns None).
+
+                    Returns:
+                      None
+                    """
                     return None
 
                 def __len__(self) -> int:
@@ -607,6 +638,14 @@ class BaseRepo:
         parents_provider = ParentsProvider(self.object_store, shallows=current_shallow)
 
         def get_parents(commit):
+            """Get parents for a commit using the parents provider.
+
+            Args:
+              commit: Commit object
+
+            Returns:
+              List of parent commit SHAs
+            """
             return parents_provider.get_parents(commit.id, commit)
 
         return MissingObjectFinder(
@@ -708,6 +747,11 @@ class BaseRepo:
         return self.object_store[sha]
 
     def parents_provider(self) -> ParentsProvider:
+        """Get a parents provider for this repository.
+
+        Returns:
+          ParentsProvider instance configured with grafts and shallows
+        """
         return ParentsProvider(
             self.object_store,
             grafts=self._graftpoints,
@@ -857,26 +901,25 @@ class BaseRepo:
         Args:
           include: Iterable of SHAs of commits to include along with their
             ancestors. Defaults to [HEAD]
+          **kwargs: Additional keyword arguments including:
 
-        Keyword Args:
-          exclude: Iterable of SHAs of commits to exclude along with their
-            ancestors, overriding includes.
-          order: ORDER_* constant specifying the order of results.
-            Anything other than ORDER_DATE may result in O(n) memory usage.
-          reverse: If True, reverse the order of output, requiring O(n)
-            memory.
-          max_entries: The maximum number of entries to yield, or None for
-            no limit.
-          paths: Iterable of file or subtree paths to show entries for.
-          rename_detector: diff.RenameDetector object for detecting
-            renames.
-          follow: If True, follow path across renames/copies. Forces a
-            default rename_detector.
-          since: Timestamp to list commits after.
-          until: Timestamp to list commits before.
-          queue_cls: A class to use for a queue of commits, supporting the
-            iterator protocol. The constructor takes a single argument, the
-            Walker.
+            * exclude: Iterable of SHAs of commits to exclude along with their
+              ancestors, overriding includes.
+            * order: ORDER_* constant specifying the order of results.
+              Anything other than ORDER_DATE may result in O(n) memory usage.
+            * reverse: If True, reverse the order of output, requiring O(n)
+              memory.
+            * max_entries: The maximum number of entries to yield, or None for
+              no limit.
+            * paths: Iterable of file or subtree paths to show entries for.
+            * rename_detector: diff.RenameDetector object for detecting
+              renames.
+            * follow: If True, follow path across renames/copies. Forces a
+              default rename_detector.
+            * since: Timestamp to list commits after.
+            * until: Timestamp to list commits before.
+            * queue_cls: A class to use for a queue of commits, supporting the
+              iterator protocol. The constructor takes a single argument, the Walker.
 
         Returns: A `Walker` object
         """
@@ -1085,6 +1128,11 @@ class UnsupportedVersion(Exception):
     """Unsupported repository version."""
 
     def __init__(self, version) -> None:
+        """Initialize UnsupportedVersion exception.
+
+        Args:
+            version: The unsupported repository version
+        """
         self.version = version
 
 
@@ -1092,6 +1140,11 @@ class UnsupportedExtension(Exception):
     """Unsupported repository extension."""
 
     def __init__(self, extension) -> None:
+        """Initialize UnsupportedExtension exception.
+
+        Args:
+            extension: The unsupported repository extension
+        """
         self.extension = extension
 
 
@@ -1459,7 +1512,8 @@ class Repo(BaseRepo):
 
     @replace_me(remove_in="0.26.0")
     def unstage(self, fs_paths: list[str]) -> None:
-        """Unstage specific file in the index
+        """Unstage specific file in the index.
+
         Args:
           fs_paths: a list of files to unstage,
             relative to the repository path.
@@ -1581,6 +1635,15 @@ class Repo(BaseRepo):
 
         # Add gitdir matchers
         def match_gitdir(pattern: str, case_sensitive: bool = True) -> bool:
+            """Match gitdir against a pattern.
+
+            Args:
+              pattern: Pattern to match against
+              case_sensitive: Whether to match case-sensitively
+
+            Returns:
+              True if gitdir matches pattern
+            """
             # Handle relative patterns (starting with ./)
             if pattern.startswith("./"):
                 # Can't handle relative patterns without config directory context
@@ -1618,6 +1681,14 @@ class Repo(BaseRepo):
 
         # Add onbranch matcher
         def match_onbranch(pattern: str) -> bool:
+            """Match current branch against a pattern.
+
+            Args:
+              pattern: Pattern to match against
+
+            Returns:
+              True if current branch matches pattern
+            """
             try:
                 # Get the current branch using refs
                 ref_chain, _ = self.refs.follow(b"HEAD")
@@ -1640,6 +1711,11 @@ class Repo(BaseRepo):
         return matchers
 
     def get_worktree_config(self) -> "ConfigFile":
+        """Get the worktree-specific config.
+
+        Returns:
+          ConfigFile object for the worktree config
+        """
         from .config import ConfigFile
 
         path = os.path.join(self.commondir(), "config.worktree")
@@ -1694,6 +1770,7 @@ class Repo(BaseRepo):
             return None
 
     def __repr__(self) -> str:
+        """Return string representation of this repository."""
         return f"<Repo at {self.path!r}>"
 
     def set_description(self, description) -> None:
@@ -1756,6 +1833,9 @@ class Repo(BaseRepo):
         Args:
           path: Path in which to create the repository
           mkdir: Whether to create the directory
+          config: Configuration object
+          default_branch: Default branch name
+          symlinks: Whether to support symlinks
           format: Repository format version (defaults to 0)
         Returns: `Repo` instance
         """
@@ -1843,6 +1923,10 @@ class Repo(BaseRepo):
 
         Args:
           path: Path to create bare repository in
+          mkdir: Whether to create the directory
+          object_store: Object store to use
+          config: Configuration object
+          default_branch: Default branch name
           format: Repository format version (defaults to 0)
         Returns: a `Repo` instance
         """
@@ -1868,9 +1952,11 @@ class Repo(BaseRepo):
         self.object_store.close()
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager and close repository."""
         self.close()
 
     def _read_gitattributes(self) -> dict[bytes, dict[bytes, bytes]]:
@@ -2060,9 +2146,19 @@ class MemoryRepo(BaseRepo):
         self._reflog.append(args)
 
     def set_description(self, description) -> None:
+        """Set the description for this repository.
+
+        Args:
+          description: Text to set as description
+        """
         self._description = description
 
     def get_description(self):
+        """Get the description of this repository.
+
+        Returns:
+          Repository description as bytes
+        """
         return self._description
 
     def _determine_file_mode(self):
@@ -2103,6 +2199,7 @@ class MemoryRepo(BaseRepo):
 
         Args:
           path: The path to the file, relative to the control dir.
+          basedir: Optional base directory for the path
         Returns: An open file object, or None if the file does not exist.
         """
         contents = self._named_files.get(path, None)

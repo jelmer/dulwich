@@ -52,6 +52,15 @@ def get_note_fanout_level(tree: Tree, object_store: "BaseObjectStore") -> int:
 
     # Count the total number of notes in the tree recursively
     def count_notes(tree: Tree, level: int = 0) -> int:
+        """Count notes in a tree recursively.
+
+        Args:
+            tree: Tree to count notes in
+            level: Current recursion level
+
+        Returns:
+            Total number of notes
+        """
         count = 0
         for name, mode, sha in tree.items():
             if stat.S_ISREG(mode):
@@ -223,6 +232,16 @@ class NotesTree:
 
             # Build new tree structure
             def update_tree(tree: Tree, components: list, blob_sha: bytes) -> Tree:
+                """Update tree with new note entry.
+
+                Args:
+                    tree: Tree to update
+                    components: Path components
+                    blob_sha: SHA of the note blob
+
+                Returns:
+                    Updated tree
+                """
                 if len(components) == 1:
                     # Leaf level - add the note blob
                     new_tree = Tree()
@@ -368,6 +387,16 @@ class NotesTree:
 
         # Build new tree structure
         def update_tree(tree: Tree, components: list, blob_sha: bytes) -> Tree:
+            """Update tree with new note entry.
+
+            Args:
+                tree: Tree to update
+                components: Path components
+                blob_sha: SHA of the note blob
+
+            Returns:
+                Updated tree
+            """
             if len(components) == 1:
                 # Leaf level - add the note blob
                 new_tree = Tree()
@@ -429,6 +458,15 @@ class NotesTree:
 
         # Build new tree structure without the note
         def remove_from_tree(tree: Tree, components: list) -> Optional[Tree]:
+            """Remove note entry from tree.
+
+            Args:
+                tree: Tree to remove from
+                components: Path components
+
+            Returns:
+                Updated tree or None if empty
+            """
             if len(components) == 1:
                 # Leaf level - remove the note
                 new_tree = Tree()
@@ -484,6 +522,15 @@ class NotesTree:
         """
 
         def walk_tree(tree: Tree, prefix: bytes = b"") -> Iterator[tuple[bytes, bytes]]:
+            """Walk the notes tree recursively.
+
+            Args:
+                tree: Tree to walk
+                prefix: Path prefix for current level
+
+            Yields:
+                Tuples of (object_sha, note_sha)
+            """
             for name, mode, sha in tree.items():
                 if stat.S_ISDIR(mode):  # Directory
                     subtree = self._object_store[sha]

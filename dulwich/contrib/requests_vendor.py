@@ -49,6 +49,8 @@ from ..errors import GitProtocolError, NotGitRepository
 
 
 class RequestsHttpGitClient(AbstractHttpGitClient):
+    """HTTP Git client using the requests library."""
+
     def __init__(
         self,
         base_url: str,
@@ -58,6 +60,16 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         password: Optional[str] = None,
         **kwargs: object,
     ) -> None:
+        """Initialize RequestsHttpGitClient.
+
+        Args:
+          base_url: Base URL of the Git repository
+          dumb: Whether to use dumb HTTP transport
+          config: Git configuration file
+          username: Username for authentication
+          password: Password for authentication
+          **kwargs: Additional keyword arguments
+        """
         self._username = username
         self._password = password
 
@@ -112,6 +124,14 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
 
 
 def get_session(config: Optional["ConfigFile"]) -> Session:
+    """Create a requests session with Git configuration.
+
+    Args:
+      config: Git configuration file
+
+    Returns:
+      Configured requests Session
+    """
     session = Session()
     session.headers.update({"Pragma": "no-cache"})
 

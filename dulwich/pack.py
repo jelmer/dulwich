@@ -111,10 +111,17 @@ class UnresolvedDeltas(Exception):
     """Delta objects could not be resolved."""
 
     def __init__(self, shas: list[bytes]) -> None:
+        """Initialize UnresolvedDeltas exception.
+
+        Args:
+            shas: List of SHA hashes for unresolved delta objects
+        """
         self.shas = shas
 
 
 class ObjectContainer(Protocol):
+    """Protocol for objects that can contain git objects."""
+
     def add_object(self, obj: ShaFile) -> None:
         """Add a single object to this object store."""
 
@@ -127,6 +134,7 @@ class ObjectContainer(Protocol):
 
         Args:
           objects: Iterable over a list of (object, path) tuples
+          progress: Progress callback for object insertion
         """
 
     def __contains__(self, sha1: bytes) -> bool:
@@ -145,15 +153,34 @@ class ObjectContainer(Protocol):
 
 
 class PackedObjectContainer(ObjectContainer):
+    """Container for objects packed in a pack file."""
+
     def get_unpacked_object(
         self, sha1: bytes, *, include_comp: bool = False
     ) -> "UnpackedObject":
-        """Get a raw unresolved object."""
+        """Get a raw unresolved object.
+
+        Args:
+            sha1: SHA-1 hash of the object
+            include_comp: Whether to include compressed data
+
+        Returns:
+            UnpackedObject instance
+        """
         raise NotImplementedError(self.get_unpacked_object)
 
     def iterobjects_subset(
         self, shas: Iterable[bytes], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
+        """Iterate over a subset of objects.
+
+        Args:
+            shas: Iterable of object SHAs to retrieve
+            allow_missing: If True, skip missing objects
+
+        Returns:
+            Iterator of ShaFile objects
+        """
         raise NotImplementedError(self.iterobjects_subset)
 
     def iter_unpacked_subset(
@@ -163,6 +190,17 @@ class PackedObjectContainer(ObjectContainer):
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
     ) -> Iterator["UnpackedObject"]:
+        """Iterate over unpacked objects from a subset of SHAs.
+
+        Args:
+          shas: Set of object SHAs to retrieve
+          include_comp: Include compressed data if True
+          allow_missing: If True, skip missing objects
+          convert_ofs_delta: If True, convert offset deltas to ref deltas
+
+        Returns:
+          Iterator of UnpackedObject instances
+        """
         raise NotImplementedError(self.iter_unpacked_subset)
 
 
@@ -170,9 +208,11 @@ class UnpackedObjectStream:
     """Abstract base class for a stream of unpacked objects."""
 
     def __iter__(self) -> Iterator["UnpackedObject"]:
+        """Iterate over unpacked objects."""
         raise NotImplementedError(self.__iter__)
 
     def __len__(self) -> int:
+        """Return the number of objects in the stream."""
         raise NotImplementedError(self.__len__)
 
 
@@ -183,6 +223,10 @@ def take_msb_bytes(
 
     Args:
       read: Read function
+      crc32: Optional CRC32 checksum to update
+
+    Returns:
+      Tuple of (list of bytes read, updated CRC32 or None)
     """
     ret: list[int] = []
     while len(ret) == 0 or ret[-1] & 0x80:
@@ -197,6 +241,11 @@ class PackFileDisappeared(Exception):
     """Raised when a pack file unexpectedly disappears."""
 
     def __init__(self, obj: object) -> None:
+        """Initialize PackFileDisappeared exception.
+
+        Args:
+            obj: The object that triggered the exception
+        """
         self.obj = obj
 
 
@@ -248,6 +297,17 @@ class UnpackedObject:
         decomp_chunks: Optional[list[bytes]] = None,
         offset: Optional[int] = None,
     ) -> None:
+        """Initialize an UnpackedObject.
+
+        Args:
+            pack_type_num: Type number of this object in the pack
+            delta_base: Delta base (offset or SHA) if this is a delta object
+            decomp_len: Decompressed length of this object
+            crc32: CRC32 checksum
+            sha: SHA-1 hash of the object
+            decomp_chunks: Decompressed chunks
+            offset: Offset in the pack file
+        """
         self.offset = offset
         self._sha = sha
         self.pack_type_num = pack_type_num
@@ -290,6 +350,7 @@ class UnpackedObject:
             return self.decomp_chunks
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another UnpackedObject."""
         if not isinstance(other, UnpackedObject):
             return False
         for slot in self.__slots__:
@@ -496,6 +557,7 @@ class PackIndex:
     hash_size = 20
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another PackIndex."""
         if not isinstance(other, PackIndex):
             return False
 
@@ -535,6 +597,14 @@ class PackIndex:
 
     @replace_me(since="0.21.0", remove_in="0.23.0")
     def object_index(self, sha: bytes) -> int:
+        """Return the index for the given SHA.
+
+        Args:
+            sha: SHA-1 hash
+
+        Returns:
+            Index position
+        """
         return self.object_offset(sha)
 
     def object_offset(self, sha: bytes) -> int:
@@ -691,6 +761,7 @@ class FilePackIndex(PackIndex):
         return os.fspath(self._filename)
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another FilePackIndex."""
         # Quick optimization:
         if (
             isinstance(other, FilePackIndex)
@@ -855,6 +926,14 @@ class PackIndex1(FilePackIndex):
     def __init__(
         self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
     ) -> None:
+        """Initialize a version 1 pack index.
+
+        Args:
+            filename: Path to the index file
+            file: Optional file object
+            contents: Optional mmap'd contents
+            size: Optional size of the index
+        """
         super().__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
@@ -886,6 +965,14 @@ class PackIndex2(FilePackIndex):
     def __init__(
         self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
     ) -> None:
+        """Initialize a version 2 pack index.
+
+        Args:
+            filename: Path to the index file
+            file: Optional file object
+            contents: Optional mmap'd contents
+            size: Optional size of the index
+        """
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
             raise AssertionError("Not a v2 pack index file")
@@ -939,6 +1026,14 @@ class PackIndex3(FilePackIndex):
     def __init__(
         self, filename: Union[str, os.PathLike], file=None, contents=None, size=None
     ) -> None:
+        """Initialize a version 3 pack index.
+
+        Args:
+            filename: Path to the index file
+            file: Optional file object
+            contents: Optional mmap'd contents
+            size: Optional size of the index
+        """
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
             raise AssertionError("Not a v3 pack index file")
@@ -1123,6 +1218,13 @@ class PackStreamReader:
     """
 
     def __init__(self, read_all, read_some=None, zlib_bufsize=_ZLIB_BUFSIZE) -> None:
+        """Initialize a PackStreamReader.
+
+        Args:
+            read_all: Function to read all requested bytes
+            read_some: Function to read some bytes (defaults to read_all)
+            zlib_bufsize: Buffer size for zlib decompression
+        """
         self.read_all = read_all
         if read_some is None:
             self.read_some = read_all
@@ -1202,6 +1304,7 @@ class PackStreamReader:
         return self._read(self.read_some, size)
 
     def __len__(self) -> int:
+        """Return the number of objects in this pack."""
         return self._num_objects
 
     def read_objects(self, compute_crc32=False) -> Iterator[UnpackedObject]:
@@ -1426,18 +1529,45 @@ class PackData:
 
     @property
     def filename(self):
+        """Get the filename of the pack file.
+
+        Returns:
+          Base filename without directory path
+        """
         return os.path.basename(self._filename)
 
     @property
     def path(self):
+        """Get the full path of the pack file.
+
+        Returns:
+          Full path to the pack file
+        """
         return self._filename
 
     @classmethod
     def from_file(cls, file, size=None):
+        """Create a PackData object from an open file.
+
+        Args:
+          file: Open file object
+          size: Optional file size
+
+        Returns:
+          PackData instance
+        """
         return cls(str(file), file=file, size=size)
 
     @classmethod
     def from_path(cls, path: Union[str, os.PathLike]):
+        """Create a PackData object from a file path.
+
+        Args:
+          path: Path to the pack file
+
+        Returns:
+          PackData instance
+        """
         return cls(filename=path)
 
     def close(self) -> None:
@@ -1445,9 +1575,11 @@ class PackData:
         self._file.close()
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager."""
         self.close()
 
     def __eq__(self, other):
@@ -1511,6 +1643,7 @@ class PackData:
         Args:
           progress: Progress function, called with current and total
             object count.
+          resolve_ext_ref: Optional function to resolve external references
         Returns: iterator of tuples with (sha, offset, crc32)
         """
         num_objects = self._num_objects
@@ -1530,6 +1663,7 @@ class PackData:
         Args:
           progress: Progress function, called with current and total
             object count
+          resolve_ext_ref: Optional function to resolve external references
         Returns: Iterator of tuples with (sha, offset, crc32)
         """
         return sorted(
@@ -1542,6 +1676,7 @@ class PackData:
         Args:
           filename: Index filename.
           progress: Progress report function
+          resolve_ext_ref: Optional function to resolve external references
         Returns: Checksum of index file
         """
         entries = self.sorted_entries(
@@ -1556,6 +1691,7 @@ class PackData:
         Args:
           filename: Index filename.
           progress: Progress report function
+          resolve_ext_ref: Optional function to resolve external references
         Returns: Checksum of index file
         """
         entries = self.sorted_entries(
@@ -1680,6 +1816,12 @@ class DeltaChainIterator(Generic[T]):
     _include_comp = False
 
     def __init__(self, file_obj, *, resolve_ext_ref=None) -> None:
+        """Initialize DeltaChainIterator.
+
+        Args:
+            file_obj: File object to read pack data from
+            resolve_ext_ref: Optional function to resolve external references
+        """
         self._file = file_obj
         self._resolve_ext_ref = resolve_ext_ref
         self._pending_ofs: dict[int, list[int]] = defaultdict(list)
@@ -1689,6 +1831,15 @@ class DeltaChainIterator(Generic[T]):
 
     @classmethod
     def for_pack_data(cls, pack_data: PackData, resolve_ext_ref=None):
+        """Create a DeltaChainIterator from pack data.
+
+        Args:
+          pack_data: PackData object to iterate
+          resolve_ext_ref: Optional function to resolve external refs
+
+        Returns:
+          DeltaChainIterator instance
+        """
         walker = cls(None, resolve_ext_ref=resolve_ext_ref)
         walker.set_pack_data(pack_data)
         for unpacked in pack_data.iter_unpacked(include_comp=False):
@@ -1704,6 +1855,17 @@ class DeltaChainIterator(Generic[T]):
         allow_missing: bool = False,
         resolve_ext_ref=None,
     ):
+        """Create a DeltaChainIterator for a subset of objects.
+
+        Args:
+          pack: Pack object containing the data
+          shas: Iterable of object SHAs to include
+          allow_missing: If True, skip missing objects
+          resolve_ext_ref: Optional function to resolve external refs
+
+        Returns:
+          DeltaChainIterator instance
+        """
         walker = cls(None, resolve_ext_ref=resolve_ext_ref)
         walker.set_pack_data(pack.data)
         todo = set()
@@ -1737,6 +1899,11 @@ class DeltaChainIterator(Generic[T]):
         return walker
 
     def record(self, unpacked: UnpackedObject) -> None:
+        """Record an unpacked object for later processing.
+
+        Args:
+          unpacked: UnpackedObject to record
+        """
         type_num = unpacked.pack_type_num
         offset = unpacked.offset
         assert offset is not None
@@ -1752,6 +1919,11 @@ class DeltaChainIterator(Generic[T]):
             self._full_ofs.append((offset, type_num))
 
     def set_pack_data(self, pack_data: PackData) -> None:
+        """Set the pack data for iteration.
+
+        Args:
+          pack_data: PackData object to use
+        """
         self._file = pack_data._file
 
     def _walk_all_chains(self):
@@ -1827,9 +1999,11 @@ class DeltaChainIterator(Generic[T]):
             )
 
     def __iter__(self) -> Iterator[T]:
+        """Iterate over objects in the pack."""
         return self._walk_all_chains()
 
     def ext_refs(self):
+        """Return external references."""
         return self._ext_refs
 
 
@@ -1837,6 +2011,14 @@ class UnpackedObjectIterator(DeltaChainIterator[UnpackedObject]):
     """Delta chain iterator that yield unpacked objects."""
 
     def _result(self, unpacked):
+        """Return the unpacked object.
+
+        Args:
+            unpacked: The unpacked object
+
+        Returns:
+            The unpacked object unchanged
+        """
         return unpacked
 
 
@@ -1846,6 +2028,14 @@ class PackIndexer(DeltaChainIterator[PackIndexEntry]):
     _compute_crc32 = True
 
     def _result(self, unpacked):
+        """Convert unpacked object to pack index entry.
+
+        Args:
+            unpacked: The unpacked object
+
+        Returns:
+            Tuple of (sha, offset, crc32) for index entry
+        """
         return unpacked.sha(), unpacked.offset, unpacked.crc32
 
 
@@ -1853,6 +2043,14 @@ class PackInflater(DeltaChainIterator[ShaFile]):
     """Delta chain iterator that yields ShaFile objects."""
 
     def _result(self, unpacked):
+        """Convert unpacked object to ShaFile.
+
+        Args:
+            unpacked: The unpacked object
+
+        Returns:
+            ShaFile object from the unpacked data
+        """
         return unpacked.sha_file()
 
 
@@ -1860,15 +2058,36 @@ class SHA1Reader(BinaryIO):
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f) -> None:
+        """Initialize SHA1Reader.
+
+        Args:
+            f: File-like object to wrap
+        """
         self.f = f
         self.sha1 = sha1(b"")
 
     def read(self, size: int = -1) -> bytes:
+        """Read bytes and update SHA1.
+
+        Args:
+            size: Number of bytes to read, -1 for all
+
+        Returns:
+            Bytes read from file
+        """
         data = self.f.read(size)
         self.sha1.update(data)
         return data
 
     def check_sha(self, allow_empty: bool = False) -> None:
+        """Check if the SHA1 matches the expected value.
+
+        Args:
+            allow_empty: Allow empty SHA1 hash
+
+        Raises:
+            ChecksumMismatch: If SHA1 doesn't match
+        """
         stored = self.f.read(20)
         # If git option index.skipHash is set the index will be empty
         if stored != self.sha1.digest() and (
@@ -1878,62 +2097,121 @@ class SHA1Reader(BinaryIO):
             raise ChecksumMismatch(self.sha1.hexdigest(), sha_to_hex(stored))
 
     def close(self):
+        """Close the underlying file."""
         return self.f.close()
 
     def tell(self) -> int:
+        """Return current file position."""
         return self.f.tell()
 
     # BinaryIO abstract methods
     def readable(self) -> bool:
+        """Check if file is readable."""
         return True
 
     def writable(self) -> bool:
+        """Check if file is writable."""
         return False
 
     def seekable(self) -> bool:
+        """Check if file is seekable."""
         return getattr(self.f, "seekable", lambda: False)()
 
     def seek(self, offset: int, whence: int = 0) -> int:
+        """Seek to position in file.
+
+        Args:
+            offset: Position offset
+            whence: Reference point (0=start, 1=current, 2=end)
+
+        Returns:
+            New file position
+        """
         return self.f.seek(offset, whence)
 
     def flush(self) -> None:
+        """Flush the file buffer."""
         if hasattr(self.f, "flush"):
             self.f.flush()
 
     def readline(self, size: int = -1) -> bytes:
+        """Read a line from the file.
+
+        Args:
+            size: Maximum bytes to read
+
+        Returns:
+            Line read from file
+        """
         return self.f.readline(size)
 
     def readlines(self, hint: int = -1) -> list[bytes]:
+        """Read all lines from the file.
+
+        Args:
+            hint: Approximate number of bytes to read
+
+        Returns:
+            List of lines
+        """
         return self.f.readlines(hint)
 
     def writelines(self, lines) -> None:
+        """Not supported for read-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("writelines")
 
     def write(self, data) -> int:
+        """Not supported for read-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("write")
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, type, value, traceback):
+        """Exit context manager and close file."""
         self.close()
 
     def __iter__(self):
+        """Return iterator over lines."""
         return self
 
     def __next__(self) -> bytes:
+        """Get next line from file.
+
+        Returns:
+            Next line
+
+        Raises:
+            StopIteration: When no more lines
+        """
         line = self.readline()
         if not line:
             raise StopIteration
         return line
 
     def fileno(self) -> int:
+        """Return file descriptor number."""
         return self.f.fileno()
 
     def isatty(self) -> bool:
+        """Check if file is a terminal."""
         return getattr(self.f, "isatty", lambda: False)()
 
     def truncate(self, size: Optional[int] = None) -> int:
+        """Not supported for read-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("truncate")
 
 
@@ -1941,17 +2219,35 @@ class SHA1Writer(BinaryIO):
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
     def __init__(self, f) -> None:
+        """Initialize SHA1Writer.
+
+        Args:
+            f: File-like object to wrap
+        """
         self.f = f
         self.length = 0
         self.sha1 = sha1(b"")
 
     def write(self, data) -> int:
+        """Write data and update SHA1.
+
+        Args:
+            data: Data to write
+
+        Returns:
+            Number of bytes written
+        """
         self.sha1.update(data)
         self.f.write(data)
         self.length += len(data)
         return len(data)
 
     def write_sha(self):
+        """Write the SHA1 digest to the file.
+
+        Returns:
+            The SHA1 digest bytes
+        """
         sha = self.sha1.digest()
         assert len(sha) == 20
         self.f.write(sha)
@@ -1959,65 +2255,124 @@ class SHA1Writer(BinaryIO):
         return sha
 
     def close(self):
+        """Close the file after writing SHA1.
+
+        Returns:
+            The SHA1 digest bytes
+        """
         sha = self.write_sha()
         self.f.close()
         return sha
 
     def offset(self):
+        """Get the total number of bytes written.
+
+        Returns:
+            Total bytes written
+        """
         return self.length
 
     def tell(self) -> int:
+        """Return current file position."""
         return self.f.tell()
 
     # BinaryIO abstract methods
     def readable(self) -> bool:
+        """Check if file is readable."""
         return False
 
     def writable(self) -> bool:
+        """Check if file is writable."""
         return True
 
     def seekable(self) -> bool:
+        """Check if file is seekable."""
         return getattr(self.f, "seekable", lambda: False)()
 
     def seek(self, offset: int, whence: int = 0) -> int:
+        """Seek to position in file.
+
+        Args:
+            offset: Position offset
+            whence: Reference point (0=start, 1=current, 2=end)
+
+        Returns:
+            New file position
+        """
         return self.f.seek(offset, whence)
 
     def flush(self) -> None:
+        """Flush the file buffer."""
         if hasattr(self.f, "flush"):
             self.f.flush()
 
     def readline(self, size: int = -1) -> bytes:
+        """Not supported for write-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("readline")
 
     def readlines(self, hint: int = -1) -> list[bytes]:
+        """Not supported for write-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("readlines")
 
     def writelines(self, lines) -> None:
+        """Write multiple lines to the file.
+
+        Args:
+            lines: Iterable of lines to write
+        """
         for line in lines:
             self.write(line)
 
     def read(self, size: int = -1) -> bytes:
+        """Not supported for write-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("read")
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, type, value, traceback):
+        """Exit context manager and close file."""
         self.close()
 
     def __iter__(self):
+        """Return iterator."""
         return self
 
     def __next__(self) -> bytes:
+        """Not supported for write-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("__next__")
 
     def fileno(self) -> int:
+        """Return file descriptor number."""
         return self.f.fileno()
 
     def isatty(self) -> bool:
+        """Check if file is a terminal."""
         return getattr(self.f, "isatty", lambda: False)()
 
     def truncate(self, size: Optional[int] = None) -> int:
+        """Not supported for write-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
         raise UnsupportedOperation("truncate")
 
 
@@ -2081,6 +2436,7 @@ def write_pack_object(write, type, object, sha=None, compression_level=-1):
       write: Write function to use
       type: Numeric type of the object
       object: Object to write
+      sha: Optional SHA-1 hasher to update
       compression_level: the zlib compression level
     Returns: Tuple with offset at which the object was written, and crc32
     """
@@ -2105,6 +2461,7 @@ def write_pack(
 
     Args:
       filename: Path to the new pack file (without .pack extension)
+      objects: Objects to write to the pack
       delta_window_size: Delta window size
       deltify: Whether to deltify pack objects
       compression_level: the zlib compression level
@@ -2150,6 +2507,17 @@ def find_reusable_deltas(
     other_haves: Optional[set[bytes]] = None,
     progress=None,
 ) -> Iterator[UnpackedObject]:
+    """Find deltas in a pack that can be reused.
+
+    Args:
+      container: Pack container to search for deltas
+      object_ids: Set of object IDs to find deltas for
+      other_haves: Set of other object IDs we have
+      progress: Optional progress reporting callback
+
+    Returns:
+      Iterator of UnpackedObject entries that can be reused
+    """
     if other_haves is None:
         other_haves = set()
     reused = 0
@@ -2180,6 +2548,7 @@ def deltify_pack_objects(
     Args:
       objects: An iterable of (object, path) tuples to deltify.
       window_size: Window size; None for default
+      progress: Optional progress reporting callback
     Returns: Iterator over type_num, object id, delta_base, content
         delta_base is None for full text entries
     """
@@ -2201,6 +2570,14 @@ def deltify_pack_objects(
 def sort_objects_for_delta(
     objects: Union[Iterator[ShaFile], Iterator[tuple[ShaFile, Optional[PackHint]]]],
 ) -> Iterator[ShaFile]:
+    """Sort objects for optimal delta compression.
+
+    Args:
+      objects: Iterator of objects or (object, hint) tuples
+
+    Returns:
+      Iterator of sorted ShaFile objects
+    """
     magic = []
     for entry in objects:
         if isinstance(entry, tuple):
@@ -2222,6 +2599,16 @@ def sort_objects_for_delta(
 def deltas_from_sorted_objects(
     objects, window_size: Optional[int] = None, progress=None
 ):
+    """Create deltas from sorted objects.
+
+    Args:
+      objects: Iterator of sorted objects to deltify
+      window_size: Delta window size; None for default
+      progress: Optional progress reporting callback
+
+    Returns:
+      Iterator of UnpackedObject entries
+    """
     # TODO(jelmer): Use threads
     if window_size is None:
         window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
@@ -2272,6 +2659,10 @@ def pack_objects_to_data(
 
     Args:
       objects: Pack objects
+      deltify: Whether to deltify pack objects
+      delta_window_size: Delta window size
+      ofs_delta: Whether to use offset deltas
+      progress: Optional progress reporting callback
     Returns: Tuples with (type_num, hexdigest, delta base, object chunks)
     """
     # TODO(jelmer): support deltaifying
@@ -2341,6 +2732,14 @@ def generate_unpacked_objects(
 
 
 def full_unpacked_object(o: ShaFile) -> UnpackedObject:
+    """Create an UnpackedObject from a ShaFile.
+
+    Args:
+      o: ShaFile object to convert
+
+    Returns:
+      UnpackedObject with full object data
+    """
     return UnpackedObject(
         o.type_num,
         delta_base=None,
@@ -2365,10 +2764,13 @@ def write_pack_from_container(
     Args:
       write: write function to use
       container: PackedObjectContainer
+      object_ids: Sequence of (object_id, hint) tuples to write
       delta_window_size: Sliding window size for searching for deltas;
                          Set to None for default window size.
       deltify: Whether to deltify objects
+      reuse_deltas: Whether to reuse existing deltas
       compression_level: the zlib compression level to use
+      other_haves: Set of additional object IDs the receiver has
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     pack_contents_count = len(object_ids)
@@ -2419,6 +2821,8 @@ def write_pack_objects(
 
 
 class PackChunkGenerator:
+    """Generator for pack data chunks."""
+
     def __init__(
         self,
         num_records=None,
@@ -2427,6 +2831,15 @@ class PackChunkGenerator:
         compression_level=-1,
         reuse_compressed=True,
     ) -> None:
+        """Initialize PackChunkGenerator.
+
+        Args:
+            num_records: Expected number of records
+            records: Iterator of pack records
+            progress: Optional progress callback
+            compression_level: Compression level (-1 for default)
+            reuse_compressed: Whether to reuse compressed chunks
+        """
         self.cs = sha1(b"")
         self.entries: dict[Union[int, bytes], tuple[int, int]] = {}
         self._it = self._pack_data_chunks(
@@ -2438,9 +2851,11 @@ class PackChunkGenerator:
         )
 
     def sha1digest(self):
+        """Return the SHA1 digest of the pack data."""
         return self.cs.digest()
 
     def __iter__(self):
+        """Iterate over pack data chunks."""
         return self._it
 
     def _pack_data_chunks(
@@ -2459,6 +2874,7 @@ class PackChunkGenerator:
           num_records: Number of records (defaults to len(records) if not specified)
           progress: Function to report progress to
           compression_level: the zlib compression level
+          reuse_compressed: Whether to reuse compressed chunks
         Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
         """
         # Write the pack
@@ -2884,6 +3300,18 @@ class Pack:
         threads=None,
         big_file_threshold=None,
     ) -> None:
+        """Initialize a Pack object.
+
+        Args:
+          basename: Base path for pack files (without .pack/.idx extension)
+          resolve_ext_ref: Optional function to resolve external references
+          delta_window_size: Size of the delta compression window
+          window_memory: Memory limit for delta compression window
+          delta_cache_size: Size of the delta cache
+          depth: Maximum depth for delta chains
+          threads: Number of threads to use for operations
+          big_file_threshold: Size threshold for big file handling
+        """
         self._basename = basename
         self._data = None
         self._idx = None
@@ -2909,9 +3337,7 @@ class Pack:
 
     @classmethod
     def from_lazy_objects(cls, data_fn, idx_fn):
-        """Create a new pack object from callables to load pack data and
-        index objects.
-        """
+        """Create a new pack object from callables to load pack data and index objects."""
         ret = cls("")
         ret._data_load = data_fn
         ret._idx_load = idx_fn
@@ -2953,18 +3379,22 @@ class Pack:
         return self._idx
 
     def close(self) -> None:
+        """Close the pack file and index."""
         if self._data is not None:
             self._data.close()
         if self._idx is not None:
             self._idx.close()
 
     def __enter__(self):
+        """Enter context manager."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager."""
         self.close()
 
     def __eq__(self, other):
+        """Check equality with another pack."""
         return isinstance(self, type(other)) and self.index == other.index
 
     def __len__(self) -> int:
@@ -2972,6 +3402,7 @@ class Pack:
         return len(self.index)
 
     def __repr__(self) -> str:
+        """Return string representation of this pack."""
         return f"{self.__class__.__name__}({self._basename!r})"
 
     def __iter__(self):
@@ -3007,9 +3438,11 @@ class Pack:
         # TODO: object connectivity checks
 
     def get_stored_checksum(self) -> bytes:
+        """Return the stored checksum of the pack data."""
         return self.data.get_stored_checksum()
 
     def pack_tuples(self):
+        """Return pack tuples for all objects in pack."""
         return [(o, None) for o in self.iterobjects()]
 
     def __contains__(self, sha1: bytes) -> bool:
@@ -3021,6 +3454,7 @@ class Pack:
             return False
 
     def get_raw(self, sha1: bytes) -> tuple[int, bytes]:
+        """Get raw object data by SHA1."""
         offset = self.index.object_offset(sha1)
         obj_type, obj = self.data.get_object_at(offset)
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
@@ -3040,6 +3474,7 @@ class Pack:
     def iterobjects_subset(
         self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
+        """Iterate over a subset of objects in this pack."""
         return (
             uo
             for uo in PackInflater.for_pack_subset(
@@ -3059,6 +3494,7 @@ class Pack:
         allow_missing: bool = False,
         convert_ofs_delta: bool = False,
     ) -> Iterator[UnpackedObject]:
+        """Iterate over unpacked objects in subset."""
         ofs_pending: dict[int, list[UnpackedObject]] = defaultdict(list)
         ofs: dict[bytes, int] = {}
         todo = set(shas)
@@ -3088,6 +3524,7 @@ class Pack:
             raise UnresolvedDeltas(list(todo))
 
     def iter_unpacked(self, include_comp=False):
+        """Iterate over all unpacked objects in this pack."""
         ofs_to_entries = {
             ofs: (sha, crc32) for (sha, ofs, crc32) in self.index.iterentries()
         }
@@ -3204,6 +3641,7 @@ class Pack:
         Args:
           sha: SHA of object to fetch
           include_comp: Whether to include compression data in UnpackedObject
+          convert_ofs_delta: Whether to convert offset deltas to ref deltas
         """
         offset = self.index.object_offset(sha)
         unpacked = self.data.get_unpacked_object_at(offset, include_comp=include_comp)

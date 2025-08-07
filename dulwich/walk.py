@@ -53,6 +53,12 @@ class WalkEntry:
     """Object encapsulating a single result from a walk."""
 
     def __init__(self, walker: "Walker", commit: Commit) -> None:
+        """Initialize WalkEntry.
+
+        Args:
+          walker: Walker instance that created this entry
+          commit: Commit object for this entry
+        """
         self.commit = commit
         self._store = walker.store
         self._get_parents = walker.get_parents
@@ -141,6 +147,7 @@ class WalkEntry:
         return self._changes[path_prefix]
 
     def __repr__(self) -> str:
+        """Return string representation of WalkEntry."""
         return f"<WalkEntry commit={self.commit.id.decode('ascii')}, changes={self.changes()!r}>"
 
 
@@ -435,6 +442,7 @@ class Walker:
         return results
 
     def __iter__(self) -> Iterator[WalkEntry]:
+        """Iterate over walk entries."""
         return iter(self._reorder(iter(self._next, None)))
 
 

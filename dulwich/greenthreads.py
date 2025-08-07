@@ -89,6 +89,18 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         concurrency: int = 1,
         get_parents: Optional[Callable[[ObjectID], list[ObjectID]]] = None,
     ) -> None:
+        """Initialize GreenThreadsMissingObjectFinder.
+
+        Args:
+          object_store: Object store to search
+          haves: Objects we have
+          wants: Objects we want
+          progress: Optional progress callback
+          get_tagged: Optional function to get tagged objects
+          concurrency: Number of concurrent green threads
+          get_parents: Optional function to get commit parents
+        """
+
         def collect_tree_sha(sha: ObjectID) -> None:
             self.sha_done.add(sha)
             obj = object_store[sha]

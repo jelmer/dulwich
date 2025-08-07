@@ -39,6 +39,13 @@ class ChecksumMismatch(Exception):
         got: Union[bytes, str],
         extra: Optional[str] = None,
     ) -> None:
+        """Initialize a ChecksumMismatch exception.
+
+        Args:
+            expected: The expected checksum value (bytes or hex string).
+            got: The actual checksum value (bytes or hex string).
+            extra: Optional additional error information.
+        """
         if isinstance(expected, bytes) and len(expected) == 20:
             expected_str = binascii.hexlify(expected).decode("ascii")
         else:
@@ -70,6 +77,13 @@ class WrongObjectException(Exception):
     type_name: str
 
     def __init__(self, sha: bytes, *args: object, **kwargs: object) -> None:
+        """Initialize a WrongObjectException.
+
+        Args:
+            sha: The SHA of the object that was not of the expected type.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         Exception.__init__(self, f"{sha.decode('ascii')} is not a {self.type_name}")
 
 
@@ -101,6 +115,13 @@ class MissingCommitError(Exception):
     """Indicates that a commit was not found in the repository."""
 
     def __init__(self, sha: bytes, *args: object, **kwargs: object) -> None:
+        """Initialize a MissingCommitError.
+
+        Args:
+            sha: The SHA of the missing commit.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         self.sha = sha
         Exception.__init__(self, f"{sha.decode('ascii')} is not in the revision store")
 
@@ -109,6 +130,13 @@ class ObjectMissing(Exception):
     """Indicates that a requested object is missing."""
 
     def __init__(self, sha: bytes, *args: object, **kwargs: object) -> None:
+        """Initialize an ObjectMissing exception.
+
+        Args:
+            sha: The SHA of the missing object.
+            *args: Additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         Exception.__init__(self, f"{sha.decode('ascii')} is not in the pack")
 
 
@@ -116,6 +144,12 @@ class ApplyDeltaError(Exception):
     """Indicates that applying a delta failed."""
 
     def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize an ApplyDeltaError.
+
+        Args:
+            *args: Error message and additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         Exception.__init__(self, *args, **kwargs)
 
 
@@ -123,6 +157,12 @@ class NotGitRepository(Exception):
     """Indicates that no Git repository was found."""
 
     def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize a NotGitRepository exception.
+
+        Args:
+            *args: Error message and additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         Exception.__init__(self, *args, **kwargs)
 
 
@@ -130,9 +170,23 @@ class GitProtocolError(Exception):
     """Git protocol exception."""
 
     def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize a GitProtocolError.
+
+        Args:
+            *args: Error message and additional positional arguments.
+            **kwargs: Additional keyword arguments.
+        """
         Exception.__init__(self, *args, **kwargs)
 
     def __eq__(self, other: object) -> bool:
+        """Check equality between GitProtocolError instances.
+
+        Args:
+            other: The object to compare with.
+
+        Returns:
+            True if both are GitProtocolError instances with same args, False otherwise.
+        """
         return isinstance(other, GitProtocolError) and self.args == other.args
 
 
@@ -144,6 +198,11 @@ class HangupException(GitProtocolError):
     """Hangup exception."""
 
     def __init__(self, stderr_lines: Optional[list[bytes]] = None) -> None:
+        """Initialize a HangupException.
+
+        Args:
+            stderr_lines: Optional list of stderr output lines from the remote server.
+        """
         if stderr_lines:
             super().__init__(
                 "\n".join(
@@ -155,6 +214,14 @@ class HangupException(GitProtocolError):
         self.stderr_lines = stderr_lines
 
     def __eq__(self, other: object) -> bool:
+        """Check equality between HangupException instances.
+
+        Args:
+            other: The object to compare with.
+
+        Returns:
+            True if both are HangupException instances with same stderr_lines, False otherwise.
+        """
         return (
             isinstance(other, HangupException)
             and self.stderr_lines == other.stderr_lines
@@ -165,6 +232,11 @@ class UnexpectedCommandError(GitProtocolError):
     """Unexpected command received in a proto line."""
 
     def __init__(self, command: Optional[str]) -> None:
+        """Initialize an UnexpectedCommandError.
+
+        Args:
+            command: The unexpected command received, or None for flush-pkt.
+        """
         command_str = "flush-pkt" if command is None else f"command {command}"
         super().__init__(f"Protocol got unexpected {command_str}")
 

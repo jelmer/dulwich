@@ -308,6 +308,12 @@ class Pattern:
     """A single ignore pattern."""
 
     def __init__(self, pattern: bytes, ignorecase: bool = False) -> None:
+        """Initialize a Pattern object.
+
+        Args:
+            pattern: The gitignore pattern as bytes.
+            ignorecase: Whether to perform case-insensitive matching.
+        """
         self.pattern = pattern
         self.ignorecase = ignorecase
 
@@ -334,12 +340,30 @@ class Pattern:
         self._re = re.compile(translate(pattern), flags)
 
     def __bytes__(self) -> bytes:
+        """Return the pattern as bytes.
+
+        Returns:
+            The original pattern as bytes.
+        """
         return self.pattern
 
     def __str__(self) -> str:
+        """Return the pattern as a string.
+
+        Returns:
+            The pattern decoded as a string.
+        """
         return os.fsdecode(self.pattern)
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another Pattern object.
+
+        Args:
+            other: The object to compare with.
+
+        Returns:
+            True if patterns and ignorecase flags are equal, False otherwise.
+        """
         return (
             isinstance(other, type(self))
             and self.pattern == other.pattern
@@ -347,6 +371,11 @@ class Pattern:
         )
 
     def __repr__(self) -> str:
+        """Return a string representation of the Pattern object.
+
+        Returns:
+            A string representation for debugging.
+        """
         return f"{type(self).__name__}({self.pattern!r}, {self.ignorecase!r})"
 
     def match(self, path: bytes) -> bool:
@@ -389,6 +418,13 @@ class IgnoreFilter:
         ignorecase: bool = False,
         path: Optional[str] = None,
     ) -> None:
+        """Initialize an IgnoreFilter with a set of patterns.
+
+        Args:
+            patterns: An iterable of gitignore patterns as bytes.
+            ignorecase: Whether to perform case-insensitive matching.
+            path: Optional path to the ignore file for debugging purposes.
+        """
         self._patterns: list[Pattern] = []
         self._ignorecase = ignorecase
         self._path = path
@@ -450,10 +486,20 @@ class IgnoreFilter:
     def from_path(
         cls, path: Union[str, os.PathLike], ignorecase: bool = False
     ) -> "IgnoreFilter":
+        """Create an IgnoreFilter from a file path.
+
+        Args:
+            path: Path to the ignore file.
+            ignorecase: Whether to perform case-insensitive matching.
+
+        Returns:
+            An IgnoreFilter instance with patterns loaded from the file.
+        """
         with open(path, "rb") as f:
             return cls(read_ignore_patterns(f), ignorecase, path=str(path))
 
     def __repr__(self) -> str:
+        """Return string representation of IgnoreFilter."""
         path = getattr(self, "_path", None)
         if path is not None:
             return f"{type(self).__name__}.from_path({path!r})"
@@ -465,6 +511,11 @@ class IgnoreFilterStack:
     """Check for ignore status in multiple filters."""
 
     def __init__(self, filters: list[IgnoreFilter]) -> None:
+        """Initialize an IgnoreFilterStack with multiple filters.
+
+        Args:
+            filters: A list of IgnoreFilter objects to check in order.
+        """
         self._filters = filters
 
     def is_ignored(self, path: str) -> Optional[bool]:
@@ -481,6 +532,14 @@ class IgnoreFilterStack:
             if status is not None:
                 return status
         return None
+
+    def __repr__(self) -> str:
+        """Return a string representation of the IgnoreFilterStack.
+
+        Returns:
+            A string representation for debugging.
+        """
+        return f"{type(self).__name__}({self._filters!r})"
 
 
 def default_user_ignore_filter_path(config: Config) -> str:
@@ -514,12 +573,20 @@ class IgnoreFilterManager:
         global_filters: list[IgnoreFilter],
         ignorecase: bool,
     ) -> None:
+        """Initialize an IgnoreFilterManager.
+
+        Args:
+            top_path: The top-level directory path to manage ignores for.
+            global_filters: List of global ignore filters to apply.
+            ignorecase: Whether to perform case-insensitive matching.
+        """
         self._path_filters: dict[str, Optional[IgnoreFilter]] = {}
         self._top_path = top_path
         self._global_filters = global_filters
         self._ignorecase = ignorecase
 
     def __repr__(self) -> str:
+        """Return string representation of IgnoreFilterManager."""
         return f"{type(self).__name__}({self._top_path}, {self._global_filters!r}, {self._ignorecase!r})"
 
     def _load_path(self, path: str) -> Optional[IgnoreFilter]:

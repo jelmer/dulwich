@@ -18,6 +18,12 @@ class MergeConflict(Exception):
     """Raised when a merge conflict occurs."""
 
     def __init__(self, path: bytes, message: str) -> None:
+        """Initialize MergeConflict.
+
+        Args:
+          path: Path to the conflicted file
+          message: Conflict description
+        """
         self.path = path
         super().__init__(f"Merge conflict in {path!r}: {message}")
 

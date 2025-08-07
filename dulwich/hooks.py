@@ -115,6 +115,12 @@ class PreCommitShellHook(ShellHook):
     """pre-commit shell hook."""
 
     def __init__(self, cwd: str, controldir: str) -> None:
+        """Initialize pre-commit hook.
+
+        Args:
+            cwd: Working directory for hook execution
+            controldir: Path to the git control directory (.git)
+        """
         filepath = os.path.join(controldir, "hooks", "pre-commit")
 
         ShellHook.__init__(self, "pre-commit", filepath, 0, cwd=cwd)
@@ -124,6 +130,11 @@ class PostCommitShellHook(ShellHook):
     """post-commit shell hook."""
 
     def __init__(self, controldir: str) -> None:
+        """Initialize post-commit hook.
+
+        Args:
+            controldir: Path to the git control directory (.git)
+        """
         filepath = os.path.join(controldir, "hooks", "post-commit")
 
         ShellHook.__init__(self, "post-commit", filepath, 0, cwd=controldir)
@@ -133,6 +144,11 @@ class CommitMsgShellHook(ShellHook):
     """commit-msg shell hook."""
 
     def __init__(self, controldir: str) -> None:
+        """Initialize commit-msg hook.
+
+        Args:
+            controldir: Path to the git control directory (.git)
+        """
         filepath = os.path.join(controldir, "hooks", "commit-msg")
 
         def prepare_msg(*args: bytes) -> tuple[str, ...]:
@@ -163,11 +179,28 @@ class PostReceiveShellHook(ShellHook):
     """post-receive shell hook."""
 
     def __init__(self, controldir: str) -> None:
+        """Initialize post-receive hook.
+
+        Args:
+            controldir: Path to the git control directory (.git)
+        """
         self.controldir = controldir
         filepath = os.path.join(controldir, "hooks", "post-receive")
         ShellHook.__init__(self, "post-receive", path=filepath, numparam=0)
 
     def execute(self, client_refs: list[tuple[bytes, bytes, bytes]]) -> Optional[bytes]:
+        """Execute the post-receive hook.
+
+        Args:
+            client_refs: List of tuples containing (old_sha, new_sha, ref_name)
+                        for each updated reference
+
+        Returns:
+            Output from the hook execution or None if hook doesn't exist
+
+        Raises:
+            HookError: If hook execution fails
+        """
         # do nothing if the script doesn't exist
         if not os.path.exists(self.filepath):
             return None

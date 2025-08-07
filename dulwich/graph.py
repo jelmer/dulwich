@@ -37,14 +37,27 @@ T = TypeVar("T")
 # why they do not have a builtin maxheap is simply ridiculous but
 # liveable with integer time stamps using negation
 class WorkList(Generic[T]):
+    """Priority queue for commit processing using a min-heap."""
+
     def __init__(self) -> None:
+        """Initialize an empty work list."""
         self.pq: list[tuple[int, T]] = []
 
     def add(self, item: tuple[int, T]) -> None:
+        """Add an item to the work list.
+
+        Args:
+            item: Tuple of (timestamp, commit)
+        """
         dt, cmt = item
         heappush(self.pq, (-dt, cmt))
 
     def get(self) -> Optional[tuple[int, T]]:
+        """Get the highest priority item from the work list.
+
+        Returns:
+            Tuple of (timestamp, commit) or None if empty
+        """
         item = heappop(self.pq)
         if item:
             pr, cmt = item
@@ -52,6 +65,11 @@ class WorkList(Generic[T]):
         return None
 
     def iter(self) -> Iterator[tuple[int, T]]:
+        """Iterate over items in the work list.
+
+        Yields:
+            Tuples of (timestamp, commit)
+        """
         for pr, cmt in self.pq:
             yield (-pr, cmt)
 
@@ -64,6 +82,19 @@ def _find_lcas(
     min_stamp: int = 0,
     shallows: Optional[set[ObjectID]] = None,
 ) -> list[ObjectID]:
+    """Find lowest common ancestors between commits.
+
+    Args:
+        lookup_parents: Function to get parent commits
+        c1: First commit
+        c2s: List of second commits
+        lookup_stamp: Function to get commit timestamp
+        min_stamp: Minimum timestamp to consider
+        shallows: Set of shallow commits
+
+    Returns:
+        List of lowest common ancestor commit IDs
+    """
     cands = []
     cstates = {}
 
@@ -74,6 +105,15 @@ def _find_lcas(
     _LCA = 8  # potential LCA (Lowest Common Ancestor)
 
     def _has_candidates(wlst: WorkList[ObjectID], cstates: dict[ObjectID, int]) -> bool:
+        """Check if there are any candidate commits in the work list.
+
+        Args:
+            wlst: Work list of commits
+            cstates: Dictionary of commit states
+
+        Returns:
+            True if there are candidates to process
+        """
         for dt, cmt in wlst.iter():
             if cmt in cstates:
                 if not ((cstates[cmt] & _DNC) == _DNC):

@@ -68,6 +68,15 @@ class CommitGraphEntry:
         generation: int,
         commit_time: int,
     ) -> None:
+        """Initialize CommitGraphEntry.
+
+        Args:
+          commit_id: The commit object ID
+          tree_id: The tree object ID
+          parents: List of parent commit IDs
+          generation: Generation number
+          commit_time: Commit timestamp
+        """
         self.commit_id = commit_id
         self.tree_id = tree_id
         self.parents = parents
@@ -75,6 +84,7 @@ class CommitGraphEntry:
         self.commit_time = commit_time
 
     def __repr__(self) -> str:
+        """Return string representation of CommitGraphEntry."""
         return (
             f"CommitGraphEntry(commit_id={self.commit_id!r}, "
             f"tree_id={self.tree_id!r}, parents={self.parents!r}, "
@@ -86,10 +96,17 @@ class CommitGraphChunk:
     """Represents a chunk in the commit graph file."""
 
     def __init__(self, chunk_id: bytes, data: bytes) -> None:
+        """Initialize CommitGraphChunk.
+
+        Args:
+          chunk_id: Chunk identifier
+          data: Chunk data
+        """
         self.chunk_id = chunk_id
         self.data = data
 
     def __repr__(self) -> str:
+        """Return string representation of CommitGraphChunk."""
         return f"CommitGraphChunk(chunk_id={self.chunk_id!r}, size={len(self.data)})"
 
 
@@ -97,6 +114,11 @@ class CommitGraph:
     """Git commit graph file reader/writer."""
 
     def __init__(self, hash_version: int = HASH_VERSION_SHA1) -> None:
+        """Initialize CommitGraph.
+
+        Args:
+          hash_version: Hash version to use (SHA1 or SHA256)
+        """
         self.hash_version = hash_version
         self.chunks: dict[bytes, CommitGraphChunk] = {}
         self.entries: list[CommitGraphEntry] = []

@@ -32,6 +32,14 @@ if TYPE_CHECKING:
 
 
 def to_bytes(text: Union[str, bytes]) -> bytes:
+    """Convert text to bytes.
+
+    Args:
+      text: Text to convert (str or bytes)
+
+    Returns:
+      Bytes representation of text
+    """
     if getattr(text, "encode", None) is not None:
         text = text.encode("ascii")  # type: ignore
     return text  # type: ignore
@@ -233,6 +241,7 @@ def parse_reftuple(
       lh_container: A RefsContainer object
       rh_container: A RefsContainer object
       refspec: A string
+      force: Whether to force the operation
     Returns: A tuple with left and right ref
     Raises:
       KeyError: If one of the refs can not be found
@@ -348,6 +357,12 @@ class AmbiguousShortId(Exception):
     """The short id is ambiguous."""
 
     def __init__(self, prefix: bytes, options: list[ShaFile]) -> None:
+        """Initialize AmbiguousShortId.
+
+        Args:
+          prefix: The ambiguous prefix
+          options: List of matching objects
+        """
         self.prefix = prefix
         self.options = options
 

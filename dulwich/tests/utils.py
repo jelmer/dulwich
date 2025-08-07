@@ -87,6 +87,7 @@ def make_object(cls, **attrs):
     __slots__.
 
     Args:
+      cls: The class to create an instance of
       attrs: dict of attributes to set on the new object.
     Returns: A newly initialized object of type cls.
     """

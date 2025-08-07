@@ -59,6 +59,14 @@ class ProcessFilterDriver:
         required: bool = False,
         cwd: Optional[str] = None,
     ) -> None:
+        """Initialize ProcessFilterDriver.
+
+        Args:
+          clean_cmd: Command to run for clean filter
+          smudge_cmd: Command to run for smudge filter
+          required: Whether the filter is required
+          cwd: Working directory for filter execution
+        """
         self.clean_cmd = clean_cmd
         self.smudge_cmd = smudge_cmd
         self.required = required
@@ -122,6 +130,12 @@ class FilterRegistry:
     def __init__(
         self, config: Optional["StackedConfig"] = None, repo: Optional["Repo"] = None
     ) -> None:
+        """Initialize FilterRegistry.
+
+        Args:
+          config: Git configuration stack
+          repo: Repository instance
+        """
         self.config = config
         self.repo = repo
         self._drivers: dict[str, FilterDriver] = {}
@@ -377,6 +391,14 @@ class FilterBlobNormalizer:
         filter_registry: Optional[FilterRegistry] = None,
         repo: Optional["Repo"] = None,
     ) -> None:
+        """Initialize FilterBlobNormalizer.
+
+        Args:
+          config_stack: Git configuration stack
+          gitattributes: GitAttributes instance
+          filter_registry: Optional filter registry to use
+          repo: Optional repository instance
+        """
         self.config_stack = config_stack
         self.gitattributes = gitattributes
         self.filter_registry = filter_registry or FilterRegistry(config_stack, repo)

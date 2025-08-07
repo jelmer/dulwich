@@ -139,6 +139,11 @@ class InvalidUserIdentity(Exception):
     """User identity is not of the format 'user <email>'."""
 
     def __init__(self, identity) -> None:
+        """Initialize InvalidUserIdentity exception.
+
+        Args:
+            identity: The invalid identity string
+        """
         self.identity = identity
 
 
@@ -200,6 +205,7 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
     system (e.g. the gecos field, $EMAIL, $USER@$(hostname -f).
 
     Args:
+      config: Configuration stack to read from
       kind: Optional kind to return identity for,
         usually either "AUTHOR" or "COMMITTER".
 
@@ -334,6 +340,13 @@ class ParentsProvider:
     """Provides parents for commits, handling grafts and shallow commits."""
 
     def __init__(self, store, grafts={}, shallows=[]) -> None:
+        """Initialize ParentsProvider.
+
+        Args:
+            store: Object store to get commits from
+            grafts: Dictionary mapping commit ids to parent ids
+            shallows: List of shallow commit ids
+        """
         self.store = store
         self.grafts = grafts
         self.shallows = set(shallows)
@@ -888,25 +901,24 @@ class BaseRepo:
         Args:
           include: Iterable of SHAs of commits to include along with their
             ancestors. Defaults to [HEAD]
-
-        Keyword Args:
-          exclude: Iterable of SHAs of commits to exclude along with their
-            ancestors, overriding includes.
-          order: ORDER_* constant specifying the order of results.
-            Anything other than ORDER_DATE may result in O(n) memory usage.
-          reverse: If True, reverse the order of output, requiring O(n)
-            memory.
-          max_entries: The maximum number of entries to yield, or None for
-            no limit.
-          paths: Iterable of file or subtree paths to show entries for.
-          rename_detector: diff.RenameDetector object for detecting
-            renames.
-          follow: If True, follow path across renames/copies. Forces a
-            default rename_detector.
-          since: Timestamp to list commits after.
-          until: Timestamp to list commits before.
-          queue_cls: A class to use for a queue of commits, supporting the
-            iterator protocol. The constructor takes a single argument, the
+          **kwargs: Additional keyword arguments including:
+            exclude: Iterable of SHAs of commits to exclude along with their
+              ancestors, overriding includes.
+            order: ORDER_* constant specifying the order of results.
+              Anything other than ORDER_DATE may result in O(n) memory usage.
+            reverse: If True, reverse the order of output, requiring O(n)
+              memory.
+            max_entries: The maximum number of entries to yield, or None for
+              no limit.
+            paths: Iterable of file or subtree paths to show entries for.
+            rename_detector: diff.RenameDetector object for detecting
+              renames.
+            follow: If True, follow path across renames/copies. Forces a
+              default rename_detector.
+            since: Timestamp to list commits after.
+            until: Timestamp to list commits before.
+            queue_cls: A class to use for a queue of commits, supporting the
+              iterator protocol. The constructor takes a single argument, the
             Walker.
 
         Returns: A `Walker` object
@@ -1116,6 +1128,11 @@ class UnsupportedVersion(Exception):
     """Unsupported repository version."""
 
     def __init__(self, version) -> None:
+        """Initialize UnsupportedVersion exception.
+
+        Args:
+            version: The unsupported repository version
+        """
         self.version = version
 
 
@@ -1123,6 +1140,11 @@ class UnsupportedExtension(Exception):
     """Unsupported repository extension."""
 
     def __init__(self, extension) -> None:
+        """Initialize UnsupportedExtension exception.
+
+        Args:
+            extension: The unsupported repository extension
+        """
         self.extension = extension
 
 

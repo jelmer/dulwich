@@ -1185,14 +1185,36 @@ def _find_git_in_win_reg() -> Iterator[str]:
 
 # There is no set standard for system config dirs on windows. We try the
 # following:
-#   - %PROGRAMDATA%/Git/config - (deprecated) Windows config dir per CGit docs
 #   - %PROGRAMFILES%/Git/etc/gitconfig - Git for Windows (msysgit) config dir
 #     Used if CGit installation (Git/bin/git.exe) is found in PATH in the
 #     system registry
 def get_win_system_paths() -> Iterator[str]:
+    """Get current Windows system Git config paths.
+
+    Only returns the current Git for Windows config location, not legacy paths.
+    """
+    # Try to find Git installation from PATH first
+    for git_dir in _find_git_in_win_path():
+        yield os.path.join(git_dir, "etc", "gitconfig")
+        return  # Only use the first found path
+
+    # Fall back to registry if not found in PATH
+    for git_dir in _find_git_in_win_reg():
+        yield os.path.join(git_dir, "etc", "gitconfig")
+        return  # Only use the first found path
+
+
+def get_win_legacy_system_paths() -> Iterator[str]:
+    """Get legacy Windows system Git config paths.
+
+    Returns all possible config paths including deprecated locations.
+    This function can be used for diagnostics or migration purposes.
+    """
+    # Include deprecated PROGRAMDATA location
     if "PROGRAMDATA" in os.environ:
         yield os.path.join(os.environ["PROGRAMDATA"], "Git", "config")
 
+    # Include all Git installations found
     for git_dir in _find_git_in_win_path():
         yield os.path.join(git_dir, "etc", "gitconfig")
     for git_dir in _find_git_in_win_reg():
@@ -1239,11 +1261,15 @@ class StackedConfig(Config):
                 if sys.platform == "win32":
                     paths.extend(get_win_system_paths())
 
+        logger.debug("Loading gitconfig from paths: %s", paths)
+
         backends = []
         for path in paths:
             try:
                 cf = ConfigFile.from_path(path)
+                logger.debug("Successfully loaded gitconfig from: %s", path)
             except FileNotFoundError:
+                logger.debug("Gitconfig file not found: %s", path)
                 continue
             backends.append(cf)
         return backends

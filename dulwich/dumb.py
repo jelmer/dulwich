@@ -451,7 +451,6 @@ class DumbRemoteHTTPRepo:
           determine_wants: Function that returns list of wanted SHAs
           progress: Optional progress callback
           get_tagged: Whether to get tagged objects
-          depth: Shallow clone depth
           depth: Depth for shallow clones (not supported for dumb HTTP)
 
         Returns:

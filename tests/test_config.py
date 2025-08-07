@@ -820,12 +820,10 @@ class StackedConfigTests(TestCase):
         install_dir = os.path.join("C:", "foo", "Git")
         self.overrideEnv("PATH", os.path.join(install_dir, "cmd"))
         with patch("os.path.exists", return_value=True):
-            paths = set(get_win_system_paths())
+            paths = list(get_win_system_paths())
+        # Should only return the current Git config path, not legacy paths
         self.assertEqual(
-            {
-                os.path.join(os.environ.get("PROGRAMDATA"), "Git", "config"),
-                os.path.join(install_dir, "etc", "gitconfig"),
-            },
+            [os.path.join(install_dir, "etc", "gitconfig")],
             paths,
         )
 
@@ -842,12 +840,29 @@ class StackedConfigTests(TestCase):
                 "winreg.QueryValueEx",
                 return_value=(install_dir, winreg.REG_SZ),
             ):
-                paths = set(get_win_system_paths())
+                paths = list(get_win_system_paths())
+        # Should only return the current Git config path, not legacy paths
         self.assertEqual(
-            {
-                os.path.join(os.environ.get("PROGRAMDATA"), "Git", "config"),
-                os.path.join(install_dir, "etc", "gitconfig"),
-            },
+            [os.path.join(install_dir, "etc", "gitconfig")],
+            paths,
+        )
+
+    @skipIf(sys.platform != "win32", "Windows specific config location.")
+    def test_windows_legacy_paths(self) -> None:
+        from dulwich.config import get_win_legacy_system_paths
+
+        install_dir = os.path.join("C:", "foo", "Git")
+        self.overrideEnv("PATH", os.path.join(install_dir, "cmd"))
+        self.overrideEnv("PROGRAMDATA", "C:\\ProgramData")
+        with patch("os.path.exists", return_value=True):
+            paths = list(get_win_legacy_system_paths())
+        # Should return all paths including legacy PROGRAMDATA location
+        self.assertIn(
+            os.path.join("C:\\ProgramData", "Git", "config"),
+            paths,
+        )
+        self.assertIn(
+            os.path.join(install_dir, "etc", "gitconfig"),
             paths,
         )
 
@@ -901,6 +916,35 @@ class StackedConfigTests(TestCase):
             )
         finally:
             os.unlink(config_path)
+
+    def test_debug_logging(self) -> None:
+        """Test that debug logging outputs gitconfig paths."""
+        import logging
+
+        # Set up a custom handler to capture log messages
+        log_messages = []
+        handler = logging.Handler()
+        handler.emit = lambda record: log_messages.append(record.getMessage())
+
+        # Get the dulwich.config logger and add our handler
+        logger = logging.getLogger("dulwich.config")
+        old_level = logger.level
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
+
+        try:
+            # Call default_backends which now logs unconditionally
+            StackedConfig.default_backends()
+
+            # Check that debug messages were logged
+            self.assertTrue(
+                any("Loading gitconfig from paths:" in msg for msg in log_messages),
+                "Debug logging should log gitconfig paths",
+            )
+        finally:
+            # Clean up
+            logger.removeHandler(handler)
+            logger.setLevel(old_level)
 
     def test_git_config_nosystem_precedence(self) -> None:
         # GIT_CONFIG_SYSTEM should take precedence over GIT_CONFIG_NOSYSTEM

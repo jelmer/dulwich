@@ -298,6 +298,11 @@ class FixedSha:
     __slots__ = ("_hexsha", "_sha")
 
     def __init__(self, hexsha: Union[str, bytes]) -> None:
+        """Initialize FixedSha with a fixed SHA value.
+
+        Args:
+            hexsha: Hex SHA value as string or bytes
+        """
         if isinstance(hexsha, str):
             hexsha = hexsha.encode("ascii")
         if not isinstance(hexsha, bytes):
@@ -679,6 +684,7 @@ class Blob(ShaFile):
     _chunked_text: list[bytes]
 
     def __init__(self) -> None:
+        """Initialize a new Blob object."""
         super().__init__()
         self._chunked_text = []
         self._needs_serialization = False
@@ -863,6 +869,7 @@ class Tag(ShaFile):
     _tagger: Optional[bytes]
 
     def __init__(self) -> None:
+        """Initialize a new Tag object."""
         super().__init__()
         self._tagger = None
         self._tag_time = None
@@ -1115,6 +1122,7 @@ def parse_tree(text: bytes, strict: bool = False) -> Iterator[tuple[bytes, int, 
 
     Args:
       text: Serialized text to parse
+      strict: If True, enforce strict validation
     Returns: iterator of tuples of (name, mode, sha)
 
     Raises:
@@ -1205,6 +1213,7 @@ def pretty_format_tree_entry(
       name: Name of the directory entry
       mode: Mode of entry
       hexsha: Hexsha of the referenced object
+      encoding: Character encoding for the name
     Returns: string describing the tree entry
     """
     if mode & stat.S_IFDIR:
@@ -1223,6 +1232,12 @@ class SubmoduleEncountered(Exception):
     """A submodule was encountered while resolving a path."""
 
     def __init__(self, path: bytes, sha: ObjectID) -> None:
+        """Initialize SubmoduleEncountered exception.
+
+        Args:
+            path: Path where the submodule was encountered
+            sha: SHA of the submodule
+        """
         self.path = path
         self.sha = sha
 

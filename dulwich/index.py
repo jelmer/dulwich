@@ -722,6 +722,11 @@ class UnsupportedIndexFormat(Exception):
     """An unsupported index format was encountered."""
 
     def __init__(self, version: int) -> None:
+        """Initialize UnsupportedIndexFormat exception.
+
+        Args:
+            version: The unsupported index format version
+        """
         self.index_format_version = version
 
 
@@ -997,6 +1002,7 @@ class Index:
         return self._filename
 
     def __repr__(self) -> str:
+        """Return string representation of Index."""
         return f"{self.__class__.__name__}({self._filename!r})"
 
     def write(self) -> None:
@@ -1072,6 +1078,7 @@ class Index:
         return iter(self._byname)
 
     def __contains__(self, key: bytes) -> bool:
+        """Check if a path exists in the index."""
         return key in self._byname
 
     def get_sha1(self, path: bytes) -> bytes:
@@ -1114,10 +1121,12 @@ class Index:
     def __setitem__(
         self, name: bytes, value: Union[IndexEntry, ConflictedIndexEntry]
     ) -> None:
+        """Set an entry in the index."""
         assert isinstance(name, bytes)
         self._byname[name] = value
 
     def __delitem__(self, name: bytes) -> None:
+        """Delete an entry from the index."""
         del self._byname[name]
 
     def iteritems(

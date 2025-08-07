@@ -549,6 +549,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         pack_depth=None,
         pack_threads=None,
         pack_big_file_threshold=None,
+        pack_allow_pack_reuse=None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -571,6 +572,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         self.pack_depth = pack_depth
         self.pack_threads = pack_threads
         self.pack_big_file_threshold = pack_big_file_threshold
+        self.pack_allow_pack_reuse = pack_allow_pack_reuse
 
     def add_pack(self) -> tuple[BytesIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack to this object store."""
@@ -667,6 +669,9 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
             progress=progress,
             ofs_delta=ofs_delta,
             other_haves=remote_has,
+            reuse_deltas=self.pack_allow_pack_reuse
+            if self.pack_allow_pack_reuse is not None
+            else True,
         )
 
     def _clear_cached_packs(self) -> None:
@@ -1017,6 +1022,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_depth=None,
         pack_threads=None,
         pack_big_file_threshold=None,
+        pack_allow_pack_reuse=None,
     ) -> None:
         """Open an object store.
 
@@ -1031,6 +1037,7 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_depth: maximum delta chain depth
           pack_threads: number of threads for pack operations
           pack_big_file_threshold: threshold for treating files as big
+          pack_allow_pack_reuse: whether to allow reusing existing pack data
         """
         super().__init__(
             pack_compression_level=pack_compression_level,
@@ -1041,6 +1048,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth=pack_depth,
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
+            pack_allow_pack_reuse=pack_allow_pack_reuse,
         )
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
@@ -1127,6 +1135,9 @@ class DiskObjectStore(PackBasedObjectStore):
         except KeyError:
             pack_big_file_threshold = None
 
+        # Read new pack configuration options
+        pack_allow_pack_reuse = config.get_boolean((b"pack",), b"allowPackReuse", True)
+
         # Read core.commitGraph setting
         use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
 
@@ -1141,6 +1152,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth,
             pack_threads,
             pack_big_file_threshold,
+            pack_allow_pack_reuse,
         )
         instance._use_commit_graph = use_commit_graph
         return instance
@@ -1702,6 +1714,7 @@ class MemoryObjectStore(BaseObjectStore):
         super().__init__()
         self._data: dict[str, ShaFile] = {}
         self.pack_compression_level = -1
+        self.pack_allow_pack_reuse = None
 
     def _to_hexsha(self, sha):
         if len(sha) == 40:

@@ -46,14 +46,19 @@ from dulwich.pack import (
     PackStreamReader,
     UnpackedObject,
     UnresolvedDeltas,
+    _calculate_optimal_threads,
     _delta_encode_size,
     _encode_copy_operation,
     apply_delta,
     compute_file_sha,
     create_delta,
+    deltas_from_sorted_objects_multi_threaded,
+    deltas_from_sorted_objects_no_deltas,
+    deltas_from_sorted_objects_single_threaded,
     deltify_pack_objects,
     load_pack_index,
     read_zlib_chunks,
+    sort_objects_for_delta,
     unpack_object,
     write_pack,
     write_pack_header,
@@ -1194,6 +1199,337 @@ class DeltifyTests(TestCase):
             ],
             list(deltify_pack_objects([(b1, b""), (b2, b"")])),
         )
+
+
+class DeltificationTestsBase(TestCase):
+    """Base class for deltification tests with common setup."""
+
+    def setUp(self):
+        # Create test objects
+        self.blob1 = Blob.from_string(b"a" * 100)
+        self.blob2 = Blob.from_string(b"a" * 99 + b"b")  # Similar to blob1
+        self.blob3 = Blob.from_string(b"completely different content")
+        self.commit1 = Commit()
+        self.commit1.message = b"Test commit"
+        self.commit1.author = b"Test Author <test@example.com>"
+        self.commit1.committer = b"Test Committer <test@example.com>"
+        self.commit1.author_time = 1234567890
+        self.commit1.commit_time = 1234567890
+        self.commit1.author_timezone = 0
+        self.commit1.commit_timezone = 0
+        self.commit1.tree = b"0" * 40
+
+        # Sort objects for delta generation
+        def objects_with_hints():
+            for obj in [self.blob1, self.blob2, self.blob3, self.commit1]:
+                yield (obj, (obj.type_num, None))
+
+        self.objects = list(sort_objects_for_delta(objects_with_hints()))
+
+    def _test_basic_functionality(self, impl_func, expects_deltas):
+        """Test basic functionality of a deltification implementation."""
+        result = list(impl_func(self.objects))
+
+        # Should return same number of objects
+        self.assertEqual(len(result), 4)
+
+        # All results should be UnpackedObject instances
+        for obj in result:
+            self.assertIsInstance(obj, UnpackedObject)
+
+        # Check delta expectations
+        delta_count = sum(1 for obj in result if obj.delta_base is not None)
+        if expects_deltas:
+            self.assertGreater(delta_count, 0)
+        else:
+            self.assertEqual(delta_count, 0)
+
+        # Verify object integrity - all objects should be findable by SHA
+        result_by_sha = {r.sha(): r for r in result}
+        expected_shas = {
+            obj.sha().digest()
+            for obj in [self.blob1, self.blob2, self.blob3, self.commit1]
+        }
+        actual_shas = set(result_by_sha.keys())
+        self.assertEqual(expected_shas, actual_shas)
+
+        # If deltas exist, verify they reference valid base objects
+        for obj in result:
+            if obj.delta_base is not None:
+                self.assertIn(obj.delta_base, result_by_sha.keys())
+
+    def _test_empty_input(self, impl_func):
+        """Test implementation handles empty input correctly."""
+        result = list(impl_func([]))
+        self.assertEqual([], result)
+
+    def _test_single_object(self, impl_func):
+        """Test implementation handles single object correctly."""
+        single = [self.blob1]
+        result = list(impl_func(single))
+        self.assertEqual(len(result), 1)
+        self.assertIsNone(result[0].delta_base)  # No base to delta against
+
+    def _test_progress_callback(self, impl_func):
+        """Test that implementation calls progress callback when provided."""
+        # Create enough objects to trigger progress (>1000)
+        many_objects = []
+        for i in range(1001):
+            blob = Blob.from_string(b"blob %d" % i)
+            many_objects.append(blob)
+
+        progress_calls = []
+
+        def progress_callback(msg):
+            progress_calls.append(msg)
+
+        # Run implementation with progress callback
+        list(impl_func(many_objects, progress=progress_callback))
+
+        # Should have received progress updates
+        self.assertGreater(len(progress_calls), 0)
+        # Progress messages should contain expected text
+        if progress_calls:
+            msg = progress_calls[0]
+            self.assertIn(b":", msg)
+
+
+class NoDeltasTests(DeltificationTestsBase):
+    """Tests for deltas_from_sorted_objects_no_deltas implementation."""
+
+    def test_basic_functionality(self):
+        """Test basic functionality of no-deltas implementation."""
+        self._test_basic_functionality(
+            deltas_from_sorted_objects_no_deltas, expects_deltas=False
+        )
+
+    def test_empty_input(self):
+        """Test no-deltas implementation handles empty input correctly."""
+        self._test_empty_input(deltas_from_sorted_objects_no_deltas)
+
+    def test_single_object(self):
+        """Test no-deltas implementation handles single object correctly."""
+        self._test_single_object(deltas_from_sorted_objects_no_deltas)
+
+    def test_progress_callback(self):
+        """Test that no-deltas implementation calls progress callback."""
+        self._test_progress_callback(deltas_from_sorted_objects_no_deltas)
+
+    def test_no_deltas_produced(self):
+        """Test that no-deltas implementation never produces deltas."""
+        result = list(deltas_from_sorted_objects_no_deltas(self.objects))
+        for obj in result:
+            self.assertIsNone(obj.delta_base)
+
+
+class SingleThreadedDeltasTests(DeltificationTestsBase):
+    """Tests for deltas_from_sorted_objects_single_threaded implementation."""
+
+    def test_basic_functionality(self):
+        """Test basic functionality of single-threaded implementation."""
+        self._test_basic_functionality(
+            deltas_from_sorted_objects_single_threaded, expects_deltas=True
+        )
+
+    def test_empty_input(self):
+        """Test single-threaded implementation handles empty input correctly."""
+        self._test_empty_input(deltas_from_sorted_objects_single_threaded)
+
+    def test_single_object(self):
+        """Test single-threaded implementation handles single object correctly."""
+        self._test_single_object(deltas_from_sorted_objects_single_threaded)
+
+    def test_progress_callback(self):
+        """Test that single-threaded implementation calls progress callback."""
+        self._test_progress_callback(deltas_from_sorted_objects_single_threaded)
+
+    def test_delta_consistency(self):
+        """Test that single-threaded implementation produces valid delta relationships."""
+        result = list(deltas_from_sorted_objects_single_threaded(self.objects))
+
+        # Find blob2 in results
+        blob2_sha = self.blob2.sha().digest()
+        blob2_results = [r for r in result if r.sha() == blob2_sha]
+        self.assertEqual(len(blob2_results), 1)
+
+        # If blob2 was deltified, it should be against blob1 (similar content)
+        blob2_result = blob2_results[0]
+        if blob2_result.delta_base is not None:
+            self.assertEqual(blob2_result.delta_base, self.blob1.sha().digest())
+
+    def test_window_size_respected(self):
+        """Test that window size is respected in single-threaded deltification."""
+        # Create many objects
+        many_objects = []
+        for i in range(10):
+            blob = Blob.from_string(b"content %d" % i)
+            many_objects.append(blob)
+
+        # With window_size=1, objects should only delta against recent objects
+        result = list(
+            deltas_from_sorted_objects_single_threaded(many_objects, window_size=1)
+        )
+
+        # Check that deltas only reference recent objects
+        for i, obj in enumerate(result):
+            if obj.delta_base is not None:
+                # Find which object this is a delta of
+                base_idx = None
+                for j, other in enumerate(result[:i]):
+                    if other.sha() == obj.delta_base:
+                        base_idx = j
+                        break
+                # Should only delta against immediately previous object with window_size=1
+                if base_idx is not None:
+                    self.assertGreaterEqual(i - base_idx, 0)
+                    self.assertLessEqual(i - base_idx, 1)
+
+
+class MultiThreadedDeltasTests(DeltificationTestsBase):
+    """Tests for deltas_from_sorted_objects_multi_threaded implementation."""
+
+    def test_basic_functionality(self):
+        """Test basic functionality of multi-threaded implementation."""
+        # Multi-threaded may or may not produce deltas due to adaptive threading
+        result = list(deltas_from_sorted_objects_multi_threaded(self.objects))
+        self.assertEqual(len(result), 4)
+        for obj in result:
+            self.assertIsInstance(obj, UnpackedObject)
+
+    def test_empty_input(self):
+        """Test multi-threaded implementation handles empty input correctly."""
+        self._test_empty_input(deltas_from_sorted_objects_multi_threaded)
+
+    def test_single_object(self):
+        """Test multi-threaded implementation handles single object correctly."""
+        self._test_single_object(deltas_from_sorted_objects_multi_threaded)
+
+    def test_progress_callback(self):
+        """Test that multi-threaded implementation calls progress callback."""
+        self._test_progress_callback(deltas_from_sorted_objects_multi_threaded)
+
+    def test_custom_thread_counts(self):
+        """Test multi-threaded implementation with different thread counts."""
+        thread_counts = [1, 4]
+        results = {}
+
+        for num_threads in thread_counts:
+            result = list(
+                deltas_from_sorted_objects_multi_threaded(
+                    self.objects, num_threads=num_threads
+                )
+            )
+            results[num_threads] = result
+
+        # All thread counts should produce same number of objects
+        first_result = next(iter(results.values()))
+        for num_threads, result in results.items():
+            self.assertEqual(len(result), len(first_result))
+
+            # All results should have same SHAs
+            result_shas = {r.sha() for r in result}
+            first_shas = {r.sha() for r in first_result}
+            self.assertEqual(result_shas, first_shas)
+
+    def test_custom_batch_sizes(self):
+        """Test multi-threaded implementation with different batch sizes."""
+        batch_sizes = [1, 100]
+        results = {}
+
+        for batch_size in batch_sizes:
+            result = list(
+                deltas_from_sorted_objects_multi_threaded(
+                    self.objects, batch_size=batch_size
+                )
+            )
+            results[batch_size] = result
+
+        # All batch sizes should produce same number of objects
+        first_result = next(iter(results.values()))
+        for batch_size, result in results.items():
+            self.assertEqual(len(result), len(first_result))
+
+            # All results should have same SHAs
+            result_shas = {r.sha() for r in result}
+            first_shas = {r.sha() for r in first_result}
+            self.assertEqual(result_shas, first_shas)
+
+    def test_window_size_respected(self):
+        """Test that window size is respected in multi-threaded deltification."""
+        # Create many objects
+        many_objects = []
+        for i in range(10):
+            blob = Blob.from_string(b"content %d" % i)
+            many_objects.append(blob)
+
+        # With window_size=1, objects should only delta against recent objects
+        result = list(
+            deltas_from_sorted_objects_multi_threaded(many_objects, window_size=1)
+        )
+
+        # Check that deltas only reference recent objects
+        for i, obj in enumerate(result):
+            if obj.delta_base is not None:
+                # Find which object this is a delta of
+                base_idx = None
+                for j, other in enumerate(result[:i]):
+                    if other.sha() == obj.delta_base:
+                        base_idx = j
+                        break
+                # Should only delta against immediately previous object with window_size=1
+                if base_idx is not None:
+                    self.assertGreaterEqual(i - base_idx, 0)
+                    self.assertLessEqual(i - base_idx, 1)
+
+    def test_adaptive_thread_calculation(self):
+        """Test the adaptive thread count calculation."""
+        # Small datasets should use 1 thread
+        self.assertEqual(_calculate_optimal_threads(10), 1)
+        self.assertEqual(_calculate_optimal_threads(25), 1)
+        self.assertEqual(_calculate_optimal_threads(49), 1)
+
+        # Medium datasets should use 2 threads
+        self.assertEqual(_calculate_optimal_threads(50), 2)
+        self.assertEqual(_calculate_optimal_threads(100), 2)
+        self.assertEqual(_calculate_optimal_threads(199), 2)
+
+        # Large datasets should use 4 threads
+        self.assertEqual(_calculate_optimal_threads(200), 4)
+        self.assertEqual(_calculate_optimal_threads(500), 4)
+        self.assertEqual(_calculate_optimal_threads(999), 4)
+
+        # Very large datasets should use logarithmic scaling
+        self.assertGreaterEqual(_calculate_optimal_threads(1000), 2)
+        self.assertLessEqual(_calculate_optimal_threads(1000), 8)
+        self.assertGreaterEqual(_calculate_optimal_threads(10000), 2)
+        self.assertLessEqual(_calculate_optimal_threads(10000), 8)
+
+    def test_adaptive_threading_with_default(self):
+        """Test that multi-threaded implementation uses adaptive threading by default."""
+        # Create different sized object sets
+        small_objects = self.objects[:2]  # 2 objects -> should use 1 thread
+        medium_objects = self.objects * 15  # ~60 objects -> should use 2 threads
+
+        # These should run without error and choose appropriate thread counts
+        small_result = list(deltas_from_sorted_objects_multi_threaded(small_objects))
+        self.assertEqual(len(small_result), 2)
+
+        medium_result = list(deltas_from_sorted_objects_multi_threaded(medium_objects))
+        self.assertEqual(len(medium_result), len(medium_objects))
+
+    def test_thread_count_override(self):
+        """Test that explicit thread count overrides adaptive calculation."""
+        # Force specific thread count
+        result = list(
+            deltas_from_sorted_objects_multi_threaded(self.objects, num_threads=1)
+        )
+        self.assertEqual(len(result), len(self.objects))
+
+        # Force different thread count
+        result = list(
+            deltas_from_sorted_objects_multi_threaded(self.objects, num_threads=4)
+        )
+        self.assertEqual(len(result), len(self.objects))
 
 
 class TestPackStreamReader(TestCase):

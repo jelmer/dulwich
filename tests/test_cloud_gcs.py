@@ -39,8 +39,8 @@ class GcsObjectStoreTests(unittest.TestCase):
         self.assertIn("git", repr(self.store))
 
     def test_remove_pack(self):
-        """Test _remove_pack method."""
-        self.store._remove_pack("pack-1234")
+        """Test _remove_pack_by_name method."""
+        self.store._remove_pack_by_name("pack-1234")
         self.mock_bucket.delete_blobs.assert_called_once()
         args = self.mock_bucket.delete_blobs.call_args[0][0]
         self.assertEqual(

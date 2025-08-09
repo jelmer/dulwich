@@ -34,9 +34,10 @@ import warnings
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, Callable, Union
 
 from .errors import CommitError, HookError
-from .objects import Commit, ObjectID, Tag, Tree
+from .objects import Blob, Commit, ObjectID, Tag, Tree
 from .refs import SYMREF, Ref
 from .repo import (
     GITDIR,
@@ -335,7 +336,7 @@ class WorkTree:
 
         index = self._repo.open_index()
         try:
-            tree_id = self._repo[b"HEAD"].tree
+            commit = self._repo[b"HEAD"]
         except KeyError:
             # no head mean no commit in the repo
             for fs_path in fs_paths:
@@ -343,6 +344,9 @@ class WorkTree:
                 del index[tree_path]
             index.write()
             return
+        else:
+            assert isinstance(commit, Commit), "HEAD must be a commit"
+            tree_id = commit.tree
 
         for fs_path in fs_paths:
             tree_path = _fs_to_tree_path(fs_path)
@@ -367,15 +371,19 @@ class WorkTree:
             except FileNotFoundError:
                 pass
 
+            blob_obj = self._repo[tree_entry[1]]
+            assert isinstance(blob_obj, Blob)
+            blob_size = len(blob_obj.data)
+
             index_entry = IndexEntry(
-                ctime=(self._repo[b"HEAD"].commit_time, 0),
-                mtime=(self._repo[b"HEAD"].commit_time, 0),
+                ctime=(commit.commit_time, 0),
+                mtime=(commit.commit_time, 0),
                 dev=st.st_dev if st else 0,
                 ino=st.st_ino if st else 0,
                 mode=tree_entry[0],
                 uid=st.st_uid if st else 0,
                 gid=st.st_gid if st else 0,
-                size=len(self._repo[tree_entry[1]].data),
+                size=blob_size,
                 sha=tree_entry[1],
                 flags=0,
                 extended_flags=0,
@@ -386,7 +394,7 @@ class WorkTree:
 
     def commit(
         self,
-        message: bytes | None = None,
+        message: Union[str, bytes, Callable[[Any, Commit], bytes], None] = None,
         committer: bytes | None = None,
         author: bytes | None = None,
         commit_timestamp: float | None = None,
@@ -541,13 +549,18 @@ class WorkTree:
                 if should_sign:
                     c.sign(keyid)
                 self._repo.object_store.add_object(c)
+                message_bytes = (
+                    message.encode() if isinstance(message, str) else message
+                )
                 ok = self._repo.refs.set_if_equals(
                     ref,
                     old_head,
                     c.id,
-                    message=b"commit: " + message,
+                    message=b"commit: " + message_bytes,
                     committer=committer,
-                    timestamp=commit_timestamp,
+                    timestamp=int(commit_timestamp)
+                    if commit_timestamp is not None
+                    else None,
                     timezone=commit_timezone,
                 )
             except KeyError:
@@ -555,12 +568,17 @@ class WorkTree:
                 if should_sign:
                     c.sign(keyid)
                 self._repo.object_store.add_object(c)
+                message_bytes = (
+                    message.encode() if isinstance(message, str) else message
+                )
                 ok = self._repo.refs.add_if_new(
                     ref,
                     c.id,
-                    message=b"commit: " + message,
+                    message=b"commit: " + message_bytes,
                     committer=committer,
-                    timestamp=commit_timestamp,
+                    timestamp=int(commit_timestamp)
+                    if commit_timestamp is not None
+                    else None,
                     timezone=commit_timezone,
                 )
             if not ok:
@@ -603,6 +621,9 @@ class WorkTree:
             if isinstance(head, Tag):
                 _cls, obj = head.object
                 head = self._repo.get_object(obj)
+            from .objects import Commit
+
+            assert isinstance(head, Commit)
             tree = head.tree
         config = self._repo.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
@@ -616,11 +637,15 @@ class WorkTree:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(source, target) -> None:  # type: ignore
-                with open(
-                    target, "w" + ("b" if isinstance(source, bytes) else "")
-                ) as f:
-                    f.write(source)
+            def symlink_fn(
+                src: Union[str, bytes, os.PathLike],
+                dst: Union[str, bytes, os.PathLike],
+                target_is_directory: bool = False,
+                *,
+                dir_fd: int | None = None,
+            ) -> None:
+                with open(dst, "w" + ("b" if isinstance(src, bytes) else "")) as f:
+                    f.write(src)
 
         blob_normalizer = self._repo.get_blob_normalizer()
         return build_index_from_tree(

@@ -567,9 +567,7 @@ def write_commit_graph(
 
     graph_path = os.path.join(info_dir, b"commit-graph")
     with GitFile(graph_path, "wb") as f:
-        from typing import BinaryIO, cast
-
-        graph.write_to_file(cast(BinaryIO, f))
+        graph.write_to_file(f)
 
 
 def get_reachable_commits(

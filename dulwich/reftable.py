@@ -700,7 +700,7 @@ class ReftableReader:
         # Read magic bytes
         magic = self.f.read(4)
         if magic != REFTABLE_MAGIC:
-            raise ValueError(f"Invalid reftable magic: {magic}")
+            raise ValueError(f"Invalid reftable magic: {magic!r}")
 
         # Read version + block size (4 bytes total, big-endian network order)
         # Format: uint8(version) + uint24(block_size)

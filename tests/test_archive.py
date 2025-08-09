@@ -46,7 +46,9 @@ class ArchiveTests(TestCase):
         self.addCleanup(tf.close)
         self.assertEqual([], tf.getnames())
 
-    def _get_example_tar_stream(self, mtime: int, prefix: bytes = b"", format: str = "") -> BytesIO:
+    def _get_example_tar_stream(
+        self, mtime: int, prefix: bytes = b"", format: str = ""
+    ) -> BytesIO:
         store = MemoryObjectStore()
         b1 = Blob.from_string(b"somedata")
         store.add_object(b1)

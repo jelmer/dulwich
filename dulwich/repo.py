@@ -34,7 +34,7 @@ import stat
 import sys
 import time
 import warnings
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
@@ -42,6 +42,7 @@ from typing import (
     BinaryIO,
     Callable,
     Optional,
+    TypeVar,
     Union,
 )
 
@@ -52,8 +53,11 @@ if TYPE_CHECKING:
     from .attrs import GitAttributes
     from .config import ConditionMatcher, ConfigFile, StackedConfig
     from .index import Index
+    from .line_ending import BlobNormalizer
     from .notes import Notes
-    from .object_store import BaseObjectStore
+    from .object_store import BaseObjectStore, GraphWalker, UnpackedObject
+    from .rebase import RebaseStateManager
+    from .walk import Walker
     from .worktree import WorkTree
 
 from . import replace_me
@@ -116,6 +120,8 @@ from .refs import (
 
 CONTROLDIR = ".git"
 OBJECTDIR = "objects"
+
+T = TypeVar("T", bound="ShaFile")
 REFSDIR = "refs"
 REFSDIR_TAGS = "tags"
 REFSDIR_HEADS = "heads"
@@ -248,11 +254,11 @@ def check_user_identity(identity: bytes) -> None:
     try:
         fst, snd = identity.split(b" <", 1)
     except ValueError as exc:
-        raise InvalidUserIdentity(identity) from exc
+        raise InvalidUserIdentity(identity.decode("utf-8", "replace")) from exc
     if b">" not in snd:
-        raise InvalidUserIdentity(identity)
+        raise InvalidUserIdentity(identity.decode("utf-8", "replace"))
     if b"\0" in identity or b"\n" in identity:
-        raise InvalidUserIdentity(identity)
+        raise InvalidUserIdentity(identity.decode("utf-8", "replace"))
 
 
 def parse_graftpoints(
@@ -333,7 +339,12 @@ def _set_filesystem_hidden(path: str) -> None:
 
 
 class ParentsProvider:
-    def __init__(self, store: "BaseObjectStore", grafts: dict = {}, shallows: list = []) -> None:
+    def __init__(
+        self,
+        store: "BaseObjectStore",
+        grafts: dict = {},
+        shallows: Iterable[bytes] = [],
+    ) -> None:
         self.store = store
         self.grafts = grafts
         self.shallows = set(shallows)
@@ -341,7 +352,9 @@ class ParentsProvider:
         # Get commit graph once at initialization for performance
         self.commit_graph = store.get_commit_graph()
 
-    def get_parents(self, commit_id: bytes, commit: Optional[Any] = None) -> list[bytes]:
+    def get_parents(
+        self, commit_id: bytes, commit: Optional[Commit] = None
+    ) -> list[bytes]:
         try:
             return self.grafts[commit_id]
         except KeyError:
@@ -357,7 +370,9 @@ class ParentsProvider:
 
         # Fallback to reading the commit object
         if commit is None:
-            commit = self.store[commit_id]
+            obj = self.store[commit_id]
+            assert isinstance(obj, Commit)
+            commit = obj
         return commit.parents
 
 
@@ -472,7 +487,11 @@ class BaseRepo:
         raise NotImplementedError(self.open_index)
 
     def fetch(
-        self, target: "BaseRepo", determine_wants: Optional[Callable] = None, progress: Optional[Callable] = None, depth: Optional[int] = None
+        self,
+        target: "BaseRepo",
+        determine_wants: Optional[Callable] = None,
+        progress: Optional[Callable] = None,
+        depth: Optional[int] = None,
     ) -> dict:
         """Fetch objects into another repository.
 
@@ -498,7 +517,7 @@ class BaseRepo:
     def fetch_pack_data(
         self,
         determine_wants: Callable,
-        graph_walker: Any,
+        graph_walker: "GraphWalker",
         progress: Optional[Callable],
         *,
         get_tagged: Optional[Callable] = None,
@@ -533,7 +552,7 @@ class BaseRepo:
     def find_missing_objects(
         self,
         determine_wants: Callable,
-        graph_walker: Any,
+        graph_walker: "GraphWalker",
         progress: Optional[Callable],
         *,
         get_tagged: Optional[Callable] = None,
@@ -563,16 +582,17 @@ class BaseRepo:
         current_shallow = set(getattr(graph_walker, "shallow", set()))
 
         if depth not in (None, 0):
+            assert depth is not None
             shallow, not_shallow = find_shallow(self.object_store, wants, depth)
             # Only update if graph_walker has shallow attribute
             if hasattr(graph_walker, "shallow"):
                 graph_walker.shallow.update(shallow - not_shallow)
                 new_shallow = graph_walker.shallow - current_shallow
-                unshallow = graph_walker.unshallow = not_shallow & current_shallow
+                unshallow = graph_walker.unshallow = not_shallow & current_shallow  # type: ignore[attr-defined]
                 if hasattr(graph_walker, "update_shallow"):
                     graph_walker.update_shallow(new_shallow, unshallow)
         else:
-            unshallow = getattr(graph_walker, "unshallow", frozenset())
+            unshallow = getattr(graph_walker, "unshallow", set())
 
         if wants == []:
             # TODO(dborowitz): find a way to short-circuit that doesn't change
@@ -596,7 +616,7 @@ class BaseRepo:
                 def __len__(self) -> int:
                     return 0
 
-                def __iter__(self) -> Any:
+                def __iter__(self) -> Iterator[tuple[bytes, Optional[bytes]]]:
                     yield from []
 
             return DummyMissingObjectFinder()  # type: ignore
@@ -615,7 +635,7 @@ class BaseRepo:
 
         parents_provider = ParentsProvider(self.object_store, shallows=current_shallow)
 
-        def get_parents(commit: Any) -> list[bytes]:
+        def get_parents(commit: Commit) -> list[bytes]:
             """Get parents for a commit using the parents provider.
 
             Args:
@@ -638,11 +658,11 @@ class BaseRepo:
 
     def generate_pack_data(
         self,
-        have: list[ObjectID],
-        want: list[ObjectID],
+        have: Iterable[ObjectID],
+        want: Iterable[ObjectID],
         progress: Optional[Callable[[str], None]] = None,
         ofs_delta: Optional[bool] = None,
-    ) -> Any:
+    ) -> tuple[int, Iterator["UnpackedObject"]]:
         """Generate pack data objects for a set of wants/haves.
 
         Args:
@@ -697,18 +717,18 @@ class BaseRepo:
         # TODO: move this method to WorkTree
         return self.refs[b"HEAD"]
 
-    def _get_object(self, sha: bytes, cls: Any) -> Any:
+    def _get_object(self, sha: bytes, cls: type[T]) -> T:
         assert len(sha) in (20, 40)
         ret = self.get_object(sha)
         if not isinstance(ret, cls):
             if cls is Commit:
-                raise NotCommitError(ret)
+                raise NotCommitError(ret.id)
             elif cls is Blob:
-                raise NotBlobError(ret)
+                raise NotBlobError(ret.id)
             elif cls is Tree:
-                raise NotTreeError(ret)
+                raise NotTreeError(ret.id)
             elif cls is Tag:
-                raise NotTagError(ret)
+                raise NotTagError(ret.id)
             else:
                 raise Exception(f"Type invalid: {ret.type_name!r} != {cls.type_name!r}")
         return ret
@@ -776,14 +796,14 @@ class BaseRepo:
         """
         raise NotImplementedError(self.set_description)
 
-    def get_rebase_state_manager(self) -> Any:
+    def get_rebase_state_manager(self) -> "RebaseStateManager":
         """Get the appropriate rebase state manager for this repository.
 
         Returns: RebaseStateManager instance
         """
         raise NotImplementedError(self.get_rebase_state_manager)
 
-    def get_blob_normalizer(self) -> Any:
+    def get_blob_normalizer(self) -> "BlobNormalizer":
         """Return a BlobNormalizer object for checkin/checkout operations.
 
         Returns: BlobNormalizer instance
@@ -831,7 +851,9 @@ class BaseRepo:
         with f:
             return {line.strip() for line in f}
 
-    def update_shallow(self, new_shallow: Any, new_unshallow: Any) -> None:
+    def update_shallow(
+        self, new_shallow: Optional[set[bytes]], new_unshallow: Optional[set[bytes]]
+    ) -> None:
         """Update the list of shallow objects.
 
         Args:
@@ -873,7 +895,7 @@ class BaseRepo:
 
         return Notes(self.object_store, self.refs)
 
-    def get_walker(self, include: Optional[list[bytes]] = None, **kwargs) -> Any:
+    def get_walker(self, include: Optional[list[bytes]] = None, **kwargs) -> "Walker":
         """Obtain a walker for this repository.
 
         Args:
@@ -910,7 +932,7 @@ class BaseRepo:
 
         return Walker(self.object_store, include, **kwargs)
 
-    def __getitem__(self, name: Union[ObjectID, Ref]) -> Any:
+    def __getitem__(self, name: Union[ObjectID, Ref]) -> "ShaFile":
         """Retrieve a Git object by SHA1 or ref.
 
         Args:
@@ -1002,7 +1024,7 @@ class BaseRepo:
         for sha in to_remove:
             del self._graftpoints[sha]
 
-    def _read_heads(self, name: str) -> Any:
+    def _read_heads(self, name: str) -> list[bytes]:
         f = self.get_named_file(name)
         if f is None:
             return []
@@ -1028,17 +1050,17 @@ class BaseRepo:
         message: Optional[bytes] = None,
         committer: Optional[bytes] = None,
         author: Optional[bytes] = None,
-        commit_timestamp: Optional[Any] = None,
-        commit_timezone: Optional[Any] = None,
-        author_timestamp: Optional[Any] = None,
-        author_timezone: Optional[Any] = None,
+        commit_timestamp: Optional[float] = None,
+        commit_timezone: Optional[int] = None,
+        author_timestamp: Optional[float] = None,
+        author_timezone: Optional[int] = None,
         tree: Optional[ObjectID] = None,
         encoding: Optional[bytes] = None,
         ref: Optional[Ref] = b"HEAD",
         merge_heads: Optional[list[ObjectID]] = None,
         no_verify: bool = False,
         sign: bool = False,
-    ) -> Any:
+    ) -> bytes:
         """Create a new commit.
 
         If not specified, committer and author default to
@@ -1097,9 +1119,9 @@ def read_gitfile(f: BinaryIO) -> str:
     Returns: A path
     """
     cs = f.read()
-    if not cs.startswith("gitdir: "):
+    if not cs.startswith(b"gitdir: "):
         raise ValueError("Expected file to start with 'gitdir: '")
-    return cs[len("gitdir: ") :].rstrip("\n")
+    return cs[len(b"gitdir: ") :].rstrip(b"\n").decode("utf-8")
 
 
 class UnsupportedVersion(Exception):
@@ -1183,7 +1205,7 @@ class Repo(BaseRepo):
         self.bare = bare
         if bare is False:
             if os.path.isfile(hidden_path):
-                with open(hidden_path) as f:
+                with open(hidden_path, "rb") as f:
                     path = read_gitfile(f)
                 self._controldir = os.path.join(root, path)
             else:
@@ -2018,6 +2040,7 @@ class Repo(BaseRepo):
                 if isinstance(head, Tag):
                     _cls, obj = head.object
                     head = self.get_object(obj)
+                assert isinstance(head, Commit)
                 tree = head.tree
             except KeyError:
                 # No HEAD, no attributes from tree
@@ -2026,6 +2049,7 @@ class Repo(BaseRepo):
         if tree is not None:
             try:
                 tree_obj = self[tree]
+                assert isinstance(tree_obj, Tree)
                 if b".gitattributes" in tree_obj:
                     _, attrs_sha = tree_obj[b".gitattributes"]
                     attrs_blob = self[attrs_sha]
@@ -2114,7 +2138,7 @@ class MemoryRepo(BaseRepo):
 
         self._reflog: list[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
-        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)  # type: ignore
+        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)  # type: ignore[arg-type]
         self._named_files: dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()

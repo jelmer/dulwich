@@ -37,7 +37,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Callable, ClassVar, Optional, Union
+from typing import BinaryIO, Callable, ClassVar, Optional, Union
 
 from dulwich import porcelain
 
@@ -45,10 +45,24 @@ from .bundle import create_bundle_from_repo, read_bundle, write_bundle
 from .client import GitProtocolError, get_transport_and_path
 from .errors import ApplyDeltaError
 from .index import Index
-from .objects import valid_hexsha
+from .objects import Commit, valid_hexsha
 from .objectspec import parse_commit_range
 from .pack import Pack, sha_to_hex
 from .repo import Repo
+
+
+def to_display_str(value: Union[bytes, str]) -> str:
+    """Convert a bytes or string value to a display string.
+
+    Args:
+        value: The value to convert (bytes or str)
+
+    Returns:
+        A string suitable for display
+    """
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return value
 
 
 class CommitMessageError(Exception):
@@ -126,7 +140,7 @@ def parse_relative_time(time_str: str) -> int:
         raise
 
 
-def format_bytes(bytes: int) -> str:
+def format_bytes(bytes: float) -> str:
     """Format bytes as human-readable string.
 
     Args:
@@ -231,7 +245,7 @@ class Pager:
         Args:
             pager_cmd: Command to use for paging (default: "cat")
         """
-        self.pager_process = None
+        self.pager_process: Optional[subprocess.Popen] = None
         self.buffer = PagerBuffer(self)
         self._closed = False
         self.pager_cmd = pager_cmd
@@ -449,12 +463,12 @@ def get_pager(config=None, cmd_name: Optional[str] = None):
 
 def disable_pager() -> None:
     """Disable pager for this session."""
-    get_pager._disabled = True
+    get_pager._disabled = True  # type: ignore[attr-defined]
 
 
 def enable_pager() -> None:
     """Enable pager for this session."""
-    get_pager._disabled = False
+    get_pager._disabled = False  # type: ignore[attr-defined]
 
 
 class Command:
@@ -491,10 +505,14 @@ class cmd_archive(Command):
                 write_error=sys.stderr.write,
             )
         else:
-            # Use buffer if available (for binary output), otherwise use stdout
-            outstream = getattr(sys.stdout, "buffer", sys.stdout)
+            # Use binary buffer for archive output
+            outstream: BinaryIO = sys.stdout.buffer
+            errstream: BinaryIO = sys.stderr.buffer
             porcelain.archive(
-                ".", args.committish, outstream=outstream, errstream=sys.stderr
+                ".",
+                args.committish,
+                outstream=outstream,
+                errstream=errstream,
             )
 
 
@@ -642,10 +660,11 @@ class cmd_fetch(Command):
         def progress(msg: bytes) -> None:
             sys.stdout.buffer.write(msg)
 
-        refs = client.fetch(path, r, progress=progress)
+        result = client.fetch(path, r, progress=progress)
         print("Remote refs:")
-        for item in refs.items():
-            print("{} -> {}".format(*item))
+        for ref, sha in result.refs.items():
+            if sha is not None:
+                print(f"{ref.decode()} -> {sha.decode()}")
 
 
 class cmd_for_each_ref(Command):
@@ -676,7 +695,7 @@ class cmd_fsck(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         for obj, msg in porcelain.fsck("."):
-            print(f"{obj}: {msg}")
+            print(f"{obj.decode() if isinstance(obj, bytes) else obj}: {msg}")
 
 
 class cmd_log(Command):
@@ -1302,9 +1321,17 @@ class cmd_reflog(Command):
 
                     for i, entry in enumerate(porcelain.reflog(repo, ref)):
                         # Format similar to git reflog
+                        from dulwich.reflog import Entry
+
+                        assert isinstance(entry, Entry)
                         short_new = entry.new_sha[:8].decode("ascii")
+                        message = (
+                            entry.message.decode("utf-8", "replace")
+                            if entry.message
+                            else ""
+                        )
                         outstream.write(
-                            f"{short_new} {ref.decode('utf-8', 'replace')}@{{{i}}}: {entry.message.decode('utf-8', 'replace')}\n"
+                            f"{short_new} {ref.decode('utf-8', 'replace')}@{{{i}}}: {message}\n"
                         )
 
 
@@ -1538,11 +1565,14 @@ class cmd_ls_remote(Command):
         if args.symref:
             # Show symrefs first, like git does
             for ref, target in sorted(result.symrefs.items()):
-                sys.stdout.write(f"ref: {target.decode()}\t{ref.decode()}\n")
+                if target:
+                    sys.stdout.write(f"ref: {target.decode()}\t{ref.decode()}\n")
 
         # Show regular refs
         for ref in sorted(result.refs):
-            sys.stdout.write(f"{result.refs[ref].decode()}\t{ref.decode()}\n")
+            sha = result.refs[ref]
+            if sha is not None:
+                sys.stdout.write(f"{sha.decode()}\t{ref.decode()}\n")
 
 
 class cmd_ls_tree(Command):
@@ -1601,12 +1631,13 @@ class cmd_pack_objects(Command):
         if not args.stdout and not args.basename:
             parser.error("basename required when not using --stdout")
 
-        object_ids = [line.strip() for line in sys.stdin.readlines()]
+        object_ids = [line.strip().encode() for line in sys.stdin.readlines()]
         deltify = args.deltify
         reuse_deltas = not args.no_reuse_deltas
 
         if args.stdout:
             packf = getattr(sys.stdout, "buffer", sys.stdout)
+            assert isinstance(packf, BinaryIO)
             idxf = None
             close = []
         else:
@@ -2022,8 +2053,17 @@ class cmd_stash_list(Command):
         """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
-        for i, entry in porcelain.stash_list("."):
-            print("stash@{{{}}}: {}".format(i, entry.message.rstrip("\n")))
+        from .repo import Repo
+        from .stash import Stash
+
+        with Repo(".") as r:
+            stash = Stash.from_repo(r)
+            for i, entry in enumerate(stash.stashes()):
+                print(
+                    "stash@{{{}}}: {}".format(
+                        i, entry.message.decode("utf-8", "replace").rstrip("\n")
+                    )
+                )
 
 
 class cmd_stash_push(Command):
@@ -2145,6 +2185,7 @@ class cmd_bisect(SuperCommand):
                         with open(bad_ref, "rb") as f:
                             bad_sha = f.read().strip()
                         commit = r.object_store[bad_sha]
+                        assert isinstance(commit, Commit)
                         message = commit.message.decode(
                             "utf-8", errors="replace"
                         ).split("\n")[0]
@@ -2173,7 +2214,7 @@ class cmd_bisect(SuperCommand):
                 print(log, end="")
 
             elif parsed_args.subcommand == "replay":
-                porcelain.bisect_replay(log_file=parsed_args.logfile)
+                porcelain.bisect_replay(".", log_file=parsed_args.logfile)
                 print(f"Replayed bisect log from {parsed_args.logfile}")
 
             elif parsed_args.subcommand == "help":
@@ -2270,6 +2311,7 @@ class cmd_merge(Command):
             elif args.no_commit:
                 print("Automatic merge successful; not committing as requested.")
             else:
+                assert merge_commit_id is not None
                 print(
                     f"Merge successful. Created merge commit {merge_commit_id.decode()}"
                 )
@@ -3129,12 +3171,14 @@ class cmd_lfs(Command):
             tracked = porcelain.lfs_untrack(patterns=args.patterns)
             print("Remaining tracked patterns:")
             for pattern in tracked:
-                print(f"  {pattern}")
+                print(f"  {to_display_str(pattern)}")
 
         elif args.subcommand == "ls-files":
             files = porcelain.lfs_ls_files(ref=args.ref)
             for path, oid, size in files:
-                print(f"{oid[:12]} * {path} ({format_bytes(size)})")
+                print(
+                    f"{to_display_str(oid[:12])} * {to_display_str(path)} ({format_bytes(size)})"
+                )
 
         elif args.subcommand == "migrate":
             count = porcelain.lfs_migrate(
@@ -3145,13 +3189,13 @@ class cmd_lfs(Command):
         elif args.subcommand == "pointer":
             if args.paths is not None:
                 results = porcelain.lfs_pointer_check(paths=args.paths or None)
-                for path, pointer in results.items():
+                for file_path, pointer in results.items():
                     if pointer:
                         print(
-                            f"{path}: LFS pointer (oid: {pointer.oid[:12]}, size: {format_bytes(pointer.size)})"
+                            f"{to_display_str(file_path)}: LFS pointer (oid: {to_display_str(pointer.oid[:12])}, size: {format_bytes(pointer.size)})"
                         )
                     else:
-                        print(f"{path}: Not an LFS pointer")
+                        print(f"{to_display_str(file_path)}: Not an LFS pointer")
 
         elif args.subcommand == "clean":
             pointer = porcelain.lfs_clean(path=args.path)
@@ -3188,13 +3232,13 @@ class cmd_lfs(Command):
 
             if status["missing"]:
                 print("\nMissing LFS objects:")
-                for path in status["missing"]:
-                    print(f"  {path}")
+                for file_path in status["missing"]:
+                    print(f"  {to_display_str(file_path)}")
 
             if status["not_staged"]:
                 print("\nModified LFS files not staged:")
-                for path in status["not_staged"]:
-                    print(f"  {path}")
+                for file_path in status["not_staged"]:
+                    print(f"  {to_display_str(file_path)}")
 
             if not any(status.values()):
                 print("No LFS files found.")
@@ -3273,14 +3317,19 @@ class cmd_format_patch(Command):
         args = parser.parse_args(args)
 
         # Parse committish using the new function
-        committish = None
+        committish: Optional[Union[bytes, tuple[bytes, bytes]]] = None
         if args.committish:
             with Repo(".") as r:
                 range_result = parse_commit_range(r, args.committish)
                 if range_result:
-                    committish = range_result
+                    # Convert Commit objects to their SHAs
+                    committish = (range_result[0].id, range_result[1].id)
                 else:
-                    committish = args.committish
+                    committish = (
+                        args.committish.encode()
+                        if isinstance(args.committish, str)
+                        else args.committish
+                    )
 
         filenames = porcelain.format_patch(
             ".",

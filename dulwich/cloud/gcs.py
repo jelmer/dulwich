@@ -43,7 +43,15 @@ if TYPE_CHECKING:
 
 
 class GcsObjectStore(BucketBasedObjectStore):
+    """Object store implementation using Google Cloud Storage."""
+
     def __init__(self, bucket: "Bucket", subpath: str = "") -> None:
+        """Initialize GCS object store.
+
+        Args:
+            bucket: GCS bucket instance
+            subpath: Optional subpath within the bucket
+        """
         super().__init__()
         self.bucket = bucket
         self.subpath = subpath

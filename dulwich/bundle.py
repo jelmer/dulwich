@@ -32,6 +32,8 @@ if TYPE_CHECKING:
 
 
 class Bundle:
+    """Git bundle object representation."""
+
     version: Optional[int]
 
     capabilities: dict[str, Optional[str]]
@@ -40,6 +42,7 @@ class Bundle:
     pack_data: PackData
 
     def __repr__(self) -> str:
+        """Return string representation of Bundle."""
         return (
             f"<{type(self).__name__}(version={self.version}, "
             f"capabilities={self.capabilities}, "
@@ -48,6 +51,7 @@ class Bundle:
         )
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another Bundle."""
         if not isinstance(other, type(self)):
             return False
         if self.version != other.version:
@@ -154,6 +158,12 @@ def read_bundle(f: BinaryIO) -> Bundle:
 
 
 def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
+    """Write a bundle to a file.
+
+    Args:
+        f: File-like object to write to
+        bundle: Bundle object to write
+    """
     version = bundle.version
     if version is None:
         if bundle.capabilities:

@@ -67,6 +67,14 @@ NO_CACHE_HEADERS = [
 
 
 def cache_forever_headers(now: Optional[float] = None) -> list[tuple[str, str]]:
+    """Generate headers for caching forever.
+
+    Args:
+      now: Timestamp to use as base (defaults to current time)
+
+    Returns:
+      List of (header_name, header_value) tuples for caching forever
+    """
     if now is None:
         now = time.time()
     return [
@@ -77,6 +85,14 @@ def cache_forever_headers(now: Optional[float] = None) -> list[tuple[str, str]]:
 
 
 def date_time_string(timestamp: Optional[float] = None) -> str:
+    """Convert a timestamp to an HTTP date string.
+
+    Args:
+      timestamp: Unix timestamp to convert (defaults to current time)
+
+    Returns:
+      HTTP date string in RFC 1123 format
+    """
     # From BaseHTTPRequestHandler.date_time_string in BaseHTTPServer.py in the
     # Python 2.6.5 standard library, following modifications:
     #  - Made a global rather than an instance method.
@@ -164,6 +180,16 @@ def _url_to_path(url: str) -> str:
 def get_text_file(
     req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
 ) -> Iterator[bytes]:
+    """Send a plain text file from the repository.
+
+    Args:
+      req: The HTTP request object
+      backend: The git backend
+      mat: The regex match for the requested path
+
+    Returns:
+      Iterator yielding file contents as bytes
+    """
     req.nocache()
     path = _url_to_path(mat.group())
     logger.info("Sending plain text file %s", path)
@@ -173,6 +199,16 @@ def get_text_file(
 def get_loose_object(
     req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
 ) -> Iterator[bytes]:
+    """Send a loose git object.
+
+    Args:
+      req: The HTTP request object
+      backend: The git backend
+      mat: The regex match containing object path segments
+
+    Returns:
+      Iterator yielding object contents as bytes
+    """
     sha = (mat.group(1) + mat.group(2)).encode("ascii")
     logger.info("Sending loose object %s", sha)
     object_store = get_repo(backend, mat).object_store
@@ -192,6 +228,16 @@ def get_loose_object(
 def get_pack_file(
     req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
 ) -> Iterator[bytes]:
+    """Send a git pack file.
+
+    Args:
+      req: The HTTP request object
+      backend: The git backend
+      mat: The regex match for the requested pack file
+
+    Returns:
+      Iterator yielding pack file contents as bytes
+    """
     req.cache_forever()
     path = _url_to_path(mat.group())
     logger.info("Sending pack file %s", path)
@@ -205,6 +251,16 @@ def get_pack_file(
 def get_idx_file(
     req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
 ) -> Iterator[bytes]:
+    """Send a git pack index file.
+
+    Args:
+      req: The HTTP request object
+      backend: The git backend
+      mat: The regex match for the requested index file
+
+    Returns:
+      Iterator yielding index file contents as bytes
+    """
     req.cache_forever()
     path = _url_to_path(mat.group())
     logger.info("Sending pack file %s", path)
@@ -218,6 +274,16 @@ def get_idx_file(
 def get_info_refs(
     req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
 ) -> Iterator[bytes]:
+    """Send git info/refs for discovery.
+
+    Args:
+      req: The HTTP request object
+      backend: The git backend
+      mat: The regex match for the info/refs request
+
+    Returns:
+      Iterator yielding refs advertisement or info/refs contents
+    """
     params = parse_qs(req.environ["QUERY_STRING"])
     service = params.get("service", [None])[0]
     try:
@@ -255,6 +321,16 @@ def get_info_refs(
 def get_info_packs(
     req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
 ) -> Iterator[bytes]:
+    """Send git info/packs file listing available packs.
+
+    Args:
+      req: The HTTP request object
+      backend: The git backend
+      mat: The regex match for the info/packs request
+
+    Returns:
+      Iterator yielding pack listing as bytes
+    """
     req.nocache()
     req.respond(HTTP_OK, "text/plain")
     logger.info("Emulating dumb info/packs")
@@ -275,10 +351,23 @@ class ChunkReader:
     """Reader for chunked transfer encoding streams."""
 
     def __init__(self, f: BinaryIO) -> None:
+        """Initialize ChunkReader.
+
+        Args:
+            f: Binary file-like object to read from
+        """
         self._iter = _chunk_iter(f)
         self._buffer: list[bytes] = []
 
     def read(self, n: int) -> bytes:
+        """Read n bytes from the chunked stream.
+
+        Args:
+          n: Number of bytes to read
+
+        Returns:
+          Up to n bytes of data
+        """
         while sum(map(len, self._buffer)) < n:
             try:
                 self._buffer.append(next(self._iter))
@@ -303,6 +392,14 @@ class _LengthLimitedFile:
         self._bytes_avail = max_bytes
 
     def read(self, size: int = -1) -> bytes:
+        """Read up to size bytes from the limited input.
+
+        Args:
+          size: Maximum number of bytes to read, or -1 for all available
+
+        Returns:
+          Up to size bytes of data
+        """
         if self._bytes_avail <= 0:
             return b""
         if size == -1 or size > self._bytes_avail:
@@ -316,6 +413,16 @@ class _LengthLimitedFile:
 def handle_service_request(
     req: "HTTPGitRequest", backend: "Backend", mat: re.Match[str]
 ) -> Iterator[bytes]:
+    """Handle a git service request (upload-pack or receive-pack).
+
+    Args:
+      req: The HTTP request object
+      backend: The git backend
+      mat: The regex match for the service request
+
+    Returns:
+      Iterator yielding service response as bytes
+    """
     service = mat.group().lstrip("/")
     logger.info("Handling service request for %s", service)
     handler_cls = req.handlers.get(service.encode("ascii"), None)
@@ -350,6 +457,14 @@ class HTTPGitRequest:
     def __init__(
         self, environ, start_response, dumb: bool = False, handlers=None
     ) -> None:
+        """Initialize HTTPGitRequest.
+
+        Args:
+            environ: WSGI environment dictionary
+            start_response: WSGI start_response callable
+            dumb: Whether to use dumb HTTP protocol
+            handlers: Optional handler overrides
+        """
         self.environ = environ
         self.dumb = dumb
         self.handlers = handlers
@@ -443,6 +558,14 @@ class HTTPGitApplication:
     def __init__(
         self, backend, dumb: bool = False, handlers=None, fallback_app=None
     ) -> None:
+        """Initialize HTTPGitApplication.
+
+        Args:
+            backend: Backend object for git operations
+            dumb: Whether to use dumb HTTP protocol
+            handlers: Optional handler overrides
+            fallback_app: Optional fallback WSGI application
+        """
         self.backend = backend
         self.dumb = dumb
         self.handlers = dict(DEFAULT_HANDLERS)
@@ -451,6 +574,7 @@ class HTTPGitApplication:
             self.handlers.update(handlers)
 
     def __call__(self, environ, start_response):
+        """Handle WSGI request."""
         path = environ["PATH_INFO"]
         method = environ["REQUEST_METHOD"]
         req = HTTPGitRequest(
@@ -476,14 +600,14 @@ class HTTPGitApplication:
 
 
 class GunzipFilter:
-    """WSGI middleware that unzips gzip-encoded requests before
-    passing on to the underlying application.
-    """
+    """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application."""
 
     def __init__(self, application) -> None:
+        """Initialize GunzipFilter."""
         self.app = application
 
     def __call__(self, environ, start_response):
+        """Handle WSGI request."""
         import gzip
 
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
@@ -498,14 +622,14 @@ class GunzipFilter:
 
 
 class LimitedInputFilter:
-    """WSGI middleware that limits the input length of a request to that
-    specified in Content-Length.
-    """
+    """WSGI middleware that limits the input length of a request to that specified in Content-Length."""
 
     def __init__(self, application) -> None:
+        """Initialize LimitedInputFilter."""
         self.app = application
 
     def __call__(self, environ, start_response):
+        """Handle WSGI request."""
         # This is not necessary if this app is run from a conforming WSGI
         # server. Unfortunately, there's no way to tell that at this point.
         # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
@@ -519,9 +643,7 @@ class LimitedInputFilter:
 
 
 def make_wsgi_chain(*args, **kwargs):
-    """Factory function to create an instance of HTTPGitApplication,
-    correctly wrapped with needed middleware.
-    """
+    """Factory function to create an instance of HTTPGitApplication, correctly wrapped with needed middleware."""
     app = HTTPGitApplication(*args, **kwargs)
     wrapped_app = LimitedInputFilter(GunzipFilter(app))
     return wrapped_app
@@ -531,15 +653,31 @@ class ServerHandlerLogger(ServerHandler):
     """ServerHandler that uses dulwich's logger for logging exceptions."""
 
     def log_exception(self, exc_info) -> None:
+        """Log an exception using dulwich's logger.
+
+        Args:
+          exc_info: Exception information tuple
+        """
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
     def log_message(self, format, *args) -> None:
+        """Log a message using dulwich's logger.
+
+        Args:
+          format: Format string for the message
+          *args: Arguments for the format string
+        """
         logger.info(format, *args)
 
     def log_error(self, *args) -> None:
+        """Log an error using dulwich's logger.
+
+        Args:
+          *args: Error message components
+        """
         logger.error(*args)
 
 
@@ -547,15 +685,31 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
     """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
 
     def log_exception(self, exc_info) -> None:
+        """Log an exception using dulwich's logger.
+
+        Args:
+          exc_info: Exception information tuple
+        """
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
     def log_message(self, format, *args) -> None:
+        """Log a message using dulwich's logger.
+
+        Args:
+          format: Format string for the message
+          *args: Arguments for the format string
+        """
         logger.info(format, *args)
 
     def log_error(self, *args) -> None:
+        """Log an error using dulwich's logger.
+
+        Args:
+          *args: Error message components
+        """
         logger.error(*args)
 
     def handle(self) -> None:

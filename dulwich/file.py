@@ -125,6 +125,12 @@ class FileLocked(Exception):
     def __init__(
         self, filename: Union[str, bytes, os.PathLike], lockfilename: Union[str, bytes]
     ) -> None:
+        """Initialize FileLocked.
+
+        Args:
+          filename: Name of the file that is locked
+          lockfilename: Name of the lock file
+        """
         self.filename = filename
         self.lockfilename = lockfilename
         super().__init__(filename, lockfilename)

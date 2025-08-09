@@ -131,22 +131,57 @@ NAK_LINE = b"NAK\n"
 
 
 def agent_string() -> bytes:
+    """Generate the agent string for dulwich.
+
+    Returns:
+      Agent string as bytes
+    """
     return ("dulwich/" + ".".join(map(str, dulwich.__version__))).encode("ascii")
 
 
 def capability_agent() -> bytes:
+    """Generate the agent capability string.
+
+    Returns:
+      Agent capability with dulwich version
+    """
     return CAPABILITY_AGENT + b"=" + agent_string()
 
 
 def capability_symref(from_ref: bytes, to_ref: bytes) -> bytes:
+    """Generate a symref capability string.
+
+    Args:
+      from_ref: Source reference name
+      to_ref: Target reference name
+
+    Returns:
+      Symref capability string
+    """
     return CAPABILITY_SYMREF + b"=" + from_ref + b":" + to_ref
 
 
 def extract_capability_names(capabilities: Iterable[bytes]) -> set[bytes]:
+    """Extract capability names from a list of capabilities.
+
+    Args:
+      capabilities: List of capability strings
+
+    Returns:
+      Set of capability names
+    """
     return {parse_capability(c)[0] for c in capabilities}
 
 
 def parse_capability(capability: bytes) -> tuple[bytes, Optional[bytes]]:
+    """Parse a capability string into name and value.
+
+    Args:
+      capability: Capability string
+
+    Returns:
+      Tuple of (capability_name, capability_value)
+    """
     parts = capability.split(b"=", 1)
     if len(parts) == 1:
         return (parts[0], None)
@@ -154,6 +189,14 @@ def parse_capability(capability: bytes) -> tuple[bytes, Optional[bytes]]:
 
 
 def symref_capabilities(symrefs: Iterable[tuple[bytes, bytes]]) -> list[bytes]:
+    """Generate symref capability strings from symref pairs.
+
+    Args:
+      symrefs: Iterable of (from_ref, to_ref) tuples
+
+    Returns:
+      List of symref capability strings
+    """
     return [capability_symref(*k) for k in symrefs]
 
 
@@ -166,10 +209,27 @@ COMMAND_HAVE = b"have"
 
 
 def format_cmd_pkt(cmd: bytes, *args: bytes) -> bytes:
+    """Format a command packet.
+
+    Args:
+      cmd: Command name
+      *args: Command arguments
+
+    Returns:
+      Formatted command packet
+    """
     return cmd + b" " + b"".join([(a + b"\0") for a in args])
 
 
 def parse_cmd_pkt(line: bytes) -> tuple[bytes, list[bytes]]:
+    """Parse a command packet.
+
+    Args:
+      line: Command line to parse
+
+    Returns:
+      Tuple of (command, [arguments])
+    """
     splice_at = line.find(b" ")
     cmd, args = line[:splice_at], line[splice_at + 1 :]
     assert args[-1:] == b"\x00"
@@ -229,6 +289,14 @@ class Protocol:
         close: Optional[Callable[[], None]] = None,
         report_activity: Optional[Callable[[int, str], None]] = None,
     ) -> None:
+        """Initialize Protocol.
+
+        Args:
+          read: Function to read bytes from the transport
+          write: Function to write bytes to the transport
+          close: Optional function to close the transport
+          report_activity: Optional function to report activity
+        """
         self.read = read
         self.write = write
         self._close = close
@@ -236,10 +304,12 @@ class Protocol:
         self._readahead: Optional[BytesIO] = None
 
     def close(self) -> None:
+        """Close the underlying transport if a close function was provided."""
         if self._close:
             self._close()
 
     def __enter__(self) -> "Protocol":
+        """Enter context manager."""
         return self
 
     def __exit__(
@@ -248,6 +318,7 @@ class Protocol:
         exc_val: Optional[BaseException],
         exc_tb: Optional[types.TracebackType],
     ) -> None:
+        """Exit context manager and close transport."""
         self.close()
 
     def read_pkt_line(self) -> Optional[bytes]:
@@ -405,12 +476,29 @@ class ReceivableProtocol(Protocol):
         report_activity: Optional[Callable[[int, str], None]] = None,
         rbufsize: int = _RBUFSIZE,
     ) -> None:
+        """Initialize ReceivableProtocol.
+
+        Args:
+          recv: Function to receive bytes from the transport
+          write: Function to write bytes to the transport
+          close: Optional function to close the transport
+          report_activity: Optional function to report activity
+          rbufsize: Read buffer size
+        """
         super().__init__(self.read, write, close=close, report_activity=report_activity)
         self._recv = recv
         self._rbuf = BytesIO()
         self._rbufsize = rbufsize
 
     def read(self, size: int) -> bytes:
+        """Read bytes from the socket.
+
+        Args:
+          size: Number of bytes to read
+
+        Returns:
+          Bytes read from socket
+        """
         # From _fileobj.read in socket.py in the Python 2.6.5 standard library,
         # with the following modifications:
         #  - omit the size <= 0 branch
@@ -472,6 +560,14 @@ class ReceivableProtocol(Protocol):
         return buf.read()
 
     def recv(self, size: int) -> bytes:
+        """Receive bytes from the socket with buffering.
+
+        Args:
+          size: Maximum number of bytes to receive
+
+        Returns:
+          Bytes received from socket
+        """
         assert size > 0
 
         buf = self._rbuf
@@ -585,6 +681,11 @@ class PktLineParser:
     """Packet line parser that hands completed packets off to a callback."""
 
     def __init__(self, handle_pkt: Callable[[Optional[bytes]], None]) -> None:
+        """Initialize PktLineParser.
+
+        Args:
+          handle_pkt: Callback function to handle completed packets
+        """
         self.handle_pkt = handle_pkt
         self._readahead = BytesIO()
 
@@ -613,12 +714,30 @@ class PktLineParser:
 
 
 def format_capability_line(capabilities: Iterable[bytes]) -> bytes:
+    """Format a capabilities list for the wire protocol.
+
+    Args:
+      capabilities: List of capability strings
+
+    Returns:
+      Space-separated capabilities as bytes
+    """
     return b"".join([b" " + c for c in capabilities])
 
 
 def format_ref_line(
     ref: bytes, sha: bytes, capabilities: Optional[list[bytes]] = None
 ) -> bytes:
+    """Format a ref advertisement line.
+
+    Args:
+      ref: Reference name
+      sha: SHA hash
+      capabilities: Optional list of capabilities
+
+    Returns:
+      Formatted ref line
+    """
     if capabilities is None:
         return sha + b" " + ref + b"\n"
     else:
@@ -626,14 +745,39 @@ def format_ref_line(
 
 
 def format_shallow_line(sha: bytes) -> bytes:
+    """Format a shallow line.
+
+    Args:
+      sha: SHA to mark as shallow
+
+    Returns:
+      Formatted shallow line
+    """
     return COMMAND_SHALLOW + b" " + sha
 
 
 def format_unshallow_line(sha: bytes) -> bytes:
+    """Format an unshallow line.
+
+    Args:
+      sha: SHA to unshallow
+
+    Returns:
+      Formatted unshallow line
+    """
     return COMMAND_UNSHALLOW + b" " + sha
 
 
 def format_ack_line(sha: bytes, ack_type: bytes = b"") -> bytes:
+    """Format an ACK line.
+
+    Args:
+      sha: SHA to acknowledge
+      ack_type: Optional ACK type (e.g. b"continue")
+
+    Returns:
+      Formatted ACK line
+    """
     if ack_type:
         ack_type = b" " + ack_type
     return b"ACK " + sha + ack_type + b"\n"

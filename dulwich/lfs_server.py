@@ -246,6 +246,13 @@ class LFSServer(HTTPServer):
         lfs_store: LFSStore,
         log_requests: bool = False,
     ) -> None:
+        """Initialize LFSServer.
+
+        Args:
+          server_address: Tuple of (host, port) to bind to
+          lfs_store: LFS store instance to use
+          log_requests: Whether to log incoming requests
+        """
         super().__init__(server_address, LFSRequestHandler)
         self.lfs_store = lfs_store
         self.log_requests = log_requests

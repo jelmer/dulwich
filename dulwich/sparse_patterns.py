@@ -39,8 +39,7 @@ class BlobNotFoundError(Exception):
 
 
 def determine_included_paths(index: Index, lines: list[str], cone: bool) -> set[str]:
-    """Determine which paths in the index should be included based on either
-    a full-pattern match or a cone-mode approach.
+    """Determine which paths in the index should be included based on either a full-pattern match or a cone-mode approach.
 
     Args:
       index: An Index object containing the repository's index.

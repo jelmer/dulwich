@@ -334,8 +334,8 @@ def parse_timezone_format(tz_str):
 
 
 def get_user_timezones():
-    """Retrieve local timezone as described in
-    https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
+    """Retrieve local timezone as described in https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt.
+
     Returns: A tuple containing author timezone, committer timezone.
     """
     local_timezone = time.localtime().tm_gmtoff
@@ -391,6 +391,7 @@ def open_repo_closing(
     path_or_repo: Union[str, os.PathLike, T],
 ) -> AbstractContextManager[Union[T, Repo]]:
     """Open an argument that can be a repository or a path for a repository.
+
     returns a context manager that will close the repo on exit if the argument
     is a path, else does nothing if the argument is a repo.
     """
@@ -402,12 +403,12 @@ def open_repo_closing(
 def path_to_tree_path(
     repopath: Union[str, os.PathLike], path, tree_encoding=DEFAULT_ENCODING
 ):
-    """Convert a path to a path usable in an index, e.g. bytes and relative to
-    the repository root.
+    """Convert a path to a path usable in an index, e.g. bytes and relative to the repository root.
 
     Args:
       repopath: Repository path, absolute or relative to the cwd
       path: A path, absolute or relative to the cwd
+      tree_encoding: Encoding to use for tree paths
     Returns: A path formatted for use in e.g. an index
     """
     # Resolve might returns a relative path on Windows
@@ -570,6 +571,7 @@ def commit(
       author_timezone: Author timestamp timezone
       committer: Optional committer name and email
       commit_timezone: Commit timestamp timezone
+      encoding: Encoding to use for commit message
       no_verify: Skip pre-commit and commit-msg hooks
       signoff: GPG Sign the commit (bool, defaults to False,
         pass True to use default GPG key,
@@ -664,6 +666,7 @@ def commit_tree(
     Args:
       repo: Path to repository
       tree: An existing tree object
+      message: Commit message
       author: Optional author name and email
       committer: Optional committer name and email
     """
@@ -729,10 +732,8 @@ def clone(
       protocol_version: desired Git protocol version. By default the highest
         mutually supported protocol version will be used.
       recurse_submodules: Whether to initialize and clone submodules
-
-    Keyword Args:
-      refspecs: refspecs to fetch. Can be a bytestring, a string, or a list of
-        bytestring/string.
+      **kwargs: Additional keyword arguments including refspecs to fetch.
+        Can be a bytestring, a string, or a list of bytestring/string.
 
     Returns: The new repository
     """
@@ -977,6 +978,7 @@ def remove(repo: Union[str, os.PathLike, Repo] = ".", paths=None, cached=False) 
     Args:
       repo: Repository for the files
       paths: Paths to remove. Can be absolute or relative to the repository root.
+      cached: Only remove from index, not from working directory
     """
     with open_repo_closing(repo) as r:
         index = r.open_index()
@@ -1180,6 +1182,7 @@ def print_commit(commit, decode, outstream=sys.stdout) -> None:
 
     Args:
       commit: A `Commit` object
+      decode: Function to decode commit data
       outstream: A stream file to write to
     """
     outstream.write("-" * 50 + "\n")
@@ -1247,10 +1250,22 @@ def show_commit(repo: RepoPath, commit, decode, outstream=sys.stdout) -> None:
 
     # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
     class _StreamWrapper:
+        """Wrapper for ColorizedDiffStream to handle string/bytes conversion."""
+
         def __init__(self, stream):
+            """Initialize a _StreamWrapper.
+
+            Args:
+              stream: The underlying stream to wrap
+            """
             self.stream = stream
 
         def write(self, data):
+            """Write data to the stream, converting strings to bytes if needed.
+
+            Args:
+              data: Data to write (str or bytes)
+            """
             if isinstance(data, str):
                 # Convert string to bytes for ColorizedDiffStream
                 self.stream.write(data.encode("utf-8"))
@@ -1639,6 +1654,7 @@ def submodule_update(
       paths: Optional list of specific submodule paths to update. If None, updates all.
       init: If True, initialize submodules first
       force: Force update even if local changes exist
+      errstream: Error stream for error messages
     """
     from .submodule import iter_cached_submodules
 
@@ -1781,6 +1797,7 @@ def tag_create(
       sign: GPG Sign the tag (bool, defaults to False,
         pass True to use default GPG key,
         pass a str containing Key ID to use a specific GPG key)
+      encoding: Encoding to use for tag messages
     """
     with open_repo_closing(repo) as r:
         object = parse_object(r, objectish)
@@ -2173,6 +2190,7 @@ def push(
       outstream: A stream file to write output
       errstream: A stream file to write errors
       force: Force overwriting refs
+      **kwargs: Additional keyword arguments for the client
     """
     # Open the repo
     with open_repo_closing(repo) as r:
@@ -2301,6 +2319,7 @@ def pull(
         feature, and ignored otherwise.
       protocol_version: desired Git protocol version. By default the highest
         mutually supported protocol version will be used
+      **kwargs: Additional keyword arguments for the client
     """
     # Open the repo
     with open_repo_closing(repo) as r:
@@ -3019,6 +3038,8 @@ def fetch(
       depth: Depth to fetch at
       prune: Prune remote removed refs
       prune_tags: Prune reomte removed tags
+      force: Force fetching even if it would overwrite local changes
+      **kwargs: Additional keyword arguments for the client
     Returns:
       Dictionary with refs on the remote
     """
@@ -3108,6 +3129,7 @@ def ls_remote(remote, config: Optional[Config] = None, **kwargs):
     Args:
       remote: Remote repository location
       config: Configuration to use
+      **kwargs: Additional keyword arguments for the client
     Returns:
       LsRemoteResult object with refs and symrefs
     """
@@ -3616,6 +3638,7 @@ def reset_file(
       repo: dulwich Repo object
       file_path: file to reset, relative to the repository path
       target: branch or commit or b'HEAD' to reset
+      symlink_fn: Function to use for creating symlinks
     """
     tree = parse_tree(repo, treeish=target)
     tree_path = _fs_to_tree_path(file_path)
@@ -4249,7 +4272,7 @@ def merge_tree(
         return merged_tree.id, conflicts
 
 
-def cherry_pick(
+def cherry_pick(  # noqa: D417
     repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag, None],
     no_commit=False,
@@ -4260,9 +4283,9 @@ def cherry_pick(
 
     Args:
       repo: Repository to cherry-pick into
-      committish: Commit to cherry-pick (can be None only when ``continue_`` or abort is True)
+      committish: Commit to cherry-pick (can be None only when resuming or aborting)
       no_commit: If True, do not create a commit after applying changes
-      ``continue_``: Continue an in-progress cherry-pick after resolving conflicts
+      ``continue_``: Resume an in-progress cherry-pick after resolving conflicts if True
       abort: Abort an in-progress cherry-pick
 
     Returns:

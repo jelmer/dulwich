@@ -48,6 +48,16 @@ except ImportError:
         since: Optional[Union[str, tuple[int, ...]]] = None,
         remove_in: Optional[Union[str, tuple[int, ...]]] = None,
     ) -> Callable[[F], F]:
+        """Decorator to mark functions as deprecated.
+
+        Args:
+            since: Version when the function was deprecated
+            remove_in: Version when the function will be removed
+
+        Returns:
+            Decorator function
+        """
+
         def decorator(func: F) -> F:
             import functools
             import warnings

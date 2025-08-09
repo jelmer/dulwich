@@ -72,6 +72,18 @@ class WorkTreeInfo:
         prunable: bool = False,
         lock_reason: str | None = None,
     ):
+        """Initialize WorkTreeInfo.
+
+        Args:
+          path: Path to the worktree
+          head: Current HEAD commit SHA
+          branch: Current branch (if not detached)
+          bare: Whether this is a bare repository
+          detached: Whether HEAD is detached
+          locked: Whether the worktree is locked
+          prunable: Whether the worktree can be pruned
+          lock_reason: Reason for locking (if locked)
+        """
         self.path = path
         self.head = head
         self.branch = branch
@@ -82,9 +94,11 @@ class WorkTreeInfo:
         self.lock_reason = lock_reason
 
     def __repr__(self) -> str:
+        """Return string representation of WorkTreeInfo."""
         return f"WorkTreeInfo(path={self.path!r}, branch={self.branch!r}, detached={self.detached})"
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another WorkTreeInfo."""
         if not isinstance(other, WorkTreeInfo):
             return NotImplemented
         return (
@@ -311,7 +325,8 @@ class WorkTree:
         index.write()
 
     def unstage(self, fs_paths: list[str]) -> None:
-        """Unstage specific file in the index
+        """Unstage specific file in the index.
+
         Args:
           fs_paths: a list of files to unstage,
             relative to the repository path.

@@ -32,7 +32,12 @@ from dulwich.objects import Blob, Commit, ShaFile, Tag, Tree, sha_to_hex
 
 
 class MockResponse:
-    def __init__(self, status: int = 200, content: bytes = b"", headers: Optional[dict[str, str]] = None) -> None:
+    def __init__(
+        self,
+        status: int = 200,
+        content: bytes = b"",
+        headers: Optional[dict[str, str]] = None,
+    ) -> None:
         self.status = status
         self.content = content
         self.headers = headers or {}
@@ -50,7 +55,9 @@ class DumbHTTPObjectStoreTests(TestCase):
         self.responses: dict[str, dict[str, Union[int, bytes]]] = {}
         self.store = DumbHTTPObjectStore(self.base_url, self._mock_http_request)
 
-    def _mock_http_request(self, url: str, headers: dict[str, str]) -> tuple[MockResponse, Callable[[Optional[int]], bytes]]:
+    def _mock_http_request(
+        self, url: str, headers: dict[str, str]
+    ) -> tuple[MockResponse, Callable[[Optional[int]], bytes]]:
         """Mock HTTP request function."""
         if url in self.responses:
             resp_data = self.responses[url]
@@ -183,7 +190,9 @@ class DumbRemoteHTTPRepoTests(TestCase):
         self.responses: dict[str, dict[str, Union[int, bytes]]] = {}
         self.repo = DumbRemoteHTTPRepo(self.base_url, self._mock_http_request)
 
-    def _mock_http_request(self, url: str, headers: dict[str, str]) -> tuple[MockResponse, Callable[[Optional[int]], bytes]]:
+    def _mock_http_request(
+        self, url: str, headers: dict[str, str]
+    ) -> tuple[MockResponse, Callable[[Optional[int]], bytes]]:
         """Mock HTTP request function."""
         if url in self.responses:
             resp_data = self.responses[url]

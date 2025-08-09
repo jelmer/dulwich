@@ -52,7 +52,7 @@ import time
 import zlib
 from collections.abc import Iterable, Iterator
 from functools import partial
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional
 from typing import Protocol as TypingProtocol
 
 if TYPE_CHECKING:
@@ -551,10 +551,12 @@ def _split_proto_line(line, allowed):
             COMMAND_SHALLOW,
             COMMAND_UNSHALLOW,
         ):
+            assert fields[1] is not None
             if not valid_hexsha(fields[1]):
                 raise GitProtocolError("Invalid sha")
             return tuple(fields)
         elif command == COMMAND_DEEPEN:
+            assert fields[1] is not None
             return command, int(fields[1])
     raise GitProtocolError(f"Received invalid line from client: {line!r}")
 
@@ -631,6 +633,9 @@ class AckGraphWalkerImpl:
         Args:
           have_ref: Object ID to acknowledge
         """
+        raise NotImplementedError
+
+    def handle_done(self, done_required, done_received):
         raise NotImplementedError
 
 
@@ -784,6 +789,7 @@ class _ProtocolGraphWalker:
         """
         if len(have_ref) != 40:
             raise ValueError(f"invalid sha {have_ref!r}")
+        assert self._impl is not None
         return self._impl.ack(have_ref)
 
     def reset(self) -> None:
@@ -799,7 +805,8 @@ class _ProtocolGraphWalker:
         if not self._cached:
             if not self._impl and self.stateless_rpc:
                 return None
-            return next(self._impl)
+            assert self._impl is not None
+            return next(self._impl)  # type: ignore[call-overload]
         self._cache_index += 1
         if self._cache_index > len(self._cache):
             return None
@@ -884,6 +891,7 @@ class _ProtocolGraphWalker:
         Returns: True if done handling succeeded
         """
         # Delegate this to the implementation.
+        assert self._impl is not None
         return self._impl.handle_done(done_required, done_received)
 
     def set_wants(self, wants) -> None:
@@ -1400,7 +1408,11 @@ class UploadArchiveHandler(Handler):
                 format = arguments[i].decode("ascii")
             else:
                 commit_sha = self.repo.refs[argument]
-                tree = cast(Tree, store[cast(Commit, store[commit_sha]).tree])
+                commit_obj = store[commit_sha]
+                assert isinstance(commit_obj, Commit)
+                tree_obj = store[commit_obj.tree]
+                assert isinstance(tree_obj, Tree)
+                tree = tree_obj
             i += 1
         self.proto.write_pkt_line(b"ACK")
         self.proto.write_pkt_line(None)

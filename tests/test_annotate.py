@@ -110,7 +110,9 @@ class UpdateLinesTestCase(TestCase):
 
     def test_update_lines_empty_new(self) -> None:
         """Test update_lines with empty new blob."""
-        old_lines: list[tuple[tuple[Any, Any], bytes]] = [(("commit1", "entry1"), b"line1")]
+        old_lines: list[tuple[tuple[Any, Any], bytes]] = [
+            (("commit1", "entry1"), b"line1")
+        ]
         new_blob = b""
         new_history_data = ("commit2", "entry2")
 
@@ -131,7 +133,9 @@ class AnnotateLinesTestCase(TestCase):
 
         shutil.rmtree(self.temp_dir)
 
-    def _make_commit(self, blob_content: bytes, message: str, parent: Optional[bytes] = None) -> bytes:
+    def _make_commit(
+        self, blob_content: bytes, message: str, parent: Optional[bytes] = None
+    ) -> bytes:
         """Helper to create a commit with a single file."""
         # Create blob
         blob = Blob()
@@ -222,7 +226,13 @@ class PorcelainAnnotateTestCase(TestCase):
 
         shutil.rmtree(self.temp_dir)
 
-    def _make_commit_with_file(self, filename: str, content: bytes, message: str, parent: Optional[bytes] = None) -> bytes:
+    def _make_commit_with_file(
+        self,
+        filename: str,
+        content: bytes,
+        message: str,
+        parent: Optional[bytes] = None,
+    ) -> bytes:
         """Helper to create a commit with a file."""
         # Create blob
         blob = Blob()
@@ -315,7 +325,13 @@ class IntegrationTestCase(TestCase):
 
         shutil.rmtree(self.temp_dir)
 
-    def _create_file_commit(self, filename: str, content: bytes, message: str, parent: Optional[bytes] = None) -> bytes:
+    def _create_file_commit(
+        self,
+        filename: str,
+        content: bytes,
+        message: str,
+        parent: Optional[bytes] = None,
+    ) -> bytes:
         """Helper to create a commit with file content."""
         # Write file to working directory
         filepath = os.path.join(self.temp_dir, filename)

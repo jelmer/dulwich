@@ -283,6 +283,7 @@ class ReportStatusParser:
 
 
 def negotiate_protocol_version(proto: Protocol) -> int:
+    """Negotiate protocol version with the server."""
     pkt = proto.read_pkt_line()
     if pkt is not None and pkt.strip() == b"version 2":
         return 2
@@ -291,6 +292,7 @@ def negotiate_protocol_version(proto: Protocol) -> int:
 
 
 def read_server_capabilities(pkt_seq: Iterable[bytes]) -> set[bytes]:
+    """Read server capabilities from packet sequence."""
     server_capabilities = []
     for pkt in pkt_seq:
         server_capabilities.append(pkt)
@@ -300,6 +302,7 @@ def read_server_capabilities(pkt_seq: Iterable[bytes]) -> set[bytes]:
 def read_pkt_refs_v2(
     pkt_seq: Iterable[bytes],
 ) -> tuple[dict[bytes, Optional[bytes]], dict[bytes, bytes], dict[bytes, bytes]]:
+    """Read references using protocol version 2."""
     refs: dict[bytes, Optional[bytes]] = {}
     symrefs = {}
     peeled = {}
@@ -325,6 +328,7 @@ def read_pkt_refs_v2(
 def read_pkt_refs_v1(
     pkt_seq: Iterable[bytes],
 ) -> tuple[dict[bytes, Optional[bytes]], set[bytes]]:
+    """Read references using protocol version 1."""
     server_capabilities = None
     refs: dict[bytes, Optional[bytes]] = {}
     # Receive refs from server
@@ -437,6 +441,7 @@ class FetchPackResult(_DeprecatedDictProxy):
         self.new_unshallow = new_unshallow
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another object."""
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
@@ -486,6 +491,7 @@ class LsRemoteResult(_DeprecatedDictProxy):
         )
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another object."""
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
@@ -526,6 +532,7 @@ class SendPackResult(_DeprecatedDictProxy):
         self.ref_status = ref_status
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another object."""
         if isinstance(other, dict):
             self._warn_deprecated()
             return self.refs == other
@@ -634,6 +641,7 @@ def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[tuple[int, byt
 def find_capability(
     capabilities: list, key: bytes, value: Optional[bytes]
 ) -> Optional[bytes]:
+    """Find a capability with a specific key and value."""
     for capability in capabilities:
         k, v = parse_capability(capability)
         if k != key:

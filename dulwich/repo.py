@@ -146,6 +146,7 @@ class InvalidUserIdentity(Exception):
     """User identity is not of the format 'user <email>'."""
 
     def __init__(self, identity: str) -> None:
+        """Initialize InvalidUserIdentity exception."""
         self.identity = identity
 
 
@@ -339,12 +340,21 @@ def _set_filesystem_hidden(path: str) -> None:
 
 
 class ParentsProvider:
+    """Provider for commit parent information."""
+
     def __init__(
         self,
         store: "BaseObjectStore",
         grafts: dict = {},
         shallows: Iterable[bytes] = [],
     ) -> None:
+        """Initialize ParentsProvider.
+
+        Args:
+            store: Object store to use
+            grafts: Graft information
+            shallows: Shallow commit SHAs
+        """
         self.store = store
         self.grafts = grafts
         self.shallows = set(shallows)
@@ -355,6 +365,7 @@ class ParentsProvider:
     def get_parents(
         self, commit_id: bytes, commit: Optional[Commit] = None
     ) -> list[bytes]:
+        """Get parents for a commit using the parents provider."""
         try:
             return self.grafts[commit_id]
         except KeyError:

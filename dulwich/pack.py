@@ -1237,6 +1237,13 @@ class PackStreamReader:
         read_some: Optional[Callable[[int], bytes]] = None,
         zlib_bufsize: int = _ZLIB_BUFSIZE,
     ) -> None:
+        """Initialize pack stream reader.
+
+        Args:
+            read_all: Function to read all requested bytes
+            read_some: Function to read some bytes (optional)
+            zlib_bufsize: Buffer size for zlib decompression
+        """
         self.read_all = read_all
         if read_some is None:
             self.read_some = read_all
@@ -1292,6 +1299,7 @@ class PackStreamReader:
 
     @property
     def offset(self) -> int:
+        """Return current offset in the stream."""
         return self._offset - self._buf_len()
 
     def read(self, size: int) -> bytes:
@@ -1595,6 +1603,7 @@ class PackData:
         self.close()
 
     def __eq__(self, other: object) -> bool:
+        """Check equality with another object."""
         if isinstance(other, PackData):
             return self.get_stored_checksum() == other.get_stored_checksum()
         return False
@@ -1620,6 +1629,7 @@ class PackData:
         return compute_file_sha(cast(IO[bytes], self._file), end_ofs=-20).digest()
 
     def iter_unpacked(self, *, include_comp: bool = False) -> Iterator[UnpackedObject]:
+        """Iterate over unpacked objects in the pack."""
         self._file.seek(self._header_size)
 
         if self._num_objects is None:
@@ -2202,9 +2212,11 @@ class SHA1Reader(BinaryIO):
         raise UnsupportedOperation("write")
 
     def writelines(self, lines: Iterable[bytes], /) -> None:  # type: ignore[override]
+        """Write multiple lines to the file (not supported)."""
         raise UnsupportedOperation("writelines")
 
     def write(self, data: bytes, /) -> int:  # type: ignore[override]
+        """Write data to the file (not supported)."""
         raise UnsupportedOperation("write")
 
     def __enter__(self) -> "SHA1Reader":
@@ -2301,6 +2313,7 @@ class SHA1Writer(BinaryIO):
         sha = self.write_sha()
 
     def close(self) -> None:
+        """Close the pack file and finalize the SHA."""
         self.digest = self.write_sha()
         self.f.close()
 

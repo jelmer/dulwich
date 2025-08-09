@@ -636,6 +636,7 @@ class AckGraphWalkerImpl:
         raise NotImplementedError
 
     def handle_done(self, done_required, done_received):
+        """Handle 'done' packet from client."""
         raise NotImplementedError
 
 

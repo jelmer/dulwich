@@ -18,6 +18,10 @@
  * Fix Windows config loading to only use current Git config path,
    avoiding loading older config files.  (Jelmer Vernooĳ, #1732)
 
+ * Add interactive rebase support with ``git rebase -i``, including support
+   for pick, reword, edit, squash, fixup, drop, exec, and break commands.
+   (Jelmer Vernooĳ, #1696)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

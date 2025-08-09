@@ -4272,7 +4272,7 @@ def merge_tree(
         return merged_tree.id, conflicts
 
 
-def cherry_pick(
+def cherry_pick(  # noqa: D417
     repo: Union[str, os.PathLike, Repo],
     committish: Union[str, bytes, Commit, Tag, None],
     no_commit=False,
@@ -4283,9 +4283,9 @@ def cherry_pick(
 
     Args:
       repo: Repository to cherry-pick into
-      committish: Commit to cherry-pick (can be None only when ``continue_`` or abort is True)
+      committish: Commit to cherry-pick (can be None only when resuming or aborting)
       no_commit: If True, do not create a commit after applying changes
-      continue_: Continue an in-progress cherry-pick after resolving conflicts
+      ``continue_``: Resume an in-progress cherry-pick after resolving conflicts if True
       abort: Abort an in-progress cherry-pick
 
     Returns:

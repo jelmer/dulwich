@@ -90,8 +90,13 @@ if TYPE_CHECKING:
 class GraphWalker(Protocol):
     """Protocol for graph walker objects."""
 
-    def __next__(self) -> Optional[bytes]: ...
-    def ack(self, sha: bytes) -> None: ...
+    def __next__(self) -> Optional[bytes]:
+        """Return the next object SHA to visit."""
+        ...
+
+    def ack(self, sha: bytes) -> None:
+        """Acknowledge that an object has been received."""
+        ...
 
 
 INFODIR = "info"
@@ -222,6 +227,7 @@ class BaseObjectStore:
     def determine_wants_all(
         self, refs: dict[Ref, ObjectID], depth: Optional[int] = None
     ) -> list[ObjectID]:
+        """Determine which objects are wanted based on refs."""
         def _want_deepen(sha: bytes) -> bool:
             if not depth:
                 return False
@@ -638,6 +644,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
     @property
     def alternates(self) -> list:
+        """Return list of alternate object stores."""
         return []
 
     def contains_packed(self, sha: bytes) -> bool:

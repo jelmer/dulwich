@@ -1834,7 +1834,9 @@ class DeltaChainIterator(Generic[T]):
     _compute_crc32 = False
     _include_comp = False
 
-    def __init__(self, file_obj: Any, *, resolve_ext_ref: Optional[Callable] = None) -> None:
+    def __init__(
+        self, file_obj: Any, *, resolve_ext_ref: Optional[Callable] = None
+    ) -> None:
         """Initialize DeltaChainIterator.
 
         Args:
@@ -1875,7 +1877,7 @@ class DeltaChainIterator(Generic[T]):
         *,
         allow_missing: bool = False,
         resolve_ext_ref: Optional[Callable] = None,
-    ) -> 'DeltaChainIterator':
+    ) -> "DeltaChainIterator":
         """Create a DeltaChainIterator for a subset of objects.
 
         Args:
@@ -2076,6 +2078,7 @@ class PackInflater(DeltaChainIterator[ShaFile]):
         Returns:
             ShaFile object from the unpacked data
         """
+
     def _result(self, unpacked: UnpackedObject) -> ShaFile:
         return unpacked.sha_file()
 
@@ -2296,6 +2299,7 @@ class SHA1Writer(BinaryIO):
             The SHA1 digest bytes
         """
         sha = self.write_sha()
+
     def close(self) -> None:
         self.digest = self.write_sha()
         self.f.close()
@@ -2375,16 +2379,22 @@ class SHA1Writer(BinaryIO):
         """
         raise UnsupportedOperation("read")
 
-    def __enter__(self) -> 'SHA1Writer':
+    def __enter__(self) -> "SHA1Writer":
         """Enter context manager."""
         return self
 
-    def __exit__(self, type: Optional[type], value: Optional[BaseException], traceback: Optional[Any]) -> None:
+    def __exit__(
+        self,
+        type: Optional[type],
+        value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> None:
         """Exit context manager and close file."""
         self.close()
 
-    def __iter__(self) -> 'SHA1Writer':
+    def __iter__(self) -> "SHA1Writer":
         """Return iterator."""
+
     def __enter__(self) -> "SHA1Writer":
         return self
 
@@ -2424,7 +2434,9 @@ class SHA1Writer(BinaryIO):
         raise UnsupportedOperation("truncate")
 
 
-def pack_object_header(type_num: int, delta_base: Optional[Any], size: int) -> bytearray:
+def pack_object_header(
+    type_num: int, delta_base: Optional[Any], size: int
+) -> bytearray:
     """Create a pack object header for the given object info.
 
     Args:
@@ -2455,7 +2467,9 @@ def pack_object_header(type_num: int, delta_base: Optional[Any], size: int) -> b
     return bytearray(header)
 
 
-def pack_object_chunks(type: int, object: ShaFile, compression_level: int = -1) -> Iterator[bytes]:
+def pack_object_chunks(
+    type: int, object: ShaFile, compression_level: int = -1
+) -> Iterator[bytes]:
     """Generate chunks for a pack object.
 
     Args:
@@ -2477,7 +2491,13 @@ def pack_object_chunks(type: int, object: ShaFile, compression_level: int = -1) 
     yield compressor.flush()
 
 
-def write_pack_object(write: Callable[[bytes], int], type: int, object: ShaFile, sha: Optional[bytes] = None, compression_level: int = -1) -> bytes:
+def write_pack_object(
+    write: Callable[[bytes], int],
+    type: int,
+    object: ShaFile,
+    sha: Optional[bytes] = None,
+    compression_level: int = -1,
+) -> bytes:
     """Write pack object to a file.
 
     Args:
@@ -3004,7 +3024,9 @@ def write_pack_data(
     return chunk_generator.entries, chunk_generator.sha1digest()
 
 
-def write_pack_index_v1(f: BinaryIO, entries: list[tuple[bytes, int, Optional[int]]], pack_checksum: bytes) -> None:
+def write_pack_index_v1(
+    f: BinaryIO, entries: list[tuple[bytes, int, Optional[int]]], pack_checksum: bytes
+) -> None:
     """Write a new pack index file.
 
     Args:
@@ -3384,7 +3406,7 @@ class Pack:
         self.resolve_ext_ref = resolve_ext_ref
 
     @classmethod
-    def from_lazy_objects(cls, data_fn: Callable, idx_fn: Callable) -> 'Pack':
+    def from_lazy_objects(cls, data_fn: Callable, idx_fn: Callable) -> "Pack":
         """Create a new pack object from callables to load pack data and index objects."""
         ret = cls("")
         ret._data_load = data_fn
@@ -3392,7 +3414,7 @@ class Pack:
         return ret
 
     @classmethod
-    def from_objects(cls, data: PackData, idx: PackIndex) -> 'Pack':
+    def from_objects(cls, data: PackData, idx: PackIndex) -> "Pack":
         """Create a new pack object from pack data and index objects."""
         ret = cls("")
         ret._data = data
@@ -3433,11 +3455,16 @@ class Pack:
         if self._idx is not None:
             self._idx.close()
 
-    def __enter__(self) -> 'Pack':
+    def __enter__(self) -> "Pack":
         """Enter context manager."""
         return self
 
-    def __exit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]) -> None:
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
         """Exit context manager."""
         self.close()
 

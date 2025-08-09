@@ -1,0 +1,51 @@
+name: Android tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  test-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
+
+      - name: Provide gpgme-config and gpg-error-config
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cp .github/gpgme-config "$HOME/.local/bin/gpgme-config"
+          cp .github/gpg-error-config "$HOME/.local/bin/gpg-error-config"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade "setuptools>=77"
+          python -m pip install --upgrade pip
+          pip install --upgrade ".[merge,fastimport,paramiko,https]" setuptools-rust
+
+      - name: Install gpg
+        run: pip install --upgrade ".[pgp]"
+
+      - name: Build
+        run: python setup.py build_ext -i
+        env:
+          RUSTFLAGS: "-D warnings"
+
+      - name: Run tests on Android Emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          script: python -m unittest tests.test_suite

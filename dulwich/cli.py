@@ -2316,6 +2316,14 @@ class cmd_rebase(Command):
             "--branch", type=str, help="Branch to rebase (default: current)"
         )
         parser.add_argument(
+            "-i", "--interactive", action="store_true", help="Interactive rebase"
+        )
+        parser.add_argument(
+            "--edit-todo",
+            action="store_true",
+            help="Edit the todo list during an interactive rebase",
+        )
+        parser.add_argument(
             "--abort", action="store_true", help="Abort an in-progress rebase"
         )
         parser.add_argument(
@@ -2341,10 +2349,33 @@ class cmd_rebase(Command):
 
         if args.continue_rebase:
             try:
-                new_shas = porcelain.rebase(
-                    ".", args.upstream or "HEAD", continue_rebase=True
-                )
-                print("Rebase complete.")
+                # Check if interactive rebase is in progress
+                if porcelain.is_interactive_rebase("."):
+                    result = porcelain.rebase(
+                        ".",
+                        args.upstream or "HEAD",
+                        continue_rebase=True,
+                        interactive=True,
+                    )
+                    if result:
+                        print("Rebase complete.")
+                    else:
+                        print("Rebase paused. Use --continue to resume.")
+                else:
+                    new_shas = porcelain.rebase(
+                        ".", args.upstream or "HEAD", continue_rebase=True
+                    )
+                    print("Rebase complete.")
+            except porcelain.Error as e:
+                print(f"Error: {e}")
+                return 1
+            return 0
+
+        if args.edit_todo:
+            # Edit todo list for interactive rebase
+            try:
+                porcelain.rebase(".", args.upstream or "HEAD", edit_todo=True)
+                print("Todo list updated.")
             except porcelain.Error as e:
                 print(f"Error: {e}")
                 return 1
@@ -2356,17 +2387,32 @@ class cmd_rebase(Command):
             return 1
 
         try:
-            new_shas = porcelain.rebase(
-                ".",
-                args.upstream,
-                onto=args.onto,
-                branch=args.branch,
-            )
-
-            if new_shas:
-                print(f"Successfully rebased {len(new_shas)} commits.")
+            if args.interactive:
+                # Interactive rebase
+                result = porcelain.rebase(
+                    ".",
+                    args.upstream,
+                    onto=args.onto,
+                    branch=args.branch,
+                    interactive=True,
+                )
+                if result:
+                    print("Interactive rebase started. Edit the todo list and save.")
+                else:
+                    print("No commits to rebase.")
             else:
-                print("Already up to date.")
+                # Regular rebase
+                new_shas = porcelain.rebase(
+                    ".",
+                    args.upstream,
+                    onto=args.onto,
+                    branch=args.branch,
+                )
+
+                if new_shas:
+                    print(f"Successfully rebased {len(new_shas)} commits.")
+                else:
+                    print("Already up to date.")
             return 0
 
         except porcelain.Error as e:

@@ -23,7 +23,6 @@ import unittest
 
 
 def test_suite() -> unittest.TestSuite:
-
     names = [
         "diffstat",
         "paramiko_vendor",

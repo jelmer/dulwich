@@ -736,7 +736,8 @@ class CommitGraphGenerationTests(unittest.TestCase):
         self.assertEqual(parents_provider.get_parents(commit1.id), [])  # type: ignore[no-untyped-call]
         self.assertEqual(parents_provider.get_parents(commit2.id), [commit1.id])  # type: ignore[no-untyped-call]
         self.assertEqual(
-            parents_provider.get_parents(commit5.id), [commit3.id, commit4.id]  # type: ignore[no-untyped-call]
+            parents_provider.get_parents(commit5.id),
+            [commit3.id, commit4.id],  # type: ignore[no-untyped-call]
         )
 
     def test_performance_with_commit_graph(self) -> None:

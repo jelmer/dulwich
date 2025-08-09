@@ -47,11 +47,11 @@ Example usage:
 import logging
 import os
 import stat
-from typing import BinaryIO, Optional, cast
+from typing import BinaryIO, Optional
 
 from .index import ConflictedIndexEntry, commit_index
 from .object_store import iter_tree_contents
-from .objects import S_ISGITLINK, Blob
+from .objects import S_ISGITLINK, Blob, Commit
 from .patch import write_blob_diff, write_object_diff
 from .repo import Repo
 
@@ -90,12 +90,16 @@ def diff_index_to_tree(
     if commit_sha is None:
         try:
             commit_sha = repo.refs[b"HEAD"]
-            old_tree = repo[commit_sha].tree
+            old_commit = repo[commit_sha]
+            assert isinstance(old_commit, Commit)
+            old_tree = old_commit.tree
         except KeyError:
             # No HEAD means no commits yet
             old_tree = None
     else:
-        old_tree = repo[commit_sha].tree
+        old_commit = repo[commit_sha]
+        assert isinstance(old_commit, Commit)
+        old_tree = old_commit.tree
 
     # Get tree from index
     index = repo.open_index()
@@ -125,7 +129,9 @@ def diff_working_tree_to_tree(
         commit_sha: SHA of commit to compare against
         paths: Optional list of paths to filter (as bytes)
     """
-    tree = repo[commit_sha].tree
+    commit = repo[commit_sha]
+    assert isinstance(commit, Commit)
+    tree = commit.tree
     normalizer = repo.get_blob_normalizer()
     filter_callback = normalizer.checkin_normalize
 
@@ -382,7 +388,7 @@ def diff_working_tree_to_index(
         old_obj = repo.object_store[old_sha]
         # Type check and cast to Blob
         if isinstance(old_obj, Blob):
-            old_blob = cast(Blob, old_obj)
+            old_blob = old_obj
         else:
             old_blob = None
 

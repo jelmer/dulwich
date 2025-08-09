@@ -165,7 +165,9 @@ def make_tag(target: ShaFile, **attrs: Any) -> Tag:
     return make_object(Tag, **all_attrs)
 
 
-def functest_builder(method: Callable[[Any, Any], None], func: Any) -> Callable[[Any], None]:
+def functest_builder(
+    method: Callable[[Any, Any], None], func: Any
+) -> Callable[[Any], None]:
     """Generate a test method that tests the given function."""
 
     def do_test(self: Any) -> None:
@@ -174,7 +176,9 @@ def functest_builder(method: Callable[[Any, Any], None], func: Any) -> Callable[
     return do_test
 
 
-def ext_functest_builder(method: Callable[[Any, Any], None], func: Any) -> Callable[[Any], None]:
+def ext_functest_builder(
+    method: Callable[[Any, Any], None], func: Any
+) -> Callable[[Any], None]:
     """Generate a test method that tests the given extension function.
 
     This is intended to generate test methods that test both a pure-Python
@@ -204,7 +208,11 @@ def ext_functest_builder(method: Callable[[Any, Any], None], func: Any) -> Calla
     return do_test
 
 
-def build_pack(f: BinaryIO, objects_spec: list[tuple[int, Any]], store: Optional[BaseObjectStore] = None) -> list[tuple[int, int, bytes, bytes, int]]:
+def build_pack(
+    f: BinaryIO,
+    objects_spec: list[tuple[int, Any]],
+    store: Optional[BaseObjectStore] = None,
+) -> list[tuple[int, int, bytes, bytes, int]]:
     """Write test pack data from a concise spec.
 
     Args:
@@ -282,7 +290,14 @@ def build_pack(f: BinaryIO, objects_spec: list[tuple[int, Any]], store: Optional
     return expected
 
 
-def build_commit_graph(object_store: BaseObjectStore, commit_spec: list[list[int]], trees: Optional[dict[int, list[Union[tuple[bytes, ShaFile], tuple[bytes, ShaFile, int]]]]] = None, attrs: Optional[dict[int, dict[str, Any]]] = None) -> list[Commit]:
+def build_commit_graph(
+    object_store: BaseObjectStore,
+    commit_spec: list[list[int]],
+    trees: Optional[
+        dict[int, list[Union[tuple[bytes, ShaFile], tuple[bytes, ShaFile, int]]]]
+    ] = None,
+    attrs: Optional[dict[int, dict[str, Any]]] = None,
+) -> list[Commit]:
     """Build a commit graph from a concise specification.
 
     Sample usage:

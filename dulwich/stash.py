@@ -23,7 +23,7 @@
 
 import os
 import sys
-from typing import TYPE_CHECKING, Optional, TypedDict
+from typing import TYPE_CHECKING, Optional, TypedDict, Union
 
 from .diff_tree import tree_changes
 from .file import GitFile
@@ -162,10 +162,16 @@ class Stash:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(source, target) -> None:  # type: ignore
-                mode = "w" + ("b" if isinstance(source, bytes) else "")
-                with open(target, mode) as f:
-                    f.write(source)
+            def symlink_fn(
+                src: Union[str, bytes, os.PathLike],
+                dst: Union[str, bytes, os.PathLike],
+                target_is_directory: bool = False,
+                *,
+                dir_fd: Optional[int] = None,
+            ) -> None:
+                mode = "w" + ("b" if isinstance(src, bytes) else "")
+                with open(dst, mode) as f:
+                    f.write(src)
 
         # Get blob normalizer for line ending conversion
         blob_normalizer = self._repo.get_blob_normalizer()

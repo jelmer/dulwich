@@ -38,8 +38,13 @@ from .pack import PackData, UnpackedObject, write_pack_data
 class PackDataLike(Protocol):
     """Protocol for objects that behave like PackData."""
 
-    def __len__(self) -> int: ...
-    def iter_unpacked(self) -> Iterator[UnpackedObject]: ...
+    def __len__(self) -> int:
+        """Return the number of objects in the pack."""
+        ...
+
+    def iter_unpacked(self) -> Iterator[UnpackedObject]:
+        """Iterate over unpacked objects in the pack."""
+        ...
 
 
 if TYPE_CHECKING:

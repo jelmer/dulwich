@@ -66,6 +66,7 @@ class SymrefLoop(Exception):
     """There is a loop between one or more symrefs."""
 
     def __init__(self, ref: bytes, depth: int) -> None:
+        """Initialize SymrefLoop exception."""
         self.ref = ref
         self.depth = depth
 
@@ -1420,6 +1421,7 @@ def write_info_refs(
 
 
 def is_local_branch(x: bytes) -> bool:
+    """Check if a ref name is a local branch."""
     return x.startswith(LOCAL_BRANCH_PREFIX)
 
 

@@ -150,6 +150,11 @@ class InvalidWants(Exception):
     """Invalid wants."""
 
     def __init__(self, wants) -> None:
+        """Initialize InvalidWants exception.
+
+        Args:
+            wants: List of invalid wants
+        """
         Exception.__init__(
             self, f"requested wants not in server provided refs: {wants!r}"
         )
@@ -159,6 +164,12 @@ class HTTPUnauthorized(Exception):
     """Raised when authentication fails."""
 
     def __init__(self, www_authenticate, url) -> None:
+        """Initialize HTTPUnauthorized exception.
+
+        Args:
+            www_authenticate: WWW-Authenticate header value
+            url: URL that requires authentication
+        """
         Exception.__init__(self, "No valid credentials provided")
         self.www_authenticate = www_authenticate
         self.url = url
@@ -168,6 +179,12 @@ class HTTPProxyUnauthorized(Exception):
     """Raised when proxy authentication fails."""
 
     def __init__(self, proxy_authenticate, url) -> None:
+        """Initialize HTTPProxyUnauthorized exception.
+
+        Args:
+            proxy_authenticate: Proxy-Authenticate header value
+            url: URL that requires proxy authentication
+        """
         Exception.__init__(self, "No valid proxy credentials provided")
         self.proxy_authenticate = proxy_authenticate
         self.url = url
@@ -211,6 +228,7 @@ class ReportStatusParser:
     """Handle status as reported by servers with 'report-status' capability."""
 
     def __init__(self) -> None:
+        """Initialize ReportStatusParser."""
         self._done = False
         self._pack_status = None
         self._ref_statuses: list[bytes] = []
@@ -409,6 +427,15 @@ class FetchPackResult(_DeprecatedDictProxy):
     def __init__(
         self, refs, symrefs, agent, new_shallow=None, new_unshallow=None
     ) -> None:
+        """Initialize FetchPackResult.
+
+        Args:
+            refs: Dictionary with all remote refs
+            symrefs: Dictionary with remote symrefs
+            agent: User agent string
+            new_shallow: New shallow commits
+            new_unshallow: New unshallow commits
+        """
         self.refs = refs
         self.symrefs = symrefs
         self.agent = agent
@@ -440,6 +467,12 @@ class LsRemoteResult(_DeprecatedDictProxy):
     """
 
     def __init__(self, refs, symrefs) -> None:
+        """Initialize LsRemoteResult.
+
+        Args:
+            refs: Dictionary with all remote refs
+            symrefs: Dictionary with remote symrefs
+        """
         self.refs = refs
         self.symrefs = symrefs
 
@@ -476,6 +509,13 @@ class SendPackResult(_DeprecatedDictProxy):
     """
 
     def __init__(self, refs, agent=None, ref_status=None) -> None:
+        """Initialize SendPackResult.
+
+        Args:
+            refs: Dictionary with all remote refs
+            agent: User agent string
+            ref_status: Optional dictionary mapping ref name to error message
+        """
         self.refs = refs
         self.agent = agent
         self.ref_status = ref_status
@@ -791,8 +831,10 @@ class GitClient:
           thin_packs: Whether or not thin packs should be retrieved
           report_activity: Optional callback for reporting transport
             activity.
+          quiet: Whether to suppress output
           include_tags: send annotated tags when sending the objects they point
             to
+          **kwargs: Additional keyword arguments
         """
         self._report_activity = report_activity
         self._report_status_parser: Optional[ReportStatusParser] = None
@@ -826,6 +868,7 @@ class GitClient:
 
         Args:
           parsedurl: Result of urlparse()
+          **kwargs: Additional keyword arguments passed to the client constructor
 
         Returns:
           A `GitClient` object
@@ -1233,6 +1276,12 @@ class TraditionalGitClient(GitClient):
     DEFAULT_ENCODING = "utf-8"
 
     def __init__(self, path_encoding=DEFAULT_ENCODING, **kwargs) -> None:
+        """Initialize a TraditionalGitClient.
+
+        Args:
+            path_encoding: Encoding for paths (default: utf-8)
+            **kwargs: Additional arguments passed to parent class
+        """
         self._remote_path_encoding = path_encoding
         super().__init__(**kwargs)
 
@@ -1559,6 +1608,18 @@ class TraditionalGitClient(GitClient):
         subdirs=None,
         prefix=None,
     ) -> None:
+        """Request an archive of a specific commit.
+
+        Args:
+            path: Repository path
+            committish: Commit ID or ref to archive
+            write_data: Function to write archive data
+            progress: Optional progress callback
+            write_error: Optional error callback
+            format: Optional archive format
+            subdirs: Optional subdirectories to include
+            prefix: Optional prefix for archived files
+        """
         proto, can_read, stderr = self._connect(b"upload-archive", path)
         with proto:
             if format is not None:
@@ -1627,13 +1688,13 @@ class TCPGitClient(TraditionalGitClient):
         return cls(parsedurl.hostname, port=parsedurl.port, **kwargs)
 
     def get_url(self, path):
-        """Get the URL for a TCP git connection.
+        r"""Get the URL for a TCP git connection.
 
         Args:
           path: Repository path
 
         Returns:
-          git:// URL for the path
+          ``git://`` URL for the path
         """
         netloc = self._host
         if self._port is not None and self._port != TCP_GIT_PORT:
@@ -1847,6 +1908,7 @@ class LocalGitClient(GitClient):
           thin_packs: Whether or not thin packs should be retrieved
           report_activity: Optional callback for reporting transport
             activity.
+          config: Optional configuration object
         """
         self._report_activity = report_activity
         # Ignore the thin_packs argument
@@ -1898,6 +1960,8 @@ class LocalGitClient(GitClient):
             Receive dict with existing remote refs, returns dict with
             changed refs (name -> sha, where sha=ZERO_SHA for deletions)
             with number of items and pack data to upload.
+          generate_pack_data: Function that generates pack data given
+            have and want object sets
           progress: Optional progress function
 
         Returns:
@@ -1979,6 +2043,8 @@ class LocalGitClient(GitClient):
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
+          protocol_version: Optional Git protocol version
+          **kwargs: Additional keyword arguments
 
         Returns:
           FetchPackResult object
@@ -2022,6 +2088,7 @@ class LocalGitClient(GitClient):
           filter_spec: A git-rev-list-style object filter spec, as bytestring.
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
+          protocol_version: Optional Git protocol version
 
         Returns:
           FetchPackResult object
@@ -2084,6 +2151,7 @@ class BundleClient(GitClient):
           thin_packs: Whether or not thin packs should be retrieved
           report_activity: Optional callback for reporting transport
             activity.
+          config: Optional configuration object
         """
         self._report_activity = report_activity
 
@@ -2383,6 +2451,11 @@ class StrangeHostname(Exception):
     """Refusing to connect to strange SSH hostname."""
 
     def __init__(self, hostname) -> None:
+        """Initialize StrangeHostname exception.
+
+        Args:
+            hostname: The strange hostname that was rejected
+        """
         super().__init__(hostname)
 
 
@@ -2400,6 +2473,21 @@ class SubprocessSSHVendor(SSHVendor):
         ssh_command=None,
         protocol_version: Optional[int] = None,
     ):
+        """Run a git command over SSH.
+
+        Args:
+            host: SSH host to connect to
+            command: Git command to run
+            username: Optional username
+            port: Optional port number
+            password: Optional password (not supported)
+            key_filename: Optional SSH key file
+            ssh_command: Optional custom SSH command
+            protocol_version: Optional Git protocol version
+
+        Returns:
+            Tuple of (subprocess.Popen, Protocol, stderr_stream)
+        """
         if password is not None:
             raise NotImplementedError(
                 "Setting password not supported by SubprocessSSHVendor."
@@ -2453,6 +2541,21 @@ class PLinkSSHVendor(SSHVendor):
         ssh_command=None,
         protocol_version: Optional[int] = None,
     ):
+        """Run a git command over SSH using PLink.
+
+        Args:
+            host: SSH host to connect to
+            command: Git command to run
+            username: Optional username
+            port: Optional port number
+            password: Optional password
+            key_filename: Optional SSH key file
+            ssh_command: Optional custom SSH command
+            protocol_version: Optional Git protocol version
+
+        Returns:
+            Tuple of (subprocess.Popen, Protocol, stderr_stream)
+        """
         if ssh_command:
             import shlex
 
@@ -2506,6 +2609,7 @@ class PLinkSSHVendor(SSHVendor):
 
 
 def ParamikoSSHVendor(**kwargs):
+    """Create a ParamikoSSHVendor (deprecated)."""
     import warnings
 
     warnings.warn(
@@ -2522,6 +2626,8 @@ get_ssh_vendor: Callable[[], SSHVendor] = SubprocessSSHVendor
 
 
 class SSHGitClient(TraditionalGitClient):
+    """Git client that connects over SSH."""
+
     def __init__(
         self,
         host,
@@ -2534,6 +2640,19 @@ class SSHGitClient(TraditionalGitClient):
         ssh_command=None,
         **kwargs,
     ) -> None:
+        """Initialize SSHGitClient.
+
+        Args:
+            host: SSH hostname
+            port: Optional SSH port
+            username: Optional username
+            vendor: Optional SSH vendor
+            config: Optional configuration
+            password: Optional password
+            key_filename: Optional SSH key file
+            ssh_command: Optional custom SSH command
+            **kwargs: Additional keyword arguments
+        """
         self.host = host
         self.port = port
         self.username = username
@@ -2566,6 +2685,7 @@ class SSHGitClient(TraditionalGitClient):
             self.ssh_vendor = get_ssh_vendor()
 
     def get_url(self, path):
+        """Get the SSH URL for a path."""
         netloc = self.host
         if self.port is not None:
             netloc += f":{self.port}"
@@ -2577,6 +2697,7 @@ class SSHGitClient(TraditionalGitClient):
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an SSHGitClient from a parsed URL."""
         return cls(
             host=parsedurl.hostname,
             port=parsedurl.port,
@@ -2636,6 +2757,7 @@ class SSHGitClient(TraditionalGitClient):
 
 
 def default_user_agent_string():
+    """Return the default user agent string for Dulwich."""
     # Start user agent with "git/", because GitHub requires this. :-( See
     # https://github.com/jelmer/dulwich/issues/562 for details.
     return "git/dulwich/{}".format(".".join([str(x) for x in dulwich.__version__]))
@@ -2655,6 +2777,9 @@ def default_urllib3_manager(
 
     Args:
       config: `dulwich.config.ConfigDict` instance with Git configuration.
+      pool_manager_cls: Pool manager class to use
+      proxy_manager_cls: Proxy manager class to use
+      base_url: Base URL for proxy bypass checks
       timeout: Timeout for HTTP requests in seconds
       override_kwargs: Additional arguments for `urllib3.ProxyManager`
 
@@ -2756,6 +2881,7 @@ def default_urllib3_manager(
 
 
 def check_for_proxy_bypass(base_url) -> bool:
+    """Check if proxy should be bypassed for the given URL."""
     # Check if a proxy bypass is defined with the no_proxy environment variable
     if base_url:  # only check if base_url is provided
         no_proxy_str = os.environ.get("no_proxy")
@@ -2819,6 +2945,7 @@ class AbstractHttpGitClient(GitClient):
     """
 
     def __init__(self, base_url, dumb=False, **kwargs) -> None:
+        """Initialize AbstractHttpGitClient."""
         self._base_url = base_url.rstrip("/") + "/"
         self.dumb = dumb
         GitClient.__init__(self, **kwargs)
@@ -2830,6 +2957,7 @@ class AbstractHttpGitClient(GitClient):
           url: Request URL.
           headers: Optional custom headers to override defaults.
           data: Request data.
+          raise_for_status: Whether to raise an exception for HTTP errors.
 
         Returns:
           Tuple (response, read), where response is an urllib3
@@ -3230,6 +3358,7 @@ class AbstractHttpGitClient(GitClient):
         return LsRemoteResult(refs, symrefs)
 
     def get_url(self, path):
+        """Get the HTTP URL for a path."""
         return self._get_url(path).rstrip("/")
 
     def _get_url(self, path):
@@ -3237,6 +3366,7 @@ class AbstractHttpGitClient(GitClient):
 
     @classmethod
     def from_parsedurl(cls, parsedurl, **kwargs):
+        """Create an AbstractHttpGitClient from a parsed URL."""
         password = parsedurl.password
         if password is not None:
             kwargs["password"] = urlunquote(password)
@@ -3246,6 +3376,7 @@ class AbstractHttpGitClient(GitClient):
         return cls(urlunparse(parsedurl), **kwargs)
 
     def __repr__(self) -> str:
+        """Return string representation of this client."""
         return f"{type(self).__name__}({self._base_url!r}, dumb={self.dumb!r})"
 
 
@@ -3262,6 +3393,8 @@ def _wrap_urllib3_exceptions(func):
 
 
 class Urllib3HttpGitClient(AbstractHttpGitClient):
+    """Git client that uses urllib3 for HTTP(S) connections."""
+
     def __init__(
         self,
         base_url,
@@ -3273,6 +3406,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         timeout=None,
         **kwargs,
     ) -> None:
+        """Initialize Urllib3HttpGitClient."""
         self._username = username
         self._password = password
         self._timeout = timeout
@@ -3389,6 +3523,7 @@ def get_transport_and_path_from_url(
       url: URL to open (a unicode string)
       config: Optional config object
       operation: Kind of operation that'll be performed; "pull" or "push"
+      **kwargs: Additional keyword arguments
 
     Keyword Args:
       thin_packs: Whether or not thin packs should be retrieved
@@ -3460,6 +3595,7 @@ def get_transport_and_path(
       location: URL or path (a string)
       config: Optional config object
       operation: Kind of operation that'll be performed; "pull" or "push"
+      **kwargs: Additional keyword arguments
 
     Keyword Args:
       thin_packs: Whether or not thin packs should be retrieved
@@ -3508,6 +3644,7 @@ DEFAULT_GIT_CREDENTIALS_PATHS = [
 def get_credentials_from_store(
     scheme, hostname, username=None, fnames=DEFAULT_GIT_CREDENTIALS_PATHS
 ):
+    """Read credentials from a Git credential store."""
     for fname in fnames:
         try:
             with open(fname, "rb") as f:

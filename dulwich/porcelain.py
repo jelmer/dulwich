@@ -4691,6 +4691,25 @@ def count_objects(repo: RepoPath = ".", verbose=False) -> CountObjectsResult:
         )
 
 
+def is_interactive_rebase(repo: Union[Repo, str]) -> bool:
+    """Check if an interactive rebase is in progress.
+
+    Args:
+      repo: Repository to check
+
+    Returns:
+      True if interactive rebase is in progress, False otherwise
+    """
+    with open_repo_closing(repo) as r:
+        state_manager = r.get_rebase_state_manager()
+        if not state_manager.exists():
+            return False
+
+        # Check if todo file exists
+        todo = state_manager.load_todo()
+        return todo is not None
+
+
 def rebase(
     repo: Union[Repo, str],
     upstream: Union[bytes, str],
@@ -4699,6 +4718,8 @@ def rebase(
     abort: bool = False,
     continue_rebase: bool = False,
     skip: bool = False,
+    interactive: bool = False,
+    edit_todo: bool = False,
 ) -> list[bytes]:
     """Rebase commits onto another branch.
 
@@ -4710,6 +4731,8 @@ def rebase(
       abort: Abort an in-progress rebase
       continue_rebase: Continue an in-progress rebase
       skip: Skip current commit and continue rebase
+      interactive: Start an interactive rebase
+      edit_todo: Edit the todo list of an interactive rebase
 
     Returns:
       List of new commit SHAs created by rebase
@@ -4717,7 +4740,17 @@ def rebase(
     Raises:
       Error: If rebase fails or conflicts occur
     """
-    from .rebase import RebaseConflict, RebaseError, Rebaser
+    from .cli import launch_editor
+    from .rebase import (
+        RebaseConflict,
+        RebaseError,
+        Rebaser,
+        process_interactive_rebase,
+        start_interactive,
+    )
+    from .rebase import (
+        edit_todo as edit_todo_func,
+    )
 
     with open_repo_closing(repo) as r:
         rebaser = Rebaser(r)
@@ -4729,17 +4762,45 @@ def rebase(
             except RebaseError as e:
                 raise Error(str(e))
 
+        if edit_todo:
+            # Edit the todo list of an interactive rebase
+            try:
+                edit_todo_func(r, launch_editor)
+                print("Todo list updated. Continue with 'rebase --continue'")
+                return []
+            except RebaseError as e:
+                raise Error(str(e))
+
         if continue_rebase:
             try:
-                result = rebaser.continue_()
-                if result is None:
-                    # Rebase complete
-                    return []
-                elif isinstance(result, tuple) and result[1]:
-                    # Still have conflicts
-                    raise Error(
-                        f"Conflicts in: {', '.join(f.decode('utf-8', 'replace') for f in result[1])}"
+                if interactive:
+                    # Continue interactive rebase
+                    is_complete, pause_reason = process_interactive_rebase(
+                        r, editor_callback=launch_editor
                     )
+                    if is_complete:
+                        return [c.id for c in rebaser._done]
+                    else:
+                        if pause_reason == "conflict":
+                            raise Error("Conflicts detected. Resolve and continue.")
+                        elif pause_reason == "edit":
+                            print("Stopped for editing. Make changes and continue.")
+                        elif pause_reason == "break":
+                            print("Rebase paused at break. Continue when ready.")
+                        else:
+                            print(f"Rebase paused: {pause_reason}")
+                        return []
+                else:
+                    # Continue regular rebase
+                    result = rebaser.continue_()
+                    if result is None:
+                        # Rebase complete
+                        return [c.id for c in rebaser._done]
+                    elif isinstance(result, tuple) and result[1]:
+                        # Still have conflicts
+                        raise Error(
+                            f"Conflicts in: {', '.join(f.decode('utf-8', 'replace') for f in result[1])}"
+                        )
             except RebaseError as e:
                 raise Error(str(e))
 
@@ -4752,17 +4813,39 @@ def rebase(
             branch = branch.encode("utf-8") if branch else None
 
         try:
-            # Start rebase
-            rebaser.start(upstream, onto, branch)
+            if interactive:
+                # Start interactive rebase
+                todo = start_interactive(r, upstream, onto, branch, launch_editor)
 
-            # Continue rebase automatically
-            result = rebaser.continue_()
-            if result is not None:
-                # Conflicts
-                raise RebaseConflict(result[1])
+                # Process the todo list
+                is_complete, pause_reason = process_interactive_rebase(
+                    r, todo, editor_callback=launch_editor
+                )
 
-            # Return the SHAs of the rebased commits
-            return [c.id for c in rebaser._done]
+                if is_complete:
+                    return [c.id for c in rebaser._done]
+                else:
+                    if pause_reason == "conflict":
+                        raise Error("Conflicts detected. Resolve and continue.")
+                    elif pause_reason == "edit":
+                        print("Stopped for editing. Make changes and continue.")
+                    elif pause_reason == "break":
+                        print("Rebase paused at break. Continue when ready.")
+                    else:
+                        print(f"Rebase paused: {pause_reason}")
+                    return []
+            else:
+                # Regular rebase
+                rebaser.start(upstream, onto, branch)
+
+                # Continue rebase automatically
+                result = rebaser.continue_()
+                if result is not None:
+                    # Conflicts
+                    raise RebaseConflict(result[1])
+
+                # Return the SHAs of the rebased commits
+                return [c.id for c in rebaser._done]
 
         except RebaseConflict as e:
             raise Error(str(e))

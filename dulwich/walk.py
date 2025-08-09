@@ -87,7 +87,9 @@ class WalkEntry:
                 parent = None
             elif len(self._get_parents(commit)) == 1:
                 changes_func = tree_changes
-                parent = cast(Commit, self._store[self._get_parents(commit)[0]]).tree
+                parent_commit = self._store[self._get_parents(commit)[0]]
+                assert isinstance(parent_commit, Commit)
+                parent = parent_commit.tree
                 if path_prefix:
                     mode, subtree_sha = parent.lookup_path(
                         self._store.__getitem__,
@@ -96,9 +98,12 @@ class WalkEntry:
                     parent = self._store[subtree_sha]
             else:
                 # For merge commits, we need to handle multiple parents differently
-                parent = [
-                    cast(Commit, self._store[p]).tree for p in self._get_parents(commit)
-                ]
+                parent_trees = []
+                for p in self._get_parents(commit):
+                    parent_commit = self._store[p]
+                    assert isinstance(parent_commit, Commit)
+                    parent_trees.append(parent_commit.tree)
+                parent = parent_trees
                 # Use a lambda to adapt the signature
                 changes_func = cast(
                     Any,
@@ -200,7 +205,9 @@ class _CommitTimeQueue:
                     # some caching (which DiskObjectStore currently does not).
                     # We could either add caching in this class or pass around
                     # parsed queue entry objects instead of commits.
-                    todo.append(cast(Commit, self._store[parent]))
+                    parent_commit = self._store[parent]
+                    assert isinstance(parent_commit, Commit)
+                    todo.append(parent_commit)
                 excluded.add(parent)
 
     def next(self) -> Optional[WalkEntry]:

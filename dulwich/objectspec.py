@@ -24,6 +24,7 @@
 from typing import TYPE_CHECKING, Optional, Union
 
 from .objects import Commit, ShaFile, Tag, Tree
+from .repo import BaseRepo
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
@@ -40,9 +41,9 @@ def to_bytes(text: Union[str, bytes]) -> bytes:
     Returns:
       Bytes representation of text
     """
-    if getattr(text, "encode", None) is not None:
-        text = text.encode("ascii")  # type: ignore
-    return text  # type: ignore
+    if isinstance(text, str):
+        return text.encode("ascii")
+    return text
 
 
 def _resolve_object(repo: "Repo", ref: bytes) -> "ShaFile":
@@ -136,7 +137,9 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
                         raise ValueError(
                             f"Commit {commit.id.decode('ascii', 'replace')} has no parents"
                         )
-                    commit = repo[commit.parents[0]]
+                    parent_obj = repo[commit.parents[0]]
+                    assert isinstance(parent_obj, Commit)
+                    commit = parent_obj
                 obj = commit
             else:  # sep == b"^"
                 # Get N-th parent (or commit itself if N=0)
@@ -157,11 +160,13 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
     return _resolve_object(repo, objectish)
 
 
-def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "Tree":
+def parse_tree(
+    repo: "BaseRepo", treeish: Union[bytes, str, Tree, Commit, Tag]
+) -> "Tree":
     """Parse a string referring to a tree.
 
     Args:
-      repo: A `Repo` object
+      repo: A repository object
       treeish: A string referring to a tree, or a Tree, Commit, or Tag object
     Returns: A Tree object
     Raises:
@@ -173,7 +178,9 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "
 
     # If it's a Commit, return its tree
     if isinstance(treeish, Commit):
-        return repo[treeish.tree]
+        tree = repo[treeish.tree]
+        assert isinstance(tree, Tree)
+        return tree
 
     # For Tag objects or strings, use the existing logic
     if isinstance(treeish, Tag):
@@ -181,7 +188,7 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "
     else:
         treeish = to_bytes(treeish)
     try:
-        treeish = parse_ref(repo, treeish)
+        treeish = parse_ref(repo.refs, treeish)
     except KeyError:  # treeish is commit sha
         pass
     try:
@@ -190,15 +197,21 @@ def parse_tree(repo: "Repo", treeish: Union[bytes, str, Tree, Commit, Tag]) -> "
         # Try parsing as commit (handles short hashes)
         try:
             commit = parse_commit(repo, treeish)
-            return repo[commit.tree]
+            assert isinstance(commit, Commit)
+            tree = repo[commit.tree]
+            assert isinstance(tree, Tree)
+            return tree
         except KeyError:
             raise KeyError(treeish)
-    if o.type_name == b"commit":
-        return repo[o.tree]
-    elif o.type_name == b"tag":
+    if isinstance(o, Commit):
+        tree = repo[o.tree]
+        assert isinstance(tree, Tree)
+        return tree
+    elif isinstance(o, Tag):
         # Tag handling - dereference and recurse
         obj_type, obj_sha = o.object
         return parse_tree(repo, obj_sha)
+    assert isinstance(o, Tree)
     return o
 
 
@@ -383,11 +396,13 @@ def scan_for_short_id(
     raise AmbiguousShortId(prefix, ret)
 
 
-def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit, Tag]) -> "Commit":
+def parse_commit(
+    repo: "BaseRepo", committish: Union[str, bytes, Commit, Tag]
+) -> "Commit":
     """Parse a string referring to a single commit.
 
     Args:
-      repo: A` Repo` object
+      repo: A repository object
       committish: A string referring to a single commit, or a Commit or Tag object.
     Returns: A Commit object
     Raises:
@@ -426,7 +441,7 @@ def parse_commit(repo: "Repo", committish: Union[str, bytes, Commit, Tag]) -> "C
     else:
         return dereference_tag(obj)
     try:
-        obj = repo[parse_ref(repo, committish)]
+        obj = repo[parse_ref(repo.refs, committish)]
     except KeyError:
         pass
     else:

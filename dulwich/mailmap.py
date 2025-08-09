@@ -26,6 +26,14 @@ from typing import IO, Optional, Union
 
 
 def parse_identity(text: bytes) -> tuple[Optional[bytes], Optional[bytes]]:
+    """Parse an identity string into name and email.
+
+    Args:
+      text: Identity string in format "Name <email>"
+
+    Returns:
+      Tuple of (name, email) where either can be None
+    """
     # TODO(jelmer): Integrate this with dulwich.fastexport.split_email and
     # dulwich.repo.check_user_identity
     (name_str, email_str) = text.rsplit(b"<", 1)
@@ -81,6 +89,11 @@ class Mailmap:
             ]
         ] = None,
     ) -> None:
+        """Initialize Mailmap.
+
+        Args:
+          map: Optional iterator of (canonical_identity, from_identity) tuples
+        """
         self._table: dict[
             tuple[Optional[bytes], Optional[bytes]],
             tuple[Optional[bytes], Optional[bytes]],
@@ -143,5 +156,13 @@ class Mailmap:
 
     @classmethod
     def from_path(cls, path: str) -> "Mailmap":
+        """Create Mailmap from file path.
+
+        Args:
+          path: Path to mailmap file
+
+        Returns:
+          Mailmap instance
+        """
         with open(path, "rb") as f:
             return cls(read_mailmap(f))

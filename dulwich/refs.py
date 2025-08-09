@@ -56,6 +56,12 @@ class SymrefLoop(Exception):
     """There is a loop between one or more symrefs."""
 
     def __init__(self, ref, depth) -> None:
+        """Initialize a SymrefLoop exception.
+
+        Args:
+          ref: The ref that caused the loop
+          depth: Depth at which the loop was detected
+        """
         self.ref = ref
         self.depth = depth
 
@@ -137,6 +143,11 @@ class RefsContainer:
     """A container for refs."""
 
     def __init__(self, logger=None) -> None:
+        """Initialize a RefsContainer.
+
+        Args:
+          logger: Optional logger for reflog updates
+        """
         self._logger = logger
 
     def _log(
@@ -169,6 +180,9 @@ class RefsContainer:
         Args:
           name: Name of the ref to set
           other: Name of the ref to point at
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message
         """
         raise NotImplementedError(self.set_symbolic_ref)
@@ -213,6 +227,17 @@ class RefsContainer:
         message: Optional[bytes] = None,
         prune: bool = False,
     ) -> None:
+        """Import refs from another repository.
+
+        Args:
+          base: Base ref to import into (e.g., b'refs/remotes/origin')
+          other: Dictionary of refs to import
+          committer: Optional committer for reflog
+          timestamp: Optional timestamp for reflog
+          timezone: Optional timezone for reflog
+          message: Optional message for reflog
+          prune: If True, remove refs not in other
+        """
         if prune:
             to_delete = set(self.subkeys(base))
         else:
@@ -237,6 +262,7 @@ class RefsContainer:
         raise NotImplementedError(self.allkeys)
 
     def __iter__(self):
+        """Iterate over all ref names."""
         return iter(self.allkeys())
 
     def keys(self, base=None):
@@ -346,6 +372,14 @@ class RefsContainer:
         return refnames, contents
 
     def __contains__(self, refname) -> bool:
+        """Check if a ref exists.
+
+        Args:
+          refname: Name of the ref to check
+
+        Returns:
+          True if the ref exists
+        """
         if self.read_ref(refname):
             return True
         return False
@@ -381,6 +415,9 @@ class RefsContainer:
           old_ref: The old sha the refname must refer to, or None to set
             unconditionally.
           new_ref: The new sha the refname will refer to.
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Message for reflog
         Returns: True if the set was successful, False otherwise.
         """
@@ -394,6 +431,10 @@ class RefsContainer:
         Args:
           name: Ref name
           ref: Ref value
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
+          message: Optional message for reflog
         """
         raise NotImplementedError(self.add_if_new)
 
@@ -434,6 +475,9 @@ class RefsContainer:
           name: The refname to delete.
           old_ref: The old sha the refname must refer to, or None to
             delete unconditionally.
+          committer: Optional committer name/email
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Message for reflog
         Returns: True if the delete was successful, False otherwise.
         """
@@ -486,18 +530,37 @@ class DictRefsContainer(RefsContainer):
     """
 
     def __init__(self, refs, logger=None) -> None:
+        """Initialize DictRefsContainer."""
         super().__init__(logger=logger)
         self._refs = refs
         self._peeled: dict[bytes, ObjectID] = {}
         self._watchers: set[Any] = set()
 
     def allkeys(self):
+        """Get all ref names.
+
+        Returns:
+          All ref names in the container
+        """
         return self._refs.keys()
 
     def read_loose_ref(self, name):
+        """Read a reference from the refs dictionary.
+
+        Args:
+          name: The ref name to read
+
+        Returns:
+          The ref value or None if not found
+        """
         return self._refs.get(name, None)
 
     def get_packed_refs(self):
+        """Get packed refs (always empty for DictRefsContainer).
+
+        Returns:
+          Empty dictionary
+        """
         return {}
 
     def _notify(self, ref, newsha) -> None:
@@ -513,6 +576,16 @@ class DictRefsContainer(RefsContainer):
         timezone=None,
         message=None,
     ) -> None:
+        """Make a ref point at another ref.
+
+        Args:
+          name: Name of the ref to set
+          other: Name of the ref to point at
+          committer: Optional committer name for reflog
+          timestamp: Optional timestamp for reflog
+          timezone: Optional timezone for reflog
+          message: Optional message for reflog
+        """
         old = self.follow(name)[-1]
         new = SYMREF + other
         self._refs[name] = new
@@ -537,6 +610,24 @@ class DictRefsContainer(RefsContainer):
         timezone=None,
         message=None,
     ) -> bool:
+        """Set a refname to new_ref only if it currently equals old_ref.
+
+        This method follows all symbolic references, and can be used to perform
+        an atomic compare-and-swap operation.
+
+        Args:
+          name: The refname to set.
+          old_ref: The old sha the refname must refer to, or None to set
+            unconditionally.
+          new_ref: The new sha the refname will refer to.
+          committer: Optional committer name for reflog
+          timestamp: Optional timestamp for reflog
+          timezone: Optional timezone for reflog
+          message: Optional message for reflog
+
+        Returns:
+          True if the set was successful, False otherwise.
+        """
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
         # Only update the specific ref requested, not the whole chain
@@ -564,6 +655,19 @@ class DictRefsContainer(RefsContainer):
         timezone=None,
         message: Optional[bytes] = None,
     ) -> bool:
+        """Add a new reference only if it does not already exist.
+
+        Args:
+          name: Ref name
+          ref: Ref value
+          committer: Optional committer name for reflog
+          timestamp: Optional timestamp for reflog
+          timezone: Optional timezone for reflog
+          message: Optional message for reflog
+
+        Returns:
+          True if the add was successful, False otherwise.
+        """
         if name in self._refs:
             return False
         self._refs[name] = ref
@@ -588,6 +692,23 @@ class DictRefsContainer(RefsContainer):
         timezone=None,
         message=None,
     ) -> bool:
+        """Remove a refname only if it currently equals old_ref.
+
+        This method does not follow symbolic references. It can be used to
+        perform an atomic compare-and-delete operation.
+
+        Args:
+          name: The refname to delete.
+          old_ref: The old sha the refname must refer to, or None to
+            delete unconditionally.
+          committer: Optional committer name for reflog
+          timestamp: Optional timestamp for reflog
+          timezone: Optional timezone for reflog
+          message: Optional message for reflog
+
+        Returns:
+          True if the delete was successful, False otherwise.
+        """
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
         try:
@@ -608,6 +729,14 @@ class DictRefsContainer(RefsContainer):
         return True
 
     def get_peeled(self, name):
+        """Get the peeled value of a ref.
+
+        Args:
+          name: Ref name to get peeled value for
+
+        Returns:
+          The peeled SHA or None if not available
+        """
         return self._peeled.get(name)
 
     def _update(self, refs) -> None:
@@ -626,21 +755,55 @@ class InfoRefsContainer(RefsContainer):
     """Refs container that reads refs from a info/refs file."""
 
     def __init__(self, f) -> None:
+        """Initialize an InfoRefsContainer.
+
+        Args:
+          f: File-like object containing info/refs data
+        """
         self._refs = {}
         self._peeled = {}
         refs = read_info_refs(f)
         (self._refs, self._peeled) = split_peeled_refs(refs)
 
     def allkeys(self):
+        """Get all ref names.
+
+        Returns:
+          All ref names in the info/refs file
+        """
         return self._refs.keys()
 
     def read_loose_ref(self, name):
+        """Read a reference from the parsed info/refs.
+
+        Args:
+          name: The ref name to read
+
+        Returns:
+          The ref value or None if not found
+        """
         return self._refs.get(name, None)
 
     def get_packed_refs(self):
+        """Get packed refs (always empty for InfoRefsContainer).
+
+        Returns:
+          Empty dictionary
+        """
         return {}
 
     def get_peeled(self, name):
+        """Get the peeled value of a ref.
+
+        Args:
+          name: Ref name to get peeled value for
+
+        Returns:
+          The peeled SHA if available, otherwise the ref value itself
+
+        Raises:
+          KeyError: If the ref doesn't exist
+        """
         try:
             return self._peeled[name]
         except KeyError:
@@ -656,6 +819,7 @@ class DiskRefsContainer(RefsContainer):
         worktree_path: Optional[Union[str, bytes, os.PathLike]] = None,
         logger=None,
     ) -> None:
+        """Initialize DiskRefsContainer."""
         super().__init__(logger=logger)
         # Convert path-like objects to strings, then to bytes for Git compatibility
         self.path = os.fsencode(os.fspath(path))
@@ -667,9 +831,18 @@ class DiskRefsContainer(RefsContainer):
         self._peeled_refs = None
 
     def __repr__(self) -> str:
+        """Return string representation of DiskRefsContainer."""
         return f"{self.__class__.__name__}({self.path!r})"
 
     def subkeys(self, base):
+        """Get all ref names under a base ref.
+
+        Args:
+          base: Base ref path to search under
+
+        Returns:
+          Set of ref names under the base (without base prefix)
+        """
         subkeys = set()
         path = self.refpath(base)
         for root, unused_dirs, files in os.walk(path):
@@ -689,6 +862,11 @@ class DiskRefsContainer(RefsContainer):
         return subkeys
 
     def allkeys(self):
+        """Get all ref names from disk.
+
+        Returns:
+          Set of all ref names (both loose and packed)
+        """
         allkeys = set()
         if os.path.exists(self.refpath(HEADREF)):
             allkeys.add(HEADREF)
@@ -870,6 +1048,9 @@ class DiskRefsContainer(RefsContainer):
         Args:
           name: Name of the ref to set
           other: Name of the ref to point at
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message to describe the change
         """
         self._check_refname(name)
@@ -914,6 +1095,9 @@ class DiskRefsContainer(RefsContainer):
           old_ref: The old sha the refname must refer to, or None to set
             unconditionally.
           new_ref: The new sha the refname will refer to.
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Set message for reflog
         Returns: True if the set was successful, False otherwise.
         """
@@ -992,6 +1176,9 @@ class DiskRefsContainer(RefsContainer):
         Args:
           name: The refname to set.
           ref: The new sha the refname will refer to.
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message for reflog
         Returns: True if the add was successful, False otherwise.
         """
@@ -1044,6 +1231,9 @@ class DiskRefsContainer(RefsContainer):
           name: The refname to delete.
           old_ref: The old sha the refname must refer to, or None to
             delete unconditionally.
+          committer: Optional committer name
+          timestamp: Optional timestamp
+          timezone: Optional timezone
           message: Optional message
         Returns: True if the delete was successful, False otherwise.
         """
@@ -1211,6 +1401,14 @@ def write_packed_refs(f, packed_refs, peeled_refs=None) -> None:
 
 
 def read_info_refs(f):
+    """Read info/refs file.
+
+    Args:
+      f: File-like object to read from
+
+    Returns:
+      Dictionary mapping ref names to SHA1s
+    """
     ret = {}
     for line in f.readlines():
         (sha, name) = line.rstrip(b"\r\n").split(b"\t", 1)
@@ -1239,6 +1437,14 @@ def write_info_refs(refs, store: ObjectContainer):
 
 
 def is_local_branch(x):
+    """Check if a ref name refers to a local branch.
+
+    Args:
+      x: Ref name to check
+
+    Returns:
+      True if ref is a local branch (refs/heads/...)
+    """
     return x.startswith(LOCAL_BRANCH_PREFIX)
 
 
@@ -1356,6 +1562,15 @@ def _import_remote_refs(
 
 
 def serialize_refs(store, refs):
+    """Serialize refs with peeled refs.
+
+    Args:
+      store: Object store to peel refs from
+      refs: Dictionary of ref names to SHAs
+
+    Returns:
+      Dictionary with refs and peeled refs (marked with ^{})
+    """
     # TODO: Avoid recursive import :(
     from .object_store import peel_sha
 
@@ -1385,6 +1600,12 @@ class locked_ref:
     """
 
     def __init__(self, refs_container: DiskRefsContainer, refname: Ref) -> None:
+        """Initialize a locked ref.
+
+        Args:
+          refs_container: The DiskRefsContainer to lock the ref in
+          refname: The ref name to lock
+        """
         self._refs_container = refs_container
         self._refname = refname
         self._file: Optional[_GitFile] = None
@@ -1392,6 +1613,14 @@ class locked_ref:
         self._deleted = False
 
     def __enter__(self) -> "locked_ref":
+        """Enter the context manager and acquire the lock.
+
+        Returns:
+          This locked_ref instance
+
+        Raises:
+          OSError: If the lock cannot be acquired
+        """
         self._refs_container._check_refname(self._refname)
         try:
             realnames, _ = self._refs_container.follow(self._refname)
@@ -1411,6 +1640,13 @@ class locked_ref:
         exc_value: Optional[BaseException],
         traceback: Optional[types.TracebackType],
     ) -> None:
+        """Exit the context manager and release the lock.
+
+        Args:
+          exc_type: Type of exception if one occurred
+          exc_value: Exception instance if one occurred
+          traceback: Traceback if an exception occurred
+        """
         if self._file:
             if exc_type is not None or self._deleted:
                 self._file.abort()

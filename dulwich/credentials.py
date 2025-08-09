@@ -35,6 +35,15 @@ from .config import ConfigDict, SectionLike
 
 
 def match_urls(url: ParseResult, url_prefix: ParseResult) -> bool:
+    """Check if a URL matches a URL prefix.
+
+    Args:
+      url: Parsed URL to check
+      url_prefix: Parsed URL prefix to match against
+
+    Returns:
+      True if url matches the prefix
+    """
     base_match = (
         url.scheme == url_prefix.scheme
         and url.hostname == url_prefix.hostname

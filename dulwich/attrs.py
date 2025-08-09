@@ -164,6 +164,11 @@ class Pattern:
     """A single gitattributes pattern."""
 
     def __init__(self, pattern: bytes):
+        """Initialize GitAttributesPattern.
+
+        Args:
+            pattern: Attribute pattern as bytes
+        """
         self.pattern = pattern
         self._regex: Optional[re.Pattern[bytes]] = None
         self._compile()

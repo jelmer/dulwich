@@ -56,10 +56,22 @@ class CommitMessageError(Exception):
 
 
 def signal_int(signal, frame) -> None:
+    """Handle interrupt signal by exiting.
+
+    Args:
+        signal: Signal number
+        frame: Current stack frame
+    """
     sys.exit(1)
 
 
 def signal_quit(signal, frame) -> None:
+    """Handle quit signal by entering debugger.
+
+    Args:
+        signal: Signal number
+        frame: Current stack frame
+    """
     import pdb
 
     pdb.set_trace()
@@ -165,6 +177,11 @@ class PagerBuffer:
     """Binary buffer wrapper for Pager to mimic sys.stdout.buffer."""
 
     def __init__(self, pager):
+        """Initialize PagerBuffer.
+
+        Args:
+            pager: Pager instance to wrap
+        """
         self.pager = pager
 
     def write(self, data: bytes):
@@ -209,6 +226,11 @@ class Pager:
     """File-like object that pages output through external pager programs."""
 
     def __init__(self, pager_cmd="cat"):
+        """Initialize Pager.
+
+        Args:
+            pager_cmd: Command to use for paging (default: "cat")
+        """
         self.pager_process = None
         self.buffer = PagerBuffer(self)
         self._closed = False
@@ -447,6 +469,11 @@ class cmd_archive(Command):
     """Create an archive of files from a named tree."""
 
     def run(self, args) -> None:
+        """Execute the archive command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--remote",
@@ -475,6 +502,11 @@ class cmd_add(Command):
     """Add file contents to the index."""
 
     def run(self, argv) -> None:
+        """Execute the add command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("path", nargs="+")
         args = parser.parse_args(argv)
@@ -491,6 +523,11 @@ class cmd_annotate(Command):
     """Annotate each line in a file with commit information."""
 
     def run(self, argv) -> None:
+        """Execute the annotate command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("path", help="Path to file to annotate")
         parser.add_argument("committish", nargs="?", help="Commit to start from")
@@ -510,6 +547,11 @@ class cmd_blame(Command):
     """Show what revision and author last modified each line of a file."""
 
     def run(self, argv) -> None:
+        """Execute the blame command.
+
+        Args:
+            argv: Command line arguments
+        """
         # blame is an alias for annotate
         cmd_annotate().run(argv)
 
@@ -518,6 +560,11 @@ class cmd_rm(Command):
     """Remove files from the working tree and from the index."""
 
     def run(self, argv) -> None:
+        """Execute the rm command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--cached", action="store_true", help="Remove from index only"
@@ -532,6 +579,11 @@ class cmd_mv(Command):
     """Move or rename a file, a directory, or a symlink."""
 
     def run(self, argv) -> None:
+        """Execute the mv command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "-f",
@@ -550,6 +602,11 @@ class cmd_fetch_pack(Command):
     """Receive missing objects from another repository."""
 
     def run(self, argv) -> None:
+        """Execute the fetch-pack command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("--all", action="store_true")
         parser.add_argument("location", nargs="?", type=str)
@@ -571,6 +628,11 @@ class cmd_fetch(Command):
     """Download objects and refs from another repository."""
 
     def run(self, args) -> None:
+        """Execute the fetch command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("location", help="Remote location to fetch from")
         args = parser.parse_args(args)
@@ -590,6 +652,11 @@ class cmd_for_each_ref(Command):
     """Output information on each ref."""
 
     def run(self, args) -> None:
+        """Execute the for-each-ref command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("pattern", type=str, nargs="?")
         args = parser.parse_args(args)
@@ -601,6 +668,11 @@ class cmd_fsck(Command):
     """Verify the connectivity and validity of objects in the database."""
 
     def run(self, args) -> None:
+        """Execute the fsck command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         for obj, msg in porcelain.fsck("."):
@@ -611,6 +683,11 @@ class cmd_log(Command):
     """Show commit logs."""
 
     def run(self, args) -> None:
+        """Execute the log command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--reverse",
@@ -641,6 +718,11 @@ class cmd_diff(Command):
     """Show changes between commits, commit and working tree, etc."""
 
     def run(self, args) -> None:
+        """Execute the diff command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "committish", nargs="*", default=[], help="Commits or refs to compare"
@@ -745,6 +827,11 @@ class cmd_dump_pack(Command):
     """Dump the contents of a pack file for debugging."""
 
     def run(self, args) -> None:
+        """Execute the dump-pack command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("filename", help="Pack file to dump")
         args = parser.parse_args(args)
@@ -768,6 +855,11 @@ class cmd_dump_index(Command):
     """Show information about a pack index file."""
 
     def run(self, args) -> None:
+        """Execute the dump-index command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("filename", help="Index file to dump")
         args = parser.parse_args(args)
@@ -782,6 +874,11 @@ class cmd_init(Command):
     """Create an empty Git repository or reinitialize an existing one."""
 
     def run(self, args) -> None:
+        """Execute the init command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--bare", action="store_true", help="Create a bare repository"
@@ -798,6 +895,11 @@ class cmd_clone(Command):
     """Clone a repository into a new directory."""
 
     def run(self, args) -> None:
+        """Execute the clone command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--bare",
@@ -899,6 +1001,11 @@ class cmd_commit(Command):
     """Record changes to the repository."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the commit command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("--message", "-m", help="Commit message")
         parser.add_argument(
@@ -951,6 +1058,11 @@ class cmd_commit_tree(Command):
     """Create a new commit object from a tree."""
 
     def run(self, args) -> None:
+        """Execute the commit-tree command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("--message", "-m", required=True, help="Commit message")
         parser.add_argument("tree", help="Tree SHA to commit")
@@ -962,6 +1074,11 @@ class cmd_update_server_info(Command):
     """Update auxiliary info file to help dumb servers."""
 
     def run(self, args) -> None:
+        """Execute the update-server-info command.
+
+        Args:
+            args: Command line arguments
+        """
         porcelain.update_server_info(".")
 
 
@@ -969,6 +1086,11 @@ class cmd_symbolic_ref(Command):
     """Read, modify and delete symbolic refs."""
 
     def run(self, args) -> None:
+        """Execute the symbolic-ref command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("name", help="Symbolic reference name")
         parser.add_argument("ref", nargs="?", help="Target reference")
@@ -1001,6 +1123,11 @@ class cmd_pack_refs(Command):
     """Pack heads and tags for efficient repository access."""
 
     def run(self, argv) -> None:
+        """Execute the pack-refs command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("--all", action="store_true")
         # ignored, we never prune
@@ -1015,6 +1142,11 @@ class cmd_show(Command):
     """Show various types of objects."""
 
     def run(self, argv) -> None:
+        """Execute the show command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("objectish", type=str, nargs="*")
         parser.add_argument(
@@ -1065,6 +1197,11 @@ class cmd_diff_tree(Command):
     """Compare the content and mode of trees."""
 
     def run(self, args) -> None:
+        """Execute the diff-tree command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("old_tree", help="Old tree SHA")
         parser.add_argument("new_tree", help="New tree SHA")
@@ -1076,6 +1213,11 @@ class cmd_rev_list(Command):
     """List commit objects in reverse chronological order."""
 
     def run(self, args) -> None:
+        """Execute the rev-list command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("commits", nargs="+", help="Commit IDs to list")
         args = parser.parse_args(args)
@@ -1086,6 +1228,11 @@ class cmd_tag(Command):
     """Create, list, delete or verify a tag object."""
 
     def run(self, args) -> None:
+        """Execute the tag command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "-a",
@@ -1107,6 +1254,11 @@ class cmd_repack(Command):
     """Pack unpacked objects in a repository."""
 
     def run(self, args) -> None:
+        """Execute the repack command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         porcelain.repack(".")
@@ -1116,6 +1268,11 @@ class cmd_reflog(Command):
     """Manage reflog information."""
 
     def run(self, args) -> None:
+        """Execute the reflog command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "ref", nargs="?", default="HEAD", help="Reference to show reflog for"
@@ -1155,6 +1312,11 @@ class cmd_reset(Command):
     """Reset current HEAD to the specified state."""
 
     def run(self, args) -> None:
+        """Execute the reset command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         mode_group = parser.add_mutually_exclusive_group()
         mode_group.add_argument(
@@ -1185,6 +1347,11 @@ class cmd_revert(Command):
     """Revert some existing commits."""
 
     def run(self, args) -> None:
+        """Execute the revert command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--no-commit",
@@ -1208,6 +1375,11 @@ class cmd_daemon(Command):
     """Run a simple Git protocol server."""
 
     def run(self, args) -> None:
+        """Execute the daemon command.
+
+        Args:
+            args: Command line arguments
+        """
         from dulwich import log_utils
 
         from .protocol import TCP_GIT_PORT
@@ -1239,6 +1411,11 @@ class cmd_web_daemon(Command):
     """Run a simple HTTP server for Git repositories."""
 
     def run(self, args) -> None:
+        """Execute the web-daemon command.
+
+        Args:
+            args: Command line arguments
+        """
         from dulwich import log_utils
 
         parser = argparse.ArgumentParser()
@@ -1268,6 +1445,11 @@ class cmd_write_tree(Command):
     """Create a tree object from the current index."""
 
     def run(self, args) -> None:
+        """Execute the write-tree command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         sys.stdout.write("{}\n".format(porcelain.write_tree(".").decode()))
@@ -1277,6 +1459,11 @@ class cmd_receive_pack(Command):
     """Receive what is pushed into the repository."""
 
     def run(self, args) -> None:
+        """Execute the receive-pack command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
         args = parser.parse_args(args)
@@ -1287,6 +1474,11 @@ class cmd_upload_pack(Command):
     """Send objects packed back to git-fetch-pack."""
 
     def run(self, args) -> None:
+        """Execute the upload-pack command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
         args = parser.parse_args(args)
@@ -1297,6 +1489,11 @@ class cmd_status(Command):
     """Show the working tree status."""
 
     def run(self, args) -> None:
+        """Execute the status command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
         args = parser.parse_args(args)
@@ -1325,6 +1522,11 @@ class cmd_ls_remote(Command):
     """List references in a remote repository."""
 
     def run(self, args) -> None:
+        """Execute the ls-remote command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--symref", action="store_true", help="Show symbolic references"
@@ -1347,6 +1549,11 @@ class cmd_ls_tree(Command):
     """List the contents of a tree object."""
 
     def run(self, args) -> None:
+        """Execute the ls-tree command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "-r",
@@ -1375,6 +1582,11 @@ class cmd_pack_objects(Command):
     """Create a packed archive of objects."""
 
     def run(self, args) -> None:
+        """Execute the pack-objects command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--stdout", action="store_true", help="Write pack to stdout"
@@ -1413,6 +1625,11 @@ class cmd_unpack_objects(Command):
     """Unpack objects from a packed archive."""
 
     def run(self, args) -> None:
+        """Execute the unpack-objects command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("pack_file", help="Pack file to unpack")
         args = parser.parse_args(args)
@@ -1425,6 +1642,11 @@ class cmd_prune(Command):
     """Prune all unreachable objects from the object database."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the prune command.
+
+        Args:
+            args: Command line arguments
+        """
         import datetime
         import time
 
@@ -1489,6 +1711,11 @@ class cmd_pull(Command):
     """Fetch from and integrate with another repository or a local branch."""
 
     def run(self, args) -> None:
+        """Execute the pull command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("from_location", type=str)
         parser.add_argument("refspec", type=str, nargs="*")
@@ -1508,6 +1735,11 @@ class cmd_push(Command):
     """Update remote refs along with associated objects."""
 
     def run(self, argv) -> Optional[int]:
+        """Execute the push command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("-f", "--force", action="store_true", help="Force")
         parser.add_argument("to_location", type=str)
@@ -1528,6 +1760,11 @@ class cmd_remote_add(Command):
     """Add a remote repository."""
 
     def run(self, args) -> None:
+        """Execute the remote-add command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("name", help="Name of the remote")
         parser.add_argument("url", help="URL of the remote")
@@ -1542,6 +1779,11 @@ class SuperCommand(Command):
     default_command: ClassVar[Optional[type[Command]]] = None
 
     def run(self, args):
+        """Execute the subcommand command.
+
+        Args:
+            args: Command line arguments
+        """
         if not args:
             if self.default_command:
                 return self.default_command().run(args)
@@ -1573,6 +1815,11 @@ class cmd_submodule_list(Command):
     """List submodules."""
 
     def run(self, argv) -> None:
+        """Execute the submodule-list command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(argv)
         for path, sha in porcelain.submodule_list("."):
@@ -1583,6 +1830,11 @@ class cmd_submodule_init(Command):
     """Initialize submodules."""
 
     def run(self, argv) -> None:
+        """Execute the submodule-init command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(argv)
         porcelain.submodule_init(".")
@@ -1592,6 +1844,11 @@ class cmd_submodule_add(Command):
     """Add a submodule."""
 
     def run(self, argv) -> None:
+        """Execute the submodule-add command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("url", help="URL of repository to add as submodule")
         parser.add_argument("path", nargs="?", help="Path where submodule should live")
@@ -1604,6 +1861,11 @@ class cmd_submodule_update(Command):
     """Update submodules."""
 
     def run(self, argv) -> None:
+        """Execute the submodule-update command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--init", action="store_true", help="Initialize submodules first"
@@ -1638,6 +1900,11 @@ class cmd_check_ignore(Command):
     """Check whether files are excluded by gitignore."""
 
     def run(self, args):
+        """Execute the check-ignore command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("paths", nargs="+", help="Paths to check")
         args = parser.parse_args(args)
@@ -1652,6 +1919,11 @@ class cmd_check_mailmap(Command):
     """Show canonical names and email addresses of contacts."""
 
     def run(self, args) -> None:
+        """Execute the check-mailmap command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("identities", nargs="+", help="Identities to check")
         args = parser.parse_args(args)
@@ -1664,6 +1936,11 @@ class cmd_branch(Command):
     """List, create, or delete branches."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the branch command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "branch",
@@ -1696,6 +1973,11 @@ class cmd_checkout(Command):
     """Switch branches or restore working tree files."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the checkout command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "target",
@@ -1733,6 +2015,11 @@ class cmd_stash_list(Command):
     """List stash entries."""
 
     def run(self, args) -> None:
+        """Execute the stash-list command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         for i, entry in porcelain.stash_list("."):
@@ -1743,6 +2030,11 @@ class cmd_stash_push(Command):
     """Save your local modifications to a new stash."""
 
     def run(self, args) -> None:
+        """Execute the stash-push command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         porcelain.stash_push(".")
@@ -1753,6 +2045,11 @@ class cmd_stash_pop(Command):
     """Apply a stash and remove it from the stash list."""
 
     def run(self, args) -> None:
+        """Execute the stash-pop command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         porcelain.stash_pop(".")
@@ -1765,6 +2062,11 @@ class cmd_bisect(SuperCommand):
     subcommands: ClassVar[dict[str, type[Command]]] = {}
 
     def run(self, args):
+        """Execute the bisect command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(prog="dulwich bisect")
         subparsers = parser.add_subparsers(dest="subcommand", help="bisect subcommands")
 
@@ -1901,6 +2203,11 @@ class cmd_ls_files(Command):
     """Show information about files in the index and working tree."""
 
     def run(self, args) -> None:
+        """Execute the ls-files command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         for name in porcelain.ls_files("."):
@@ -1911,6 +2218,11 @@ class cmd_describe(Command):
     """Give an object a human readable name based on an available ref."""
 
     def run(self, args) -> None:
+        """Execute the describe command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         print(porcelain.describe("."))
@@ -1920,6 +2232,11 @@ class cmd_merge(Command):
     """Join two or more development histories together."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the merge command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("commit", type=str, help="Commit to merge")
         parser.add_argument(
@@ -1966,6 +2283,11 @@ class cmd_notes_add(Command):
     """Add notes to a commit."""
 
     def run(self, args) -> None:
+        """Execute the notes-add command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("object", help="Object to annotate")
         parser.add_argument("-m", "--message", help="Note message", required=True)
@@ -1981,6 +2303,11 @@ class cmd_notes_show(Command):
     """Show notes for a commit."""
 
     def run(self, args) -> None:
+        """Execute the notes-show command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("object", help="Object to show notes for")
         parser.add_argument(
@@ -1999,6 +2326,11 @@ class cmd_notes_remove(Command):
     """Remove notes for a commit."""
 
     def run(self, args) -> None:
+        """Execute the notes-remove command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument("object", help="Object to remove notes from")
         parser.add_argument(
@@ -2017,6 +2349,11 @@ class cmd_notes_list(Command):
     """List all note objects."""
 
     def run(self, args) -> None:
+        """Execute the notes-list command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "--ref", default="commits", help="Notes ref (default: commits)"
@@ -2045,6 +2382,11 @@ class cmd_cherry_pick(Command):
     """Apply the changes introduced by some existing commits."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the cherry-pick command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Apply the changes introduced by some existing commits"
         )
@@ -2115,6 +2457,11 @@ class cmd_merge_tree(Command):
     """Show three-way merge without touching index."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the merge-tree command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Perform a tree-level merge without touching the working directory"
         )
@@ -2179,6 +2526,11 @@ class cmd_gc(Command):
     """Cleanup unnecessary files and optimize the local repository."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the gc command.
+
+        Args:
+            args: Command line arguments
+        """
         import datetime
         import time
 
@@ -2277,6 +2629,11 @@ class cmd_count_objects(Command):
     """Count unpacked number of objects and their disk consumption."""
 
     def run(self, args) -> None:
+        """Execute the count-objects command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "-v",
@@ -2307,6 +2664,11 @@ class cmd_rebase(Command):
     """Reapply commits on top of another base tip."""
 
     def run(self, args) -> int:
+        """Execute the rebase command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "upstream", nargs="?", help="Upstream branch to rebase onto"
@@ -2424,6 +2786,11 @@ class cmd_filter_branch(Command):
     """Rewrite branches."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the filter-branch command.
+
+        Args:
+            args: Command line arguments
+        """
         import subprocess
 
         parser = argparse.ArgumentParser(description="Rewrite branches")
@@ -2662,6 +3029,11 @@ class cmd_lfs(Command):
     """Git LFS management commands."""
 
     def run(self, argv) -> None:
+        """Execute the lfs command.
+
+        Args:
+            argv: Command line arguments
+        """
         parser = argparse.ArgumentParser(prog="dulwich lfs")
         subparsers = parser.add_subparsers(dest="subcommand", help="LFS subcommands")
 
@@ -2836,6 +3208,11 @@ class cmd_help(Command):
     """Display help information about git."""
 
     def run(self, args) -> None:
+        """Execute the help command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "-a",
@@ -2864,6 +3241,11 @@ class cmd_format_patch(Command):
     """Prepare patches for e-mail submission."""
 
     def run(self, args) -> None:
+        """Execute the format-patch command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "committish",
@@ -2918,6 +3300,11 @@ class cmd_bundle(Command):
     """Create, unpack, and manipulate bundle files."""
 
     def run(self, args) -> int:
+        """Execute the bundle command.
+
+        Args:
+            args: Command line arguments
+        """
         if not args:
             print("Usage: bundle <create|verify|list-heads|unbundle> <options>")
             return 1
@@ -3121,6 +3508,11 @@ class cmd_worktree_add(Command):
     """Add a new worktree to the repository."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the worktree-add command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Add a new worktree", prog="dulwich worktree add"
         )
@@ -3171,6 +3563,11 @@ class cmd_worktree_list(Command):
     """List details of each worktree."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the worktree-list command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="List worktrees", prog="dulwich worktree list"
         )
@@ -3223,6 +3620,11 @@ class cmd_worktree_remove(Command):
     """Remove a worktree."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the worktree-remove command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Remove a worktree", prog="dulwich worktree remove"
         )
@@ -3246,6 +3648,11 @@ class cmd_worktree_prune(Command):
     """Prune worktree information."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the worktree-prune command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Prune worktree information", prog="dulwich worktree prune"
         )
@@ -3286,6 +3693,11 @@ class cmd_worktree_lock(Command):
     """Lock a worktree."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the worktree-lock command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Lock a worktree", prog="dulwich worktree lock"
         )
@@ -3309,6 +3721,11 @@ class cmd_worktree_unlock(Command):
     """Unlock a worktree."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the worktree-unlock command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Unlock a worktree", prog="dulwich worktree unlock"
         )
@@ -3329,6 +3746,11 @@ class cmd_worktree_move(Command):
     """Move a worktree."""
 
     def run(self, args) -> Optional[int]:
+        """Execute the worktree-move command.
+
+        Args:
+            args: Command line arguments
+        """
         parser = argparse.ArgumentParser(
             description="Move a worktree", prog="dulwich worktree move"
         )
@@ -3433,6 +3855,14 @@ commands = {
 
 
 def main(argv=None) -> Optional[int]:
+    """Main entry point for the Dulwich CLI.
+
+    Args:
+        argv: Command line arguments (defaults to sys.argv[1:])
+
+    Returns:
+        Exit code or None
+    """
     if argv is None:
         argv = sys.argv[1:]
 

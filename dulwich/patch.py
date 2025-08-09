@@ -58,8 +58,12 @@ def write_commit_patch(
     """Write a individual file patch.
 
     Args:
+      f: File-like object to write to
       commit: Commit object
+      contents: Contents of the patch
       progress: tuple with current patch number and total.
+      version: Version string to include in patch header
+      encoding: Encoding to use for the patch
 
     Returns:
       tuple with filename and contents
@@ -147,8 +151,7 @@ def unified_diff(
     tree_encoding: str = "utf-8",
     output_encoding: str = "utf-8",
 ) -> Generator[bytes, None, None]:
-    """difflib.unified_diff that can detect "No newline at end of file" as
-    original "git diff" does.
+    """difflib.unified_diff that can detect "No newline at end of file" as original "git diff" does.
 
     Based on the same function in Python2.7 difflib.py
     """
@@ -197,6 +200,14 @@ def is_binary(content: bytes) -> bool:
 
 
 def shortid(hexsha: Optional[bytes]) -> bytes:
+    """Get short object ID.
+
+    Args:
+        hexsha: Full hex SHA or None
+
+    Returns:
+        7-character short ID
+    """
     if hexsha is None:
         return b"0" * 7
     else:
@@ -204,6 +215,15 @@ def shortid(hexsha: Optional[bytes]) -> bytes:
 
 
 def patch_filename(p: Optional[bytes], root: bytes) -> bytes:
+    """Generate patch filename.
+
+    Args:
+        p: Path or None
+        root: Root directory
+
+    Returns:
+        Full patch filename
+    """
     if p is None:
         return b"/dev/null"
     else:
@@ -235,6 +255,15 @@ def write_object_diff(
     patched_new_path = patch_filename(new_path, b"b")
 
     def content(mode: Optional[int], hexsha: Optional[bytes]) -> Blob:
+        """Get blob content for a file.
+
+        Args:
+            mode: File mode
+            hexsha: Object SHA
+
+        Returns:
+            Blob object
+        """
         from typing import cast
 
         if hexsha is None:
@@ -250,6 +279,14 @@ def write_object_diff(
                 return cast(Blob, Blob.from_string(obj.as_raw_string()))
 
     def lines(content: "Blob") -> list[bytes]:
+        """Split blob content into lines.
+
+        Args:
+            content: Blob content
+
+        Returns:
+            List of lines
+        """
         if not content:
             return []
         else:
@@ -338,6 +375,14 @@ def write_blob_diff(
     patched_new_path = patch_filename(new_path, b"b")
 
     def lines(blob: Optional["Blob"]) -> list[bytes]:
+        """Split blob content into lines.
+
+        Args:
+            blob: Blob object or None
+
+        Returns:
+            List of lines
+        """
         if blob is not None:
             return blob.splitlines()
         else:
@@ -368,6 +413,7 @@ def write_tree_diff(
 
     Args:
       f: File-like object to write to.
+      store: Object store to read from
       old_tree: Old tree id
       new_tree: New tree id
       diff_binary: Whether to diff files even if they

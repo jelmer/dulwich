@@ -410,6 +410,11 @@ class DumbRemoteHTTPRepo:
         return dict(self._refs)
 
     def get_head(self) -> Ref:
+        """Get the current HEAD reference.
+
+        Returns:
+          HEAD reference name or commit ID
+        """
         head_resp_bytes = self._fetch_url("HEAD")
         head_split = head_resp_bytes.replace(b"\n", b"").split(b" ")
         head_target = head_split[1] if len(head_split) > 1 else head_split[0]
@@ -445,6 +450,7 @@ class DumbRemoteHTTPRepo:
           graph_walker: GraphWalker instance (not used for dumb HTTP)
           determine_wants: Function that returns list of wanted SHAs
           progress: Optional progress callback
+          get_tagged: Whether to get tagged objects
           depth: Depth for shallow clones (not supported for dumb HTTP)
 
         Returns:

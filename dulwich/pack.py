@@ -2079,7 +2079,7 @@ class PackIndexer(DeltaChainIterator[PackIndexEntry]):
 class PackInflater(DeltaChainIterator[ShaFile]):
     """Delta chain iterator that yields ShaFile objects."""
 
-    def _result(self, unpacked: UnpackedObject) -> Any:
+    def _result(self, unpacked: UnpackedObject) -> ShaFile:
         """Convert unpacked object to ShaFile.
 
         Args:
@@ -2088,8 +2088,6 @@ class PackInflater(DeltaChainIterator[ShaFile]):
         Returns:
             ShaFile object from the unpacked data
         """
-
-    def _result(self, unpacked: UnpackedObject) -> ShaFile:
         return unpacked.sha_file()
 
 
@@ -2195,22 +2193,6 @@ class SHA1Reader(BinaryIO):
         """
         return self.f.readlines(hint)
 
-    def writelines(self, lines) -> None:
-        """Not supported for read-only file.
-
-        Raises:
-            UnsupportedOperation: Always raised
-        """
-        raise UnsupportedOperation("writelines")
-
-    def write(self, data) -> int:
-        """Not supported for read-only file.
-
-        Raises:
-            UnsupportedOperation: Always raised
-        """
-        raise UnsupportedOperation("write")
-
     def writelines(self, lines: Iterable[bytes], /) -> None:  # type: ignore[override]
         """Write multiple lines to the file (not supported)."""
         raise UnsupportedOperation("writelines")
@@ -2303,14 +2285,6 @@ class SHA1Writer(BinaryIO):
         self.f.write(sha)
         self.length += len(sha)
         return sha
-
-    def close(self) -> bytes:
-        """Close the file after writing SHA1.
-
-        Returns:
-            The SHA1 digest bytes
-        """
-        sha = self.write_sha()
 
     def close(self) -> None:
         """Close the pack file and finalize the SHA."""
@@ -2407,19 +2381,6 @@ class SHA1Writer(BinaryIO):
 
     def __iter__(self) -> "SHA1Writer":
         """Return iterator."""
-
-    def __enter__(self) -> "SHA1Writer":
-        return self
-
-    def __exit__(
-        self,
-        type: Optional[type],
-        value: Optional[BaseException],
-        traceback: Optional[TracebackType],
-    ) -> None:
-        self.close()
-
-    def __iter__(self) -> "SHA1Writer":
         return self
 
     def __next__(self) -> bytes:

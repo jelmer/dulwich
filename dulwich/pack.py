@@ -77,7 +77,14 @@ else:
     has_mmap = True
 
 if TYPE_CHECKING:
+    from typing import Protocol
     from .commit_graph import CommitGraph
+    
+    class HashObject(Protocol):
+        """Protocol for hash objects like those returned by hashlib."""
+        def update(self, data: bytes) -> None: ...
+        def digest(self) -> bytes: ...
+        def hexdigest(self) -> str: ...
 
 # For some reason the above try, except fails to set has_mmap = False for plan9
 if sys.platform == "Plan9":
@@ -1444,7 +1451,7 @@ def obj_sha(type: int, chunks: Union[bytes, Iterable[bytes]]) -> bytes:
 
 def compute_file_sha(
     f: IO[bytes], start_ofs: int = 0, end_ofs: int = 0, buffer_size: int = 1 << 16
-) -> "hashlib._Hash":
+) -> "HashObject":
     """Hash a portion of a file into a new SHA.
 
     Args:
@@ -2491,7 +2498,7 @@ def write_pack_object(
     write: Callable[[bytes], int],
     type: int,
     object: ShaFile,
-    sha: Optional[hashlib._Hash] = None,
+    sha: Optional["HashObject"] = None,
     compression_level: int = -1,
 ) -> int:
     """Write pack object to a file.

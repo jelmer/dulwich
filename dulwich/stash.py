@@ -234,7 +234,7 @@ class Stash:
                     entry.mode,
                     full_path,
                     honor_filemode=honor_filemode,
-                    symlink_fn=symlink_fn,
+                    symlink_fn=symlink_fn,  # type: ignore[arg-type]
                 )
 
             # Update index if the file wasn't already staged

@@ -43,7 +43,6 @@ try:
 except ModuleNotFoundError:
     from difflib import SequenceMatcher
 
-import hashlib
 import os
 import struct
 import sys
@@ -77,14 +76,9 @@ else:
     has_mmap = True
 
 if TYPE_CHECKING:
-    from typing import Protocol
+    from _hashlib import HASH as HashObject
+
     from .commit_graph import CommitGraph
-    
-    class HashObject(Protocol):
-        """Protocol for hash objects like those returned by hashlib."""
-        def update(self, data: bytes) -> None: ...
-        def digest(self) -> bytes: ...
-        def hexdigest(self) -> str: ...
 
 # For some reason the above try, except fails to set has_mmap = False for plan9
 if sys.platform == "Plan9":
@@ -1706,7 +1700,11 @@ class PackData:
         )
         checksum = self.calculate_checksum()
         with GitFile(filename, "wb") as f:
-            write_pack_index_v1(cast(BinaryIO, f), cast(list[tuple[bytes, int, Optional[int]]], entries), checksum)
+            write_pack_index_v1(
+                cast(BinaryIO, f),
+                cast(list[tuple[bytes, int, Optional[int]]], entries),
+                checksum,
+            )
         return checksum
 
     def create_index_v2(
@@ -1854,7 +1852,10 @@ class DeltaChainIterator(Generic[T]):
     _include_comp = False
 
     def __init__(
-        self, file_obj: Optional[BinaryIO], *, resolve_ext_ref: Optional[Callable] = None
+        self,
+        file_obj: Optional[BinaryIO],
+        *,
+        resolve_ext_ref: Optional[Callable] = None,
     ) -> None:
         """Initialize DeltaChainIterator.
 
@@ -2456,7 +2457,11 @@ def pack_object_header(
 
 
 def pack_object_chunks(
-    type: int, object: Union[ShaFile, bytes, list[bytes], tuple[Union[bytes, int], Union[bytes, list[bytes]]]], compression_level: int = -1
+    type: int,
+    object: Union[
+        ShaFile, bytes, list[bytes], tuple[Union[bytes, int], Union[bytes, list[bytes]]]
+    ],
+    compression_level: int = -1,
 ) -> Iterator[bytes]:
     """Generate chunks for a pack object.
 
@@ -2473,7 +2478,7 @@ def pack_object_chunks(
             raise TypeError("Delta types require a tuple of (delta_base, object)")
     else:
         delta_base = None
-    
+
     # Convert object to list of bytes chunks
     if isinstance(object, bytes):
         chunks = [object]
@@ -2484,7 +2489,7 @@ def pack_object_chunks(
     else:
         # Shouldn't reach here with proper typing
         raise TypeError(f"Unexpected object type: {object.__class__.__name__}")
-    
+
     yield bytes(pack_object_header(type, delta_base, sum(map(len, chunks))))
     compressor = zlib.compressobj(level=compression_level)
     for data in chunks:
@@ -3132,7 +3137,9 @@ def create_delta(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
             yield memoryview(target_buf)[o : o + s]
 
 
-def apply_delta(src_buf: Union[bytes, list[bytes]], delta: Union[bytes, list[bytes]]) -> list[bytes]:
+def apply_delta(
+    src_buf: Union[bytes, list[bytes]], delta: Union[bytes, list[bytes]]
+) -> list[bytes]:
     """Based on the similar function in git's patch-delta.c.
 
     Args:
@@ -3695,10 +3702,10 @@ class Pack:
                     chunks_bytes = chunk_data
             else:
                 chunks_bytes = chunks
-            
+
             # Apply delta and get result as list
             chunks = apply_delta(chunks_bytes, delta)
-            
+
             if prev_offset is not None:
                 self.data._offset_cache[prev_offset] = base_type, chunks
         return base_type, chunks

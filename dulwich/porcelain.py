@@ -234,6 +234,7 @@ class NoneStream(RawIOBase):
     """Fallback if stdout or stderr are unavailable, does nothing."""
 
     def read(self, size: int = -1) -> None:
+        """Read from stream (returns None as this is a null stream)."""
         return None
 
     def readall(self) -> bytes:
@@ -269,6 +270,7 @@ class Error(Exception):
     """Porcelain-based error."""
 
     def __init__(self, msg: str) -> None:
+        """Initialize Error with message."""
         super().__init__(msg)
 
 
@@ -340,7 +342,8 @@ def parse_timezone_format(tz_str: str) -> int:
 
 
 def get_user_timezones() -> tuple[int, int]:
-    """Retrieve local timezone as described in
+    """Retrieve local timezone as described in git documentation.
+
     https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
     Returns: A tuple containing author timezone, committer timezone.
     """
@@ -411,8 +414,7 @@ def path_to_tree_path(
     path: Union[str, bytes, os.PathLike],
     tree_encoding: str = DEFAULT_ENCODING,
 ) -> bytes:
-    """Convert a path to a path usable in an index, e.g. bytes and relative to
-    the repository root.
+    """Convert a path to a path usable in an index, e.g. bytes and relative to the repository root.
 
     Args:
       repopath: Repository path, absolute or relative to the cwd
@@ -462,6 +464,7 @@ class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
     def __init__(self, current_sha: bytes, new_sha: bytes) -> None:
+        """Initialize DivergedBranches error with current and new SHA values."""
         self.current_sha = current_sha
         self.new_sha = new_sha
 
@@ -554,6 +557,7 @@ def symbolic_ref(
 
 
 def pack_refs(repo: RepoPath, all: bool = False) -> None:
+    """Pack loose references into packed-refs file."""
     with open_repo_closing(repo) as repo_obj:
         repo_obj.refs.pack_refs(all=all)
 
@@ -1205,6 +1209,7 @@ move = mv
 def commit_decode(
     commit: Commit, contents: bytes, default_encoding: str = DEFAULT_ENCODING
 ) -> str:
+    """Decode commit contents using the commit's encoding or default."""
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1215,6 +1220,7 @@ def commit_decode(
 def commit_encode(
     commit: Commit, contents: str, default_encoding: str = DEFAULT_ENCODING
 ) -> bytes:
+    """Encode commit contents using the commit's encoding or default."""
     if commit.encoding:
         encoding = commit.encoding.decode("ascii")
     else:
@@ -1393,6 +1399,7 @@ def show_object(
     decode: Callable[[bytes], str],
     outstream: TextIO,
 ) -> None:
+    """Show details of a git object."""
     handlers: dict[bytes, Callable[[RepoPath, Any, Any, TextIO], None]] = {
         b"tree": show_tree,
         b"blob": show_blob,

@@ -881,7 +881,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         f = os.fdopen(fd, "w+b")
         try:
             pack_data = PackData(file=cast(_GitFile, f), filename=path)
-            indexer = PackIndexer(pack_data, resolve_ext_ref=None)
+            indexer = PackIndexer(cast(BinaryIO, pack_data._file), resolve_ext_ref=None)
             copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
             copier.verify()
             return self._complete_thin_pack(f, path, copier, indexer)

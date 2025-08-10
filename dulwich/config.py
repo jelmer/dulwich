@@ -41,14 +41,11 @@ from contextlib import suppress
 from pathlib import Path
 from typing import (
     IO,
-    Any,
-    BinaryIO,
     Callable,
     Generic,
     Optional,
     TypeVar,
     Union,
-    cast,
     overload,
 )
 
@@ -60,7 +57,7 @@ ConfigValue = Union[str, bytes, bool, int]
 logger = logging.getLogger(__name__)
 
 # Type for file opener callback
-FileOpener = Callable[[Union[str, os.PathLike]], BinaryIO]
+FileOpener = Callable[[Union[str, os.PathLike]], IO[bytes]]
 
 # Type for includeIf condition matcher
 # Takes the condition value (e.g., "main" for onbranch:main) and returns bool
@@ -194,7 +191,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
           default_factory: Optional factory function for default values
         """
         self._real: list[tuple[K, V]] = []
-        self._keyed: dict[Any, V] = {}
+        self._keyed: dict[ConfigKey, V] = {}
         self._default_factory = default_factory
 
     @classmethod
@@ -239,7 +236,31 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
 
     def keys(self) -> KeysView[K]:
         """Return a view of the dictionary's keys."""
-        return self._keyed.keys()  # type: ignore[return-value]
+        # Return a view of the original keys (not lowercased)
+        # We need to deduplicate since _real can have duplicates
+        seen = set()
+        unique_keys = []
+        for k, _ in self._real:
+            lower = lower_key(k)
+            if lower not in seen:
+                seen.add(lower)
+                unique_keys.append(k)
+        from collections.abc import KeysView as ABCKeysView
+
+        class UniqueKeysView(ABCKeysView[K]):
+            def __init__(self, keys: list[K]):
+                self._keys = keys
+
+            def __contains__(self, key: object) -> bool:
+                return key in self._keys
+
+            def __iter__(self):
+                return iter(self._keys)
+
+            def __len__(self) -> int:
+                return len(self._keys)
+
+        return UniqueKeysView(unique_keys)
 
     def items(self) -> ItemsView[K, V]:
         """Return a view of the dictionary's (key, value) pairs in insertion order."""
@@ -267,7 +288,13 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
 
     def __iter__(self) -> Iterator[K]:
         """Iterate over the dictionary's keys."""
-        return iter(self._keyed)
+        # Return iterator over original keys (not lowercased), deduplicated
+        seen = set()
+        for k, _ in self._real:
+            lower = lower_key(k)
+            if lower not in seen:
+                seen.add(lower)
+                yield k
 
     def values(self) -> ValuesView[V]:
         """Return a view of the dictionary's values."""
@@ -898,7 +925,7 @@ class ConfigFile(ConfigDict):
     @classmethod
     def from_file(
         cls,
-        f: BinaryIO,
+        f: IO[bytes],
         *,
         config_dir: Optional[str] = None,
         included_paths: Optional[set[str]] = None,
@@ -1075,8 +1102,8 @@ class ConfigFile(ConfigDict):
             opener: FileOpener
             if file_opener is None:
 
-                def opener(path: Union[str, os.PathLike]) -> BinaryIO:
-                    return cast(BinaryIO, GitFile(path, "rb"))
+                def opener(path: Union[str, os.PathLike]) -> IO[bytes]:
+                    return GitFile(path, "rb")
             else:
                 opener = file_opener
 
@@ -1236,8 +1263,8 @@ class ConfigFile(ConfigDict):
         opener: FileOpener
         if file_opener is None:
 
-            def opener(p: Union[str, os.PathLike]) -> BinaryIO:
-                return cast(BinaryIO, GitFile(p, "rb"))
+            def opener(p: Union[str, os.PathLike]) -> IO[bytes]:
+                return GitFile(p, "rb")
         else:
             opener = file_opener
 

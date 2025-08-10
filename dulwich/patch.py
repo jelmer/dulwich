@@ -30,6 +30,7 @@ import time
 from collections.abc import Generator
 from difflib import SequenceMatcher
 from typing import (
+    IO,
     TYPE_CHECKING,
     BinaryIO,
     Optional,
@@ -48,7 +49,7 @@ FIRST_FEW_BYTES = 8000
 
 
 def write_commit_patch(
-    f: BinaryIO,
+    f: IO[bytes],
     commit: "Commit",
     contents: Union[str, bytes],
     progress: tuple[int, int],
@@ -231,7 +232,7 @@ def patch_filename(p: Optional[bytes], root: bytes) -> bytes:
 
 
 def write_object_diff(
-    f: BinaryIO,
+    f: IO[bytes],
     store: "BaseObjectStore",
     old_file: tuple[Optional[bytes], Optional[int], Optional[bytes]],
     new_file: tuple[Optional[bytes], Optional[int], Optional[bytes]],
@@ -264,19 +265,17 @@ def write_object_diff(
         Returns:
             Blob object
         """
-        from typing import cast
-
         if hexsha is None:
-            return cast(Blob, Blob.from_string(b""))
+            return Blob.from_string(b"")
         elif mode is not None and S_ISGITLINK(mode):
-            return cast(Blob, Blob.from_string(b"Subproject commit " + hexsha + b"\n"))
+            return Blob.from_string(b"Subproject commit " + hexsha + b"\n")
         else:
             obj = store[hexsha]
             if isinstance(obj, Blob):
                 return obj
             else:
                 # Fallback for non-blob objects
-                return cast(Blob, Blob.from_string(obj.as_raw_string()))
+                return Blob.from_string(obj.as_raw_string())
 
     def lines(content: "Blob") -> list[bytes]:
         """Split blob content into lines.
@@ -356,7 +355,7 @@ def gen_diff_header(
 
 # TODO(jelmer): Support writing unicode, rather than bytes.
 def write_blob_diff(
-    f: BinaryIO,
+    f: IO[bytes],
     old_file: tuple[Optional[bytes], Optional[int], Optional["Blob"]],
     new_file: tuple[Optional[bytes], Optional[int], Optional["Blob"]],
 ) -> None:
@@ -403,7 +402,7 @@ def write_blob_diff(
 
 
 def write_tree_diff(
-    f: BinaryIO,
+    f: IO[bytes],
     store: "BaseObjectStore",
     old_tree: Optional[bytes],
     new_tree: Optional[bytes],

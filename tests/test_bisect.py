@@ -36,19 +36,19 @@ from . import TestCase
 class BisectStateTests(TestCase):
     """Tests for BisectState class."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.test_dir = tempfile.mkdtemp()
         self.repo = porcelain.init(self.test_dir)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)
 
-    def test_is_active_false(self):
+    def test_is_active_false(self) -> None:
         """Test is_active when no bisect session is active."""
         state = BisectState(self.repo)
         self.assertFalse(state.is_active)
 
-    def test_start_bisect(self):
+    def test_start_bisect(self) -> None:
         """Test starting a bisect session."""
         # Create at least one commit so HEAD exists
         c1 = make_commit(id=b"1" * 40, message=b"initial commit")
@@ -73,7 +73,7 @@ class BisectStateTests(TestCase):
             os.path.exists(os.path.join(self.repo.controldir(), "BISECT_LOG"))
         )
 
-    def test_start_bisect_no_head(self):
+    def test_start_bisect_no_head(self) -> None:
         """Test starting a bisect session when repository has no HEAD."""
         state = BisectState(self.repo)
 
@@ -81,7 +81,7 @@ class BisectStateTests(TestCase):
             state.start()
         self.assertIn("Cannot start bisect: repository has no HEAD", str(cm.exception))
 
-    def test_start_bisect_already_active(self):
+    def test_start_bisect_already_active(self) -> None:
         """Test starting a bisect session when one is already active."""
         # Create at least one commit so HEAD exists
         c1 = make_commit(id=b"1" * 40, message=b"initial commit")
@@ -94,28 +94,28 @@ class BisectStateTests(TestCase):
         with self.assertRaises(ValueError):
             state.start()
 
-    def test_mark_bad_no_session(self):
+    def test_mark_bad_no_session(self) -> None:
         """Test marking bad commit when no session is active."""
         state = BisectState(self.repo)
 
         with self.assertRaises(ValueError):
             state.mark_bad()
 
-    def test_mark_good_no_session(self):
+    def test_mark_good_no_session(self) -> None:
         """Test marking good commit when no session is active."""
         state = BisectState(self.repo)
 
         with self.assertRaises(ValueError):
             state.mark_good()
 
-    def test_reset_no_session(self):
+    def test_reset_no_session(self) -> None:
         """Test resetting when no session is active."""
         state = BisectState(self.repo)
 
         with self.assertRaises(ValueError):
             state.reset()
 
-    def test_bisect_workflow(self):
+    def test_bisect_workflow(self) -> None:
         """Test a complete bisect workflow."""
         # Create some commits
         c1 = make_commit(id=b"1" * 40, message=b"good commit 1")
@@ -163,7 +163,7 @@ class BisectStateTests(TestCase):
 class BisectPorcelainTests(TestCase):
     """Tests for porcelain bisect functions."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.test_dir = tempfile.mkdtemp()
         self.repo = porcelain.init(self.test_dir)
 
@@ -191,10 +191,10 @@ class BisectPorcelainTests(TestCase):
         self.repo.refs[b"HEAD"] = self.c4.id
         self.repo.refs[b"refs/heads/master"] = self.c4.id
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)
 
-    def test_bisect_start(self):
+    def test_bisect_start(self) -> None:
         """Test bisect_start porcelain function."""
         porcelain.bisect_start(self.test_dir)
 
@@ -203,7 +203,7 @@ class BisectPorcelainTests(TestCase):
             os.path.exists(os.path.join(self.repo.controldir(), "BISECT_START"))
         )
 
-    def test_bisect_bad_good(self):
+    def test_bisect_bad_good(self) -> None:
         """Test marking commits as bad and good."""
         porcelain.bisect_start(self.test_dir)
         porcelain.bisect_bad(self.test_dir, self.c4.id.decode("ascii"))
@@ -226,7 +226,7 @@ class BisectPorcelainTests(TestCase):
             )
         )
 
-    def test_bisect_log(self):
+    def test_bisect_log(self) -> None:
         """Test getting bisect log."""
         porcelain.bisect_start(self.test_dir)
         porcelain.bisect_bad(self.test_dir, self.c4.id.decode("ascii"))
@@ -238,7 +238,7 @@ class BisectPorcelainTests(TestCase):
         self.assertIn("git bisect bad", log)
         self.assertIn("git bisect good", log)
 
-    def test_bisect_reset(self):
+    def test_bisect_reset(self) -> None:
         """Test resetting bisect state."""
         porcelain.bisect_start(self.test_dir)
         porcelain.bisect_bad(self.test_dir)

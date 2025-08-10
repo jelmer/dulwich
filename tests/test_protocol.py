@@ -36,10 +36,10 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
-    filter_ref_prefix,
     pkt_line,
     pkt_seq,
 )
+from dulwich.refs import filter_ref_prefix
 
 from . import TestCase
 

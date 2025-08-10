@@ -27,8 +27,9 @@ Python's difflib.
 """
 
 import difflib
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional
 
+from dulwich.objects import Blob
 from dulwich.walk import (
     ORDER_DATE,
     Walker,
@@ -37,7 +38,7 @@ from dulwich.walk import (
 if TYPE_CHECKING:
     from dulwich.diff_tree import TreeChange, TreeEntry
     from dulwich.object_store import BaseObjectStore
-    from dulwich.objects import Blob, Commit
+    from dulwich.objects import Commit
 
 # Walk over ancestry graph breadth-first
 # When checking each revision, find lines that according to difflib.Differ()
@@ -108,7 +109,7 @@ def annotate_lines(
 
     lines_annotated: list[tuple[tuple[Commit, TreeEntry], bytes]] = []
     for commit, entry in reversed(revs):
-        lines_annotated = update_lines(
-            lines_annotated, (commit, entry), cast("Blob", store[entry.sha])
-        )
+        blob_obj = store[entry.sha]
+        assert isinstance(blob_obj, Blob)
+        lines_annotated = update_lines(lines_annotated, (commit, entry), blob_obj)
     return lines_annotated

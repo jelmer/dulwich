@@ -38,7 +38,7 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
-from typing import ClassVar
+from typing import ClassVar, Optional
 from unittest import SkipTest, expectedFailure, skipIf
 from unittest import TestCase as _TestCase
 
@@ -49,7 +49,7 @@ class TestCase(_TestCase):
         self.overrideEnv("HOME", "/nonexistent")
         self.overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 
-    def overrideEnv(self, name, value) -> None:
+    def overrideEnv(self, name: str, value: Optional[str]) -> None:
         def restore() -> None:
             if oldval is not None:
                 os.environ[name] = oldval
@@ -74,7 +74,7 @@ class BlackboxTestCase(TestCase):
         "/usr/local/bin",
     ]
 
-    def bin_path(self, name):
+    def bin_path(self, name: str) -> str:
         """Determine the full path of a binary.
 
         Args:
@@ -88,7 +88,7 @@ class BlackboxTestCase(TestCase):
         else:
             raise SkipTest(f"Unable to find binary {name}")
 
-    def run_command(self, name, args):
+    def run_command(self, name: str, args: list[str]) -> subprocess.Popen[bytes]:
         """Run a Dulwich command.
 
         Args:
@@ -113,7 +113,7 @@ class BlackboxTestCase(TestCase):
         )
 
 
-def self_test_suite():
+def self_test_suite() -> unittest.TestSuite:
     names = [
         "annotate",
         "archive",
@@ -181,7 +181,7 @@ def self_test_suite():
     return loader.loadTestsFromNames(module_names)
 
 
-def tutorial_test_suite():
+def tutorial_test_suite() -> unittest.TestSuite:
     tutorial = [
         "introduction",
         "file-format",
@@ -194,7 +194,7 @@ def tutorial_test_suite():
 
     to_restore = []
 
-    def overrideEnv(name, value) -> None:
+    def overrideEnv(name: str, value: Optional[str]) -> None:
         oldval = os.environ.get(name)
         if value is not None:
             os.environ[name] = value
@@ -202,17 +202,17 @@ def tutorial_test_suite():
             del os.environ[name]
         to_restore.append((name, oldval))
 
-    def setup(test) -> None:
-        test.__old_cwd = os.getcwd()
-        test.tempdir = tempfile.mkdtemp()
-        test.globs.update({"tempdir": test.tempdir})
-        os.chdir(test.tempdir)
+    def setup(test: doctest.DocTest) -> None:
+        test.__old_cwd = os.getcwd()  # type: ignore[attr-defined]
+        test.tempdir = tempfile.mkdtemp()  # type: ignore[attr-defined]
+        test.globs.update({"tempdir": test.tempdir})  # type: ignore[attr-defined]
+        os.chdir(test.tempdir)  # type: ignore[attr-defined]
         overrideEnv("HOME", "/nonexistent")
         overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
 
-    def teardown(test) -> None:
-        os.chdir(test.__old_cwd)
-        shutil.rmtree(test.tempdir)
+    def teardown(test: doctest.DocTest) -> None:
+        os.chdir(test.__old_cwd)  # type: ignore[attr-defined]
+        shutil.rmtree(test.tempdir)  # type: ignore[attr-defined]
         for name, oldval in to_restore:
             if oldval is not None:
                 os.environ[name] = oldval
@@ -229,7 +229,7 @@ def tutorial_test_suite():
     )
 
 
-def nocompat_test_suite():
+def nocompat_test_suite() -> unittest.TestSuite:
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
     result.addTests(tutorial_test_suite())
@@ -239,7 +239,7 @@ def nocompat_test_suite():
     return result
 
 
-def compat_test_suite():
+def compat_test_suite() -> unittest.TestSuite:
     result = unittest.TestSuite()
     from .compat import test_suite as compat_test_suite
 
@@ -247,7 +247,7 @@ def compat_test_suite():
     return result
 
 
-def test_suite():
+def test_suite() -> unittest.TestSuite:
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
     if sys.platform != "win32":

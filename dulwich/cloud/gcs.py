@@ -24,22 +24,33 @@
 
 import posixpath
 import tempfile
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from ..object_store import BucketBasedObjectStore
-from ..pack import PACK_SPOOL_FILE_MAX_SIZE, Pack, PackData, load_pack_index_file
+from ..pack import (
+    PACK_SPOOL_FILE_MAX_SIZE,
+    Pack,
+    PackData,
+    PackIndex,
+    load_pack_index_file,
+)
+
+if TYPE_CHECKING:
+    from google.cloud.storage import Bucket
 
 # TODO(jelmer): For performance, read ranges?
 
 
 class GcsObjectStore(BucketBasedObjectStore):
-    """Object store implementation for Google Cloud Storage."""
+    """Object store implementation using Google Cloud Storage."""
 
-    def __init__(self, bucket, subpath="") -> None:
-        """Initialize GcsObjectStore.
+    def __init__(self, bucket: "Bucket", subpath: str = "") -> None:
+        """Initialize GCS object store.
 
         Args:
-          bucket: GCS bucket instance
-          subpath: Subpath within the bucket
+            bucket: GCS bucket instance
+            subpath: Optional subpath within the bucket
         """
         super().__init__()
         self.bucket = bucket
@@ -49,13 +60,13 @@ class GcsObjectStore(BucketBasedObjectStore):
         """Return string representation of GcsObjectStore."""
         return f"{type(self).__name__}({self.bucket!r}, subpath={self.subpath!r})"
 
-    def _remove_pack(self, name) -> None:
+    def _remove_pack_by_name(self, name: str) -> None:
         self.bucket.delete_blobs(
             [posixpath.join(self.subpath, name) + "." + ext for ext in ["pack", "idx"]]
         )
 
-    def _iter_pack_names(self):
-        packs = {}
+    def _iter_pack_names(self) -> Iterator[str]:
+        packs: dict[str, set[str]] = {}
         for blob in self.bucket.list_blobs(prefix=self.subpath):
             name, ext = posixpath.splitext(posixpath.basename(blob.name))
             packs.setdefault(name, set()).add(ext)
@@ -63,26 +74,32 @@ class GcsObjectStore(BucketBasedObjectStore):
             if exts == {".pack", ".idx"}:
                 yield name
 
-    def _load_pack_data(self, name):
+    def _load_pack_data(self, name: str) -> PackData:
         b = self.bucket.blob(posixpath.join(self.subpath, name + ".pack"))
+        from typing import cast
+
+        from ..file import _GitFile
+
         f = tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE)
         b.download_to_file(f)
         f.seek(0)
-        return PackData(name + ".pack", f)
+        return PackData(name + ".pack", cast(_GitFile, f))
 
-    def _load_pack_index(self, name):
+    def _load_pack_index(self, name: str) -> PackIndex:
         b = self.bucket.blob(posixpath.join(self.subpath, name + ".idx"))
         f = tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE)
         b.download_to_file(f)
         f.seek(0)
         return load_pack_index_file(name + ".idx", f)
 
-    def _get_pack(self, name):
-        return Pack.from_lazy_objects(
+    def _get_pack(self, name: str) -> Pack:
+        return Pack.from_lazy_objects(  # type: ignore[no-untyped-call]
             lambda: self._load_pack_data(name), lambda: self._load_pack_index(name)
         )
 
-    def _upload_pack(self, basename, pack_file, index_file) -> None:
+    def _upload_pack(
+        self, basename: str, pack_file: BinaryIO, index_file: BinaryIO
+    ) -> None:
         idxblob = self.bucket.blob(posixpath.join(self.subpath, basename + ".idx"))
         datablob = self.bucket.blob(posixpath.join(self.subpath, basename + ".pack"))
         idxblob.upload_from_file(index_file)

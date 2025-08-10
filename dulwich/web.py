@@ -26,9 +26,10 @@ import os
 import re
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from io import BytesIO
-from typing import BinaryIO, Callable, ClassVar, Optional, cast
+from types import TracebackType
+from typing import Any, BinaryIO, Callable, ClassVar, Optional, Union, cast
 from urllib.parse import parse_qs
 from wsgiref.simple_server import (
     ServerHandler,
@@ -36,6 +37,45 @@ from wsgiref.simple_server import (
     WSGIServer,
     make_server,
 )
+
+# wsgiref.types was added in Python 3.11
+if sys.version_info >= (3, 11):
+    from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
+else:
+    # Fallback type definitions for Python < 3.11
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        # For type checking, use the _typeshed types if available
+        try:
+            from _typeshed.wsgi import StartResponse, WSGIApplication, WSGIEnvironment
+        except ImportError:
+            # Define our own protocol types for type checking
+            from typing import Protocol
+
+            class StartResponse(Protocol):  # type: ignore[no-redef]
+                """WSGI start_response callable protocol."""
+
+                def __call__(
+                    self,
+                    status: str,
+                    response_headers: list[tuple[str, str]],
+                    exc_info: Optional[
+                        tuple[type, BaseException, TracebackType]
+                    ] = None,
+                ) -> Callable[[bytes], None]:
+                    """Start the response with status and headers."""
+                    ...
+
+            WSGIEnvironment = dict[str, Any]  # type: ignore[misc]
+            WSGIApplication = Callable[  # type: ignore[misc]
+                [WSGIEnvironment, StartResponse], Iterable[bytes]
+            ]
+    else:
+        # At runtime, just use type aliases since these are only for type hints
+        StartResponse = Any
+        WSGIEnvironment = dict[str, Any]
+        WSGIApplication = Callable
 
 from dulwich import log_utils
 
@@ -45,6 +85,7 @@ from .server import (
     DEFAULT_HANDLERS,
     Backend,
     DictBackend,
+    Handler,
     generate_info_refs,
     generate_objects_info_packs,
 )
@@ -292,13 +333,21 @@ def get_info_refs(
         yield req.not_found(str(e))
         return
     if service and not req.dumb:
+        if req.handlers is None:
+            yield req.forbidden("No handlers configured")
+            return
         handler_cls = req.handlers.get(service.encode("ascii"), None)
         if handler_cls is None:
             yield req.forbidden("Unsupported service")
             return
         req.nocache()
         write = req.respond(HTTP_OK, f"application/x-{service}-advertisement")
-        proto = ReceivableProtocol(BytesIO().read, write)
+
+        def write_fn(data: bytes) -> Optional[int]:
+            result = write(data)
+            return len(data) if result is not None else None
+
+        proto = ReceivableProtocol(BytesIO().read, write_fn)
         handler = handler_cls(
             backend,
             [url_prefix(mat)],
@@ -425,6 +474,9 @@ def handle_service_request(
     """
     service = mat.group().lstrip("/")
     logger.info("Handling service request for %s", service)
+    if req.handlers is None:
+        yield req.forbidden("No handlers configured")
+        return
     handler_cls = req.handlers.get(service.encode("ascii"), None)
     if handler_cls is None:
         yield req.forbidden("Unsupported service")
@@ -436,11 +488,16 @@ def handle_service_request(
         return
     req.nocache()
     write = req.respond(HTTP_OK, f"application/x-{service}-result")
+
+    def write_fn(data: bytes) -> Optional[int]:
+        result = write(data)
+        return len(data) if result is not None else None
+
     if req.environ.get("HTTP_TRANSFER_ENCODING") == "chunked":
         read = ChunkReader(req.environ["wsgi.input"]).read
     else:
         read = req.environ["wsgi.input"].read
-    proto = ReceivableProtocol(read, write)
+    proto = ReceivableProtocol(read, write_fn)
     # TODO(jelmer): Find a way to pass in repo, rather than having handler_cls
     # reopen.
     handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
@@ -455,7 +512,11 @@ class HTTPGitRequest:
     """
 
     def __init__(
-        self, environ, start_response, dumb: bool = False, handlers=None
+        self,
+        environ: WSGIEnvironment,
+        start_response: StartResponse,
+        dumb: bool = False,
+        handlers: Optional[dict[bytes, Callable]] = None,
     ) -> None:
         """Initialize HTTPGitRequest.
 
@@ -472,7 +533,7 @@ class HTTPGitRequest:
         self._cache_headers: list[tuple[str, str]] = []
         self._headers: list[tuple[str, str]] = []
 
-    def add_header(self, name, value) -> None:
+    def add_header(self, name: str, value: str) -> None:
         """Add a header to the response."""
         self._headers.append((name, value))
 
@@ -481,7 +542,7 @@ class HTTPGitRequest:
         status: str = HTTP_OK,
         content_type: Optional[str] = None,
         headers: Optional[list[tuple[str, str]]] = None,
-    ):
+    ) -> Callable[[bytes], object]:
         """Begin a response with the given status and other headers."""
         if headers:
             self._headers.extend(headers)
@@ -556,7 +617,11 @@ class HTTPGitApplication:
     }
 
     def __init__(
-        self, backend, dumb: bool = False, handlers=None, fallback_app=None
+        self,
+        backend: Backend,
+        dumb: bool = False,
+        handlers: Optional[dict[bytes, Callable]] = None,
+        fallback_app: Optional[WSGIApplication] = None,
     ) -> None:
         """Initialize HTTPGitApplication.
 
@@ -568,12 +633,18 @@ class HTTPGitApplication:
         """
         self.backend = backend
         self.dumb = dumb
-        self.handlers = dict(DEFAULT_HANDLERS)
+        self.handlers: dict[bytes, Union[type[Handler], Callable[..., Any]]] = dict(
+            DEFAULT_HANDLERS
+        )
         self.fallback_app = fallback_app
         if handlers is not None:
             self.handlers.update(handlers)
 
-    def __call__(self, environ, start_response):
+    def __call__(
+        self,
+        environ: WSGIEnvironment,
+        start_response: StartResponse,
+    ) -> Iterable[bytes]:
         """Handle WSGI request."""
         path = environ["PATH_INFO"]
         method = environ["REQUEST_METHOD"]
@@ -582,6 +653,7 @@ class HTTPGitApplication:
         )
         # environ['QUERY_STRING'] has qs args
         handler = None
+        mat = None
         for smethod, spath in self.services.keys():
             if smethod != method:
                 continue
@@ -590,7 +662,7 @@ class HTTPGitApplication:
                 handler = self.services[smethod, spath]
                 break
 
-        if handler is None:
+        if handler is None or mat is None:
             if self.fallback_app is not None:
                 return self.fallback_app(environ, start_response)
             else:
@@ -602,12 +674,16 @@ class HTTPGitApplication:
 class GunzipFilter:
     """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application."""
 
-    def __init__(self, application) -> None:
-        """Initialize GunzipFilter."""
+    def __init__(self, application: WSGIApplication) -> None:
+        """Initialize GunzipFilter with WSGI application."""
         self.app = application
 
-    def __call__(self, environ, start_response):
-        """Handle WSGI request."""
+    def __call__(
+        self,
+        environ: WSGIEnvironment,
+        start_response: StartResponse,
+    ) -> Iterable[bytes]:
+        """Handle WSGI request with gzip decompression."""
         import gzip
 
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
@@ -615,8 +691,7 @@ class GunzipFilter:
                 filename=None, fileobj=environ["wsgi.input"], mode="rb"
             )
             del environ["HTTP_CONTENT_ENCODING"]
-            if "CONTENT_LENGTH" in environ:
-                del environ["CONTENT_LENGTH"]
+            environ.pop("CONTENT_LENGTH", None)
 
         return self.app(environ, start_response)
 
@@ -624,12 +699,16 @@ class GunzipFilter:
 class LimitedInputFilter:
     """WSGI middleware that limits the input length of a request to that specified in Content-Length."""
 
-    def __init__(self, application) -> None:
-        """Initialize LimitedInputFilter."""
+    def __init__(self, application: WSGIApplication) -> None:
+        """Initialize LimitedInputFilter with WSGI application."""
         self.app = application
 
-    def __call__(self, environ, start_response):
-        """Handle WSGI request."""
+    def __call__(
+        self,
+        environ: WSGIEnvironment,
+        start_response: StartResponse,
+    ) -> Iterable[bytes]:
+        """Handle WSGI request with input length limiting."""
         # This is not necessary if this app is run from a conforming WSGI
         # server. Unfortunately, there's no way to tell that at this point.
         # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
@@ -642,9 +721,19 @@ class LimitedInputFilter:
         return self.app(environ, start_response)
 
 
-def make_wsgi_chain(*args, **kwargs):
-    """Factory function to create an instance of HTTPGitApplication, correctly wrapped with needed middleware."""
-    app = HTTPGitApplication(*args, **kwargs)
+def make_wsgi_chain(
+    backend: Backend,
+    dumb: bool = False,
+    handlers: Optional[dict[bytes, Callable[..., Any]]] = None,
+    fallback_app: Optional[WSGIApplication] = None,
+) -> WSGIApplication:
+    """Factory function to create an instance of HTTPGitApplication.
+
+    Correctly wrapped with needed middleware.
+    """
+    app = HTTPGitApplication(
+        backend, dumb=dumb, handlers=handlers, fallback_app=fallback_app
+    )
     wrapped_app = LimitedInputFilter(GunzipFilter(app))
     return wrapped_app
 
@@ -652,64 +741,52 @@ def make_wsgi_chain(*args, **kwargs):
 class ServerHandlerLogger(ServerHandler):
     """ServerHandler that uses dulwich's logger for logging exceptions."""
 
-    def log_exception(self, exc_info) -> None:
-        """Log an exception using dulwich's logger.
-
-        Args:
-          exc_info: Exception information tuple
-        """
+    def log_exception(
+        self,
+        exc_info: Union[
+            tuple[type[BaseException], BaseException, TracebackType],
+            tuple[None, None, None],
+            None,
+        ],
+    ) -> None:
+        """Log exception using dulwich logger."""
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
-    def log_message(self, format, *args) -> None:
-        """Log a message using dulwich's logger.
-
-        Args:
-          format: Format string for the message
-          *args: Arguments for the format string
-        """
+    def log_message(self, format: str, *args: object) -> None:
+        """Log message using dulwich logger."""
         logger.info(format, *args)
 
-    def log_error(self, *args) -> None:
-        """Log an error using dulwich's logger.
-
-        Args:
-          *args: Error message components
-        """
+    def log_error(self, *args: object) -> None:
+        """Log error using dulwich logger."""
         logger.error(*args)
 
 
 class WSGIRequestHandlerLogger(WSGIRequestHandler):
     """WSGIRequestHandler that uses dulwich's logger for logging exceptions."""
 
-    def log_exception(self, exc_info) -> None:
-        """Log an exception using dulwich's logger.
-
-        Args:
-          exc_info: Exception information tuple
-        """
+    def log_exception(
+        self,
+        exc_info: Union[
+            tuple[type[BaseException], BaseException, TracebackType],
+            tuple[None, None, None],
+            None,
+        ],
+    ) -> None:
+        """Log exception using dulwich logger."""
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
-    def log_message(self, format, *args) -> None:
-        """Log a message using dulwich's logger.
-
-        Args:
-          format: Format string for the message
-          *args: Arguments for the format string
-        """
+    def log_message(self, format: str, *args: object) -> None:
+        """Log message using dulwich logger."""
         logger.info(format, *args)
 
-    def log_error(self, *args) -> None:
-        """Log an error using dulwich's logger.
-
-        Args:
-          *args: Error message components
-        """
+    def log_error(self, *args: object) -> None:
+        """Log error using dulwich logger."""
         logger.error(*args)
 
     def handle(self) -> None:
@@ -731,14 +808,14 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
 class WSGIServerLogger(WSGIServer):
     """WSGIServer that uses dulwich's logger for error handling."""
 
-    def handle_error(self, request, client_address) -> None:
+    def handle_error(self, request: object, client_address: tuple[str, int]) -> None:
         """Handle an error."""
         logger.exception(
             f"Exception happened during processing of request from {client_address!s}"
         )
 
 
-def main(argv=sys.argv) -> None:
+def main(argv: list[str] = sys.argv) -> None:
     """Entry point for starting an HTTP git server."""
     import optparse
 

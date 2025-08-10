@@ -35,7 +35,7 @@ from dulwich.commit_graph import (
 class CommitGraphEntryTests(unittest.TestCase):
     """Tests for CommitGraphEntry."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         commit_id = b"a" * 40
         tree_id = b"b" * 40
         parents = [b"c" * 40, b"d" * 40]
@@ -50,7 +50,7 @@ class CommitGraphEntryTests(unittest.TestCase):
         self.assertEqual(entry.generation, generation)
         self.assertEqual(entry.commit_time, commit_time)
 
-    def test_repr(self):
+    def test_repr(self) -> None:
         entry = CommitGraphEntry(b"a" * 40, b"b" * 40, [], 1, 1000)
         repr_str = repr(entry)
         self.assertIn("CommitGraphEntry", repr_str)
@@ -60,12 +60,12 @@ class CommitGraphEntryTests(unittest.TestCase):
 class CommitGraphChunkTests(unittest.TestCase):
     """Tests for CommitGraphChunk."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         chunk = CommitGraphChunk(b"TEST", b"test data")
         self.assertEqual(chunk.chunk_id, b"TEST")
         self.assertEqual(chunk.data, b"test data")
 
-    def test_repr(self):
+    def test_repr(self) -> None:
         chunk = CommitGraphChunk(b"TEST", b"x" * 100)
         repr_str = repr(chunk)
         self.assertIn("CommitGraphChunk", repr_str)
@@ -75,13 +75,13 @@ class CommitGraphChunkTests(unittest.TestCase):
 class CommitGraphTests(unittest.TestCase):
     """Tests for CommitGraph."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         graph = CommitGraph()
         self.assertEqual(graph.hash_version, HASH_VERSION_SHA1)
         self.assertEqual(len(graph.entries), 0)
         self.assertEqual(len(graph.chunks), 0)
 
-    def test_len(self):
+    def test_len(self) -> None:
         graph = CommitGraph()
         self.assertEqual(len(graph), 0)
 
@@ -90,7 +90,7 @@ class CommitGraphTests(unittest.TestCase):
         graph.entries.append(entry)
         self.assertEqual(len(graph), 1)
 
-    def test_iter(self):
+    def test_iter(self) -> None:
         graph = CommitGraph()
         entry1 = CommitGraphEntry(b"a" * 40, b"b" * 40, [], 1, 1000)
         entry2 = CommitGraphEntry(b"c" * 40, b"d" * 40, [], 2, 2000)
@@ -101,22 +101,22 @@ class CommitGraphTests(unittest.TestCase):
         self.assertEqual(entries[0], entry1)
         self.assertEqual(entries[1], entry2)
 
-    def test_get_entry_by_oid_missing(self):
+    def test_get_entry_by_oid_missing(self) -> None:
         graph = CommitGraph()
         result = graph.get_entry_by_oid(b"f" * 40)
         self.assertIsNone(result)
 
-    def test_get_generation_number_missing(self):
+    def test_get_generation_number_missing(self) -> None:
         graph = CommitGraph()
         result = graph.get_generation_number(b"f" * 40)
         self.assertIsNone(result)
 
-    def test_get_parents_missing(self):
+    def test_get_parents_missing(self) -> None:
         graph = CommitGraph()
         result = graph.get_parents(b"f" * 40)
         self.assertIsNone(result)
 
-    def test_from_invalid_signature(self):
+    def test_from_invalid_signature(self) -> None:
         data = b"XXXX" + b"\\x00" * 100
         f = io.BytesIO(data)
 
@@ -124,7 +124,7 @@ class CommitGraphTests(unittest.TestCase):
             CommitGraph.from_file(f)
         self.assertIn("Invalid commit graph signature", str(cm.exception))
 
-    def test_from_invalid_version(self):
+    def test_from_invalid_version(self) -> None:
         data = COMMIT_GRAPH_SIGNATURE + struct.pack(">B", 99) + b"\\x00" * 100
         f = io.BytesIO(data)
 
@@ -132,7 +132,7 @@ class CommitGraphTests(unittest.TestCase):
             CommitGraph.from_file(f)
         self.assertIn("Unsupported commit graph version", str(cm.exception))
 
-    def test_from_invalid_hash_version(self):
+    def test_from_invalid_hash_version(self) -> None:
         data = (
             COMMIT_GRAPH_SIGNATURE
             + struct.pack(">B", COMMIT_GRAPH_VERSION)
@@ -145,7 +145,7 @@ class CommitGraphTests(unittest.TestCase):
             CommitGraph.from_file(f)
         self.assertIn("Unsupported hash version", str(cm.exception))
 
-    def create_minimal_commit_graph_data(self):
+    def create_minimal_commit_graph_data(self) -> bytes:
         """Create minimal valid commit graph data for testing."""
         # Create the data in order and calculate offsets properly
 
@@ -209,7 +209,7 @@ class CommitGraphTests(unittest.TestCase):
 
         return header + toc + fanout + oid_lookup + commit_data
 
-    def test_from_minimal_valid_file(self):
+    def test_from_minimal_valid_file(self) -> None:
         """Test parsing a minimal but valid commit graph file."""
         data = self.create_minimal_commit_graph_data()
         f = io.BytesIO(data)
@@ -233,7 +233,7 @@ class CommitGraphTests(unittest.TestCase):
         self.assertEqual(graph.get_parents(commit_oid), [])
         self.assertIsNotNone(graph.get_entry_by_oid(commit_oid))
 
-    def test_missing_required_chunks(self):
+    def test_missing_required_chunks(self) -> None:
         """Test error handling for missing required chunks."""
         # Create data with header but no chunks
         header = (
@@ -254,7 +254,7 @@ class CommitGraphTests(unittest.TestCase):
             CommitGraph.from_file(f)
         self.assertIn("Missing required OID lookup chunk", str(cm.exception))
 
-    def test_write_empty_graph_raises(self):
+    def test_write_empty_graph_raises(self) -> None:
         """Test that writing empty graph raises ValueError."""
         graph = CommitGraph()
         f = io.BytesIO()
@@ -262,7 +262,7 @@ class CommitGraphTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             graph.write_to_file(f)
 
-    def test_write_and_read_round_trip(self):
+    def test_write_and_read_round_trip(self) -> None:
         """Test writing and reading a commit graph."""
         # Create a simple commit graph
         graph = CommitGraph()
@@ -297,21 +297,21 @@ class CommitGraphTests(unittest.TestCase):
 class CommitGraphFileOperationsTests(unittest.TestCase):
     """Tests for commit graph file operations."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.tempdir = tempfile.mkdtemp()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         import shutil
 
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
-    def test_read_commit_graph_missing_file(self):
+    def test_read_commit_graph_missing_file(self) -> None:
         """Test reading from non-existent file."""
         missing_path = os.path.join(self.tempdir, "missing.graph")
         result = read_commit_graph(missing_path)
         self.assertIsNone(result)
 
-    def test_read_commit_graph_invalid_file(self):
+    def test_read_commit_graph_invalid_file(self) -> None:
         """Test reading from invalid file."""
         invalid_path = os.path.join(self.tempdir, "invalid.graph")
         with open(invalid_path, "wb") as f:
@@ -320,12 +320,12 @@ class CommitGraphFileOperationsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_commit_graph(invalid_path)
 
-    def test_find_commit_graph_file_missing(self):
+    def test_find_commit_graph_file_missing(self) -> None:
         """Test finding commit graph file when it doesn't exist."""
         result = find_commit_graph_file(self.tempdir)
         self.assertIsNone(result)
 
-    def test_find_commit_graph_file_standard_location(self):
+    def test_find_commit_graph_file_standard_location(self) -> None:
         """Test finding commit graph file in standard location."""
         # Create .git/objects/info/commit-graph
         objects_dir = os.path.join(self.tempdir, "objects")
@@ -339,7 +339,7 @@ class CommitGraphFileOperationsTests(unittest.TestCase):
         result = find_commit_graph_file(self.tempdir)
         self.assertEqual(result, graph_path.encode())
 
-    def test_find_commit_graph_file_chain_location(self):
+    def test_find_commit_graph_file_chain_location(self) -> None:
         """Test finding commit graph file in chain location."""
         # Create .git/objects/info/commit-graphs/graph-{hash}.graph
         objects_dir = os.path.join(self.tempdir, "objects")
@@ -354,7 +354,7 @@ class CommitGraphFileOperationsTests(unittest.TestCase):
         result = find_commit_graph_file(self.tempdir)
         self.assertEqual(result, graph_path.encode())
 
-    def test_find_commit_graph_file_prefers_standard(self):
+    def test_find_commit_graph_file_prefers_standard(self) -> None:
         """Test that standard location is preferred over chain location."""
         # Create both locations
         objects_dir = os.path.join(self.tempdir, "objects")
@@ -380,15 +380,15 @@ class CommitGraphFileOperationsTests(unittest.TestCase):
 class CommitGraphGenerationTests(unittest.TestCase):
     """Tests for commit graph generation functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.tempdir = tempfile.mkdtemp()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         import shutil
 
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
-    def test_generate_commit_graph_empty(self):
+    def test_generate_commit_graph_empty(self) -> None:
         """Test generating commit graph with no commits."""
         from dulwich.object_store import MemoryObjectStore
 
@@ -397,7 +397,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
         self.assertEqual(len(graph), 0)
 
-    def test_generate_commit_graph_single_commit(self):
+    def test_generate_commit_graph_single_commit(self) -> None:
         """Test generating commit graph with single commit."""
         from dulwich.object_store import MemoryObjectStore
         from dulwich.objects import Commit, Tree
@@ -428,7 +428,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         self.assertEqual(entry.generation, 1)
         self.assertEqual(entry.commit_time, 1234567890)
 
-    def test_get_reachable_commits(self):
+    def test_get_reachable_commits(self) -> None:
         """Test getting reachable commits."""
         from dulwich.object_store import MemoryObjectStore
         from dulwich.objects import Commit, Tree
@@ -465,7 +465,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         self.assertIn(commit1.id, reachable)
         self.assertIn(commit2.id, reachable)
 
-    def test_write_commit_graph_to_file(self):
+    def test_write_commit_graph_to_file(self) -> None:
         """Test writing commit graph to file."""
         from dulwich.object_store import DiskObjectStore
         from dulwich.objects import Commit, Tree
@@ -498,13 +498,14 @@ class CommitGraphGenerationTests(unittest.TestCase):
         # Read back and verify
         graph = read_commit_graph(graph_path)
         self.assertIsNotNone(graph)
+        assert graph is not None  # For mypy
         self.assertEqual(len(graph), 1)
 
         entry = graph.entries[0]
         self.assertEqual(entry.commit_id, commit.id)
         self.assertEqual(entry.tree_id, commit.tree)
 
-    def test_object_store_commit_graph_methods(self):
+    def test_object_store_commit_graph_methods(self) -> None:
         """Test ObjectStore commit graph methods."""
         from dulwich.object_store import DiskObjectStore
         from dulwich.objects import Commit, Tree
@@ -515,7 +516,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         object_store = DiskObjectStore(object_store_path)
 
         # Initially no commit graph
-        self.assertIsNone(object_store.get_commit_graph())
+        self.assertIsNone(object_store.get_commit_graph())  # type: ignore[no-untyped-call]
 
         # Create a tree and commit
         tree = Tree()
@@ -534,13 +535,13 @@ class CommitGraphGenerationTests(unittest.TestCase):
         object_store.write_commit_graph([commit.id], reachable=False)
 
         # Now should have commit graph
-        self.assertIsNotNone(object_store.get_commit_graph())
+        self.assertIsNotNone(object_store.get_commit_graph())  # type: ignore[no-untyped-call]
 
         # Test update (should still have commit graph)
         object_store.write_commit_graph()
-        self.assertIsNot(None, object_store.get_commit_graph())
+        self.assertIsNot(None, object_store.get_commit_graph())  # type: ignore[no-untyped-call]
 
-    def test_parents_provider_commit_graph_integration(self):
+    def test_parents_provider_commit_graph_integration(self) -> None:
         """Test that ParentsProvider uses commit graph when available."""
         from dulwich.object_store import DiskObjectStore
         from dulwich.objects import Commit, Tree
@@ -584,10 +585,10 @@ class CommitGraphGenerationTests(unittest.TestCase):
         self.assertIsNotNone(provider.commit_graph)
 
         # Test parent lookups
-        parents1 = provider.get_parents(commit1.id)
+        parents1 = provider.get_parents(commit1.id)  # type: ignore[no-untyped-call]
         self.assertEqual(parents1, [])
 
-        parents2 = provider.get_parents(commit2.id)
+        parents2 = provider.get_parents(commit2.id)  # type: ignore[no-untyped-call]
         self.assertEqual(parents2, [commit1.id])
 
         # Test fallback behavior by creating provider without commit graph
@@ -602,13 +603,13 @@ class CommitGraphGenerationTests(unittest.TestCase):
         self.assertIsNone(provider_no_graph.commit_graph)
 
         # Should still work via commit object fallback
-        parents1_fallback = provider_no_graph.get_parents(commit1.id)
+        parents1_fallback = provider_no_graph.get_parents(commit1.id)  # type: ignore[no-untyped-call]
         self.assertEqual(parents1_fallback, [])
 
-        parents2_fallback = provider_no_graph.get_parents(commit2.id)
+        parents2_fallback = provider_no_graph.get_parents(commit2.id)  # type: ignore[no-untyped-call]
         self.assertEqual(parents2_fallback, [commit1.id])
 
-    def test_graph_operations_use_commit_graph(self):
+    def test_graph_operations_use_commit_graph(self) -> None:
         """Test that graph operations use commit graph when available."""
         from dulwich.graph import can_fast_forward, find_merge_base
         from dulwich.object_store import DiskObjectStore
@@ -695,7 +696,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         repo2.object_store = object_store
 
         # Verify commit graph is available
-        commit_graph = repo2.object_store.get_commit_graph()
+        commit_graph = repo2.object_store.get_commit_graph()  # type: ignore[no-untyped-call]
         self.assertIsNotNone(commit_graph)
 
         # Test graph operations WITH commit graph
@@ -732,13 +733,14 @@ class CommitGraphGenerationTests(unittest.TestCase):
         )
 
         # Verify parent lookups work through the provider
-        self.assertEqual(parents_provider.get_parents(commit1.id), [])
-        self.assertEqual(parents_provider.get_parents(commit2.id), [commit1.id])
+        self.assertEqual(parents_provider.get_parents(commit1.id), [])  # type: ignore[no-untyped-call]
+        self.assertEqual(parents_provider.get_parents(commit2.id), [commit1.id])  # type: ignore[no-untyped-call]
         self.assertEqual(
-            parents_provider.get_parents(commit5.id), [commit3.id, commit4.id]
+            parents_provider.get_parents(commit5.id),
+            [commit3.id, commit4.id],  # type: ignore[no-untyped-call]
         )
 
-    def test_performance_with_commit_graph(self):
+    def test_performance_with_commit_graph(self) -> None:
         """Test that using commit graph provides performance benefits."""
         from dulwich.graph import find_merge_base
         from dulwich.object_store import DiskObjectStore
@@ -754,7 +756,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         object_store.add_object(tree)
 
         # Create a chain of 20 commits
-        commits = []
+        commits: list[Commit] = []
         for i in range(20):
             commit = Commit()
             commit.tree = tree.id
@@ -785,7 +787,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         repo2.object_store = object_store
 
         # Verify commit graph is loaded
-        self.assertIsNotNone(repo2.object_store.get_commit_graph())
+        self.assertIsNotNone(repo2.object_store.get_commit_graph())  # type: ignore[no-untyped-call]
 
         # Time operations with commit graph
         for _ in range(10):  # Run multiple times for better measurement

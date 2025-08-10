@@ -32,13 +32,13 @@ from collections.abc import Generator, Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
+    IO,
     TYPE_CHECKING,
     Any,
     BinaryIO,
     Callable,
     Optional,
     Union,
-    cast,
 )
 
 if TYPE_CHECKING:
@@ -588,7 +588,7 @@ def read_cache_time(f: BinaryIO) -> tuple[int, int]:
     return struct.unpack(">LL", f.read(8))
 
 
-def write_cache_time(f: BinaryIO, t: Union[int, float, tuple[int, int]]) -> None:
+def write_cache_time(f: IO[bytes], t: Union[int, float, tuple[int, int]]) -> None:
     """Write a cache time.
 
     Args:
@@ -664,7 +664,7 @@ def read_cache_entry(
 
 
 def write_cache_entry(
-    f: BinaryIO, entry: SerializedIndexEntry, version: int, previous_path: bytes = b""
+    f: IO[bytes], entry: SerializedIndexEntry, version: int, previous_path: bytes = b""
 ) -> None:
     """Write an index entry to a file.
 
@@ -745,7 +745,7 @@ def read_index_header(f: BinaryIO) -> tuple[int, int]:
     return version, num_entries
 
 
-def write_index_extension(f: BinaryIO, extension: IndexExtension) -> None:
+def write_index_extension(f: IO[bytes], extension: IndexExtension) -> None:
     """Write an index extension.
 
     Args:
@@ -868,7 +868,7 @@ def read_index_dict(
 
 
 def write_index(
-    f: BinaryIO,
+    f: IO[bytes],
     entries: list[SerializedIndexEntry],
     version: Optional[int] = None,
     extensions: Optional[list[IndexExtension]] = None,
@@ -909,7 +909,7 @@ def write_index(
 
 
 def write_index_dict(
-    f: BinaryIO,
+    f: IO[bytes],
     entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]],
     version: Optional[int] = None,
     extensions: Optional[list[IndexExtension]] = None,
@@ -1007,8 +1007,6 @@ class Index:
 
     def write(self) -> None:
         """Write current contents of index to disk."""
-        from typing import BinaryIO, cast
-
         f = GitFile(self._filename, "wb")
         try:
             # Filter out extensions with no meaningful data
@@ -1022,7 +1020,7 @@ class Index:
             if self._skip_hash:
                 # When skipHash is enabled, write the index without computing SHA1
                 write_index_dict(
-                    cast(BinaryIO, f),
+                    f,
                     self._byname,
                     version=self._version,
                     extensions=meaningful_extensions,
@@ -1031,9 +1029,9 @@ class Index:
                 f.write(b"\x00" * 20)
                 f.close()
             else:
-                sha1_writer = SHA1Writer(cast(BinaryIO, f))
+                sha1_writer = SHA1Writer(f)
                 write_index_dict(
-                    cast(BinaryIO, sha1_writer),
+                    sha1_writer,
                     self._byname,
                     version=self._version,
                     extensions=meaningful_extensions,
@@ -1050,9 +1048,7 @@ class Index:
         f = GitFile(self._filename, "rb")
         try:
             sha1_reader = SHA1Reader(f)
-            entries, version, extensions = read_index_dict_with_version(
-                cast(BinaryIO, sha1_reader)
-            )
+            entries, version, extensions = read_index_dict_with_version(sha1_reader)
             self._version = version
             self._extensions = extensions
             self.update(entries)
@@ -1411,7 +1407,9 @@ def build_file_from_blob(
     *,
     honor_filemode: bool = True,
     tree_encoding: str = "utf-8",
-    symlink_fn: Optional[Callable] = None,
+    symlink_fn: Optional[
+        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+    ] = None,
 ) -> os.stat_result:
     """Build a file or symlink on disk based on a Git object.
 
@@ -1596,7 +1594,9 @@ def build_index_from_tree(
     tree_id: bytes,
     honor_filemode: bool = True,
     validate_path_element: Callable[[bytes], bool] = validate_path_element_default,
-    symlink_fn: Optional[Callable] = None,
+    symlink_fn: Optional[
+        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+    ] = None,
     blob_normalizer: Optional["BlobNormalizer"] = None,
     tree_encoding: str = "utf-8",
 ) -> None:
@@ -1956,7 +1956,9 @@ def _transition_to_file(
     entry: IndexEntry,
     index: Index,
     honor_filemode: bool,
-    symlink_fn: Optional[Callable[[bytes, bytes], None]],
+    symlink_fn: Optional[
+        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+    ],
     blob_normalizer: Optional["BlobNormalizer"],
     tree_encoding: str = "utf-8",
 ) -> None:
@@ -2208,7 +2210,9 @@ def update_working_tree(
     change_iterator: Iterator["TreeChange"],
     honor_filemode: bool = True,
     validate_path_element: Optional[Callable[[bytes], bool]] = None,
-    symlink_fn: Optional[Callable] = None,
+    symlink_fn: Optional[
+        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+    ] = None,
     force_remove_untracked: bool = False,
     blob_normalizer: Optional["BlobNormalizer"] = None,
     tree_encoding: str = "utf-8",
@@ -2685,10 +2689,8 @@ class locked_index:
             self._file.abort()
             return
         try:
-            from typing import BinaryIO, cast
-
-            f = SHA1Writer(cast(BinaryIO, self._file))
-            write_index_dict(cast(BinaryIO, f), self._index._byname)
+            f = SHA1Writer(self._file)
+            write_index_dict(f, self._index._byname)
         except BaseException:
             self._file.abort()
         else:

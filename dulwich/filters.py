@@ -30,7 +30,7 @@ from .objects import Blob
 
 if TYPE_CHECKING:
     from .config import StackedConfig
-    from .repo import Repo
+    from .repo import BaseRepo
 
 
 class FilterError(Exception):
@@ -128,7 +128,9 @@ class FilterRegistry:
     """Registry for filter drivers."""
 
     def __init__(
-        self, config: Optional["StackedConfig"] = None, repo: Optional["Repo"] = None
+        self,
+        config: Optional["StackedConfig"] = None,
+        repo: Optional["BaseRepo"] = None,
     ) -> None:
         """Initialize FilterRegistry.
 
@@ -211,8 +213,12 @@ class FilterRegistry:
         required = self.config.get_boolean(("filter", name), "required", False)
 
         if clean_cmd or smudge_cmd:
-            # Get repository working directory
-            repo_path = self.repo.path if self.repo else None
+            # Get repository working directory (only for Repo, not BaseRepo)
+            from .repo import Repo
+
+            repo_path = (
+                self.repo.path if self.repo and isinstance(self.repo, Repo) else None
+            )
             return ProcessFilterDriver(clean_cmd, smudge_cmd, required, repo_path)
 
         return None
@@ -221,8 +227,10 @@ class FilterRegistry:
         """Create LFS filter driver."""
         from .lfs import LFSFilterDriver, LFSStore
 
-        # If we have a repo, use its LFS store
-        if registry.repo is not None:
+        # If we have a Repo (not just BaseRepo), use its LFS store
+        from .repo import Repo
+
+        if registry.repo is not None and isinstance(registry.repo, Repo):
             lfs_store = LFSStore.from_repo(registry.repo, create=True)
         else:
             # Fall back to creating a temporary LFS store
@@ -389,7 +397,7 @@ class FilterBlobNormalizer:
         config_stack: Optional["StackedConfig"],
         gitattributes: GitAttributes,
         filter_registry: Optional[FilterRegistry] = None,
-        repo: Optional["Repo"] = None,
+        repo: Optional["BaseRepo"] = None,
     ) -> None:
         """Initialize FilterBlobNormalizer.
 

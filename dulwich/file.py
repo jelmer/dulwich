@@ -24,9 +24,14 @@
 import os
 import sys
 import warnings
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from types import TracebackType
 from typing import IO, Any, ClassVar, Literal, Optional, Union, overload
+
+if sys.version_info >= (3, 12):
+    from collections.abc import Buffer
+else:
+    Buffer = Union[bytes, bytearray, memoryview]
 
 
 def ensure_dir_exists(dirname: Union[str, bytes, os.PathLike]) -> None:
@@ -136,7 +141,7 @@ class FileLocked(Exception):
         super().__init__(filename, lockfilename)
 
 
-class _GitFile:
+class _GitFile(IO[bytes]):
     """File that follows the git locking protocol for writes.
 
     All writes to a file foo will be written into foo.lock in the same
@@ -148,7 +153,6 @@ class _GitFile:
     """
 
     PROXY_PROPERTIES: ClassVar[set[str]] = {
-        "closed",
         "encoding",
         "errors",
         "mode",
@@ -158,15 +162,19 @@ class _GitFile:
     }
     PROXY_METHODS: ClassVar[set[str]] = {
         "__iter__",
+        "__next__",
         "flush",
         "fileno",
         "isatty",
         "read",
+        "readable",
         "readline",
         "readlines",
         "seek",
+        "seekable",
         "tell",
         "truncate",
+        "writable",
         "write",
         "writelines",
     }
@@ -194,9 +202,6 @@ class _GitFile:
             raise FileLocked(filename, self._lockfilename) from exc
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
-
-        for method in self.PROXY_METHODS:
-            setattr(self, method, getattr(self._file, method))
 
     def __iter__(self) -> Iterator[bytes]:
         """Iterate over lines in the file."""
@@ -267,20 +272,63 @@ class _GitFile:
         else:
             self.close()
 
+    @property
+    def closed(self) -> bool:
+        """Return whether the file is closed."""
+        return self._closed
+
     def __getattr__(self, name: str) -> Any:  # noqa: ANN401
         """Proxy property calls to the underlying file."""
         if name in self.PROXY_PROPERTIES:
             return getattr(self._file, name)
         raise AttributeError(name)
 
+    # Implement IO[bytes] methods by delegating to the underlying file
+    def read(self, size: int = -1) -> bytes:
+        return self._file.read(size)
+
+    # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
+    # Python 3.9/3.10 have issues with IO[bytes] overload signatures
+    def write(self, data: Buffer, /) -> int:  # type: ignore[override]
+        return self._file.write(data)
+
+    def readline(self, size: int = -1) -> bytes:
+        return self._file.readline(size)
+
+    def readlines(self, hint: int = -1) -> list[bytes]:
+        return self._file.readlines(hint)
+
+    # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
+    # Python 3.9/3.10 have issues with IO[bytes] overload signatures
+    def writelines(self, lines: Iterable[Buffer], /) -> None:  # type: ignore[override]
+        return self._file.writelines(lines)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self._file.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._file.tell()
+
+    def flush(self) -> None:
+        return self._file.flush()
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        return self._file.truncate(size)
+
+    def fileno(self) -> int:
+        return self._file.fileno()
+
+    def isatty(self) -> bool:
+        return self._file.isatty()
+
     def readable(self) -> bool:
-        """Return whether the file is readable."""
         return self._file.readable()
 
     def writable(self) -> bool:
-        """Return whether the file is writable."""
         return self._file.writable()
 
     def seekable(self) -> bool:
-        """Return whether the file is seekable."""
         return self._file.seekable()
+
+    def __next__(self) -> bytes:
+        return next(iter(self._file))

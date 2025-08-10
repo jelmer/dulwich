@@ -43,6 +43,7 @@ from typing import BinaryIO, Callable, Optional, Union, cast
 
 from geventhttpclient import HTTPClient
 
+from ..file import _GitFile
 from ..greenthreads import GreenThreadsMissingObjectFinder
 from ..lru_cache import LRUSizeCache
 from ..object_store import INFODIR, PACKDIR, ObjectContainer, PackBasedObjectStore
@@ -823,7 +824,11 @@ class SwiftObjectStore(PackBasedObjectStore):
               The created SwiftPack or None if empty
             """
             f.seek(0)
-            pack = PackData(file=f, filename="")
+            from typing import cast
+
+            from ..file import _GitFile
+
+            pack = PackData(file=cast(_GitFile, f), filename="")
             entries = pack.sorted_entries()
             if entries:
                 basename = posixpath.join(
@@ -875,7 +880,8 @@ class SwiftObjectStore(PackBasedObjectStore):
         fd, path = tempfile.mkstemp(prefix="tmp_pack_")
         f = os.fdopen(fd, "w+b")
         try:
-            indexer = PackIndexer(f, resolve_ext_ref=None)
+            pack_data = PackData(file=cast(_GitFile, f), filename=path)
+            indexer = PackIndexer(cast(BinaryIO, pack_data._file), resolve_ext_ref=None)
             copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
             copier.verify()
             return self._complete_thin_pack(f, path, copier, indexer)
@@ -890,7 +896,7 @@ class SwiftObjectStore(PackBasedObjectStore):
 
         # Update the header with the new number of objects.
         f.seek(0)
-        write_pack_header(f, len(entries) + len(indexer.ext_refs()))  # type: ignore
+        write_pack_header(f, len(entries) + len(indexer.ext_refs))  # type: ignore
 
         # Must flush before reading (http://bugs.python.org/issue3207)
         f.flush()
@@ -902,7 +908,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         f.seek(0, os.SEEK_CUR)
 
         # Complete the pack.
-        for ext_sha in indexer.ext_refs():  # type: ignore
+        for ext_sha in indexer.ext_refs:  # type: ignore
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
@@ -928,7 +934,7 @@ class SwiftObjectStore(PackBasedObjectStore):
 
         # Write pack info.
         f.seek(0)
-        pack_data = PackData(filename="", file=f)
+        pack_data = PackData(filename="", file=cast(_GitFile, f))
         index_file.seek(0)
         pack_index = load_pack_index_file("", index_file)
         serialized_pack_info = pack_info_create(pack_data, pack_index)
@@ -1030,17 +1036,17 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         del self._refs[name]
         return True
 
-    def allkeys(self) -> Iterator[bytes]:
+    def allkeys(self) -> set[bytes]:
         """Get all reference names.
 
         Returns:
-          Iterator of reference names as bytes
+          Set of reference names as bytes
         """
         try:
             self._refs[b"HEAD"] = self._refs[b"refs/heads/master"]
         except KeyError:
             pass
-        return iter(self._refs.keys())
+        return set(self._refs.keys())
 
 
 class SwiftRepo(BaseRepo):

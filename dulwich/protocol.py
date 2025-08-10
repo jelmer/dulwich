@@ -258,18 +258,6 @@ def pkt_seq(*seq: Optional[bytes]) -> bytes:
     return b"".join([pkt_line(s) for s in seq]) + pkt_line(None)
 
 
-def filter_ref_prefix(
-    refs: dict[bytes, bytes], prefixes: Iterable[bytes]
-) -> dict[bytes, bytes]:
-    """Filter refs to only include those with a given prefix.
-
-    Args:
-      refs: A list of refs.
-      prefixes: The prefixes to filter by.
-    """
-    return {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
-
-
 class Protocol:
     """Class for interacting with a remote git process over the wire.
 

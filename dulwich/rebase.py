@@ -32,7 +32,7 @@ from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
 from dulwich.objects import Commit
 from dulwich.objectspec import parse_commit
-from dulwich.repo import Repo
+from dulwich.repo import BaseRepo, Repo
 
 
 class RebaseError(Exception):
@@ -529,7 +529,7 @@ class DiskRebaseStateManager:
 class MemoryRebaseStateManager:
     """Manages rebase state in memory for MemoryRepo."""
 
-    def __init__(self, repo: Repo) -> None:
+    def __init__(self, repo: BaseRepo) -> None:
         """Initialize MemoryRebaseStateManager.
 
         Args:
@@ -642,6 +642,8 @@ class Rebaser:
         if branch is None:
             # Use current HEAD
             head_ref, head_sha = self.repo.refs.follow(b"HEAD")
+            if head_sha is None:
+                raise ValueError("HEAD does not point to a valid commit")
             branch_commit = self.repo[head_sha]
         else:
             # Parse the branch reference
@@ -664,6 +666,7 @@ class Rebaser:
         commits = []
         current = branch_commit
         while current.id != merge_base:
+            assert isinstance(current, Commit)
             commits.append(current)
             if not current.parents:
                 break
@@ -690,6 +693,9 @@ class Rebaser:
 
         parent = self.repo[commit.parents[0]]
         onto_commit = self.repo[onto]
+
+        assert isinstance(parent, Commit)
+        assert isinstance(onto_commit, Commit)
 
         # Perform three-way merge
         merged_tree, conflicts = three_way_merge(
@@ -798,7 +804,9 @@ class Rebaser:
 
         if new_sha:
             # Success - add to done list
-            self._done.append(self.repo[new_sha])
+            new_commit = self.repo[new_sha]
+            assert isinstance(new_commit, Commit)
+            self._done.append(new_commit)
             self._save_rebase_state()
 
             # Continue with next commit if any
@@ -822,6 +830,8 @@ class Rebaser:
             raise RebaseError("No rebase in progress")
 
         # Restore original HEAD
+        if self._original_head is None:
+            raise RebaseError("No original HEAD to restore")
         self.repo.refs[b"HEAD"] = self._original_head
 
         # Clean up rebase state
@@ -1200,12 +1210,16 @@ def _squash_commits(
     if not entry.commit_sha:
         raise RebaseError("No commit SHA for squash/fixup operation")
     commit_to_squash = repo[entry.commit_sha]
+    if not isinstance(commit_to_squash, Commit):
+        raise RebaseError(f"Expected commit, got {type(commit_to_squash).__name__}")
 
     # Get the previous commit (target of squash)
     previous_commit = rebaser._done[-1]
 
     # Cherry-pick the changes onto the previous commit
     parent = repo[commit_to_squash.parents[0]]
+    if not isinstance(parent, Commit):
+        raise RebaseError(f"Expected parent commit, got {type(parent).__name__}")
 
     # Perform three-way merge for the tree
     merged_tree, conflicts = three_way_merge(

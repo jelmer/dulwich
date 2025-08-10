@@ -25,7 +25,7 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "urllib3>=1.25",
-    'typing_extensions >=4.0 ; python_version < "3.11"',
+    'typing_extensions >=4.0 ; python_version < "3.12"',
 ]
 dynamic = ["version"]
 license-files = ["COPYING"]
@@ -99,6 +99,7 @@ ignore = [
     "ANN205",
     "ANN206",
     "E501",  # line too long
+    "UP007",  # Use X | Y for type annotations (Python 3.10+ syntax, but we support 3.9+)
 ]
 
 [tool.ruff.lint.pydocstyle]

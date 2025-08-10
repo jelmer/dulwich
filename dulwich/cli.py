@@ -865,9 +865,13 @@ class cmd_dump_pack(Command):
             try:
                 print(f"\t{x[name]}")
             except KeyError as k:
-                print(f"\t{name.decode('ascii', 'replace')}: Unable to resolve base {k!r}")
+                print(
+                    f"\t{name.decode('ascii', 'replace')}: Unable to resolve base {k!r}"
+                )
             except ApplyDeltaError as e:
-                print(f"\t{name.decode('ascii', 'replace')}: Unable to apply delta: {e!r}")
+                print(
+                    f"\t{name.decode('ascii', 'replace')}: Unable to apply delta: {e!r}"
+                )
 
 
 class cmd_dump_index(Command):

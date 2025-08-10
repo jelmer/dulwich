@@ -228,6 +228,7 @@ class BaseObjectStore:
         self, refs: dict[Ref, ObjectID], depth: Optional[int] = None
     ) -> list[ObjectID]:
         """Determine which objects are wanted based on refs."""
+
         def _want_deepen(sha: bytes) -> bool:
             if not depth:
                 return False

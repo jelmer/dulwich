@@ -37,7 +37,45 @@ from wsgiref.simple_server import (
     WSGIServer,
     make_server,
 )
-from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
+
+# wsgiref.types was added in Python 3.11
+if sys.version_info >= (3, 11):
+    from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
+else:
+    # Fallback type definitions for Python < 3.11
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        # For type checking, use the _typeshed types if available
+        try:
+            from _typeshed.wsgi import StartResponse, WSGIApplication, WSGIEnvironment
+        except ImportError:
+            # Define our own protocol types for type checking
+            from typing import Protocol
+
+            class StartResponse(Protocol):  # type: ignore[no-redef]
+                """WSGI start_response callable protocol."""
+
+                def __call__(
+                    self,
+                    status: str,
+                    response_headers: list[tuple[str, str]],
+                    exc_info: Optional[
+                        tuple[type, BaseException, TracebackType]
+                    ] = None,
+                ) -> Callable[[bytes], None]:
+                    """Start the response with status and headers."""
+                    ...
+
+            WSGIEnvironment = dict[str, Any]  # type: ignore[misc]
+            WSGIApplication = Callable[  # type: ignore[misc]
+                [WSGIEnvironment, StartResponse], Iterable[bytes]
+            ]
+    else:
+        # At runtime, just use type aliases since these are only for type hints
+        StartResponse = Any
+        WSGIEnvironment = dict[str, Any]
+        WSGIApplication = Callable
 
 from dulwich import log_utils
 

@@ -287,7 +287,9 @@ class _GitFile(IO[bytes]):
     def read(self, size: int = -1) -> bytes:
         return self._file.read(size)
 
-    def write(self, data: Buffer, /) -> int:
+    # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
+    # Python 3.9/3.10 have issues with IO[bytes] overload signatures
+    def write(self, data: Buffer, /) -> int:  # type: ignore[override]
         return self._file.write(data)
 
     def readline(self, size: int = -1) -> bytes:
@@ -296,7 +298,9 @@ class _GitFile(IO[bytes]):
     def readlines(self, hint: int = -1) -> list[bytes]:
         return self._file.readlines(hint)
 
-    def writelines(self, lines: Iterable[Buffer], /) -> None:
+    # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
+    # Python 3.9/3.10 have issues with IO[bytes] overload signatures
+    def writelines(self, lines: Iterable[Buffer], /) -> None:  # type: ignore[override]
         return self._file.writelines(lines)
 
     def seek(self, offset: int, whence: int = 0) -> int:

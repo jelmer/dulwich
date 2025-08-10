@@ -103,13 +103,13 @@ from typing import (
     Union,
     cast,
     overload,
-    override,
 )
 
 if sys.version_info >= (3, 12):
     from collections.abc import Buffer
+    from typing import override
 else:
-    from typing_extensions import Buffer
+    from typing_extensions import Buffer, override
 
 if TYPE_CHECKING:
     from .gc import GCStats
@@ -2222,7 +2222,7 @@ def reset(
                     source: Union[str, bytes, os.PathLike],
                     target: Union[str, bytes, os.PathLike],
                 ) -> None:
-                    symlink(source, target)
+                    symlink(source, target)  # type: ignore[arg-type]  # type: ignore[arg-type]
 
                 symlink_fn = symlink_wrapper
             else:
@@ -3830,7 +3830,7 @@ def checkout(
                 source: Union[str, bytes, os.PathLike],
                 target: Union[str, bytes, os.PathLike],
             ) -> None:
-                symlink(source, target)
+                symlink(source, target)  # type: ignore[arg-type]
 
             symlink_fn = symlink_wrapper
         else:

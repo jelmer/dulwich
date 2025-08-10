@@ -607,6 +607,7 @@ class HTTPGitApplication:
         environ: WSGIEnvironment,
         start_response: StartResponse,
     ) -> Iterable[bytes]:
+        """Handle WSGI request."""
         path = environ["PATH_INFO"]
         method = environ["REQUEST_METHOD"]
         req = HTTPGitRequest(
@@ -636,6 +637,7 @@ class GunzipFilter:
     """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application."""
 
     def __init__(self, application: WSGIApplication) -> None:
+        """Initialize GunzipFilter with WSGI application."""
         self.app = application
 
     def __call__(
@@ -643,6 +645,7 @@ class GunzipFilter:
         environ: WSGIEnvironment,
         start_response: StartResponse,
     ) -> Iterable[bytes]:
+        """Handle WSGI request with gzip decompression."""
         import gzip
 
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
@@ -659,6 +662,7 @@ class LimitedInputFilter:
     """WSGI middleware that limits the input length of a request to that specified in Content-Length."""
 
     def __init__(self, application: WSGIApplication) -> None:
+        """Initialize LimitedInputFilter with WSGI application."""
         self.app = application
 
     def __call__(
@@ -666,6 +670,7 @@ class LimitedInputFilter:
         environ: WSGIEnvironment,
         start_response: StartResponse,
     ) -> Iterable[bytes]:
+        """Handle WSGI request with input length limiting."""
         # This is not necessary if this app is run from a conforming WSGI
         # server. Unfortunately, there's no way to tell that at this point.
         # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
@@ -706,15 +711,18 @@ class ServerHandlerLogger(ServerHandler):
             None,
         ],
     ) -> None:
+        """Log exception using dulwich logger."""
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
     def log_message(self, format: str, *args: object) -> None:
+        """Log message using dulwich logger."""
         logger.info(format, *args)
 
     def log_error(self, *args: object) -> None:
+        """Log error using dulwich logger."""
         logger.error(*args)
 
 
@@ -729,15 +737,18 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
             None,
         ],
     ) -> None:
+        """Log exception using dulwich logger."""
         logger.exception(
             "Exception happened during processing of request",
             exc_info=exc_info,
         )
 
     def log_message(self, format: str, *args: object) -> None:
+        """Log message using dulwich logger."""
         logger.info(format, *args)
 
     def log_error(self, *args: object) -> None:
+        """Log error using dulwich logger."""
         logger.error(*args)
 
     def handle(self) -> None:

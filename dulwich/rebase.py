@@ -1210,12 +1210,16 @@ def _squash_commits(
     if not entry.commit_sha:
         raise RebaseError("No commit SHA for squash/fixup operation")
     commit_to_squash = repo[entry.commit_sha]
+    if not isinstance(commit_to_squash, Commit):
+        raise RebaseError(f"Expected commit, got {type(commit_to_squash).__name__}")
 
     # Get the previous commit (target of squash)
     previous_commit = rebaser._done[-1]
 
     # Cherry-pick the changes onto the previous commit
     parent = repo[commit_to_squash.parents[0]]
+    if not isinstance(parent, Commit):
+        raise RebaseError(f"Expected parent commit, got {type(parent).__name__}")
 
     # Perform three-way merge for the tree
     merged_tree, conflicts = three_way_merge(

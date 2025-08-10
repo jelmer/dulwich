@@ -2019,9 +2019,7 @@ class DeltaChainIterator(Generic[T]):
         else:
             assert unpacked.pack_type_num in DELTA_TYPES
             unpacked.obj_type_num = obj_type_num
-            base_data = b"".join(base_chunks) if base_chunks else b""
-            delta_data = b"".join(unpacked.decomp_chunks) if unpacked.decomp_chunks else b""
-            unpacked.obj_chunks = [apply_delta(base_data, delta_data)]
+            unpacked.obj_chunks = apply_delta(base_chunks, unpacked.decomp_chunks)
         return unpacked
 
     def _follow_chain(
@@ -3134,7 +3132,7 @@ def create_delta(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
             yield memoryview(target_buf)[o : o + s]
 
 
-def apply_delta(src_buf: bytes, delta: bytes) -> bytes:
+def apply_delta(src_buf: Union[bytes, list[bytes]], delta: Union[bytes, list[bytes]]) -> list[bytes]:
     """Based on the similar function in git's patch-delta.c.
 
     Args:
@@ -3205,7 +3203,7 @@ def apply_delta(src_buf: bytes, delta: bytes) -> bytes:
     if dest_size != chunks_length(out):
         raise ApplyDeltaError("dest size incorrect")
 
-    return b"".join(out)
+    return out
 
 
 def write_pack_index_v2(
@@ -3698,9 +3696,8 @@ class Pack:
             else:
                 chunks_bytes = chunks
             
-            # Apply delta and convert back to list
-            result_bytes = apply_delta(chunks_bytes, delta)
-            chunks = [result_bytes]
+            # Apply delta and get result as list
+            chunks = apply_delta(chunks_bytes, delta)
             
             if prev_offset is not None:
                 self.data._offset_cache[prev_offset] = base_type, chunks

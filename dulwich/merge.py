@@ -163,6 +163,11 @@ def merge_blobs(
             return ours_blob.data, False
         else:
             # Both added different content - conflict
+            if merge3 is None:
+                raise ImportError(
+                    "merge3 module is required for three-way merging. "
+                    "Install it with: pip install merge3"
+                )
             m = merge3.Merge3(
                 [],
                 ours_blob.data.splitlines(True),
@@ -185,6 +190,11 @@ def merge_blobs(
                 return b"", False  # They didn't modify, accept deletion
             else:
                 # Conflict: we deleted, they modified
+                if merge3 is None:
+                    raise ImportError(
+                        "merge3 module is required for three-way merging. "
+                        "Install it with: pip install merge3"
+                    )
                 m = merge3.Merge3(
                     base_content.splitlines(True),
                     [],
@@ -197,6 +207,11 @@ def merge_blobs(
                 return b"", False  # We didn't modify, accept deletion
             else:
                 # Conflict: they deleted, we modified
+                if merge3 is None:
+                    raise ImportError(
+                        "merge3 module is required for three-way merging. "
+                        "Install it with: pip install merge3"
+                    )
                 m = merge3.Merge3(
                     base_content.splitlines(True),
                     ours_content.splitlines(True),
@@ -213,6 +228,11 @@ def merge_blobs(
         return ours_content, False
 
     # Perform three-way merge
+    if merge3 is None:
+        raise ImportError(
+            "merge3 module is required for three-way merging. "
+            "Install it with: pip install merge3"
+        )
     m = merge3.Merge3(
         base_content.splitlines(True),
         ours_content.splitlines(True),

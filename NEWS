@@ -1,5 +1,9 @@
 0.24.2	UNRELEASED
 
+ * Fix merge functionality to gracefully handle missing optional merge3 dependency
+   by raising informative ImportError with installation instructions.
+   (Jelmer Vernooĳ, #1759)
+
  * Fix worktree CLI tests to properly change to repository directory.
    (Jelmer Vernooĳ, #1738)
 

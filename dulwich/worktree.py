@@ -655,7 +655,7 @@ class WorkTree:
             tree,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
-            symlink_fn=symlink_fn,
+            symlink_fn=symlink_fn,  # type: ignore[arg-type]
             blob_normalizer=blob_normalizer,
         )
 

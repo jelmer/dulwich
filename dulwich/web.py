@@ -690,7 +690,7 @@ def make_wsgi_chain(
     fallback_app: Optional[WSGIApplication] = None,
 ) -> WSGIApplication:
     """Factory function to create an instance of HTTPGitApplication.
-    
+
     Correctly wrapped with needed middleware.
     """
     app = HTTPGitApplication(

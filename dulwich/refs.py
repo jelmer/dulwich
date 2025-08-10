@@ -164,6 +164,7 @@ class RefsContainer:
             ]
         ] = None,
     ) -> None:
+        """Initialize RefsContainer with optional logger function."""
         self._logger = logger
 
     def _log(
@@ -278,6 +279,7 @@ class RefsContainer:
         raise NotImplementedError(self.allkeys)
 
     def __iter__(self) -> Iterator[Ref]:
+        """Iterate over all reference keys."""
         return iter(self.allkeys())
 
     def keys(self, base=None):
@@ -387,6 +389,7 @@ class RefsContainer:
         return refnames, contents
 
     def __contains__(self, refname: bytes) -> bool:
+        """Check if a reference exists."""
         if self.read_ref(refname):
             return True
         return False
@@ -562,18 +565,22 @@ class DictRefsContainer(RefsContainer):
             ]
         ] = None,
     ) -> None:
+        """Initialize DictRefsContainer with refs dictionary and optional logger."""
         super().__init__(logger=logger)
         self._refs = refs
         self._peeled: dict[bytes, ObjectID] = {}
         self._watchers: set[Any] = set()
 
     def allkeys(self) -> set[bytes]:
+        """Return all reference keys."""
         return set(self._refs.keys())
 
     def read_loose_ref(self, name: bytes) -> Optional[bytes]:
+        """Read a loose reference."""
         return self._refs.get(name, None)
 
     def get_packed_refs(self) -> dict[bytes, bytes]:
+        """Get packed references."""
         return {}
 
     def _notify(self, ref: bytes, newsha: Optional[bytes]) -> None:
@@ -742,6 +749,7 @@ class DictRefsContainer(RefsContainer):
         return True
 
     def get_peeled(self, name: bytes) -> Optional[bytes]:
+        """Get peeled version of a reference."""
         return self._peeled.get(name)
 
     def _update(self, refs: dict[bytes, bytes]) -> None:
@@ -760,21 +768,26 @@ class InfoRefsContainer(RefsContainer):
     """Refs container that reads refs from a info/refs file."""
 
     def __init__(self, f: BinaryIO) -> None:
+        """Initialize InfoRefsContainer from info/refs file."""
         self._refs: dict[bytes, bytes] = {}
         self._peeled: dict[bytes, bytes] = {}
         refs = read_info_refs(f)
         (self._refs, self._peeled) = split_peeled_refs(refs)
 
     def allkeys(self) -> set[bytes]:
+        """Return all reference keys."""
         return set(self._refs.keys())
 
     def read_loose_ref(self, name: bytes) -> Optional[bytes]:
+        """Read a loose reference."""
         return self._refs.get(name, None)
 
     def get_packed_refs(self) -> dict[bytes, bytes]:
+        """Get packed references."""
         return {}
 
     def get_peeled(self, name: bytes) -> Optional[bytes]:
+        """Get peeled version of a reference."""
         try:
             return self._peeled[name]
         except KeyError:
@@ -819,6 +832,7 @@ class DiskRefsContainer(RefsContainer):
         return f"{self.__class__.__name__}({self.path!r})"
 
     def subkeys(self, base: bytes) -> set[bytes]:
+        """Return subkeys under a given base reference path."""
         subkeys = set()
         path = self.refpath(base)
         for root, unused_dirs, files in os.walk(path):
@@ -838,6 +852,7 @@ class DiskRefsContainer(RefsContainer):
         return subkeys
 
     def allkeys(self) -> set[bytes]:
+        """Return all reference keys."""
         allkeys = set()
         if os.path.exists(self.refpath(HEADREF)):
             allkeys.add(HEADREF)

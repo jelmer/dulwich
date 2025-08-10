@@ -20,6 +20,7 @@
 
 """Tests for merge driver support."""
 
+import importlib.util
 import sys
 import unittest
 from typing import Optional
@@ -209,6 +210,10 @@ class MergeBlobsWithDriversTests(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise unittest.SkipTest("merge3 module not available, skipping merge tests")
+
         # Reset global registry
         global _merge_driver_registry
         from dulwich import merge_drivers

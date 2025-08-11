@@ -1338,9 +1338,9 @@ class Repo(BaseRepo):
             )
 
     def _reflog_path(self, ref: bytes) -> str:
-        assert not ref.startswith((b"main-worktree/", b"worktrees/")), (
-            "special paths are not supported"
-        )
+        if ref.startswith((b"main-worktree/", b"worktrees/")):
+            raise NotImplementedError(f"refs {ref.decode()} are not supported")
+
         base = self.controldir() if is_per_worktree_ref(ref) else self.commondir()
         return os.path.join(base, "logs", os.fsdecode(ref))
 

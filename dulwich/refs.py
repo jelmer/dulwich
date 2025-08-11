@@ -1764,6 +1764,16 @@ def filter_ref_prefix(refs: T, prefixes: Iterable[bytes]) -> T:
 
 
 def is_per_worktree_ref(ref: bytes) -> bool:
+    """Returns whether a reference is stored per worktree or not.
+
+    Per-worktree references are:
+    - all pseudorefs, e.g. HEAD
+    - all references stored inside "refs/bisect/", "refs/worktree/" and "refs/rewritten/"
+
+    All refs starting with "refs/" are shared, except for the ones listed above.
+
+    See https://git-scm.com/docs/git-worktree#_refs.
+    """
     return not ref.startswith(b"refs/") or ref.startswith(
         (b"refs/bisect/", b"refs/worktree/", b"refs/rewritten/")
     )

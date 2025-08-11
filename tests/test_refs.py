@@ -36,6 +36,7 @@ from dulwich.refs import (
     SymrefLoop,
     _split_ref_line,
     check_ref_format,
+    is_per_worktree_ref,
     parse_remote_ref,
     parse_symref_value,
     read_packed_refs,
@@ -837,6 +838,25 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         # Now it should work
         self._refs[ref_name] = ref_value
+
+
+class IsPerWorktreeRefsTests(TestCase):
+    def test(self) -> None:
+        cases = [
+            (b"HEAD", True),
+            (b"refs/bisect/good", True),
+            (b"refs/worktree/foo", True),
+            (b"refs/rewritten/onto", True),
+            (b"refs/stash", False),
+            (b"refs/heads/main", False),
+            (b"refs/tags/v1.0", False),
+            (b"refs/remotes/origin/main", False),
+            (b"refs/custom/foo", False),
+            (b"refs/replace/aaaaaa", False),
+        ]
+        for ref, expected in cases:
+            with self.subTest(ref=ref, expected=expected):
+                self.assertEqual(is_per_worktree_ref(ref), expected)
 
 
 class DiskRefsContainerWorktreeRefsTest(TestCase):

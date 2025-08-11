@@ -1,0 +1,108 @@
+.. _recipes:
+
+========================
+Recipes for common tasks
+========================
+
+How do I check out files with Dulwich?
+======================================
+
+The answer depends on the exact meaning of "check out" that is
+intended. There are several common goals it could be describing, and
+correspondingly several options to achieve them.
+
+Make sure a working tree on disk matches a particular commit (like ``git checkout``)
+------------------------------------------------------------------------------------
+
+:py:func:`dulwich.porcelain.checkout` is a very high-level function
+that operates on the working tree and behaves very similar to the
+``git checkout`` command. It packages a lot of functionality into a
+single command, just as Git's porcelain does, which is useful when
+matching Git's CLI is the goal, but might be less desirable for
+programmatic access to a repository's contents.
+
+Retrieve a single file's contents at a particular commit
+--------------------------------------------------------
+
+:py:func:`dulwich.object_store.tree_lookup_path` can a retrieve the
+object SHA given its path and the SHA of a tree to look it up in. This
+makes it very easy to access a specific file as stored in the
+repo. Note that this function operates on *trees*, not *commits*
+(every commit contains a tree for its contents, but a commit's ID is
+not the same as its tree's ID).
+
+With the retrieved SHA it's possible to get a file's blob directly
+from the repository's object store, and thus its content bytes. It's
+also possible to write it out to disk, using
+:py:func:`dulwich.index.build_file_from_blob`, which takes care of
+things like symlinks and file permissions.
+
+.. code-block:: python
+
+    from dulwich.repo import Repo
+    from dulwich.objectspec import parse_commit
+    from dulwich.object_store import tree_lookup_path
+
+    repo = Repo("/path/to/some/repo")
+    # parse_commit will understand most commonly-used types of Git refs, including
+    # short SHAs, tag names, branch names, HEAD, etc.
+    commit = parse_commit(repo, "v1.0.0")
+
+    path = b"README.md"
+    mode, sha = tree_lookup_path(repo.get_object, commit.tree, path)
+    # Normalizer takes care of line ending conversion and applying smudge
+    # filters during checkout. See the Git Book for more details:
+    # https://git-scm.com/book/ms/v2/Customizing-Git-Git-Attributes
+    blob = repo.get_blob_normalizer().checkout_normalize(repo[sha], path)
+
+    print(f"The readme at {commit.id.decode('ascii')} is:")
+    print(blob.data.decode("utf-8"))
+
+
+Retrieve all or a subset of files at a particular commit
+--------------------------------------------------------
+
+A dedicated helper function
+:py:func:`dulwich.object_store.iter_commit_contents` exists to
+simplify the common requirement of programmatically getting the
+contents of a repo as stored at a specific commit. Unlike
+:py:func:`!porcelain.checkout`, it is not tied to a working tree, or
+even files.
+
+When paired with :py:func:`dulwich.index.build_file_from_blob`, it's
+very easy to write out the retrieved files to an arbitrary location on
+disk, independent of any working trees. This makes it ideal for tasks
+such as retrieving a pristine copy of the contained files without any
+of Git's tracking information, for use in deployments, automation, and
+similar.
+
+.. code-block:: python
+
+    import stat
+    from pathlib import Path
+
+    from dulwich.repo import Repo
+    from dulwich.object_store import iter_commit_contents
+    from dulwich.index import build_file_from_blob
+
+    repo = Repo("/path/to/another/repo")
+    normalize = repo.get_blob_normalizer().checkout_normalize
+    commit = repo[repo.head()]
+    encoding = commit.encoding or "utf-8"
+
+    # Scan the repo at current HEAD. Retrieve all files marked as
+    # executable under bin/ and write them to disk
+    for entry in iter_commit_contents(repo, commit.id, include=[b"bin"]):
+        if entry.mode & stat.S_IXUSR:
+            # Strip the leading bin/ from returned paths, write to
+            # current directory
+            path = Path(entry.path.decode(encoding)).relative_to("bin/")
+            # Make sure the target directory exists
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            blob = normalize(repo[entry.sha], entry.path)
+            build_file_from_blob(
+                blob, entry.mode,
+                str(path)
+            )
+            print(f"Wrote executable {path}")

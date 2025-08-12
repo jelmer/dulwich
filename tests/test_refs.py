@@ -36,6 +36,7 @@ from dulwich.refs import (
     SymrefLoop,
     _split_ref_line,
     check_ref_format,
+    is_per_worktree_ref,
     parse_remote_ref,
     parse_symref_value,
     read_packed_refs,
@@ -46,6 +47,7 @@ from dulwich.refs import (
 )
 from dulwich.repo import Repo
 from dulwich.tests.utils import open_repo, tear_down_repo
+from dulwich.worktree import add_worktree
 
 from . import SkipTest, TestCase
 
@@ -836,6 +838,192 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         # Now it should work
         self._refs[ref_name] = ref_value
+
+
+class IsPerWorktreeRefsTests(TestCase):
+    def test(self) -> None:
+        cases = [
+            (b"HEAD", True),
+            (b"refs/bisect/good", True),
+            (b"refs/worktree/foo", True),
+            (b"refs/rewritten/onto", True),
+            (b"refs/stash", False),
+            (b"refs/heads/main", False),
+            (b"refs/tags/v1.0", False),
+            (b"refs/remotes/origin/main", False),
+            (b"refs/custom/foo", False),
+            (b"refs/replace/aaaaaa", False),
+        ]
+        for ref, expected in cases:
+            with self.subTest(ref=ref, expected=expected):
+                self.assertEqual(is_per_worktree_ref(ref), expected)
+
+
+class DiskRefsContainerWorktreeRefsTest(TestCase):
+    def setUp(self) -> None:
+        # Create temporary directories
+        temp_dir = tempfile.mkdtemp()
+        test_dir = os.path.join(temp_dir, "main")
+        os.makedirs(test_dir)
+
+        repo = Repo.init(test_dir, default_branch=b"main")
+        main_worktree = repo.get_worktree()
+        with open(os.path.join(test_dir, "test.txt"), "wb") as f:
+            f.write(b"test content")
+        main_worktree.stage(["test.txt"])
+        self.first_commit = main_worktree.commit(message=b"Initial commit")
+
+        worktree_dir = os.path.join(temp_dir, "worktree")
+        wt_repo = add_worktree(repo, worktree_dir, branch="wt-main")
+        linked_worktree = wt_repo.get_worktree()
+        with open(os.path.join(test_dir, "test2.txt"), "wb") as f:
+            f.write(b"test content")
+        linked_worktree.stage(["test2.txt"])
+        self.second_commit = linked_worktree.commit(message=b"second commit")
+
+        self.refs = repo.refs
+        self.wt_refs = wt_repo.refs
+
+    def test_refpath(self) -> None:
+        main_path = self.refs.path
+        common = self.wt_refs.path
+        wt_path = self.wt_refs.worktree_path
+
+        cases = [
+            (self.refs, b"HEAD", main_path),
+            (self.refs, b"refs/heads/main", main_path),
+            (self.refs, b"refs/heads/wt-main", main_path),
+            (self.refs, b"refs/worktree/foo", main_path),
+            (self.refs, b"refs/bisect/good", main_path),
+            (self.wt_refs, b"HEAD", wt_path),
+            (self.wt_refs, b"refs/heads/main", common),
+            (self.wt_refs, b"refs/heads/wt-main", common),
+            (self.wt_refs, b"refs/worktree/foo", wt_path),
+            (self.wt_refs, b"refs/bisect/good", wt_path),
+        ]
+
+        for refs, refname, git_dir in cases:
+            with self.subTest(refs=refs, refname=refname, git_dir=git_dir):
+                refpath = refs.refpath(refname)
+                expected_path = os.path.join(
+                    git_dir, refname.replace(b"/", os.fsencode(os.sep))
+                )
+                self.assertEqual(refpath, expected_path)
+
+    def test_shared_ref(self) -> None:
+        self.assertEqual(self.refs[b"refs/heads/main"], self.first_commit)
+        self.assertEqual(self.refs[b"refs/heads/wt-main"], self.second_commit)
+        self.assertEqual(self.wt_refs[b"refs/heads/main"], self.first_commit)
+        self.assertEqual(self.wt_refs[b"refs/heads/wt-main"], self.second_commit)
+
+        expected = {b"HEAD", b"refs/heads/main", b"refs/heads/wt-main"}
+        self.assertEqual(expected, self.refs.keys())
+        self.assertEqual(expected, self.wt_refs.keys())
+
+        self.assertEqual({b"main", b"wt-main"}, set(self.refs.keys(b"refs/heads/")))
+        self.assertEqual({b"main", b"wt-main"}, set(self.wt_refs.keys(b"refs/heads/")))
+
+        ref_path = os.path.join(self.refs.path, b"refs", b"heads", b"main")
+        self.assertTrue(os.path.exists(ref_path))
+
+        ref_path = os.path.join(self.wt_refs.worktree_path, b"refs", b"heads", b"main")
+        self.assertFalse(os.path.exists(ref_path))
+
+    def test_per_worktree_ref(self) -> None:
+        path = self.refs.path
+        wt_path = self.wt_refs.worktree_path
+
+        self.assertEqual(self.refs[b"HEAD"], self.first_commit)
+        self.assertEqual(self.wt_refs[b"HEAD"], self.second_commit)
+
+        self.refs[b"refs/bisect/good"] = self.first_commit
+        self.wt_refs[b"refs/bisect/good"] = self.second_commit
+
+        self.refs[b"refs/bisect/start"] = self.first_commit
+        self.wt_refs[b"refs/bisect/bad"] = self.second_commit
+
+        self.assertEqual(self.refs[b"refs/bisect/good"], self.first_commit)
+        self.assertEqual(self.wt_refs[b"refs/bisect/good"], self.second_commit)
+
+        self.assertTrue(os.path.exists(os.path.join(path, b"refs", b"bisect", b"good")))
+        self.assertTrue(
+            os.path.exists(os.path.join(wt_path, b"refs", b"bisect", b"good"))
+        )
+
+        self.assertEqual(self.refs[b"refs/bisect/start"], self.first_commit)
+        with self.assertRaises(KeyError):
+            self.wt_refs[b"refs/bisect/start"]
+        self.assertTrue(
+            os.path.exists(os.path.join(path, b"refs", b"bisect", b"start"))
+        )
+        self.assertFalse(
+            os.path.exists(os.path.join(wt_path, b"refs", b"bisect", b"start"))
+        )
+
+        with self.assertRaises(KeyError):
+            self.refs[b"refs/bisect/bad"]
+        self.assertEqual(self.wt_refs[b"refs/bisect/bad"], self.second_commit)
+        self.assertFalse(os.path.exists(os.path.join(path, b"refs", b"bisect", b"bad")))
+        self.assertTrue(
+            os.path.exists(os.path.join(wt_path, b"refs", b"bisect", b"bad"))
+        )
+
+        expected_refs = {
+            b"HEAD",
+            b"refs/heads/main",
+            b"refs/heads/wt-main",
+            b"refs/bisect/good",
+            b"refs/bisect/start",
+        }
+        self.assertEqual(self.refs.keys(), expected_refs)
+        self.assertEqual({b"good", b"start"}, self.refs.keys(b"refs/bisect/"))
+
+        expected_wt_refs = {
+            b"HEAD",
+            b"refs/heads/main",
+            b"refs/heads/wt-main",
+            b"refs/bisect/good",
+            b"refs/bisect/bad",
+        }
+        self.assertEqual(self.wt_refs.keys(), expected_wt_refs)
+        self.assertEqual({b"good", b"bad"}, self.wt_refs.keys(b"refs/bisect/"))
+
+    def test_delete_per_worktree_ref(self) -> None:
+        self.refs[b"refs/worktree/foo"] = self.first_commit
+        self.wt_refs[b"refs/worktree/foo"] = self.second_commit
+
+        del self.wt_refs[b"refs/worktree/foo"]
+        with self.assertRaises(KeyError):
+            self.wt_refs[b"refs/worktree/foo"]
+
+        del self.refs[b"refs/worktree/foo"]
+        with self.assertRaises(KeyError):
+            self.refs[b"refs/worktree/foo"]
+
+    def test_delete_shared_ref(self) -> None:
+        self.refs[b"refs/heads/branch"] = self.first_commit
+
+        del self.wt_refs[b"refs/heads/branch"]
+
+        with self.assertRaises(KeyError):
+            self.wt_refs[b"refs/heads/branch"]
+        with self.assertRaises(KeyError):
+            self.refs[b"refs/heads/branch"]
+
+    def test_contains_shared_ref(self):
+        self.assertIn(b"refs/heads/main", self.refs)
+        self.assertIn(b"refs/heads/main", self.wt_refs)
+        self.assertIn(b"refs/heads/wt-main", self.refs)
+        self.assertIn(b"refs/heads/wt-main", self.wt_refs)
+
+    def test_contains_per_worktree_ref(self):
+        self.refs[b"refs/worktree/foo"] = self.first_commit
+        self.wt_refs[b"refs/worktree/bar"] = self.second_commit
+
+        self.assertIn(b"refs/worktree/foo", self.refs)
+        self.assertNotIn(b"refs/worktree/bar", self.refs)
+        self.assertNotIn(b"refs/worktree/foo", self.wt_refs)
+        self.assertIn(b"refs/worktree/bar", self.wt_refs)
 
 
 _TEST_REFS_SERIALIZED = (

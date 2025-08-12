@@ -896,7 +896,7 @@ class SwiftObjectStore(PackBasedObjectStore):
 
         # Update the header with the new number of objects.
         f.seek(0)
-        write_pack_header(f, len(entries) + len(indexer.ext_refs))  # type: ignore
+        write_pack_header(f, len(entries) + len(indexer.ext_refs()))  # type: ignore
 
         # Must flush before reading (http://bugs.python.org/issue3207)
         f.flush()
@@ -908,7 +908,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         f.seek(0, os.SEEK_CUR)
 
         # Complete the pack.
-        for ext_sha in indexer.ext_refs:  # type: ignore
+        for ext_sha in indexer.ext_refs():  # type: ignore
             assert len(ext_sha) == 20
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()

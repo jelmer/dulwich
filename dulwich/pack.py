@@ -2048,7 +2048,6 @@ class DeltaChainIterator(Generic[T]):
         """Iterate over objects in the pack."""
         return self._walk_all_chains()
 
-    @property
     def ext_refs(self) -> list[bytes]:
         """Return external references."""
         return self._ext_refs

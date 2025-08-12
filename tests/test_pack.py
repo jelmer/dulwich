@@ -1465,7 +1465,7 @@ class DeltaChainIteratorTests(TestCase):
         entries = build_pack(f, [(REF_DELTA, (blob.id, b"blob1"))], store=self.store)
         pack_iter = self.make_pack_iter(f)
         self.assertEntriesMatch([0], entries, pack_iter)
-        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_ext_ref_chain(self) -> None:
         (blob,) = self.store_blobs([b"blob"])
@@ -1480,7 +1480,7 @@ class DeltaChainIteratorTests(TestCase):
         )
         pack_iter = self.make_pack_iter(f)
         self.assertEntriesMatch([1, 0], entries, pack_iter)
-        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_ext_ref_chain_degenerate(self) -> None:
         # Test a degenerate case where the sender is sending a REF_DELTA
@@ -1500,7 +1500,7 @@ class DeltaChainIteratorTests(TestCase):
         )
         pack_iter = self.make_pack_iter(f)
         self.assertEntriesMatch([0, 1], entries, pack_iter)
-        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_ext_ref_multiple_times(self) -> None:
         (blob,) = self.store_blobs([b"blob"])
@@ -1515,7 +1515,7 @@ class DeltaChainIteratorTests(TestCase):
         )
         pack_iter = self.make_pack_iter(f)
         self.assertEntriesMatch([0, 1], entries, pack_iter)
-        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs)
+        self.assertEqual([hex_to_sha(blob.id)], pack_iter.ext_refs())
 
     def test_multiple_ext_refs(self) -> None:
         b1, b2 = self.store_blobs([b"foo", b"bar"])
@@ -1530,7 +1530,7 @@ class DeltaChainIteratorTests(TestCase):
         )
         pack_iter = self.make_pack_iter(f)
         self.assertEntriesMatch([0, 1], entries, pack_iter)
-        self.assertEqual([hex_to_sha(b1.id), hex_to_sha(b2.id)], pack_iter.ext_refs)
+        self.assertEqual([hex_to_sha(b1.id), hex_to_sha(b2.id)], pack_iter.ext_refs())
 
     def test_bad_ext_ref_non_thin_pack(self) -> None:
         (blob,) = self.store_blobs([b"blob"])

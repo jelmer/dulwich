@@ -1410,7 +1410,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         pack_sha, extra_entries = extend_pack(
             f,
-            indexer.ext_refs,
+            indexer.ext_refs(),
             get_raw=self.get_raw,
             compression_level=self.pack_compression_level,
             progress=progress,

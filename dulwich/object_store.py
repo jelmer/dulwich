@@ -32,6 +32,7 @@ import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import suppress
 from io import BytesIO
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -2653,8 +2654,8 @@ def iter_tree_contents(
       store: Object store to get trees from
       tree_id: SHA1 of the tree.
       include_trees: If True, include tree objects in the iteration.
-    Returns: Iterator over TreeEntry namedtuples for all the objects in a
-        tree.
+
+    Yields: TreeEntry namedtuples for all the objects in a tree.
     """
     if tree_id is None:
         return
@@ -2672,6 +2673,57 @@ def iter_tree_contents(
             todo.extend(reversed(extra))
         if not stat.S_ISDIR(entry.mode) or include_trees:
             yield entry
+
+
+def iter_commit_contents(
+    store: ObjectContainer,
+    commit: Union[Commit, bytes],
+    *,
+    include: Optional[Sequence[Union[str, bytes, Path]]] = None,
+):
+    """Iterate the contents of the repository at the specified commit.
+
+    This is a wrapper around iter_tree_contents() and
+    tree_lookup_path() to simplify the common task of getting the
+    contest of a repo at a particular commit. See also
+    dulwich.index.build_file_from_blob() for writing individual files
+    to disk.
+
+    Args:
+      store: Object store to get trees from
+      commit: Commit object, or SHA1 of a commit
+      include: if provided, only the entries whose paths are in the
+        list, or whose parent tree is in the list, will be
+        included. Note that duplicate or overlapping paths
+        (e.g. ["foo", "foo/bar"]) may result in duplicate entries
+
+    Yields: TreeEntry namedtuples for all matching files in a commit.
+    """
+    sha = commit.id if isinstance(commit, Commit) else commit
+    if not isinstance(obj := store[sha], Commit):
+        raise TypeError(
+            f"{sha.decode('ascii')} should be ID of a Commit, but is {type(obj)}"
+        )
+    commit = obj
+    encoding = commit.encoding or "utf-8"
+    include = (
+        [
+            path if isinstance(path, bytes) else str(path).encode(encoding)
+            for path in include
+        ]
+        if include is not None
+        else [b""]
+    )
+
+    for path in include:
+        mode, obj_id = tree_lookup_path(store.__getitem__, commit.tree, path)
+        # Iterate all contained files if path points to a dir, otherwise just get that
+        # single file
+        if isinstance(store[obj_id], Tree):
+            for entry in iter_tree_contents(store, obj_id):
+                yield entry.in_path(path)
+        else:
+            yield TreeEntry(path, mode, obj_id)
 
 
 def peel_sha(store: ObjectContainer, sha: bytes) -> tuple[ShaFile, ShaFile]:

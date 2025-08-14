@@ -30,6 +30,7 @@ from dulwich.object_store import (
     MemoryObjectStore,
     PackBasedObjectStore,
     find_shallow,
+    iter_commit_contents,
     iter_tree_contents,
     peel_sha,
 )
@@ -427,8 +428,8 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
         self.assertNotIn(b1.id, self.store)
 
 
-class FindShallowTests(TestCase):
-    """Tests for finding shallow commits."""
+class CommitTestHelper:
+    """Helper for tests which iterate over commits."""
 
     def setUp(self):
         """Set up test fixture."""
@@ -440,6 +441,149 @@ class FindShallowTests(TestCase):
         commit = make_commit(**attrs)
         self._store.add_object(commit)
         return commit
+
+
+class IterCommitContentsTests(CommitTestHelper, TestCase):
+    """Tests for iter_commit_contents."""
+
+    def make_commits_with_contents(self):
+        """Helper to prepare test commits."""
+        files = [
+            # (path, contents)
+            (b"foo", b"foo"),
+            (b"bar", b"bar"),
+            (b"dir/baz", b"baz"),
+            (b"dir/subdir/foo", b"subfoo"),
+            (b"dir/subdir/bar", b"subbar"),
+            (b"dir/subdir/baz", b"subbaz"),
+        ]
+        blobs = {contents: make_object(Blob, data=contents) for path, contents in files}
+        for blob in blobs.values():
+            self._store.add_object(blob)
+        commit = self.make_commit(
+            tree=commit_tree(
+                self._store,
+                [(path, blobs[contents].id, 0o100644) for path, contents in files],
+            )
+        )
+
+        return commit
+
+    def assertCommitEntries(self, results, expected):
+        """Assert that iter_commit_contents results are equal to expected."""
+        actual = [(entry.path, self._store[entry.sha].data) for entry in results]
+        self.assertEqual(actual, expected)
+
+    def test_iter_commit_contents_no_includes(self) -> None:
+        """Test iterating commit contents without includes."""
+        commit = self.make_commits_with_contents()
+
+        # this is the same list as used by make_commits_with_contents,
+        # but ordered to match the actual iter_tree_contents iteration
+        # order
+        all_files = [
+            (b"bar", b"bar"),
+            (b"dir/baz", b"baz"),
+            (b"dir/subdir/bar", b"subbar"),
+            (b"dir/subdir/baz", b"subbaz"),
+            (b"dir/subdir/foo", b"subfoo"),
+            (b"foo", b"foo"),
+        ]
+
+        # No includes
+        self.assertCommitEntries(iter_commit_contents(self._store, commit), all_files)
+
+        # Explicit include=None
+        self.assertCommitEntries(
+            iter_commit_contents(self._store, commit, include=None), all_files
+        )
+
+        # include=[] is not the same as None
+        self.assertCommitEntries(
+            iter_commit_contents(self._store, commit, include=[]), []
+        )
+
+    def test_iter_commit_contents_with_includes(self) -> None:
+        """Test iterating commit contents with includes."""
+        commit = self.make_commits_with_contents()
+
+        include1 = ["foo", "bar"]
+        expected1 = [
+            # Note: iter_tree_contents iterates in name order, but we
+            # listed two separate paths, so they'll keep their order
+            # as specified
+            (b"foo", b"foo"),
+            (b"bar", b"bar"),
+        ]
+
+        include2 = ["foo", "dir/subdir"]
+        expected2 = [
+            # foo
+            (b"foo", b"foo"),
+            # dir/subdir
+            (b"dir/subdir/bar", b"subbar"),
+            (b"dir/subdir/baz", b"subbaz"),
+            (b"dir/subdir/foo", b"subfoo"),
+        ]
+
+        include3 = ["dir"]
+        expected3 = [
+            (b"dir/baz", b"baz"),
+            (b"dir/subdir/bar", b"subbar"),
+            (b"dir/subdir/baz", b"subbaz"),
+            (b"dir/subdir/foo", b"subfoo"),
+        ]
+
+        for include, expected in [
+            (include1, expected1),
+            (include2, expected2),
+            (include3, expected3),
+        ]:
+            self.assertCommitEntries(
+                iter_commit_contents(self._store, commit, include=include), expected
+            )
+
+    def test_iter_commit_contents_overlapping_includes(self) -> None:
+        """Test iterating commit contents with overlaps in includes."""
+        commit = self.make_commits_with_contents()
+
+        include1 = ["dir", "dir/baz"]
+        expected1 = [
+            # dir
+            (b"dir/baz", b"baz"),
+            (b"dir/subdir/bar", b"subbar"),
+            (b"dir/subdir/baz", b"subbaz"),
+            (b"dir/subdir/foo", b"subfoo"),
+            # dir/baz
+            (b"dir/baz", b"baz"),
+        ]
+
+        include2 = ["dir", "dir/subdir", "dir/subdir/baz"]
+        expected2 = [
+            # dir
+            (b"dir/baz", b"baz"),
+            (b"dir/subdir/bar", b"subbar"),
+            (b"dir/subdir/baz", b"subbaz"),
+            (b"dir/subdir/foo", b"subfoo"),
+            # dir/subdir
+            (b"dir/subdir/bar", b"subbar"),
+            (b"dir/subdir/baz", b"subbaz"),
+            (b"dir/subdir/foo", b"subfoo"),
+            # dir/subdir/baz
+            (b"dir/subdir/baz", b"subbaz"),
+        ]
+
+        for include, expected in [
+            (include1, expected1),
+            (include2, expected2),
+        ]:
+            self.assertCommitEntries(
+                iter_commit_contents(self._store, commit, include=include), expected
+            )
+
+
+class FindShallowTests(CommitTestHelper, TestCase):
+    """Tests for finding shallow commits."""
 
     def make_linear_commits(self, n, message=b""):
         """Create a linear chain of commits."""

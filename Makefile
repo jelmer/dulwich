@@ -9,6 +9,8 @@ DESTDIR=/
 
 all: build
 
+all-style:: fix reformat codespell
+
 doc:: sphinx
 
 sphinx::

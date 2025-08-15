@@ -64,7 +64,6 @@ jobs:
           RUSTFLAGS: "-D warnings"
       - name: codespell
         run: |
-          pip install --upgrade codespell
           codespell --config .codespellrc .
       - name: Coverage test suite run
         run: |

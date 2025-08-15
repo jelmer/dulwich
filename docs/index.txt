@@ -19,6 +19,8 @@ Documentation
 
     tutorial/index
 
+    recipes/index
+
     api/index
 
 

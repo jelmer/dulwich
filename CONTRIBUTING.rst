@@ -48,8 +48,8 @@ The code follows the PEP8 coding style. There are ``ruff`` rules in place that d
 exact code style, please run it to make sure your changes are conformant. See also "Style
 and typing checks" below for details on running style checkers.
 
-Furthermore, triple-quotes should always be """, single quotes are ' unless
-using " would result in less escaping within the string.
+Furthermore, triple-quotes should always be delimited with ``"""``, single quotes with
+``"`` unless using ``'`` would result in less escaping within the string.
 
 Public methods, functions and classes should all have doc strings. Please use
 Google style docstrings to document parameters and return values.

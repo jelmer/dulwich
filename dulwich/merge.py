@@ -14,6 +14,16 @@ from dulwich.object_store import BaseObjectStore
 from dulwich.objects import S_ISGITLINK, Blob, Commit, Tree, is_blob, is_tree
 
 
+def make_merge3(*args, **kwargs) -> "merge3.Merge3":
+    """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
+    if merge3 is None:
+        raise ImportError(
+            "merge3 module is required for three-way merging. "
+            "Install it with: pip install merge3"
+        )
+    return merge3.Merge3(*args, **kwargs)
+
+
 class MergeConflict(Exception):
     """Raised when a merge conflict occurs."""
 
@@ -163,12 +173,7 @@ def merge_blobs(
             return ours_blob.data, False
         else:
             # Both added different content - conflict
-            if merge3 is None:
-                raise ImportError(
-                    "merge3 module is required for three-way merging. "
-                    "Install it with: pip install merge3"
-                )
-            m = merge3.Merge3(
+            m = make_merge3(
                 [],
                 ours_blob.data.splitlines(True),
                 theirs_blob.data.splitlines(True),
@@ -190,12 +195,7 @@ def merge_blobs(
                 return b"", False  # They didn't modify, accept deletion
             else:
                 # Conflict: we deleted, they modified
-                if merge3 is None:
-                    raise ImportError(
-                        "merge3 module is required for three-way merging. "
-                        "Install it with: pip install merge3"
-                    )
-                m = merge3.Merge3(
+                m = make_merge3(
                     base_content.splitlines(True),
                     [],
                     theirs_content.splitlines(True),
@@ -207,12 +207,7 @@ def merge_blobs(
                 return b"", False  # We didn't modify, accept deletion
             else:
                 # Conflict: they deleted, we modified
-                if merge3 is None:
-                    raise ImportError(
-                        "merge3 module is required for three-way merging. "
-                        "Install it with: pip install merge3"
-                    )
-                m = merge3.Merge3(
+                m = make_merge3(
                     base_content.splitlines(True),
                     ours_content.splitlines(True),
                     [],
@@ -228,12 +223,7 @@ def merge_blobs(
         return ours_content, False
 
     # Perform three-way merge
-    if merge3 is None:
-        raise ImportError(
-            "merge3 module is required for three-way merging. "
-            "Install it with: pip install merge3"
-        )
-    m = merge3.Merge3(
+    m = make_merge3(
         base_content.splitlines(True),
         ours_content.splitlines(True),
         theirs_content.splitlines(True),

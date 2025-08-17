@@ -476,10 +476,13 @@ class TreeBlobNormalizer(BlobNormalizer):
 
     def checkin_normalize(self, blob: Blob, tree_path: bytes) -> Blob:
         """Normalize blob for checkin, considering existing tree state."""
-        # Existing files should only be normalized on checkin if it was
-        # previously normalized on checkout
+        # Existing files should only be normalized on checkin if:
+        # 1. They were previously normalized on checkout (autocrlf=true), OR
+        # 2. We have a write filter (autocrlf=true or autocrlf=input), OR
+        # 3. They are new files
         if (
             self.fallback_read_filter is not None
+            or self.fallback_write_filter is not None
             or tree_path not in self.existing_paths
         ):
             return super().checkin_normalize(blob, tree_path)

@@ -26,6 +26,10 @@
    for pick, reword, edit, squash, fixup, drop, exec, and break commands.
    (Jelmer Vernooĳ, #1696)
 
+ * Fix handling of CRLF line endings with ``core.autocrlf = input`` to prevent
+   unchanged files from appearing as unstaged in status.
+   (Jelmer Vernooĳ, #1770)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

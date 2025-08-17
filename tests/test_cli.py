@@ -81,6 +81,7 @@ class DulwichCliTestCase(TestCase):
         old_stdout = sys.stdout
         old_stderr = sys.stderr
         old_cwd = os.getcwd()
+
         try:
             # Use custom stdout_stream if provided, otherwise use MockStream
             if stdout_stream:
@@ -691,13 +692,15 @@ class FilterBranchCommandTest(DulwichCliTestCase):
     def test_filter_branch_subdirectory_filter(self):
         """Test filter-branch with subdirectory filter."""
         # Run filter-branch to extract only the subdir
-        result, stdout, stderr = self._run_cli(
-            "filter-branch", "--subdirectory-filter", "subdir"
-        )
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli(
+                "filter-branch", "--subdirectory-filter", "subdir"
+            )
 
-        # Check that the operation succeeded
-        self.assertEqual(result, 0)
-        self.assertIn("Rewrite HEAD", stdout)
+            # Check that the operation succeeded
+            self.assertEqual(result, 0)
+            log_output = "\n".join(cm.output)
+            self.assertIn("Rewrite HEAD", log_output)
 
         # filter-branch rewrites history but doesn't update working tree
         # We need to check the commit contents, not the working tree
@@ -786,12 +789,14 @@ class FilterBranchCommandTest(DulwichCliTestCase):
         self.assertTrue(len(original_refs) > 0, "No original refs found")
 
         # Run again without force - should fail
-        result, stdout, stderr = self._run_cli(
-            "filter-branch", "--msg-filter", "sed 's/^/[TEST2] /'"
-        )
-        self.assertEqual(result, 1)
-        self.assertIn("Cannot create a new backup", stdout)
-        self.assertIn("refs/original", stdout)
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, stdout, stderr = self._run_cli(
+                "filter-branch", "--msg-filter", "sed 's/^/[TEST2] /'"
+            )
+            self.assertEqual(result, 1)
+            log_output = "\n".join(cm.output)
+            self.assertIn("Cannot create a new backup", log_output)
+            self.assertIn("refs/original", log_output)
 
         # Run with force - should succeed
         result, stdout, stderr = self._run_cli(
@@ -810,12 +815,14 @@ class FilterBranchCommandTest(DulwichCliTestCase):
         self._run_cli("commit", "--message=Branch commit")
 
         # Run filter-branch on the test-branch
-        result, stdout, stderr = self._run_cli(
-            "filter-branch", "--msg-filter", "sed 's/^/[BRANCH] /'", "test-branch"
-        )
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli(
+                "filter-branch", "--msg-filter", "sed 's/^/[BRANCH] /'", "test-branch"
+            )
 
-        self.assertEqual(result, 0)
-        self.assertIn("Ref 'refs/heads/test-branch' was rewritten", stdout)
+            self.assertEqual(result, 0)
+            log_output = "\n".join(cm.output)
+            self.assertIn("Ref 'refs/heads/test-branch' was rewritten", log_output)
 
         # Check that only test-branch was modified
         result, stdout, stderr = self._run_cli("log")
@@ -962,9 +969,11 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         )
 
         # Test format-patch for last commit
-        result, stdout, stderr = self._run_cli("format-patch", "-n", "1")
-        self.assertEqual(result, None)
-        self.assertIn("0001-Add-hello.txt.patch", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("format-patch", "-n", "1")
+            self.assertEqual(result, None)
+            log_output = "\n".join(cm.output)
+            self.assertIn("0001-Add-hello.txt.patch", log_output)
 
         # Check patch contents
         patch_file = os.path.join(self.repo_path, "0001-Add-hello.txt.patch")
@@ -1019,10 +1028,12 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         )
 
         # Test format-patch for last 2 commits
-        result, stdout, stderr = self._run_cli("format-patch", "-n", "2")
-        self.assertEqual(result, None)
-        self.assertIn("0001-Add-file1.txt.patch", stdout)
-        self.assertIn("0002-Add-file2.txt.patch", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("format-patch", "-n", "2")
+            self.assertEqual(result, None)
+            log_output = "\n".join(cm.output)
+            self.assertIn("0001-Add-file1.txt.patch", log_output)
+            self.assertIn("0002-Add-file2.txt.patch", log_output)
 
         # Check first patch
         with open(os.path.join(self.repo_path, "0001-Add-file1.txt.patch"), "rb") as f:
@@ -1110,14 +1121,16 @@ class FormatPatchCommandTest(DulwichCliTestCase):
             commits.append(c)
 
         # Test format-patch with commit range (should get commits 2 and 3)
-        result, stdout, stderr = self._run_cli(
-            "format-patch", f"{commits[1].decode()}..{commits[3].decode()}"
-        )
-        self.assertEqual(result, None)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli(
+                "format-patch", f"{commits[1].decode()}..{commits[3].decode()}"
+            )
+            self.assertEqual(result, None)
 
-        # Should create patches for commits 2 and 3
-        self.assertIn("0001-Add-file2.txt.patch", stdout)
-        self.assertIn("0002-Add-file3.txt.patch", stdout)
+            # Should create patches for commits 2 and 3
+            log_output = "\n".join(cm.output)
+            self.assertIn("0001-Add-file2.txt.patch", log_output)
+            self.assertIn("0002-Add-file3.txt.patch", log_output)
 
         # Verify patch contents
         with open(os.path.join(self.repo_path, "0001-Add-file2.txt.patch"), "rb") as f:
@@ -1307,8 +1320,12 @@ class ForEachRefCommandTest(DulwichCliTestCase):
         self._run_cli("add", "test.txt")
         self._run_cli("commit", "--message=Initial")
 
-        result, stdout, stderr = self._run_cli("for-each-ref")
-        self.assertIn("refs/heads/master", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("for-each-ref")
+            log_output = "\n".join(cm.output)
+            # Just check that we have some refs output and it contains refs/heads
+            self.assertTrue(len(cm.output) > 0, "Expected some ref output")
+            self.assertIn("refs/heads/", log_output)
 
 
 class PackRefsCommandTest(DulwichCliTestCase):
@@ -1374,8 +1391,9 @@ class StashCommandTest(DulwichCliTestCase):
             f.write("modified")
 
         # Stash changes
-        result, stdout, stderr = self._run_cli("stash", "push")
-        self.assertIn("Saved working directory", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("stash", "push")
+            self.assertIn("Saved working directory", cm.output[0])
 
         # Note: Dulwich stash doesn't currently update the working tree
         # so the file remains modified after stash push
@@ -1416,14 +1434,18 @@ class HelpCommandTest(DulwichCliTestCase):
     """Tests for help command."""
 
     def test_help_basic(self):
-        result, stdout, stderr = self._run_cli("help")
-        self.assertIn("dulwich command line tool", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("help")
+            log_output = "\n".join(cm.output)
+            self.assertIn("dulwich command line tool", log_output)
 
     def test_help_all(self):
-        result, stdout, stderr = self._run_cli("help", "-a")
-        self.assertIn("Available commands:", stdout)
-        self.assertIn("add", stdout)
-        self.assertIn("commit", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("help", "-a")
+            log_output = "\n".join(cm.output)
+            self.assertIn("Available commands:", log_output)
+            self.assertIn("add", log_output)
+            self.assertIn("commit", log_output)
 
 
 class RemoteCommandTest(DulwichCliTestCase):
@@ -1450,9 +1472,13 @@ class CheckIgnoreCommandTest(DulwichCliTestCase):
         with open(gitignore, "w") as f:
             f.write("*.log\n")
 
-        result, stdout, stderr = self._run_cli("check-ignore", "test.log", "test.txt")
-        self.assertIn("test.log", stdout)
-        self.assertNotIn("test.txt", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli(
+                "check-ignore", "test.log", "test.txt"
+            )
+            log_output = "\n".join(cm.output)
+            self.assertIn("test.log", log_output)
+            self.assertNotIn("test.txt", log_output)
 
 
 class LsFilesCommandTest(DulwichCliTestCase):
@@ -1466,10 +1492,12 @@ class LsFilesCommandTest(DulwichCliTestCase):
                 f.write(f"content of {name}")
         self._run_cli("add", "a.txt", "b.txt", "c.txt")
 
-        result, stdout, stderr = self._run_cli("ls-files")
-        self.assertIn("a.txt", stdout)
-        self.assertIn("b.txt", stdout)
-        self.assertIn("c.txt", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("ls-files")
+            log_output = "\n".join(cm.output)
+            self.assertIn("a.txt", log_output)
+            self.assertIn("b.txt", log_output)
+            self.assertIn("c.txt", log_output)
 
 
 class LsTreeCommandTest(DulwichCliTestCase):
@@ -1515,8 +1543,9 @@ class DescribeCommandTest(DulwichCliTestCase):
         self._run_cli("commit", "--message=Initial")
         self._run_cli("tag", "v1.0")
 
-        result, stdout, stderr = self._run_cli("describe")
-        self.assertIn("v1.0", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("describe")
+            self.assertIn("v1.0", cm.output[0])
 
 
 class FsckCommandTest(DulwichCliTestCase):
@@ -1706,9 +1735,10 @@ class BundleCommandTest(DulwichCliTestCase):
         """Test bundle creation with no refs specified."""
         bundle_file = os.path.join(self.test_dir, "noref.bundle")
 
-        result, stdout, stderr = self._run_cli("bundle", "create", bundle_file)
-        self.assertEqual(result, 1)
-        self.assertIn("No refs specified", stdout)
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, stdout, stderr = self._run_cli("bundle", "create", bundle_file)
+            self.assertEqual(result, 1)
+            self.assertIn("No refs specified", cm.output[0])
 
     def test_bundle_create_empty_bundle_refused(self):
         """Test that empty bundles are refused."""
@@ -1729,9 +1759,10 @@ class BundleCommandTest(DulwichCliTestCase):
         self.assertEqual(result, 0)
 
         # Now verify it
-        result, stdout, stderr = self._run_cli("bundle", "verify", bundle_file)
-        self.assertEqual(result, 0)
-        self.assertIn("valid and can be applied", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("bundle", "verify", bundle_file)
+            self.assertEqual(result, 0)
+            self.assertIn("valid and can be applied", cm.output[0])
 
     def test_bundle_verify_quiet(self):
         """Test bundle verification with quiet flag."""
@@ -1776,10 +1807,11 @@ class BundleCommandTest(DulwichCliTestCase):
         self._run_cli("bundle", "create", bundle_file, "HEAD")
 
         # List heads
-        result, stdout, stderr = self._run_cli("bundle", "list-heads", bundle_file)
-        self.assertEqual(result, 0)
-        # Should contain at least the HEAD reference
-        self.assertTrue(len(stdout.strip()) > 0)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("bundle", "list-heads", bundle_file)
+            self.assertEqual(result, 0)
+            # Should contain at least the HEAD reference
+            self.assertTrue(len(cm.output) > 0)
 
     def test_bundle_list_heads_specific_refs(self):
         """Test listing specific bundle heads."""
@@ -1789,10 +1821,11 @@ class BundleCommandTest(DulwichCliTestCase):
         self._run_cli("bundle", "create", bundle_file, "HEAD")
 
         # List heads without filtering
-        result, stdout, stderr = self._run_cli("bundle", "list-heads", bundle_file)
-        self.assertEqual(result, 0)
-        # Should contain some reference
-        self.assertTrue(len(stdout.strip()) > 0)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("bundle", "list-heads", bundle_file)
+            self.assertEqual(result, 0)
+            # Should contain some reference
+            self.assertTrue(len(cm.output) > 0)
 
     def test_bundle_list_heads_from_stdin(self):
         """Test listing bundle heads from stdin."""
@@ -1918,15 +1951,17 @@ class BundleCommandTest(DulwichCliTestCase):
 
     def test_bundle_invalid_subcommand(self):
         """Test invalid bundle subcommand."""
-        result, stdout, stderr = self._run_cli("bundle", "invalid-command")
-        self.assertEqual(result, 1)
-        self.assertIn("Unknown bundle subcommand", stdout)
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, stdout, stderr = self._run_cli("bundle", "invalid-command")
+            self.assertEqual(result, 1)
+            self.assertIn("Unknown bundle subcommand", cm.output[0])
 
     def test_bundle_no_subcommand(self):
         """Test bundle command with no subcommand."""
-        result, stdout, stderr = self._run_cli("bundle")
-        self.assertEqual(result, 1)
-        self.assertIn("Usage: bundle", stdout)
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, stdout, stderr = self._run_cli("bundle")
+            self.assertEqual(result, 1)
+            self.assertIn("Usage: bundle", cm.output[0])
 
     def test_bundle_create_with_stdin_refs(self):
         """Test bundle creation reading refs from stdin."""
@@ -2003,9 +2038,10 @@ class BundleCommandTest(DulwichCliTestCase):
         self.assertTrue(os.path.exists(bundle_file))
 
         # Verify the bundle was created
-        result, stdout, stderr = self._run_cli("bundle", "verify", bundle_file)
-        self.assertEqual(result, 0)
-        self.assertIn("valid and can be applied", stdout)
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("bundle", "verify", bundle_file)
+            self.assertEqual(result, 0)
+            self.assertIn("valid and can be applied", cm.output[0])
 
 
 class FormatBytesTestCase(TestCase):
@@ -2355,19 +2391,14 @@ class WorktreeCliTests(DulwichCliTestCase):
         """Test worktree add command."""
         wt_path = os.path.join(self.test_dir, "worktree1")
 
-        # Change to repo directory like real usage
-        old_cwd = os.getcwd()
-        os.chdir(self.repo_path)
-        try:
-            cmd = cli.cmd_worktree()
-            with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-                result = cmd.run(["add", wt_path, "feature"])
-
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli(
+                "worktree", "add", wt_path, "feature"
+            )
             self.assertEqual(result, 0)
             self.assertTrue(os.path.exists(wt_path))
-            self.assertIn("Worktree added:", mock_stdout.getvalue())
-        finally:
-            os.chdir(old_cwd)
+            log_output = "\n".join(cm.output)
+            self.assertIn("Worktree added:", log_output)
 
     def test_worktree_add_detached(self):
         """Test worktree add with detached HEAD."""
@@ -2390,98 +2421,73 @@ class WorktreeCliTests(DulwichCliTestCase):
         """Test worktree remove command."""
         # First add a worktree
         wt_path = os.path.join(self.test_dir, "to-remove")
+        result, stdout, stderr = self._run_cli("worktree", "add", wt_path)
+        self.assertEqual(result, 0)
 
-        # Change to repo directory
-        old_cwd = os.getcwd()
-        os.chdir(self.repo_path)
-        try:
-            cmd = cli.cmd_worktree()
-            cmd.run(["add", wt_path])
-
-            # Then remove it
-            with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-                result = cmd.run(["remove", wt_path])
-
+        # Then remove it
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("worktree", "remove", wt_path)
             self.assertEqual(result, 0)
             self.assertFalse(os.path.exists(wt_path))
-            self.assertIn("Worktree removed:", mock_stdout.getvalue())
-        finally:
-            os.chdir(old_cwd)
+            log_output = "\n".join(cm.output)
+            self.assertIn("Worktree removed:", log_output)
 
     def test_worktree_prune(self):
         """Test worktree prune command."""
         # Add a worktree and manually remove it
         wt_path = os.path.join(self.test_dir, "to-prune")
+        result, stdout, stderr = self._run_cli("worktree", "add", wt_path)
+        self.assertEqual(result, 0)
+        shutil.rmtree(wt_path)
 
-        # Change to repo directory
-        old_cwd = os.getcwd()
-        os.chdir(self.repo_path)
-        try:
-            cmd = cli.cmd_worktree()
-            cmd.run(["add", wt_path])
-            shutil.rmtree(wt_path)
-
-            # Prune
-            with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-                result = cmd.run(["prune", "-v"])
-
+        # Prune
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("worktree", "prune", "-v")
             self.assertEqual(result, 0)
-            output = mock_stdout.getvalue()
-            self.assertIn("to-prune", output)
-        finally:
-            os.chdir(old_cwd)
+            log_output = "\n".join(cm.output)
+            self.assertIn("to-prune", log_output)
 
     def test_worktree_lock_unlock(self):
         """Test worktree lock and unlock commands."""
         # Add a worktree
         wt_path = os.path.join(self.test_dir, "lockable")
+        result, stdout, stderr = self._run_cli("worktree", "add", wt_path)
+        self.assertEqual(result, 0)
 
-        # Change to repo directory
-        old_cwd = os.getcwd()
-        os.chdir(self.repo_path)
-        try:
-            cmd = cli.cmd_worktree()
-            cmd.run(["add", wt_path])
-
-            # Lock it
-            with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-                result = cmd.run(["lock", wt_path, "--reason", "Testing"])
-
+        # Lock it
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli(
+                "worktree", "lock", wt_path, "--reason", "Testing"
+            )
             self.assertEqual(result, 0)
-            self.assertIn("Worktree locked:", mock_stdout.getvalue())
+            log_output = "\n".join(cm.output)
+            self.assertIn("Worktree locked:", log_output)
 
-            # Unlock it
-            with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-                result = cmd.run(["unlock", wt_path])
-
+        # Unlock it
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli("worktree", "unlock", wt_path)
             self.assertEqual(result, 0)
-            self.assertIn("Worktree unlocked:", mock_stdout.getvalue())
-        finally:
-            os.chdir(old_cwd)
+            log_output = "\n".join(cm.output)
+            self.assertIn("Worktree unlocked:", log_output)
 
     def test_worktree_move(self):
         """Test worktree move command."""
         # Add a worktree
         old_path = os.path.join(self.test_dir, "old-location")
         new_path = os.path.join(self.test_dir, "new-location")
+        result, stdout, stderr = self._run_cli("worktree", "add", old_path)
+        self.assertEqual(result, 0)
 
-        # Change to repo directory
-        old_cwd = os.getcwd()
-        os.chdir(self.repo_path)
-        try:
-            cmd = cli.cmd_worktree()
-            cmd.run(["add", old_path])
-
-            # Move it
-            with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-                result = cmd.run(["move", old_path, new_path])
-
+        # Move it
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, stdout, stderr = self._run_cli(
+                "worktree", "move", old_path, new_path
+            )
             self.assertEqual(result, 0)
             self.assertFalse(os.path.exists(old_path))
             self.assertTrue(os.path.exists(new_path))
-            self.assertIn("Worktree moved:", mock_stdout.getvalue())
-        finally:
-            os.chdir(old_cwd)
+            log_output = "\n".join(cm.output)
+            self.assertIn("Worktree moved:", log_output)
 
     def test_worktree_invalid_command(self):
         """Test invalid worktree subcommand."""

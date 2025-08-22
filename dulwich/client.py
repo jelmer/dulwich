@@ -2850,6 +2850,19 @@ def default_urllib3_manager(
 
     headers = {"User-agent": user_agent}
 
+    # Check for extra headers in config
+    if config is not None:
+        try:
+            # Git allows multiple http.extraHeader entries
+            extra_headers = config.get_multivar(b"http", b"extraHeader")
+            for extra_header in extra_headers:
+                if extra_header and b": " in extra_header:
+                    # Parse the header (format: "Header-Name: value")
+                    header_name, header_value = extra_header.split(b": ", 1)
+                    headers[header_name.decode("utf-8")] = header_value.decode("utf-8")
+        except KeyError:
+            pass
+
     kwargs = {
         "ca_certs": ca_certs,
     }
@@ -3425,12 +3438,14 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         username=None,
         password=None,
         timeout=None,
+        extra_headers=None,
         **kwargs,
     ) -> None:
         """Initialize Urllib3HttpGitClient."""
         self._username = username
         self._password = password
         self._timeout = timeout
+        self._extra_headers = extra_headers or {}
 
         if pool_manager is None:
             self.pool_manager = default_urllib3_manager(

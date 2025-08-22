@@ -5731,8 +5731,111 @@ class StatusTests(PorcelainTestCase):
         self.assertDictEqual(
             {"add": [b"crlf-new"], "delete": [], "modify": []}, results.staged
         )
+        # File committed with CRLF before autocrlf=input was enabled
+        # will appear as unstaged because working tree is normalized to LF
+        # during comparison but index still has CRLF
         self.assertListEqual(results.unstaged, [b"crlf-exists"])
         self.assertListEqual(results.untracked, [])
+
+    def test_status_autocrlf_input_modified(self) -> None:
+        """Test that modified files with CRLF are correctly detected with autocrlf=input."""
+        # Commit existing file with CRLF
+        file_path = os.path.join(self.repo.path, "crlf-file.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line1\r\nline2\r\nline3\r\n")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"initial commit",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Modify the file content but keep CRLF
+        with open(file_path, "wb") as f:
+            f.write(b"line1\r\nline2 modified\r\nline3\r\n")
+
+        results = porcelain.status(self.repo)
+        # Modified file should be detected as unstaged
+        self.assertListEqual(results.unstaged, [b"crlf-file.txt"])
+
+    def test_status_autocrlf_input_binary(self) -> None:
+        """Test that binary files are not affected by autocrlf=input."""
+        # Set autocrlf=input first
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Commit binary file with CRLF-like sequences
+        file_path = os.path.join(self.repo.path, "binary.dat")
+        with open(file_path, "wb") as f:
+            f.write(b"binary\r\ndata\x00\xff\r\nmore")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"add binary",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Status should be clean - binary files not normalized
+        results = porcelain.status(self.repo)
+        self.assertListEqual(results.unstaged, [])
+
+    def test_status_autocrlf_input_mixed_endings(self) -> None:
+        """Test files with mixed line endings with autocrlf=input."""
+        # Set autocrlf=input
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Create file with mixed line endings
+        file_path = os.path.join(self.repo.path, "mixed.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line1\r\nline2\nline3\r\n")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"add mixed",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # The file was normalized on commit, so working tree should match
+        results = porcelain.status(self.repo)
+        self.assertListEqual(results.unstaged, [])
+
+    def test_status_autocrlf_input_issue_1770(self) -> None:
+        """Test the specific scenario from issue #1770.
+
+        Files with CRLF committed with autocrlf=input should not show as unstaged
+        when their content hasn't changed.
+        """
+        # Set autocrlf=input BEFORE committing
+        c = self.repo.get_config()
+        c.set("core", "autocrlf", "input")
+        c.write_to_path()
+
+        # Create and commit file with CRLF endings
+        file_path = os.path.join(self.repo.path, "crlf-test.dsp")
+        with open(file_path, "wb") as f:
+            f.write(b"# Microsoft DSP file\r\n\r\nContent here\r\n")
+        porcelain.add(repo=self.repo.path, paths=[file_path])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"add dsp file",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # File was normalized to LF in index, but working tree still has CRLF
+        # Status should be clean because comparison normalizes working tree too
+        results = porcelain.status(self.repo)
+        self.assertListEqual(results.unstaged, [])
 
     def test_get_tree_changes_add(self) -> None:
         """Unit test for get_tree_changes add."""

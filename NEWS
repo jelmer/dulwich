@@ -30,6 +30,10 @@
    unchanged files from appearing as unstaged in status.
    (Jelmer Vernooĳ, #1770)
 
+ * Add support for ``http.extraHeader`` configuration to pass additional HTTP
+   headers to the server when communicating over HTTP(S).
+   (Jelmer Vernooĳ, #1769)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

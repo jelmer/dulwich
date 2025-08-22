@@ -1589,6 +1589,40 @@ class HttpGitClientTests(TestCase):
         c = HttpGitClient(url, config=config, timeout=15)
         self.assertEqual(c._timeout, 15)
 
+    def test_http_extra_headers_from_config(self) -> None:
+        """Test that http.extraHeader config values are applied."""
+        from dulwich.config import ConfigDict
+
+        url = "https://github.com/jelmer/dulwich"
+        config = ConfigDict()
+        # Set a single extra header
+        config.set((b"http",), b"extraHeader", b"X-Custom-Header: test-value")
+
+        c = HttpGitClient(url, config=config)
+        # Check that the header was added to the pool manager
+        self.assertIn("X-Custom-Header", c.pool_manager.headers)
+        self.assertEqual(c.pool_manager.headers["X-Custom-Header"], "test-value")
+
+    def test_http_multiple_extra_headers_from_config(self) -> None:
+        """Test that multiple http.extraHeader config values are applied."""
+        from dulwich.config import ConfigDict
+
+        url = "https://github.com/jelmer/dulwich"
+        config = ConfigDict()
+        # Set multiple extra headers
+        config.set((b"http",), b"extraHeader", b"X-Header-1: value1")
+        config.add((b"http",), b"extraHeader", b"X-Header-2: value2")
+        config.add((b"http",), b"extraHeader", b"Authorization: Bearer token123")
+
+        c = HttpGitClient(url, config=config)
+        # Check that all headers were added to the pool manager
+        self.assertIn("X-Header-1", c.pool_manager.headers)
+        self.assertEqual(c.pool_manager.headers["X-Header-1"], "value1")
+        self.assertIn("X-Header-2", c.pool_manager.headers)
+        self.assertEqual(c.pool_manager.headers["X-Header-2"], "value2")
+        self.assertIn("Authorization", c.pool_manager.headers)
+        self.assertEqual(c.pool_manager.headers["Authorization"], "Bearer token123")
+
 
 class TCPGitClientTests(TestCase):
     def test_get_url(self) -> None:

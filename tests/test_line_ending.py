@@ -24,6 +24,7 @@
 from dulwich.line_ending import (
     BlobNormalizer,
     LineEndingFilter,
+    TreeBlobNormalizer,
     convert_crlf_to_lf,
     convert_lf_to_crlf,
     get_clean_filter_autocrlf,
@@ -363,6 +364,96 @@ class BlobNormalizerTests(TestCase):
 
         result = normalizer.checkout_normalize(blob, b"binary.dat")
         self.assertIs(result, blob)
+
+
+class TreeBlobNormalizerTests(TestCase):
+    """Test the TreeBlobNormalizer class for existing file handling."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        from dulwich.config import ConfigDict
+        from dulwich.object_store import MemoryObjectStore
+
+        self.config = ConfigDict()
+        self.gitattributes = {}
+        self.object_store = MemoryObjectStore()
+
+    def test_autocrlf_input_existing_files(self) -> None:
+        """Test that autocrlf=input normalizes existing files with CRLF."""
+        # Create a tree with an existing file
+        from dulwich.objects import Tree
+
+        tree = Tree()
+        tree[b"existing.txt"] = (0o100644, b"a" * 40)  # dummy sha
+        self.object_store.add_object(tree)
+
+        # Create normalizer with autocrlf=input
+        normalizer = TreeBlobNormalizer(
+            self.config,
+            self.gitattributes,
+            self.object_store,
+            tree.id,
+            autocrlf=b"input",
+        )
+
+        # Create blob with CRLF line endings
+        blob = Blob()
+        blob.data = b"line1\r\nline2\r\n"
+
+        # Should convert CRLF to LF on checkin even for existing files
+        result = normalizer.checkin_normalize(blob, b"existing.txt")
+        self.assertEqual(result.data, b"line1\nline2\n")
+
+    def test_autocrlf_false_existing_files(self) -> None:
+        """Test that autocrlf=false does not normalize existing files."""
+        # Create a tree with an existing file
+        from dulwich.objects import Tree
+
+        tree = Tree()
+        tree[b"existing.txt"] = (0o100644, b"a" * 40)  # dummy sha
+        self.object_store.add_object(tree)
+
+        # Create normalizer with autocrlf=false
+        normalizer = TreeBlobNormalizer(
+            self.config,
+            self.gitattributes,
+            self.object_store,
+            tree.id,
+            autocrlf=b"false",
+        )
+
+        # Create blob with CRLF line endings
+        blob = Blob()
+        blob.data = b"line1\r\nline2\r\n"
+
+        # Should NOT convert for existing files when autocrlf=false
+        result = normalizer.checkin_normalize(blob, b"existing.txt")
+        self.assertIs(result, blob)
+
+    def test_autocrlf_input_new_files(self) -> None:
+        """Test that autocrlf=input normalizes new files."""
+        # Create empty tree (no existing files)
+        from dulwich.objects import Tree
+
+        tree = Tree()
+        self.object_store.add_object(tree)
+
+        # Create normalizer with autocrlf=input
+        normalizer = TreeBlobNormalizer(
+            self.config,
+            self.gitattributes,
+            self.object_store,
+            tree.id,
+            autocrlf=b"input",
+        )
+
+        # Create blob with CRLF line endings
+        blob = Blob()
+        blob.data = b"line1\r\nline2\r\n"
+
+        # Should convert CRLF to LF for new files
+        result = normalizer.checkin_normalize(blob, b"new.txt")
+        self.assertEqual(result.data, b"line1\nline2\n")
 
 
 class LineEndingIntegrationTests(TestCase):

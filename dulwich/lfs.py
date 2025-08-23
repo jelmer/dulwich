@@ -35,6 +35,8 @@ Key components:
 import hashlib
 import json
 import logging
+
+logger = logging.getLogger(__name__)
 import os
 import tempfile
 from collections.abc import Iterable
@@ -272,7 +274,7 @@ class LFSFilterDriver:
                 return content
             except LFSError as e:
                 # Download failed, fall back to returning pointer
-                logging.warning("LFS object download failed for %s: %s", pointer.oid, e)
+                logger.warning("LFS object download failed for %s: %s", pointer.oid, e)
 
                 # Return pointer as-is when object is missing and download failed
                 return data

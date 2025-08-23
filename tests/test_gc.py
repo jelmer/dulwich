@@ -21,6 +21,11 @@ from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.repo import MemoryRepo, Repo
 
 
+def no_op_progress(msg):
+    """Progress callback that does nothing."""
+    pass
+
+
 class GCTestCase(TestCase):
     """Tests for garbage collection functionality."""
 
@@ -159,7 +164,7 @@ class GCTestCase(TestCase):
         self.repo.object_store.add_object(unreachable_blob)
 
         # Run garbage collection (grace_period=None means no grace period check)
-        stats = garbage_collect(self.repo, prune=True, grace_period=None)
+        stats = garbage_collect(self.repo, prune=True, grace_period=None, progress=no_op_progress)
 
         # Check results
         self.assertIsInstance(stats, GCStats)
@@ -180,7 +185,7 @@ class GCTestCase(TestCase):
         self.repo.object_store.add_object(unreachable_blob)
 
         # Run garbage collection without pruning
-        stats = garbage_collect(self.repo, prune=False)
+        stats = garbage_collect(self.repo, prune=False, progress=no_op_progress)
 
         # Check that nothing was pruned
         self.assertEqual(set(), stats.pruned_objects)
@@ -194,7 +199,7 @@ class GCTestCase(TestCase):
         self.repo.object_store.add_object(unreachable_blob)
 
         # Run garbage collection with dry run (grace_period=None means no grace period check)
-        stats = garbage_collect(self.repo, prune=True, grace_period=None, dry_run=True)
+        stats = garbage_collect(self.repo, prune=True, grace_period=None, dry_run=True, progress=no_op_progress)
 
         # Check that object would be pruned but still exists
         # On Windows, the repository initialization might create additional unreachable objects
@@ -214,7 +219,7 @@ class GCTestCase(TestCase):
 
         # Run garbage collection with a 1 hour grace period, but dry run to avoid packing
         # The object was just created, so it should not be pruned
-        stats = garbage_collect(self.repo, prune=True, grace_period=3600, dry_run=True)
+        stats = garbage_collect(self.repo, prune=True, grace_period=3600, dry_run=True, progress=no_op_progress)
 
         # Check that the object was NOT pruned
         self.assertEqual(set(), stats.pruned_objects)
@@ -244,7 +249,7 @@ class GCTestCase(TestCase):
 
         # Run garbage collection with a 1 hour grace period
         # The object is 2 hours old, so it should be pruned
-        stats = garbage_collect(self.repo, prune=True, grace_period=3600)
+        stats = garbage_collect(self.repo, prune=True, grace_period=3600, progress=no_op_progress)
 
         # Check that the object was pruned
         self.assertEqual({old_blob.id}, stats.pruned_objects)
@@ -257,14 +262,14 @@ class GCTestCase(TestCase):
         self.repo.object_store.add_object(unreachable_blob)
 
         # Pack the objects to ensure the blob is in a pack
-        self.repo.object_store.pack_loose_objects()
+        self.repo.object_store.pack_loose_objects(progress=no_op_progress)
 
         # Ensure the object is NOT loose anymore
         self.assertFalse(self.repo.object_store.contains_loose(unreachable_blob.id))
         self.assertIn(unreachable_blob.id, self.repo.object_store)
 
         # Run garbage collection (grace_period=None means no grace period check)
-        stats = garbage_collect(self.repo, prune=True, grace_period=None)
+        stats = garbage_collect(self.repo, prune=True, grace_period=None, progress=no_op_progress)
 
         # Check that the packed object was pruned
         self.assertEqual({unreachable_blob.id}, stats.pruned_objects)
@@ -410,7 +415,7 @@ class GCTestCase(TestCase):
             self.repo.object_store, "get_object_mtime", side_effect=KeyError
         ):
             # Run garbage collection with grace period
-            stats = garbage_collect(self.repo, prune=True, grace_period=3600)
+            stats = garbage_collect(self.repo, prune=True, grace_period=3600, progress=no_op_progress)
 
         # Object should be kept because mtime couldn't be determined
         self.assertEqual(set(), stats.pruned_objects)
@@ -487,7 +492,7 @@ class AutoGCTestCase(TestCase):
                 blob = Blob()
                 blob.data = f"test blob {i}".encode()
                 r.object_store.add_object(blob)
-                r.object_store.pack_loose_objects()
+                r.object_store.pack_loose_objects(progress=no_op_progress)
 
             # Force re-enumeration of packs
             r.object_store._update_pack_cache()
@@ -525,7 +530,7 @@ class AutoGCTestCase(TestCase):
             blob = Blob()
             blob.data = b"test blob"
             r.object_store.add_object(blob)
-            r.object_store.pack_loose_objects()
+            r.object_store.pack_loose_objects(progress=no_op_progress)
 
             # Force re-enumeration of packs
             r.object_store._update_pack_cache()
@@ -547,10 +552,10 @@ class AutoGCTestCase(TestCase):
                 r.object_store.add_object(blob)
 
             with patch("dulwich.gc.garbage_collect") as mock_gc:
-                result = maybe_auto_gc(r, config)
+                result = maybe_auto_gc(r, config, progress=no_op_progress)
 
             self.assertTrue(result)
-            mock_gc.assert_called_once_with(r, auto=True)
+            mock_gc.assert_called_once_with(r, auto=True, progress=no_op_progress)
 
     def test_maybe_auto_gc_skips_when_not_needed(self):
         """Test that auto GC doesn't run when thresholds are not exceeded."""
@@ -558,7 +563,7 @@ class AutoGCTestCase(TestCase):
         config = ConfigDict()
 
         with patch("dulwich.gc.garbage_collect") as mock_gc:
-            result = maybe_auto_gc(r, config)
+            result = maybe_auto_gc(r, config, progress=no_op_progress)
 
         self.assertFalse(result)
         mock_gc.assert_not_called()
@@ -580,12 +585,15 @@ class AutoGCTestCase(TestCase):
             blob.data = b"test"
             r.object_store.add_object(blob)
 
-            with patch("builtins.print") as mock_print:
-                result = maybe_auto_gc(r, config)
+            # Capture log messages
+            import logging
+
+            with self.assertLogs(level=logging.INFO) as cm:
+                result = maybe_auto_gc(r, config, progress=no_op_progress)
 
             self.assertFalse(result)
-            # Verify gc.log contents were printed
-            mock_print.assert_called_once_with("Previous GC failed\n")
+            # Verify gc.log contents were logged
+            self.assertTrue(any("Previous GC failed" in msg for msg in cm.output))
 
     def test_maybe_auto_gc_with_expired_gc_log(self):
         """Test that auto GC runs when gc.log exists but is expired."""
@@ -610,10 +618,10 @@ class AutoGCTestCase(TestCase):
             r.object_store.add_object(blob)
 
             with patch("dulwich.gc.garbage_collect") as mock_gc:
-                result = maybe_auto_gc(r, config)
+                result = maybe_auto_gc(r, config, progress=no_op_progress)
 
             self.assertTrue(result)
-            mock_gc.assert_called_once_with(r, auto=True)
+            mock_gc.assert_called_once_with(r, auto=True, progress=no_op_progress)
             # gc.log should be removed after successful GC
             self.assertFalse(os.path.exists(gc_log_path))
 
@@ -632,10 +640,10 @@ class AutoGCTestCase(TestCase):
             with patch(
                 "dulwich.gc.garbage_collect", side_effect=OSError("GC failed")
             ) as mock_gc:
-                result = maybe_auto_gc(r, config)
+                result = maybe_auto_gc(r, config, progress=no_op_progress)
 
             self.assertFalse(result)
-            mock_gc.assert_called_once_with(r, auto=True)
+            mock_gc.assert_called_once_with(r, auto=True, progress=no_op_progress)
 
             # Check that error was written to gc.log
             gc_log_path = os.path.join(r.controldir(), "gc.log")
@@ -667,10 +675,10 @@ class AutoGCTestCase(TestCase):
             r.object_store.add_object(blob)
 
             with patch("dulwich.gc.garbage_collect") as mock_gc:
-                result = maybe_auto_gc(r, config)
+                result = maybe_auto_gc(r, config, progress=no_op_progress)
 
             self.assertTrue(result)
-            mock_gc.assert_called_once_with(r, auto=True)
+            mock_gc.assert_called_once_with(r, auto=True, progress=no_op_progress)
 
     def test_gc_log_expiry_invalid_format(self):
         """Test that invalid gc.logExpiry format defaults to 1 day."""
@@ -694,12 +702,16 @@ class AutoGCTestCase(TestCase):
             blob.data = b"test"
             r.object_store.add_object(blob)
 
-            with patch("builtins.print") as mock_print:
-                result = maybe_auto_gc(r, config)
+            # Capture log messages
+            import logging
+
+            with self.assertLogs(level=logging.INFO) as cm:
+                result = maybe_auto_gc(r, config, progress=no_op_progress)
 
             # Should not run GC because gc.log is recent (within default 1 day)
             self.assertFalse(result)
-            mock_print.assert_called_once()
+            # Check that gc.log content was logged
+            self.assertTrue(any("gc.log content:" in msg for msg in cm.output))
 
     def test_maybe_auto_gc_non_disk_repo(self):
         """Test auto GC on non-disk repository (MemoryRepo)."""
@@ -715,7 +727,7 @@ class AutoGCTestCase(TestCase):
 
         # For non-disk repos, should_run_gc returns False
         # because it can't count loose objects
-        result = maybe_auto_gc(r, config)
+        result = maybe_auto_gc(r, config, progress=no_op_progress)
         self.assertFalse(result)
 
     def test_gc_removes_existing_gc_log_on_success(self):
@@ -740,7 +752,7 @@ class AutoGCTestCase(TestCase):
             r.object_store.add_object(blob)
 
             # Run auto GC
-            result = maybe_auto_gc(r, config)
+            result = maybe_auto_gc(r, config, progress=no_op_progress)
 
             self.assertTrue(result)
             # gc.log should be removed after successful GC

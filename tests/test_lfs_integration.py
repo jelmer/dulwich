@@ -35,6 +35,11 @@ from . import TestCase
 class LFSFilterIntegrationTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
+        # Suppress LFS warnings during these integration tests
+        import logging
+
+        self._old_level = logging.getLogger("dulwich.lfs").level
+        logging.getLogger("dulwich.lfs").setLevel(logging.ERROR)
         # Create temporary directory for LFS store
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
@@ -59,6 +64,13 @@ class LFSFilterIntegrationTests(TestCase):
         self.normalizer = FilterBlobNormalizer(
             self.config, self.gitattributes, self.registry
         )
+
+    def tearDown(self) -> None:
+        # Restore original logging level
+        import logging
+
+        logging.getLogger("dulwich.lfs").setLevel(self._old_level)
+        super().tearDown()
 
     def test_lfs_round_trip(self) -> None:
         """Test complete LFS round trip through filter normalizer."""

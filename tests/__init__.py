@@ -30,6 +30,7 @@ __all__ = [
 ]
 
 import doctest
+import logging
 import os
 import shutil
 import subprocess

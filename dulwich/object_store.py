@@ -769,9 +769,12 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
     def _remove_pack(self, pack: "Pack") -> None:
         raise NotImplementedError(self._remove_pack)
 
-    def pack_loose_objects(self) -> int:
+    def pack_loose_objects(self, progress: Optional[Callable] = None) -> int:
         """Pack loose objects.
 
+        Args:
+          progress: Optional progress reporting callback
+          
         Returns: Number of objects packed
         """
         objects: list[tuple[ShaFile, None]] = []
@@ -779,12 +782,12 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
             obj = self._get_loose_object(sha)
             if obj is not None:
                 objects.append((obj, None))
-        self.add_objects(objects)
+        self.add_objects(objects, progress=progress)
         for obj, path in objects:
             self.delete_loose_object(obj.id)
         return len(objects)
 
-    def repack(self, exclude: Optional[set] = None) -> int:
+    def repack(self, exclude: Optional[set] = None, progress: Optional[Callable] = None) -> int:
         """Repack the packs in this repository.
 
         Note that this implementation is fairly naive and currently keeps all
@@ -792,6 +795,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
         Args:
           exclude: Optional set of object SHAs to exclude from repacking
+          progress: Optional progress reporting callback
         """
         if exclude is None:
             exclude = set()
@@ -818,7 +822,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
             # The name of the consolidated pack might match the name of a
             # pre-existing pack. Take care not to remove the newly created
             # consolidated pack.
-            consolidated = self.add_objects(list(objects))
+            consolidated = self.add_objects(list(objects), progress=progress)
             if consolidated is not None:
                 old_packs.pop(consolidated.name(), None)
 
@@ -2507,10 +2511,13 @@ class BucketBasedObjectStore(PackBasedObjectStore):
         """
         # Doesn't exist..
 
-    def pack_loose_objects(self) -> int:
+    def pack_loose_objects(self, progress: Optional[Callable] = None) -> int:
         """Pack loose objects. Returns number of objects packed.
 
         BucketBasedObjectStore doesn't support loose objects, so this is a no-op.
+        
+        Args:
+          progress: Optional progress reporting callback (ignored)
         """
         return 0
 

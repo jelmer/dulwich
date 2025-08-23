@@ -37,6 +37,9 @@
  * Add support for ``patiencediff`` algorithm in diff.
    (Jelmer Vernooĳ, #1795)
 
+ * Add IPv6 support for git:// protocol URLs.
+   (Jelmer Vernooĳ, #1796)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

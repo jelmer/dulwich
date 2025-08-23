@@ -51,6 +51,8 @@ from .pack import Pack, sha_to_hex
 from .patch import DiffAlgorithmNotAvailable
 from .repo import Repo
 
+logger = logging.getLogger(__name__)
+
 
 def to_display_str(value: Union[bytes, str]) -> str:
     """Convert a bytes or string value to a display string.
@@ -662,10 +664,10 @@ class cmd_fetch(Command):
             sys.stdout.buffer.write(msg)
 
         result = client.fetch(path, r, progress=progress)
-        print("Remote refs:")
+        logger.info("Remote refs:")
         for ref, sha in result.refs.items():
             if sha is not None:
-                print(f"{ref.decode()} -> {sha.decode()}")
+                logger.info("%s → %s", ref.decode(), sha.decode())
 
 
 class cmd_for_each_ref(Command):
@@ -681,7 +683,7 @@ class cmd_for_each_ref(Command):
         parser.add_argument("pattern", type=str, nargs="?")
         args = parser.parse_args(args)
         for sha, object_type, ref in porcelain.for_each_ref(".", args.pattern):
-            print(f"{sha.decode()} {object_type.decode()}\t{ref.decode()}")
+            logger.info("%s %s\t%s", sha.decode(), object_type.decode(), ref.decode())
 
 
 class cmd_fsck(Command):
@@ -696,7 +698,7 @@ class cmd_fsck(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         for obj, msg in porcelain.fsck("."):
-            print(f"{obj.decode() if isinstance(obj, bytes) else obj}: {msg}")
+            logger.info("%s: %s", obj.decode() if isinstance(obj, bytes) else obj, msg)
 
 
 class cmd_log(Command):
@@ -883,20 +885,24 @@ class cmd_dump_pack(Command):
 
         basename, _ = os.path.splitext(args.filename)
         x = Pack(basename)
-        print(f"Object names checksum: {x.name().decode('ascii', 'replace')}")
-        print(f"Checksum: {sha_to_hex(x.get_stored_checksum())!r}")
+        logger.info("Object names checksum: %s", x.name().decode("ascii", "replace"))
+        logger.info("Checksum: %r", sha_to_hex(x.get_stored_checksum()))
         x.check()
-        print(f"Length: {len(x)}")
+        logger.info("Length: %d", len(x))
         for name in x:
             try:
-                print(f"\t{x[name]}")
+                logger.info("\t%s", x[name])
             except KeyError as k:
-                print(
-                    f"\t{name.decode('ascii', 'replace')}: Unable to resolve base {k!r}"
+                logger.error(
+                    "\t%s: Unable to resolve base %r",
+                    name.decode("ascii", "replace"),
+                    k,
                 )
             except ApplyDeltaError as e:
-                print(
-                    f"\t{name.decode('ascii', 'replace')}: Unable to apply delta: {e!r}"
+                logger.error(
+                    "\t%s: Unable to apply delta: %r",
+                    name.decode("ascii", "replace"),
+                    e,
                 )
 
 
@@ -916,7 +922,7 @@ class cmd_dump_index(Command):
         idx = Index(args.filename)
 
         for o in idx:
-            print(o, idx[o])
+            logger.info("%s %s", o, idx[o])
 
 
 class cmd_init(Command):
@@ -1001,7 +1007,7 @@ class cmd_clone(Command):
                 recurse_submodules=args.recurse_submodules,
             )
         except GitProtocolError as e:
-            print(f"{e}")
+            logging.exception(e)
 
 
 def _get_commit_message_with_template(initial_message, repo=None, commit=None):
@@ -1098,7 +1104,7 @@ class cmd_commit(Command):
         try:
             porcelain.commit(".", message=message, all=args.all, amend=args.amend)
         except CommitMessageError as e:
-            print(f"error: {e}", file=sys.stderr)
+            logging.exception(e)
             return 1
         return None
 
@@ -1134,7 +1140,7 @@ class cmd_update_server_info(Command):
 class cmd_symbolic_ref(Command):
     """Read, modify and delete symbolic refs."""
 
-    def run(self, args) -> None:
+    def run(self, args) -> Optional[int]:
         """Execute the symbolic-ref command.
 
         Args:
@@ -1153,6 +1159,7 @@ class cmd_symbolic_ref(Command):
 
             with Repo(".") as repo:
                 repo.refs.set_symbolic_ref(args.name.encode(), args.ref.encode())
+            return 0
         else:
             # Read symbolic reference
             from .repo import Repo
@@ -1161,11 +1168,13 @@ class cmd_symbolic_ref(Command):
                 try:
                     target = repo.refs.read_ref(args.name.encode())
                     if target.startswith(b"ref: "):
-                        print(target[5:].decode())
+                        logger.info(target[5:].decode())
                     else:
-                        print(target.decode())
+                        logger.info(target.decode())
+                    return 0
                 except KeyError:
-                    print(f"fatal: ref '{args.name}' is not a symbolic ref")
+                    logging.error("fatal: ref '%s' is not a symbolic ref", args.name)
+                    return 1
 
 
 class cmd_pack_refs(Command):
@@ -1425,7 +1434,7 @@ class cmd_revert(Command):
         )
 
         if result and not args.no_commit:
-            print(f"[{result.decode('ascii')[:7]}] Revert completed")
+            logger.info("[%s] Revert completed", result.decode("ascii")[:7])
 
 
 class cmd_daemon(Command):
@@ -1696,7 +1705,7 @@ class cmd_unpack_objects(Command):
         args = parser.parse_args(args)
 
         count = porcelain.unpack_objects(args.pack_file)
-        print(f"Unpacked {count} objects")
+        logger.info("Unpacked %d objects", count)
 
 
 class cmd_prune(Command):
@@ -1747,13 +1756,13 @@ class cmd_prune(Command):
                     date = datetime.datetime.strptime(args.expire, "%Y-%m-%d")
                     grace_period = int(time.time() - date.timestamp())
                 except ValueError:
-                    print(f"Error: Invalid expire date: {args.expire}", file=sys.stderr)
+                    logger.error("Invalid expire date: %s", args.expire)
                     return 1
 
         # Progress callback
         def progress(msg):
             if args.verbose:
-                print(msg)
+                logger.info(msg)
 
         try:
             porcelain.prune(
@@ -1764,7 +1773,7 @@ class cmd_prune(Command):
             )
             return None
         except porcelain.Error as e:
-            print(f"Error: {e}", file=sys.stderr)
+            logger.error("%s", e)
             return 1
 
 
@@ -1849,17 +1858,15 @@ class SuperCommand(Command):
             if self.default_command:
                 return self.default_command().run(args)
             else:
-                print(
-                    "Supported subcommands: {}".format(
-                        ", ".join(self.subcommands.keys())
-                    )
+                logger.info(
+                    "Supported subcommands: %s", ", ".join(self.subcommands.keys())
                 )
                 return False
         cmd = args[0]
         try:
             cmd_kls = self.subcommands[cmd]
         except KeyError:
-            print(f"No such subcommand: {args[0]}")
+            logger.error("No such subcommand: %s", args[0])
             sys.exit(1)
         return cmd_kls().run(args[1:])
 
@@ -1971,7 +1978,7 @@ class cmd_check_ignore(Command):
         args = parser.parse_args(args)
         ret = 1
         for path in porcelain.check_ignore(".", args.paths):
-            print(path)
+            logger.info(path)
             ret = 0
         return ret
 
@@ -1990,7 +1997,7 @@ class cmd_check_mailmap(Command):
         args = parser.parse_args(args)
         for identity in args.identities:
             canonical_identity = porcelain.check_mailmap(".", identity)
-            print(canonical_identity)
+            logger.info(canonical_identity)
 
 
 class cmd_branch(Command):
@@ -2016,7 +2023,7 @@ class cmd_branch(Command):
         )
         args = parser.parse_args(args)
         if not args.branch:
-            print("Usage: dulwich branch [-d] BRANCH_NAME")
+            logger.error("Usage: dulwich branch [-d] BRANCH_NAME")
             return 1
 
         if args.delete:
@@ -2059,7 +2066,7 @@ class cmd_checkout(Command):
         )
         args = parser.parse_args(args)
         if not args.target:
-            print("Usage: dulwich checkout TARGET [--force] [-b NEW_BRANCH]")
+            logger.error("Usage: dulwich checkout TARGET [--force] [-b NEW_BRANCH]")
             return 1
 
         try:
@@ -2089,10 +2096,10 @@ class cmd_stash_list(Command):
         with Repo(".") as r:
             stash = Stash.from_repo(r)
             for i, entry in enumerate(stash.stashes()):
-                print(
-                    "stash@{{{}}}: {}".format(
-                        i, entry.message.decode("utf-8", "replace").rstrip("\n")
-                    )
+                logger.info(
+                    "stash@{%d}: %s",
+                    i,
+                    entry.message.decode("utf-8", "replace").rstrip("\n"),
                 )
 
 
@@ -2108,7 +2115,7 @@ class cmd_stash_push(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         porcelain.stash_push(".")
-        print("Saved working directory and index state")
+        logger.info("Saved working directory and index state")
 
 
 class cmd_stash_pop(Command):
@@ -2123,7 +2130,7 @@ class cmd_stash_pop(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         porcelain.stash_pop(".")
-        print("Restored working directory and index state")
+        logger.info("Restored working directory and index state")
 
 
 class cmd_bisect(SuperCommand):
@@ -2202,12 +2209,16 @@ class cmd_bisect(SuperCommand):
                     term_good=parsed_args.term_good,
                 )
                 if next_sha:
-                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+                    logger.info(
+                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                    )
 
             elif parsed_args.subcommand == "bad":
                 next_sha = porcelain.bisect_bad(rev=parsed_args.rev)
                 if next_sha:
-                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+                    logger.info(
+                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                    )
                 else:
                     # Bisect complete - find the first bad commit
                     with porcelain.open_repo_closing(".") as r:
@@ -2219,42 +2230,48 @@ class cmd_bisect(SuperCommand):
                         message = commit.message.decode(
                             "utf-8", errors="replace"
                         ).split("\n")[0]
-                        print(f"{bad_sha.decode('ascii')} is the first bad commit")
-                        print(f"commit {bad_sha.decode('ascii')}")
-                        print(f"    {message}")
+                        logger.info(
+                            "%s is the first bad commit", bad_sha.decode("ascii")
+                        )
+                        logger.info("commit %s", bad_sha.decode("ascii"))
+                        logger.info("    %s", message)
 
             elif parsed_args.subcommand == "good":
                 next_sha = porcelain.bisect_good(rev=parsed_args.rev)
                 if next_sha:
-                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+                    logger.info(
+                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                    )
 
             elif parsed_args.subcommand == "skip":
                 next_sha = porcelain.bisect_skip(
                     revs=parsed_args.revs if parsed_args.revs else None
                 )
                 if next_sha:
-                    print(f"Bisecting: checking out '{next_sha.decode('ascii')}'")
+                    logger.info(
+                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                    )
 
             elif parsed_args.subcommand == "reset":
                 porcelain.bisect_reset(commit=parsed_args.commit)
-                print("Bisect reset")
+                logger.info("Bisect reset")
 
             elif parsed_args.subcommand == "log":
                 log = porcelain.bisect_log()
-                print(log, end="")
+                logger.info(log.rstrip())
 
             elif parsed_args.subcommand == "replay":
                 porcelain.bisect_replay(".", log_file=parsed_args.logfile)
-                print(f"Replayed bisect log from {parsed_args.logfile}")
+                logger.info("Replayed bisect log from %s", parsed_args.logfile)
 
             elif parsed_args.subcommand == "help":
                 parser.print_help()
 
         except porcelain.Error as e:
-            print(f"Error: {e}", file=sys.stderr)
+            logger.error("%s", e)
             return 1
         except ValueError as e:
-            print(f"Error: {e}", file=sys.stderr)
+            logger.error("%s", e)
             return 1
 
         return 0
@@ -2282,7 +2299,7 @@ class cmd_ls_files(Command):
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
         for name in porcelain.ls_files("."):
-            print(name)
+            logger.info(name)
 
 
 class cmd_describe(Command):
@@ -2296,7 +2313,7 @@ class cmd_describe(Command):
         """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
-        print(porcelain.describe("."))
+        logger.info(porcelain.describe("."))
 
 
 class cmd_merge(Command):
@@ -2329,25 +2346,26 @@ class cmd_merge(Command):
             )
 
             if conflicts:
-                print(f"Merge conflicts in {len(conflicts)} file(s):")
+                logger.warning("Merge conflicts in %d file(s):", len(conflicts))
                 for conflict_path in conflicts:
-                    print(f"  {conflict_path.decode()}")
-                print(
-                    "\nAutomatic merge failed; fix conflicts and then commit the result."
+                    logger.warning("  %s", conflict_path.decode())
+                logger.error(
+                    "Automatic merge failed; fix conflicts and then commit the result."
                 )
                 return 1
             elif merge_commit_id is None and not args.no_commit:
-                print("Already up to date.")
+                logger.info("Already up to date.")
             elif args.no_commit:
-                print("Automatic merge successful; not committing as requested.")
+                logger.info("Automatic merge successful; not committing as requested.")
             else:
                 assert merge_commit_id is not None
-                print(
-                    f"Merge successful. Created merge commit {merge_commit_id.decode()}"
+                logger.info(
+                    "Merge successful. Created merge commit %s",
+                    merge_commit_id.decode(),
                 )
             return 0
         except porcelain.Error as e:
-            print(f"Error: {e}")
+            logger.error("%s", e)
             return 1
 
 
@@ -2391,7 +2409,7 @@ class cmd_notes_show(Command):
         if note:
             sys.stdout.buffer.write(note)
         else:
-            print(f"No notes found for object {args.object}")
+            logger.info("No notes found for object %s", args.object)
 
 
 class cmd_notes_remove(Command):
@@ -2412,9 +2430,9 @@ class cmd_notes_remove(Command):
 
         result = porcelain.notes_remove(".", args.object, ref=args.ref)
         if result:
-            print(f"Removed notes for object {args.object}")
+            logger.info("Removed notes for object %s", args.object)
         else:
-            print(f"No notes found for object {args.object}")
+            logger.info("No notes found for object %s", args.object)
 
 
 class cmd_notes_list(Command):
@@ -2434,7 +2452,7 @@ class cmd_notes_list(Command):
 
         notes = porcelain.notes_list(".", ref=args.ref)
         for object_sha, note_content in notes:
-            print(f"{object_sha.hex()}")
+            logger.info(object_sha.hex())
 
 
 class cmd_notes(SuperCommand):
@@ -2504,24 +2522,24 @@ class cmd_cherry_pick(Command):
             )
 
             if args.abort:
-                print("Cherry-pick aborted.")
+                logger.info("Cherry-pick aborted.")
             elif args.continue_:
                 if result:
-                    print(f"Cherry-pick completed: {result.decode()}")
+                    logger.info("Cherry-pick completed: %s", result.decode())
                 else:
-                    print("Cherry-pick completed.")
+                    logger.info("Cherry-pick completed.")
             elif result is None:
                 if args.no_commit:
-                    print("Cherry-pick applied successfully (no commit created).")
+                    logger.info("Cherry-pick applied successfully (no commit created).")
                 else:
                     # This shouldn't happen unless there were conflicts
-                    print("Cherry-pick resulted in conflicts.")
+                    logger.warning("Cherry-pick resulted in conflicts.")
             else:
-                print(f"Cherry-pick successful: {result.decode()}")
+                logger.info("Cherry-pick successful: %s", result.decode())
 
             return None
         except porcelain.Error as e:
-            print(f"Error: {e}", file=sys.stderr)
+            logger.error("%s", e)
             return 1
 
 
@@ -2576,21 +2594,21 @@ class cmd_merge_tree(Command):
                     sys.stdout.buffer.write(b"\0")
             else:
                 # Output the merged tree SHA
-                print(merged_tree_id.decode("ascii"))
+                logger.info(merged_tree_id.decode("ascii"))
 
                 # Output conflict information
                 if conflicts:
-                    print(f"\nConflicts in {len(conflicts)} file(s):")
+                    logger.warning("\nConflicts in %d file(s):", len(conflicts))
                     for conflict_path in conflicts:
-                        print(f"  {conflict_path.decode()}")
+                        logger.warning("  %s", conflict_path.decode())
 
             return None
 
         except porcelain.Error as e:
-            print(f"Error: {e}", file=sys.stderr)
+            logger.error("%s", e)
             return 1
         except KeyError as e:
-            print(f"Error: Object not found: {e}", file=sys.stderr)
+            logger.error("Object not found: %s", e)
             return 1
 
 
@@ -2653,7 +2671,7 @@ class cmd_gc(Command):
                     date = datetime.datetime.strptime(args.prune, "%Y-%m-%d")
                     grace_period = int(time.time() - date.timestamp())
                 except ValueError:
-                    print(f"Error: Invalid prune date: {args.prune}")
+                    logger.error("Invalid prune date: %s", args.prune)
                     return 1
         elif not args.no_prune:
             # Default to 2 weeks
@@ -2662,7 +2680,7 @@ class cmd_gc(Command):
         # Progress callback
         def progress(msg):
             if not args.quiet:
-                print(msg)
+                logger.info(msg)
 
         try:
             stats = porcelain.gc(
@@ -2678,21 +2696,25 @@ class cmd_gc(Command):
             # Report results
             if not args.quiet:
                 if args.dry_run:
-                    print("\nDry run results:")
+                    logger.info("\nDry run results:")
                 else:
-                    print("\nGarbage collection complete:")
+                    logger.info("\nGarbage collection complete:")
 
                 if stats.pruned_objects:
-                    print(f"  Pruned {len(stats.pruned_objects)} unreachable objects")
-                    print(f"  Freed {format_bytes(stats.bytes_freed)}")
+                    logger.info(
+                        "  Pruned %d unreachable objects", len(stats.pruned_objects)
+                    )
+                    logger.info("  Freed %s", format_bytes(stats.bytes_freed))
 
                 if stats.packs_before != stats.packs_after:
-                    print(
-                        f"  Reduced pack files from {stats.packs_before} to {stats.packs_after}"
+                    logger.info(
+                        "  Reduced pack files from %d to %d",
+                        stats.packs_before,
+                        stats.packs_after,
                     )
 
         except porcelain.Error as e:
-            print(f"Error: {e}")
+            logger.error("%s", e)
             return 1
         return None
 
@@ -2718,18 +2740,18 @@ class cmd_count_objects(Command):
         if args.verbose:
             stats = porcelain.count_objects(".", verbose=True)
             # Display verbose output
-            print(f"count: {stats.count}")
-            print(f"size: {stats.size // 1024}")  # Size in KiB
+            logger.info("count: %d", stats.count)
+            logger.info("size: %d", stats.size // 1024)  # Size in KiB
             assert stats.in_pack is not None
-            print(f"in-pack: {stats.in_pack}")
+            logger.info("in-pack: %d", stats.in_pack)
             assert stats.packs is not None
-            print(f"packs: {stats.packs}")
+            logger.info("packs: %d", stats.packs)
             assert stats.size_pack is not None
-            print(f"size-pack: {stats.size_pack // 1024}")  # Size in KiB
+            logger.info("size-pack: %d", stats.size_pack // 1024)  # Size in KiB
         else:
             # Simple output
             stats = porcelain.count_objects(".", verbose=False)
-            print(f"{stats.count} objects, {stats.size // 1024} kilobytes")
+            logger.info("%d objects, %d kilobytes", stats.count, stats.size // 1024)
 
 
 class cmd_rebase(Command):
@@ -2775,9 +2797,9 @@ class cmd_rebase(Command):
         if args.abort:
             try:
                 porcelain.rebase(".", args.upstream or "HEAD", abort=True)
-                print("Rebase aborted.")
+                logger.info("Rebase aborted.")
             except porcelain.Error as e:
-                print(f"Error: {e}")
+                logger.error("%s", e)
                 return 1
             return 0
 
@@ -2792,16 +2814,16 @@ class cmd_rebase(Command):
                         interactive=True,
                     )
                     if result:
-                        print("Rebase complete.")
+                        logger.info("Rebase complete.")
                     else:
-                        print("Rebase paused. Use --continue to resume.")
+                        logger.info("Rebase paused. Use --continue to resume.")
                 else:
                     new_shas = porcelain.rebase(
                         ".", args.upstream or "HEAD", continue_rebase=True
                     )
-                    print("Rebase complete.")
+                    logger.info("Rebase complete.")
             except porcelain.Error as e:
-                print(f"Error: {e}")
+                logger.error("%s", e)
                 return 1
             return 0
 
@@ -2809,15 +2831,15 @@ class cmd_rebase(Command):
             # Edit todo list for interactive rebase
             try:
                 porcelain.rebase(".", args.upstream or "HEAD", edit_todo=True)
-                print("Todo list updated.")
+                logger.info("Todo list updated.")
             except porcelain.Error as e:
-                print(f"Error: {e}")
+                logger.error("%s", e)
                 return 1
             return 0
 
         # Normal rebase requires upstream
         if not args.upstream:
-            print("Error: Missing required argument 'upstream'")
+            logger.error("Missing required argument 'upstream'")
             return 1
 
         try:
@@ -2831,9 +2853,11 @@ class cmd_rebase(Command):
                     interactive=True,
                 )
                 if result:
-                    print("Interactive rebase started. Edit the todo list and save.")
+                    logger.info(
+                        "Interactive rebase started. Edit the todo list and save."
+                    )
                 else:
-                    print("No commits to rebase.")
+                    logger.info("No commits to rebase.")
             else:
                 # Regular rebase
                 new_shas = porcelain.rebase(
@@ -2844,13 +2868,13 @@ class cmd_rebase(Command):
                 )
 
                 if new_shas:
-                    print(f"Successfully rebased {len(new_shas)} commits.")
+                    logger.info("Successfully rebased %d commits.", len(new_shas))
                 else:
-                    print("Already up to date.")
+                    logger.info("Already up to date.")
             return 0
 
         except porcelain.Error as e:
-            print(f"Error: {e}")
+            logger.error("%s", e)
             return 1
 
 
@@ -3049,9 +3073,11 @@ class cmd_filter_branch(Command):
                 original_prefix = args.original.encode() + b"/"
                 for ref in r.refs.allkeys():
                     if ref.startswith(original_prefix):
-                        print("Cannot create a new backup.")
-                        print(f"A previous backup already exists in {args.original}/")
-                        print("Force overwriting the backup with -f")
+                        logger.error("Cannot create a new backup.")
+                        logger.error(
+                            "A previous backup already exists in %s/", args.original
+                        )
+                        logger.error("Force overwriting the backup with -f")
                         return 1
 
             try:
@@ -3073,12 +3099,12 @@ class cmd_filter_branch(Command):
 
                 # Check if any filter failed
                 if filter_error:
-                    print("Error: Filter command failed", file=sys.stderr)
+                    logger.error("Filter command failed")
                     return 1
 
                 # Git filter-branch shows progress
                 if result:
-                    print(f"Rewrite {args.branch} ({len(result)} commits)")
+                    logger.info("Rewrite %s (%d commits)", args.branch, len(result))
                     # Git shows: Ref 'refs/heads/branch' was rewritten
                     if args.branch != "HEAD":
                         ref_name = (
@@ -3086,12 +3112,12 @@ class cmd_filter_branch(Command):
                             if args.branch.startswith("refs/")
                             else f"refs/heads/{args.branch}"
                         )
-                        print(f"Ref '{ref_name}' was rewritten")
+                        logger.info("Ref '%s' was rewritten", ref_name)
 
                 return 0
 
             except porcelain.Error as e:
-                print(f"Error: {e}", file=sys.stderr)
+                logger.error("%s", e)
                 return 1
 
 
@@ -3185,47 +3211,55 @@ class cmd_lfs(Command):
 
         if args.subcommand == "init":
             porcelain.lfs_init()
-            print("Git LFS initialized.")
+            logger.info("Git LFS initialized.")
 
         elif args.subcommand == "track":
             if args.patterns:
                 tracked = porcelain.lfs_track(patterns=args.patterns)
-                print("Tracking patterns:")
+                logger.info("Tracking patterns:")
             else:
                 tracked = porcelain.lfs_track()
-                print("Currently tracked patterns:")
+                logger.info("Currently tracked patterns:")
             for pattern in tracked:
-                print(f"  {pattern}")
+                logger.info("  %s", pattern)
 
         elif args.subcommand == "untrack":
             tracked = porcelain.lfs_untrack(patterns=args.patterns)
-            print("Remaining tracked patterns:")
+            logger.info("Remaining tracked patterns:")
             for pattern in tracked:
-                print(f"  {to_display_str(pattern)}")
+                logger.info("  %s", to_display_str(pattern))
 
         elif args.subcommand == "ls-files":
             files = porcelain.lfs_ls_files(ref=args.ref)
             for path, oid, size in files:
-                print(
-                    f"{to_display_str(oid[:12])} * {to_display_str(path)} ({format_bytes(size)})"
+                logger.info(
+                    "%s * %s (%s)",
+                    to_display_str(oid[:12]),
+                    to_display_str(path),
+                    format_bytes(size),
                 )
 
         elif args.subcommand == "migrate":
             count = porcelain.lfs_migrate(
                 include=args.include, exclude=args.exclude, everything=args.everything
             )
-            print(f"Migrated {count} file(s) to Git LFS.")
+            logger.info("Migrated %d file(s) to Git LFS.", count)
 
         elif args.subcommand == "pointer":
             if args.paths is not None:
                 results = porcelain.lfs_pointer_check(paths=args.paths or None)
                 for file_path, pointer in results.items():
                     if pointer:
-                        print(
-                            f"{to_display_str(file_path)}: LFS pointer (oid: {to_display_str(pointer.oid[:12])}, size: {format_bytes(pointer.size)})"
+                        logger.info(
+                            "%s: LFS pointer (oid: %s, size: %s)",
+                            to_display_str(file_path),
+                            to_display_str(pointer.oid[:12]),
+                            format_bytes(pointer.size),
                         )
                     else:
-                        print(f"{to_display_str(file_path)}: Not an LFS pointer")
+                        logger.warning(
+                            "%s: Not an LFS pointer", to_display_str(file_path)
+                        )
 
         elif args.subcommand == "clean":
             pointer = porcelain.lfs_clean(path=args.path)
@@ -3237,41 +3271,41 @@ class cmd_lfs(Command):
                 content = porcelain.lfs_smudge(pointer_content=pointer_content)
                 sys.stdout.buffer.write(content)
             else:
-                print("Error: --stdin required for smudge command")
+                logger.error("--stdin required for smudge command")
                 sys.exit(1)
 
         elif args.subcommand == "fetch":
             refs = args.refs or None
             count = porcelain.lfs_fetch(remote=args.remote, refs=refs)
-            print(f"Fetched {count} LFS object(s).")
+            logger.info("Fetched %d LFS object(s).", count)
 
         elif args.subcommand == "pull":
             count = porcelain.lfs_pull(remote=args.remote)
-            print(f"Pulled {count} LFS object(s).")
+            logger.info("Pulled %d LFS object(s).", count)
 
         elif args.subcommand == "push":
             refs = args.refs or None
             count = porcelain.lfs_push(remote=args.remote, refs=refs)
-            print(f"Pushed {count} LFS object(s).")
+            logger.info("Pushed %d LFS object(s).", count)
 
         elif args.subcommand == "status":
             status = porcelain.lfs_status()
 
             if status["tracked"]:
-                print(f"LFS tracked files: {len(status['tracked'])}")
+                logger.info("LFS tracked files: %d", len(status["tracked"]))
 
             if status["missing"]:
-                print("\nMissing LFS objects:")
+                logger.warning("\nMissing LFS objects:")
                 for file_path in status["missing"]:
-                    print(f"  {to_display_str(file_path)}")
+                    logger.warning("  %s", to_display_str(file_path))
 
             if status["not_staged"]:
-                print("\nModified LFS files not staged:")
+                logger.info("\nModified LFS files not staged:")
                 for file_path in status["not_staged"]:
-                    print(f"  {to_display_str(file_path)}")
+                    logger.warning("  %s", to_display_str(file_path))
 
             if not any(status.values()):
-                print("No LFS files found.")
+                logger.info("No LFS files found.")
 
         else:
             parser.print_help()
@@ -3297,17 +3331,15 @@ class cmd_help(Command):
         args = parser.parse_args(args)
 
         if args.all:
-            print("Available commands:")
+            logger.info("Available commands:")
             for cmd in sorted(commands):
-                print(f"  {cmd}")
+                logger.info("  %s", cmd)
         else:
-            print(
-                """\
-The dulwich command line tool is currently a very basic frontend for the
-Dulwich python module. For full functionality, please see the API reference.
-
-For a list of supported commands, see 'dulwich help -a'.
-"""
+            logger.info(
+                "The dulwich command line tool is currently a very basic frontend for the\n"
+                "Dulwich python module. For full functionality, please see the API reference.\n"
+                "\n"
+                "For a list of supported commands, see 'dulwich help -a'."
             )
 
 
@@ -3372,7 +3404,7 @@ class cmd_format_patch(Command):
 
         if not args.stdout:
             for filename in filenames:
-                print(filename)
+                logger.info(filename)
 
 
 class cmd_bundle(Command):
@@ -3385,7 +3417,7 @@ class cmd_bundle(Command):
             args: Command line arguments
         """
         if not args:
-            print("Usage: bundle <create|verify|list-heads|unbundle> <options>")
+            logger.error("Usage: bundle <create|verify|list-heads|unbundle> <options>")
             return 1
 
         subcommand = args[0]
@@ -3400,7 +3432,7 @@ class cmd_bundle(Command):
         elif subcommand == "unbundle":
             return self._unbundle(subargs)
         else:
-            print(f"Unknown bundle subcommand: {subcommand}")
+            logger.error("Unknown bundle subcommand: %s", subcommand)
             return 1
 
     def _create(self, args) -> int:
@@ -3425,7 +3457,7 @@ class cmd_bundle(Command):
         if parsed_args.progress and not parsed_args.quiet:
 
             def progress(msg: str) -> None:
-                print(msg, file=sys.stderr)
+                logger.error(msg)
 
         refs_to_include = []
         prerequisites = []
@@ -3462,11 +3494,11 @@ class cmd_bundle(Command):
                         sha = repo.refs[ref_arg.encode("utf-8")]
                         refs_to_include.append(ref_arg.encode("utf-8"))
         else:
-            print("No refs specified. Use --all, --stdin, or specify refs")
+            logger.error("No refs specified. Use --all, --stdin, or specify refs")
             return 1
 
         if not refs_to_include:
-            print("fatal: Refusing to create empty bundle.")
+            logger.error("fatal: Refusing to create empty bundle.")
             return 1
 
         bundle = create_bundle_from_repo(
@@ -3506,13 +3538,13 @@ class cmd_bundle(Command):
 
             if missing_prereqs:
                 if not parsed_args.quiet:
-                    print("The bundle requires these prerequisite commits:")
+                    logger.info("The bundle requires these prerequisite commits:")
                     for sha in missing_prereqs:
-                        print(f"  {sha.decode()}")
+                        logger.info("  %s", sha.decode())
                 return 1
             else:
                 if not parsed_args.quiet:
-                    print(
+                    logger.info(
                         "The bundle is valid and can be applied to the current repository"
                     )
                 return 0
@@ -3535,7 +3567,7 @@ class cmd_bundle(Command):
         def list_heads(bundle):
             for ref, sha in bundle.references.items():
                 if not parsed_args.refnames or ref.decode() in parsed_args.refnames:
-                    print(f"{sha.decode()} {ref.decode()}")
+                    logger.info("%s %s", sha.decode(), ref.decode())
 
         if parsed_args.file == "-":
             bundle = read_bundle(sys.stdin.buffer)
@@ -3561,7 +3593,7 @@ class cmd_bundle(Command):
         if parsed_args.progress:
 
             def progress(msg: str) -> None:
-                print(msg, file=sys.stderr)
+                logger.error(msg)
 
         if parsed_args.file == "-":
             bundle = read_bundle(sys.stdin.buffer)
@@ -3576,7 +3608,7 @@ class cmd_bundle(Command):
 
         for ref, sha in bundle.references.items():
             if not parsed_args.refnames or ref.decode() in parsed_args.refnames:
-                print(ref.decode())
+                logger.info(ref.decode())
 
         return 0
 
@@ -3632,7 +3664,7 @@ class cmd_worktree_add(Command):
             detach=parsed_args.detach,
             force=parsed_args.force or bool(parsed_args.force_create_branch),
         )
-        print(f"Worktree added: {worktree_path}")
+        logger.info("Worktree added: %s", worktree_path)
         return 0
 
 
@@ -3680,8 +3712,13 @@ class cmd_worktree_list(Command):
             if parsed_args.porcelain:
                 locked = "locked" if wt.locked else "unlocked"
                 prunable = "prunable" if wt.prunable else "unprunable"
-                print(
-                    f"{path} {wt.head.decode() if wt.head else 'unknown'} {status} {locked} {prunable}"
+                logger.info(
+                    "%s %s %s %s %s",
+                    path,
+                    wt.head.decode() if wt.head else "unknown",
+                    status,
+                    locked,
+                    prunable,
                 )
             else:
                 line = f"{path}  {status}"
@@ -3689,7 +3726,7 @@ class cmd_worktree_list(Command):
                     line += " locked"
                 if wt.prunable:
                     line += " prunable"
-                print(line)
+                logger.info(line)
         return 0
 
 
@@ -3717,7 +3754,7 @@ class cmd_worktree_remove(Command):
         porcelain.worktree_remove(
             repo=".", path=parsed_args.worktree, force=parsed_args.force
         )
-        print(f"Worktree removed: {parsed_args.worktree}")
+        logger.info("Worktree removed: %s", parsed_args.worktree)
         return 0
 
 
@@ -3755,14 +3792,14 @@ class cmd_worktree_prune(Command):
 
         if pruned:
             if parsed_args.dry_run:
-                print("Would prune worktrees:")
+                logger.info("Would prune worktrees:")
             elif parsed_args.verbose:
-                print("Pruned worktrees:")
+                logger.info("Pruned worktrees:")
 
             for wt_id in pruned:
-                print(f"  {wt_id}")
+                logger.info("  %s", wt_id)
         elif parsed_args.verbose:
-            print("No worktrees to prune")
+            logger.info("No worktrees to prune")
         return 0
 
 
@@ -3790,7 +3827,7 @@ class cmd_worktree_lock(Command):
         porcelain.worktree_lock(
             repo=".", path=parsed_args.worktree, reason=parsed_args.reason
         )
-        print(f"Worktree locked: {parsed_args.worktree}")
+        logger.info("Worktree locked: %s", parsed_args.worktree)
         return 0
 
 
@@ -3815,7 +3852,7 @@ class cmd_worktree_unlock(Command):
         from dulwich import porcelain
 
         porcelain.worktree_unlock(repo=".", path=parsed_args.worktree)
-        print(f"Worktree unlocked: {parsed_args.worktree}")
+        logger.info("Worktree unlocked: %s", parsed_args.worktree)
         return 0
 
 
@@ -3843,7 +3880,9 @@ class cmd_worktree_move(Command):
         porcelain.worktree_move(
             repo=".", old_path=parsed_args.worktree, new_path=parsed_args.new_path
         )
-        print(f"Worktree moved: {parsed_args.worktree} -> {parsed_args.new_path}")
+        logger.info(
+            "Worktree moved: %s -> %s", parsed_args.worktree, parsed_args.new_path
+        )
         return 0
 
 
@@ -3979,6 +4018,11 @@ def main(argv=None) -> Optional[int]:
         parser.print_help()
         return 1
 
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+    )
+
     # First remaining arg is the command
     cmd = remaining[0]
     cmd_args = remaining[1:]
@@ -3986,7 +4030,7 @@ def main(argv=None) -> Optional[int]:
     try:
         cmd_kls = commands[cmd]
     except KeyError:
-        print(f"No such subcommand: {cmd}")
+        logging.fatal("No such subcommand: %s", cmd)
         return 1
     # TODO(jelmer): Return non-0 on errors
     return cmd_kls().run(cmd_args)

@@ -119,18 +119,22 @@ class CommitGraphTests(unittest.TestCase):
     def test_from_invalid_signature(self) -> None:
         data = b"XXXX" + b"\\x00" * 100
         f = io.BytesIO(data)
-
-        with self.assertRaises(ValueError) as cm:
-            CommitGraph.from_file(f)
-        self.assertIn("Invalid commit graph signature", str(cm.exception))
+        try:
+            with self.assertRaises(ValueError) as cm:
+                CommitGraph.from_file(f)
+            self.assertIn("Invalid commit graph signature", str(cm.exception))
+        finally:
+            f.close()
 
     def test_from_invalid_version(self) -> None:
         data = COMMIT_GRAPH_SIGNATURE + struct.pack(">B", 99) + b"\\x00" * 100
         f = io.BytesIO(data)
-
-        with self.assertRaises(ValueError) as cm:
-            CommitGraph.from_file(f)
-        self.assertIn("Unsupported commit graph version", str(cm.exception))
+        try:
+            with self.assertRaises(ValueError) as cm:
+                CommitGraph.from_file(f)
+            self.assertIn("Unsupported commit graph version", str(cm.exception))
+        finally:
+            f.close()
 
     def test_from_invalid_hash_version(self) -> None:
         data = (
@@ -140,10 +144,12 @@ class CommitGraphTests(unittest.TestCase):
             + b"\\x00" * 100
         )
         f = io.BytesIO(data)
-
-        with self.assertRaises(ValueError) as cm:
-            CommitGraph.from_file(f)
-        self.assertIn("Unsupported hash version", str(cm.exception))
+        try:
+            with self.assertRaises(ValueError) as cm:
+                CommitGraph.from_file(f)
+            self.assertIn("Unsupported hash version", str(cm.exception))
+        finally:
+            f.close()
 
     def create_minimal_commit_graph_data(self) -> bytes:
         """Create minimal valid commit graph data for testing."""

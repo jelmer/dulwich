@@ -21,11 +21,9 @@
 
 """Tests for dulwich merge CLI command."""
 
-import io
 import os
 import tempfile
 import unittest
-from unittest.mock import patch
 
 from dulwich import porcelain
 from dulwich.cli import main
@@ -65,12 +63,12 @@ class CLIMergeTests(TestCase):
             old_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                with self.assertLogs("dulwich.cli", level="INFO") as cm:
                     ret = main(["merge", "feature"])
-                    output = mock_stdout.getvalue()
+                    log_output = "\n".join(cm.output)
 
                 self.assertEqual(ret, 0)  # Success
-                self.assertIn("Merge successful", output)
+                self.assertIn("Merge successful", log_output)
 
                 # Check that file2.txt exists
                 self.assertTrue(os.path.exists(os.path.join(tmpdir, "file2.txt")))
@@ -108,13 +106,13 @@ class CLIMergeTests(TestCase):
             old_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                with self.assertLogs("dulwich.cli", level="WARNING") as cm:
                     retcode = main(["merge", "feature"])
                     self.assertEqual(retcode, 1)
-                    output = mock_stdout.getvalue()
+                    log_output = "\n".join(cm.output)
 
-                self.assertIn("Merge conflicts", output)
-                self.assertIn("file1.txt", output)
+                self.assertIn("Merge conflicts", log_output)
+                self.assertIn("file1.txt", log_output)
             finally:
                 os.chdir(old_cwd)
 
@@ -134,12 +132,12 @@ class CLIMergeTests(TestCase):
             old_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                with self.assertLogs("dulwich.cli", level="INFO") as cm:
                     ret = main(["merge", "HEAD"])
-                    output = mock_stdout.getvalue()
+                    log_output = "\n".join(cm.output)
 
                 self.assertEqual(ret, 0)  # Success
-                self.assertIn("Already up to date", output)
+                self.assertIn("Already up to date", log_output)
             finally:
                 os.chdir(old_cwd)
 
@@ -176,12 +174,12 @@ class CLIMergeTests(TestCase):
             old_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                with self.assertLogs("dulwich.cli", level="INFO") as cm:
                     ret = main(["merge", "--no-commit", "feature"])
-                    output = mock_stdout.getvalue()
+                    log_output = "\n".join(cm.output)
 
                 self.assertEqual(ret, 0)  # Success
-                self.assertIn("not committing", output)
+                self.assertIn("not committing", log_output)
 
                 # Check that files are merged
                 self.assertTrue(os.path.exists(os.path.join(tmpdir, "file2.txt")))
@@ -218,13 +216,13 @@ class CLIMergeTests(TestCase):
             old_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                with self.assertLogs("dulwich.cli", level="INFO") as cm:
                     ret = main(["merge", "--no-ff", "feature"])
-                    output = mock_stdout.getvalue()
+                    log_output = "\n".join(cm.output)
 
                 self.assertEqual(ret, 0)  # Success
-                self.assertIn("Merge successful", output)
-                self.assertIn("Created merge commit", output)
+                self.assertIn("Merge successful", log_output)
+                self.assertIn("Created merge commit", log_output)
             finally:
                 os.chdir(old_cwd)
 
@@ -261,12 +259,12 @@ class CLIMergeTests(TestCase):
             old_cwd = os.getcwd()
             try:
                 os.chdir(tmpdir)
-                with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                with self.assertLogs("dulwich.cli", level="INFO") as cm:
                     ret = main(["merge", "-m", "Custom merge message", "feature"])
-                    output = mock_stdout.getvalue()
+                    log_output = "\n".join(cm.output)
 
                 self.assertEqual(ret, 0)  # Success
-                self.assertIn("Merge successful", output)
+                self.assertIn("Merge successful", log_output)
             finally:
                 os.chdir(old_cwd)
 

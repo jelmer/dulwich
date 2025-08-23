@@ -36,9 +36,21 @@ from . import TestCase
 class LFSTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
+        # Suppress LFS warnings during these tests
+        import logging
+
+        self._old_level = logging.getLogger("dulwich.lfs").level
+        logging.getLogger("dulwich.lfs").setLevel(logging.ERROR)
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.lfs = LFSStore.create(self.test_dir)
+
+    def tearDown(self) -> None:
+        # Restore original logging level
+        import logging
+
+        logging.getLogger("dulwich.lfs").setLevel(self._old_level)
+        super().tearDown()
 
     def test_create(self) -> None:
         sha = self.lfs.write_object([b"a", b"b"])
@@ -209,18 +221,29 @@ class LFSIntegrationTests(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        import os
+        # Suppress LFS warnings during these integration tests
+        import logging
 
-        from dulwich.repo import Repo
+        self._old_level = logging.getLogger("dulwich.lfs").level
+        logging.getLogger("dulwich.lfs").setLevel(logging.ERROR)
 
         # Create temporary directory for test repo
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
 
         # Initialize repo
+        from dulwich.repo import Repo
+
         self.repo = Repo.init(self.test_dir)
         self.lfs_dir = os.path.join(self.test_dir, ".git", "lfs")
         self.lfs_store = LFSStore.create(self.lfs_dir)
+
+    def tearDown(self) -> None:
+        # Restore original logging level
+        import logging
+
+        logging.getLogger("dulwich.lfs").setLevel(self._old_level)
+        super().tearDown()
 
     def test_lfs_with_gitattributes(self) -> None:
         """Test LFS integration with .gitattributes."""
@@ -701,7 +724,13 @@ class LFSServerTests(TestCase):
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
-        self.addCleanup(self.server.shutdown)
+
+        def cleanup_server():
+            self.server.shutdown()
+            self.server.server_close()
+            self.server_thread.join(timeout=1.0)
+
+        self.addCleanup(cleanup_server)
 
     def test_server_batch_endpoint(self) -> None:
         """Test the batch endpoint directly."""
@@ -974,7 +1003,13 @@ class LFSClientTests(TestCase):
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
-        self.addCleanup(self.server.shutdown)
+
+        def cleanup_server():
+            self.server.shutdown()
+            self.server.server_close()
+            self.server_thread.join(timeout=1.0)
+
+        self.addCleanup(cleanup_server)
 
         # Create LFS client pointing to our test server
         self.client = LFSClient(self.server_url)

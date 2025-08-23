@@ -430,33 +430,39 @@ class TestPackData(PackTests):
 
     def test_compute_file_sha(self) -> None:
         f = BytesIO(b"abcd1234wxyz")
-        self.assertEqual(
-            sha1(b"abcd1234wxyz").hexdigest(), compute_file_sha(f).hexdigest()
-        )
-        self.assertEqual(
-            sha1(b"abcd1234wxyz").hexdigest(),
-            compute_file_sha(f, buffer_size=5).hexdigest(),
-        )
-        self.assertEqual(
-            sha1(b"abcd1234").hexdigest(),
-            compute_file_sha(f, end_ofs=-4).hexdigest(),
-        )
-        self.assertEqual(
-            sha1(b"1234wxyz").hexdigest(),
-            compute_file_sha(f, start_ofs=4).hexdigest(),
-        )
-        self.assertEqual(
-            sha1(b"1234").hexdigest(),
-            compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest(),
-        )
+        try:
+            self.assertEqual(
+                sha1(b"abcd1234wxyz").hexdigest(), compute_file_sha(f).hexdigest()
+            )
+            self.assertEqual(
+                sha1(b"abcd1234wxyz").hexdigest(),
+                compute_file_sha(f, buffer_size=5).hexdigest(),
+            )
+            self.assertEqual(
+                sha1(b"abcd1234").hexdigest(),
+                compute_file_sha(f, end_ofs=-4).hexdigest(),
+            )
+            self.assertEqual(
+                sha1(b"1234wxyz").hexdigest(),
+                compute_file_sha(f, start_ofs=4).hexdigest(),
+            )
+            self.assertEqual(
+                sha1(b"1234").hexdigest(),
+                compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest(),
+            )
+        finally:
+            f.close()
 
     def test_compute_file_sha_short_file(self) -> None:
         f = BytesIO(b"abcd1234wxyz")
-        self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=-20)
-        self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=20)
-        self.assertRaises(
-            AssertionError, compute_file_sha, f, start_ofs=10, end_ofs=-12
-        )
+        try:
+            self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=-20)
+            self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=20)
+            self.assertRaises(
+                AssertionError, compute_file_sha, f, start_ofs=10, end_ofs=-12
+            )
+        finally:
+            f.close()
 
 
 class TestPack(PackTests):
@@ -729,24 +735,30 @@ class TestThinPack(PackTests):
 class WritePackTests(TestCase):
     def test_write_pack_header(self) -> None:
         f = BytesIO()
-        write_pack_header(f.write, 42)
-        self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00*", f.getvalue())
+        try:
+            write_pack_header(f.write, 42)
+            self.assertEqual(b"PACK\x00\x00\x00\x02\x00\x00\x00*", f.getvalue())
+        finally:
+            f.close()
 
     def test_write_pack_object(self) -> None:
         f = BytesIO()
-        f.write(b"header")
-        offset = f.tell()
-        crc32 = write_pack_object(f.write, Blob.type_num, b"blob")
-        self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xFFFFFFFF)
+        try:
+            f.write(b"header")
+            offset = f.tell()
+            crc32 = write_pack_object(f.write, Blob.type_num, b"blob")
+            self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xFFFFFFFF)
 
-        f.write(b"x")  # unpack_object needs extra trailing data.
-        f.seek(offset)
-        unpacked, unused = unpack_object(f.read, compute_crc32=True)
-        self.assertEqual(Blob.type_num, unpacked.pack_type_num)
-        self.assertEqual(Blob.type_num, unpacked.obj_type_num)
-        self.assertEqual([b"blob"], unpacked.decomp_chunks)
-        self.assertEqual(crc32, unpacked.crc32)
-        self.assertEqual(b"x", unused)
+            f.write(b"x")  # unpack_object needs extra trailing data.
+            f.seek(offset)
+            unpacked, unused = unpack_object(f.read, compute_crc32=True)
+            self.assertEqual(Blob.type_num, unpacked.pack_type_num)
+            self.assertEqual(Blob.type_num, unpacked.obj_type_num)
+            self.assertEqual([b"blob"], unpacked.decomp_chunks)
+            self.assertEqual(crc32, unpacked.crc32)
+            self.assertEqual(b"x", unused)
+        finally:
+            f.close()
 
     def test_write_pack_object_sha(self) -> None:
         f = BytesIO()

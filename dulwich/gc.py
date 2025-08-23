@@ -1,6 +1,7 @@
 """Git garbage collection implementation."""
 
 import collections
+import logging
 import os
 import time
 from dataclasses import dataclass, field
@@ -292,10 +293,10 @@ def garbage_collect(
     if not dry_run:
         if prune and unreachable_to_prune:
             # Repack excluding unreachable objects
-            object_store.repack(exclude=unreachable_to_prune)
+            object_store.repack(exclude=unreachable_to_prune, progress=progress)
         else:
             # Normal repack
-            object_store.repack()
+            object_store.repack(progress=progress)
 
     # Prune orphaned temporary files
     if progress:
@@ -367,12 +368,13 @@ def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
     return False
 
 
-def maybe_auto_gc(repo: "Repo", config: Optional["Config"] = None) -> bool:
+def maybe_auto_gc(repo: "Repo", config: Optional["Config"] = None, progress: Optional[Callable] = None) -> bool:
     """Run automatic garbage collection if needed.
 
     Args:
         repo: Repository to potentially GC
         config: Configuration to use (defaults to repo config)
+        progress: Optional progress reporting callback
 
     Returns:
         True if GC was run, False otherwise
@@ -383,7 +385,7 @@ def maybe_auto_gc(repo: "Repo", config: Optional["Config"] = None) -> bool:
     # Check for gc.log file - only for disk-based repos
     if not hasattr(repo, "controldir"):
         # For non-disk repos, just run GC without gc.log handling
-        garbage_collect(repo, auto=True)
+        garbage_collect(repo, auto=True, progress=progress)
         return True
 
     gc_log_path = os.path.join(repo.controldir(), "gc.log")
@@ -409,7 +411,9 @@ def maybe_auto_gc(repo: "Repo", config: Optional["Config"] = None) -> bool:
         if time.time() - stat_info.st_mtime < expiry_seconds:
             # gc.log exists and is not expired - skip GC
             with open(gc_log_path, "rb") as f:
-                print(f.read().decode("utf-8", errors="replace"))
+                logging.info(
+                    "gc.log content: %s", f.read().decode("utf-8", errors="replace")
+                )
             return False
 
     # TODO: Support gc.autoDetach to run in background
@@ -417,7 +421,7 @@ def maybe_auto_gc(repo: "Repo", config: Optional["Config"] = None) -> bool:
 
     try:
         # Run GC with auto=True flag
-        garbage_collect(repo, auto=True)
+        garbage_collect(repo, auto=True, progress=progress)
 
         # Remove gc.log on successful completion
         if os.path.exists(gc_log_path):

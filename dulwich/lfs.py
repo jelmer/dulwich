@@ -138,24 +138,37 @@ class LFSStore:
 
         Returns: object SHA
         """
+        # First pass: compute SHA256 and collect data
         sha = hashlib.sha256()
+        data_chunks = []
+        for chunk in chunks:
+            sha.update(chunk)
+            data_chunks.append(chunk)
+
+        sha_hex = sha.hexdigest()
+        path = self._sha_path(sha_hex)
+
+        # If object already exists, no need to write
+        if os.path.exists(path):
+            return sha_hex
+
+        # Object doesn't exist, write it
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
         tmpdir = os.path.join(self.path, "tmp")
         with tempfile.NamedTemporaryFile(dir=tmpdir, mode="wb", delete=False) as f:
-            for chunk in chunks:
-                sha.update(chunk)
+            for chunk in data_chunks:
                 f.write(chunk)
             f.flush()
             tmppath = f.name
-        path = self._sha_path(sha.hexdigest())
-        if not os.path.exists(os.path.dirname(path)):
-            os.makedirs(os.path.dirname(path))
 
         # Handle concurrent writes - if file already exists, just remove temp file
         if os.path.exists(path):
             os.remove(tmppath)
         else:
             os.rename(tmppath, path)
-        return sha.hexdigest()
+        return sha_hex
 
 
 class LFSPointer:

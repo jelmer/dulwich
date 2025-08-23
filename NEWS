@@ -34,6 +34,12 @@
    headers to the server when communicating over HTTP(S).
    (Jelmer Vernooĳ, #1769)
 
+ * Optimize LFS filter performance by avoiding redundant disk writes when
+   checking file status. The LFS store now checks if objects already exist
+   before writing them to disk, significantly improving ``git status``
+   performance in repositories with many LFS-tracked files.
+   (Jelmer Vernooĳ, #1789)
+
  * Add support for ``patiencediff`` algorithm in diff.
    (Jelmer Vernooĳ, #1795)
 

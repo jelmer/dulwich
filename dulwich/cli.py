@@ -1133,6 +1133,7 @@ class cmd_symbolic_ref(Command):
 
             with Repo(".") as repo:
                 repo.refs.set_symbolic_ref(args.name.encode(), args.ref.encode())
+            return 0
         else:
             # Read symbolic reference
             from .repo import Repo
@@ -1144,6 +1145,7 @@ class cmd_symbolic_ref(Command):
                         logger.info(target[5:].decode())
                     else:
                         logger.info(target.decode())
+                    return 0
                 except KeyError:
                     logging.error("fatal: ref '%s' is not a symbolic ref", args.name)
                     return 1

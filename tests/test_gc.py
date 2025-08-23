@@ -23,7 +23,6 @@ from dulwich.repo import MemoryRepo, Repo
 
 def no_op_progress(msg):
     """Progress callback that does nothing."""
-    pass
 
 
 class GCTestCase(TestCase):
@@ -164,7 +163,9 @@ class GCTestCase(TestCase):
         self.repo.object_store.add_object(unreachable_blob)
 
         # Run garbage collection (grace_period=None means no grace period check)
-        stats = garbage_collect(self.repo, prune=True, grace_period=None, progress=no_op_progress)
+        stats = garbage_collect(
+            self.repo, prune=True, grace_period=None, progress=no_op_progress
+        )
 
         # Check results
         self.assertIsInstance(stats, GCStats)
@@ -199,7 +200,13 @@ class GCTestCase(TestCase):
         self.repo.object_store.add_object(unreachable_blob)
 
         # Run garbage collection with dry run (grace_period=None means no grace period check)
-        stats = garbage_collect(self.repo, prune=True, grace_period=None, dry_run=True, progress=no_op_progress)
+        stats = garbage_collect(
+            self.repo,
+            prune=True,
+            grace_period=None,
+            dry_run=True,
+            progress=no_op_progress,
+        )
 
         # Check that object would be pruned but still exists
         # On Windows, the repository initialization might create additional unreachable objects
@@ -219,7 +226,13 @@ class GCTestCase(TestCase):
 
         # Run garbage collection with a 1 hour grace period, but dry run to avoid packing
         # The object was just created, so it should not be pruned
-        stats = garbage_collect(self.repo, prune=True, grace_period=3600, dry_run=True, progress=no_op_progress)
+        stats = garbage_collect(
+            self.repo,
+            prune=True,
+            grace_period=3600,
+            dry_run=True,
+            progress=no_op_progress,
+        )
 
         # Check that the object was NOT pruned
         self.assertEqual(set(), stats.pruned_objects)
@@ -249,7 +262,9 @@ class GCTestCase(TestCase):
 
         # Run garbage collection with a 1 hour grace period
         # The object is 2 hours old, so it should be pruned
-        stats = garbage_collect(self.repo, prune=True, grace_period=3600, progress=no_op_progress)
+        stats = garbage_collect(
+            self.repo, prune=True, grace_period=3600, progress=no_op_progress
+        )
 
         # Check that the object was pruned
         self.assertEqual({old_blob.id}, stats.pruned_objects)
@@ -269,7 +284,9 @@ class GCTestCase(TestCase):
         self.assertIn(unreachable_blob.id, self.repo.object_store)
 
         # Run garbage collection (grace_period=None means no grace period check)
-        stats = garbage_collect(self.repo, prune=True, grace_period=None, progress=no_op_progress)
+        stats = garbage_collect(
+            self.repo, prune=True, grace_period=None, progress=no_op_progress
+        )
 
         # Check that the packed object was pruned
         self.assertEqual({unreachable_blob.id}, stats.pruned_objects)
@@ -415,7 +432,9 @@ class GCTestCase(TestCase):
             self.repo.object_store, "get_object_mtime", side_effect=KeyError
         ):
             # Run garbage collection with grace period
-            stats = garbage_collect(self.repo, prune=True, grace_period=3600, progress=no_op_progress)
+            stats = garbage_collect(
+                self.repo, prune=True, grace_period=3600, progress=no_op_progress
+            )
 
         # Object should be kept because mtime couldn't be determined
         self.assertEqual(set(), stats.pruned_objects)

@@ -368,7 +368,9 @@ def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
     return False
 
 
-def maybe_auto_gc(repo: "Repo", config: Optional["Config"] = None, progress: Optional[Callable] = None) -> bool:
+def maybe_auto_gc(
+    repo: "Repo", config: Optional["Config"] = None, progress: Optional[Callable] = None
+) -> bool:
     """Run automatic garbage collection if needed.
 
     Args:

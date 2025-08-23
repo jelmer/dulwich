@@ -424,6 +424,20 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual(1234, c._port)
         self.assertEqual("/bar/baz", path)
 
+    def test_tcp_ipv6(self) -> None:
+        c, path = get_transport_and_path("git://[::1]/bar/baz")
+        self.assertIsInstance(c, TCPGitClient)
+        self.assertEqual("::1", c._host)
+        self.assertEqual(TCP_GIT_PORT, c._port)
+        self.assertEqual("/bar/baz", path)
+
+    def test_tcp_ipv6_port(self) -> None:
+        c, path = get_transport_and_path("git://[2001:db8::1]:1234/bar/baz")
+        self.assertIsInstance(c, TCPGitClient)
+        self.assertEqual("2001:db8::1", c._host)
+        self.assertEqual(1234, c._port)
+        self.assertEqual("/bar/baz", path)
+
     def test_git_ssh_explicit(self) -> None:
         c, path = get_transport_and_path("git+ssh://foo.com/bar/baz")
         self.assertIsInstance(c, SSHGitClient)
@@ -1641,6 +1655,32 @@ class TCPGitClientTests(TestCase):
 
         url = c.get_url(path)
         self.assertEqual("git://github.com:9090/jelmer/dulwich", url)
+
+    def test_get_url_with_ipv6(self) -> None:
+        host = "::1"
+        path = "/jelmer/dulwich"
+        c = TCPGitClient(host)
+
+        url = c.get_url(path)
+        self.assertEqual("git://[::1]/jelmer/dulwich", url)
+
+    def test_get_url_with_ipv6_and_port(self) -> None:
+        host = "2001:db8::1"
+        path = "/jelmer/dulwich"
+        port = 9090
+        c = TCPGitClient(host, port=port)
+
+        url = c.get_url(path)
+        self.assertEqual("git://[2001:db8::1]:9090/jelmer/dulwich", url)
+
+    def test_get_url_with_ipv6_default_port(self) -> None:
+        host = "2001:db8::1"
+        path = "/jelmer/dulwich"
+        port = TCP_GIT_PORT  # Default port should not be included in URL
+        c = TCPGitClient(host, port=port)
+
+        url = c.get_url(path)
+        self.assertEqual("git://[2001:db8::1]/jelmer/dulwich", url)
 
 
 class DefaultUrllib3ManagerTest(TestCase):

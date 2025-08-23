@@ -49,6 +49,7 @@ dev = [
 ]
 merge = ["merge3"]
 fuzzing = ["atheris"]
+patiencediff = ["patiencediff"]
 
 [project.scripts]
 dulwich = "dulwich.cli:main"

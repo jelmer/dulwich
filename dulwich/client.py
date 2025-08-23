@@ -1708,7 +1708,12 @@ class TCPGitClient(TraditionalGitClient):
         Returns:
           ``git://`` URL for the path
         """
-        netloc = self._host
+        # IPv6 addresses contain colons and need to be wrapped in brackets
+        if ":" in self._host:
+            netloc = f"[{self._host}]"
+        else:
+            netloc = self._host
+
         if self._port is not None and self._port != TCP_GIT_PORT:
             netloc += f":{self._port}"
         return urlunsplit(("git", netloc, path, "", ""))

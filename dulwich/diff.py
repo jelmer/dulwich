@@ -78,6 +78,7 @@ def diff_index_to_tree(
     outstream: BinaryIO,
     commit_sha: Optional[bytes] = None,
     paths: Optional[list[bytes]] = None,
+    diff_algorithm: Optional[str] = None,
 ) -> None:
     """Show staged changes (index vs commit).
 
@@ -86,6 +87,7 @@ def diff_index_to_tree(
         outstream: Stream to write diff to
         commit_sha: SHA of commit to compare against, or None for HEAD
         paths: Optional list of paths to filter (as bytes)
+        diff_algorithm: Algorithm to use for diffing ("myers" or "patience"), defaults to DEFAULT_DIFF_ALGORITHM if None
     """
     if commit_sha is None:
         try:
@@ -112,6 +114,7 @@ def diff_index_to_tree(
             repo.object_store,
             (oldpath, oldmode, oldsha),
             (newpath, newmode, newsha),
+            diff_algorithm=diff_algorithm,
         )
 
 
@@ -120,6 +123,7 @@ def diff_working_tree_to_tree(
     outstream: BinaryIO,
     commit_sha: bytes,
     paths: Optional[list[bytes]] = None,
+    diff_algorithm: Optional[str] = None,
 ) -> None:
     """Compare working tree to a specific commit.
 
@@ -128,6 +132,7 @@ def diff_working_tree_to_tree(
         outstream: Stream to write diff to
         commit_sha: SHA of commit to compare against
         paths: Optional list of paths to filter (as bytes)
+        diff_algorithm: Algorithm to use for diffing ("myers" or "patience"), defaults to DEFAULT_DIFF_ALGORITHM if None
     """
     commit = repo[commit_sha]
     assert isinstance(commit, Commit)
@@ -357,7 +362,10 @@ def diff_working_tree_to_tree(
 
 
 def diff_working_tree_to_index(
-    repo: Repo, outstream: BinaryIO, paths: Optional[list[bytes]] = None
+    repo: Repo,
+    outstream: BinaryIO,
+    paths: Optional[list[bytes]] = None,
+    diff_algorithm: Optional[str] = None,
 ) -> None:
     """Compare working tree to index.
 
@@ -365,6 +373,7 @@ def diff_working_tree_to_index(
         repo: Repository object
         outstream: Stream to write diff to
         paths: Optional list of paths to filter (as bytes)
+        diff_algorithm: Algorithm to use for diffing ("myers" or "patience"), defaults to DEFAULT_DIFF_ALGORITHM if None
     """
     index = repo.open_index()
     normalizer = repo.get_blob_normalizer()

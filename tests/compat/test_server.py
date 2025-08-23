@@ -58,9 +58,20 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         backend = DictBackend({b"/": repo})
         dul_server = TCPGitServer(backend, b"localhost", 0, handlers=self._handlers())
         self._check_server(dul_server)
-        self.addCleanup(dul_server.shutdown)
-        self.addCleanup(dul_server.server_close)
-        threading.Thread(target=dul_server.serve).start()
+
+        # Start server in a thread
+        server_thread = threading.Thread(target=dul_server.serve)
+        server_thread.daemon = True  # Make thread daemon so it dies with main thread
+        server_thread.start()
+
+        # Add cleanup in the correct order
+        def cleanup_server():
+            dul_server.shutdown()
+            dul_server.server_close()
+            # Give thread a moment to exit cleanly
+            server_thread.join(timeout=1.0)
+
+        self.addCleanup(cleanup_server)
         self._server = dul_server
         _, port = self._server.socket.getsockname()
         return port

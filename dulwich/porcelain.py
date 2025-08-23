@@ -1560,6 +1560,7 @@ def diff(
     staged: bool = False,
     paths: Optional[list[Union[str, bytes]]] = None,
     outstream: BinaryIO = default_bytes_out_stream,
+    diff_algorithm: Optional[str] = None,
 ) -> None:
     """Show diff.
 
@@ -1576,6 +1577,8 @@ def diff(
               Ignored if commit2 is provided.
       paths: Optional list of paths to limit diff
       outstream: Stream to write to
+      diff_algorithm: Algorithm to use for diffing ("myers" or "patience"),
+                      defaults to the underlying function's default if None
     """
     from . import diff as diff_module
 
@@ -1637,19 +1640,26 @@ def diff(
                     r.object_store,
                     (oldpath, oldmode, oldsha),
                     (newpath, newmode, newsha),
+                    diff_algorithm=diff_algorithm,
                 )
         elif staged:
             # Show staged changes (index vs commit)
-            diff_module.diff_index_to_tree(r, outstream, commit_sha, byte_paths)
+            diff_module.diff_index_to_tree(
+                r, outstream, commit_sha, byte_paths, diff_algorithm=diff_algorithm
+            )
         elif commit is not None:
             # Compare working tree to a specific commit
             assert (
                 commit_sha is not None
             )  # mypy: commit_sha is set when commit is not None
-            diff_module.diff_working_tree_to_tree(r, outstream, commit_sha, byte_paths)
+            diff_module.diff_working_tree_to_tree(
+                r, outstream, commit_sha, byte_paths, diff_algorithm=diff_algorithm
+            )
         else:
             # Compare working tree to index
-            diff_module.diff_working_tree_to_index(r, outstream, byte_paths)
+            diff_module.diff_working_tree_to_index(
+                r, outstream, byte_paths, diff_algorithm=diff_algorithm
+            )
 
 
 def rev_list(

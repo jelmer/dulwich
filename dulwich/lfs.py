@@ -43,6 +43,8 @@ from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     import urllib3
 
@@ -285,7 +287,7 @@ class LFSFilterDriver:
                 return content
             except LFSError as e:
                 # Download failed, fall back to returning pointer
-                logging.warning("LFS object download failed for %s: %s", pointer.oid, e)
+                logger.warning("LFS object download failed for %s: %s", pointer.oid, e)
 
                 # Return pointer as-is when object is missing and download failed
                 return data

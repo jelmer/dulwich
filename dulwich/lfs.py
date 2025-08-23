@@ -35,8 +35,6 @@ Key components:
 import hashlib
 import json
 import logging
-
-logger = logging.getLogger(__name__)
 import os
 import tempfile
 from collections.abc import Iterable
@@ -44,6 +42,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import urllib3

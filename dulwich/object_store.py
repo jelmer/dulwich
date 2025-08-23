@@ -774,7 +774,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
         Args:
           progress: Optional progress reporting callback
-          
+
         Returns: Number of objects packed
         """
         objects: list[tuple[ShaFile, None]] = []
@@ -787,7 +787,9 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
             self.delete_loose_object(obj.id)
         return len(objects)
 
-    def repack(self, exclude: Optional[set] = None, progress: Optional[Callable] = None) -> int:
+    def repack(
+        self, exclude: Optional[set] = None, progress: Optional[Callable] = None
+    ) -> int:
         """Repack the packs in this repository.
 
         Note that this implementation is fairly naive and currently keeps all
@@ -2515,7 +2517,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
         """Pack loose objects. Returns number of objects packed.
 
         BucketBasedObjectStore doesn't support loose objects, so this is a no-op.
-        
+
         Args:
           progress: Optional progress reporting callback (ignored)
         """

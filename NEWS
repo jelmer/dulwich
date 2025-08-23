@@ -34,6 +34,9 @@
    headers to the server when communicating over HTTP(S).
    (Jelmer Vernooĳ, #1769)
 
+ * Add support for ``patiencediff`` algorithm in diff.
+   (Jelmer Vernooĳ, #1795)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

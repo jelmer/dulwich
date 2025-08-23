@@ -48,6 +48,7 @@ from .index import Index
 from .objects import Commit, valid_hexsha
 from .objectspec import parse_commit_range
 from .pack import Pack, sha_to_hex
+from .patch import DiffAlgorithmNotAvailable
 from .repo import Repo
 
 
@@ -759,6 +760,17 @@ class cmd_diff(Command):
             help="Use colored output (requires rich)",
         )
         parser.add_argument(
+            "--patience",
+            action="store_true",
+            help="Use patience diff algorithm",
+        )
+        parser.add_argument(
+            "--diff-algorithm",
+            choices=["myers", "patience"],
+            default="myers",
+            help="Choose a diff algorithm",
+        )
+        parser.add_argument(
             "--", dest="separator", action="store_true", help=argparse.SUPPRESS
         )
         parser.add_argument("paths", nargs="*", default=[], help="Paths to limit diff")
@@ -772,6 +784,11 @@ class cmd_diff(Command):
             parsed_args = parser.parse_args(args)
 
         args = parsed_args
+
+        # Determine diff algorithm
+        diff_algorithm = args.diff_algorithm
+        if args.patience:
+            diff_algorithm = "patience"
 
         # Determine if we should use color
         def _should_use_color():
@@ -806,36 +823,45 @@ class cmd_diff(Command):
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="diff") as outstream:
                 output_stream = _create_output_stream(outstream)
-                if len(args.committish) == 0:
-                    # Show diff for working tree or staged changes
-                    porcelain.diff(
-                        repo,
-                        staged=(args.staged or args.cached),
-                        paths=args.paths or None,
-                        outstream=output_stream,
-                    )
-                elif len(args.committish) == 1:
-                    # Show diff between working tree and specified commit
-                    if args.staged or args.cached:
-                        parser.error("--staged/--cached cannot be used with commits")
-                    porcelain.diff(
-                        repo,
-                        commit=args.committish[0],
-                        staged=False,
-                        paths=args.paths or None,
-                        outstream=output_stream,
-                    )
-                elif len(args.committish) == 2:
-                    # Show diff between two commits
-                    porcelain.diff(
-                        repo,
-                        commit=args.committish[0],
-                        commit2=args.committish[1],
-                        paths=args.paths or None,
-                        outstream=output_stream,
-                    )
-                else:
-                    parser.error("Too many arguments - specify at most two commits")
+                try:
+                    if len(args.committish) == 0:
+                        # Show diff for working tree or staged changes
+                        porcelain.diff(
+                            repo,
+                            staged=(args.staged or args.cached),
+                            paths=args.paths or None,
+                            outstream=output_stream,
+                            diff_algorithm=diff_algorithm,
+                        )
+                    elif len(args.committish) == 1:
+                        # Show diff between working tree and specified commit
+                        if args.staged or args.cached:
+                            parser.error(
+                                "--staged/--cached cannot be used with commits"
+                            )
+                        porcelain.diff(
+                            repo,
+                            commit=args.committish[0],
+                            staged=False,
+                            paths=args.paths or None,
+                            outstream=output_stream,
+                            diff_algorithm=diff_algorithm,
+                        )
+                    elif len(args.committish) == 2:
+                        # Show diff between two commits
+                        porcelain.diff(
+                            repo,
+                            commit=args.committish[0],
+                            commit2=args.committish[1],
+                            paths=args.paths or None,
+                            outstream=output_stream,
+                            diff_algorithm=diff_algorithm,
+                        )
+                    else:
+                        parser.error("Too many arguments - specify at most two commits")
+                except DiffAlgorithmNotAvailable as e:
+                    sys.stderr.write(f"fatal: {e}\n")
+                    sys.exit(1)
 
                 # Flush any remaining output
                 if hasattr(output_stream, "flush"):

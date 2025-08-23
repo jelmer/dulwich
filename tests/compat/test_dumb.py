@@ -21,6 +21,7 @@
 
 """Compatibility tests for dumb HTTP git repositories."""
 
+import io
 import os
 import sys
 import tempfile
@@ -36,6 +37,10 @@ from tests.compat.utils import (
     rmtree_ro,
     run_git_or_fail,
 )
+
+
+def no_op_progress(msg):
+    """Progress callback that does nothing."""
 
 
 class DumbHTTPRequestHandler(SimpleHTTPRequestHandler):
@@ -163,7 +168,8 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
     )
     def test_clone_dumb(self):
         dest_path = os.path.join(self.temp_dir, "cloned")
-        repo = clone(self.server.url, dest_path)
+        # Use a dummy errstream to suppress progress output
+        repo = clone(self.server.url, dest_path, errstream=io.BytesIO())
         assert b"HEAD" in repo
 
     def test_clone_from_dumb_http(self):
@@ -183,7 +189,9 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
                     sha for ref, sha in refs.items() if ref.startswith(b"refs/heads/")
                 ]
 
-            result = client.fetch("/", dest_repo, determine_wants=determine_wants)
+            result = client.fetch(
+                "/", dest_repo, determine_wants=determine_wants, progress=no_op_progress
+            )
 
             # Update refs
             for ref, sha in result.refs.items():
@@ -237,7 +245,9 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
                         wants.append(sha)
                 return wants
 
-            result = client.fetch("/", dest_repo, determine_wants=determine_wants)
+            result = client.fetch(
+                "/", dest_repo, determine_wants=determine_wants, progress=no_op_progress
+            )
 
             # Update refs
             for ref, sha in result.refs.items():
@@ -282,7 +292,9 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
                     if ref.startswith((b"refs/heads/", b"refs/tags/"))
                 ]
 
-            result = client.fetch("/", dest_repo, determine_wants=determine_wants)
+            result = client.fetch(
+                "/", dest_repo, determine_wants=determine_wants, progress=no_op_progress
+            )
 
             # Update refs
             for ref, sha in result.refs.items():

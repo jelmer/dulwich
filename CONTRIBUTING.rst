@@ -42,8 +42,7 @@ There are also other, optional dependencies which are needed to run the full tes
 implement optional features, and provide the full typing information. They are however not
 strictly necessary; the above is sufficient to start developing and have your PR pass the
 tests in most cases. Please consult the ``[project.optional-dependencies]`` section in
-``pyproject.toml`` and the various targets in ``Makefile`` for a full list of optional
-dependencies.
+``pyproject.toml``.
 
 Coding style
 ------------
@@ -53,7 +52,9 @@ and typing checks" below for details on running style checkers.
 
 Public methods, functions and classes should all have doc strings. Please use
 Google style docstrings to document parameters and return values.
-You can generate the documentation by running "make doc".
+You can generate the documentation by running ``pydoctor --docformat=google dulwich``
+from the root of the repository, and then opening
+``apidocs/index.html`` in your web browser.
 
 String Types
 ~~~~~~~~~~~~
@@ -98,39 +99,49 @@ dulwich package. This will ensure that the deprecation is handled correctly:
 
 Running the tests
 -----------------
-To run the testsuite, you should be able to simply run "make check". This
-will run the tests using unittest.
+To run the testsuite, you should be able to run ``dulwich.tests.test_suite``.
+This will run the tests using unittest.
 
 .. code:: console
 
-   $ make check
+   $ python -m unittest dulwich.tests.test_suite
 
 The compatibility tests that verify Dulwich behaves in a way that is compatible
 with C Git are the slowest, so you may want to avoid them while developing:
 
 .. code:: console
 
-   $ make check-nocompat
+   $ python -m unittest dulwich.tests.nocompat_test_suite
 
 testr and tox configuration is also present.
 
 Style and typing checks
 -----------------------
 
-Use ``make all-style`` to run all style-related checks. Use ``make typing`` for typing
-checks. Those checks are *mandatory*, a PR will not pass tests and will not be merged if
+Several static analysis tools are used to ensure code quality and consistency.
+
+* Use ``ruff check`` to run all style-related checks.
+* Use ``ruff format --check`` to check code formatting.
+* Use ``mypy dulwich`` for typing checks.
+* Use ``codespell`` to check for common misspellings.
+
+Those checks are *mandatory*, a PR will not pass tests and will not be merged if
 they aren't successful.
 
 .. code:: console
 
-   $ make all-style
-   $ make typing
+   $ ruff check
+   $ ruff format --check
+   $ mypy dulwich
+   $ codespell
 
-Some of these checks will modify the code to fix issues encountered, remember to commit
-these changes afterwards!
+In some cases you can automatically fix issues found by these tools. To do so, you can run:
 
-There are also individual ``make`` targets to run just a single style check, see the
-definition of ``all-style`` in ``Makefile``.
+.. code:: console
+
+   $ ruff check --fix  # or pass --unsafe-fixes to apply more aggressive fixes
+   $ ruff format
+   $ codespell --config .codespellrc -w
 
 Merge requests
 --------------

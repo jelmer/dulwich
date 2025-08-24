@@ -6,16 +6,55 @@ Where possible include updates to NEWS along with your improvements.
 
 New functionality and bug fixes should be accompanied by matching unit tests.
 
+Installing development dependencies
+-----------------------------------
+
+Contributing to Dulwich requires several more dependencies than are required to install
+the base package; they are used to run tests and various other checks.
+
+First, make sure your system has the Rust compiler and Cargo (the Rust package manager)
+installed. As this is a system-level requirement and not a Python library, the right way
+to install it depends on your platform. Please consult the `Rust documentation
+<https://www.rust-lang.org/learn/get-started>`__ to find out more.
+
+Next, you will need to set up your Python environment for Dulwich. An easy way to get
+started is to install the checked out Dulwich package in editable mode with ``dev``
+extras, preferably in a new virtual environment:
+
+.. code:: console
+
+   $ cd ~/path/to/checkouts/dulwich
+   # Create and activate a virtual environment via your favourite method, such as pyenv,
+   # uv, built-in venv module...
+   $ python -m venv .venv && . .venv/bin/activate
+   # Now install Dulwich and the required dependencies
+   $ pip install -e ".[dev]"
+
+This will ensure the tools needed to test your changes are installed. It is not necessary
+to install Dulwich in editable mode (``-e``), but doing so is convenient for development,
+as code changes will be visible immediately, without requiring a reinstall (although any
+running Python processes will need to be reloaded to see the updated module
+definitions). Editable mode only applies to Python code; if you modify any of the Rust
+extension code, you will need to reinstall the package for the extensions to be
+recompiled.
+
+There are also other, optional dependencies which are needed to run the full test suite,
+implement optional features, and provide the full typing information. They are however not
+strictly necessary; the above is sufficient to start developing and have your PR pass the
+tests in most cases. Please consult the ``[project.optional-dependencies]`` section in
+``pyproject.toml``.
+
 Coding style
 ------------
-Where possible, please follow PEP8 with regard to coding style. Run ruff.
-
-Furthermore, triple-quotes should always be """, single quotes are ' unless
-using " would result in less escaping within the string.
+The code follows the PEP8 coding style. There are ``ruff`` rules in place that define the
+exact code style, please run it to make sure your changes are conformant. See also "Style
+and typing checks" below for details on running style checkers.
 
 Public methods, functions and classes should all have doc strings. Please use
 Google style docstrings to document parameters and return values.
-You can generate the documentation by running "make doc".
+You can generate the documentation by running ``pydoctor --docformat=google dulwich``
+from the root of the repository, and then opening
+``apidocs/index.html`` in your web browser.
 
 String Types
 ~~~~~~~~~~~~
@@ -60,19 +99,49 @@ dulwich package. This will ensure that the deprecation is handled correctly:
 
 Running the tests
 -----------------
-To run the testsuite, you should be able to simply run "make check". This
-will run the tests using unittest.
+To run the testsuite, you should be able to run ``dulwich.tests.test_suite``.
+This will run the tests using unittest.
 
-::
-   $ make check
+.. code:: console
+
+   $ python -m unittest dulwich.tests.test_suite
 
 The compatibility tests that verify Dulwich behaves in a way that is compatible
 with C Git are the slowest, so you may want to avoid them while developing:
 
-::
-   $ make check-nocompat
+.. code:: console
+
+   $ python -m unittest dulwich.tests.nocompat_test_suite
 
 testr and tox configuration is also present.
+
+Style and typing checks
+-----------------------
+
+Several static analysis tools are used to ensure code quality and consistency.
+
+* Use ``ruff check`` to run all style-related checks.
+* Use ``ruff format --check`` to check code formatting.
+* Use ``mypy dulwich`` for typing checks.
+* Use ``codespell`` to check for common misspellings.
+
+Those checks are *mandatory*, a PR will not pass tests and will not be merged if
+they aren't successful.
+
+.. code:: console
+
+   $ ruff check
+   $ ruff format --check
+   $ mypy dulwich
+   $ codespell
+
+In some cases you can automatically fix issues found by these tools. To do so, you can run:
+
+.. code:: console
+
+   $ ruff check --fix  # or pass --unsafe-fixes to apply more aggressive fixes
+   $ ruff format
+   $ codespell --config .codespellrc -w
 
 Merge requests
 --------------

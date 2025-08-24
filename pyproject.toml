@@ -45,7 +45,8 @@ colordiff = ["rich"]
 dev = [
     "ruff==0.12.9",
     "mypy==1.17.0",
-    "dissolve>=0.1.1"
+    "dissolve>=0.1.1",
+    "codespell==2.4.1",
 ]
 merge = ["merge3"]
 fuzzing = ["atheris"]

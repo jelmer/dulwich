@@ -42,8 +42,6 @@ check-noextensions:: clean
 check-contrib:: clean
 	$(RUNTEST) -v dulwich.contrib.test_suite
 
-check-all: check check-pypy check-noextensions
-
 typing:
 	$(PYTHON) -m mypy dulwich
 

@@ -64,6 +64,7 @@ Currently implemented:
  * update_server_info
  * write_commit_graph
  * status
+ * shortlog
  * symbolic_ref
  * worktree{_add,_list,_remove,_prune,_lock,_unlock,_move}
 
@@ -2669,6 +2670,51 @@ def status(
 
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
+def shortlog(
+    repo: Union[str, os.PathLike, Repo],
+    summary_only: bool = False,
+    sort_by_commits: bool = False,
+) -> str:
+    """Summarize commits by author, like git shortlog.
+
+    Args:
+      repo: Path to repository or Repo object.
+      summary_only: If True, only show counts per author (like `git shortlog -s`).
+      sort_by_commits: If True, sort authors by number of commits (like `git shortlog -n`).
+
+    Returns:
+      A string containing authors and their commit messages or counts.
+    """
+    with open_repo_closing(repo) as r:
+        walker = r.get_walker()
+        authors = {}  # dict mapping author -> list of messages
+
+        for entry in walker:
+            commit = entry.commit
+            author = commit.author.decode("utf-8")
+            message = commit.message.decode("utf-8").strip()
+            if author in authors:
+                authors[author].append(message)
+            else:
+                authors[author] = [message]
+
+        # Optionally sort authors
+        items = list(authors.items())
+        if sort_by_commits:
+            items.sort(key=lambda x: len(x[1]), reverse=True)
+
+        # Format output
+        out_lines = []
+        for author, msgs in items:
+            if summary_only:
+                out_lines.append(f"{len(msgs)}\t{author}")
+            else:
+                out_lines.append(f"{author} ({len(msgs)}):")
+                for msg in msgs:
+                    out_lines.append(f"    {msg}")
+                out_lines.append("")  # blank line between authors
+
+        return "\n".join(out_lines)
 
 def _walk_working_dir_paths(
     frompath: Union[str, bytes, os.PathLike],

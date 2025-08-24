@@ -6343,6 +6343,48 @@ class StatusTests(PorcelainTestCase):
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
 
+class ShortlogTests(PorcelainTestCase):
+    def test_shortlog(self) -> None:
+        """Test porcelain.shortlog function with multiple authors and commits."""
+        
+        # First commit by John
+        file_a = os.path.join(self.repo.path, "a.txt")
+        with open(file_a, "w") as f:
+            f.write("hello")
+        porcelain.add(self.repo.path, paths=[file_a])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Initial commit",
+            author=b"John <john@example.com>"
+        )
+
+        # Second commit by Doe
+        file_b = os.path.join(self.repo.path, "b.txt")
+        with open(file_b, "w") as f:
+            f.write("update")
+        porcelain.add(self.repo.path, paths=[file_b])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Update file",
+            author=b"Doe <doe@example.com>"
+        )
+
+        # Check normal shortlog
+        output = porcelain.shortlog(self.repo.path)
+        self.assertIn("John <john@example.com> (1):", output)
+        self.assertIn("Doe <doe@example.com> (1):", output)
+
+        # Check summary only
+        output_summary = porcelain.shortlog(self.repo.path, summary_only=True)
+        self.assertIn("1\tJohn <john@example.com>", output_summary)
+        self.assertIn("1\tDoe <doe@example.com>", output_summary)
+
+        # Check sort by commits
+        output_sorted = porcelain.shortlog(self.repo.path, sort_by_commits=True)
+        lines = output_sorted.splitlines()
+        self.assertTrue(any("John <john@example.com>" in line for line in lines))
+        self.assertTrue(any("Doe <doe@example.com>" in line for line in lines))
+
 class UploadPackTests(PorcelainTestCase):
     """Tests for upload_pack."""
 

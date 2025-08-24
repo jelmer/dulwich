@@ -2691,30 +2691,19 @@ def shortlog(
 
         for entry in walker:
             commit = entry.commit
-            author = commit.author.decode("utf-8")
-            message = commit.message.decode("utf-8").strip()
+            author = commit.author.decode(commit.encoding or "utf-8")
+            message = commit.message.decode(commit.encoding or "utf-8").strip()
             if author in authors:
                 authors[author].append(message)
             else:
                 authors[author] = [message]
 
         # Optionally sort authors
-        items = list(authors.items())
+        items = [{"author": author, "messages": msgs} for author, msgs in authors.items()]
         if sort_by_commits:
-            items.sort(key=lambda x: len(x[1]), reverse=True)
+            items.sort(key=lambda x: len(x["messages"]), reverse=True)
 
-        # Format output
-        out_lines = []
-        for author, msgs in items:
-            if summary_only:
-                out_lines.append(f"{len(msgs)}\t{author}")
-            else:
-                out_lines.append(f"{author} ({len(msgs)}):")
-                for msg in msgs:
-                    out_lines.append(f"    {msg}")
-                out_lines.append("")  # blank line between authors
-
-        return "\n".join(out_lines)
+        return items
 
 def _walk_working_dir_paths(
     frompath: Union[str, bytes, os.PathLike],

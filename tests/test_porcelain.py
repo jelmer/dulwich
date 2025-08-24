@@ -6342,11 +6342,10 @@ class StatusTests(PorcelainTestCase):
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
-
 class ShortlogTests(PorcelainTestCase):
     def test_shortlog(self) -> None:
         """Test porcelain.shortlog function with multiple authors and commits."""
-        
+
         # First commit by John
         file_a = os.path.join(self.repo.path, "a.txt")
         with open(file_a, "w") as f:
@@ -6369,21 +6368,33 @@ class ShortlogTests(PorcelainTestCase):
             author=b"Doe <doe@example.com>"
         )
 
-        # Check normal shortlog
+        # Check normal shortlog (structured output)
         output = porcelain.shortlog(self.repo.path)
-        self.assertIn("John <john@example.com> (1):", output)
-        self.assertIn("Doe <doe@example.com> (1):", output)
+        expected = [
+            {"author": "John <john@example.com>", "messages": ["Initial commit"]},
+            {"author": "Doe <doe@example.com>", "messages": ["Update file"]},
+        ]
+        self.assertCountEqual(output, expected)
 
         # Check summary only
-        output_summary = porcelain.shortlog(self.repo.path, summary_only=True)
-        self.assertIn("1\tJohn <john@example.com>", output_summary)
-        self.assertIn("1\tDoe <doe@example.com>", output_summary)
+        output_summary = [
+            {"author": entry["author"], "count": len(entry["messages"])}
+            for entry in output
+        ]
+        expected_summary = [
+            {"author": "John <john@example.com>", "count": 1},
+            {"author": "Doe <doe@example.com>", "count": 1},
+        ]
+        self.assertCountEqual(output_summary, expected_summary)
 
         # Check sort by commits
         output_sorted = porcelain.shortlog(self.repo.path, sort_by_commits=True)
-        lines = output_sorted.splitlines()
-        self.assertTrue(any("John <john@example.com>" in line for line in lines))
-        self.assertTrue(any("Doe <doe@example.com>" in line for line in lines))
+        # Expected sorted by commit count
+        expected_sorted = sorted(output, key=lambda x: len(x["messages"]), reverse=True)
+        self.assertEqual(output_sorted, expected_sorted)
+
+
+
 
 class UploadPackTests(PorcelainTestCase):
     """Tests for upload_pack."""

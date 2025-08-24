@@ -6342,6 +6342,7 @@ class StatusTests(PorcelainTestCase):
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
+
 class ShortlogTests(PorcelainTestCase):
     def test_shortlog(self) -> None:
         """Test porcelain.shortlog function with multiple authors and commits."""
@@ -6354,7 +6355,7 @@ class ShortlogTests(PorcelainTestCase):
         porcelain.commit(
             repo=self.repo.path,
             message=b"Initial commit",
-            author=b"John <john@example.com>"
+            author=b"John <john@example.com>",
         )
 
         # Second commit by Doe
@@ -6363,9 +6364,7 @@ class ShortlogTests(PorcelainTestCase):
             f.write("update")
         porcelain.add(self.repo.path, paths=[file_b])
         porcelain.commit(
-            repo=self.repo.path,
-            message=b"Update file",
-            author=b"Doe <doe@example.com>"
+            repo=self.repo.path, message=b"Update file", author=b"Doe <doe@example.com>"
         )
 
         # Check normal shortlog (structured output)
@@ -6392,8 +6391,6 @@ class ShortlogTests(PorcelainTestCase):
         # Expected sorted by commit count
         expected_sorted = sorted(output, key=lambda x: len(x["messages"]), reverse=True)
         self.assertEqual(output_sorted, expected_sorted)
-
-
 
 
 class UploadPackTests(PorcelainTestCase):

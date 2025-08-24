@@ -2670,6 +2670,7 @@ def status(
 
         return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
 
+
 def shortlog(
     repo: Union[str, os.PathLike, Repo],
     summary_only: bool = False,
@@ -2699,11 +2700,14 @@ def shortlog(
                 authors[author] = [message]
 
         # Optionally sort authors
-        items = [{"author": author, "messages": msgs} for author, msgs in authors.items()]
+        items = [
+            {"author": author, "messages": msgs} for author, msgs in authors.items()
+        ]
         if sort_by_commits:
             items.sort(key=lambda x: len(x["messages"]), reverse=True)
 
         return items
+
 
 def _walk_working_dir_paths(
     frompath: Union[str, bytes, os.PathLike],

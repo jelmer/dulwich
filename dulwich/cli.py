@@ -1550,6 +1550,7 @@ class cmd_upload_pack(Command):
         args = parser.parse_args(args)
         porcelain.upload_pack(args.gitdir)
 
+
 class cmd_shortlog(Command):
     """Show a shortlog of commits by author."""
 
@@ -1560,12 +1561,8 @@ class cmd_shortlog(Command):
             args: Command line arguments
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "gitdir", nargs="?", default=".", help="Git directory"
-        )
-        parser.add_argument(
-            "--summary", action="store_true", help="Show summary only"
-        )
+        parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
+        parser.add_argument("--summary", action="store_true", help="Show summary only")
         parser.add_argument(
             "--sort", action="store_true", help="Sort authors by commit count"
         )
@@ -3999,7 +3996,7 @@ commands = {
     "show": cmd_show,
     "stash": cmd_stash,
     "status": cmd_status,
-    "shortlog":cmd_shortlog,
+    "shortlog": cmd_shortlog,
     "symbolic-ref": cmd_symbolic_ref,
     "submodule": cmd_submodule,
     "tag": cmd_tag,

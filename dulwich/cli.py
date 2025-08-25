@@ -1561,23 +1561,28 @@ class cmd_shortlog(Command):
             args: Command line arguments
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
-        parser.add_argument("--summary", action="store_true", help="Show summary only")
         parser.add_argument(
-            "--sort", action="store_true", help="Sort authors by commit count"
-        )
+                "gitdir", nargs="?", default=".", help="Git directory"
+                )
+        parser.add_argument(
+                "--summary", action="store_true", help="Show summary only"
+                )
+        parser.add_argument(
+                "--sort", action="store_true", help="Sort authors by commit count"
+                )
         args = parser.parse_args(args)
 
-        shortlog_items = porcelain.shortlog(
-            repo=args.gitdir,
-            summary_only=args.summary,
-            sort_by_commits=args.sort,
-        )
+        # Tell mypy that this is a list of dicts
+        shortlog_items: list[dict[str, Any]] = porcelain.shortlog(
+                repo=args.gitdir,
+                summary_only=args.summary,
+                sort_by_commits=args.sort,
+                )
 
         # Render structured output
         for item in shortlog_items:
-            author = item["author"]
-            messages = item["messages"]
+            author: str = item["author"]
+            messages: list[str] = item["messages"]
             if args.summary:
                 sys.stdout.write(f"{len(messages)}\t{author}\n")
             else:
@@ -1585,7 +1590,6 @@ class cmd_shortlog(Command):
                 for msg in messages:
                     sys.stdout.write(f"    {msg}\n")
                 sys.stdout.write("\n")
-
 
 class cmd_status(Command):
     """Show the working tree status."""

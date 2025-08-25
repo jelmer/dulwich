@@ -2684,11 +2684,14 @@ def shortlog(
       sort_by_commits: If True, sort authors by number of commits (like `git shortlog -n`).
 
     Returns:
-      A string containing authors and their commit messages or counts.
+      A list of dictionaries, each containing:
+        - "author": the author's name as a string
+        - "messages": a list of commit messages from that author
+      The list is optionally sorted by number of commits if 'sort_by_commits' is True
     """
     with open_repo_closing(repo) as r:
         walker = r.get_walker()
-        authors = {}  # dict mapping author -> list of messages
+        authors: dict[str, list[str]] = {}  # dict mapping author -> list of messages
 
         for entry in walker:
             commit = entry.commit

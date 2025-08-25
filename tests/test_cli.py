@@ -421,7 +421,43 @@ class BranchCommandTest(DulwichCliTestCase):
         # Delete branch
         result, stdout, stderr = self._run_cli("branch", "-d", "test-branch")
         self.assertNotIn(b"refs/heads/test-branch", self.repo.refs.keys())
+    
+    def test_branch_list_all(self):
+        # Create initial commit and local branches
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
 
+        # Create local test branches
+        self._run_cli("branch", "feature-1") 
+        self._run_cli("branch", "feature-2")
+        
+        # Setup a remote and create remote branches 
+        self.repo.refs[b"refs/remotes/origin/master"] = self.repo.refs[b"refs/heads/master"]
+        self.repo.refs[b"refs/remotes/origin/feature-remote"] = self.repo.refs[b"refs/heads/master"]
+        
+        # Test --all listing
+        result, stdout, stderr = self._run_cli("branch", "--all")
+        self.assertEqual(result, 0)
+        
+        # Check that local branches are listed 
+        self.assertIn("feature-1", stdout)
+        self.assertIn("feature-2", stdout)
+        self.assertIn("master", stdout)
+        
+        # Check that remote branches are listed
+        self.assertIn("origin/master", stdout)
+        self.assertIn("origin/feature-remote", stdout)
+        
+        # Verify format matches git behavior
+        lines = stdout.splitlines()
+        has_local = any(line.strip().startswith(('feature-1', 'feature-2', 'master')) for line in lines)
+        has_remote = any('origin/' in line for line in lines)
+        self.assertTrue(has_local, "Should contain local branches")
+        self.assertTrue(has_remote, "Should contain remote branches")
+        
 
 class CheckoutCommandTest(DulwichCliTestCase):
     """Tests for checkout command."""

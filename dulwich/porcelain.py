@@ -3213,8 +3213,8 @@ def branch_list(repo: RepoPath) -> list[bytes]:
             # Sort by date
             def get_commit_date(branch_name: bytes) -> int:
                 ref = LOCAL_BRANCH_PREFIX + branch_name
-                sha = repo.refs[ref]
-                commit = repo.object_store[sha]
+                sha = r.refs[ref]
+                commit = r.object_store[sha]
                 assert isinstance(commit, Commit)
                 if sort_key == "committerdate":
                     return commit.commit_time

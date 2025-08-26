@@ -23,13 +23,16 @@
 
 import logging
 import subprocess
-from typing import TYPE_CHECKING, Callable, Optional, Protocol
+import threading
+from typing import TYPE_CHECKING, Callable, Optional
+from typing import Protocol as TypingProtocol
 
 from .attrs import GitAttributes
 from .objects import Blob
 
 if TYPE_CHECKING:
     from .config import StackedConfig
+    from .protocol import Protocol
     from .repo import BaseRepo
 
 
@@ -37,7 +40,7 @@ class FilterError(Exception):
     """Exception raised when filter operations fail."""
 
 
-class FilterDriver(Protocol):
+class FilterDriver(TypingProtocol):
     """Protocol for filter drivers."""
 
     def clean(self, data: bytes) -> bytes:
@@ -58,6 +61,7 @@ class ProcessFilterDriver:
         smudge_cmd: Optional[str] = None,
         required: bool = False,
         cwd: Optional[str] = None,
+        process_cmd: Optional[str] = None,
     ) -> None:
         """Initialize ProcessFilterDriver.
 
@@ -66,14 +70,165 @@ class ProcessFilterDriver:
           smudge_cmd: Command to run for smudge filter
           required: Whether the filter is required
           cwd: Working directory for filter execution
+          process_cmd: Command to run for process filter (preferred for performance)
         """
         self.clean_cmd = clean_cmd
         self.smudge_cmd = smudge_cmd
         self.required = required
         self.cwd = cwd
+        self.process_cmd = process_cmd
+        self._process: Optional[subprocess.Popen] = None
+        self._protocol: Optional[Protocol] = None
+        self._capabilities: set[bytes] = set()
+        self._process_lock = threading.Lock()
+
+    def _get_or_start_process(self):
+        """Get or start the long-running process filter."""
+        if self._process is None and self.process_cmd:
+            from .errors import HangupException
+            from .protocol import Protocol
+
+            try:
+                self._process = subprocess.Popen(
+                    self.process_cmd,
+                    shell=True,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=self.cwd,
+                    text=False,  # Use bytes
+                )
+
+                # Check if process started successfully
+                if self._process.poll() is not None:
+                    # Process already terminated
+                    raise OSError(
+                        f"Process terminated immediately with code {self._process.returncode}"
+                    )
+
+                # Create protocol wrapper
+                def write_func(data):
+                    n = self._process.stdin.write(data)
+                    self._process.stdin.flush()
+                    return n
+
+                def read_func(size):
+                    return self._process.stdout.read(size)
+
+                self._protocol = Protocol(read_func, write_func)
+
+                # Send handshake using pkt-line format
+                self._protocol.write_pkt_line(b"git-filter-client")
+                self._protocol.write_pkt_line(b"version=2")
+                self._protocol.write_pkt_line(None)  # flush packet
+
+                # Read handshake response
+                welcome = self._protocol.read_pkt_line()
+                version = self._protocol.read_pkt_line()
+                flush = self._protocol.read_pkt_line()
+
+                # Verify handshake (be liberal - accept with or without newlines)
+                if welcome and welcome.rstrip(b"\n\r") != b"git-filter-server":
+                    raise FilterError(f"Invalid welcome message: {welcome}")
+                if version and version.rstrip(b"\n\r") != b"version=2":
+                    raise FilterError(f"Invalid version: {version}")
+                if flush is not None:
+                    raise FilterError("Expected flush packet after handshake")
+
+                # Send capabilities
+                self._protocol.write_pkt_line(b"capability=clean")
+                self._protocol.write_pkt_line(b"capability=smudge")
+                self._protocol.write_pkt_line(None)  # flush packet
+
+                # Read capability response
+                capabilities = []
+                while True:
+                    pkt = self._protocol.read_pkt_line()
+                    if pkt is None:  # flush packet
+                        break
+                    capabilities.append(pkt)
+
+                # Store supported capabilities
+                self._capabilities = set()
+                for cap in capabilities:
+                    cap = cap.rstrip(b"\n\r")  # Be liberal - strip any line endings
+                    if cap.startswith(b"capability="):
+                        self._capabilities.add(cap[11:])  # Remove "capability=" prefix
+
+            except (OSError, subprocess.SubprocessError, HangupException) as e:
+                self._cleanup_process()
+                raise FilterError(f"Failed to start process filter: {e}")
+        return self._process
+
+    def _use_process_filter(self, data: bytes, operation: str, path: str = "") -> bytes:
+        """Use the long-running process filter for the operation."""
+        with self._process_lock:
+            try:
+                proc = self._get_or_start_process()
+                if proc is None:
+                    return data
+
+                operation_bytes = operation.encode()
+                if operation_bytes not in self._capabilities:
+                    raise FilterError(f"Operation {operation} not supported by filter")
+
+                if not self._protocol:
+                    raise FilterError("Protocol not initialized")
+
+                # Send request using pkt-line format
+                self._protocol.write_pkt_line(f"command={operation}".encode())
+                self._protocol.write_pkt_line(f"pathname={path}".encode())
+                self._protocol.write_pkt_line(None)  # flush packet
+
+                # Send data
+                # Split data into chunks if needed (max pkt-line payload is 65516 bytes)
+                chunk_size = 65516
+                for i in range(0, len(data), chunk_size):
+                    chunk = data[i : i + chunk_size]
+                    self._protocol.write_pkt_line(chunk)
+                self._protocol.write_pkt_line(None)  # flush packet to end data
+
+                # Read response
+                response_headers = {}
+                while True:
+                    pkt = self._protocol.read_pkt_line()
+                    if pkt is None:  # flush packet ends headers
+                        break
+                    key, _, value = pkt.decode().rstrip("\n\r").partition("=")
+                    response_headers[key] = value
+
+                # Check status
+                status = response_headers.get("status", "error")
+                if status != "success":
+                    raise FilterError(f"Process filter {operation} failed: {status}")
+
+                # Read result data
+                result_chunks = []
+                while True:
+                    pkt = self._protocol.read_pkt_line()
+                    if pkt is None:  # flush packet ends data
+                        break
+                    result_chunks.append(pkt)
+
+                return b"".join(result_chunks)
+
+            except (OSError, subprocess.SubprocessError, ValueError) as e:
+                # Clean up broken process
+                self._cleanup_process()
+                raise FilterError(f"Process filter failed: {e}")
 
     def clean(self, data: bytes) -> bytes:
         """Apply clean filter using external process."""
+        # Try process filter first (much faster)
+        if self.process_cmd:
+            try:
+                return self._use_process_filter(data, "clean")
+            except FilterError as e:
+                if self.required:
+                    raise
+                logging.warning(f"Process filter failed, falling back: {e}")
+
+        # Fall back to clean command
         if not self.clean_cmd:
             if self.required:
                 raise FilterError("Clean command is required but not configured")
@@ -98,13 +253,25 @@ class ProcessFilterDriver:
 
     def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Apply smudge filter using external process."""
+        path_str = path.decode("utf-8", errors="replace")
+
+        # Try process filter first (much faster)
+        if self.process_cmd:
+            try:
+                return self._use_process_filter(data, "smudge", path_str)
+            except FilterError as e:
+                if self.required:
+                    raise
+                logging.warning(f"Process filter failed, falling back: {e}")
+
+        # Fall back to smudge command
         if not self.smudge_cmd:
             if self.required:
                 raise FilterError("Smudge command is required but not configured")
             return data
 
         # Substitute %f placeholder with file path
-        cmd = self.smudge_cmd.replace("%f", path.decode("utf-8", errors="replace"))
+        cmd = self.smudge_cmd.replace("%f", path_str)
 
         try:
             result = subprocess.run(
@@ -122,6 +289,67 @@ class ProcessFilterDriver:
             # If not required, log warning and return original data on failure
             logging.warning(f"Optional smudge filter failed: {e}")
             return data
+
+    def _cleanup_process(self):
+        """Clean up the process filter."""
+        if self._process:
+            # Close stdin first to signal the process to quit cleanly
+            if self._process.stdin and not self._process.stdin.closed:
+                try:
+                    self._process.stdin.close()
+                except BrokenPipeError:
+                    pass
+
+            # Try to terminate gracefully first
+            if self._process.poll() is None:  # Still running
+                try:
+                    self._process.terminate()
+                    self._process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    # Force kill if terminate didn't work
+                    try:
+                        self._process.kill()
+                        self._process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        # On Windows, sometimes we need to be more aggressive
+                        import os
+
+                        if os.name == "nt":
+                            try:
+                                subprocess.run(
+                                    [
+                                        "taskkill",
+                                        "/F",
+                                        "/T",
+                                        "/PID",
+                                        str(self._process.pid),
+                                    ],
+                                    capture_output=True,
+                                    timeout=5,
+                                )
+                                self._process.wait(timeout=1)
+                            except (
+                                subprocess.CalledProcessError,
+                                subprocess.TimeoutExpired,
+                            ):
+                                pass
+                        else:
+                            try:
+                                import signal
+
+                                os.kill(self._process.pid, signal.SIGKILL)
+                                self._process.wait(timeout=1)
+                            except (ProcessLookupError, subprocess.TimeoutExpired):
+                                pass
+                except ProcessLookupError:
+                    # Process already dead
+                    pass
+        self._process = None
+        self._protocol = None
+
+    def __del__(self):
+        """Clean up the process filter on destruction."""
+        self._cleanup_process()
 
 
 class FilterRegistry:
@@ -181,6 +409,21 @@ class FilterRegistry:
 
         return None
 
+    def close(self) -> None:
+        """Close all filter drivers, ensuring process cleanup."""
+        for driver in self._drivers.values():
+            if isinstance(driver, ProcessFilterDriver):
+                driver._cleanup_process()
+        self._drivers.clear()
+
+    def __del__(self) -> None:
+        """Clean up filter drivers on destruction."""
+        try:
+            self.close()
+        except Exception:
+            # Don't raise exceptions in __del__
+            pass
+
     def _create_from_config(self, name: str) -> Optional[FilterDriver]:
         """Create a filter driver from config."""
         if self.config is None:
@@ -188,6 +431,17 @@ class FilterRegistry:
 
         clean_cmd: Optional[str] = None
         smudge_cmd: Optional[str] = None
+        process_cmd: Optional[str] = None
+
+        # Get process command (preferred over clean/smudge for performance)
+        try:
+            process_cmd_raw = self.config.get(("filter", name), "process")
+            if isinstance(process_cmd_raw, bytes):
+                process_cmd = process_cmd_raw.decode("utf-8")
+            else:
+                process_cmd = process_cmd_raw
+        except KeyError:
+            pass
 
         # Get clean command
         try:
@@ -212,14 +466,16 @@ class FilterRegistry:
         # Get required flag (defaults to False)
         required = self.config.get_boolean(("filter", name), "required", False)
 
-        if clean_cmd or smudge_cmd:
+        if process_cmd or clean_cmd or smudge_cmd:
             # Get repository working directory (only for Repo, not BaseRepo)
             from .repo import Repo
 
             repo_path = (
                 self.repo.path if self.repo and isinstance(self.repo, Repo) else None
             )
-            return ProcessFilterDriver(clean_cmd, smudge_cmd, required, repo_path)
+            return ProcessFilterDriver(
+                clean_cmd, smudge_cmd, required, repo_path, process_cmd
+            )
 
         return None
 
@@ -448,3 +704,15 @@ class FilterBlobNormalizer:
         new_blob = Blob()
         new_blob.data = filtered_data
         return new_blob
+
+    def close(self) -> None:
+        """Close all filter drivers, ensuring process cleanup."""
+        self.filter_registry.close()
+
+    def __del__(self) -> None:
+        """Clean up filter drivers on destruction."""
+        try:
+            self.close()
+        except Exception:
+            # Don't raise exceptions in __del__
+            pass

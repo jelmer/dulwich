@@ -3269,8 +3269,8 @@ def branch_remotes_list(repo: RepoPath) -> list[bytes]:
             # Sort by date
             def get_commit_date(branch_name: bytes) -> int:
                 ref = LOCAL_REMOTE_PREFIX + branch_name
-                sha = repo.refs[ref]
-                commit = repo.object_store[sha]
+                sha = r.refs[ref]
+                commit = r.object_store[sha]
                 assert isinstance(commit, Commit)
                 if sort_key == "committerdate":
                     return commit.commit_time
@@ -3287,8 +3287,8 @@ def branch_remotes_list(repo: RepoPath) -> list[bytes]:
             else:
                 branches.sort(key=lambda b: (get_commit_date(b), b))
         else:
-            # Unknown sort key, fall back to default
-            branches.sort()  
+            # Unknown sort key
+            raise ValueError(f"Unknown sort key: {sort_key}")
 
         return branches
 

@@ -2675,39 +2675,40 @@ def shortlog(
     repo: Union[str, os.PathLike, Repo],
     summary_only: bool = False,
     sort_by_commits: bool = False,
-) -> str:
+) -> list[dict[str, str]]:
     """Summarize commits by author, like git shortlog.
 
     Args:
-      repo: Path to repository or Repo object.
-      summary_only: If True, only show counts per author (like `git shortlog -s`).
-      sort_by_commits: If True, sort authors by number of commits (like `git shortlog -n`).
+        repo: Path to repository or Repo object.
+        summary_only: If True, only show counts per author.
+        sort_by_commits: If True, sort authors by number of commits.
 
     Returns:
-      A list of dictionaries, each containing:
-        - "author": the author's name as a string
-        - "messages": a list of commit messages from that author
-      The list is optionally sorted by number of commits if 'sort_by_commits' is True
+        A list of dictionaries, each containing:
+            - "author": the author's name as a string
+            - "messages": all commit messages concatenated into a single string
     """
     with open_repo_closing(repo) as r:
         walker = r.get_walker()
-        authors: dict[str, list[str]] = {}  # dict mapping author -> list of messages
+        authors: dict[str, list[str]] = {}
 
         for entry in walker:
             commit = entry.commit
+
             author = commit.author.decode(commit.encoding or "utf-8")
             message = commit.message.decode(commit.encoding or "utf-8").strip()
-            if author in authors:
-                authors[author].append(message)
-            else:
-                authors[author] = [message]
 
-        # Optionally sort authors
-        items = [
-            {"author": author, "messages": msgs} for author, msgs in authors.items()
+            authors.setdefault(author, []).append(message)
+
+        # Convert messages to single string per author
+        items: list[dict[str, str]] = [
+            {"author": author, "messages": "\n".join(msgs)}
+            for author, msgs in authors.items()
         ]
+
         if sort_by_commits:
-            items.sort(key=lambda x: len(x["messages"]), reverse=True)
+            # Sort by number of commits (lines in messages)
+            items.sort(key=lambda x: len(x["messages"].splitlines()), reverse=True)
 
         return items
 

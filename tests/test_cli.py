@@ -441,24 +441,21 @@ class BranchCommandTest(DulwichCliTestCase):
         # Test --all listing
         result, stdout, stderr = self._run_cli("branch", "--all")
         self.assertEqual(result, 0)
-        
-        # Check that local branches are listed 
-        self.assertIn("feature-1", stdout)
-        self.assertIn("feature-2", stdout)
-        self.assertIn("master", stdout)
-        
-        # Check that remote branches are listed
-        self.assertIn("origin/master", stdout)
-        self.assertIn("origin/feature-remote", stdout)
-        
-        # Verify format matches git behavior
-        lines = stdout.splitlines()
-        has_local = any(line.strip().startswith(('feature-1', 'feature-2', 'master')) for line in lines)
-        has_remote = any('origin/' in line for line in lines)
-        self.assertTrue(has_local, "Should contain local branches")
-        self.assertTrue(has_remote, "Should contain remote branches")
-        
 
+        expected_branches = {
+            "feature-1",  # local branch
+            "feature-2",  # local branch
+            "master",     # local branch
+            "origin/master",      # remote branch
+            "origin/feature-remote"  # remote branch 
+        }
+        lines = [line.strip() for line in stdout.splitlines()]
+
+        # All branches from stdout
+        all_branches = set(line for line in lines)   
+        self.assertEqual(all_branches, expected_branches)
+        
+        
 class CheckoutCommandTest(DulwichCliTestCase):
     """Tests for checkout command."""
 

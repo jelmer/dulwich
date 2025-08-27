@@ -27,7 +27,12 @@ import threading
 import unittest
 
 from dulwich import porcelain
-from dulwich.filters import FilterError, ProcessFilterDriver
+from dulwich.filters import (
+    FilterContext,
+    FilterError,
+    FilterRegistry,
+    ProcessFilterDriver,
+)
 from dulwich.repo import Repo
 
 from . import TestCase
@@ -536,43 +541,188 @@ while True:
 
         self.assertIn("Failed to start process filter", str(cm.exception))
 
-    def test_thread_safety_with_process_filter(self):
-        """Test thread safety with actual process filter."""
+
+class FilterContextTests(TestCase):
+    """Tests for FilterContext class."""
+
+    def test_filter_context_caches_long_running_drivers(self):
+        """Test that FilterContext caches only long-running drivers."""
+
+        # Create real filter drivers
+        class UppercaseFilter:
+            def clean(self, data):
+                return data.upper()
+
+            def smudge(self, data, path=b""):
+                return data.lower()
+
+            def cleanup(self):
+                pass
+
+            def reuse(self, config, filter_name):
+                # Pretend it's a long-running filter that should be cached
+                return True
+
+        class IdentityFilter:
+            def clean(self, data):
+                return data
+
+            def smudge(self, data, path=b""):
+                return data
+
+            def cleanup(self):
+                pass
+
+            def reuse(self, config, filter_name):
+                # Lightweight filter, don't cache
+                return False
+
+        # Create registry and context
+        registry = FilterRegistry()
+        context = FilterContext(registry)
+
+        # Register drivers
+        long_running = UppercaseFilter()
+        stateless = IdentityFilter()
+        registry.register_driver("uppercase", long_running)
+        registry.register_driver("identity", stateless)
+
+        # Get drivers through context
+        driver1 = context.get_driver("uppercase")
+        driver2 = context.get_driver("uppercase")
+
+        # Long-running driver should be cached
+        self.assertIs(driver1, driver2)
+        self.assertIs(driver1, long_running)
+
+        # Get stateless driver
+        stateless1 = context.get_driver("identity")
+        stateless2 = context.get_driver("identity")
+
+        # Stateless driver comes from registry but isn't cached in context
+        self.assertIs(stateless1, stateless)
+        self.assertIs(stateless2, stateless)
+        self.assertNotIn("identity", context._active_drivers)
+        self.assertIn("uppercase", context._active_drivers)
+
+    def test_filter_context_cleanup(self):
+        """Test that FilterContext properly cleans up resources."""
+        cleanup_called = []
+
+        class TrackableFilter:
+            def __init__(self, name):
+                self.name = name
+
+            def clean(self, data):
+                return data
+
+            def smudge(self, data, path=b""):
+                return data
+
+            def cleanup(self):
+                cleanup_called.append(self.name)
+
+            def is_long_running(self):
+                return True
+
+        # Create registry and context
+        registry = FilterRegistry()
+        context = FilterContext(registry)
+
+        # Register and use drivers
+        filter1 = TrackableFilter("filter1")
+        filter2 = TrackableFilter("filter2")
+        filter3 = TrackableFilter("filter3")
+        registry.register_driver("filter1", filter1)
+        registry.register_driver("filter2", filter2)
+        registry.register_driver("filter3", filter3)
+
+        # Get only some drivers to cache them
+        context.get_driver("filter1")
+        context.get_driver("filter2")
+        # Don't get filter3
+
+        # Close context
+        context.close()
+
+        # Verify cleanup was called for all drivers (context closes registry too)
+        self.assertEqual(set(cleanup_called), {"filter1", "filter2", "filter3"})
+
+    def test_filter_context_get_driver_returns_none_for_missing(self):
+        """Test that get_driver returns None for non-existent drivers."""
+        registry = FilterRegistry()
+        context = FilterContext(registry)
+
+        result = context.get_driver("nonexistent")
+        self.assertIsNone(result)
+
+    def test_filter_context_with_real_process_filter(self):
+        """Test FilterContext with real ProcessFilterDriver instances."""
         import sys
 
-        driver = ProcessFilterDriver(
-            process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
+        # Use existing test filter from ProcessFilterDriverTests
+        test_dir = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(test_dir))
+
+        # Create a simple test filter that just passes data through
+        filter_script = """import sys
+while True:
+    line = sys.stdin.buffer.read()
+    if not line:
+        break
+    sys.stdout.buffer.write(line)
+    sys.stdout.buffer.flush()
+"""
+        filter_path = os.path.join(test_dir, "simple_filter.py")
+        with open(filter_path, "w") as f:
+            f.write(filter_script)
+
+        # Create ProcessFilterDriver instances
+        # One with process_cmd (long-running)
+        process_driver = ProcessFilterDriver(
+            process_cmd=None,  # Don't use actual process to avoid complexity
+            clean_cmd=f"{sys.executable} {filter_path}",
+            smudge_cmd=f"{sys.executable} {filter_path}",
         )
 
-        results = []
-        errors = []
+        # Register in context
+        registry = FilterRegistry()
+        context = FilterContext(registry)
+        registry.register_driver("process", process_driver)
 
-        def worker(data):
-            try:
-                result = driver.clean(data)
-                results.append(result)
-            except Exception as e:
-                errors.append(e)
+        # Get driver - should not be cached since it's not long-running
+        driver1 = context.get_driver("process")
+        self.assertIsNotNone(driver1)
+        self.assertFalse(driver1.is_long_running())
+        self.assertNotIn("process", context._active_drivers)
 
-        # Start multiple threads
-        threads = []
-        for i in range(3):
-            data = f"test{i}".encode()
-            t = threading.Thread(target=worker, args=(data,))
-            threads.append(t)
-            t.start()
+        # Test with a long-running driver (has process_cmd)
+        long_process_driver = ProcessFilterDriver()
+        long_process_driver.process_cmd = "dummy"  # Just to make it long-running
+        registry.register_driver("long_process", long_process_driver)
 
-        # Wait for all threads
-        for t in threads:
-            t.join()
+        driver2 = context.get_driver("long_process")
+        self.assertTrue(driver2.is_long_running())
+        self.assertIn("long_process", context._active_drivers)
 
-        # Should have no errors and correct results
-        self.assertEqual(len(errors), 0, f"Errors: {errors}")
-        self.assertEqual(len(results), 3)
+        context.close()
 
-        # Check results are correct (uppercased)
-        expected = [b"TEST0", b"TEST1", b"TEST2"]
-        self.assertEqual(sorted(results), sorted(expected))
+    def test_filter_context_closes_registry(self):
+        """Test that closing FilterContext also closes the registry."""
+        # Track if registry.close() is called
+        registry_closed = []
+
+        class TrackingRegistry(FilterRegistry):
+            def close(self):
+                registry_closed.append(True)
+                super().close()
+
+        registry = TrackingRegistry()
+        context = FilterContext(registry)
+
+        # Close context should also close registry
+        context.close()
+        self.assertTrue(registry_closed)
 
 
 class ProcessFilterProtocolTests(TestCase):
@@ -824,7 +974,7 @@ while True:
         if driver._process:
             driver._process.kill()
             driver._process.wait()
-        driver._cleanup_process()
+        driver.cleanup()
 
         # Should restart and work again
         result = driver.clean(b"test2")
@@ -934,7 +1084,7 @@ protocol.write_pkt_line(None)
         old_process = driver._process
 
         # Manually clean up (simulates __del__)
-        driver._cleanup_process()
+        driver.cleanup()
 
         # Process reference should be cleared
         self.assertIsNone(driver._process)

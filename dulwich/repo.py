@@ -1969,6 +1969,10 @@ class Repo(BaseRepo):
     def close(self) -> None:
         """Close any files opened by this repository."""
         self.object_store.close()
+        # Clean up cached blob normalizer
+        if hasattr(self, '_blob_normalizer'):
+            self._blob_normalizer.close()
+            del self._blob_normalizer
 
     def __enter__(self):
         """Enter context manager."""
@@ -2021,15 +2025,15 @@ class Repo(BaseRepo):
         """Return a BlobNormalizer object."""
         from .filters import FilterBlobNormalizer, FilterRegistry
 
-        # Get proper GitAttributes object
-        git_attributes = self.get_gitattributes()
-        config_stack = self.get_config_stack()
+        # Cache FilterBlobNormalizer per repository to maintain registered drivers
+        if not hasattr(self, '_blob_normalizer'):
+            # Get proper GitAttributes object
+            git_attributes = self.get_gitattributes()
+            config_stack = self.get_config_stack()
+            filter_registry = FilterRegistry(config_stack, self)
+            self._blob_normalizer = FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
 
-        # Create FilterRegistry with repo reference
-        filter_registry = FilterRegistry(config_stack, self)
-
-        # Return FilterBlobNormalizer which handles all filters including line endings
-        return FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
+        return self._blob_normalizer
 
     def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
         """Read gitattributes for the repository.
@@ -2256,15 +2260,15 @@ class MemoryRepo(BaseRepo):
         """Return a BlobNormalizer object for checkin/checkout operations."""
         from .filters import FilterBlobNormalizer, FilterRegistry
 
-        # Get GitAttributes object
-        git_attributes = self.get_gitattributes()
-        config_stack = self.get_config_stack()
+        # Cache FilterBlobNormalizer per repository to maintain registered drivers
+        if not hasattr(self, '_blob_normalizer'):
+            # Get GitAttributes object
+            git_attributes = self.get_gitattributes()
+            config_stack = self.get_config_stack()
+            filter_registry = FilterRegistry(config_stack, self)
+            self._blob_normalizer = FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
 
-        # Create FilterRegistry with repo reference
-        filter_registry = FilterRegistry(config_stack, self)
-
-        # Return FilterBlobNormalizer which handles all filters
-        return FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
+        return self._blob_normalizer
 
     def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
         """Read gitattributes for the repository."""

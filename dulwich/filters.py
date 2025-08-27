@@ -51,6 +51,28 @@ class FilterDriver(TypingProtocol):
         """Apply smudge filter (repository → working tree)."""
         ...
 
+    def cleanup(self) -> None:
+        """Clean up any resources held by this filter driver."""
+        ...
+
+    def reuse(self, config: "StackedConfig", filter_name: str) -> bool:
+        """Check if this filter driver should be reused with the given configuration.
+
+        This method determines whether a cached filter driver instance should continue
+        to be used or if it should be recreated. Only filters that are expensive to
+        create (like long-running process filters) and whose configuration hasn't
+        changed should return True. Lightweight filters should return False to ensure
+        they always use the latest configuration.
+
+        Args:
+            config: The current configuration stack
+            filter_name: The name of the filter in config
+
+        Returns:
+            True if the filter should be reused, False if it should be recreated
+        """
+        ...
+
 
 class ProcessFilterDriver:
     """Filter driver that executes external processes."""
@@ -156,7 +178,7 @@ class ProcessFilterDriver:
                         self._capabilities.add(cap[11:])  # Remove "capability=" prefix
 
             except (OSError, subprocess.SubprocessError, HangupException) as e:
-                self._cleanup_process()
+                self.cleanup()
                 raise FilterError(f"Failed to start process filter: {e}")
         return self._process
 
@@ -214,7 +236,7 @@ class ProcessFilterDriver:
 
             except (OSError, subprocess.SubprocessError, ValueError) as e:
                 # Clean up broken process
-                self._cleanup_process()
+                self.cleanup()
                 raise FilterError(f"Process filter failed: {e}")
 
     def clean(self, data: bytes) -> bytes:
@@ -290,7 +312,7 @@ class ProcessFilterDriver:
             logging.warning(f"Optional smudge filter failed: {e}")
             return data
 
-    def _cleanup_process(self):
+    def cleanup(self):
         """Clean up the process filter."""
         if self._process:
             # Close stdin first to signal the process to quit cleanly
@@ -347,9 +369,136 @@ class ProcessFilterDriver:
         self._process = None
         self._protocol = None
 
+    def reuse(self, config: "StackedConfig", filter_name: str) -> bool:
+        """Check if this filter driver should be reused with the given configuration."""
+        # Only reuse if it's a long-running process filter AND config hasn't changed
+        if self.process_cmd is None:
+            # Not a long-running filter, don't cache
+            return False
+
+        # Check if the filter commands in config match our current commands
+        try:
+            clean_cmd = config.get(("filter", filter_name), "clean")
+        except KeyError:
+            clean_cmd = None
+        if clean_cmd != self.clean_cmd:
+            return False
+
+        try:
+            smudge_cmd = config.get(("filter", filter_name), "smudge")
+        except KeyError:
+            smudge_cmd = None
+        if smudge_cmd != self.smudge_cmd:
+            return False
+
+        try:
+            process_cmd = config.get(("filter", filter_name), "process")
+        except KeyError:
+            process_cmd = None
+        if process_cmd != self.process_cmd:
+            return False
+
+        required = config.get_boolean(("filter", filter_name), "required", False)
+        if required != self.required:
+            return False
+
+        return True
+
     def __del__(self):
         """Clean up the process filter on destruction."""
-        self._cleanup_process()
+        self.cleanup()
+
+
+class FilterContext:
+    """Context for managing stateful filter resources.
+
+    This class manages the runtime state for filters, including:
+    - Cached filter driver instances that maintain long-running state
+    - Resource lifecycle management
+
+    It works in conjunction with FilterRegistry to provide complete
+    filter functionality while maintaining proper separation of concerns.
+    """
+
+    def __init__(self, filter_registry: "FilterRegistry") -> None:
+        """Initialize FilterContext.
+
+        Args:
+            filter_registry: The filter registry to use for driver lookups
+        """
+        self.filter_registry = filter_registry
+        self._active_drivers: dict[str, FilterDriver] = {}
+
+    def get_driver(self, name: str) -> Optional[FilterDriver]:
+        """Get a filter driver by name, managing stateful instances.
+
+        This method handles driver instantiation and caching. Only drivers
+        that should be reused are cached.
+
+        Args:
+            name: The filter name
+
+        Returns:
+            FilterDriver instance or None
+        """
+        driver: Optional[FilterDriver] = None
+        # Check if we have a cached instance that should be reused
+        if name in self._active_drivers:
+            driver = self._active_drivers[name]
+            # Check if the cached driver should still be reused
+            if self.filter_registry.config and driver.reuse(
+                self.filter_registry.config, name
+            ):
+                return driver
+            else:
+                # Driver shouldn't be reused, clean it up and remove from cache
+                driver.cleanup()
+                del self._active_drivers[name]
+
+        # Get driver from registry
+        driver = self.filter_registry.get_driver(name)
+        if driver is not None and self.filter_registry.config:
+            # Only cache drivers that should be reused
+            if driver.reuse(self.filter_registry.config, name):
+                self._active_drivers[name] = driver
+
+        return driver
+
+    def close(self) -> None:
+        """Close all active filter resources."""
+        # Clean up active drivers
+        for driver in self._active_drivers.values():
+            driver.cleanup()
+        self._active_drivers.clear()
+
+        # Also close the registry
+        self.filter_registry.close()
+
+    def refresh_config(self, config: "StackedConfig") -> None:
+        """Refresh the configuration used by the filter registry.
+
+        This should be called when the configuration has changed to ensure
+        filters use the latest settings.
+
+        Args:
+            config: The new configuration stack
+        """
+        # Update the registry's config
+        self.filter_registry.config = config
+
+        # Re-setup line ending filter with new config
+        # This will update the text filter factory to use new autocrlf settings
+        self.filter_registry._setup_line_ending_filter()
+
+        # The get_driver method will now handle checking reuse() for cached drivers
+
+    def __del__(self) -> None:
+        """Clean up on destruction."""
+        try:
+            self.close()
+        except Exception:
+            # Don't raise exceptions in __del__
+            pass
 
 
 class FilterRegistry:
@@ -412,8 +561,7 @@ class FilterRegistry:
     def close(self) -> None:
         """Close all filter drivers, ensuring process cleanup."""
         for driver in self._drivers.values():
-            if isinstance(driver, ProcessFilterDriver):
-                driver._cleanup_process()
+            driver.cleanup()
         self._drivers.clear()
 
     def __del__(self) -> None:
@@ -577,18 +725,30 @@ class FilterRegistry:
 def get_filter_for_path(
     path: bytes,
     gitattributes: "GitAttributes",
-    filter_registry: FilterRegistry,
+    filter_registry: Optional[FilterRegistry] = None,
+    filter_context: Optional[FilterContext] = None,
 ) -> Optional[FilterDriver]:
     """Get the appropriate filter driver for a given path.
 
     Args:
         path: Path to check
         gitattributes: GitAttributes object with parsed patterns
-        filter_registry: Registry of filter drivers
+        filter_registry: Registry of filter drivers (deprecated, use filter_context)
+        filter_context: Context for managing filter state
 
     Returns:
         FilterDriver instance or None
     """
+    # Use filter_context if provided, otherwise fall back to registry
+    if filter_context is not None:
+        registry = filter_context.filter_registry
+        get_driver = filter_context.get_driver
+    elif filter_registry is not None:
+        registry = filter_registry
+        get_driver = filter_registry.get_driver
+    else:
+        raise ValueError("Either filter_registry or filter_context must be provided")
+
     # Get all attributes for this path
     attributes = gitattributes.match_path(path)
 
@@ -599,11 +759,11 @@ def get_filter_for_path(
             return None
         if isinstance(filter_name, bytes):
             filter_name_str = filter_name.decode("utf-8")
-            driver = filter_registry.get_driver(filter_name_str)
+            driver = get_driver(filter_name_str)
 
             # Check if filter is required but missing
-            if driver is None and filter_registry.config is not None:
-                required = filter_registry.config.get_boolean(
+            if driver is None and registry.config is not None:
+                required = registry.config.get_boolean(
                     ("filter", filter_name_str), "required", False
                 )
                 if required:
@@ -618,16 +778,16 @@ def get_filter_for_path(
     text_attr = attributes.get(b"text")
     if text_attr is True:
         # Use the text filter for line ending conversion
-        return filter_registry.get_driver("text")
+        return get_driver("text")
     elif text_attr is False:
         # -text means binary, no conversion
         return None
 
     # If no explicit text attribute, check if autocrlf is enabled
     # When autocrlf is true/input, files are treated as text by default
-    if filter_registry.config is not None:
+    if registry.config is not None:
         try:
-            autocrlf_raw = filter_registry.config.get("core", "autocrlf")
+            autocrlf_raw = registry.config.get("core", "autocrlf")
             autocrlf: bytes = (
                 autocrlf_raw.lower()
                 if isinstance(autocrlf_raw, bytes)
@@ -635,7 +795,7 @@ def get_filter_for_path(
             )
             if autocrlf in (b"true", b"input"):
                 # Use text filter for files without explicit attributes
-                return filter_registry.get_driver("text")
+                return get_driver("text")
         except KeyError:
             pass
 
@@ -654,24 +814,47 @@ class FilterBlobNormalizer:
         gitattributes: GitAttributes,
         filter_registry: Optional[FilterRegistry] = None,
         repo: Optional["BaseRepo"] = None,
+        filter_context: Optional[FilterContext] = None,
     ) -> None:
         """Initialize FilterBlobNormalizer.
 
         Args:
           config_stack: Git configuration stack
           gitattributes: GitAttributes instance
-          filter_registry: Optional filter registry to use
+          filter_registry: Optional filter registry to use (deprecated, use filter_context)
           repo: Optional repository instance
+          filter_context: Optional filter context to use for managing filter state
         """
         self.config_stack = config_stack
         self.gitattributes = gitattributes
-        self.filter_registry = filter_registry or FilterRegistry(config_stack, repo)
+        self._owns_context = False  # Track if we created our own context
+
+        # Support both old and new API
+        if filter_context is not None:
+            self.filter_context = filter_context
+            self.filter_registry = filter_context.filter_registry
+            self._owns_context = False  # We're using an external context
+        else:
+            if filter_registry is not None:
+                import warnings
+
+                warnings.warn(
+                    "Passing filter_registry to FilterBlobNormalizer is deprecated. "
+                    "Pass a FilterContext instead.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                self.filter_registry = filter_registry
+            else:
+                self.filter_registry = FilterRegistry(config_stack, repo)
+            self.filter_context = FilterContext(self.filter_registry)
+            self._owns_context = True  # We created our own context
 
     def checkin_normalize(self, blob: Blob, path: bytes) -> Blob:
         """Apply clean filter during checkin (working tree -> repository)."""
         # Get filter for this path
         filter_driver = get_filter_for_path(
-            path, self.gitattributes, self.filter_registry
+            path, self.gitattributes, filter_context=self.filter_context
         )
         if filter_driver is None:
             return blob
@@ -690,7 +873,7 @@ class FilterBlobNormalizer:
         """Apply smudge filter during checkout (repository -> working tree)."""
         # Get filter for this path
         filter_driver = get_filter_for_path(
-            path, self.gitattributes, self.filter_registry
+            path, self.gitattributes, filter_context=self.filter_context
         )
         if filter_driver is None:
             return blob
@@ -707,7 +890,9 @@ class FilterBlobNormalizer:
 
     def close(self) -> None:
         """Close all filter drivers, ensuring process cleanup."""
-        self.filter_registry.close()
+        # Only close the filter context if we created it ourselves
+        if self._owns_context:
+            self.filter_context.close()
 
     def __del__(self) -> None:
         """Clean up filter drivers on destruction."""

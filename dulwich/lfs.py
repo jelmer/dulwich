@@ -324,6 +324,15 @@ class LFSFilterDriver:
 
         return content
 
+    def cleanup(self) -> None:
+        """Clean up any resources held by this filter driver."""
+        # LFSFilterDriver doesn't hold any resources that need cleanup
+
+    def reuse(self, config, filter_name: str) -> bool:
+        """Check if this filter driver should be reused with the given configuration."""
+        # LFSFilterDriver is stateless and lightweight, no need to cache
+        return False
+
 
 def _get_lfs_user_agent(config: Optional["Config"]) -> str:
     """Get User-Agent string for LFS requests, respecting git config."""

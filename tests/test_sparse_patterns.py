@@ -27,7 +27,6 @@ import shutil
 import tempfile
 import time
 
-from dulwich.filters import FilterBlobNormalizer, FilterRegistry
 from dulwich.index import IndexEntry
 from dulwich.objects import Blob
 from dulwich.repo import Repo
@@ -544,7 +543,7 @@ class ApplyIncludedPathsTests(TestCase):
 
     def test_checkout_normalization_applied(self):
         """Test that checkout normalization is applied when materializing files during sparse checkout."""
-        
+
         # Create a simple filter that converts content to uppercase
         class UppercaseFilter:
             def smudge(self, input_bytes, path=b""):
@@ -553,18 +552,29 @@ class ApplyIncludedPathsTests(TestCase):
             def clean(self, input_bytes):
                 return input_bytes.lower()
 
+            def cleanup(self):
+                pass
+
+            def reuse(self, config, filter_name):
+                return False
+
         # Create .gitattributes file
         gitattributes_path = os.path.join(self.temp_dir, ".gitattributes")
         with open(gitattributes_path, "w") as f:
             f.write("*.txt filter=uppercase\n")
-        
+
         # Add and commit .gitattributes
-        self.repo.stage([b".gitattributes"])
+        self.repo.get_worktree().stage([b".gitattributes"])
         self.repo.do_commit(b"Add gitattributes", committer=b"Test <test@example.com>")
 
-        # Register the filter with the repo's cached filter registry
-        normalizer = self.repo.get_blob_normalizer()
-        normalizer.filter_registry.register_driver("uppercase", UppercaseFilter())
+        # Initialize the filter context and register the filter
+        _ = self.repo.get_blob_normalizer()
+
+        # Register the filter with the cached filter context
+        uppercase_filter = UppercaseFilter()
+        self.repo.filter_context.filter_registry.register_driver(
+            "uppercase", uppercase_filter
+        )
 
         # Commit a file with lowercase content
         self._commit_blob("test.txt", b"hello world")
@@ -572,7 +582,8 @@ class ApplyIncludedPathsTests(TestCase):
         # Remove the file from working tree to force materialization
         os.remove(os.path.join(self.temp_dir, "test.txt"))
 
-        # Apply sparse checkout
+        # Apply sparse checkout - this will call get_blob_normalizer() internally
+        # which will use the cached filter_context with our registered filter
         apply_included_paths(self.repo, included_paths={"test.txt"}, force=False)
 
         # Verify file was materialized with uppercase content (checkout normalization applied)

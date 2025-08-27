@@ -1,5 +1,8 @@
 0.24.2	UNRELEASED
 
+ * Added ``porcelain.shortlog`` function to summarize commits by author,
+   similar to git shortlog. (Muhammad Usama, #1693)
+
  * Fix merge functionality to gracefully handle missing optional merge3 dependency
    by raising informative ImportError with installation instructions.
    (Jelmer Vernooĳ, #1759)

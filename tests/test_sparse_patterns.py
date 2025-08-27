@@ -544,7 +544,7 @@ class ApplyIncludedPathsTests(TestCase):
 
     def test_checkout_normalization_applied(self):
         """Test that checkout normalization is applied when materializing files during sparse checkout."""
-
+        
         # Create a simple filter that converts content to uppercase
         class UppercaseFilter:
             def smudge(self, input_bytes, path=b""):
@@ -553,23 +553,18 @@ class ApplyIncludedPathsTests(TestCase):
             def clean(self, input_bytes):
                 return input_bytes.lower()
 
-        # Set up filter registry and normalizer
-        filter_registry = FilterRegistry()
-        filter_registry.register_driver("uppercase", UppercaseFilter())
+        # Create .gitattributes file
+        gitattributes_path = os.path.join(self.temp_dir, ".gitattributes")
+        with open(gitattributes_path, "w") as f:
+            f.write("*.txt filter=uppercase\n")
+        
+        # Add and commit .gitattributes
+        self.repo.stage([b".gitattributes"])
+        self.repo.do_commit(b"Add gitattributes", committer=b"Test <test@example.com>")
 
-        # Create gitattributes object
-        from dulwich.attrs import GitAttributes, Pattern
-
-        patterns = [(Pattern(b"*.txt"), {b"filter": b"uppercase"})]
-        gitattributes = GitAttributes(patterns)
-
-        # Monkey patch the repo to use our filter registry
-        original_get_blob_normalizer = self.repo.get_blob_normalizer
-
-        def get_blob_normalizer_with_filters():
-            return FilterBlobNormalizer(None, gitattributes, filter_registry)
-
-        self.repo.get_blob_normalizer = get_blob_normalizer_with_filters
+        # Register the filter with the repo's cached filter registry
+        normalizer = self.repo.get_blob_normalizer()
+        normalizer.filter_registry.register_driver("uppercase", UppercaseFilter())
 
         # Commit a file with lowercase content
         self._commit_blob("test.txt", b"hello world")
@@ -584,9 +579,6 @@ class ApplyIncludedPathsTests(TestCase):
         with open(os.path.join(self.temp_dir, "test.txt"), "rb") as f:
             content = f.read()
             self.assertEqual(content, b"HELLO WORLD")
-
-        # Restore original method
-        self.repo.get_blob_normalizer = original_get_blob_normalizer
 
     def test_checkout_normalization_with_lf_to_crlf(self):
         """Test that line ending normalization is applied during sparse checkout."""

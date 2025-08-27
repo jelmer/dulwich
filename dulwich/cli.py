@@ -1551,6 +1551,42 @@ class cmd_upload_pack(Command):
         porcelain.upload_pack(args.gitdir)
 
 
+class cmd_shortlog(Command):
+    """Show a shortlog of commits by author."""
+
+    def run(self, args) -> None:
+        """Execute the shortlog command with the given CLI arguments.
+
+        Args:
+            args: List of command line arguments.
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
+        parser.add_argument("--summary", action="store_true", help="Show summary only")
+        parser.add_argument(
+            "--sort", action="store_true", help="Sort authors by commit count"
+        )
+        args = parser.parse_args(args)
+
+        shortlog_items: list[dict[str, str]] = porcelain.shortlog(
+            repo=args.gitdir,
+            summary_only=args.summary,
+            sort_by_commits=args.sort,
+        )
+
+        for item in shortlog_items:
+            author: str = item["author"]
+            messages: str = item["messages"]
+            if args.summary:
+                count = len(messages.splitlines())
+                sys.stdout.write(f"{count}\t{author}\n")
+            else:
+                sys.stdout.write(f"{author} ({len(messages.splitlines())}):\n")
+                for msg in messages.splitlines():
+                    sys.stdout.write(f"    {msg}\n")
+                sys.stdout.write("\n")
+
+
 class cmd_status(Command):
     """Show the working tree status."""
 
@@ -3960,6 +3996,7 @@ commands = {
     "show": cmd_show,
     "stash": cmd_stash,
     "status": cmd_status,
+    "shortlog": cmd_shortlog,
     "symbolic-ref": cmd_symbolic_ref,
     "submodule": cmd_submodule,
     "tag": cmd_tag,

@@ -6343,6 +6343,52 @@ class StatusTests(PorcelainTestCase):
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 
 
+class ShortlogTests(PorcelainTestCase):
+    def test_shortlog(self) -> None:
+        """Test porcelain.shortlog function with multiple authors and commits."""
+
+        # Create first file and commit
+        file_a = os.path.join(self.repo.path, "a.txt")
+        with open(file_a, "w") as f:
+            f.write("hello")
+        porcelain.add(self.repo.path, paths=[file_a])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Initial commit",
+            author=b"John <john@example.com>",
+        )
+
+        # Create second file and commit
+        file_b = os.path.join(self.repo.path, "b.txt")
+        with open(file_b, "w") as f:
+            f.write("update")
+        porcelain.add(self.repo.path, paths=[file_b])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Update file",
+            author=b"Doe <doe@example.com>",
+        )
+
+        # Call shortlog
+        output = porcelain.shortlog(self.repo.path)
+        expected = [
+            {"author": "John <john@example.com>", "messages": "Initial commit"},
+            {"author": "Doe <doe@example.com>", "messages": "Update file"},
+        ]
+        self.assertCountEqual(output, expected)
+
+        # Test summary output (count of messages)
+        output_summary = [
+            {"author": entry["author"], "count": len(entry["messages"].splitlines())}
+            for entry in output
+        ]
+        expected_summary = [
+            {"author": "John <john@example.com>", "count": 1},
+            {"author": "Doe <doe@example.com>", "count": 1},
+        ]
+        self.assertCountEqual(output_summary, expected_summary)
+
+
 class UploadPackTests(PorcelainTestCase):
     """Tests for upload_pack."""
 

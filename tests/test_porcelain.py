@@ -5534,6 +5534,46 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual(results.staged["add"][0], filename_add.encode("ascii"))
         self.assertEqual(results.unstaged, [b"foo"])
 
+    def test_status_with_core_preloadindex(self) -> None:
+        """Test status with core.preloadIndex enabled."""
+        # Set core.preloadIndex to true
+        config = self.repo.get_config()
+        config.set(b"core", b"preloadIndex", b"true")
+        config.write_to_path()
+
+        # Create multiple files
+        files = []
+        for i in range(10):
+            filename = f"file{i}"
+            fullpath = os.path.join(self.repo.path, filename)
+            with open(fullpath, "w") as f:
+                f.write(f"content{i}")
+            files.append(fullpath)
+
+        porcelain.add(repo=self.repo.path, paths=files)
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"test preload status",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Modify some files
+        modified_files = ["file1", "file3", "file5", "file7"]
+        for filename in modified_files:
+            fullpath = os.path.join(self.repo.path, filename)
+            with open(fullpath, "w") as f:
+                f.write("modified content")
+            os.utime(fullpath, (0, 0))
+
+        # Status should work correctly with preloadIndex enabled
+        results = porcelain.status(self.repo)
+
+        # Check that we detected the correct unstaged changes
+        unstaged_sorted = sorted(results.unstaged)
+        expected_sorted = sorted([f.encode("ascii") for f in modified_files])
+        self.assertEqual(unstaged_sorted, expected_sorted)
+
     def test_status_all(self) -> None:
         del_path = os.path.join(self.repo.path, "foo")
         mod_path = os.path.join(self.repo.path, "bar")

@@ -3307,6 +3307,38 @@ def branch_remotes_list(repo: RepoPath) -> list[bytes]:
         return branches
 
 
+def merged_branches_list(repo: RepoPath) -> list[bytes]:
+    """List branches that have been merged into the current branch.
+
+    Args:
+      repo: Path to the repository
+    Returns:
+      List of branch names (without refs/heads/ prefix) that are merged
+      into the current HEAD
+    """
+    with open_repo_closing(repo) as r:
+        current_sha = r.refs[b"HEAD"]
+        merged_branches = []
+
+        for branch_ref in r.refs.keys(base=b"refs/heads/"):
+            full_ref = b"refs/heads/" + branch_ref
+
+            if full_ref not in r.refs:
+                continue
+
+            try:
+                branch_sha = r.refs[full_ref]
+
+                # Check if branch is an ancestor of HEAD (fully merged)
+                if can_fast_forward(r, branch_sha, current_sha):
+                    merged_branches.append(branch_ref)
+
+            except (KeyError, ValueError):
+                continue
+
+        return merged_branches
+
+
 def active_branch(repo: RepoPath) -> bytes:
     """Return the active branch in the repository, if any.
 

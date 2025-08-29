@@ -28,13 +28,13 @@ import posixpath
 import stat
 import sys
 import zlib
-from collections import namedtuple
 from collections.abc import Callable, Iterable, Iterator
 from hashlib import sha1
 from io import BufferedIOBase, BytesIO
 from typing import (
     IO,
     TYPE_CHECKING,
+    NamedTuple,
     Optional,
     Union,
 )
@@ -1109,8 +1109,12 @@ class Tag(ShaFile):
                 raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
 
 
-class TreeEntry(namedtuple("TreeEntry", ["path", "mode", "sha"])):
+class TreeEntry(NamedTuple):
     """Named tuple encapsulating a single tree entry."""
+
+    path: bytes
+    mode: int
+    sha: bytes
 
     def in_path(self, path: bytes) -> "TreeEntry":
         """Return a copy of this entry with the given path prepended."""

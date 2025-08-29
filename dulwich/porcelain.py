@@ -1421,25 +1421,39 @@ def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
         if isinstance(change, list):
             change = change[0]
         if change.type == CHANGE_ADD:
+            assert change.new is not None
             path1 = change.new.path
-            path2 = ""
+            path2 = b""
             kind = "A"
         elif change.type == CHANGE_DELETE:
+            assert change.old is not None
             path1 = change.old.path
-            path2 = ""
+            path2 = b""
             kind = "D"
         elif change.type == CHANGE_MODIFY:
+            assert change.new is not None
             path1 = change.new.path
-            path2 = ""
+            path2 = b""
             kind = "M"
         elif change.type in RENAME_CHANGE_TYPES:
+            assert change.old is not None and change.new is not None
             path1 = change.old.path
             path2 = change.new.path
             if change.type == CHANGE_RENAME:
                 kind = "R"
             elif change.type == CHANGE_COPY:
                 kind = "C"
-        yield "%-8s%-20s%-20s" % (kind, path1, path2)  # noqa: UP031
+        path1_str = (
+            path1.decode("utf-8", errors="replace")
+            if isinstance(path1, bytes)
+            else path1
+        )
+        path2_str = (
+            path2.decode("utf-8", errors="replace")
+            if isinstance(path2, bytes)
+            else path2
+        )
+        yield f"{kind:<8}{path1_str:<20}{path2_str:<20}"
 
 
 def log(
@@ -3519,9 +3533,10 @@ def ls_tree(
             if base:
                 name = posixpath.join(base, name)
             if name_only:
-                outstream.write(name + b"\n")
+                outstream.write(name.decode("utf-8", errors="replace") + "\n")
             else:
-                outstream.write(pretty_format_tree_entry(name, mode, sha))
+                formatted = pretty_format_tree_entry(name, mode, sha)
+                outstream.write(formatted)
             if stat.S_ISDIR(mode) and recursive:
                 list_tree(store, sha, name)
 

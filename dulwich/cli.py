@@ -2059,6 +2059,9 @@ class cmd_branch(Command):
             help="Delete branch",
         )
         parser.add_argument("--all", action="store_true", help="List all branches")
+        parser.add_argument(
+            "--merged", action="store_true", help="List merged branches"
+        )
         args = parser.parse_args(args)
 
         if args.all:
@@ -2066,6 +2069,18 @@ class cmd_branch(Command):
                 branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(
                     "."
                 )
+
+                for branch in branches:
+                    sys.stdout.write(f"{branch.decode()}\n")
+
+                return 0
+            except porcelain.Error as e:
+                sys.stderr.write(f"{e}")
+                return 1
+
+        if args.merged:
+            try:
+                branches = porcelain.merged_branches_list(".")
 
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")

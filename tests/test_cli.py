@@ -479,6 +479,14 @@ class BranchCommandTest(DulwichCliTestCase):
         self._run_cli("add", "test2.txt")
         self._run_cli("commit", "--message=New branch commit")
 
+        new_branch_sha = self.repo.refs[b"HEAD"]
+
+        # Switch back to master
+        self.repo.refs[b"HEAD"] = master_sha
+
+        # Create a non-merged branch that points to the new branch commit
+        self.repo.refs[b"refs/heads/non-merged-branch"] = new_branch_sha
+
         # Test --merged listing
         result, stdout, stderr = self._run_cli("branch", "--merged")
         self.assertEqual(result, 0)
@@ -486,6 +494,9 @@ class BranchCommandTest(DulwichCliTestCase):
         branches = [line.strip() for line in stdout.splitlines()]
         expected_branches = {"master", "merged-branch"}
         self.assertEqual(set(branches), expected_branches)
+
+        # Verify that the non-merged branch is not included
+        self.assertNotIn("non-merged-branch", branches)
 
 
 class CheckoutCommandTest(DulwichCliTestCase):

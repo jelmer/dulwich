@@ -338,10 +338,16 @@ class BaseObjectStore:
             rename_detector=rename_detector,
             paths=paths,
         ):
+            old_path = change.old.path if change.old is not None else None
+            new_path = change.new.path if change.new is not None else None
+            old_mode = change.old.mode if change.old is not None else None
+            new_mode = change.new.mode if change.new is not None else None
+            old_sha = change.old.sha if change.old is not None else None
+            new_sha = change.new.sha if change.new is not None else None
             yield (
-                (change.old.path, change.new.path),
-                (change.old.mode, change.new.mode),
-                (change.old.sha, change.new.sha),
+                (old_path, new_path),
+                (old_mode, new_mode),
+                (old_sha, new_sha),
             )
 
     def iter_tree_contents(
@@ -2715,7 +2721,7 @@ def iter_commit_contents(
         )
     commit = obj
     encoding = commit.encoding or "utf-8"
-    include = (
+    include_bytes: list[bytes] = (
         [
             path if isinstance(path, bytes) else str(path).encode(encoding)
             for path in include
@@ -2724,7 +2730,7 @@ def iter_commit_contents(
         else [b""]
     )
 
-    for path in include:
+    for path in include_bytes:
         mode, obj_id = tree_lookup_path(store.__getitem__, commit.tree, path)
         # Iterate all contained files if path points to a dir, otherwise just get that
         # single file

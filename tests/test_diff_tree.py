@@ -93,41 +93,47 @@ class TreeChangesTest(DiffTestCase):
         self.assertEqual([], merge_entries(b"", self.empty_tree, self.empty_tree))
         self.assertEqual(
             [
-                ((None, None, None), (b"a", 0o100644, blob_a1.id)),
-                ((None, None, None), (b"b", 0o100755, blob_b1.id)),
+                (None, TreeEntry(b"a", 0o100644, blob_a1.id)),
+                (None, TreeEntry(b"b", 0o100755, blob_b1.id)),
             ],
             merge_entries(b"", self.empty_tree, tree1),
         )
         self.assertEqual(
             [
-                ((None, None, None), (b"x/a", 0o100644, blob_a1.id)),
-                ((None, None, None), (b"x/b", 0o100755, blob_b1.id)),
+                (None, TreeEntry(b"x/a", 0o100644, blob_a1.id)),
+                (None, TreeEntry(b"x/b", 0o100755, blob_b1.id)),
             ],
             merge_entries(b"x", self.empty_tree, tree1),
         )
 
         self.assertEqual(
             [
-                ((b"a", 0o100644, blob_a2.id), (None, None, None)),
-                ((b"c", 0o100755, blob_c2.id), (None, None, None)),
+                (TreeEntry(b"a", 0o100644, blob_a2.id), None),
+                (TreeEntry(b"c", 0o100755, blob_c2.id), None),
             ],
             merge_entries(b"", tree2, self.empty_tree),
         )
 
         self.assertEqual(
             [
-                ((b"a", 0o100644, blob_a1.id), (b"a", 0o100644, blob_a2.id)),
-                ((b"b", 0o100755, blob_b1.id), (None, None, None)),
-                ((None, None, None), (b"c", 0o100755, blob_c2.id)),
+                (
+                    TreeEntry(b"a", 0o100644, blob_a1.id),
+                    TreeEntry(b"a", 0o100644, blob_a2.id),
+                ),
+                (TreeEntry(b"b", 0o100755, blob_b1.id), None),
+                (None, TreeEntry(b"c", 0o100755, blob_c2.id)),
             ],
             merge_entries(b"", tree1, tree2),
         )
 
         self.assertEqual(
             [
-                ((b"a", 0o100644, blob_a2.id), (b"a", 0o100644, blob_a1.id)),
-                ((None, None, None), (b"b", 0o100755, blob_b1.id)),
-                ((b"c", 0o100755, blob_c2.id), (None, None, None)),
+                (
+                    TreeEntry(b"a", 0o100644, blob_a2.id),
+                    TreeEntry(b"a", 0o100644, blob_a1.id),
+                ),
+                (None, TreeEntry(b"b", 0o100755, blob_b1.id)),
+                (TreeEntry(b"c", 0o100755, blob_c2.id), None),
             ],
             merge_entries(b"", tree2, tree1),
         )
@@ -142,7 +148,7 @@ class TreeChangesTest(DiffTestCase):
     )
 
     def _do_test_is_tree(self, is_tree) -> None:
-        self.assertFalse(is_tree(TreeEntry(None, None, None)))
+        self.assertFalse(is_tree(None))
         self.assertFalse(is_tree(TreeEntry(b"a", 0o100644, b"a" * 40)))
         self.assertFalse(is_tree(TreeEntry(b"a", 0o100755, b"a" * 40)))
         self.assertFalse(is_tree(TreeEntry(b"a", 0o120000, b"a" * 40)))

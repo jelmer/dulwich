@@ -84,6 +84,10 @@ fn _count_blocks(py: Python, obj: &Bound<PyAny>) -> PyResult<PyObject> {
 
 #[pyfunction]
 fn _is_tree(_py: Python, entry: &Bound<PyAny>) -> PyResult<bool> {
+    if entry.is_none() {
+        return Ok(false);
+    }
+
     let mode = entry.getattr("mode")?;
 
     if mode.is_none() {
@@ -142,9 +146,6 @@ fn _merge_entries(
     let entries1 = tree_entries(path, tree1, py)?;
     let entries2 = tree_entries(path, tree2, py)?;
 
-    let pym = py.import("dulwich.diff_tree")?;
-    let null_entry = pym.getattr("_NULL_ENTRY")?.unbind();
-
     let mut result = Vec::new();
 
     let mut i1 = 0;
@@ -153,8 +154,8 @@ fn _merge_entries(
         let cmp = entry_path_cmp(entries1[i1].bind(py), entries2[i2].bind(py))?;
         let (e1, e2) = match cmp {
             Ordering::Equal => (entries1[i1].clone_ref(py), entries2[i2].clone_ref(py)),
-            Ordering::Less => (entries1[i1].clone_ref(py), null_entry.clone_ref(py)),
-            Ordering::Greater => (null_entry.clone_ref(py), entries2[i2].clone_ref(py)),
+            Ordering::Less => (entries1[i1].clone_ref(py), py.None()),
+            Ordering::Greater => (py.None(), entries2[i2].clone_ref(py)),
         };
         let pair = PyTuple::new(py, &[e1, e2]).unwrap();
         result.push(pair);
@@ -173,15 +174,13 @@ fn _merge_entries(
     }
 
     while i1 < entries1.len() {
-        let pair =
-            PyTuple::new(py, &[entries1[i1].clone_ref(py), null_entry.clone_ref(py)]).unwrap();
+        let pair = PyTuple::new(py, &[entries1[i1].clone_ref(py), py.None()]).unwrap();
         result.push(pair);
         i1 += 1;
     }
 
     while i2 < entries2.len() {
-        let pair =
-            PyTuple::new(py, &[null_entry.clone_ref(py), entries2[i2].clone_ref(py)]).unwrap();
+        let pair = PyTuple::new(py, &[py.None(), entries2[i2].clone_ref(py)]).unwrap();
         result.push(pair);
         i2 += 1;
     }

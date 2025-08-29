@@ -6717,7 +6717,7 @@ class BranchRemoteListTests(PorcelainTestCase):
         self.assertEqual(expected, branches)
 
 
-class BranchMergedListTests(PorcelainTestCase):
+class BranchMergedTests(PorcelainTestCase):
     def test_no_merged_branches(self) -> None:
         """Test with no merged branches."""
         # Create complete graph: c1 → c2 (master), c1 → c3 (feature)
@@ -6734,7 +6734,7 @@ class BranchMergedListTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/master"] = c2.id
         self.repo.refs[b"refs/heads/feature"] = c3.id
 
-        result = porcelain.merged_branches_list(self.repo)
+        result = list(porcelain.merged_branches(self.repo))
         self.assertEqual([b"master"], result)
 
     def test_all_branches_merged(self) -> None:
@@ -6747,7 +6747,7 @@ class BranchMergedListTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature-1"] = c2.id  # Merged (ancestor)
         self.repo.refs[b"refs/heads/feature-2"] = c1.id  # Merged (ancestor)
 
-        branches = porcelain.merged_branches_list(self.repo)
+        branches = list(porcelain.merged_branches(self.repo))
         expected = [b"feature-1", b"master", b"feature-2"]
         expected.sort()
         branches.sort()
@@ -6773,7 +6773,7 @@ class BranchMergedListTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature-1"] = c5.id  # Not merged (diverged)
         self.repo.refs[b"refs/heads/feature-2"] = c2.id  # Merged (ancestor)
 
-        branches = porcelain.merged_branches_list(self.repo)
+        branches = list(porcelain.merged_branches(self.repo))
         expected = [b"feature-2", b"master"]
         expected.sort()
         branches.sort()
@@ -6785,7 +6785,7 @@ class BranchMergedListTests(PorcelainTestCase):
         self.repo.refs[b"HEAD"] = c1.id
         self.repo.refs[b"refs/heads/master"] = c1.id
 
-        result = porcelain.merged_branches_list(self.repo)
+        result = list(porcelain.merged_branches(self.repo))
         self.assertEqual([b"master"], result)
 
 

@@ -2058,20 +2058,18 @@ class cmd_branch(Command):
             action="store_true",
             help="Delete branch",
         )
-        parser.add_argument(
-            "--all",
-            action="store_true",
-            help="List all branches"
-        )
+        parser.add_argument("--all", action="store_true", help="List all branches")
         args = parser.parse_args(args)
-        
+
         if args.all:
             try:
-                branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(".")
+                branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(
+                    "."
+                )
 
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")
-                    
+
                 return 0
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")

@@ -421,7 +421,7 @@ class BranchCommandTest(DulwichCliTestCase):
         # Delete branch
         result, stdout, stderr = self._run_cli("branch", "-d", "test-branch")
         self.assertNotIn(b"refs/heads/test-branch", self.repo.refs.keys())
-    
+
     def test_branch_list_all(self):
         # Create initial commit and local branches
         test_file = os.path.join(self.repo_path, "test.txt")
@@ -431,13 +431,17 @@ class BranchCommandTest(DulwichCliTestCase):
         self._run_cli("commit", "--message=Initial")
 
         # Create local test branches
-        self._run_cli("branch", "feature-1") 
+        self._run_cli("branch", "feature-1")
         self._run_cli("branch", "feature-2")
-        
-        # Setup a remote and create remote branches 
-        self.repo.refs[b"refs/remotes/origin/master"] = self.repo.refs[b"refs/heads/master"]
-        self.repo.refs[b"refs/remotes/origin/feature-remote"] = self.repo.refs[b"refs/heads/master"]
-        
+
+        # Setup a remote and create remote branches
+        self.repo.refs[b"refs/remotes/origin/master"] = self.repo.refs[
+            b"refs/heads/master"
+        ]
+        self.repo.refs[b"refs/remotes/origin/feature-remote"] = self.repo.refs[
+            b"refs/heads/master"
+        ]
+
         # Test --all listing
         result, stdout, stderr = self._run_cli("branch", "--all")
         self.assertEqual(result, 0)
@@ -445,17 +449,17 @@ class BranchCommandTest(DulwichCliTestCase):
         expected_branches = {
             "feature-1",  # local branch
             "feature-2",  # local branch
-            "master",     # local branch
-            "origin/master",      # remote branch
-            "origin/feature-remote"  # remote branch 
+            "master",  # local branch
+            "origin/master",  # remote branch
+            "origin/feature-remote",  # remote branch
         }
         lines = [line.strip() for line in stdout.splitlines()]
 
         # All branches from stdout
-        all_branches = set(line for line in lines)   
+        all_branches = set(line for line in lines)
         self.assertEqual(all_branches, expected_branches)
-        
-        
+
+
 class CheckoutCommandTest(DulwichCliTestCase):
     """Tests for checkout command."""
 

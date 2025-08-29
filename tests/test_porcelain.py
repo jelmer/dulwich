@@ -6581,9 +6581,13 @@ class BranchRemoteListTests(PorcelainTestCase):
 
         # Should return only branch names, sorted alphabetically
         branches = porcelain.branch_remotes_list(self.repo)
-        expected = [b"origin/feature-1", b"origin/feature-2", b"origin/feature-3", b"origin/feature-4"]
+        expected = [
+            b"origin/feature-1",
+            b"origin/feature-2",
+            b"origin/feature-3",
+            b"origin/feature-4",
+        ]
         self.assertEqual(expected, branches)
-    
 
     def test_remote_branches_refname_reverse_sort(self) -> None:
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
@@ -6599,7 +6603,12 @@ class BranchRemoteListTests(PorcelainTestCase):
         config.write_to_path()
 
         branches = porcelain.branch_remotes_list(self.repo)
-        expected = [b"origin/feature-4", b"origin/feature-3", b"origin/feature-2", b"origin/feature-1"]
+        expected = [
+            b"origin/feature-4",
+            b"origin/feature-3",
+            b"origin/feature-2",
+            b"origin/feature-1",
+        ]
         self.assertEqual(expected, branches)
 
     def test_remote_branches_committerdate_sort(self) -> None:
@@ -6611,8 +6620,8 @@ class BranchRemoteListTests(PorcelainTestCase):
             attrs={
                 1: {"commit_time": 1000},
                 2: {"commit_time": 2000},
-                3: {"commit_time": 3000}
-            }
+                3: {"commit_time": 3000},
+            },
         )
 
         self.repo.refs[b"refs/remotes/origin/oldest"] = c1.id
@@ -6635,8 +6644,8 @@ class BranchRemoteListTests(PorcelainTestCase):
             self.repo.object_store,
             [[1], [2], [3]],
             attrs={
-                1: {"commit_time": 1000},  
-                2: {"commit_time": 2000},  
+                1: {"commit_time": 1000},
+                2: {"commit_time": 2000},
                 3: {"commit_time": 1500},
             },
         )
@@ -6661,9 +6670,9 @@ class BranchRemoteListTests(PorcelainTestCase):
             self.repo.object_store,
             [[1], [2], [3]],
             attrs={
-                1: {"author_time": 1500},  
-                2: {"author_time": 2000},  
-                3: {"author_time": 1000},  
+                1: {"author_time": 1500},
+                2: {"author_time": 2000},
+                3: {"author_time": 1000},
             },
         )
 
@@ -6679,7 +6688,7 @@ class BranchRemoteListTests(PorcelainTestCase):
         branches = porcelain.branch_remotes_list(self.repo)
         expected = [b"origin/oldest", b"origin/middle", b"origin/newest"]
         self.assertEqual(expected, branches)
-    
+
     def test_unknown_sort_key(self) -> None:
         """Test that unknown sort key raises ValueError."""
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
@@ -6693,11 +6702,11 @@ class BranchRemoteListTests(PorcelainTestCase):
         with self.assertRaises(ValueError) as cm:
             porcelain.branch_remotes_list(self.repo)
         self.assertIn("Unknown sort key: unknown", str(cm.exception))
-    
+
     def test_default_sort_no_config(self) -> None:
         """Test default sorting when no config is set."""
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
-        
+
         self.repo.refs[b"refs/remotes/origin/feature-1"] = c1.id
         self.repo.refs[b"refs/remotes/origin/feature-2"] = c1.id
         self.repo.refs[b"refs/remotes/origin/feature-3"] = c1.id
@@ -6706,7 +6715,7 @@ class BranchRemoteListTests(PorcelainTestCase):
         branches = porcelain.branch_remotes_list(self.repo)
         expected = [b"origin/feature-1", b"origin/feature-2", b"origin/feature-3"]
         self.assertEqual(expected, branches)
-    
+
 
 class BranchCreateTests(PorcelainTestCase):
     def test_branch_exists(self) -> None:

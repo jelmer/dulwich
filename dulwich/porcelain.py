@@ -3232,10 +3232,10 @@ def branch_list(repo: RepoPath) -> list[bytes]:
                 branches.sort(key=lambda b: (get_commit_date(b), b))
         else:
             # Unknown sort key, fall back to default
-            branches.sort()  
+            branches.sort()
 
         return branches
-        
+
 
 def branch_remotes_list(repo: RepoPath) -> list[bytes]:
     """List the short names of all remote branches.

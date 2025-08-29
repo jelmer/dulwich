@@ -2080,7 +2080,7 @@ class cmd_branch(Command):
 
         if args.merged:
             try:
-                branches = porcelain.merged_branches_list(".")
+                branches = porcelain.merged_branches(".")
 
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")

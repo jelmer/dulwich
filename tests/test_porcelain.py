@@ -6557,6 +6557,166 @@ class BranchListTests(PorcelainTestCase):
         self.assertEqual([b"alpha", b"beta", b"master", b"zebra"], branches)
 
 
+class BranchRemoteListTests(PorcelainTestCase):
+    def test_no_remote_branches(self) -> None:
+        """Test with no remote branches."""
+        result = porcelain.branch_remotes_list(self.repo)
+        self.assertEqual([], result)
+
+    def test_remote_branches_refname_sort(self) -> None:
+        """Test remote branches sorting with refname (alphabetical)."""
+        # Create some remote branches
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+
+        # Create remote branches is non-alphabetical order
+        self.repo.refs[b"refs/remotes/origin/feature-1"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-2"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-3"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-4"] = c1.id
+
+        # Set branch.sort to refname
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"refname")
+        config.write_to_path()
+
+        # Should return only branch names, sorted alphabetically
+        branches = porcelain.branch_remotes_list(self.repo)
+        expected = [
+            b"origin/feature-1",
+            b"origin/feature-2",
+            b"origin/feature-3",
+            b"origin/feature-4",
+        ]
+        self.assertEqual(expected, branches)
+
+    def test_remote_branches_refname_reverse_sort(self) -> None:
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+
+        self.repo.refs[b"refs/remotes/origin/feature-1"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-2"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-3"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-4"] = c1.id
+
+        # Set branch.sort to -refname
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"-refname")
+        config.write_to_path()
+
+        branches = porcelain.branch_remotes_list(self.repo)
+        expected = [
+            b"origin/feature-4",
+            b"origin/feature-3",
+            b"origin/feature-2",
+            b"origin/feature-1",
+        ]
+        self.assertEqual(expected, branches)
+
+    def test_remote_branches_committerdate_sort(self) -> None:
+        """Test remote branches sorting with committerdate"""
+        # Create commits with different timestamps
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2], [3]],
+            attrs={
+                1: {"commit_time": 1000},
+                2: {"commit_time": 2000},
+                3: {"commit_time": 3000},
+            },
+        )
+
+        self.repo.refs[b"refs/remotes/origin/oldest"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/middle"] = c2.id
+        self.repo.refs[b"refs/remotes/origin/newest"] = c3.id
+
+        # Set branch.sort to committerdate
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"committerdate")
+        config.write_to_path()
+
+        branches = porcelain.branch_remotes_list(self.repo)
+        # Should be sorted by commit time (oldest first), then alphabetically for same time
+        expected = [b"origin/oldest", b"origin/middle", b"origin/newest"]
+        self.assertEqual(expected, branches)
+
+    def test_remote_branches_committerdate_reverse_sort(self) -> None:
+        """Test remote branches sorting with -committerdate."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2], [3]],
+            attrs={
+                1: {"commit_time": 1000},
+                2: {"commit_time": 2000},
+                3: {"commit_time": 1500},
+            },
+        )
+
+        self.repo.refs[b"refs/remotes/origin/oldest"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/newest"] = c2.id
+        self.repo.refs[b"refs/remotes/origin/middle"] = c3.id
+
+        # Set branch.sort to -committerdate
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"-committerdate")
+        config.write_to_path()
+
+        branches = porcelain.branch_remotes_list(self.repo)
+        # Should be sorted by commit time (newest first), then alphabetically for same time
+        expected = [b"origin/newest", b"origin/middle", b"origin/oldest"]
+        self.assertEqual(expected, branches)
+
+    def test_remote_branches_authordate_sort(self) -> None:
+        """Test remote branches sorting with authordate."""
+        c1, c2, c3 = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2], [3]],
+            attrs={
+                1: {"author_time": 1500},
+                2: {"author_time": 2000},
+                3: {"author_time": 1000},
+            },
+        )
+
+        self.repo.refs[b"refs/remotes/origin/middle"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/newest"] = c2.id
+        self.repo.refs[b"refs/remotes/origin/oldest"] = c3.id
+
+        # Set branch.sort to authordate
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"authordate")
+        config.write_to_path()
+
+        branches = porcelain.branch_remotes_list(self.repo)
+        expected = [b"origin/oldest", b"origin/middle", b"origin/newest"]
+        self.assertEqual(expected, branches)
+
+    def test_unknown_sort_key(self) -> None:
+        """Test that unknown sort key raises ValueError."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"refs/remotes/origin/master"] = c1.id
+
+        # Set branch.sort to unknown key
+        config = self.repo.get_config()
+        config.set((b"branch",), b"sort", b"unknown")
+        config.write_to_path()
+
+        with self.assertRaises(ValueError) as cm:
+            porcelain.branch_remotes_list(self.repo)
+        self.assertIn("Unknown sort key: unknown", str(cm.exception))
+
+    def test_default_sort_no_config(self) -> None:
+        """Test default sorting when no config is set."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+
+        self.repo.refs[b"refs/remotes/origin/feature-1"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-2"] = c1.id
+        self.repo.refs[b"refs/remotes/origin/feature-3"] = c1.id
+
+        # No config set - should default to alphabetical
+        branches = porcelain.branch_remotes_list(self.repo)
+        expected = [b"origin/feature-1", b"origin/feature-2", b"origin/feature-3"]
+        self.assertEqual(expected, branches)
+
+
 class BranchCreateTests(PorcelainTestCase):
     def test_branch_exists(self) -> None:
         [c1] = build_commit_graph(self.repo.object_store, [[1]])

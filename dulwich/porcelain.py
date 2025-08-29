@@ -183,6 +183,7 @@ from .protocol import ZERO_SHA, Protocol
 from .refs import (
     LOCAL_BRANCH_PREFIX,
     LOCAL_NOTES_PREFIX,
+    LOCAL_REMOTE_PREFIX,
     LOCAL_TAG_PREFIX,
     Ref,
     SymrefLoop,
@@ -3246,6 +3247,62 @@ def branch_list(repo: RepoPath) -> list[bytes]:
         else:
             # Unknown sort key, fall back to default
             branches.sort()
+
+        return branches
+
+
+def branch_remotes_list(repo: RepoPath) -> list[bytes]:
+    """List the short names of all remote branches.
+
+    Args:
+      repo: Path to the repository
+    Returns:
+      List of branch names (without refs/remotes/ prefix, and without remote name; e.g. 'main' from 'origin/main')
+    """
+    with open_repo_closing(repo) as r:
+        branches = list(r.refs.keys(base=LOCAL_REMOTE_PREFIX))
+
+        config = r.get_config_stack()
+        try:
+            sort_key = config.get((b"branch",), b"sort").decode()
+        except KeyError:
+            # Default is refname (alphabetical)
+            sort_key = "refname"
+
+        # Parse sort key
+        reverse = False
+        if sort_key.startswith("-"):
+            reverse = True
+            sort_key = sort_key[1:]
+
+        # Apply sorting
+        if sort_key == "refname":
+            # Simple alphabetical sort (default)
+            branches.sort(reverse=reverse)
+        elif sort_key in ("committerdate", "authordate"):
+            # Sort by date
+            def get_commit_date(branch_name: bytes) -> int:
+                ref = LOCAL_REMOTE_PREFIX + branch_name
+                sha = r.refs[ref]
+                commit = r.object_store[sha]
+                assert isinstance(commit, Commit)
+                if sort_key == "committerdate":
+                    return commit.commit_time
+                else:  # authordate
+                    return commit.author_time
+
+            # Sort branches by date
+            # Note: Python's sort naturally orders smaller values first (ascending)
+            # For dates, this means oldest first by default
+            # Use a stable sort with branch name as secondary key for consistent ordering
+            if reverse:
+                # For reverse sort, we want newest dates first but alphabetical names second
+                branches.sort(key=lambda b: (-get_commit_date(b), b))
+            else:
+                branches.sort(key=lambda b: (get_commit_date(b), b))
+        else:
+            # Unknown sort key
+            raise ValueError(f"Unknown sort key: {sort_key}")
 
         return branches
 

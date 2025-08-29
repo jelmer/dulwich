@@ -360,10 +360,11 @@ class Walker:
         if not change:
             return False
 
-        old_path = change.old.path
-        new_path = change.new.path
+        old_path = change.old.path if change.old is not None else None
+        new_path = change.new.path if change.new is not None else None
         if self._path_matches(new_path):
             if self.follow and change.type in RENAME_CHANGE_TYPES:
+                assert old_path is not None and new_path is not None
                 self.paths.add(old_path)
                 self.paths.remove(new_path)
             return True
@@ -391,12 +392,19 @@ class Walker:
             return True
 
         if len(self.get_parents(commit)) > 1:
-            for path_changes in entry.changes():
+            changes_result = entry.changes()
+            # For merge commits, changes() returns list[list[TreeChange]]
+            assert isinstance(changes_result, list)
+            for path_changes in changes_result:
                 # For merge commits, only include changes with conflicts for
                 # this path. Since a rename conflict may include different
                 # old.paths, we have to check all of them.
-                for change in path_changes:
-                    if self._change_matches(change):
+                if isinstance(path_changes, list):
+                    for change in path_changes:
+                        if change is not None and self._change_matches(change):
+                            return True
+                elif path_changes is not None:
+                    if self._change_matches(path_changes):
                         return True
         else:
             changes = entry.changes()
@@ -404,16 +412,20 @@ class Walker:
             if changes and isinstance(changes[0], list):
                 # It's list[list[TreeChange]], flatten it
                 for change_list in changes:
-                    for change in change_list:
-                        if self._change_matches(change):
-                            return True
+                    if isinstance(change_list, list):
+                        for item in change_list:
+                            if item is not None and self._change_matches(item):
+                                return True
             else:
                 # It's list[TreeChange]
                 from .diff_tree import TreeChange
 
-                for change in changes:
-                    if isinstance(change, TreeChange) and self._change_matches(change):
-                        return True
+                if isinstance(changes, list):
+                    for entry_item in changes:
+                        if isinstance(entry_item, TreeChange) and self._change_matches(
+                            entry_item
+                        ):
+                            return True
         return None
 
     def _next(self) -> Optional[WalkEntry]:

@@ -57,6 +57,7 @@ from .objects import (
     Blob,
     ObjectID,
     Tree,
+    TreeEntry,
     hex_to_sha,
     sha_to_hex,
 )
@@ -1929,7 +1930,7 @@ def _transition_to_submodule(
     path: bytes,
     full_path: bytes,
     current_stat: Optional[os.stat_result],
-    entry: IndexEntry,
+    entry: Union[IndexEntry, TreeEntry],
     index: Index,
 ) -> None:
     """Transition any type to submodule."""
@@ -1953,7 +1954,7 @@ def _transition_to_file(
     path: bytes,
     full_path: bytes,
     current_stat: Optional[os.stat_result],
-    entry: IndexEntry,
+    entry: Union[IndexEntry, TreeEntry],
     index: Index,
     honor_filemode: bool,
     symlink_fn: Optional[
@@ -2275,6 +2276,7 @@ def update_working_tree(
     paths_becoming_dirs = set()
     for change in changes:
         if change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY):
+            assert change.new is not None
             path = change.new.path
             if b"/" in path:  # This is a file inside a directory
                 # Check if any parent path exists as a file in the old tree or changes
@@ -2316,6 +2318,7 @@ def update_working_tree(
 
             if old_change:
                 # Check if file has been modified
+                assert old_change.old is not None
                 file_matches = _check_file_matches(
                     repo.object_store,
                     full_path,
@@ -2377,6 +2380,7 @@ def update_working_tree(
     for change in changes:
         if change.type in (CHANGE_DELETE, CHANGE_RENAME):
             # Remove file/directory
+            assert change.old is not None
             path = change.old.path
             if path.startswith(b".git") or not validate_path(
                 path, validate_path_element
@@ -2403,6 +2407,7 @@ def update_working_tree(
             CHANGE_RENAME,
         ):
             # Add or modify file
+            assert change.new is not None
             path = change.new.path
             if path.startswith(b".git") or not validate_path(
                 path, validate_path_element

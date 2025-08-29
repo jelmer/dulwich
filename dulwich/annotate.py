@@ -102,8 +102,9 @@ def annotate_lines(
             else:
                 changes = [tree_change]
             for change in changes:
-                if change.new.path == path:
-                    path = change.old.path
+                if change.new is not None and change.new.path == path:
+                    if change.old is not None:
+                        path = change.old.path
                     revs.append((log_entry.commit, change.new))
                     break
 

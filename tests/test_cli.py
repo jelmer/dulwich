@@ -459,6 +459,42 @@ class BranchCommandTest(DulwichCliTestCase):
         all_branches = set(line for line in lines)
         self.assertEqual(all_branches, expected_branches)
 
+    def test_branch_list_merged(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        master_sha = self.repo.refs[b"refs/heads/master"]
+
+        # Create a merged branch (points to same commit as master)
+        self.repo.refs[b"refs/heads/merged-branch"] = master_sha
+
+        # Create a new branch with different content (not merged)
+        test_file2 = os.path.join(self.repo_path, "test2.txt")
+        with open(test_file2, "w") as f:
+            f.write("test2")
+        self._run_cli("add", "test2.txt")
+        self._run_cli("commit", "--message=New branch commit")
+
+        new_branch_sha = self.repo.refs[b"HEAD"]
+
+        # Switch back to master
+        self.repo.refs[b"HEAD"] = master_sha
+
+        # Create a non-merged branch that points to the new branch commit
+        self.repo.refs[b"refs/heads/non-merged-branch"] = new_branch_sha
+
+        # Test --merged listing
+        result, stdout, stderr = self._run_cli("branch", "--merged")
+        self.assertEqual(result, 0)
+
+        branches = [line.strip() for line in stdout.splitlines()]
+        expected_branches = {"master", "merged-branch"}
+        self.assertEqual(set(branches), expected_branches)
+
     def test_branch_list_remotes(self):
         # Create initial commit
         test_file = os.path.join(self.repo_path, "test.txt")

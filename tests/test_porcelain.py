@@ -6717,6 +6717,78 @@ class BranchRemoteListTests(PorcelainTestCase):
         self.assertEqual(expected, branches)
 
 
+class BranchMergedTests(PorcelainTestCase):
+    def test_no_merged_branches(self) -> None:
+        """Test with no merged branches."""
+        # Create complete graph: c1 → c2 (master), c1 → c3 (feature)
+        [c1, c2, c3] = build_commit_graph(
+            self.repo.object_store,
+            [
+                [1],  # c1
+                [2, 1],  # c2 → c1 (master line)
+                [3, 1],  # c3 → c1 (diverged feature branch)
+            ],
+        )
+
+        self.repo.refs[b"HEAD"] = c2.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/heads/feature"] = c3.id
+
+        result = list(porcelain.merged_branches(self.repo))
+        self.assertEqual([b"master"], result)
+
+    def test_all_branches_merged(self) -> None:
+        """Test when all branches are merged into current."""
+        # Create linear history: c1 → c2 → c3 (HEAD)
+        [c1, c2, c3] = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/heads/feature-1"] = c2.id  # Merged (ancestor)
+        self.repo.refs[b"refs/heads/feature-2"] = c1.id  # Merged (ancestor)
+
+        branches = list(porcelain.merged_branches(self.repo))
+        expected = [b"feature-1", b"master", b"feature-2"]
+        expected.sort()
+        branches.sort()
+        self.assertEqual(expected, branches)
+
+    def test_some_branches_merged(self) -> None:
+        """Test when some branches are merged, some are not."""
+        # c1 → c2 → c3 (HEAD/master)
+        # c1 → c4 → c5 (feature-1 - diverged)
+        [c1, c2, c3, c4, c5] = build_commit_graph(
+            self.repo.object_store,
+            [
+                [1],  # c1
+                [2, 1],  # c2 → c1 (master line)
+                [3, 2],  # c3 → c2 (HEAD)
+                [4, 1],  # c4 → c1 (feature branch)
+                [5, 4],  # c5 → c4 (feature branch)
+            ],
+        )
+
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/heads/feature-1"] = c5.id  # Not merged (diverged)
+        self.repo.refs[b"refs/heads/feature-2"] = c2.id  # Merged (ancestor)
+
+        branches = list(porcelain.merged_branches(self.repo))
+        expected = [b"feature-2", b"master"]
+        expected.sort()
+        branches.sort()
+        self.assertEqual(expected, branches)
+
+    def test_only_current_branch_merged(self) -> None:
+        """Test when only current branch exists."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"HEAD"] = c1.id
+        self.repo.refs[b"refs/heads/master"] = c1.id
+
+        result = list(porcelain.merged_branches(self.repo))
+        self.assertEqual([b"master"], result)
+
+
 class BranchCreateTests(PorcelainTestCase):
     def test_branch_exists(self) -> None:
         [c1] = build_commit_graph(self.repo.object_store, [[1]])

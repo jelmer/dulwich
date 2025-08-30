@@ -2083,9 +2083,9 @@ class cmd_branch(Command):
 
         if args.merged:
             try:
-                branches = porcelain.merged_branches(".")
+                branches_iter = porcelain.merged_branches(".")
 
-                for branch in branches:
+                for branch in branches_iter:
                     sys.stdout.write(f"{branch.decode()}\n")
 
                 return 0

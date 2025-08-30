@@ -3307,6 +3307,29 @@ def branch_remotes_list(repo: RepoPath) -> list[bytes]:
         return branches
 
 
+def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
+    """Get merge status for all branches relative to current HEAD.
+
+    Args:
+        repo: Path to the repository
+
+    Yields:
+        Tuple of (branch_name, is_merged) where:
+        - branch_name: Branch name without refs/heads/ prefix
+        - is_merged: True if branch is merged into HEAD, False otherwise
+    """
+    with open_repo_closing(repo) as r:
+        current_sha = r.refs[b"HEAD"]
+
+        for branch_ref in r.refs.keys(base=b"refs/heads/"):
+            full_ref = b"refs/heads/" + branch_ref
+            branch_sha = r.refs[full_ref]
+
+            # Check if branch is an ancestor of HEAD (fully merged)
+            is_merged = can_fast_forward(r, branch_sha, current_sha)
+            yield branch_ref, is_merged
+
+
 def merged_branches(repo: RepoPath) -> Iterator[bytes]:
     """List branches that have been merged into the current branch.
 
@@ -3316,17 +3339,23 @@ def merged_branches(repo: RepoPath) -> Iterator[bytes]:
       Branch names (without refs/heads/ prefix) that are merged
       into the current HEAD
     """
-    with open_repo_closing(repo) as r:
-        current_sha = r.refs[b"HEAD"]
+    for branch_name, is_merged in _get_branch_merge_status(repo):
+        if is_merged:
+            yield branch_name
 
-        for branch_ref in r.refs.keys(base=b"refs/heads/"):
-            full_ref = b"refs/heads/" + branch_ref
 
-            branch_sha = r.refs[full_ref]
+def no_merged_branches(repo: RepoPath) -> Iterator[bytes]:
+    """List branches that have been merged into the current branch.
 
-            # Check if branch is an ancestor of HEAD (fully merged)
-            if can_fast_forward(r, branch_sha, current_sha):
-                yield branch_ref
+    Args:
+      repo: Path to the repository
+    Yields:
+      Branch names (without refs/heads/ prefix) that are merged
+      into the current HEAD
+    """
+    for branch_name, is_merged in _get_branch_merge_status(repo):
+        if not is_merged:
+            yield branch_name
 
 
 def active_branch(repo: RepoPath) -> bytes:

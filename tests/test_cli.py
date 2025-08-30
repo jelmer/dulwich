@@ -494,7 +494,7 @@ class BranchCommandTest(DulwichCliTestCase):
         branches = [line.strip() for line in stdout.splitlines()]
         expected_branches = {"master", "merged-branch"}
         self.assertEqual(set(branches), expected_branches)
-      
+
     def test_branch_list_remotes(self):
         # Create initial commit
         test_file = os.path.join(self.repo_path, "test.txt")

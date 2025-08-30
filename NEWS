@@ -43,6 +43,8 @@
    performance in repositories with many LFS-tracked files.
    (Jelmer Vernooĳ, #1789)
 
+ * Add filter server support. (Jelmer Vernooĳ, #1789)
+
  * Add support for ``patiencediff`` algorithm in diff.
    (Jelmer Vernooĳ, #1795)
 

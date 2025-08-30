@@ -1301,6 +1301,9 @@ class Repo(BaseRepo):
         self.hooks["post-commit"] = PostCommitShellHook(self.controldir())
         self.hooks["post-receive"] = PostReceiveShellHook(self.controldir())
 
+        # Initialize filter context as None, will be created lazily
+        self.filter_context = None
+
     def get_worktree(self) -> "WorkTree":
         """Get the working tree for this repository.
 
@@ -1969,6 +1972,10 @@ class Repo(BaseRepo):
     def close(self) -> None:
         """Close any files opened by this repository."""
         self.object_store.close()
+        # Clean up filter context if it was created
+        if self.filter_context is not None:
+            self.filter_context.close()
+            self.filter_context = None
 
     def __enter__(self):
         """Enter context manager."""
@@ -2019,17 +2026,24 @@ class Repo(BaseRepo):
 
     def get_blob_normalizer(self):
         """Return a BlobNormalizer object."""
-        from .filters import FilterBlobNormalizer, FilterRegistry
+        from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
-        # Get proper GitAttributes object
-        git_attributes = self.get_gitattributes()
+        # Get fresh configuration and GitAttributes
         config_stack = self.get_config_stack()
+        git_attributes = self.get_gitattributes()
 
-        # Create FilterRegistry with repo reference
-        filter_registry = FilterRegistry(config_stack, self)
+        # Lazily create FilterContext if needed
+        if self.filter_context is None:
+            filter_registry = FilterRegistry(config_stack, self)
+            self.filter_context = FilterContext(filter_registry)
+        else:
+            # Refresh the context with current config to handle config changes
+            self.filter_context.refresh_config(config_stack)
 
-        # Return FilterBlobNormalizer which handles all filters including line endings
-        return FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
+        # Return a new FilterBlobNormalizer with the context
+        return FilterBlobNormalizer(
+            config_stack, git_attributes, filter_context=self.filter_context
+        )
 
     def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
         """Read gitattributes for the repository.
@@ -2162,6 +2176,7 @@ class MemoryRepo(BaseRepo):
         self.bare = True
         self._config = ConfigFile()
         self._description = None
+        self.filter_context = None
 
     def _append_reflog(self, *args) -> None:
         self._reflog.append(args)
@@ -2254,17 +2269,24 @@ class MemoryRepo(BaseRepo):
 
     def get_blob_normalizer(self):
         """Return a BlobNormalizer object for checkin/checkout operations."""
-        from .filters import FilterBlobNormalizer, FilterRegistry
+        from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
-        # Get GitAttributes object
-        git_attributes = self.get_gitattributes()
+        # Get fresh configuration and GitAttributes
         config_stack = self.get_config_stack()
+        git_attributes = self.get_gitattributes()
 
-        # Create FilterRegistry with repo reference
-        filter_registry = FilterRegistry(config_stack, self)
+        # Lazily create FilterContext if needed
+        if self.filter_context is None:
+            filter_registry = FilterRegistry(config_stack, self)
+            self.filter_context = FilterContext(filter_registry)
+        else:
+            # Refresh the context with current config to handle config changes
+            self.filter_context.refresh_config(config_stack)
 
-        # Return FilterBlobNormalizer which handles all filters
-        return FilterBlobNormalizer(config_stack, git_attributes, filter_registry, self)
+        # Return a new FilterBlobNormalizer with the context
+        return FilterBlobNormalizer(
+            config_stack, git_attributes, filter_context=self.filter_context
+        )
 
     def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
         """Read gitattributes for the repository."""
@@ -2273,6 +2295,13 @@ class MemoryRepo(BaseRepo):
         # Memory repos don't have working trees or gitattributes files
         # Return empty GitAttributes
         return GitAttributes([])
+
+    def close(self) -> None:
+        """Close any resources opened by this repository."""
+        # Clean up filter context if it was created
+        if self.filter_context is not None:
+            self.filter_context.close()
+            self.filter_context = None
 
     def do_commit(
         self,

@@ -190,6 +190,16 @@ class LineEndingFilter(FilterDriver):
 
         return self.smudge_conversion(data)
 
+    def cleanup(self) -> None:
+        """Clean up any resources held by this filter driver."""
+        # LineEndingFilter doesn't hold any resources that need cleanup
+
+    def reuse(self, config, filter_name: str) -> bool:
+        """Check if this filter driver should be reused with the given configuration."""
+        # LineEndingFilter is lightweight and should always be recreated
+        # to ensure it uses the latest configuration
+        return False
+
 
 def convert_crlf_to_lf(text_hunk: bytes) -> bytes:
     """Convert CRLF in text hunk into LF.

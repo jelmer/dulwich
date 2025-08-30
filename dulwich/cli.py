@@ -2063,7 +2063,9 @@ class cmd_branch(Command):
             "--merged", action="store_true", help="List merged into current branch"
         )
         parser.add_argument(
-            "--no-merged", action="store_true", help="List branches not merged into current branch"
+            "--no-merged",
+            action="store_true",
+            help="List branches not merged into current branch",
         )
         parser.add_argument(
             "--remotes", action="store_true", help="List remotes branches"

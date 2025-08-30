@@ -519,6 +519,12 @@ class LineEndingIntegrationTests(TestCase):
             def smudge(self, data):
                 return b"LFS content"
 
+            def cleanup(self):
+                pass
+
+            def reuse(self, config, filter_name):
+                return False
+
         self.registry.register_driver("lfs", MockLFSFilter())
 
         # Different files use different filters

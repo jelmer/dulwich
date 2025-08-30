@@ -423,7 +423,7 @@ class BranchCommandTest(DulwichCliTestCase):
         self.assertNotIn(b"refs/heads/test-branch", self.repo.refs.keys())
 
     def test_branch_list_all(self):
-        # Create initial commit and local branches
+        # Create initial commit
         test_file = os.path.join(self.repo_path, "test.txt")
         with open(test_file, "w") as f:
             f.write("test")
@@ -494,6 +494,38 @@ class BranchCommandTest(DulwichCliTestCase):
         branches = [line.strip() for line in stdout.splitlines()]
         expected_branches = {"master", "merged-branch"}
         self.assertEqual(set(branches), expected_branches)
+      
+    def test_branch_list_remotes(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Setup a remote and create remote branches
+        self.repo.refs[b"refs/remotes/origin/master"] = self.repo.refs[
+            b"refs/heads/master"
+        ]
+        self.repo.refs[b"refs/remotes/origin/feature-remote-1"] = self.repo.refs[
+            b"refs/heads/master"
+        ]
+        self.repo.refs[b"refs/remotes/origin/feature-remote-2"] = self.repo.refs[
+            b"refs/heads/master"
+        ]
+
+        # Test --remotes listing
+        result, stdout, stderr = self._run_cli("branch", "--remotes")
+        self.assertEqual(result, 0)
+
+        branches = [line.strip() for line in stdout.splitlines()]
+        expected_branches = [
+            "origin/feature-remote-1",
+            "origin/feature-remote-2",
+            "origin/master",
+        ]
+
+        self.assertEqual(branches, expected_branches)
 
 
 class CheckoutCommandTest(DulwichCliTestCase):

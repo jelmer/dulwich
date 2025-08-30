@@ -495,9 +495,6 @@ class BranchCommandTest(DulwichCliTestCase):
         expected_branches = {"master", "merged-branch"}
         self.assertEqual(set(branches), expected_branches)
 
-        # Verify that the non-merged branch is not included
-        self.assertNotIn("non-merged-branch", branches)
-
 
 class CheckoutCommandTest(DulwichCliTestCase):
     """Tests for checkout command."""

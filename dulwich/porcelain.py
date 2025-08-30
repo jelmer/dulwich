@@ -3322,18 +3322,11 @@ def merged_branches(repo: RepoPath) -> Iterator[bytes]:
         for branch_ref in r.refs.keys(base=b"refs/heads/"):
             full_ref = b"refs/heads/" + branch_ref
 
-            if full_ref not in r.refs:
-                continue
+            branch_sha = r.refs[full_ref]
 
-            try:
-                branch_sha = r.refs[full_ref]
-
-                # Check if branch is an ancestor of HEAD (fully merged)
-                if can_fast_forward(r, branch_sha, current_sha):
-                    yield branch_ref
-
-            except (KeyError, ValueError):
-                continue
+            # Check if branch is an ancestor of HEAD (fully merged)
+            if can_fast_forward(r, branch_sha, current_sha):
+                yield branch_ref
 
 
 def active_branch(repo: RepoPath) -> bytes:

@@ -6895,11 +6895,11 @@ class BranchContainsTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature"] = c3.id
 
         # c2 is only in master branch
-        result = list(porcelain.contains_branches(self.repo, c2.id.decode()))
+        result = list(porcelain.branches_containing(self.repo, c2.id.decode()))
         self.assertEqual([b"master"], result)
 
         # c3 is only in feature branch
-        result = list(porcelain.contains_branches(self.repo, c3.id.decode()))
+        result = list(porcelain.branches_containing(self.repo, c3.id.decode()))
         self.assertEqual([b"feature"], result)
 
     def test_commit_in_multiple_branches(self) -> None:
@@ -6920,14 +6920,14 @@ class BranchContainsTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature"] = c4.id
 
         # c2 is in both branches (common ancestor)
-        branches = list(porcelain.contains_branches(self.repo, c2.id.decode()))
+        branches = list(porcelain.branches_containing(self.repo, c2.id.decode()))
         expected = [b"master", b"feature"]
         expected.sort()
         branches.sort()
         self.assertEqual(expected, branches)
 
         # c1 is in both branches (older common ancestor)
-        branches = list(porcelain.contains_branches(self.repo, c1.id.decode()))
+        branches = list(porcelain.branches_containing(self.repo, c1.id.decode()))
         expected = [b"master", b"feature"]
         expected.sort()
         branches.sort()
@@ -6944,7 +6944,7 @@ class BranchContainsTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature-2"] = c2.id  # Ancestor
 
         # c1 is in all branches
-        branches = list(porcelain.contains_branches(self.repo, c1.id.decode()))
+        branches = list(porcelain.branches_containing(self.repo, c1.id.decode()))
         expected = [b"master", b"feature-1", b"feature-2"]
         expected.sort()
         branches.sort()
@@ -6968,7 +6968,7 @@ class BranchContainsTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature"] = c3.id
 
         # c4 is not in any branch
-        result = list(porcelain.contains_branches(self.repo, c4.id.decode()))
+        result = list(porcelain.branches_containing(self.repo, c4.id.decode()))
         self.assertEqual([], result)
 
     def test_commit_ref_by_branch_name(self) -> None:
@@ -6988,11 +6988,11 @@ class BranchContainsTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature"] = c3.id
 
         # Use "master" as commit reference - should find master branch
-        result = list(porcelain.contains_branches(self.repo, "master"))
+        result = list(porcelain.branches_containing(self.repo, "master"))
         self.assertEqual([b"master"], result)
 
         # Use "feature" as commit reference - should find feature branch
-        result = list(porcelain.contains_branches(self.repo, "feature"))
+        result = list(porcelain.branches_containing(self.repo, "feature"))
         self.assertEqual([b"feature"], result)
 
     def test_commit_ref_by_head(self) -> None:
@@ -7005,24 +7005,24 @@ class BranchContainsTests(PorcelainTestCase):
         self.repo.refs[b"refs/heads/feature"] = c2.id  # Ancestor
 
         # Use "HEAD" as commit reference
-        result = list(porcelain.contains_branches(self.repo, "HEAD"))
+        result = list(porcelain.branches_containing(self.repo, "HEAD"))
         self.assertEqual([b"master"], result)
 
-    def test_malformed_commit_ref(self) -> None:
+    def test_invalid_commit_ref(self) -> None:
         """Test with invalid commit reference."""
         [c1] = build_commit_graph(self.repo.object_store, [[1]])
         self.repo.refs[b"HEAD"] = c1.id
         self.repo.refs[b"refs/heads/master"] = c1.id
 
         # Test with non-existent commit
-        with self.assertRaises(ValueError) as cm:
-            list(porcelain.contains_branches(self.repo, "nonexistent"))
-        self.assertIn("malformed object name nonexistent", str(cm.exception))
+        with self.assertRaises(KeyError) as cm:
+            list(porcelain.branches_containing(self.repo, "nonexistent"))
+        self.assertEqual(b"nonexistent", cm.exception.args[0])
 
         # Test with invalid SHA
-        with self.assertRaises(ValueError) as cm:
-            list(porcelain.contains_branches(self.repo, "invalid-sha"))
-        self.assertIn("malformed object name invalid-sha", str(cm.exception))
+        with self.assertRaises(KeyError) as cm:
+            list(porcelain.branches_containing(self.repo, "invalid-sha"))
+        self.assertEqual(b"invalid-sha", cm.exception.args[0])
 
     def test_short_sha_reference(self) -> None:
         """Test using short SHA as commit reference."""
@@ -7034,7 +7034,7 @@ class BranchContainsTests(PorcelainTestCase):
 
         # Use short SHA (first 7 characters)
         short_sha = c1.id.decode()[:7]
-        result = list(porcelain.contains_branches(self.repo, short_sha))
+        result = list(porcelain.branches_containing(self.repo, short_sha))
         self.assertEqual([b"master"], result)
 
 

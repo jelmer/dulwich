@@ -3358,6 +3358,34 @@ def no_merged_branches(repo: RepoPath) -> Iterator[bytes]:
             yield branch_name
 
 
+def contains_branches(repo: RepoPath, commit: str) -> Iterator[bytes]:
+    """List branches that contain the specified commit.
+
+    Args:
+        repo: Path to the repository
+        commit: Commit-ish string (SHA, branch name, tag, etc.)
+
+    Yields:
+        Branch names (without refs/heads/ prefix) that contain the commit
+
+    Raises:
+        ValueError: If the commit reference is malformed or not found
+    """
+    with open_repo_closing(repo) as r:
+        try:
+            commit_obj = parse_commit(r, commit)
+            commit_sha = commit_obj.id
+        except (KeyError, ValueError):
+            raise ValueError(f"malformed object name {commit}")
+
+        for branch_ref in r.refs.keys(base=LOCAL_BRANCH_PREFIX):
+            full_ref = LOCAL_BRANCH_PREFIX + branch_ref
+            branch_sha = r.refs[full_ref]
+
+            if can_fast_forward(r, commit_sha, branch_sha):
+                yield branch_ref
+
+
 def active_branch(repo: RepoPath) -> bytes:
     """Return the active branch in the repository, if any.
 

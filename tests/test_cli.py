@@ -627,7 +627,7 @@ class BranchCommandTest(DulwichCliTestCase):
         # Test with invalid commit hash
         result, stdout, stderr = self._run_cli("branch", "--contains", "invalid123")
         self.assertNotEqual(result, 0)
-        self.assertIn("malformed object name", stderr)
+        self.assertIn("error: object name invalid123 not found", stderr)
 
 
 class CheckoutCommandTest(DulwichCliTestCase):

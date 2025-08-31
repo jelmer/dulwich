@@ -2070,6 +2070,12 @@ class cmd_branch(Command):
         parser.add_argument(
             "--remotes", action="store_true", help="List remotes branches"
         )
+        parser.add_argument(
+            "--contains",
+            nargs="?",
+            const="HEAD",
+            help="List branches that contain a specific commit",
+        )
         args = parser.parse_args(args)
 
         if args.all:
@@ -2106,6 +2112,23 @@ class cmd_branch(Command):
                     sys.stdout.write(f"{branch.decode()}\n")
 
                 return 0
+            except porcelain.Error as e:
+                sys.stderr.write(f"{e}")
+                return 1
+
+        if args.contains:
+            try:
+                branches_iter = porcelain.contains_branches(".", commit=args.contains)
+
+                for branch in branches_iter:
+                    sys.stdout.write(f"{branch.decode()}\n")
+
+                return 0
+
+            except ValueError as e:
+                sys.stderr.write(f"error: {e}\n")
+                return 1
+
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")
                 return 1

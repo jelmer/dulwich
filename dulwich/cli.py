@@ -2088,6 +2088,7 @@ class cmd_branch(Command):
                     sys.stdout.write(f"{branch.decode()}\n")
 
                 return 0
+
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")
                 return 1
@@ -2118,15 +2119,15 @@ class cmd_branch(Command):
 
         if args.contains:
             try:
-                branches_iter = porcelain.contains_branches(".", commit=args.contains)
+                branches_iter = porcelain.branches_containing(".", commit=args.contains)
 
                 for branch in branches_iter:
                     sys.stdout.write(f"{branch.decode()}\n")
 
                 return 0
 
-            except ValueError as e:
-                sys.stderr.write(f"error: {e}\n")
+            except KeyError as e:
+                sys.stderr.write(f"error: object name {e.args[0].decode()} not found\n")
                 return 1
 
             except porcelain.Error as e:

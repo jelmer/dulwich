@@ -6877,6 +6877,167 @@ class BranchNoMergedTests(PorcelainTestCase):
         self.assertEqual([], result)
 
 
+class BranchContainsTests(PorcelainTestCase):
+    def test_commit_in_single_branch(self) -> None:
+        """Test commit contained in only one branch."""
+        # Create: c1 → c2 (master), c1 → c3 (feature)
+        [c1, c2, c3] = build_commit_graph(
+            self.repo.object_store,
+            [
+                [1],  # c1
+                [2, 1],  # c2 → c1 (master line)
+                [3, 1],  # c3 → c1 (feature branch)
+            ],
+        )
+
+        self.repo.refs[b"HEAD"] = c2.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/heads/feature"] = c3.id
+
+        # c2 is only in master branch
+        result = list(porcelain.branches_containing(self.repo, c2.id.decode()))
+        self.assertEqual([b"master"], result)
+
+        # c3 is only in feature branch
+        result = list(porcelain.branches_containing(self.repo, c3.id.decode()))
+        self.assertEqual([b"feature"], result)
+
+    def test_commit_in_multiple_branches(self) -> None:
+        """Test commit contained in multiple branches."""
+        # Create: c1 → c2 → c3 (master), c2 → c4 (feature)
+        [c1, c2, c3, c4] = build_commit_graph(
+            self.repo.object_store,
+            [
+                [1],  # c1
+                [2, 1],  # c2 → c1
+                [3, 2],  # c3 → c2 (master)
+                [4, 2],  # c4 → c2 (feature)
+            ],
+        )
+
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/heads/feature"] = c4.id
+
+        # c2 is in both branches (common ancestor)
+        branches = list(porcelain.branches_containing(self.repo, c2.id.decode()))
+        expected = [b"master", b"feature"]
+        expected.sort()
+        branches.sort()
+        self.assertEqual(expected, branches)
+
+        # c1 is in both branches (older common ancestor)
+        branches = list(porcelain.branches_containing(self.repo, c1.id.decode()))
+        expected = [b"master", b"feature"]
+        expected.sort()
+        branches.sort()
+        self.assertEqual(expected, branches)
+
+    def test_commit_in_all_branches(self) -> None:
+        """Test commit contained in all branches."""
+        # Create linear history: c1 → c2 → c3 (HEAD/master)
+        [c1, c2, c3] = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/heads/feature-1"] = c3.id  # Same as master
+        self.repo.refs[b"refs/heads/feature-2"] = c2.id  # Ancestor
+
+        # c1 is in all branches
+        branches = list(porcelain.branches_containing(self.repo, c1.id.decode()))
+        expected = [b"master", b"feature-1", b"feature-2"]
+        expected.sort()
+        branches.sort()
+        self.assertEqual(expected, branches)
+
+    def test_commit_in_no_branches(self) -> None:
+        """Test commit not contained in any branch."""
+        # Create: c1 → c2 (master), c1 → c3 (feature), orphan c4
+        [c1, c2, c3, c4] = build_commit_graph(
+            self.repo.object_store,
+            [
+                [1],  # c1
+                [2, 1],  # c2 → c1 (master)
+                [3, 1],  # c3 → c1 (feature)
+                [4],  # c4 (orphan commit)
+            ],
+        )
+
+        self.repo.refs[b"HEAD"] = c2.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/heads/feature"] = c3.id
+
+        # c4 is not in any branch
+        result = list(porcelain.branches_containing(self.repo, c4.id.decode()))
+        self.assertEqual([], result)
+
+    def test_commit_ref_by_branch_name(self) -> None:
+        """Test using branch name as commit reference."""
+        # Create: c1 → c2 (master), c1 → c3 (feature)
+        [c1, c2, c3] = build_commit_graph(
+            self.repo.object_store,
+            [
+                [1],  # c1
+                [2, 1],  # c2 → c1 (master)
+                [3, 1],  # c3 → c1 (feature)
+            ],
+        )
+
+        self.repo.refs[b"HEAD"] = c2.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+        self.repo.refs[b"refs/heads/feature"] = c3.id
+
+        # Use "master" as commit reference - should find master branch
+        result = list(porcelain.branches_containing(self.repo, "master"))
+        self.assertEqual([b"master"], result)
+
+        # Use "feature" as commit reference - should find feature branch
+        result = list(porcelain.branches_containing(self.repo, "feature"))
+        self.assertEqual([b"feature"], result)
+
+    def test_commit_ref_by_head(self) -> None:
+        """Test using HEAD as commit reference."""
+        # Create: c1 → c2 → c3 (HEAD/master)
+        [c1, c2, c3] = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+
+        self.repo.refs[b"HEAD"] = c3.id
+        self.repo.refs[b"refs/heads/master"] = c3.id
+        self.repo.refs[b"refs/heads/feature"] = c2.id  # Ancestor
+
+        # Use "HEAD" as commit reference
+        result = list(porcelain.branches_containing(self.repo, "HEAD"))
+        self.assertEqual([b"master"], result)
+
+    def test_invalid_commit_ref(self) -> None:
+        """Test with invalid commit reference."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"HEAD"] = c1.id
+        self.repo.refs[b"refs/heads/master"] = c1.id
+
+        # Test with non-existent commit
+        with self.assertRaises(KeyError) as cm:
+            list(porcelain.branches_containing(self.repo, "nonexistent"))
+        self.assertEqual(b"nonexistent", cm.exception.args[0])
+
+        # Test with invalid SHA
+        with self.assertRaises(KeyError) as cm:
+            list(porcelain.branches_containing(self.repo, "invalid-sha"))
+        self.assertEqual(b"invalid-sha", cm.exception.args[0])
+
+    def test_short_sha_reference(self) -> None:
+        """Test using short SHA as commit reference."""
+        # Create: c1 → c2 (master)
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2, 1]])
+
+        self.repo.refs[b"HEAD"] = c2.id
+        self.repo.refs[b"refs/heads/master"] = c2.id
+
+        # Use short SHA (first 7 characters)
+        short_sha = c1.id.decode()[:7]
+        result = list(porcelain.branches_containing(self.repo, short_sha))
+        self.assertEqual([b"master"], result)
+
+
 class BranchCreateTests(PorcelainTestCase):
     def test_branch_exists(self) -> None:
         [c1] = build_commit_graph(self.repo.object_store, [[1]])

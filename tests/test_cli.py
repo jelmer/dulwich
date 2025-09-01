@@ -629,6 +629,34 @@ class BranchCommandTest(DulwichCliTestCase):
         self.assertNotEqual(result, 0)
         self.assertIn("error: object name invalid123 not found", stderr)
 
+    def test_branch_list_column(self):
+        """Test branch --column formatting"""
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        self._run_cli("branch", "feature-1")
+        self._run_cli("branch", "feature-2")
+        self._run_cli("branch", "feature-3")
+
+        # Run branch --column
+        result, stdout, stderr = self._run_cli("branch", "--column")
+        self.assertEqual(result, 0)
+
+        expected = ["feature-1", "feature-2", "feature-3"]
+
+        for branch in expected:
+            self.assertIn(branch, stdout)
+
+        multiple_columns = any(
+            sum(branch in line for branch in expected) > 1
+            for line in stdout.strip().split("\n")
+        )
+        self.assertTrue(multiple_columns)
+
 
 class CheckoutCommandTest(DulwichCliTestCase):
     """Tests for checkout command."""

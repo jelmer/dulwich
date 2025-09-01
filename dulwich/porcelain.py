@@ -3321,10 +3321,7 @@ def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
     with open_repo_closing(repo) as r:
         current_sha = r.refs[b"HEAD"]
 
-        for branch_ref in r.refs.keys(base=b"refs/heads/"):
-            full_ref = b"refs/heads/" + branch_ref
-            branch_sha = r.refs[full_ref]
-
+        for branch_ref, branch_sha in r.refs.as_dict(base=b"refs/heads/").items():
             # Check if branch is an ancestor of HEAD (fully merged)
             is_merged = can_fast_forward(r, branch_sha, current_sha)
             yield branch_ref, is_merged
@@ -3356,6 +3353,29 @@ def no_merged_branches(repo: RepoPath) -> Iterator[bytes]:
     for branch_name, is_merged in _get_branch_merge_status(repo):
         if not is_merged:
             yield branch_name
+
+
+def branches_containing(repo: RepoPath, commit: str) -> Iterator[bytes]:
+    """List branches that contain the specified commit.
+
+    Args:
+        repo: Path to the repository
+        commit: Commit-ish string (SHA, branch name, tag, etc.)
+
+    Yields:
+        Branch names (without refs/heads/ prefix) that contain the commit
+
+    Raises:
+        ValueError: If the commit reference is malformed
+        KeyError: If the commit reference does not exist
+    """
+    with open_repo_closing(repo) as r:
+        commit_obj = parse_commit(r, commit)
+        commit_sha = commit_obj.id
+
+        for branch_ref, branch_sha in r.refs.as_dict(base=LOCAL_BRANCH_PREFIX).items():
+            if can_fast_forward(r, commit_sha, branch_sha):
+                yield branch_ref
 
 
 def active_branch(repo: RepoPath) -> bytes:

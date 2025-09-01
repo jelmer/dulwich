@@ -2076,6 +2076,9 @@ class cmd_branch(Command):
             const="HEAD",
             help="List branches that contain a specific commit",
         )
+        parser.add_argument(
+            "--column", action="store_true", help="Display branch list in columns"
+        )
         args = parser.parse_args(args)
 
         if args.all:
@@ -2140,6 +2143,72 @@ class cmd_branch(Command):
 
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")
+
+                return 0
+            except porcelain.Error as e:
+                sys.stderr.write(f"{e}")
+                return 1
+
+        if args.column:
+            try:
+                branches = porcelain.branch_list(".")
+
+                try:
+                    ter_width = os.get_terminal_size().columns
+                except OSError:
+                    ter_width = 80
+
+                branch_names = [branch.decode() for branch in branches]
+
+                def columns(names, width, num_cols):
+                    if num_cols <= 0:
+                        return False, []
+
+                    num_rows = (len(names) + num_cols - 1) // num_cols
+                    col_widths = []
+
+                    for col in range(num_cols):
+                        max_width = 0
+                        for row in range(num_rows):
+                            idx = row + col * num_rows
+                            if idx < len(names):
+                                max_width = max(max_width, len(names[idx]))
+                        col_widths.append(max_width + 2)  # add padding
+
+                    total_width = sum(col_widths)
+                    if total_width <= width:
+                        return True, col_widths
+                    return False, []
+
+                best_cols = 1
+                best_widths = []
+
+                for num_cols in range(min(8, len(branch_names)), 0, -1):
+                    fits, widths = columns(branch_names, ter_width, num_cols)
+                    if fits:
+                        best_cols = num_cols
+                        best_widths = widths
+                        break
+
+                if not best_widths:
+                    best_cols = 1
+                    best_widths = [max(len(name) for name in branch_names) + 2]
+
+                num_rows = (len(branch_names) + best_cols - 1) // best_cols
+
+                for row in range(num_rows):
+                    lines = []
+                    for col in range(best_cols):
+                        idx = row + col * num_rows
+                        if idx < len(branch_names):
+                            branch_name = branch_names[idx]
+                            if col < len(best_widths):
+                                lines.append(branch_name.ljust(best_widths[col]))
+                            else:
+                                lines.append(branch_name)
+
+                    if lines:
+                        sys.stdout.write("".join(lines).rstrip() + "\n")
 
                 return 0
             except porcelain.Error as e:

@@ -563,6 +563,72 @@ class BranchCommandTest(DulwichCliTestCase):
 
         self.assertEqual(branches, expected_branches)
 
+    def test_branch_list_contains(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        initial_commit_sha = self.repo.refs[b"HEAD"]
+
+        # Create first branch from initial commit
+        self._run_cli("branch", "branch-1")
+
+        # Make a new commit on master
+        test_file2 = os.path.join(self.repo_path, "test2.txt")
+        with open(test_file2, "w") as f:
+            f.write("test2")
+        self._run_cli("add", "test2.txt")
+        self._run_cli("commit", "--message=Second commit")
+
+        second_commit_sha = self.repo.refs[b"HEAD"]
+
+        # Create second branch from current master (contains both commits)
+        self._run_cli("branch", "branch-2")
+
+        # Create third branch that doesn't contain the second commit
+        # Switch to initial commit and create branch from there
+        self.repo.refs[b"HEAD"] = initial_commit_sha
+        self._run_cli("branch", "branch-3")
+
+        # Switch back to master
+        self.repo.refs[b"HEAD"] = second_commit_sha
+
+        # Test --contains with second commit (should include master and branch-2)
+        result, stdout, stderr = self._run_cli(
+            "branch", "--contains", second_commit_sha.decode()
+        )
+        self.assertEqual(result, 0)
+
+        branches = [line.strip() for line in stdout.splitlines()]
+        expected_branches = {"master", "branch-2"}
+        self.assertEqual(set(branches), expected_branches)
+
+        # Test --contains with initial commit (should include all branches)
+        result, stdout, stderr = self._run_cli(
+            "branch", "--contains", initial_commit_sha.decode()
+        )
+        self.assertEqual(result, 0)
+
+        branches = [line.strip() for line in stdout.splitlines()]
+        expected_branches = {"master", "branch-1", "branch-2", "branch-3"}
+        self.assertEqual(set(branches), expected_branches)
+
+        # Test --contains without argument (uses HEAD, which is second commit)
+        result, stdout, stderr = self._run_cli("branch", "--contains")
+        self.assertEqual(result, 0)
+
+        branches = [line.strip() for line in stdout.splitlines()]
+        expected_branches = {"master", "branch-2"}
+        self.assertEqual(set(branches), expected_branches)
+
+        # Test with invalid commit hash
+        result, stdout, stderr = self._run_cli("branch", "--contains", "invalid123")
+        self.assertNotEqual(result, 0)
+        self.assertIn("error: object name invalid123 not found", stderr)
+
 
 class CheckoutCommandTest(DulwichCliTestCase):
     """Tests for checkout command."""

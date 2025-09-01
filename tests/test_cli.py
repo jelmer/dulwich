@@ -643,7 +643,7 @@ class BranchCommandTest(DulwichCliTestCase):
         self._run_cli("branch", "feature-3")
 
         # Run branch --column
-        result, stdout, stderr = self._run_cli("branch", "--column")
+        result, stdout, stderr = self._run_cli("branch", "--all", "--column")
         self.assertEqual(result, 0)
 
         expected = ["feature-1", "feature-2", "feature-3"]

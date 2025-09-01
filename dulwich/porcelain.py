@@ -3321,10 +3321,7 @@ def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
     with open_repo_closing(repo) as r:
         current_sha = r.refs[b"HEAD"]
 
-        for branch_ref in r.refs.keys(base=b"refs/heads/"):
-            full_ref = b"refs/heads/" + branch_ref
-            branch_sha = r.refs[full_ref]
-
+        for branch_ref, branch_sha in r.refs.as_dict(base=b"refs/heads/").items():
             # Check if branch is an ancestor of HEAD (fully merged)
             is_merged = can_fast_forward(r, branch_sha, current_sha)
             yield branch_ref, is_merged

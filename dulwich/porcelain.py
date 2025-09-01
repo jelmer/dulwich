@@ -3373,11 +3373,8 @@ def branches_containing(repo: RepoPath, commit: str) -> Iterator[bytes]:
         KeyError: If the commit reference does not exist
     """
     with open_repo_closing(repo) as r:
-        try:
-            commit_obj = parse_commit(r, commit)
-            commit_sha = commit_obj.id
-        except ValueError:
-            raise
+        commit_obj = parse_commit(r, commit)
+        commit_sha = commit_obj.id
 
         for branch_ref, branch_sha in r.refs.as_dict(base=LOCAL_BRANCH_PREFIX).items():
             if can_fast_forward(r, commit_sha, branch_sha):

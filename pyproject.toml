@@ -43,7 +43,7 @@ pgp = ["gpg"]
 paramiko = ["paramiko"]
 colordiff = ["rich"]
 dev = [
-    "ruff==0.12.10",
+    "ruff==0.12.11",
     "mypy==1.17.1",
     "dissolve>=0.1.1",
     "codespell==2.4.1",

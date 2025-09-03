@@ -31,7 +31,16 @@
 
  * Fix handling of CRLF line endings with ``core.autocrlf = input`` to prevent
    unchanged files from appearing as unstaged in status.
-   (Jelmer Vernooĳ, #1770)
+   (Jelmer Vernooĳ, #1773)
+
+ * Add support for ``core.whitespace`` configuration for whitespace error
+   detection and fixing. Supports blank-at-eol, space-before-tab, indent-with-non-tab,
+   tab-in-indent, blank-at-eof, cr-at-eol, and tabwidth settings.
+   (Jelmer Vernooĳ, #1806)
+
+ * Add support for ``core.safecrlf`` configuration to check if CRLF/LF conversions
+   would be reversible and optionally abort or warn on potentially lossy conversions.
+   (Jelmer Vernooĳ, #1806)
 
  * Add support for ``http.extraHeader`` configuration to pass additional HTTP
    headers to the server when communicating over HTTP(S).

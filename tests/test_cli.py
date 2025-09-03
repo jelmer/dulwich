@@ -33,7 +33,7 @@ from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
 from dulwich import cli
-from dulwich.cli import format_bytes, launch_editor, parse_relative_time
+from dulwich.cli import format_bytes, launch_editor, parse_relative_time, write_columns
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
     build_commit_graph,
@@ -656,6 +656,169 @@ class BranchCommandTest(DulwichCliTestCase):
             for line in stdout.strip().split("\n")
         )
         self.assertTrue(multiple_columns)
+
+
+class TestWriteColumns(TestCase):
+    """Tests for write_columns function"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.original_stdout = sys.stdout
+        self.original_get_terminal_size = os.get_terminal_size
+
+    def tearDown(self):
+        super().tearDown()
+        sys.stdout = self.original_stdout
+        os.get_terminal_size = self.original_get_terminal_size
+
+    @patch("os.get_terminal_size")
+    def test_basic_functionality(self, mock_terminal_size):
+        """Test basic functionality with default terminal width."""
+        mock_terminal_size.return_value.columns = 80
+
+        with patch("sys.stdout.write") as mock_write:
+            items = [b"main", b"dev", b"feature/branch-1"]
+            write_columns(items)
+
+            self.assertGreater(mock_write.call_count, 0)
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+            self.assertIn("main", output_text)
+            self.assertIn("dev", output_text)
+            self.assertIn("feature/branch-1", output_text)
+
+    @patch("os.get_terminal_size")
+    def test_narrow_terminal_single_column(self, mock_terminal_size):
+        """Test with narrow terminal forcing single column."""
+        mock_terminal_size.return_value.columns = 20
+
+        with patch("sys.stdout.write") as mock_write:
+            items = [b"main", b"dev", b"feature/branch-1"]
+            write_columns(items)
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+            for item in items:
+                self.assertIn(item.decode(), output_text)
+
+    @patch("os.get_terminal_size")
+    def test_wide_terminal_multiple_columns(self, mock_terminal_size):
+        """Test with wide terminal allowing multiple columns."""
+        mock_terminal_size.return_value.columns = 120
+
+        with patch("sys.stdout.write") as mock_write:
+            items = [
+                b"main",
+                b"dev",
+                b"feature/branch-1",
+                b"feature/branch-2",
+                b"feature/branch-3",
+            ]
+            write_columns(items)
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+            for item in items:
+                self.assertIn(item.decode(), output_text)
+
+    @patch("os.get_terminal_size")
+    def test_single_item(self, mock_terminal_size):
+        """Test with single item."""
+        mock_terminal_size.return_value.columns = 80
+
+        with patch("sys.stdout.write") as mock_write:
+            write_columns([b"single"])
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+            self.assertIn("single", output_text)
+            self.assertTrue(output_text.endswith("\n"))
+
+    def test_os_error_fallback(self):
+        """Test fallback behavior when os.get_terminal_size raises OSError."""
+        with patch("os.get_terminal_size", side_effect=OSError("No terminal")):
+            with patch("sys.stdout.write") as mock_write:
+                items = [b"main", b"dev"]
+                write_columns(items)
+
+                output_text = "".join(
+                    call.args[0] for call in mock_write.call_args_list
+                )
+                self.assertIn("main", output_text)
+                self.assertIn("dev", output_text)
+
+    @patch("os.get_terminal_size")
+    def test_iterator_input(self, mock_terminal_size):
+        """Test with iterator input instead of list."""
+        mock_terminal_size.return_value.columns = 80
+
+        with patch("sys.stdout.write") as mock_write:
+            items = [b"main", b"dev", b"feature/branch-1"]
+            items_iterator = iter(items)
+            write_columns(items_iterator)
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+            for item in items:
+                self.assertIn(item.decode(), output_text)
+
+    @patch("os.get_terminal_size")
+    def test_column_alignment(self, mock_terminal_size):
+        """Test that columns are properly aligned."""
+        mock_terminal_size.return_value.columns = 50
+
+        with patch("sys.stdout.write") as mock_write:
+            items = [b"short", b"medium_length", b"very_long______name"]
+            write_columns(items)
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+            for item in items:
+                self.assertIn(item.decode(), output_text)
+
+    @patch("os.get_terminal_size")
+    def test_columns_formatting(self, mock_terminal_size):
+        """Test that items are formatted in columns within single line."""
+        mock_terminal_size.return_value.columns = 80
+
+        with patch("sys.stdout.write") as mock_write:
+            items = [b"branch-1", b"branch-2", b"branch-3", b"branch-4", b"branch-5"]
+            write_columns(items)
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+
+            self.assertEqual(output_text.count("\n"), 1)
+            self.assertTrue(output_text.endswith("\n"))
+
+            line = output_text.strip()
+            for item in items:
+                self.assertIn(item.decode(), line)
+
+    @patch("os.get_terminal_size")
+    def test_column_alignment_multiple_lines(self, mock_terminal_size):
+        """Test that columns are properly aligned across multiple lines."""
+        mock_terminal_size.return_value.columns = 60
+
+        with patch("sys.stdout.write") as mock_write:
+            items = [
+                b"short",
+                b"medium_length",
+                b"very_long_branch_name",
+                b"another",
+                b"more",
+                b"even_longer_branch_name_here",
+            ]
+
+            write_columns(items)
+
+            output_text = "".join(call.args[0] for call in mock_write.call_args_list)
+            lines = output_text.strip().split("\n")
+
+            self.assertGreater(len(lines), 1)
+
+            line_lengths = [len(line) for line in lines if line.strip()]
+
+            for length in line_lengths:
+                self.assertLessEqual(length, mock_terminal_size.return_value.columns)
+
+            all_output = " ".join(lines)
+            for item in items:
+                self.assertIn(item.decode(), all_output)
 
 
 class CheckoutCommandTest(DulwichCliTestCase):

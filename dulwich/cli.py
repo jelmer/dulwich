@@ -36,8 +36,9 @@ import signal
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
-from typing import BinaryIO, Callable, ClassVar, Optional, Union
+from typing import BinaryIO, Callable, ClassVar, Optional, TextIO, Union
 
 from dulwich import porcelain
 
@@ -188,6 +189,90 @@ def launch_editor(template_content: bytes = b"") -> bytes:
     finally:
         # Clean up the temporary file
         os.unlink(temp_file)
+
+
+def detect_terminal_width() -> int:
+    """Detect the width of the terminal.
+
+    Returns:
+        Width of the terminal in characters, or 80 if it cannot be determined
+    """
+    try:
+        return os.get_terminal_size().columns
+    except OSError:
+        return 80
+
+
+def write_columns(
+    items: Union[Iterator[bytes], list[bytes]], out: TextIO, width: Optional[int] = None
+) -> None:
+    """Display items in formatted columns based on terminal width.
+
+    Args:
+        items: List or iterator of bytes objects to display in columns
+        out: Output stream to write to
+        width: Optional width of the terminal (if None, auto-detect)
+
+    The function calculates the optimal number of columns to fit the terminal
+    width and displays the items in a formatted column layout with proper
+    padding and alignment.
+    """
+    if width is None:
+        ter_width = detect_terminal_width()
+    else:
+        ter_width = width
+
+    item_names = [item.decode() for item in items]
+
+    def columns(names, width, num_cols):
+        if num_cols <= 0:
+            return False, []
+
+        num_rows = (len(names) + num_cols - 1) // num_cols
+        col_widths = []
+
+        for col in range(num_cols):
+            max_width = 0
+            for row in range(num_rows):
+                idx = row + col * num_rows
+                if idx < len(names):
+                    max_width = max(max_width, len(names[idx]))
+            col_widths.append(max_width + 2)  # add padding
+
+        total_width = sum(col_widths)
+        if total_width <= width:
+            return True, col_widths
+        return False, []
+
+    best_cols = 1
+    best_widths = []
+
+    for num_cols in range(min(8, len(item_names)), 0, -1):
+        fits, widths = columns(item_names, ter_width, num_cols)
+        if fits:
+            best_cols = num_cols
+            best_widths = widths
+            break
+
+    if not best_widths:
+        best_cols = 1
+        best_widths = [max(len(name) for name in item_names) + 2]
+
+    num_rows = (len(item_names) + best_cols - 1) // best_cols
+
+    for row in range(num_rows):
+        lines = []
+        for col in range(best_cols):
+            idx = row + col * num_rows
+            if idx < len(item_names):
+                branch_name = item_names[idx]
+                if col < len(best_widths):
+                    lines.append(branch_name.ljust(best_widths[col]))
+                else:
+                    lines.append(branch_name)
+
+        if lines:
+            out.write("".join(lines).rstrip() + "\n")
 
 
 class PagerBuffer:
@@ -2076,17 +2161,26 @@ class cmd_branch(Command):
             const="HEAD",
             help="List branches that contain a specific commit",
         )
+        parser.add_argument(
+            "--column", action="store_true", help="Display branch list in columns"
+        )
         args = parser.parse_args(args)
+
+        def print_branches(
+            branches: Union[Iterator[bytes], list[bytes]], use_columns=False
+        ) -> None:
+            if use_columns:
+                write_columns(branches, sys.stdout)
+            else:
+                for branch in branches:
+                    sys.stdout.write(f"{branch.decode()}\n")
 
         if args.all:
             try:
                 branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(
                     "."
                 )
-
-                for branch in branches:
-                    sys.stdout.write(f"{branch.decode()}\n")
-
+                print_branches(branches, args.column)
                 return 0
 
             except porcelain.Error as e:
@@ -2096,11 +2190,9 @@ class cmd_branch(Command):
         if args.merged:
             try:
                 branches_iter = porcelain.merged_branches(".")
-
-                for branch in branches_iter:
-                    sys.stdout.write(f"{branch.decode()}\n")
-
+                print_branches(branches_iter, args.column)
                 return 0
+
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")
                 return 1
@@ -2108,11 +2200,9 @@ class cmd_branch(Command):
         if args.no_merged:
             try:
                 branches_iter = porcelain.no_merged_branches(".")
-
-                for branch in branches_iter:
-                    sys.stdout.write(f"{branch.decode()}\n")
-
+                print_branches(branches_iter, args.column)
                 return 0
+
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")
                 return 1
@@ -2120,10 +2210,7 @@ class cmd_branch(Command):
         if args.contains:
             try:
                 branches_iter = porcelain.branches_containing(".", commit=args.contains)
-
-                for branch in branches_iter:
-                    sys.stdout.write(f"{branch.decode()}\n")
-
+                print_branches(branches_iter, args.column)
                 return 0
 
             except KeyError as e:
@@ -2137,11 +2224,9 @@ class cmd_branch(Command):
         if args.remotes:
             try:
                 branches = porcelain.branch_remotes_list(".")
-
-                for branch in branches:
-                    sys.stdout.write(f"{branch.decode()}\n")
-
+                print_branches(branches, args.column)
                 return 0
+
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")
                 return 1

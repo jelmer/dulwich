@@ -33,6 +33,7 @@ __all__ = [
 ]
 
 import logging
+import shlex
 import subprocess
 import threading
 from collections.abc import Callable
@@ -352,6 +353,8 @@ class ProcessFilterDriver:
 
     def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Apply smudge filter using external process."""
+        import os
+
         path_str = path.decode("utf-8", errors="replace")
 
         # Try process filter first (much faster)
@@ -369,8 +372,13 @@ class ProcessFilterDriver:
                 raise FilterError("Smudge command is required but not configured")
             return data
 
-        # Substitute %f placeholder with file path
-        cmd = self.smudge_cmd.replace("%f", path_str)
+        # quote path according to platform and Substitute %f placeholder with file path
+        quoted_path = (
+            subprocess.list2cmdline([path_str])
+            if os.name == "nt"
+            else shlex.quote(path_str)
+        )
+        cmd = self.smudge_cmd.replace("%f", quoted_path)
 
         try:
             result = subprocess.run(
@@ -384,7 +392,9 @@ class ProcessFilterDriver:
             return result.stdout
         except subprocess.CalledProcessError as e:
             if self.required:
-                raise FilterError(f"Required smudge filter failed: {e}")
+                raise FilterError(
+                    f"Required smudge filter failed: {e} {e.stderr} {e.stdout}"
+                )
             # If not required, log warning and return original data on failure
             logging.warning("Optional smudge filter failed: %s", e)
             return data

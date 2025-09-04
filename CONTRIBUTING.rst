@@ -97,6 +97,25 @@ dulwich package. This will ensure that the deprecation is handled correctly:
 * Users can use `dissolve migrate` to automatically replace deprecated
   functionality in their code
 
+Tests
+~~~~~
+
+Dulwich has two kinds of tests:
+
+* Unit tests, which test individual functions and classes
+* Compatibility tests, which test that Dulwich behaves in a way that is
+    compatible with C Git
+
+The former should never invoke C Git, while the latter may do so. This is
+to ensure that it is possible to run the unit tests in an environment
+where C Git is not available.
+
+Tests should not depend on the internet, or any other external services.
+
+Avoid using mocks if at all possible; rather, design your code to be easily
+testable without them. If you do need to use mocks, please use the
+``unittest.mock`` module.
+
 Running the tests
 -----------------
 To run the testsuite, you should be able to run ``dulwich.tests.test_suite``.

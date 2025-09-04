@@ -877,7 +877,14 @@ def add(
         index = r.open_index()
         normalizer = r.get_blob_normalizer()
         filter_callback = normalizer.checkin_normalize
-        all_unstaged_paths = list(get_unstaged_changes(index, r.path, filter_callback))
+
+        # Check if core.preloadIndex is enabled
+        config = r.get_config_stack()
+        preload_index = config.get_boolean(b"core", b"preloadIndex", False)
+
+        all_unstaged_paths = list(
+            get_unstaged_changes(index, r.path, filter_callback, preload_index)
+        )
 
         if not paths:
             # When no paths specified, add all untracked and modified files from repo root
@@ -2667,7 +2674,14 @@ def status(
         index = r.open_index()
         normalizer = r.get_blob_normalizer()
         filter_callback = normalizer.checkin_normalize
-        unstaged_changes = list(get_unstaged_changes(index, r.path, filter_callback))
+
+        # Check if core.preloadIndex is enabled
+        config = r.get_config_stack()
+        preload_index = config.get_boolean(b"core", b"preloadIndex", False)
+
+        unstaged_changes = list(
+            get_unstaged_changes(index, r.path, filter_callback, preload_index)
+        )
 
         untracked_paths = get_untracked_paths(
             r.path,

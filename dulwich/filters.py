@@ -652,53 +652,9 @@ class FilterRegistry:
         This filter is used when files have the 'text' attribute set explicitly.
         It always normalizes line endings on checkin (CRLF -> LF).
         """
-        from .line_ending import (
-            LineEndingFilter,
-            convert_crlf_to_lf,
-            get_smudge_filter,
-        )
+        from .line_ending import LineEndingFilter
 
-        if self.config is None:
-            # Default text filter: always normalize on checkin
-            return LineEndingFilter(
-                clean_conversion=convert_crlf_to_lf,
-                smudge_conversion=None,
-                binary_detection=True,
-            )
-
-        # Get core.eol and core.autocrlf settings for smudge behavior
-        try:
-            core_eol_raw = self.config.get("core", "eol")
-            core_eol: str = (
-                core_eol_raw.decode("ascii")
-                if isinstance(core_eol_raw, bytes)
-                else core_eol_raw
-            )
-        except KeyError:
-            core_eol = "native"
-
-        # Parse autocrlf as bytes (can be b"true", b"input", or b"false")
-        try:
-            autocrlf_raw = self.config.get("core", "autocrlf")
-            autocrlf: bytes = (
-                autocrlf_raw.lower()
-                if isinstance(autocrlf_raw, bytes)
-                else str(autocrlf_raw).lower().encode("ascii")
-            )
-        except KeyError:
-            autocrlf = b"false"
-
-        # For explicit text attribute:
-        # - Always normalize to LF on checkin (clean)
-        # - Smudge behavior depends on core.eol and core.autocrlf
-        smudge_filter = get_smudge_filter(core_eol, autocrlf)
-        clean_filter = convert_crlf_to_lf
-
-        return LineEndingFilter(
-            clean_conversion=clean_filter,
-            smudge_conversion=smudge_filter,
-            binary_detection=True,
-        )
+        return LineEndingFilter.from_config(self.config, for_text_attr=True)
 
     def _setup_line_ending_filter(self) -> None:
         """Automatically register line ending filter if configured."""

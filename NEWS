@@ -60,6 +60,10 @@
  * Add IPv6 support for git:// protocol URLs.
    (Jelmer Vernooĳ, #1796)
 
+ * Add support for ``core.preloadIndex`` configuration setting to enable
+   parallel stat operations when checking for unstaged changes. This improves
+   performance on slow filesystems like NFS. (Jelmer Vernooĳ, #1851)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

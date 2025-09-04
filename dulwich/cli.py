@@ -38,7 +38,7 @@ import sys
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
-from typing import BinaryIO, Callable, ClassVar, Optional, Union
+from typing import BinaryIO, Callable, ClassVar, Optional, TextIO, Union
 
 from dulwich import porcelain
 
@@ -191,20 +191,36 @@ def launch_editor(template_content: bytes = b"") -> bytes:
         os.unlink(temp_file)
 
 
-def write_columns(items: Union[Iterator[bytes], list[bytes]]) -> None:
+def detect_terminal_width() -> int:
+    """Detect the width of the terminal.
+
+    Returns:
+        Width of the terminal in characters, or 80 if it cannot be determined
+    """
+    try:
+        return os.get_terminal_size().columns
+    except OSError:
+        return 80
+
+
+def write_columns(
+    items: Union[Iterator[bytes], list[bytes]], out: TextIO, width: Optional[int] = None
+) -> None:
     """Display items in formatted columns based on terminal width.
 
     Args:
         items: List or iterator of bytes objects to display in columns
+        out: Output stream to write to
+        width: Optional width of the terminal (if None, auto-detect)
 
     The function calculates the optimal number of columns to fit the terminal
     width and displays the items in a formatted column layout with proper
     padding and alignment.
     """
-    try:
-        ter_width = os.get_terminal_size().columns
-    except OSError:
-        ter_width = 80
+    if width is None:
+        ter_width = detect_terminal_width()
+    else:
+        ter_width = width
 
     item_names = [item.decode() for item in items]
 
@@ -256,7 +272,7 @@ def write_columns(items: Union[Iterator[bytes], list[bytes]]) -> None:
                     lines.append(branch_name)
 
         if lines:
-            sys.stdout.write("".join(lines).rstrip() + "\n")
+            out.write("".join(lines).rstrip() + "\n")
 
 
 class PagerBuffer:
@@ -2154,7 +2170,7 @@ class cmd_branch(Command):
             branches: Union[Iterator[bytes], list[bytes]], use_columns=False
         ) -> None:
             if use_columns:
-                write_columns(branches)
+                write_columns(branches, sys.stdout)
             else:
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")

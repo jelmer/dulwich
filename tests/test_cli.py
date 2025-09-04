@@ -33,7 +33,13 @@ from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
 from dulwich import cli
-from dulwich.cli import format_bytes, launch_editor, parse_relative_time
+from dulwich.cli import (
+    detect_terminal_width,
+    format_bytes,
+    launch_editor,
+    parse_relative_time,
+    write_columns,
+)
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
     build_commit_graph,
@@ -628,6 +634,173 @@ class BranchCommandTest(DulwichCliTestCase):
         result, stdout, stderr = self._run_cli("branch", "--contains", "invalid123")
         self.assertNotEqual(result, 0)
         self.assertIn("error: object name invalid123 not found", stderr)
+
+    def test_branch_list_column(self):
+        """Test branch --column formatting"""
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        self._run_cli("branch", "feature-1")
+        self._run_cli("branch", "feature-2")
+        self._run_cli("branch", "feature-3")
+
+        # Run branch --column
+        result, stdout, stderr = self._run_cli("branch", "--all", "--column")
+        self.assertEqual(result, 0)
+
+        expected = ["feature-1", "feature-2", "feature-3"]
+
+        for branch in expected:
+            self.assertIn(branch, stdout)
+
+        multiple_columns = any(
+            sum(branch in line for branch in expected) > 1
+            for line in stdout.strip().split("\n")
+        )
+        self.assertTrue(multiple_columns)
+
+
+class TestTerminalWidth(TestCase):
+    @patch("os.get_terminal_size")
+    def test_terminal_size(self, mock_get_terminal_size):
+        """Test os.get_terminal_size mocking."""
+        mock_get_terminal_size.return_value.columns = 100
+        width = detect_terminal_width()
+        self.assertEqual(width, 100)
+
+    @patch("os.get_terminal_size")
+    def test_terminal_size_os_error(self, mock_get_terminal_size):
+        """Test os.get_terminal_size raising OSError."""
+        mock_get_terminal_size.side_effect = OSError("No terminal")
+        width = detect_terminal_width()
+        self.assertEqual(width, 80)
+
+
+class TestWriteColumns(TestCase):
+    """Tests for write_columns function"""
+
+    def test_basic_functionality(self):
+        """Test basic functionality with default terminal width."""
+        out = io.StringIO()
+        items = [b"main", b"dev", b"feature/branch-1"]
+        write_columns(items, out, width=80)
+
+        output_text = out.getvalue()
+        self.assertEqual(output_text, "main  dev  feature/branch-1\n")
+
+    def test_narrow_terminal_single_column(self):
+        """Test with narrow terminal forcing single column."""
+        out = io.StringIO()
+
+        items = [b"main", b"dev", b"feature/branch-1"]
+        write_columns(items, out, 20)
+
+        self.assertEqual(out.getvalue(), "main\ndev\nfeature/branch-1\n")
+
+    def test_wide_terminal_multiple_columns(self):
+        """Test with wide terminal allowing multiple columns."""
+        out = io.StringIO()
+        items = [
+            b"main",
+            b"dev",
+            b"feature/branch-1",
+            b"feature/branch-2",
+            b"feature/branch-3",
+        ]
+        write_columns(items, out, 120)
+
+        output_text = out.getvalue()
+        self.assertEqual(
+            output_text,
+            "main  dev  feature/branch-1  feature/branch-2  feature/branch-3\n",
+        )
+
+    def test_single_item(self):
+        """Test with single item."""
+        out = io.StringIO()
+        write_columns([b"single"], out, 80)
+
+        output_text = out.getvalue()
+        self.assertEqual("single\n", output_text)
+        self.assertTrue(output_text.endswith("\n"))
+
+    def test_os_error_fallback(self):
+        """Test fallback behavior when os.get_terminal_size raises OSError."""
+        with patch("os.get_terminal_size", side_effect=OSError("No terminal")):
+            out = io.StringIO()
+            items = [b"main", b"dev"]
+            write_columns(items, out)
+
+            output_text = out.getvalue()
+            # With default width (80), should display in columns
+            self.assertEqual(output_text, "main  dev\n")
+
+    def test_iterator_input(self):
+        """Test with iterator input instead of list."""
+        out = io.StringIO()
+        items = [b"main", b"dev", b"feature/branch-1"]
+        items_iterator = iter(items)
+        write_columns(items_iterator, out, 80)
+
+        output_text = out.getvalue()
+        self.assertEqual(output_text, "main  dev  feature/branch-1\n")
+
+    def test_column_alignment(self):
+        """Test that columns are properly aligned."""
+        out = io.StringIO()
+        items = [b"short", b"medium_length", b"very_long______name"]
+        write_columns(items, out, 50)
+
+        output_text = out.getvalue()
+        self.assertEqual(output_text, "short  medium_length  very_long______name\n")
+
+    def test_columns_formatting(self):
+        """Test that items are formatted in columns within single line."""
+        out = io.StringIO()
+        items = [b"branch-1", b"branch-2", b"branch-3", b"branch-4", b"branch-5"]
+        write_columns(items, out, 80)
+
+        output_text = out.getvalue()
+
+        self.assertEqual(output_text.count("\n"), 1)
+        self.assertTrue(output_text.endswith("\n"))
+
+        line = output_text.strip()
+        for item in items:
+            self.assertIn(item.decode(), line)
+
+    def test_column_alignment_multiple_lines(self):
+        """Test that columns are properly aligned across multiple lines."""
+        items = [
+            b"short",
+            b"medium_length",
+            b"very_long_branch_name",
+            b"another",
+            b"more",
+            b"even_longer_branch_name_here",
+        ]
+
+        out = io.StringIO()
+
+        write_columns(items, out, width=60)
+
+        output_text = out.getvalue()
+        lines = output_text.strip().split("\n")
+
+        self.assertGreater(len(lines), 1)
+
+        line_lengths = [len(line) for line in lines if line.strip()]
+
+        for length in line_lengths:
+            self.assertLessEqual(length, 60)
+
+        all_output = " ".join(lines)
+        for item in items:
+            self.assertIn(item.decode(), all_output)
 
 
 class CheckoutCommandTest(DulwichCliTestCase):

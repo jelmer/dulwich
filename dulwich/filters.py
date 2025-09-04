@@ -22,6 +22,7 @@
 """Implementation of Git filter drivers (clean/smudge filters)."""
 
 import logging
+import shlex
 import subprocess
 import threading
 from typing import TYPE_CHECKING, Callable, Optional
@@ -293,7 +294,7 @@ class ProcessFilterDriver:
             return data
 
         # Substitute %f placeholder with file path
-        cmd = self.smudge_cmd.replace("%f", path_str)
+        cmd = self.smudge_cmd.replace("%f", shlex.quote(path_str))
 
         try:
             result = subprocess.run(

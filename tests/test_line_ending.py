@@ -25,6 +25,7 @@ from dulwich.line_ending import (
     BlobNormalizer,
     LineEndingFilter,
     TreeBlobNormalizer,
+    check_safecrlf,
     convert_crlf_to_lf,
     convert_lf_to_crlf,
     get_clean_filter_autocrlf,
@@ -551,3 +552,133 @@ class LineEndingIntegrationTests(TestCase):
         bin_blob.data = b"binary content"
         result = normalizer.checkin_normalize(bin_blob, b"test.bin")
         self.assertEqual(result.data, b"LFS pointer")
+
+
+class LineEndingFilterFromConfigTests(TestCase):
+    """Test LineEndingFilter.from_config classmethod."""
+
+    def test_from_config_none(self) -> None:
+        """Test from_config with no config."""
+        # No config, not for text attr - no conversion
+        filter = LineEndingFilter.from_config(None, for_text_attr=False)
+        self.assertIsNone(filter.clean_conversion)
+        self.assertIsNone(filter.smudge_conversion)
+        self.assertEqual(filter.safecrlf, b"false")
+
+        # No config, for text attr - normalize on checkin
+        filter = LineEndingFilter.from_config(None, for_text_attr=True)
+        self.assertIsNotNone(filter.clean_conversion)
+        self.assertIsNone(filter.smudge_conversion)
+        self.assertEqual(filter.safecrlf, b"false")
+
+    def test_from_config_autocrlf_true(self) -> None:
+        """Test from_config with autocrlf=true."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config.set(b"core", b"autocrlf", b"true")
+
+        filter = LineEndingFilter.from_config(config, for_text_attr=False)
+        self.assertIsNotNone(filter.clean_conversion)
+        self.assertIsNotNone(filter.smudge_conversion)
+        self.assertEqual(filter.safecrlf, b"false")
+
+    def test_from_config_with_safecrlf(self) -> None:
+        """Test from_config with safecrlf setting."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config.set(b"core", b"autocrlf", b"input")
+        config.set(b"core", b"safecrlf", b"warn")
+
+        filter = LineEndingFilter.from_config(config, for_text_attr=False)
+        self.assertIsNotNone(filter.clean_conversion)
+        self.assertIsNone(filter.smudge_conversion)
+        self.assertEqual(filter.safecrlf, b"warn")
+
+    def test_from_config_text_attr_overrides(self) -> None:
+        """Test that for_text_attr=True always normalizes on checkin."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config.set(b"core", b"autocrlf", b"false")
+
+        # Even with autocrlf=false, text attr should normalize
+        filter = LineEndingFilter.from_config(config, for_text_attr=True)
+        self.assertIsNotNone(filter.clean_conversion)
+        # Smudge should still be None since autocrlf=false
+        self.assertIsNone(filter.smudge_conversion)
+
+
+class SafeCRLFTests(TestCase):
+    """Test core.safecrlf functionality."""
+
+    def test_safecrlf_false(self) -> None:
+        """Test that safecrlf=false allows any conversion."""
+        original = b"line1\r\nline2\r\n"
+        converted = b"line1\nline2\n"
+        # Should not raise
+        check_safecrlf(original, converted, b"false", b"test.txt")
+
+    def test_safecrlf_true_safe_conversion(self) -> None:
+        """Test that safecrlf=true allows safe conversions."""
+        # CRLF -> LF -> CRLF is reversible
+        original = b"line1\r\nline2\r\n"
+        converted = b"line1\nline2\n"
+        # Should not raise because conversion is reversible
+        check_safecrlf(original, converted, b"true", b"test.txt")
+
+    def test_safecrlf_true_unsafe_conversion(self) -> None:
+        """Test that safecrlf=true fails on unsafe conversions."""
+        # Mixed line endings would be lost
+        original = b"line1\r\nline2\nline3\r\n"
+        converted = b"line1\nline2\nline3\n"
+        # Should raise because converting back gives all CRLF
+        with self.assertRaises(ValueError) as cm:
+            check_safecrlf(original, converted, b"true", b"test.txt")
+        self.assertIn("CRLF would be replaced by LF", str(cm.exception))
+
+    def test_safecrlf_warn(self) -> None:
+        """Test that safecrlf=warn issues warnings."""
+        # Mixed line endings would be lost
+        original = b"line1\r\nline2\nline3\r\n"
+        converted = b"line1\nline2\nline3\n"
+        # Should warn but not raise
+        with self.assertLogs("dulwich.line_ending", level="WARNING") as cm:
+            check_safecrlf(original, converted, b"warn", b"test.txt")
+            self.assertEqual(len(cm.output), 1)
+            self.assertIn("CRLF would be replaced by LF", cm.output[0])
+
+    def test_lineending_filter_with_safecrlf(self) -> None:
+        """Test LineEndingFilter with safecrlf enabled."""
+        # Test with safecrlf=true
+        filter_strict = LineEndingFilter(
+            clean_conversion=convert_crlf_to_lf,
+            smudge_conversion=None,
+            binary_detection=False,
+            safecrlf=b"true",
+        )
+
+        # Safe conversion should work
+        safe_data = b"line1\r\nline2\r\n"
+        result = filter_strict.clean(safe_data, b"test.txt")
+        self.assertEqual(result, b"line1\nline2\n")
+
+        # Unsafe conversion should fail
+        unsafe_data = b"line1\r\nline2\nline3\r\n"
+        with self.assertRaises(ValueError):
+            filter_strict.clean(unsafe_data, b"test.txt")
+
+        # Test with safecrlf=warn
+        filter_warn = LineEndingFilter(
+            clean_conversion=convert_crlf_to_lf,
+            smudge_conversion=None,
+            binary_detection=False,
+            safecrlf=b"warn",
+        )
+
+        # Should warn but still convert
+        with self.assertLogs("dulwich.line_ending", level="WARNING") as cm:
+            result = filter_warn.clean(unsafe_data, b"test.txt")
+            self.assertEqual(result, b"line1\nline2\nline3\n")
+            self.assertEqual(len(cm.output), 1)

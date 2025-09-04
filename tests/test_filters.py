@@ -940,23 +940,32 @@ while True:
         """Test paths with special characters are handled correctly."""
         import sys
 
-        driver = ProcessFilterDriver(
-            process_cmd=f"{sys.executable} {self.test_filter_path}", required=True
-        )
-
         # Test various special characters in paths
         special_paths = [
             b"file with spaces.txt",
             b"path/with/slashes.txt",
             b"file=with=equals.txt",
             b"file\nwith\nnewlines.txt",
+            b"filew&with&ampersand.txt",
         ]
 
         test_data = b"test data"
 
-        for path in special_paths:
-            result = driver.smudge(test_data, path)
-            self.assertEqual(result, b"test data")
+        for process_cmd, smudge_cmd in [
+            (f"{sys.executable} {self.test_filter_path}", None),
+            (None, "git-lfs smudge -- %f"),
+        ]:
+            driver = ProcessFilterDriver(
+                process_cmd=process_cmd,
+                smudge_cmd=smudge_cmd,
+                required=True,
+            )
+            for path in special_paths:
+                with self.subTest(
+                    process_cmd=process_cmd, smudge_cmd=smudge_cmd, path=path
+                ):
+                    result = driver.smudge(test_data, path)
+                    self.assertEqual(result, b"test data")
 
     def test_process_crash_recovery(self):
         """Test that process is properly restarted after crash."""

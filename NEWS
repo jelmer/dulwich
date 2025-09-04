@@ -60,6 +60,9 @@
  * Add IPv6 support for git:// protocol URLs.
    (Jelmer Vernooĳ, #1796)
 
+ * Fix git-lfs smudge for special characters in path.
+   (Petr Chmelar, #1878)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

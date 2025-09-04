@@ -74,6 +74,41 @@ class FilterDriver(TypingProtocol):
         ...
 
 
+class CompositeFilterDriver:
+    """Filter driver that chains multiple filters together."""
+
+    def __init__(self, filters: list[FilterDriver]) -> None:
+        """Initialize CompositeFilterDriver.
+
+        Args:
+            filters: List of filters to apply in order
+        """
+        self.filters = filters
+
+    def clean(self, data: bytes) -> bytes:
+        """Apply all clean filters in order."""
+        for filter_driver in self.filters:
+            data = filter_driver.clean(data)
+        return data
+
+    def smudge(self, data: bytes, path: bytes = b"") -> bytes:
+        """Apply all smudge filters in reverse order."""
+        # For smudge, apply filters in reverse order
+        for filter_driver in reversed(self.filters):
+            data = filter_driver.smudge(data, path)
+        return data
+
+    def cleanup(self) -> None:
+        """Clean up all filter drivers."""
+        for filter_driver in self.filters:
+            filter_driver.cleanup()
+
+    def reuse(self, config: "StackedConfig", filter_name: str) -> bool:
+        """Check if all filters can be reused."""
+        # A composite filter can only be reused if all its components can
+        return all(f.reuse(config, filter_name) for f in self.filters)
+
+
 class ProcessFilterDriver:
     """Filter driver that executes external processes."""
 
@@ -584,32 +619,35 @@ class FilterRegistry:
         # Get process command (preferred over clean/smudge for performance)
         try:
             process_cmd_raw = self.config.get(("filter", name), "process")
+        except KeyError:
+            pass
+        else:
             if isinstance(process_cmd_raw, bytes):
                 process_cmd = process_cmd_raw.decode("utf-8")
             else:
                 process_cmd = process_cmd_raw
-        except KeyError:
-            pass
 
         # Get clean command
         try:
             clean_cmd_raw = self.config.get(("filter", name), "clean")
+        except KeyError:
+            pass
+        else:
             if isinstance(clean_cmd_raw, bytes):
                 clean_cmd = clean_cmd_raw.decode("utf-8")
             else:
                 clean_cmd = clean_cmd_raw
-        except KeyError:
-            pass
 
         # Get smudge command
         try:
             smudge_cmd_raw = self.config.get(("filter", name), "smudge")
+        except KeyError:
+            pass
+        else:
             if isinstance(smudge_cmd_raw, bytes):
                 smudge_cmd = smudge_cmd_raw.decode("utf-8")
             else:
                 smudge_cmd = smudge_cmd_raw
-        except KeyError:
-            pass
 
         # Get required flag (defaults to False)
         required = self.config.get_boolean(("filter", name), "required", False)
@@ -664,13 +702,14 @@ class FilterRegistry:
         # Parse autocrlf as bytes
         try:
             autocrlf_raw = self.config.get("core", "autocrlf")
+        except KeyError:
+            return
+        else:
             autocrlf: bytes = (
                 autocrlf_raw.lower()
                 if isinstance(autocrlf_raw, bytes)
                 else str(autocrlf_raw).lower().encode("ascii")
             )
-        except KeyError:
-            return
 
         # If autocrlf is enabled, register the text filter
         if autocrlf in (b"true", b"input"):
@@ -708,11 +747,42 @@ def get_filter_for_path(
     # Get all attributes for this path
     attributes = gitattributes.match_path(path)
 
+    # Collect filters to apply
+    filters: list[FilterDriver] = []
+
+    # Check for text attribute first (it should be applied before custom filters)
+    text_attr = attributes.get(b"text")
+    if text_attr is True:
+        # Add text filter for line ending conversion
+        text_filter = get_driver("text")
+        if text_filter is not None:
+            filters.append(text_filter)
+    elif text_attr is False:
+        # -text means binary, no conversion - but still check for custom filters
+        pass
+    else:
+        # If no explicit text attribute, check if autocrlf is enabled
+        # When autocrlf is true/input, files are treated as text by default
+        if registry.config is not None:
+            try:
+                autocrlf_raw = registry.config.get("core", "autocrlf")
+            except KeyError:
+                pass
+            else:
+                autocrlf: bytes = (
+                    autocrlf_raw.lower()
+                    if isinstance(autocrlf_raw, bytes)
+                    else str(autocrlf_raw).lower().encode("ascii")
+                )
+                if autocrlf in (b"true", b"input"):
+                    # Add text filter for files without explicit attributes
+                    text_filter = get_driver("text")
+                    if text_filter is not None:
+                        filters.append(text_filter)
+
     # Check if there's a filter attribute
     filter_name = attributes.get(b"filter")
-    if filter_name is not None:
-        if isinstance(filter_name, bool):
-            return None
+    if filter_name is not None and not isinstance(filter_name, bool):
         if isinstance(filter_name, bytes):
             filter_name_str = filter_name.decode("utf-8")
             driver = get_driver(filter_name_str)
@@ -727,35 +797,17 @@ def get_filter_for_path(
                         f"Required filter '{filter_name_str}' is not available"
                     )
 
-            return driver
+            if driver is not None:
+                filters.append(driver)
+
+    # Return appropriate filter(s)
+    if len(filters) == 0:
         return None
-
-    # Check for text attribute
-    text_attr = attributes.get(b"text")
-    if text_attr is True:
-        # Use the text filter for line ending conversion
-        return get_driver("text")
-    elif text_attr is False:
-        # -text means binary, no conversion
-        return None
-
-    # If no explicit text attribute, check if autocrlf is enabled
-    # When autocrlf is true/input, files are treated as text by default
-    if registry.config is not None:
-        try:
-            autocrlf_raw = registry.config.get("core", "autocrlf")
-            autocrlf: bytes = (
-                autocrlf_raw.lower()
-                if isinstance(autocrlf_raw, bytes)
-                else str(autocrlf_raw).lower().encode("ascii")
-            )
-            if autocrlf in (b"true", b"input"):
-                # Use text filter for files without explicit attributes
-                return get_driver("text")
-        except KeyError:
-            pass
-
-    return None
+    elif len(filters) == 1:
+        return filters[0]
+    else:
+        # Multiple filters - create a composite
+        return CompositeFilterDriver(filters)
 
 
 class FilterBlobNormalizer:

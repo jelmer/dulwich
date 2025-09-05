@@ -134,6 +134,8 @@ def self_test_suite() -> unittest.TestSuite:
         "dumb",
         "fastexport",
         "file",
+        "filter_branch",
+        "filters",
         "gc",
         "grafts",
         "graph",
@@ -142,6 +144,7 @@ def self_test_suite() -> unittest.TestSuite:
         "ignore",
         "index",
         "lfs",
+        "lfs_integration",
         "line_ending",
         "log_utils",
         "lru_cache",
@@ -174,6 +177,7 @@ def self_test_suite() -> unittest.TestSuite:
         "utils",
         "walk",
         "web",
+        "whitespace",
         "worktree",
     ]
     module_names = ["tests.test_" + name for name in names]

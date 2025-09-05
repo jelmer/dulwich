@@ -24,7 +24,6 @@
 import os
 import tempfile
 import threading
-import unittest
 
 from dulwich import porcelain
 from dulwich.filters import (
@@ -94,18 +93,40 @@ class GitAttributesFilterIntegrationTests(TestCase):
         bin_blob = self.repo.object_store[bin_entry.sha]
         self.assertEqual(bin_blob.data, b"binary\r\ndata\r\n")
 
-    @unittest.skip("Custom process filters require external commands")
     def test_gitattributes_custom_filter(self) -> None:
         """Test custom filter specified in gitattributes."""
+        # Create a Python script that acts as our filter
+        import sys
+
+        filter_script = os.path.join(self.test_dir, "redact_filter.py")
+        with open(filter_script, "w") as f:
+            f.write("""#!/usr/bin/env python3
+import sys
+data = sys.stdin.buffer.read()
+# Replace all digits with X
+result = bytearray()
+for b in data:
+    if chr(b).isdigit():
+        result.append(ord('X'))
+    else:
+        result.append(b)
+sys.stdout.buffer.write(result)
+""")
+        os.chmod(filter_script, 0o755)
+
         # Create .gitattributes with custom filter
         gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
         with open(gitattributes_path, "wb") as f:
             f.write(b"*.secret filter=redact\n")
 
-        # Configure custom filter (use tr command for testing)
+        # Configure custom filter (use Python script for testing)
         config = self.repo.get_config()
         # This filter replaces all digits with X
-        config.set((b"filter", b"redact"), b"clean", b"tr '0-9' 'X'")
+        config.set(
+            (b"filter", b"redact"),
+            b"clean",
+            f"{sys.executable} {filter_script}".encode(),
+        )
         config.write_to_path()
 
         # Add .gitattributes
@@ -159,9 +180,22 @@ class GitAttributesFilterIntegrationTests(TestCase):
         attrs = gitattributes.match_path(b"debug.log")
         self.assertEqual(attrs.get(b"text"), True)
 
-    @unittest.skip("Custom process filters require external commands")
     def test_filter_precedence(self) -> None:
         """Test that filter attribute takes precedence over text attribute."""
+        # Create a Python script that converts to uppercase
+        import sys
+
+        filter_script = os.path.join(self.test_dir, "uppercase_filter.py")
+        with open(filter_script, "w") as f:
+            f.write("""#!/usr/bin/env python3
+import sys
+data = sys.stdin.buffer.read()
+# Convert bytes to string, uppercase, then back to bytes
+result = data.decode('utf-8', errors='replace').upper().encode('utf-8')
+sys.stdout.buffer.write(result)
+""")
+        os.chmod(filter_script, 0o755)
+
         # Create .gitattributes with both text and filter
         gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
         with open(gitattributes_path, "wb") as f:
@@ -171,7 +205,11 @@ class GitAttributesFilterIntegrationTests(TestCase):
         config = self.repo.get_config()
         config.set((b"core",), b"autocrlf", b"true")
         # This filter converts to uppercase
-        config.set((b"filter", b"custom"), b"clean", b"tr '[:lower:]' '[:upper:]'")
+        config.set(
+            (b"filter", b"custom"),
+            b"clean",
+            f"{sys.executable} {filter_script}".encode(),
+        )
         config.write_to_path()
 
         # Add .gitattributes
@@ -578,7 +616,13 @@ class FilterContextTests(TestCase):
                 return False
 
         # Create registry and context
-        registry = FilterRegistry()
+        # Need to provide a config for caching to work
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        # Add some dummy config to make it truthy (use proper format)
+        config.set((b"filter", b"uppercase"), b"clean", b"dummy")
+        registry = FilterRegistry(config=config)
         context = FilterContext(registry)
 
         # Register drivers
@@ -686,23 +730,59 @@ while True:
         )
 
         # Register in context
-        registry = FilterRegistry()
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        # Add some dummy config to make it truthy (use proper format)
+        config.set(
+            (b"filter", b"process"),
+            b"clean",
+            f"{sys.executable} {filter_path}".encode(),
+        )
+        config.set(
+            (b"filter", b"process"),
+            b"smudge",
+            f"{sys.executable} {filter_path}".encode(),
+        )
+        registry = FilterRegistry(config=config)
         context = FilterContext(registry)
         registry.register_driver("process", process_driver)
 
         # Get driver - should not be cached since it's not long-running
         driver1 = context.get_driver("process")
         self.assertIsNotNone(driver1)
-        self.assertFalse(driver1.is_long_running())
+        # Check that it's not a long-running process (no process_cmd)
+        self.assertIsNone(driver1.process_cmd)
         self.assertNotIn("process", context._active_drivers)
 
-        # Test with a long-running driver (has process_cmd)
-        long_process_driver = ProcessFilterDriver()
-        long_process_driver.process_cmd = "dummy"  # Just to make it long-running
-        registry.register_driver("long_process", long_process_driver)
+        # Test with a long-running driver that should be cached
+        # Create a mock driver that always wants to be reused
+        class CacheableProcessDriver:
+            def __init__(self):
+                self.process_cmd = "dummy"
+                self.clean_cmd = None
+                self.smudge_cmd = None
+                self.required = False
+
+            def clean(self, data):
+                return data
+
+            def smudge(self, data, path=b""):
+                return data
+
+            def cleanup(self):
+                pass
+
+            def reuse(self, config, filter_name):
+                # This driver always wants to be cached (simulates a long-running process)
+                return True
+
+        cacheable_driver = CacheableProcessDriver()
+        registry.register_driver("long_process", cacheable_driver)
 
         driver2 = context.get_driver("long_process")
-        self.assertTrue(driver2.is_long_running())
+        # Check that it has a process_cmd (long-running)
+        self.assertIsNotNone(driver2.process_cmd)
         self.assertIn("long_process", context._active_drivers)
 
         context.close()

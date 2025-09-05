@@ -29,7 +29,6 @@ a way to test Dulwich.
 """
 
 import argparse
-import fnmatch
 import logging
 import os
 import shutil
@@ -2197,10 +2196,14 @@ class cmd_branch(Command):
                 branches = porcelain.no_merged_branches(".")
             elif args.contains:
                 try:
-                    branches = list(porcelain.branches_containing(".", commit=args.contains))
+                    branches = list(
+                        porcelain.branches_containing(".", commit=args.contains)
+                    )
 
                 except KeyError as e:
-                    sys.stderr.write(f"error: object name {e.args[0].decode()} not found\n")
+                    sys.stderr.write(
+                        f"error: object name {e.args[0].decode()} not found\n"
+                    )
                     return 1
 
         except porcelain.Error as e:
@@ -2209,11 +2212,7 @@ class cmd_branch(Command):
 
         pattern = args.list
         if pattern is not None and branches:
-            branches = [
-                branch
-                for branch in branches
-                if fnmatch.fnmatch(branch.decode(), pattern)
-            ]
+            branches = porcelain.filter_branches_by_pattern(branches, pattern)
 
         if branches is not None:
             print_branches(branches, args.column)

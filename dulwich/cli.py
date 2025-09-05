@@ -2164,7 +2164,15 @@ class cmd_branch(Command):
         parser.add_argument(
             "--column", action="store_true", help="Display branch list in columns"
         )
+        parser.add_argument(
+            "--list",
+            nargs="?",
+            const=None,
+            help="List branches matching a pattern",
+        )
         args = parser.parse_args(args)
+
+        pattern = args.list
 
         def print_branches(
             branches: Union[Iterator[bytes], list[bytes]], use_columns=False
@@ -2177,9 +2185,9 @@ class cmd_branch(Command):
 
         if args.all:
             try:
-                branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(
-                    "."
-                )
+                branches = porcelain.branch_list(
+                    ".", pattern
+                ) + porcelain.branch_remotes_list(".", pattern)
                 print_branches(branches, args.column)
                 return 0
 
@@ -2189,7 +2197,7 @@ class cmd_branch(Command):
 
         if args.merged:
             try:
-                branches_iter = porcelain.merged_branches(".")
+                branches_iter = porcelain.merged_branches(".", pattern)
                 print_branches(branches_iter, args.column)
                 return 0
 
@@ -2199,7 +2207,7 @@ class cmd_branch(Command):
 
         if args.no_merged:
             try:
-                branches_iter = porcelain.no_merged_branches(".")
+                branches_iter = porcelain.no_merged_branches(".", pattern)
                 print_branches(branches_iter, args.column)
                 return 0
 
@@ -2209,7 +2217,9 @@ class cmd_branch(Command):
 
         if args.contains:
             try:
-                branches_iter = porcelain.branches_containing(".", commit=args.contains)
+                branches_iter = porcelain.branches_containing(
+                    ".", commit=args.contains, pattern=pattern
+                )
                 print_branches(branches_iter, args.column)
                 return 0
 
@@ -2223,7 +2233,7 @@ class cmd_branch(Command):
 
         if args.remotes:
             try:
-                branches = porcelain.branch_remotes_list(".")
+                branches = porcelain.branch_remotes_list(".", pattern)
                 print_branches(branches, args.column)
                 return 0
 

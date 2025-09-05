@@ -29,6 +29,7 @@ a way to test Dulwich.
 """
 
 import argparse
+import fnmatch
 import logging
 import os
 import shutil
@@ -2172,8 +2173,6 @@ class cmd_branch(Command):
         )
         args = parser.parse_args(args)
 
-        pattern = args.list
-
         def print_branches(
             branches: Union[Iterator[bytes], list[bytes]], use_columns=False
         ) -> None:
@@ -2183,63 +2182,42 @@ class cmd_branch(Command):
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")
 
-        if args.all:
-            try:
-                branches = porcelain.branch_list(
-                    ".", pattern
-                ) + porcelain.branch_remotes_list(".", pattern)
-                print_branches(branches, args.column)
-                return 0
+        branches: Union[Iterator[bytes], list[bytes], None] = None
 
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
-
-        if args.merged:
-            try:
-                branches_iter = porcelain.merged_branches(".", pattern)
-                print_branches(branches_iter, args.column)
-                return 0
-
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
-
-        if args.no_merged:
-            try:
-                branches_iter = porcelain.no_merged_branches(".", pattern)
-                print_branches(branches_iter, args.column)
-                return 0
-
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
-
-        if args.contains:
-            try:
-                branches_iter = porcelain.branches_containing(
-                    ".", commit=args.contains, pattern=pattern
+        try:
+            if args.all:
+                branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(
+                    "."
                 )
-                print_branches(branches_iter, args.column)
-                return 0
+            elif args.remotes:
+                branches = porcelain.branch_remotes_list(".")
+            elif args.merged:
+                branches = porcelain.merged_branches(".")
+            elif args.no_merged:
+                branches = porcelain.no_merged_branches(".")
+            elif args.contains:
+                try:
+                    branches = list(porcelain.branches_containing(".", commit=args.contains))
 
-            except KeyError as e:
-                sys.stderr.write(f"error: object name {e.args[0].decode()} not found\n")
-                return 1
+                except KeyError as e:
+                    sys.stderr.write(f"error: object name {e.args[0].decode()} not found\n")
+                    return 1
 
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
+        except porcelain.Error as e:
+            sys.stderr.write(f"{e}")
+            return 1
 
-        if args.remotes:
-            try:
-                branches = porcelain.branch_remotes_list(".", pattern)
-                print_branches(branches, args.column)
-                return 0
+        pattern = args.list
+        if pattern is not None and branches:
+            branches = [
+                branch
+                for branch in branches
+                if fnmatch.fnmatch(branch.decode(), pattern)
+            ]
 
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
+        if branches is not None:
+            print_branches(branches, args.column)
+            return 0
 
         if not args.branch:
             logger.error("Usage: dulwich branch [-d] BRANCH_NAME")

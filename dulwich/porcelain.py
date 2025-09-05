@@ -3208,24 +3208,16 @@ def branch_create(
                     repo_config.write_to_path()
 
 
-def branch_list(repo: RepoPath, pattern: Optional[str] = None) -> list[bytes]:
+def branch_list(repo: RepoPath) -> list[bytes]:
     """List all branches.
 
     Args:
       repo: Path to the repository
-      pattern: Optional pattern to filter branches
     Returns:
       List of branch names (without refs/heads/ prefix)
     """
     with open_repo_closing(repo) as r:
         branches = list(r.refs.keys(base=LOCAL_BRANCH_PREFIX))
-
-        if pattern is not None:
-            branches = [
-                branch
-                for branch in branches
-                if fnmatch.fnmatch(branch.decode(), pattern)
-            ]
 
         # Check for branch.sort configuration
         config = r.get_config_stack()
@@ -3273,24 +3265,16 @@ def branch_list(repo: RepoPath, pattern: Optional[str] = None) -> list[bytes]:
         return branches
 
 
-def branch_remotes_list(repo: RepoPath, pattern: Optional[str] = None) -> list[bytes]:
+def branch_remotes_list(repo: RepoPath) -> list[bytes]:
     """List the short names of all remote branches.
 
     Args:
       repo: Path to the repository
-      pattern: Optional pattern to filter branches
     Returns:
       List of branch names (without refs/remotes/ prefix, and without remote name; e.g. 'main' from 'origin/main')
     """
     with open_repo_closing(repo) as r:
         branches = list(r.refs.keys(base=LOCAL_REMOTE_PREFIX))
-
-        if pattern is not None:
-            branches = [
-                branch
-                for branch in branches
-                if fnmatch.fnmatch(branch.decode(), pattern)
-            ]
 
         config = r.get_config_stack()
         try:
@@ -3357,49 +3341,40 @@ def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
             yield branch_ref, is_merged
 
 
-def merged_branches(repo: RepoPath, pattern: Optional[str] = None) -> Iterator[bytes]:
+def merged_branches(repo: RepoPath) -> Iterator[bytes]:
     """List branches that have been merged into the current branch.
 
     Args:
       repo: Path to the repository
-      pattern: Optional pattern to filter branches
     Yields:
       Branch names (without refs/heads/ prefix) that are merged
       into the current HEAD
     """
     for branch_name, is_merged in _get_branch_merge_status(repo):
         if is_merged:
-            if pattern is None or fnmatch.fnmatch(branch_name.decode(), pattern):
-                yield branch_name
+            yield branch_name
 
 
-def no_merged_branches(
-    repo: RepoPath, pattern: Optional[str] = None
-) -> Iterator[bytes]:
-    """List branches that have not been merged into the current branch.
+def no_merged_branches(repo: RepoPath) -> Iterator[bytes]:
+    """List branches that have been merged into the current branch.
 
     Args:
       repo: Path to the repository
-      pattern: Optional pattern to filter branches
     Yields:
-      Branch names (without refs/heads/ prefix) that are not merged
+      Branch names (without refs/heads/ prefix) that are merged
       into the current HEAD
     """
     for branch_name, is_merged in _get_branch_merge_status(repo):
         if not is_merged:
-            if pattern is None or fnmatch.fnmatch(branch_name.decode(), pattern):
-                yield branch_name
+            yield branch_name
 
 
-def branches_containing(
-    repo: RepoPath, commit: str, pattern: Optional[str] = None
-) -> Iterator[bytes]:
+def branches_containing(repo: RepoPath, commit: str) -> Iterator[bytes]:
     """List branches that contain the specified commit.
 
     Args:
         repo: Path to the repository
         commit: Commit-ish string (SHA, branch name, tag, etc.)
-        pattern: Optional pattern to filter branches
 
     Yields:
         Branch names (without refs/heads/ prefix) that contain the commit
@@ -3414,8 +3389,7 @@ def branches_containing(
 
         for branch_ref, branch_sha in r.refs.as_dict(base=LOCAL_BRANCH_PREFIX).items():
             if can_fast_forward(r, commit_sha, branch_sha):
-                if pattern is None or fnmatch.fnmatch(branch_ref.decode(), pattern):
-                    yield branch_ref
+                yield branch_ref
 
 
 def active_branch(repo: RepoPath) -> bytes:

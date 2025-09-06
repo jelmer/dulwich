@@ -2164,6 +2164,12 @@ class cmd_branch(Command):
         parser.add_argument(
             "--column", action="store_true", help="Display branch list in columns"
         )
+        parser.add_argument(
+            "--list",
+            nargs="?",
+            const=None,
+            help="List branches matching a pattern",
+        )
         args = parser.parse_args(args)
 
         def print_branches(
@@ -2175,61 +2181,42 @@ class cmd_branch(Command):
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")
 
-        if args.all:
-            try:
+        branches: Union[Iterator[bytes], list[bytes], None] = None
+
+        try:
+            if args.all:
                 branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(
                     "."
                 )
-                print_branches(branches, args.column)
-                return 0
-
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
-
-        if args.merged:
-            try:
-                branches_iter = porcelain.merged_branches(".")
-                print_branches(branches_iter, args.column)
-                return 0
-
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
-
-        if args.no_merged:
-            try:
-                branches_iter = porcelain.no_merged_branches(".")
-                print_branches(branches_iter, args.column)
-                return 0
-
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
-
-        if args.contains:
-            try:
-                branches_iter = porcelain.branches_containing(".", commit=args.contains)
-                print_branches(branches_iter, args.column)
-                return 0
-
-            except KeyError as e:
-                sys.stderr.write(f"error: object name {e.args[0].decode()} not found\n")
-                return 1
-
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
-
-        if args.remotes:
-            try:
+            elif args.remotes:
                 branches = porcelain.branch_remotes_list(".")
-                print_branches(branches, args.column)
-                return 0
+            elif args.merged:
+                branches = porcelain.merged_branches(".")
+            elif args.no_merged:
+                branches = porcelain.no_merged_branches(".")
+            elif args.contains:
+                try:
+                    branches = list(
+                        porcelain.branches_containing(".", commit=args.contains)
+                    )
 
-            except porcelain.Error as e:
-                sys.stderr.write(f"{e}")
-                return 1
+                except KeyError as e:
+                    sys.stderr.write(
+                        f"error: object name {e.args[0].decode()} not found\n"
+                    )
+                    return 1
+
+        except porcelain.Error as e:
+            sys.stderr.write(f"{e}")
+            return 1
+
+        pattern = args.list
+        if pattern is not None and branches:
+            branches = porcelain.filter_branches_by_pattern(branches, pattern)
+
+        if branches is not None:
+            print_branches(branches, args.column)
+            return 0
 
         if not args.branch:
             logger.error("Usage: dulwich branch [-d] BRANCH_NAME")

@@ -663,6 +663,31 @@ class BranchCommandTest(DulwichCliTestCase):
         )
         self.assertTrue(multiple_columns)
 
+    def test_branch_list_flag(self):
+        # Create an initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Create local branches
+        self._run_cli("branch", "feature-1")
+        self._run_cli("branch", "feature-2")
+        self._run_cli("branch", "branch-1")
+
+        # Run `branch --list` with a pattern "feature-*"
+        result, stdout, stderr = self._run_cli("branch", "--all", "--list", "feature-*")
+        self.assertEqual(result, 0)
+
+        # Collect branches from the output
+        branches = [line.strip() for line in stdout.splitlines()]
+
+        # Expected branches — exactly those matching the pattern
+        expected_branches = ["feature-1", "feature-2"]
+
+        self.assertEqual(branches, expected_branches)
+
 
 class TestTerminalWidth(TestCase):
     @patch("os.get_terminal_size")

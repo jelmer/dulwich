@@ -87,7 +87,7 @@ import stat
 import sys
 import time
 from collections import namedtuple
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
@@ -3206,6 +3206,21 @@ def branch_create(
                         (b"branch", branch_name_bytes), b"merge", remote_branch
                     )
                     repo_config.write_to_path()
+
+
+def filter_branches_by_pattern(branches: Iterable[bytes], pattern: str) -> list[bytes]:
+    """Filter branches by fnmatch pattern.
+
+    Args:
+        branches: Iterable of branch names as bytes
+        pattern: Pattern to match against
+
+    Returns:
+        List of filtered branch names
+    """
+    return [
+        branch for branch in branches if fnmatch.fnmatchcase(branch.decode(), pattern)
+    ]
 
 
 def branch_list(repo: RepoPath) -> list[bytes]:

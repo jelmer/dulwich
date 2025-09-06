@@ -3218,7 +3218,9 @@ def filter_branches_by_pattern(branches: Iterable[bytes], pattern: str) -> list[
     Returns:
         List of filtered branch names
     """
-    return [branch for branch in branches if fnmatch.fnmatchcase(branch.decode(), pattern)]
+    return [
+        branch for branch in branches if fnmatch.fnmatchcase(branch.decode(), pattern)
+    ]
 
 
 def branch_list(repo: RepoPath) -> list[bytes]:

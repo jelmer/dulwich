@@ -7078,6 +7078,83 @@ class BranchContainsTests(PorcelainTestCase):
         self.assertEqual([b"master"], result)
 
 
+class FilterBranchesByPatternTests(PorcelainTestCase):
+    """Tests for filter_branches_by_pattern function."""
+
+    def test_empty_branches(self) -> None:
+        """Test with empty branches list."""
+        result = porcelain.filter_branches_by_pattern([], "feature-*")
+        self.assertEqual([], result)
+
+    def test_star_pattern(self) -> None:
+        """Test wildcard pattern matching."""
+        branches = [b"main", b"feature-1", b"feature-2", b"develop", b"hotfix-bug"]
+
+        result = porcelain.filter_branches_by_pattern(branches, "feature-*")
+        expected = [b"feature-1", b"feature-2"]
+        self.assertEqual(expected, result)
+
+    def test_question_mark_pattern(self) -> None:
+        """Test single character wildcard pattern."""
+        branches = [b"main", b"feature-1", b"feature-2", b"feature-a", b"develop"]
+
+        result = porcelain.filter_branches_by_pattern(branches, "feature-?")
+        expected = [b"feature-1", b"feature-2", b"feature-a"]
+        self.assertEqual(expected, result)
+
+    def test_specific_pattern(self) -> None:
+        """Test exact match pattern."""
+        branches = [b"main", b"feature-1", b"feature-2", b"develop"]
+
+        result = porcelain.filter_branches_by_pattern(branches, "feature-1")
+        expected = [b"feature-1"]
+        self.assertEqual(expected, result)
+
+    def test_no_matches(self) -> None:
+        """Test pattern that matches no branches."""
+        branches = [b"main", b"feature-1", b"develop"]
+
+        result = porcelain.filter_branches_by_pattern(branches, "release-*")
+        self.assertEqual([], result)
+
+    def test_case_sensitive_pattern(self) -> None:
+        """Test case-sensitive pattern matching."""
+        branches = [b"Main", b"main", b"MAIN", b"develop"]
+
+        result = porcelain.filter_branches_by_pattern(branches, "main")
+        expected = [b"main"]
+        self.assertEqual(expected, result)
+
+    def test_multiple_patterns_behavior(self) -> None:
+        """Test that pattern works with multiple wildcards."""
+        branches = [
+            b"feature-login",
+            b"feature-signup",
+            b"bugfix-login",
+            b"hotfix-signup",
+        ]
+
+        result = porcelain.filter_branches_by_pattern(branches, "feature-*")
+        expected = [b"feature-login", b"feature-signup"]
+        self.assertEqual(expected, result)
+
+    def test_mixed_encoding_branches(self) -> None:
+        """Test with branches that have special characters."""
+        branches = [b"feature-1", b"feature/test", b"feature@prod", b"develop"]
+
+        result = porcelain.filter_branches_by_pattern(branches, "feature/*")
+        expected = [b"feature/test"]
+        self.assertEqual(expected, result)
+
+    def test_pattern_with_square_brackets(self) -> None:
+        """Test pattern with character classes."""
+        branches = [b"feature-1", b"feature-2", b"feature-a", b"feature-b", b"develop"]
+
+        result = porcelain.filter_branches_by_pattern(branches, "feature-[12]")
+        expected = [b"feature-1", b"feature-2"]
+        self.assertEqual(expected, result)
+
+
 class BranchCreateTests(PorcelainTestCase):
     def test_branch_exists(self) -> None:
         [c1] = build_commit_graph(self.repo.object_store, [[1]])

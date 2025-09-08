@@ -24,7 +24,7 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-    "urllib3>=1.25",
+    "urllib3>=2.2.2",
     'typing_extensions >=4.0 ; python_version < "3.12"',
 ]
 dynamic = ["version"]
@@ -38,7 +38,7 @@ GitHub = "https://github.com/dulwich/dulwich"
 
 [project.optional-dependencies]
 fastimport = ["fastimport"]
-https = ["urllib3>=1.24.1"]
+https = ["urllib3>=2.2.2"]
 pgp = ["gpg"]
 paramiko = ["paramiko"]
 colordiff = ["rich"]

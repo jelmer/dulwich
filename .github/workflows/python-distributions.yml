@@ -9,6 +9,9 @@ on:
   schedule:
     - cron: "0 6 * * *" # Daily 6AM UTC build
 
+permissions:
+  contents: read
+
 jobs:
   define-matrix:
     runs-on: ubuntu-latest
@@ -16,8 +19,8 @@ jobs:
       matrix: ${{ steps.merged-identifiers.outputs.merged-identifiers }}
 
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v5.3.0
         with:
           python-version: 3.x
           cache: pip
@@ -63,8 +66,8 @@ jobs:
       fail-fast: true
 
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v5.3.0
         with:
           cache: pip
       - name: Install dependencies
@@ -72,14 +75,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install setuptools wheel cibuildwheel setuptools-rust
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v3.2.0
         if: "matrix.os == 'ubuntu-latest'"
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_BUILD: "${{ matrix.build-identifier }}*"
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.5.0
         with:
           name: artifact-${{ matrix.build-identifier }}
           path: ./wheelhouse/*.whl
@@ -87,8 +90,8 @@ jobs:
   build-android-wheels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v5.3.0
         with:
           cache: pip
       - name: Install dependencies
@@ -101,7 +104,7 @@ jobs:
           CIBW_PLATFORM: android
           CIBW_ARCHS_ANDROID: arm64_v8a x86_64
       - name: Upload Android wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.5.0
         with:
           name: artifact-android
           path: ./wheelhouse/*.whl
@@ -109,14 +112,14 @@ jobs:
   build-pure-wheels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v5.3.0
         with:
           cache: pip
       - run: pip install build
       - run: PURE=true python -m build --wheel
       - name: Upload pure wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.5.0
         with:
           name: artifact-pure
           path: ./dist/*.whl
@@ -124,8 +127,8 @@ jobs:
   build-sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v5.3.0
         with:
           cache: pip
       - name: Install dependencies
@@ -135,7 +138,7 @@ jobs:
       - name: Build sdist
         run: python -m build --sdist
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.5.0
         with:
           name: artifact-source
           path: ./dist/*.tar.gz
@@ -145,7 +148,7 @@ jobs:
       - build-sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.3.0
         with:
           cache: pip
       - name: Install dependencies
@@ -155,7 +158,7 @@ jobs:
           # See https://github.com/pypa/twine/issues/1216
           pip install "twine>=6.1.0" "packaging>=24.2"
       - name: Download sdist
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v5.0.0
         with:
           name: artifact-source
           path: dist
@@ -179,10 +182,10 @@ jobs:
       url: https://pypi.org/p/dulwich
     steps:
       - name: Download distributions
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v5.0.0
         with:
           merge-multiple: true
           pattern: artifact-*
           path: dist
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.10.4

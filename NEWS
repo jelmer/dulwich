@@ -64,6 +64,9 @@
    parallel stat operations when checking for unstaged changes. This improves
    performance on slow filesystems like NFS. (Jelmer Vernooĳ, #1851)
 
+ * Fix smudge filter subprocess fallback for special characters in path.
+   (Petr Chmelar, #1878)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

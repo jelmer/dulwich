@@ -1453,7 +1453,7 @@ def write_info_refs(
             o = store[sha]
         except KeyError:
             continue
-        unpeeled, peeled = peel_sha(store, sha)
+        _unpeeled, peeled = peel_sha(store, sha)
         yield o.id + b"\t" + name + b"\n"
         if o.id != peeled.id:
             yield peeled.id + b"\t" + name + PEELED_TAG_SUFFIX + b"\n"

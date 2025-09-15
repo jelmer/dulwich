@@ -103,7 +103,7 @@ class GitImportProcessorTests(TestCase):
     def test_reset_handler_marker(self) -> None:
         from fastimport import commands
 
-        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        [c1, _c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
         self.processor.markers[b"10"] = c1.id
         cmd = commands.ResetCommand(b"refs/heads/foo", b":10")
         self.processor.reset_handler(cmd)
@@ -112,7 +112,7 @@ class GitImportProcessorTests(TestCase):
     def test_reset_handler_default(self) -> None:
         from fastimport import commands
 
-        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        [_c1, _c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
         cmd = commands.ResetCommand(b"refs/heads/foo", None)
         self.processor.reset_handler(cmd)
         self.assertEqual(ZERO_SHA, self.repo.get_refs()[b"refs/heads/foo"])

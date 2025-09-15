@@ -300,7 +300,7 @@ class ArchiveTests(PorcelainTestCase):
     """Tests for the archive command."""
 
     def test_simple(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"refs/heads/master"] = c3.id
@@ -317,7 +317,7 @@ class ArchiveTests(PorcelainTestCase):
 
 class UpdateServerInfoTests(PorcelainTestCase):
     def test_simple(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"refs/heads/foo"] = c3.id
@@ -329,7 +329,7 @@ class UpdateServerInfoTests(PorcelainTestCase):
 
 class CommitTests(PorcelainTestCase):
     def test_custom_author(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"refs/heads/foo"] = c3.id
@@ -343,7 +343,7 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
     def test_unicode(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"refs/heads/foo"] = c3.id
@@ -365,7 +365,7 @@ class CommitTests(PorcelainTestCase):
         os.makedirs(hooks_dir, exist_ok=True)
         self.addCleanup(shutil.rmtree, hooks_dir)
 
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, _c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
 
@@ -411,7 +411,7 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(len(sha), 40)
 
     def test_timezone(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"refs/heads/foo"] = c3.id
@@ -612,7 +612,7 @@ class CommitTests(PorcelainTestCase):
 )
 class CommitSignTests(PorcelainGpgTestCase):
     def test_default_key(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -651,7 +651,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         )
 
     def test_non_default_key(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -676,7 +676,7 @@ class CommitSignTests(PorcelainGpgTestCase):
 
     def test_sign_uses_config_signingkey(self) -> None:
         """Test that sign=True uses user.signingKey from config."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -708,7 +708,7 @@ class CommitSignTests(PorcelainGpgTestCase):
 
     def test_commit_gpg_sign_config_enabled(self) -> None:
         """Test that commit.gpgSign=true automatically signs commits."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -741,7 +741,7 @@ class CommitSignTests(PorcelainGpgTestCase):
 
     def test_commit_gpg_sign_config_disabled(self) -> None:
         """Test that commit.gpgSign=false does not sign commits."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -773,7 +773,7 @@ class CommitSignTests(PorcelainGpgTestCase):
 
     def test_commit_gpg_sign_config_no_signing_key(self) -> None:
         """Test that commit.gpgSign=true works without user.signingKey (uses default)."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -804,7 +804,7 @@ class CommitSignTests(PorcelainGpgTestCase):
 
     def test_explicit_signoff_overrides_config(self) -> None:
         """Test that explicit signoff parameter overrides commit.gpgSign config."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -837,7 +837,7 @@ class CommitSignTests(PorcelainGpgTestCase):
 
     def test_explicit_false_disables_signing(self) -> None:
         """Test that explicit signoff=False disables signing even with config=true."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -1049,7 +1049,7 @@ class CloneTests(PorcelainTestCase):
             3: [(b"f1", f1_1), (b"f2", f1_1)],
         }
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        _c1, _c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c3.id
         self.repo.refs[b"refs/tags/foo"] = c3.id
         target_path = tempfile.mkdtemp()
@@ -1087,7 +1087,7 @@ class CloneTests(PorcelainTestCase):
             3: [(b"f1", f1_1), (b"f2", f1_1)],
         }
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        _c1, _c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
@@ -1110,7 +1110,7 @@ class CloneTests(PorcelainTestCase):
             3: [(b"f1", f1_1), (b"f2", f1_1)],
         }
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        _c1, _c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c3.id
         target_path = tempfile.mkdtemp()
         errstream = BytesIO()
@@ -1220,7 +1220,7 @@ class CloneTests(PorcelainTestCase):
             3: [(b"f1", f1_1), (b"f2", f1_1)],
         }
 
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        _c1, c2, c3 = build_commit_graph(self.repo.object_store, commit_spec, trees)
         self.repo.refs[b"refs/heads/master"] = c2.id
         self.repo.refs.remove_if_equals(b"HEAD", None)
         self.repo.refs[b"HEAD"] = c3.id
@@ -1477,7 +1477,7 @@ class AddTests(PorcelainTestCase):
         try:
             os.chdir(build_dir)
             # Add file using absolute path from within ignored directory
-            (added, ignored) = porcelain.add(self.repo.path, paths=[src_file])
+            (added, _ignored) = porcelain.add(self.repo.path, paths=[src_file])
             self.assertIn(b"source.py", self.repo.open_index())
             self.assertEqual({"source.py"}, set(added))
         finally:
@@ -1620,7 +1620,7 @@ class AddTests(PorcelainTestCase):
         os.symlink("link1", second_link)
 
         # Add all files
-        added, ignored = porcelain.add(
+        added, _ignored = porcelain.add(
             self.repo.path, paths=[target_file, first_link, second_link]
         )
 
@@ -1711,7 +1711,7 @@ class AddTests(PorcelainTestCase):
         symlink_file_path = os.path.join(link_dir, "file.txt")
 
         # This should add the real file, not create a new entry
-        added, ignored = porcelain.add(self.repo.path, paths=[symlink_file_path])
+        added, _ignored = porcelain.add(self.repo.path, paths=[symlink_file_path])
 
         # The real file should be added
         self.assertIn("real_dir/file.txt", added)
@@ -1732,7 +1732,7 @@ class AddTests(PorcelainTestCase):
             f.write("content2")
 
         # Add the repository path itself
-        added, ignored = porcelain.add(self.repo.path, paths=[self.repo.path])
+        added, _ignored = porcelain.add(self.repo.path, paths=[self.repo.path])
 
         # Should add all untracked files, not stage './'
         self.assertIn("file1.txt", added)
@@ -1757,7 +1757,7 @@ class AddTests(PorcelainTestCase):
             f.write("content3")
 
         # Add the directory
-        added, ignored = porcelain.add(self.repo.path, paths=["subdir"])
+        added, _ignored = porcelain.add(self.repo.path, paths=["subdir"])
 
         # Should add all files in the directory
         self.assertEqual(len(added), 3)
@@ -1790,7 +1790,7 @@ class AddTests(PorcelainTestCase):
             f.write("level3")
 
         # Add the top-level directory
-        added, ignored = porcelain.add(self.repo.path, paths=["dir1"])
+        added, _ignored = porcelain.add(self.repo.path, paths=["dir1"])
 
         # Should add all files recursively
         self.assertEqual(len(added), 3)
@@ -1831,7 +1831,7 @@ class AddTests(PorcelainTestCase):
             f.write("new file 2")
 
         # Add the directory
-        added, ignored = porcelain.add(self.repo.path, paths=["mixed"])
+        added, _ignored = porcelain.add(self.repo.path, paths=["mixed"])
 
         # Should only add the untracked files
         self.assertEqual(len(added), 2)
@@ -1902,7 +1902,7 @@ class AddTests(PorcelainTestCase):
                     f.write(f"content {dirname} {i}")
 
         # Add all directories at once
-        added, ignored = porcelain.add(self.repo.path, paths=["dir1", "dir2", "dir3"])
+        added, _ignored = porcelain.add(self.repo.path, paths=["dir1", "dir2", "dir3"])
 
         # Should add all files from all directories
         self.assertEqual(len(added), 6)
@@ -2261,7 +2261,7 @@ class MvTests(PorcelainTestCase):
 
 class LogTests(PorcelainTestCase):
     def test_simple(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2300,7 +2300,7 @@ Commit 1
         )
 
     def test_max_entries(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2333,7 +2333,7 @@ Date:   Fri Jan 01 2010 00:00:00 +0000
 
 class ShowTests(PorcelainTestCase):
     def test_nolist(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2342,7 +2342,7 @@ class ShowTests(PorcelainTestCase):
         self.assertTrue(outstream.getvalue().startswith("-" * 50))
 
     def test_simple(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2599,7 +2599,7 @@ class FormatPatchTests(PorcelainTestCase):
 
     def test_format_patch_range(self) -> None:
         # Create commit chain
-        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+        c1, _c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
         self.repo[b"HEAD"] = c3.id
 
         # Test commit range
@@ -2655,7 +2655,7 @@ class FormatPatchTests(PorcelainTestCase):
 
 class SymbolicRefTests(PorcelainTestCase):
     def test_set_wrong_symbolic_ref(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2665,7 +2665,7 @@ class SymbolicRefTests(PorcelainTestCase):
         )
 
     def test_set_force_wrong_symbolic_ref(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2678,7 +2678,7 @@ class SymbolicRefTests(PorcelainTestCase):
         self.assertEqual(new_ref, b"ref: refs/heads/force_foobar\n")
 
     def test_set_symbolic_ref(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2686,7 +2686,7 @@ class SymbolicRefTests(PorcelainTestCase):
         porcelain.symbolic_ref(self.repo.path, b"master")
 
     def test_set_symbolic_ref_other_than_master(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store,
             [[1], [2, 1], [3, 1, 2]],
             attrs=dict(refs="develop"),
@@ -2704,7 +2704,7 @@ class SymbolicRefTests(PorcelainTestCase):
 
 class DiffTreeTests(PorcelainTestCase):
     def test_empty(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -2982,7 +2982,7 @@ class DiffTests(PorcelainTestCase):
 
 class CommitTreeTests(PorcelainTestCase):
     def test_simple(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, _c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         b = Blob()
@@ -3020,7 +3020,7 @@ class RevListTests(PorcelainTestCase):
 )
 class TagCreateSignTests(PorcelainGpgTestCase):
     def test_default_key(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3065,7 +3065,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         )
 
     def test_non_default_key(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3096,7 +3096,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_sign_uses_config_signingkey(self) -> None:
         """Test that sign=True uses user.signingKey from config."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3129,7 +3129,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_tag_gpg_sign_config_enabled(self) -> None:
         """Test that tag.gpgSign=true automatically signs tags."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3163,7 +3163,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_tag_gpg_sign_config_disabled(self) -> None:
         """Test that tag.gpgSign=false does not sign tags."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3196,7 +3196,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_tag_gpg_sign_config_no_signing_key(self) -> None:
         """Test that tag.gpgSign=true works without user.signingKey (uses default)."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3228,7 +3228,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_explicit_sign_overrides_config(self) -> None:
         """Test that explicit sign parameter overrides tag.gpgSign config."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3262,7 +3262,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
 
     def test_explicit_false_disables_tag_signing(self) -> None:
         """Test that explicit sign=False disables signing even with config=true."""
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3296,7 +3296,7 @@ class TagCreateSignTests(PorcelainGpgTestCase):
 
 class TagCreateTests(PorcelainTestCase):
     def test_annotated(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3318,7 +3318,7 @@ class TagCreateTests(PorcelainTestCase):
         self.assertRecentTimestamp(tag.tag_time)
 
     def test_unannotated(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -3331,7 +3331,7 @@ class TagCreateTests(PorcelainTestCase):
         self.assertEqual(list(tags.values()), [self.repo.head()])
 
     def test_unannotated_unicode(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -6761,7 +6761,7 @@ class BranchMergedTests(PorcelainTestCase):
     def test_no_merged_branches(self) -> None:
         """Test with no merged branches."""
         # Create complete graph: c1 → c2 (master), c1 → c3 (feature)
-        [c1, c2, c3] = build_commit_graph(
+        [_c1, c2, c3] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -6797,7 +6797,7 @@ class BranchMergedTests(PorcelainTestCase):
         """Test when some branches are merged, some are not."""
         # c1 → c2 → c3 (HEAD/master)
         # c1 → c4 → c5 (feature-1 - diverged)
-        [c1, c2, c3, c4, c5] = build_commit_graph(
+        [_c1, c2, c3, _c4, c5] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -6845,7 +6845,7 @@ class BranchNoMergedTests(PorcelainTestCase):
     def test_no_merged_branches(self) -> None:
         """Test with some non-merged branches."""
         # Create complete graph: c1 → c2 (master), c1 → c3 (feature)
-        [c1, c2, c3] = build_commit_graph(
+        [_c1, c2, c3] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -6864,7 +6864,7 @@ class BranchNoMergedTests(PorcelainTestCase):
         """Test when some branches are merged, some are not."""
         # c1 → c2 → c3 (HEAD/master)
         # c1 → c4 → c5 (feature-1 - diverged)
-        [c1, c2, c3, c4, c5] = build_commit_graph(
+        [_c1, c2, c3, _c4, c5] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -6887,7 +6887,7 @@ class BranchNoMergedTests(PorcelainTestCase):
         # c1 → c2 (HEAD/master)
         # c1 → c3 (feature-1 - diverged)
         # c1 → c4 (feature-2 - diverged)
-        [c1, c2, c3, c4] = build_commit_graph(
+        [_c1, c2, c3, c4] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -6921,7 +6921,7 @@ class BranchContainsTests(PorcelainTestCase):
     def test_commit_in_single_branch(self) -> None:
         """Test commit contained in only one branch."""
         # Create: c1 → c2 (master), c1 → c3 (feature)
-        [c1, c2, c3] = build_commit_graph(
+        [_c1, c2, c3] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -6993,7 +6993,7 @@ class BranchContainsTests(PorcelainTestCase):
     def test_commit_in_no_branches(self) -> None:
         """Test commit not contained in any branch."""
         # Create: c1 → c2 (master), c1 → c3 (feature), orphan c4
-        [c1, c2, c3, c4] = build_commit_graph(
+        [_c1, c2, c3, c4] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -7014,7 +7014,7 @@ class BranchContainsTests(PorcelainTestCase):
     def test_commit_ref_by_branch_name(self) -> None:
         """Test using branch name as commit reference."""
         # Create: c1 → c2 (master), c1 → c3 (feature)
-        [c1, c2, c3] = build_commit_graph(
+        [_c1, c2, c3] = build_commit_graph(
             self.repo.object_store,
             [
                 [1],  # c1
@@ -7038,7 +7038,9 @@ class BranchContainsTests(PorcelainTestCase):
     def test_commit_ref_by_head(self) -> None:
         """Test using HEAD as commit reference."""
         # Create: c1 → c2 → c3 (HEAD/master)
-        [c1, c2, c3] = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+        [_c1, c2, c3] = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 2]]
+        )
 
         self.repo.refs[b"HEAD"] = c3.id
         self.repo.refs[b"refs/heads/master"] = c3.id
@@ -7942,7 +7944,7 @@ class BranchTrackingTests(PorcelainTestCase):
 
     def test_set_branch_tracking(self) -> None:
         # Create a new branch
-        sha, _ = _commit_file_with_content(self.repo, "foo", "content\n")
+        _sha, _ = _commit_file_with_content(self.repo, "foo", "content\n")
         porcelain.branch_create(self.repo, "feature")
 
         # Set up tracking
@@ -7960,7 +7962,7 @@ class BranchTrackingTests(PorcelainTestCase):
 
 class FindUniqueAbbrevTests(PorcelainTestCase):
     def test_simple(self) -> None:
-        c1, c2, c3 = build_commit_graph(
+        c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -9002,7 +9004,7 @@ class BisectTests(PorcelainTestCase):
     def test_bisect_start(self):
         """Test starting a bisect session."""
         # Create some commits
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store,
             [[1], [2, 1], [3, 2]],
             attrs={
@@ -9073,7 +9075,7 @@ class BisectTests(PorcelainTestCase):
     def test_bisect_log(self):
         """Test getting bisect log."""
         # Create some commits
-        c1, c2, c3 = build_commit_graph(
+        c1, _c2, c3 = build_commit_graph(
             self.repo.object_store,
             [[1], [2, 1], [3, 2]],
             attrs={
@@ -9100,7 +9102,7 @@ class BisectTests(PorcelainTestCase):
     def test_bisect_reset(self):
         """Test resetting bisect state."""
         # Create some commits
-        c1, c2, c3 = build_commit_graph(
+        c1, _c2, c3 = build_commit_graph(
             self.repo.object_store,
             [[1], [2, 1], [3, 2]],
             attrs={
@@ -9135,7 +9137,7 @@ class BisectTests(PorcelainTestCase):
     def test_bisect_skip(self):
         """Test skipping commits during bisect."""
         # Create some commits
-        c1, c2, c3, c4, c5 = build_commit_graph(
+        c1, c2, _c3, _c4, c5 = build_commit_graph(
             self.repo.object_store,
             [[1], [2, 1], [3, 2], [4, 3], [5, 4]],
             attrs={
@@ -9371,7 +9373,7 @@ class WriteCommitGraphTests(PorcelainTestCase):
     def test_write_commit_graph_reachable_false(self):
         """Test writing commit graph with reachable=False."""
         # Create commits
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store,
             [[1], [2, 1], [3, 2]],
             attrs={

@@ -140,7 +140,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
     def test_git_creates_valid_reftable_format(self):
         """Test that git creates reftable files with valid format."""
-        sha1, sha2 = self._create_git_repo_with_reftable()
+        _sha1, _sha2 = self._create_git_repo_with_reftable()
 
         # Check that reftable files were created
         reftable_files = self._get_reftable_files()
@@ -292,7 +292,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
     def test_multiple_table_files_compatibility(self):
         """Test compatibility when multiple reftable files exist."""
-        sha1, sha2 = self._create_git_repo_with_reftable()
+        _sha1, _sha2 = self._create_git_repo_with_reftable()
 
         # Add more refs to potentially create multiple table files
         for i in range(10):

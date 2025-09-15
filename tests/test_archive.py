@@ -38,7 +38,7 @@ from . import TestCase
 class ArchiveTests(TestCase):
     def test_empty(self) -> None:
         store = MemoryObjectStore()
-        c1, c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
+        _c1, _c2, c3 = build_commit_graph(store, [[1], [2, 1], [3, 1, 2]])
         tree = store[c3.tree]
         stream = b"".join(tar_stream(store, tree, 10))
         out = BytesIO(stream)

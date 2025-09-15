@@ -368,7 +368,7 @@ class PorcelainMergeTreeTests(TestCase):
             self.assertIn(b"file1.txt", merged_tree)
 
             # Get the merged blob content
-            file_mode, file_sha = merged_tree[b"file1.txt"]
+            _file_mode, file_sha = merged_tree[b"file1.txt"]
             merged_blob = repo[file_sha]
             content = merged_blob.data
 
@@ -441,7 +441,7 @@ class PorcelainMergeTreeTests(TestCase):
             their_tree_id = repo[their_commit_id].tree
 
             # Perform merge_tree with tree SHAs
-            merged_tree_id, conflicts = porcelain.merge_tree(
+            _merged_tree_id, conflicts = porcelain.merge_tree(
                 tmpdir,
                 base_tree_id if base_tree_id else None,
                 our_tree_id,

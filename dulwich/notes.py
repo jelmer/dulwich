@@ -177,7 +177,7 @@ class NotesTree:
                 # Check a sample directory to determine if it's level 1 or 2
                 sample_dir_name = dir_names[0]
                 try:
-                    sample_mode, sample_sha = self._tree[sample_dir_name]
+                    _sample_mode, sample_sha = self._tree[sample_dir_name]
                     sample_tree = self._object_store[sample_sha]
                     assert isinstance(sample_tree, Tree)
 

@@ -156,7 +156,7 @@ Subject:  [Dulwich-users] [PATCH] Added unit tests for
 -- 
 1.7.0.4
 """
-        c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
+        c, _diff, _version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(
             b"""\
 Added unit tests for dulwich.object_store.tree_lookup_path.
@@ -188,7 +188,7 @@ From: Jelmer Vernooij <jelmer@debian.org>
 -- 
 1.7.0.4
 """
-        c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
+        c, _diff, _version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(b"Jelmer Vernooij <jelmer@debian.org>", c.author)
         self.assertEqual(
             b"""\
@@ -217,7 +217,7 @@ From: Jelmer Vernooij <jelmer@debian.org>
  mode change 100755 => 100644 pixmaps/prey.ico
 
 """
-        c, diff, version = git_am_patch_split(BytesIO(text), "utf-8")
+        _c, _diff, version = git_am_patch_split(BytesIO(text), "utf-8")
         self.assertEqual(None, version)
 
     def test_extract_mercurial(self) -> NoReturn:
@@ -258,7 +258,7 @@ Unsubscribe : https://launchpad.net/~dulwich-users
 More help   : https://help.launchpad.net/ListHelp
 
 """
-        c, diff, version = git_am_patch_split(BytesIO(text))
+        _c, diff, version = git_am_patch_split(BytesIO(text))
         self.assertEqual(expected_diff, diff)
         self.assertEqual(None, version)
 

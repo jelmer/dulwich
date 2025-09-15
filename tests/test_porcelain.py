@@ -1684,7 +1684,7 @@ class AddTests(PorcelainTestCase):
             symlink_target = os.environ["TEMP"]
         else:
             # On Unix-like systems, use /tmp
-            symlink_target = "/tmp"
+            symlink_target = os.environ.get("TMPDIR", "/tmp")
         os.symlink(symlink_target, symlink_path)
 
         # Adding a symlink to a directory outside the repo should raise ValueError

@@ -91,7 +91,7 @@ class WalkEntry:
                 assert isinstance(parent_commit, Commit)
                 parent = parent_commit.tree
                 if path_prefix:
-                    mode, subtree_sha = parent.lookup_path(
+                    _mode, subtree_sha = parent.lookup_path(
                         self._store.__getitem__,
                         path_prefix,
                     )
@@ -122,7 +122,7 @@ class WalkEntry:
                             from .objects import Tree
 
                             assert isinstance(p, Tree)
-                            mode, st = p.lookup_path(
+                            _mode, st = p.lookup_path(
                                 self._store.__getitem__,
                                 path_prefix,
                             )
@@ -136,7 +136,7 @@ class WalkEntry:
                 from .objects import Tree
 
                 assert isinstance(commit_tree, Tree)
-                mode, commit_tree_sha = commit_tree.lookup_path(
+                _mode, commit_tree_sha = commit_tree.lookup_path(
                     self._store.__getitem__,
                     path_prefix,
                 )

@@ -1347,7 +1347,7 @@ class PackStreamReader:
           zlib.error: if an error occurred during zlib decompression.
           IOError: if an error occurred writing to the output file.
         """
-        pack_version, self._num_objects = read_pack_header(self.read)
+        _pack_version, self._num_objects = read_pack_header(self.read)
 
         for _ in range(self._num_objects):
             offset = self.offset
@@ -1535,7 +1535,7 @@ class PackData:
             self._file = GitFile(self._filename, "rb")
         else:
             self._file = file
-        (version, self._num_objects) = read_pack_header(self._file.read)
+        (_version, self._num_objects) = read_pack_header(self._file.read)
 
         # Use delta_cache_size config if available, otherwise default
         cache_size = delta_cache_size or (1024 * 1024 * 20)
@@ -2966,7 +2966,7 @@ class PackChunkGenerator:
             raw: Union[list[bytes], tuple[int, list[bytes]], tuple[bytes, list[bytes]]]
             if unpacked.delta_base is not None:
                 try:
-                    base_offset, base_crc32 = self.entries[unpacked.delta_base]
+                    base_offset, _base_crc32 = self.entries[unpacked.delta_base]
                 except KeyError:
                     type_num = REF_DELTA
                     assert isinstance(unpacked.delta_base, bytes)

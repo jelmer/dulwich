@@ -548,7 +548,7 @@ class TestGetTransportAndPath(TestCase):
         from dulwich.config import ConfigDict
 
         config = ConfigDict()
-        c, path = get_transport_and_path(
+        c, _path = get_transport_and_path(
             "ssh://git@github.com/user/repo.git", config=config
         )
         self.assertIsInstance(c, SSHGitClient)
@@ -556,14 +556,14 @@ class TestGetTransportAndPath(TestCase):
 
         config.set((b"core",), b"sshCommand", b"custom-ssh -o CustomOption=yes")
 
-        c, path = get_transport_and_path(
+        c, _path = get_transport_and_path(
             "ssh://git@github.com/user/repo.git", config=config
         )
         self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("custom-ssh -o CustomOption=yes", c.ssh_command)
 
         # Test rsync-style URL also gets the config
-        c, path = get_transport_and_path("git@github.com:user/repo.git", config=config)
+        c, _path = get_transport_and_path("git@github.com:user/repo.git", config=config)
         self.assertIsInstance(c, SSHGitClient)
         self.assertEqual("custom-ssh -o CustomOption=yes", c.ssh_command)
 
@@ -576,7 +576,7 @@ class TestGetTransportAndPath(TestCase):
     def test_error(self) -> None:
         # Need to use a known urlparse.uses_netloc URL scheme to get the
         # expected parsing of the URL on Python versions less than 2.6.5
-        c, path = get_transport_and_path("prospero://bar/baz")
+        c, _path = get_transport_and_path("prospero://bar/baz")
         self.assertIsInstance(c, SSHGitClient)
 
     def test_http(self) -> None:
@@ -1106,7 +1106,7 @@ class BundleClientTests(TestCase):
 
     def test_fetch_pack(self) -> None:
         """Test fetching pack from bundle."""
-        bundle_path, source_repo = self._create_test_bundle()
+        bundle_path, _source_repo = self._create_test_bundle()
 
         client = BundleClient()
         pack_data = BytesIO()
@@ -1133,7 +1133,7 @@ class BundleClientTests(TestCase):
 
     def test_fetch(self) -> None:
         """Test fetching from bundle into target repo."""
-        bundle_path, source_repo = self._create_test_bundle()
+        bundle_path, _source_repo = self._create_test_bundle()
 
         client = BundleClient()
         target_repo = MemoryRepo()

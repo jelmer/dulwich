@@ -254,7 +254,7 @@ def check_user_identity(identity: bytes) -> None:
       InvalidUserIdentity: Raised when identity is invalid
     """
     try:
-        fst, snd = identity.split(b" <", 1)
+        _fst, snd = identity.split(b" <", 1)
     except ValueError as exc:
         raise InvalidUserIdentity(identity.decode("utf-8", "replace")) from exc
     if b">" not in snd:

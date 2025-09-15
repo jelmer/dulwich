@@ -1056,12 +1056,12 @@ class Tag(ShaFile):
             if keyid is not None:
                 key = c.get_key(keyid)
                 with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.signature, unused_result = ctx.sign(
+                    self.signature, _unused_result = ctx.sign(
                         self.as_raw_string(),
                         mode=gpg.constants.sig.mode.DETACH,
                     )
             else:
-                self.signature, unused_result = c.sign(
+                self.signature, _unused_result = c.sign(
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 
@@ -1770,12 +1770,12 @@ class Commit(ShaFile):
             if keyid is not None:
                 key = c.get_key(keyid)
                 with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.gpgsig, unused_result = ctx.sign(
+                    self.gpgsig, _unused_result = ctx.sign(
                         self.as_raw_string(),
                         mode=gpg.constants.sig.mode.DETACH,
                     )
             else:
-                self.gpgsig, unused_result = c.sign(
+                self.gpgsig, _unused_result = c.sign(
                     self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
                 )
 

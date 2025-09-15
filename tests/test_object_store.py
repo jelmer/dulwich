@@ -84,7 +84,7 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
 
     def test_add_pack_emtpy(self) -> None:
         o = MemoryObjectStore()
-        f, commit, abort = o.add_pack()
+        _f, commit, _abort = o.add_pack()
         commit()
 
     def test_add_thin_pack(self) -> None:
@@ -248,7 +248,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             dirname = os.path.join(self.store_dir, f"{i:02x}")
             if not os.path.isdir(dirname):
                 os.makedirs(dirname)
-            fd, n = tempfile.mkstemp(prefix="tmp_obj_", dir=dirname)
+            fd, _n = tempfile.mkstemp(prefix="tmp_obj_", dir=dirname)
             os.close(fd)
 
         self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))

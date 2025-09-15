@@ -43,7 +43,7 @@ except ImportError:
 class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
     def test_sign(self) -> None:
         # Test that dulwich signatures can be verified by CGit
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id
@@ -67,7 +67,7 @@ class TagCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
 
     def test_verify(self) -> None:
         # Test that CGit signatures can be verified by dulwich
-        c1, c2, c3 = build_commit_graph(
+        _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
         self.repo.refs[b"HEAD"] = c3.id

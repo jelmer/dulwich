@@ -144,7 +144,7 @@ class MergeTests(unittest.TestCase):
         self.repo.object_store.add_object(modified_blob)
 
         # We delete, they modify
-        result, has_conflicts = self.merger.merge_blobs(base_blob, None, modified_blob)
+        _result, has_conflicts = self.merger.merge_blobs(base_blob, None, modified_blob)
         self.assertTrue(has_conflicts)
 
     def test_merge_blobs_no_base(self):
@@ -225,7 +225,7 @@ class MergeTests(unittest.TestCase):
         self.repo.object_store.add_object(theirs_tree)
 
         # Merge
-        merged_tree, conflicts = self.merger.merge_trees(
+        _merged_tree, conflicts = self.merger.merge_trees(
             base_tree, ours_tree, theirs_tree
         )
 
@@ -285,7 +285,7 @@ class MergeTests(unittest.TestCase):
         self.repo.object_store.add_object(theirs_commit)
 
         # Perform three-way merge
-        merged_tree, conflicts = three_way_merge(
+        _merged_tree, conflicts = three_way_merge(
             self.repo.object_store, base_commit, ours_commit, theirs_commit
         )
 

@@ -638,7 +638,7 @@ def read_cache_entry(
 
     if version >= 4:
         # Version 4: paths are always compressed (name_len should be 0)
-        name, consumed = _decompress_path_from_stream(f, previous_path)
+        name, _consumed = _decompress_path_from_stream(f, previous_path)
     else:
         # Versions < 4: regular name reading
         name = f.read(flags & FLAG_NAMEMASK)

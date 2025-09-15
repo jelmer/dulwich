@@ -82,10 +82,10 @@ class WhitespaceConfigTests(TestCase):
 
     def test_parse_invalid_tabwidth(self) -> None:
         """Test invalid tabwidth defaults to 8."""
-        errors, tab_width = parse_whitespace_config("tabwidth=invalid")
+        _errors, tab_width = parse_whitespace_config("tabwidth=invalid")
         self.assertEqual(tab_width, 8)
 
-        errors, tab_width = parse_whitespace_config("tabwidth=0")
+        _errors, tab_width = parse_whitespace_config("tabwidth=0")
         self.assertEqual(tab_width, 8)
 
 

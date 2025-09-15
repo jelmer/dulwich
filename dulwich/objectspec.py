@@ -91,7 +91,7 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
         if not rev:
             raise NotImplementedError("Index path lookup (:path) not yet supported")
         tree = parse_tree(repo, rev)
-        mode, sha = tree.lookup_path(repo.object_store.__getitem__, path)
+        _mode, sha = tree.lookup_path(repo.object_store.__getitem__, path)
         return repo[sha]
 
     # Handle @{N} - reflog lookup
@@ -115,7 +115,7 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
     if objectish.endswith(b"^{}"):
         obj = _resolve_object(repo, objectish[:-3])
         while isinstance(obj, Tag):
-            obj_type, obj_sha = obj.object
+            _obj_type, obj_sha = obj.object
             obj = repo[obj_sha]
         return obj
 
@@ -209,7 +209,7 @@ def parse_tree(
         return tree
     elif isinstance(o, Tag):
         # Tag handling - dereference and recurse
-        obj_type, obj_sha = o.object
+        _obj_type, obj_sha = o.object
         return parse_tree(repo, obj_sha)
     assert isinstance(o, Tree)
     return o
@@ -413,7 +413,7 @@ def parse_commit(
     def dereference_tag(obj: ShaFile) -> "Commit":
         """Follow tag references until we reach a non-tag object."""
         while isinstance(obj, Tag):
-            obj_type, obj_sha = obj.object
+            _obj_type, obj_sha = obj.object
             try:
                 obj = repo.object_store[obj_sha]
             except KeyError:

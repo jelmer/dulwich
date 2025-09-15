@@ -40,7 +40,7 @@ class GitReceivePackTests(BlackboxTestCase):
 
     def test_basic(self) -> None:
         process = self.run_command("dul-receive-pack", [self.path])
-        (stdout, stderr) = process.communicate(b"0000")
+        (stdout, _stderr) = process.communicate(b"0000")
         self.assertEqual(b"0000", stdout[-4:])
         self.assertEqual(0, process.returncode)
 

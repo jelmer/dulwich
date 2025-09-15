@@ -331,7 +331,7 @@ class Merger:
                 theirs_entry = None
 
             # Extract mode and sha
-            base_mode, base_sha = base_entry if base_entry else (None, None)
+            _base_mode, base_sha = base_entry if base_entry else (None, None)
             ours_mode, ours_sha = ours_entry if ours_entry else (None, None)
             theirs_mode, theirs_sha = theirs_entry if theirs_entry else (None, None)
 

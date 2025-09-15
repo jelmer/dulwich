@@ -124,7 +124,7 @@ else:
 
             while self.running:
                 try:
-                    client_socket, addr = self.server_socket.accept()
+                    client_socket, _addr = self.server_socket.accept()
 
                     # Handle each connection in a separate thread
                     conn_thread = threading.Thread(
@@ -286,7 +286,7 @@ class ParamikoSSHVendorTests(TestCase):
 
     def _run(self) -> Optional[bool]:
         try:
-            conn, addr = self.socket.accept()
+            conn, _addr = self.socket.accept()
         except OSError:
             return False
         self.transport = paramiko.Transport(conn)

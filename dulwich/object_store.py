@@ -717,7 +717,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         pack_cache = self._pack_cache
         self._pack_cache = {}
         while pack_cache:
-            (name, pack) = pack_cache.popitem()
+            (_name, pack) = pack_cache.popitem()
             pack.close()
 
     def _iter_cached_packs(self) -> Iterator[Pack]:

@@ -648,7 +648,7 @@ class SwiftPackData(PackData):
             raise Exception(f"Could not get stats for {self._filename}")
         self.pack_length = int(headers["content-length"])
         pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
-        (version, self._num_objects) = read_pack_header(pack_reader.read)
+        (_version, self._num_objects) = read_pack_header(pack_reader.read)
         self._offset_cache = LRUSizeCache(
             1024 * 1024 * self.scon.cache_length,
             compute_size=_compute_object_size,
@@ -984,7 +984,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         else:
             f = obj
         refs = read_info_refs(f)
-        (refs, peeled) = split_peeled_refs(refs)
+        (refs, _peeled) = split_peeled_refs(refs)
         if old_ref is not None:
             if refs[name] != old_ref:
                 return False

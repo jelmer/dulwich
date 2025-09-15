@@ -641,7 +641,7 @@ class Rebaser:
         # Get the branch commit
         if branch is None:
             # Use current HEAD
-            head_ref, head_sha = self.repo.refs.follow(b"HEAD")
+            _head_ref, head_sha = self.repo.refs.follow(b"HEAD")
             if head_sha is None:
                 raise ValueError("HEAD does not point to a valid commit")
             branch_commit = self.repo[head_sha]

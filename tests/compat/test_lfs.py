@@ -188,7 +188,7 @@ class LFSFileOperationsCompatTest(LFSCompatTestCase):
         repo = porcelain.open_repo(repo_dir)
         self.addCleanup(repo.close)
         tree = repo[repo.head()].tree
-        mode, sha = repo.object_store[tree][b"test.bin"]
+        _mode, sha = repo.object_store[tree][b"test.bin"]
         blob = repo.object_store[sha]
         pointer = LFSPointer.from_bytes(blob.data)
         self.assertEqual(pointer.size, 1048576)

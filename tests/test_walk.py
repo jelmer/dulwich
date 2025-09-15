@@ -81,7 +81,7 @@ class WalkerTest(TestCase):
         self.assertEqual(expected, actual)
 
     def test_tag(self) -> None:
-        c1, c2, c3 = self.make_linear_commits(3)
+        c1, c2, _c3 = self.make_linear_commits(3)
         t2 = make_tag(target=c2)
         self.store.add_object(t2)
         self.assertWalkYields([c2, c1], [t2.id])
@@ -297,7 +297,7 @@ class WalkerTest(TestCase):
 
     def test_changes_with_renames(self) -> None:
         blob = make_object(Blob, data=b"blob")
-        c1, c2 = self.make_linear_commits(
+        _c1, c2 = self.make_linear_commits(
             2, trees={1: [(b"a", blob)], 2: [(b"b", blob)]}
         )
         entry_a = (b"a", F, blob.id)
@@ -325,7 +325,7 @@ class WalkerTest(TestCase):
         names = [b"a", b"a", b"b", b"b", b"c", b"c"]
 
         trees = {i + 1: [(n, blob, F)] for i, n in enumerate(names)}
-        c1, c2, c3, c4, c5, c6 = self.make_linear_commits(6, trees=trees)
+        c1, _c2, c3, _c4, c5, c6 = self.make_linear_commits(6, trees=trees)
         self.assertWalkYields([c5], [c6.id], paths=[b"c"])
 
         def e(n):
@@ -474,7 +474,7 @@ class WalkerTest(TestCase):
         self.assertWalkYields([m6, x2], [m6.id], exclude=[y5.id])
 
     def test_empty_walk(self) -> None:
-        c1, c2, c3 = self.make_linear_commits(3)
+        _c1, _c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([], [c3.id], exclude=[c3.id])
 
 
@@ -526,7 +526,7 @@ class WalkEntryTest(TestCase):
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b = make_object(Blob, data=b"b")
         blob_b2 = make_object(Blob, data=b"b2")
-        x1, y2, m3 = self.make_commits(
+        _x1, _y2, m3 = self.make_commits(
             [[1], [2], [3, 1, 2]],
             trees={
                 1: [(b"x/a", blob_a)],
@@ -587,7 +587,7 @@ class WalkEntryTest(TestCase):
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b = make_object(Blob, data=b"b")
         blob_b2 = make_object(Blob, data=b"b2")
-        x1, y2, m3 = self.make_commits(
+        _x1, _y2, m3 = self.make_commits(
             [[1], [2], [3, 1, 2]],
             trees={
                 1: [(b"x/a", blob_a)],

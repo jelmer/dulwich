@@ -1110,7 +1110,7 @@ def _get_commit_message_with_template(initial_message, repo=None, commit=None):
     # Add branch info if repo is provided
     if repo:
         try:
-            ref_names, ref_sha = repo.refs.follow(b"HEAD")
+            ref_names, _ref_sha = repo.refs.follow(b"HEAD")
             ref_path = ref_names[-1]  # Get the final reference
             if ref_path.startswith(b"refs/heads/"):
                 branch = ref_path[11:]  # Remove 'refs/heads/' prefix
@@ -3670,7 +3670,7 @@ class cmd_bundle(Command):
                 if ".." in ref_arg:
                     range_result = parse_commit_range(repo, ref_arg)
                     if range_result:
-                        start_commit, end_commit = range_result
+                        start_commit, _end_commit = range_result
                         prerequisites.append(start_commit.id)
                         # For ranges like A..B, we need to include B if it's a ref
                         # Split the range to get the end part

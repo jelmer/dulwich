@@ -82,7 +82,7 @@ class TestRefRecord(unittest.TestCase):
 
         # Decode should still work
         stream = BytesIO(encoded)
-        decoded_ref, refname = RefRecord.decode(stream, b"refs/heads/master")
+        _decoded_ref, refname = RefRecord.decode(stream, b"refs/heads/master")
         self.assertEqual(b"refs/heads/main", refname)
 
 

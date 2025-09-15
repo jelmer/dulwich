@@ -2596,7 +2596,7 @@ def pull(
                         assert lh is not None
                         merge_ref = fetch_result.refs[lh]
                         assert merge_ref is not None
-                        merge_result, conflicts = _do_merge(r, merge_ref)
+                        _merge_result, conflicts = _do_merge(r, merge_ref)
                         if conflicts:
                             raise Error(
                                 f"Merge conflicts occurred: {conflicts}"
@@ -4565,7 +4565,7 @@ def get_object_by_path(
         base_tree = commit.tree
         if not isinstance(path, bytes):
             path = commit_encode(commit, path)
-        (mode, sha) = tree_lookup_path(r.object_store.__getitem__, base_tree, path)
+        (_mode, sha) = tree_lookup_path(r.object_store.__getitem__, base_tree, path)
         obj = r[sha]
         assert isinstance(obj, (Blob, Tree, Commit, Tag))
         return obj

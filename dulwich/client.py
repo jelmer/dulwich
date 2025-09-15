@@ -1339,7 +1339,7 @@ class TraditionalGitClient(GitClient):
 
         """
         self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
-        proto, unused_can_read, stderr = self._connect(b"receive-pack", path)
+        proto, _unused_can_read, stderr = self._connect(b"receive-pack", path)
         with proto:
             try:
                 old_refs, server_capabilities = read_pkt_refs_v1(proto.read_pkt_seq())
@@ -1632,7 +1632,7 @@ class TraditionalGitClient(GitClient):
             subdirs: Optional subdirectories to include
             prefix: Optional prefix for archived files
         """
-        proto, can_read, stderr = self._connect(b"upload-archive", path)
+        proto, _can_read, stderr = self._connect(b"upload-archive", path)
         with proto:
             if format is not None:
                 proto.write_pkt_line(b"argument --format=" + format)
@@ -1851,7 +1851,7 @@ def find_git_command() -> list[str]:
             return ["cmd", "/c", "git"]
         else:
             try:
-                status, git = win32api.FindExecutable("git")
+                _status, git = win32api.FindExecutable("git")
                 return [git]
             except pywintypes.error:
                 return ["cmd", "/c", "git"]
@@ -3127,7 +3127,7 @@ class AbstractHttpGitClient(GitClient):
                             server_capabilities,
                         ) = read_pkt_refs_v1(proto.read_pkt_seq())
                         (refs, peeled) = split_peeled_refs(refs)
-                        (symrefs, agent) = _extract_symrefs_and_agent(
+                        (symrefs, _agent) = _extract_symrefs_and_agent(
                             server_capabilities
                         )
                         if ref_prefix is not None:
@@ -3198,8 +3198,8 @@ class AbstractHttpGitClient(GitClient):
 
         """
         url = self._get_url(path)
-        old_refs, server_capabilities, url, symrefs, peeled = self._discover_references(
-            b"git-receive-pack", url
+        old_refs, server_capabilities, url, _symrefs, _peeled = (
+            self._discover_references(b"git-receive-pack", url)
         )
         (
             negotiated_capabilities,
@@ -3278,7 +3278,7 @@ class AbstractHttpGitClient(GitClient):
 
         """
         url = self._get_url(path)
-        refs, server_capabilities, url, symrefs, peeled = self._discover_references(
+        refs, server_capabilities, url, symrefs, _peeled = self._discover_references(
             b"git-upload-pack",
             url,
             protocol_version=protocol_version,

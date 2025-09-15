@@ -70,7 +70,7 @@ class ParseObjectTests(TestCase):
 
     def test_combined_operators(self) -> None:
         r = MemoryRepo()
-        c1, c2, c3, c4 = build_commit_graph(
+        c1, c2, _c3, c4 = build_commit_graph(
             r.object_store, [[1], [2, 1], [3, 1, 2], [4, 3]]
         )
         # c4~1^2 means: go back 1 generation from c4 (to c3), then take its 2nd parent
@@ -256,12 +256,12 @@ class ParseCommitRangeTests(TestCase):
 
     def test_commit_by_sha(self) -> None:
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, _c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertIsNone(parse_commit_range(r, c1.id))
 
     def test_commit_range(self) -> None:
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         result = parse_commit_range(r, f"{c1.id.decode()}..{c2.id.decode()}")
         self.assertIsNotNone(result)
         start_commit, end_commit = result
@@ -534,13 +534,13 @@ class ParseTreeTests(TestCase):
 
     def test_from_commit(self) -> None:
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, _c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertEqual(r[c1.tree], parse_tree(r, c1.id))
         self.assertEqual(r[c1.tree], parse_tree(r, c1.tree))
 
     def test_from_ref(self) -> None:
         r = MemoryRepo()
-        c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
+        c1, _c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         r.refs[b"refs/heads/foo"] = c1.id
         self.assertEqual(r[c1.tree], parse_tree(r, b"foo"))
 

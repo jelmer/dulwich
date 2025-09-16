@@ -1050,20 +1050,19 @@ class Tag(ShaFile):
           keyid: Optional GPG key ID to use for signing. If not specified,
                  the default GPG key will be used.
         """
-        import gpg
+        import gnupg
+        gpg = gnupg.GPG()
 
-        with gpg.Context(armor=True) as c:
-            if keyid is not None:
-                key = c.get_key(keyid)
-                with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.signature, _unused_result = ctx.sign(
-                        self.as_raw_string(),
-                        mode=gpg.constants.sig.mode.DETACH,
-                    )
-            else:
-                self.signature, _unused_result = c.sign(
-                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
-                )
+        sig = gpg.sign(
+            self.as_raw_string(),
+            keyid=keyid,
+            clearsign=True,
+            detach=True,
+        )
+        if not sig:
+            raise RuntimeError("signing failed")
+        else:
+            self.signature = str(sig).encode("utf8")
 
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
@@ -1092,21 +1091,28 @@ class Tag(ShaFile):
         if self._signature is None:
             return
 
-        import gpg
+        import gnupg
+        gpg = gnupg.GPG()
 
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._signature,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in keys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
+        # no way to confirm with in-memory signature AND file (nor in
+        # Isis Lovecruft's version)
+
+        import tempfile
+        from io import BytesIO
+        datafname = tempfile.mktemp()
+        with open(datafname, 'wb') as f:
+            f.write(self.raw_without_sig())
+        verified = gpg.verify_file(BytesIO(self._signature), datafname)
+        if not verified:
+            raise RuntimeError("Bad signature")
+
+        if keyids:
+            available_keys = gpg.list_keys(keys=keyids)
+            for sig in verified.sig_info.values():
+                if sig["fingerprint"] in available_keys or \
+                   sig["pubkey_fingerprint"] in available_keys:
+                    return
+            raise RuntimeError("No valid signatures from specified keys")
 
 
 class TreeEntry(NamedTuple):

@@ -1,4 +1,4 @@
-0.24.2	UNRELEASED
+0.24.2	2025-09-25
 
  * Added ``porcelain.shortlog`` function to summarize commits by author,
    similar to git shortlog. (Muhammad Usama, #1693)

@@ -1,8 +1,9 @@
+---
 name: Build Python distributions
 
-on:
+"on":
   push:
-    branches: [ main, master ]
+    branches: [main, master]
     tags:
       - 'dulwich-*'
   pull_request:
@@ -188,4 +189,4 @@ jobs:
           pattern: artifact-*
           path: dist
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.10.4
+        uses: pypa/gh-action-pypi-publish@v1.13

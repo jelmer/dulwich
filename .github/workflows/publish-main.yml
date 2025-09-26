@@ -1,6 +1,7 @@
+---
 name: Publish main branch
 
-on:
+"on":
   push:
     branches:
       - master
@@ -11,32 +12,32 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0  # Fetch all history
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      
+
       - name: Install dulwich
         run: |
           pip install -e .
-      
+
       - name: Delete existing main branch if present
         run: |
           if git show-ref --verify refs/heads/main; then
             git branch -D main
           fi
-      
+
       - name: Run fix-history script
         run: |
           python devscripts/fix-history.py master main
-      
+
       - name: Push main branch
         run: |
           git push origin main --force

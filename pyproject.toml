@@ -73,6 +73,10 @@ ignore_missing_imports = true
 module = "atheris"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "fastimport"
+ignore_missing_imports = true
+
 [tool.setuptools]
 packages = [
     "dulwich",

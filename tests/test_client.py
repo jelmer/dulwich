@@ -178,7 +178,7 @@ class GitClientTests(TestCase):
         )
         self.rin.seek(0)
         ret = self.client.fetch_pack(
-            b"bla", lambda heads, **kwargs: [], None, None, None
+            b"bla", lambda heads, depth=None: [], None, None, None
         )
         self.assertEqual(
             {b"HEAD": b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"}, ret.refs
@@ -552,7 +552,7 @@ class TestGetTransportAndPath(TestCase):
             "ssh://git@github.com/user/repo.git", config=config
         )
         self.assertIsInstance(c, SSHGitClient)
-        self.assertIsNone(c.ssh_command)
+        self.assertEqual(c.ssh_command, "ssh")  # Now defaults to "ssh"
 
         config.set((b"core",), b"sshCommand", b"custom-ssh -o CustomOption=yes")
 
@@ -612,8 +612,9 @@ class TestGetTransportAndPath(TestCase):
 
         self.assertIsInstance(c, HttpGitClient)
         self.assertEqual("/jelmer/dulwich", path)
-        self.assertEqual("user", c._username)
-        self.assertEqual("passwd", c._password)
+        # Explicitly provided credentials should override URL credentials
+        self.assertEqual("user2", c._username)
+        self.assertEqual("blah", c._password)
 
     def test_http_no_auth(self) -> None:
         url = "https://github.com/jelmer/dulwich"
@@ -841,10 +842,10 @@ class SSHGitClientTests(TestCase):
         client._connect(b"command", b"/path/to/repo")
         self.assertEqual(b"username", server.username)
         self.assertEqual(1337, server.port)
-        self.assertEqual("git-command '/path/to/repo'", server.command)
+        self.assertEqual(b"git-command '/path/to/repo'", server.command)
 
         client._connect(b"relative-command", b"/~/path/to/repo")
-        self.assertEqual("git-relative-command '~/path/to/repo'", server.command)
+        self.assertEqual(b"git-relative-command '~/path/to/repo'", server.command)
 
     def test_ssh_command_precedence(self) -> None:
         self.overrideEnv("GIT_SSH", "/path/to/ssh")
@@ -862,11 +863,11 @@ class SSHGitClientTests(TestCase):
         # Test core.sshCommand config setting
         from dulwich.config import ConfigDict
 
-        # No config, no environment - should be None
+        # No config, no environment - should default to "ssh"
         self.overrideEnv("GIT_SSH", None)
         self.overrideEnv("GIT_SSH_COMMAND", None)
         test_client = SSHGitClient("git.samba.org")
-        self.assertIsNone(test_client.ssh_command)
+        self.assertEqual(test_client.ssh_command, "ssh")
 
         # Config with core.sshCommand
         config = ConfigDict()
@@ -947,7 +948,10 @@ class LocalGitClientTests(TestCase):
         out = BytesIO()
         walker = {}
         ret = c.fetch_pack(
-            s.path, lambda heads, **kwargs: [], graph_walker=walker, pack_data=out.write
+            s.path,
+            lambda heads, depth=None: [],
+            graph_walker=walker,
+            pack_data=out.write,
         )
         self.assertEqual(
             {
@@ -973,7 +977,7 @@ class LocalGitClientTests(TestCase):
         walker = MemoryRepo().get_graph_walker()
         ret = c.fetch_pack(
             s.path,
-            lambda heads, **kwargs: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
+            lambda heads, depth=None: [b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"],
             graph_walker=walker,
             pack_data=out.write,
         )
@@ -2255,38 +2259,38 @@ class GitCredentialStoreTests(TestCase):
         os.unlink(cls.fname)
 
     def test_nonmatching_scheme(self) -> None:
-        self.assertEqual(
-            get_credentials_from_store(b"http", b"example.org", fnames=[self.fname]),
-            None,
+        result = list(
+            get_credentials_from_store("http", "example.org", fnames=[self.fname])
         )
+        self.assertEqual(result, [])
 
     def test_nonmatching_hostname(self) -> None:
-        self.assertEqual(
-            get_credentials_from_store(b"https", b"noentry.org", fnames=[self.fname]),
-            None,
+        result = list(
+            get_credentials_from_store("https", "noentry.org", fnames=[self.fname])
         )
+        self.assertEqual(result, [])
 
     def test_match_without_username(self) -> None:
-        self.assertEqual(
-            get_credentials_from_store(b"https", b"example.org", fnames=[self.fname]),
-            (b"user", b"pass"),
+        result = list(
+            get_credentials_from_store("https", "example.org", fnames=[self.fname])
         )
+        self.assertEqual(result, [("user", "pass")])
 
     def test_match_with_matching_username(self) -> None:
-        self.assertEqual(
+        result = list(
             get_credentials_from_store(
-                b"https", b"example.org", b"user", fnames=[self.fname]
-            ),
-            (b"user", b"pass"),
+                "https", "example.org", "user", fnames=[self.fname]
+            )
         )
+        self.assertEqual(result, [("user", "pass")])
 
     def test_no_match_with_nonmatching_username(self) -> None:
-        self.assertEqual(
+        result = list(
             get_credentials_from_store(
-                b"https", b"example.org", b"otheruser", fnames=[self.fname]
-            ),
-            None,
+                "https", "example.org", "otheruser", fnames=[self.fname]
+            )
         )
+        self.assertEqual(result, [])
 
 
 class RemoteErrorFromStderrTests(TestCase):

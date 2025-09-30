@@ -36,6 +36,7 @@ from typing import (
     TYPE_CHECKING,
     NamedTuple,
     Optional,
+    TypeVar,
     Union,
 )
 
@@ -153,9 +154,10 @@ def valid_hexsha(hex: Union[bytes, str]) -> bool:
         return True
 
 
-def hex_to_filename(
-    path: Union[str, bytes], hex: Union[str, bytes]
-) -> Union[str, bytes]:
+PathT = TypeVar("PathT", str, bytes)
+
+
+def hex_to_filename(path: PathT, hex: Union[str, bytes]) -> PathT:
     """Takes a hex sha and returns its filename relative to the given path."""
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
@@ -1112,9 +1114,9 @@ class Tag(ShaFile):
 class TreeEntry(NamedTuple):
     """Named tuple encapsulating a single tree entry."""
 
-    path: bytes
-    mode: int
-    sha: bytes
+    path: Optional[bytes]
+    mode: Optional[int]
+    sha: Optional[bytes]
 
     def in_path(self, path: bytes) -> "TreeEntry":
         """Return a copy of this entry with the given path prepended."""
@@ -1390,7 +1392,7 @@ class Tree(ShaFile):
             last = entry
 
     def _serialize(self) -> list[bytes]:
-        return list(serialize_tree(self.iteritems()))
+        return list(serialize_tree(self.iteritems()))  # type: ignore[arg-type]
 
     def as_pretty_string(self) -> str:
         """Return a human-readable string representation of this tree.
@@ -1399,8 +1401,13 @@ class Tree(ShaFile):
           Pretty-printed tree entries
         """
         text: list[str] = []
-        for name, mode, hexsha in self.iteritems():
-            text.append(pretty_format_tree_entry(name, mode, hexsha))
+        for entry in self.iteritems():
+            if (
+                entry.path is not None
+                and entry.mode is not None
+                and entry.sha is not None
+            ):
+                text.append(pretty_format_tree_entry(entry.path, entry.mode, entry.sha))
         return "".join(text)
 
     def lookup_path(

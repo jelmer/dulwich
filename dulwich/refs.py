@@ -36,7 +36,6 @@ from typing import (
     Optional,
     TypeVar,
     Union,
-    cast,
 )
 
 if TYPE_CHECKING:
@@ -153,12 +152,12 @@ class RefsContainer:
             Callable[
                 [
                     bytes,
-                    Optional[bytes],
-                    Optional[bytes],
+                    bytes,
+                    bytes,
                     Optional[bytes],
                     Optional[int],
                     Optional[int],
-                    Optional[bytes],
+                    bytes,
                 ],
                 None,
             ]
@@ -181,6 +180,11 @@ class RefsContainer:
             return
         if message is None:
             return
+        # Use ZERO_SHA for None values, matching git behavior
+        if old_sha is None:
+            old_sha = ZERO_SHA
+        if new_sha is None:
+            new_sha = ZERO_SHA
         self._logger(ref, old_sha, new_sha, committer, timestamp, timezone, message)
 
     def set_symbolic_ref(
@@ -282,7 +286,7 @@ class RefsContainer:
         """Iterate over all reference keys."""
         return iter(self.allkeys())
 
-    def keys(self, base=None):
+    def keys(self, base: Optional[bytes] = None) -> set[bytes]:
         """Refs present in this container.
 
         Args:
@@ -799,18 +803,18 @@ class DiskRefsContainer(RefsContainer):
 
     def __init__(
         self,
-        path: Union[str, bytes, os.PathLike],
-        worktree_path: Optional[Union[str, bytes, os.PathLike]] = None,
+        path: Union[str, bytes, os.PathLike[str]],
+        worktree_path: Optional[Union[str, bytes, os.PathLike[str]]] = None,
         logger: Optional[
             Callable[
                 [
                     bytes,
-                    Optional[bytes],
-                    Optional[bytes],
+                    bytes,
+                    bytes,
                     Optional[bytes],
                     Optional[int],
                     Optional[int],
-                    Optional[bytes],
+                    bytes,
                 ],
                 None,
             ]
@@ -1378,7 +1382,7 @@ def read_packed_refs_with_peeled(
     """
     last = None
     for line in f:
-        if line[0] == b"#":
+        if line.startswith(b"#"):
             continue
         line = line.rstrip(b"\r\n")
         if line.startswith(b"^"):
@@ -1504,7 +1508,7 @@ def _set_default_branch(
     refs: RefsContainer,
     origin: bytes,
     origin_head: Optional[bytes],
-    branch: bytes,
+    branch: Optional[bytes],
     ref_message: Optional[bytes],
 ) -> bytes:
     """Set the default branch."""
@@ -1764,7 +1768,7 @@ def filter_ref_prefix(refs: T, prefixes: Iterable[bytes]) -> T:
       prefixes: The prefixes to filter by.
     """
     filtered = {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
-    return cast(T, filtered)
+    return filtered
 
 
 def is_per_worktree_ref(ref: bytes) -> bool:

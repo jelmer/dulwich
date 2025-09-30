@@ -184,7 +184,7 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
 
         try:
             # Fetch from dumb HTTP
-            def determine_wants(refs):
+            def determine_wants(refs, depth=None):
                 return [
                     sha for ref, sha in refs.items() if ref.startswith(b"refs/heads/")
                 ]
@@ -238,7 +238,7 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
         try:
             old_refs = dest_repo.get_refs()
 
-            def determine_wants(refs):
+            def determine_wants(refs, depth=None):
                 wants = []
                 for ref, sha in refs.items():
                     if ref.startswith(b"refs/heads/") and sha != old_refs.get(ref):
@@ -285,7 +285,7 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
         try:
             client = HttpGitClient(self.server.url)
 
-            def determine_wants(refs):
+            def determine_wants(refs, depth=None):
                 return [
                     sha
                     for ref, sha in refs.items()

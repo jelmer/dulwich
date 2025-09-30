@@ -22,6 +22,31 @@
 
 """HTTP server for dulwich that implements the git smart HTTP protocol."""
 
+__all__ = [
+    "HTTP_FORBIDDEN",
+    "HTTP_NOT_FOUND",
+    "HTTP_OK",
+    "GunzipFilter",
+    "HTTPGitApplication",
+    "HTTPGitRequest",
+    "LimitedInputFilter",
+    "WSGIRequestHandlerLogger",
+    "WSGIServerLogger",
+    "date_time_string",
+    "generate_info_refs",
+    "generate_objects_info_packs",
+    "get_info_packs",
+    "get_info_refs",
+    "get_loose_object",
+    "get_pack_file",
+    "get_text_file",
+    "handle_service_request",
+    "main",
+    "make_server",
+    "make_wsgi_chain",
+    "send_file",
+]
+
 import os
 import re
 import sys
@@ -29,7 +54,16 @@ import time
 from collections.abc import Iterable, Iterator
 from io import BytesIO
 from types import TracebackType
-from typing import Any, BinaryIO, Callable, ClassVar, Optional, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    BinaryIO,
+    Callable,
+    ClassVar,
+    Optional,
+    Union,
+    cast,
+)
 from urllib.parse import parse_qs
 from wsgiref.simple_server import (
     ServerHandler,
@@ -43,8 +77,6 @@ if sys.version_info >= (3, 11):
     from wsgiref.types import StartResponse, WSGIApplication, WSGIEnvironment
 else:
     # Fallback type definitions for Python < 3.11
-    from typing import TYPE_CHECKING
-
     if TYPE_CHECKING:
         # For type checking, use the _typeshed types if available
         try:
@@ -79,8 +111,9 @@ else:
 
 from dulwich import log_utils
 
+from .errors import NotGitRepository
 from .protocol import ReceivableProtocol
-from .repo import BaseRepo, NotGitRepository, Repo
+from .repo import BaseRepo, Repo
 from .server import (
     DEFAULT_HANDLERS,
     Backend,
@@ -89,6 +122,37 @@ from .server import (
     generate_info_refs,
     generate_objects_info_packs,
 )
+
+if TYPE_CHECKING:
+    from typing import Protocol as TypingProtocol
+
+    from .protocol import Protocol
+
+    class HandlerConstructor(TypingProtocol):
+        """Protocol for handler constructors."""
+
+        def __call__(
+            self,
+            backend: Backend,
+            args: list[bytes],
+            proto: Protocol,
+            stateless_rpc: bool = False,
+            advertise_refs: bool = False,
+        ) -> Handler:
+            """Create a handler instance.
+
+            Args:
+                backend: The backend to use for the handler
+                args: Arguments for the handler
+                proto: Protocol object for communication
+                stateless_rpc: Whether to use stateless RPC mode
+                advertise_refs: Whether to advertise references
+
+            Returns:
+                A Handler instance
+            """
+            ...
+
 
 logger = log_utils.getLogger(__name__)
 
@@ -348,13 +412,16 @@ def get_info_refs(
             return len(data) if result is not None else None
 
         proto = ReceivableProtocol(BytesIO().read, write_fn)
+        from typing import Any, cast
+
         handler = handler_cls(
             backend,
-            [url_prefix(mat)],
+            cast(Any, [url_prefix(mat)]),  # handler_cls could expect bytes or str
             proto,
             stateless_rpc=True,
             advertise_refs=True,
         )
+        assert handler is not None
         handler.proto.write_pkt_line(b"# service=" + service.encode("ascii") + b"\n")
         handler.proto.write_pkt_line(None)
         handler.handle()
@@ -500,7 +567,10 @@ def handle_service_request(
     proto = ReceivableProtocol(read, write_fn)
     # TODO(jelmer): Find a way to pass in repo, rather than having handler_cls
     # reopen.
-    handler = handler_cls(backend, [url_prefix(mat)], proto, stateless_rpc=True)
+    handler = handler_cls(
+        backend, [url_prefix(mat).encode("utf-8")], proto, stateless_rpc=True
+    )
+    assert handler is not None
     handler.handle()
 
 
@@ -516,7 +586,9 @@ class HTTPGitRequest:
         environ: WSGIEnvironment,
         start_response: StartResponse,
         dumb: bool = False,
-        handlers: Optional[dict[bytes, Callable]] = None,
+        handlers: Optional[
+            dict[bytes, Union["HandlerConstructor", Callable[..., Any]]]
+        ] = None,
     ) -> None:
         """Initialize HTTPGitRequest.
 
@@ -591,8 +663,8 @@ class HTTPGitApplication:
 
     services: ClassVar[
         dict[
-            tuple[str, re.Pattern],
-            Callable[[HTTPGitRequest, Backend, re.Match], Iterator[bytes]],
+            tuple[str, re.Pattern[str]],
+            Callable[[HTTPGitRequest, Backend, re.Match[str]], Iterator[bytes]],
         ]
     ] = {
         ("GET", re.compile("/HEAD$")): get_text_file,
@@ -620,7 +692,9 @@ class HTTPGitApplication:
         self,
         backend: Backend,
         dumb: bool = False,
-        handlers: Optional[dict[bytes, Callable]] = None,
+        handlers: Optional[
+            dict[bytes, Union["HandlerConstructor", Callable[..., Any]]]
+        ] = None,
         fallback_app: Optional[WSGIApplication] = None,
     ) -> None:
         """Initialize HTTPGitApplication.
@@ -633,8 +707,8 @@ class HTTPGitApplication:
         """
         self.backend = backend
         self.dumb = dumb
-        self.handlers: dict[bytes, Union[type[Handler], Callable[..., Any]]] = dict(
-            DEFAULT_HANDLERS
+        self.handlers: dict[bytes, Union[HandlerConstructor, Callable[..., Any]]] = (
+            dict(DEFAULT_HANDLERS)
         )
         self.fallback_app = fallback_app
         if handlers is not None:
@@ -843,7 +917,11 @@ def main(argv: list[str] = sys.argv) -> None:
         gitdir = os.getcwd()
 
     log_utils.default_logging_config()
-    backend = DictBackend({"/": Repo(gitdir)})
+    from typing import cast
+
+    from dulwich.server import BackendRepo
+
+    backend = DictBackend({"/": cast(BackendRepo, Repo(gitdir))})
     app = make_wsgi_chain(backend)
     server = make_server(
         options.listen_address,

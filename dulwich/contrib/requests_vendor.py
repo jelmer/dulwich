@@ -31,8 +31,9 @@ the dulwich.client.HttpGitClient attribute:
 This implementation is experimental and does not have any tests.
 """
 
+from collections.abc import Iterator
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 if TYPE_CHECKING:
     from ..config import ConfigFile
@@ -58,7 +59,10 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         config: Optional["ConfigFile"] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
-        **kwargs: object,
+        thin_packs: bool = True,
+        report_activity: Optional[Callable[[int, str], None]] = None,
+        quiet: bool = False,
+        include_tags: bool = False,
     ) -> None:
         """Initialize RequestsHttpGitClient.
 
@@ -68,7 +72,10 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
           config: Git configuration file
           username: Username for authentication
           password: Password for authentication
-          **kwargs: Additional keyword arguments
+          thin_packs: Whether to use thin packs
+          report_activity: Function to report activity
+          quiet: Whether to suppress output
+          include_tags: Whether to include tags
         """
         self._username = username
         self._password = password
@@ -79,24 +86,27 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
             self.session.auth = (username, password)  # type: ignore[assignment]
 
         super().__init__(
-            base_url=base_url, dumb=bool(dumb) if dumb is not None else False, **kwargs
+            base_url=base_url,
+            dumb=bool(dumb) if dumb is not None else False,
+            thin_packs=thin_packs,
+            report_activity=report_activity,
+            quiet=quiet,
+            include_tags=include_tags,
         )
 
     def _http_request(
         self,
         url: str,
         headers: Optional[dict[str, str]] = None,
-        data: Optional[bytes] = None,
-        allow_compression: bool = False,
+        data: Optional[Union[bytes, Iterator[bytes]]] = None,
+        raise_for_status: bool = True,
     ) -> tuple[Any, Callable[[int], bytes]]:
         req_headers = self.session.headers.copy()  # type: ignore[attr-defined]
         if headers is not None:
             req_headers.update(headers)
 
-        if allow_compression:
-            req_headers["Accept-Encoding"] = "gzip"
-        else:
-            req_headers["Accept-Encoding"] = "identity"
+        # Accept compression by default
+        req_headers.setdefault("Accept-Encoding", "gzip")
 
         if data:
             resp = self.session.post(url, headers=req_headers, data=data)

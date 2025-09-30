@@ -84,7 +84,7 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         object_store: BaseObjectStore,
         haves: list[ObjectID],
         wants: list[ObjectID],
-        progress: Optional[Callable[[str], None]] = None,
+        progress: Optional[Callable[[bytes], None]] = None,
         get_tagged: Optional[Callable[[], dict[ObjectID, ObjectID]]] = None,
         concurrency: int = 1,
         get_parents: Optional[Callable[[ObjectID], list[ObjectID]]] = None,
@@ -129,12 +129,12 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         for t in have_tags:
             self.sha_done.add(t)
         missing_tags = want_tags.difference(have_tags)
-        wants = missing_commits.union(missing_tags)
+        all_wants = missing_commits.union(missing_tags)
         self.objects_to_send: set[
             tuple[ObjectID, Optional[bytes], Optional[int], bool]
-        ] = {(w, None, 0, False) for w in wants}
+        ] = {(w, None, 0, False) for w in all_wants}
         if progress is None:
-            self.progress = lambda x: None
+            self.progress: Callable[[bytes], None] = lambda x: None
         else:
             self.progress = progress
         self._tagged = (get_tagged and get_tagged()) or {}

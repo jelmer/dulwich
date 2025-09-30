@@ -24,12 +24,25 @@
 import os
 import tempfile
 import warnings
-from typing import Callable, Optional
+from typing import Callable, Optional, TypedDict
 
 from .index import Index, build_index_from_tree
 from .object_store import BaseObjectStore
 from .objects import Commit, Tag, Tree
 from .refs import RefsContainer
+
+
+class CommitData(TypedDict, total=False):
+    """TypedDict for commit data fields."""
+
+    author: bytes
+    author_time: int
+    author_timezone: int
+    committer: bytes
+    commit_time: int
+    commit_timezone: int
+    message: bytes
+    encoding: bytes
 
 
 class CommitFilter:
@@ -39,7 +52,7 @@ class CommitFilter:
         self,
         object_store: BaseObjectStore,
         *,
-        filter_fn: Optional[Callable[[Commit], Optional[dict[str, bytes]]]] = None,
+        filter_fn: Optional[Callable[[Commit], Optional[CommitData]]] = None,
         filter_author: Optional[Callable[[bytes], Optional[bytes]]] = None,
         filter_committer: Optional[Callable[[bytes], Optional[bytes]]] = None,
         filter_message: Optional[Callable[[bytes], Optional[bytes]]] = None,
@@ -122,6 +135,7 @@ class CommitFilter:
             for entry in current_tree.items():
                 if entry.path == part:
                     try:
+                        assert entry.sha is not None
                         obj = self.object_store[entry.sha]
                         if isinstance(obj, Tree):
                             current_tree = obj
@@ -267,7 +281,7 @@ class CommitFilter:
                 return new_parents[0]
 
         # Apply filters
-        new_data = {}
+        new_data: CommitData = {}
 
         # Custom filter function takes precedence
         if self.filter_fn:

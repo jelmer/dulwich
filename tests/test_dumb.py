@@ -263,10 +263,12 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
 
         graph_walker = Mock()
 
-        def determine_wants(refs: dict[bytes, bytes]) -> list[bytes]:
+        def determine_wants(
+            refs: dict[bytes, bytes], depth: Optional[int] = None
+        ) -> list[bytes]:
             return []
 
-        result = list(self.repo.fetch_pack_data(graph_walker, determine_wants))
+        result = list(self.repo.fetch_pack_data(determine_wants, graph_walker))
         self.assertEqual([], result)
 
     def test_fetch_pack_data_with_blob(self) -> None:
@@ -288,14 +290,16 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         graph_walker = Mock()
         graph_walker.ack.return_value = []  # No existing objects
 
-        def determine_wants(refs: dict[bytes, bytes]) -> list[bytes]:
+        def determine_wants(
+            refs: dict[bytes, bytes], depth: Optional[int] = None
+        ) -> list[bytes]:
             return [blob_sha]
 
         def progress(msg: bytes) -> None:
             assert isinstance(msg, bytes)
 
         result = list(
-            self.repo.fetch_pack_data(graph_walker, determine_wants, progress)
+            self.repo.fetch_pack_data(determine_wants, graph_walker, progress)
         )
         self.assertEqual(1, len(result))
         self.assertEqual(Blob.type_num, result[0].pack_type_num)

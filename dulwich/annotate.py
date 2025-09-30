@@ -36,9 +36,9 @@ from dulwich.walk import (
 )
 
 if TYPE_CHECKING:
-    from dulwich.diff_tree import TreeChange, TreeEntry
+    from dulwich.diff_tree import TreeChange
     from dulwich.object_store import BaseObjectStore
-    from dulwich.objects import Commit
+    from dulwich.objects import Commit, TreeEntry
 
 # Walk over ancestry graph breadth-first
 # When checking each revision, find lines that according to difflib.Differ()
@@ -103,13 +103,14 @@ def annotate_lines(
                 changes = [tree_change]
             for change in changes:
                 if change.new is not None and change.new.path == path:
-                    if change.old is not None:
+                    if change.old is not None and change.old.path is not None:
                         path = change.old.path
                     revs.append((log_entry.commit, change.new))
                     break
 
     lines_annotated: list[tuple[tuple[Commit, TreeEntry], bytes]] = []
     for commit, entry in reversed(revs):
+        assert entry.sha is not None
         blob_obj = store[entry.sha]
         assert isinstance(blob_obj, Blob)
         lines_annotated = update_lines(lines_annotated, (commit, entry), blob_obj)

@@ -83,9 +83,9 @@ else:
             from _typeshed.wsgi import StartResponse, WSGIApplication, WSGIEnvironment
         except ImportError:
             # Define our own protocol types for type checking
-            from typing import Protocol
+            from typing import Protocol as TypingProtocol
 
-            class StartResponse(Protocol):  # type: ignore[no-redef]
+            class StartResponse(TypingProtocol):  # type: ignore[no-redef]
                 """WSGI start_response callable protocol."""
 
                 def __call__(

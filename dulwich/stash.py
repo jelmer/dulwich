@@ -162,7 +162,7 @@ class Stash:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(  # type: ignore[misc]
+            def symlink_fn(  # type: ignore[misc,unused-ignore]
                 src: Union[str, bytes],
                 dst: Union[str, bytes],
                 target_is_directory: bool = False,
@@ -248,7 +248,7 @@ class Stash:
                     tree_entry2.mode,
                     full_path,
                     honor_filemode=honor_filemode,
-                    symlink_fn=symlink_fn,
+                    symlink_fn=symlink_fn,  # type: ignore[arg-type,unused-ignore]
                 )
 
             # Update index if the file wasn't already staged

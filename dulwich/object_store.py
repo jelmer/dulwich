@@ -1459,7 +1459,7 @@ class DiskObjectStore(PackBasedObjectStore):
             os.remove(pack.index.path)
 
     def _get_pack_basepath(
-        self, entries: Iterable[tuple[bytes, int, int | None]]
+        self, entries: Iterable[tuple[bytes, int, Union[int, None]]]
     ) -> str:
         suffix_bytes = iter_sha1(entry[0] for entry in entries)
         # TODO: Handle self.pack_dir being bytes

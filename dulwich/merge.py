@@ -1,12 +1,15 @@
 """Git merge implementation."""
 
 from difflib import SequenceMatcher
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-try:
+if TYPE_CHECKING:
     import merge3
-except ImportError:
-    merge3 = None
+else:
+    try:
+        import merge3
+    except ImportError:
+        merge3 = None  # type: ignore[assignment]
 
 from dulwich.attrs import GitAttributes
 from dulwich.config import Config
@@ -62,7 +65,7 @@ def _can_merge_lines(
 
 if merge3 is not None:
 
-    def _merge3_to_bytes(m: merge3.Merge3) -> bytes:
+    def _merge3_to_bytes(m: "merge3.Merge3") -> bytes:
         """Convert merge3 result to bytes with conflict markers.
 
         Args:
@@ -72,7 +75,7 @@ if merge3 is not None:
             Merged content as bytes
         """
         result = []
-        for group in m.merge_groups():
+        for group in m.merge_groups():  # type: ignore[no-untyped-call,unused-ignore]
             if group[0] == "unchanged":
                 result.extend(group[1])
             elif group[0] == "a":

@@ -235,7 +235,7 @@ def _get_sequence_matcher(
         try:
             from patiencediff import PatienceSequenceMatcher
 
-            return PatienceSequenceMatcher(None, a, b)
+            return PatienceSequenceMatcher(None, a, b)  # type: ignore[no-any-return,unused-ignore]
         except ImportError:
             raise DiffAlgorithmNotAvailable(
                 "patience", "Install with: pip install 'dulwich[patiencediff]'"

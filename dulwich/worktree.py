@@ -644,7 +644,7 @@ class WorkTree:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(  # type: ignore[misc]
+            def symlink_fn(  # type: ignore[misc,unused-ignore]
                 src: Union[str, bytes],
                 dst: Union[str, bytes],
                 target_is_directory: bool = False,
@@ -662,7 +662,7 @@ class WorkTree:
             tree,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
-            symlink_fn=symlink_fn,
+            symlink_fn=symlink_fn,  # type: ignore[arg-type,unused-ignore]
             blob_normalizer=blob_normalizer,
         )
 

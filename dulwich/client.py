@@ -244,7 +244,7 @@ def _fileno_can_read(fileno: int) -> bool:
 
 def _win32_peek_avail(handle: int) -> int:
     """Wrapper around PeekNamedPipe to check how many bytes are available."""
-    from ctypes import (  # type: ignore[attr-defined]
+    from ctypes import (  # type: ignore[attr-defined,unused-ignore]
         byref,
         windll,
         wintypes,
@@ -256,7 +256,7 @@ def _win32_peek_avail(handle: int) -> int:
         handle, None, 0, None, byref(c_avail), byref(c_message)
     )
     if not success:
-        from ctypes import GetLastError  # type: ignore[attr-defined]
+        from ctypes import GetLastError  # type: ignore[attr-defined,unused-ignore]
 
         raise OSError(GetLastError())
     return c_avail.value

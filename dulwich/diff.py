@@ -48,8 +48,14 @@ import io
 import logging
 import os
 import stat
-from collections.abc import Buffer, Iterable
+import sys
+from collections.abc import Iterable
 from typing import BinaryIO, Optional, Union
+
+if sys.version_info >= (3, 12):
+    from collections.abc import Buffer
+else:
+    Buffer = Union[bytes, bytearray, memoryview]
 
 from .index import ConflictedIndexEntry, commit_index
 from .object_store import iter_tree_contents
@@ -566,7 +572,7 @@ class ColorizedDiffStream(BinaryIO):
         self.console = Console(file=self.text_wrapper, force_terminal=True)
         self.buffer = b""
 
-    def write(self, data: Union[bytes, Buffer]) -> int:
+    def write(self, data: Union[bytes, Buffer]) -> int:  # type: ignore[override,unused-ignore]
         """Write data to the stream, applying colorization.
 
         Args:
@@ -587,7 +593,7 @@ class ColorizedDiffStream(BinaryIO):
 
         return len(data)
 
-    def writelines(self, lines: Iterable[Union[bytes, Buffer]]) -> None:
+    def writelines(self, lines: Iterable[Union[bytes, Buffer]]) -> None:  # type: ignore[override,unused-ignore]
         """Write a list of lines to the stream.
 
         Args:

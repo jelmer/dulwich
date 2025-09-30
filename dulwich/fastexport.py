@@ -101,7 +101,7 @@ class GitFastExporter:
         """
         marker = self._allocate_marker()
         self.markers[marker] = blob.id
-        return (commands.BlobCommand(marker, blob.data), marker)
+        return (commands.BlobCommand(marker, blob.data), marker)  # type: ignore[no-untyped-call,unused-ignore]
 
     def emit_blob(self, blob: Blob) -> bytes:
         """Emit a blob to the output stream.
@@ -126,7 +126,7 @@ class GitFastExporter:
         ) in self.store.tree_changes(base_tree, new_tree):
             if new_path is None:
                 if old_path is not None:
-                    yield commands.FileDeleteCommand(old_path)
+                    yield commands.FileDeleteCommand(old_path)  # type: ignore[no-untyped-call,unused-ignore]
                 continue
             marker = b""
             if new_mode is not None and not stat.S_ISDIR(new_mode):
@@ -137,10 +137,10 @@ class GitFastExporter:
                     if isinstance(blob, Blob):
                         marker = self.emit_blob(blob)
             if old_path != new_path and old_path is not None:
-                yield commands.FileRenameCommand(old_path, new_path)
+                yield commands.FileRenameCommand(old_path, new_path)  # type: ignore[no-untyped-call,unused-ignore]
             if old_mode != new_mode or old_hexsha != new_hexsha:
                 prefixed_marker = b":" + marker
-                yield commands.FileModifyCommand(
+                yield commands.FileModifyCommand(  # type: ignore[no-untyped-call,unused-ignore]
                     new_path, new_mode, prefixed_marker, None
                 )
 
@@ -157,7 +157,7 @@ class GitFastExporter:
             merges = []
         author, author_email = split_email(commit.author)
         committer, committer_email = split_email(commit.committer)
-        cmd = commands.CommitCommand(
+        cmd = commands.CommitCommand(  # type: ignore[no-untyped-call,unused-ignore]
             ref,
             marker,
             (author, author_email, commit.author_time, commit.author_timezone),
@@ -192,7 +192,7 @@ class GitFastExporter:
         return marker
 
 
-class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc]
+class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused-ignore]
     """An import processor that imports into a Git repository using Dulwich."""
 
     # FIXME: Batch creation of objects?
@@ -212,7 +212,7 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc]
           verbose: Whether to enable verbose output
           outf: Output file for verbose messages
         """
-        processor.ImportProcessor.__init__(self, params, verbose)
+        processor.ImportProcessor.__init__(self, params, verbose)  # type: ignore[no-untyped-call,unused-ignore]
         self.repo = repo
         self.last_commit = ZERO_SHA
         self.markers: dict[bytes, bytes] = {}
@@ -240,8 +240,8 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc]
         Returns:
           Dictionary of markers to object IDs
         """
-        p = parser.ImportParser(stream)
-        self.process(p.iter_commands)
+        p = parser.ImportParser(stream)  # type: ignore[no-untyped-call,unused-ignore]
+        self.process(p.iter_commands)  # type: ignore[no-untyped-call,unused-ignore]
         return self.markers
 
     def blob_handler(self, cmd: commands.BlobCommand) -> None:
@@ -279,7 +279,7 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc]
         if cmd.from_:
             cmd.from_ = self.lookup_object(cmd.from_)
             self._reset_base(cmd.from_)
-        for filecmd in cmd.iter_files():
+        for filecmd in cmd.iter_files():  # type: ignore[no-untyped-call,unused-ignore]
             if filecmd.name == b"filemodify":
                 if filecmd.data is not None:
                     blob = Blob.from_string(filecmd.data)
@@ -356,4 +356,4 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc]
 
     def feature_handler(self, cmd: commands.FeatureCommand) -> None:
         """Process a FeatureCommand."""
-        raise fastimport_errors.UnknownFeature(cmd.feature_name)
+        raise fastimport_errors.UnknownFeature(cmd.feature_name)  # type: ignore[no-untyped-call,unused-ignore]

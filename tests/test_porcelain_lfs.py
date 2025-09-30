@@ -174,7 +174,7 @@ class LFSPorcelainTestCase(TestCase):
 
         self.assertEqual(len(lfs_files), 1)
         path, _oid, size = lfs_files[0]
-        self.assertEqual(path, "large.bin")
+        self.assertEqual(path, b"large.bin")
         self.assertEqual(size, len(test_content))
 
     def test_lfs_migrate(self):

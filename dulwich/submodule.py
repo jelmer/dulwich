@@ -29,13 +29,13 @@ from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK
 
 if TYPE_CHECKING:
-    from .object_store import ObjectContainer
+    from .pack import ObjectContainer
     from .repo import Repo
 
 
 def iter_cached_submodules(
     store: "ObjectContainer", root_tree_id: bytes
-) -> Iterator[tuple[str, bytes]]:
+) -> Iterator[tuple[bytes, bytes]]:
     """Iterate over cached submodules.
 
     Args:
@@ -46,7 +46,10 @@ def iter_cached_submodules(
       Iterator over over (path, sha) tuples
     """
     for entry in iter_tree_contents(store, root_tree_id):
+        assert entry.mode is not None
         if S_ISGITLINK(entry.mode):
+            assert entry.path is not None
+            assert entry.sha is not None
             yield entry.path, entry.sha
 
 

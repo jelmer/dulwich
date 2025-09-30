@@ -164,12 +164,8 @@ def apply_included_paths(
             blob_obj = repo.object_store[index_entry.sha]
         except KeyError:
             return True
-        # Create a temporary blob for normalization
-        temp_blob = Blob()
-        temp_blob.data = disk_data
-        norm_blob = normalizer.checkin_normalize(
-            temp_blob, os.path.relpath(full_path, repo.path).encode()
-        )
+        disk_blob = Blob.from_string(disk_data)
+        norm_blob = normalizer.checkin_normalize(disk_blob, full_path.encode("utf-8"))
         norm_data = norm_blob.data
         if not isinstance(blob_obj, Blob):
             return True

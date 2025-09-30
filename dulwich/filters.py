@@ -398,7 +398,7 @@ class ProcessFilterDriver:
                             try:
                                 import signal
 
-                                os.kill(self._process.pid, signal.SIGKILL)
+                                os.kill(self._process.pid, signal.SIGKILL)  # type: ignore[attr-defined,unused-ignore]
                                 self._process.wait(timeout=1)
                             except (ProcessLookupError, subprocess.TimeoutExpired):
                                 pass

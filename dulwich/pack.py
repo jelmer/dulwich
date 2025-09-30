@@ -2294,7 +2294,7 @@ class SHA1Writer(BinaryIO):
         self.sha1 = sha1(b"")
         self.digest: Optional[bytes] = None
 
-    def write(self, data: Buffer, /) -> int:
+    def write(self, data: Union[bytes, bytearray, memoryview], /) -> int:  # type: ignore[override]
         """Write data and update SHA1.
 
         Args:
@@ -2859,7 +2859,11 @@ def full_unpacked_object(o: ShaFile) -> UnpackedObject:
 
 
 def write_pack_from_container(
-    write: Union[Callable[[bytes], None], Callable[[Buffer], int], IO[bytes]],
+    write: Union[
+        Callable[[bytes], None],
+        Callable[[Union[bytes, bytearray, memoryview]], int],
+        IO[bytes],
+    ],
     container: PackedObjectContainer,
     object_ids: Sequence[tuple[ObjectID, Optional[PackHint]]],
     delta_window_size: Optional[int] = None,
@@ -3043,7 +3047,11 @@ class PackChunkGenerator:
 
 
 def write_pack_data(
-    write: Union[Callable[[bytes], None], Callable[[Buffer], int], IO[bytes]],
+    write: Union[
+        Callable[[bytes], None],
+        Callable[[Union[bytes, bytearray, memoryview]], int],
+        IO[bytes],
+    ],
     records: Iterator[UnpackedObject],
     *,
     num_records: Optional[int] = None,
@@ -3075,7 +3083,9 @@ def write_pack_data(
 
 
 def write_pack_index_v1(
-    f: IO[bytes], entries: Iterable[tuple[bytes, int, int | None]], pack_checksum: bytes
+    f: IO[bytes],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
+    pack_checksum: bytes,
 ) -> bytes:
     """Write a new pack index file.
 
@@ -3257,7 +3267,9 @@ def apply_delta(
 
 
 def write_pack_index_v2(
-    f: IO[bytes], entries: Iterable[tuple[bytes, int, int | None]], pack_checksum: bytes
+    f: IO[bytes],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
+    pack_checksum: bytes,
 ) -> bytes:
     """Write a new pack index file.
 
@@ -3298,7 +3310,7 @@ def write_pack_index_v2(
 
 def write_pack_index_v3(
     f: IO[bytes],
-    entries: Iterable[tuple[bytes, int, int | None]],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
     pack_checksum: bytes,
     hash_algorithm: int = 1,
 ) -> bytes:
@@ -3378,7 +3390,7 @@ def write_pack_index_v3(
 
 def write_pack_index(
     f: IO[bytes],
-    entries: Iterable[tuple[bytes, int, int | None]],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
     pack_checksum: bytes,
     progress: Optional[Callable[..., None]] = None,
     version: Optional[int] = None,

@@ -134,12 +134,12 @@ class ProcessFilterDriver:
         self.required = required
         self.cwd = cwd
         self.process_cmd = process_cmd
-        self._process: Optional[subprocess.Popen] = None
+        self._process: Optional[subprocess.Popen[bytes]] = None
         self._protocol: Optional[Protocol] = None
         self._capabilities: set[bytes] = set()
         self._process_lock = threading.Lock()
 
-    def _get_or_start_process(self):
+    def _get_or_start_process(self) -> Optional["Protocol"]:
         """Get or start the long-running process filter."""
         if self._process is None and self.process_cmd:
             from .errors import HangupException
@@ -164,12 +164,16 @@ class ProcessFilterDriver:
                     )
 
                 # Create protocol wrapper
-                def write_func(data):
+                def write_func(data: bytes) -> int:
+                    assert self._process is not None
+                    assert self._process.stdin is not None
                     n = self._process.stdin.write(data)
                     self._process.stdin.flush()
                     return n
 
-                def read_func(size):
+                def read_func(size: int) -> bytes:
+                    assert self._process is not None
+                    assert self._process.stdout is not None
                     return self._process.stdout.read(size)
 
                 self._protocol = Protocol(read_func, write_func)
@@ -186,9 +190,9 @@ class ProcessFilterDriver:
 
                 # Verify handshake (be liberal - accept with or without newlines)
                 if welcome and welcome.rstrip(b"\n\r") != b"git-filter-server":
-                    raise FilterError(f"Invalid welcome message: {welcome}")
+                    raise FilterError(f"Invalid welcome message: {welcome!r}")
                 if version and version.rstrip(b"\n\r") != b"version=2":
-                    raise FilterError(f"Invalid version: {version}")
+                    raise FilterError(f"Invalid version: {version!r}")
                 if flush is not None:
                     raise FilterError("Expected flush packet after handshake")
 
@@ -215,7 +219,7 @@ class ProcessFilterDriver:
             except (OSError, subprocess.SubprocessError, HangupException) as e:
                 self.cleanup()
                 raise FilterError(f"Failed to start process filter: {e}")
-        return self._process
+        return self._protocol
 
     def _use_process_filter(self, data: bytes, operation: str, path: str = "") -> bytes:
         """Use the long-running process filter for the operation."""
@@ -347,7 +351,7 @@ class ProcessFilterDriver:
             logging.warning(f"Optional smudge filter failed: {e}")
             return data
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up the process filter."""
         if self._process:
             # Close stdin first to signal the process to quit cleanly
@@ -413,23 +417,41 @@ class ProcessFilterDriver:
 
         # Check if the filter commands in config match our current commands
         try:
-            clean_cmd = config.get(("filter", filter_name), "clean")
+            clean_cmd_raw = config.get(("filter", filter_name), "clean")
         except KeyError:
             clean_cmd = None
+        else:
+            clean_cmd = (
+                clean_cmd_raw.decode("utf-8")
+                if isinstance(clean_cmd_raw, bytes)
+                else clean_cmd_raw
+            )
         if clean_cmd != self.clean_cmd:
             return False
 
         try:
-            smudge_cmd = config.get(("filter", filter_name), "smudge")
+            smudge_cmd_raw = config.get(("filter", filter_name), "smudge")
         except KeyError:
             smudge_cmd = None
+        else:
+            smudge_cmd = (
+                smudge_cmd_raw.decode("utf-8")
+                if isinstance(smudge_cmd_raw, bytes)
+                else smudge_cmd_raw
+            )
         if smudge_cmd != self.smudge_cmd:
             return False
 
         try:
-            process_cmd = config.get(("filter", filter_name), "process")
+            process_cmd_raw = config.get(("filter", filter_name), "process")
         except KeyError:
             process_cmd = None
+        else:
+            process_cmd = (
+                process_cmd_raw.decode("utf-8")
+                if isinstance(process_cmd_raw, bytes)
+                else process_cmd_raw
+            )
         if process_cmd != self.process_cmd:
             return False
 
@@ -439,7 +461,7 @@ class ProcessFilterDriver:
 
         return True
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Clean up the process filter on destruction."""
         self.cleanup()
 

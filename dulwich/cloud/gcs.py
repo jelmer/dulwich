@@ -93,7 +93,7 @@ class GcsObjectStore(BucketBasedObjectStore):
             return load_pack_index_file(name + ".idx", f)
 
     def _get_pack(self, name: str) -> Pack:
-        return Pack.from_lazy_objects(  # type: ignore[no-untyped-call]
+        return Pack.from_lazy_objects(
             lambda: self._load_pack_data(name), lambda: self._load_pack_index(name)
         )
 

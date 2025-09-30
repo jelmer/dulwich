@@ -56,6 +56,17 @@ patiencediff = ["patiencediff"]
 dulwich = "dulwich.cli:main"
 
 [tool.mypy]
+strict = true
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

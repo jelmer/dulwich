@@ -15,7 +15,8 @@ import time
 import zlib
 from dataclasses import dataclass
 from io import BytesIO
-from typing import BinaryIO, Optional, Union
+from types import TracebackType
+from typing import BinaryIO, Callable, Optional, Union
 
 from dulwich.objects import ObjectID
 from dulwich.refs import (
@@ -337,13 +338,13 @@ class LogBlock:
 class RefBlock:
     """A block containing reference records."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize RefBlock."""
-        self.refs = []
+        self.refs: list[RefRecord] = []
 
     def add_ref(
         self, refname: bytes, value_type: int, value: bytes, update_index: int = 1
-    ):
+    ) -> None:
         """Add a reference to the block."""
         self.refs.append(RefRecord(refname, value_type, value, update_index))
 
@@ -512,7 +513,7 @@ class ReftableWriter:
             is_batch_operation  # Track if this is a batch operation
         )
 
-    def add_ref(self, refname: bytes, sha: bytes):
+    def add_ref(self, refname: bytes, sha: bytes) -> None:
         """Add a direct reference."""
         self.refs[refname] = (REF_VALUE_REF, sha)
         if refname not in self.refs_order:
@@ -520,7 +521,7 @@ class ReftableWriter:
 
         self._maybe_auto_create_head()
 
-    def add_symbolic_ref(self, refname: bytes, target: bytes):
+    def add_symbolic_ref(self, refname: bytes, target: bytes) -> None:
         """Add a symbolic reference."""
         self.refs[refname] = (REF_VALUE_SYMREF, target)
         if refname not in self.refs_order:
@@ -533,20 +534,20 @@ class ReftableWriter:
             # Update existing ref (e.g., if HEAD was auto-created and now explicitly set)
             pass
 
-    def delete_ref(self, refname: bytes):
+    def delete_ref(self, refname: bytes) -> None:
         """Mark a reference as deleted."""
         self.refs[refname] = (REF_VALUE_DELETE, b"")
         if refname not in self.refs_order:
             self.refs_order.append(refname)
 
-    def _maybe_auto_create_head(self):
+    def _maybe_auto_create_head(self) -> None:
         """Auto-create HEAD -> refs/heads/master if needed (Git compatibility)."""
         if self.auto_create_head and b"HEAD" not in self.refs:
             # Git always creates HEAD -> refs/heads/master by default
             self.refs[b"HEAD"] = (REF_VALUE_SYMREF, b"refs/heads/master")
             self.refs_order.insert(0, b"HEAD")
 
-    def write(self):
+    def write(self) -> None:
         """Write the reftable to the file."""
         # Skip recalculation if max_update_index was already set higher than default
         # This preserves Git's behavior for symbolic-ref operations
@@ -569,7 +570,7 @@ class ReftableWriter:
         # so we only need to add final padding and CRC
         self._write_final_padding()
 
-    def _write_header(self):
+    def _write_header(self) -> None:
         """Write the reftable header."""
         # Magic bytes
         header_data = REFTABLE_MAGIC
@@ -591,7 +592,7 @@ class ReftableWriter:
         self.f.write(header_data)
         self._written_data.append(header_data)
 
-    def _get_ref_update_indices(self):
+    def _get_ref_update_indices(self) -> dict[bytes, int]:
         """Get update indices for all refs based on operation type.
 
         In batch operations, all refs get the same update index (timestamp).
@@ -606,7 +607,7 @@ class ReftableWriter:
             return {name: self.min_update_index for name in self.refs_order}
         elif hasattr(self, "_ref_update_indices"):
             # Use provided indices
-            return self._ref_update_indices
+            return self._ref_update_indices  # type: ignore[no-any-return]
         elif len(self.refs_order) == 1 and self.refs_order[0] == b"HEAD":
             # Special case for single HEAD symbolic ref
             value_type, _ = self.refs[b"HEAD"]
@@ -621,7 +622,7 @@ class ReftableWriter:
                 indices[name] = self.min_update_index + i
             return indices
 
-    def _write_ref_blocks(self):
+    def _write_ref_blocks(self) -> None:
         """Write reference blocks."""
         # Only write block if we have refs
         if not self.refs:
@@ -658,7 +659,7 @@ class ReftableWriter:
         self.f.write(block_data)
         self._written_data.append(block_data)
 
-    def _write_final_padding(self):
+    def _write_final_padding(self) -> None:
         """Write final padding and CRC for Git compatibility."""
         # Git writes exactly 40 bytes after the ref block (which includes embedded footer)
         # This is 36 bytes of zeros followed by 4-byte CRC
@@ -695,7 +696,7 @@ class ReftableReader:
         self.refs: dict[bytes, tuple[int, bytes]] = {}
         self._read_blocks()
 
-    def _read_header(self):
+    def _read_header(self) -> None:
         """Read and validate the reftable header."""
         # Read magic bytes
         magic = self.f.read(4)
@@ -717,7 +718,7 @@ class ReftableReader:
         self.min_update_index = struct.unpack(">Q", self.f.read(8))[0]
         self.max_update_index = struct.unpack(">Q", self.f.read(8))[0]
 
-    def _read_blocks(self):
+    def _read_blocks(self) -> None:
         """Read all blocks from the reftable."""
         while True:
             # Read block type
@@ -745,7 +746,7 @@ class ReftableReader:
             ):  # Likely parsing footer as block
                 break
 
-    def _process_ref_block(self, data: bytes):
+    def _process_ref_block(self, data: bytes) -> None:
         """Process a reference block."""
         block = RefBlock.decode(data, min_update_index=self.min_update_index)
         for ref in block.refs:
@@ -764,14 +765,19 @@ class ReftableReader:
 class _ReftableBatchContext:
     """Context manager for batching reftable updates."""
 
-    def __init__(self, refs_container):
+    def __init__(self, refs_container: "ReftableRefsContainer") -> None:
         self.refs_container = refs_container
 
-    def __enter__(self):
+    def __enter__(self) -> "_ReftableBatchContext":
         self.refs_container._batch_mode = True
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         self.refs_container._batch_mode = False
         if exc_type is None:  # Only flush if no exception occurred
             self.refs_container._flush_pending_updates()
@@ -780,7 +786,24 @@ class _ReftableBatchContext:
 class ReftableRefsContainer(RefsContainer):
     """A refs container backed by the reftable format."""
 
-    def __init__(self, path: Union[str, bytes], logger=None):
+    def __init__(
+        self,
+        path: Union[str, bytes],
+        logger: Optional[
+            Callable[
+                [
+                    bytes,
+                    bytes,
+                    bytes,
+                    Optional[bytes],
+                    Optional[int],
+                    Optional[int],
+                    bytes,
+                ],
+                None,
+            ]
+        ] = None,
+    ) -> None:
         """Initialize a reftable refs container.
 
         Args:
@@ -800,11 +823,12 @@ class ReftableRefsContainer(RefsContainer):
         self._ref_update_indices: dict[
             bytes, int
         ] = {}  # Track chronological update index for each ref
+        self._batch_mode = False  # Track whether we're in batch mode
 
         # Create refs/heads marker file for Git compatibility
         self._ensure_refs_heads_marker()
 
-    def _ensure_refs_heads_marker(self):
+    def _ensure_refs_heads_marker(self) -> None:
         """Ensure refs/heads marker file exists for Git compatibility.
 
         Git expects a refs/heads file (not directory) to exist when using
@@ -826,11 +850,11 @@ class ReftableRefsContainer(RefsContainer):
             with open(refs_heads_path, "wb") as f:
                 f.write(b"this repository uses the reftable format\n")
 
-    def _read_table_file(self, table_file: str):
+    def _read_table_file(self, table_file: str) -> BinaryIO:
         """Context manager helper to open and read a reftable file."""
         return open(table_file, "rb")
 
-    def _load_ref_update_indices(self):
+    def _load_ref_update_indices(self) -> None:
         """Load the update indices for all refs from existing reftable files."""
         for table_file in self._get_table_files():
             with self._read_table_file(table_file) as f:
@@ -921,7 +945,7 @@ class ReftableRefsContainer(RefsContainer):
                     all_refs[refname] = (value_type, value)
         return all_refs
 
-    def allkeys(self):
+    def allkeys(self) -> set[bytes]:
         """Return set of all ref names."""
         refs = self._read_all_tables()
         result = set(refs.keys())
@@ -1058,14 +1082,14 @@ class ReftableRefsContainer(RefsContainer):
         table_name = f"0x{min_idx:016x}-0x{max_idx:016x}-{hash_part:08x}.ref"
         return os.path.join(self.reftable_dir, table_name)
 
-    def add_packed_refs(self, new_refs: dict[bytes, Optional[bytes]]):
+    def add_packed_refs(self, new_refs: dict[bytes, Optional[bytes]]) -> None:
         """Add packed refs. Creates a new reftable file with all refs consolidated."""
         if not new_refs:
             return
 
         self._write_batch_updates(new_refs)
 
-    def _write_batch_updates(self, updates: dict[bytes, Optional[bytes]]):
+    def _write_batch_updates(self, updates: dict[bytes, Optional[bytes]]) -> None:
         """Write multiple ref updates to a single reftable file."""
         if not updates:
             return
@@ -1085,13 +1109,13 @@ class ReftableRefsContainer(RefsContainer):
 
     def set_if_equals(
         self,
-        name,
-        old_ref,
-        new_ref,
-        committer=None,
-        timestamp=None,
-        timezone=None,
-        message=None,
+        name: bytes,
+        old_ref: Optional[bytes],
+        new_ref: Optional[bytes],
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
     ) -> bool:
         """Atomically set a ref if it currently equals old_ref."""
         # For now, implement a simple non-atomic version
@@ -1114,7 +1138,13 @@ class ReftableRefsContainer(RefsContainer):
         return True
 
     def add_if_new(
-        self, name, ref, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name: bytes,
+        ref: bytes,
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
     ) -> bool:
         """Add a ref only if it doesn't exist."""
         try:
@@ -1126,7 +1156,13 @@ class ReftableRefsContainer(RefsContainer):
         return True
 
     def remove_if_equals(
-        self, name, old_ref, committer=None, timestamp=None, timezone=None, message=None
+        self,
+        name: bytes,
+        old_ref: Optional[bytes],
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
     ) -> bool:
         """Remove a ref if it equals old_ref."""
         return self.set_if_equals(
@@ -1140,12 +1176,18 @@ class ReftableRefsContainer(RefsContainer):
         )
 
     def set_symbolic_ref(
-        self, name, other, committer=None, timestamp=None, timezone=None, message=None
-    ):
+        self,
+        name: bytes,
+        other: bytes,
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
+    ) -> None:
         """Set a symbolic reference."""
         self._write_ref_update(name, REF_VALUE_SYMREF, other)
 
-    def _write_ref_update(self, name: bytes, value_type: int, value: bytes):
+    def _write_ref_update(self, name: bytes, value_type: int, value: bytes) -> None:
         """Write a single ref update immediately to its own reftable file."""
         # Check if we're in batch mode - if so, buffer for later
         if getattr(self, "_batch_mode", False):
@@ -1156,7 +1198,9 @@ class ReftableRefsContainer(RefsContainer):
         # Write immediately like Git does - one file per update
         self._write_single_ref_update(name, value_type, value)
 
-    def _write_single_ref_update(self, name: bytes, value_type: int, value: bytes):
+    def _write_single_ref_update(
+        self, name: bytes, value_type: int, value: bytes
+    ) -> None:
         """Write a single ref update to its own reftable file like Git does."""
         table_path = self._generate_table_path()
         next_update_index = self._get_next_update_index()
@@ -1181,7 +1225,7 @@ class ReftableRefsContainer(RefsContainer):
 
         self._update_tables_list()
 
-    def _flush_pending_updates(self):
+    def _flush_pending_updates(self) -> None:
         """Flush pending ref updates like Git does - consolidate all refs."""
         if not self._pending_updates:
             return
@@ -1226,7 +1270,9 @@ class ReftableRefsContainer(RefsContainer):
 
         self._pending_updates.clear()
 
-    def _process_pending_updates(self):
+    def _process_pending_updates(
+        self,
+    ) -> tuple[Optional[tuple[bytes, int, bytes]], list[tuple[bytes, int, bytes]]]:
         """Process pending updates and return (head_update, other_updates)."""
         head_update = None
         other_updates = []
@@ -1284,8 +1330,12 @@ class ReftableRefsContainer(RefsContainer):
         return current
 
     def _apply_batch_updates(
-        self, all_refs, other_updates, head_update, batch_update_index
-    ):
+        self,
+        all_refs: dict[bytes, tuple[int, bytes]],
+        other_updates: list[tuple[bytes, int, bytes]],
+        head_update: Optional[tuple[bytes, int, bytes]],
+        batch_update_index: int,
+    ) -> None:
         """Apply batch updates to the refs dict and update indices."""
         # Process all updates and assign the SAME update index to all refs in batch
         for name, value_type, value in other_updates:
@@ -1308,7 +1358,9 @@ class ReftableRefsContainer(RefsContainer):
                 all_refs[name] = (value_type, value)
                 self._ref_update_indices[name] = batch_update_index
 
-    def _write_batch_file(self, all_refs, batch_update_index):
+    def _write_batch_file(
+        self, all_refs: dict[bytes, tuple[int, bytes]], batch_update_index: int
+    ) -> list[str]:
         """Write all refs to a single batch file and return created filenames."""
         # All refs in batch have same update index
         table_path = self._generate_table_path(batch_update_index, batch_update_index)
@@ -1329,22 +1381,22 @@ class ReftableRefsContainer(RefsContainer):
                 writer.refs[refname] = (value_type, value)
 
             # Pass the update indices to the writer
-            writer._ref_update_indices = {
+            writer._ref_update_indices = {  # type: ignore[attr-defined]
                 name: batch_update_index for name in all_refs.keys()
             }
             writer.write()
 
         return [os.path.basename(table_path)]
 
-    def batch_update(self):
+    def batch_update(self) -> "_ReftableBatchContext":
         """Context manager for batching multiple ref updates into a single reftable."""
         return _ReftableBatchContext(self)
 
-    def remove_packed_ref(self, name: bytes):
+    def remove_packed_ref(self, name: bytes) -> None:
         """Remove a packed ref. Creates a deletion record."""
         self._write_ref_update(name, REF_VALUE_DELETE, b"")
 
-    def _compact_tables_list(self, new_table_name: str):
+    def _compact_tables_list(self, new_table_name: str) -> None:
         """Compact tables list to single file like Git does."""
         tables_list_path = os.path.join(self.reftable_dir, "tables.list")
 
@@ -1357,7 +1409,7 @@ class ReftableRefsContainer(RefsContainer):
         with open(tables_list_path, "wb") as f:
             f.write((new_table_name + "\n").encode())
 
-    def _update_tables_list(self):
+    def _update_tables_list(self) -> None:
         """Update the tables.list file with current table files."""
         tables_list_path = os.path.join(self.reftable_dir, "tables.list")
 

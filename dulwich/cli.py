@@ -29,6 +29,7 @@ a way to test Dulwich.
 """
 
 import argparse
+import io
 import logging
 import os
 import shutil
@@ -36,19 +37,34 @@ import signal
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterator
+import types
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import BinaryIO, Callable, ClassVar, Optional, TextIO, Union
+from types import TracebackType
+from typing import (
+    BinaryIO,
+    Callable,
+    ClassVar,
+    Optional,
+    TextIO,
+    Union,
+)
+
+if sys.version_info >= (3, 12):
+    from collections.abc import Buffer
+else:
+    Buffer = Union[bytes, bytearray, memoryview]
 
 from dulwich import porcelain
 
-from .bundle import create_bundle_from_repo, read_bundle, write_bundle
-from .client import GitProtocolError, get_transport_and_path
-from .errors import ApplyDeltaError
+from .bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
+from .client import get_transport_and_path
+from .config import Config
+from .errors import ApplyDeltaError, GitProtocolError
 from .index import Index
-from .objects import Commit, valid_hexsha
+from .objects import Commit, sha_to_hex, valid_hexsha
 from .objectspec import parse_commit_range
-from .pack import Pack, sha_to_hex
+from .pack import Pack
 from .patch import DiffAlgorithmNotAvailable
 from .repo import Repo
 
@@ -73,7 +89,7 @@ class CommitMessageError(Exception):
     """Raised when there's an issue with the commit message."""
 
 
-def signal_int(signal: int, frame) -> None:
+def signal_int(signal: int, frame: Optional[types.FrameType]) -> None:
     """Handle interrupt signal by exiting.
 
     Args:
@@ -83,7 +99,7 @@ def signal_int(signal: int, frame) -> None:
     sys.exit(1)
 
 
-def signal_quit(signal: int, frame) -> None:
+def signal_quit(signal: int, frame: Optional[types.FrameType]) -> None:
     """Handle quit signal by entering debugger.
 
     Args:
@@ -224,7 +240,7 @@ def write_columns(
 
     item_names = [item.decode() for item in items]
 
-    def columns(names, width, num_cols):
+    def columns(names: list[str], width: int, num_cols: int) -> tuple[bool, list[int]]:
         if num_cols <= 0:
             return False, []
 
@@ -275,7 +291,7 @@ def write_columns(
             out.write("".join(lines).rstrip() + "\n")
 
 
-class PagerBuffer:
+class PagerBuffer(BinaryIO):
     """Binary buffer wrapper for Pager to mimic sys.stdout.buffer."""
 
     def __init__(self, pager: "Pager") -> None:
@@ -286,18 +302,17 @@ class PagerBuffer:
         """
         self.pager = pager
 
-    def write(self, data: bytes) -> int:
+    def write(self, data: Buffer) -> int:
         """Write bytes to pager."""
-        if isinstance(data, bytes):
-            text = data.decode("utf-8", errors="replace")
-            return self.pager.write(text)
-        return self.pager.write(data)
+        # Convert to bytes and decode to string for the pager
+        text = bytes(data).decode("utf-8", errors="replace")
+        return self.pager.write(text)
 
     def flush(self) -> None:
         """Flush the pager."""
         return self.pager.flush()
 
-    def writelines(self, lines) -> None:
+    def writelines(self, lines: Iterable[Buffer]) -> None:
         """Write multiple lines to pager."""
         for line in lines:
             self.write(line)
@@ -323,8 +338,83 @@ class PagerBuffer:
         """Return whether the buffer is closed."""
         return self.pager.closed
 
+    @property
+    def mode(self) -> str:
+        """Return the mode."""
+        return "wb"
 
-class Pager:
+    @property
+    def name(self) -> str:
+        """Return the name."""
+        return "<pager.buffer>"
+
+    def fileno(self) -> int:
+        """Return the file descriptor (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support fileno()")
+
+    def isatty(self) -> bool:
+        """Return whether the buffer is a TTY."""
+        return False
+
+    def read(self, size: int = -1) -> bytes:
+        """Read from the buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support reading")
+
+    def read1(self, size: int = -1) -> bytes:
+        """Read from the buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support reading")
+
+    def readinto(self, b: bytearray) -> int:
+        """Read into buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support reading")
+
+    def readinto1(self, b: bytearray) -> int:
+        """Read into buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support reading")
+
+    def readline(self, size: int = -1) -> bytes:
+        """Read a line from the buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support reading")
+
+    def readlines(self, hint: int = -1) -> list[bytes]:
+        """Read lines from the buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support reading")
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Seek in the buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support seeking")
+
+    def tell(self) -> int:
+        """Return the current position (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support tell()")
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        """Truncate the buffer (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support truncation")
+
+    def __iter__(self) -> "PagerBuffer":
+        """Return iterator (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support iteration")
+
+    def __next__(self) -> bytes:
+        """Return next line (not supported)."""
+        raise io.UnsupportedOperation("PagerBuffer does not support iteration")
+
+    def __enter__(self) -> "PagerBuffer":
+        """Enter context manager."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        """Exit context manager."""
+        self.close()
+
+
+class Pager(TextIO):
     """File-like object that pages output through external pager programs."""
 
     def __init__(self, pager_cmd: str = "cat") -> None:
@@ -333,8 +423,8 @@ class Pager:
         Args:
             pager_cmd: Command to use for paging (default: "cat")
         """
-        self.pager_process: Optional[subprocess.Popen] = None
-        self.buffer = PagerBuffer(self)
+        self.pager_process: Optional[subprocess.Popen[str]] = None
+        self._buffer = PagerBuffer(self)
         self._closed = False
         self.pager_cmd = pager_cmd
         self._pager_died = False
@@ -373,7 +463,9 @@ class Pager:
 
         if self.pager_process and self.pager_process.stdin:
             try:
-                return self.pager_process.stdin.write(text)
+                result = self.pager_process.stdin.write(text)
+                assert isinstance(result, int)
+                return result
             except (OSError, subprocess.SubprocessError, BrokenPipeError):
                 # Pager died (user quit), stop writing output
                 self._pager_died = True
@@ -414,12 +506,17 @@ class Pager:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[types.TracebackType],
+    ) -> None:
         """Context manager exit."""
         self.close()
 
     # Additional file-like methods for compatibility
-    def writelines(self, lines) -> None:
+    def writelines(self, lines: Iterable[str]) -> None:
         """Write a list of lines to the pager."""
         if self._pager_died:
             return
@@ -443,11 +540,86 @@ class Pager:
         """Return whether the pager is seekable (it's not)."""
         return False
 
+    @property
+    def buffer(self) -> BinaryIO:
+        """Return the underlying binary buffer."""
+        return self._buffer
+
+    @property
+    def encoding(self) -> str:
+        """Return the encoding used."""
+        return "utf-8"
+
+    @property
+    def errors(self) -> Optional[str]:
+        """Return the error handling scheme."""
+        return "replace"
+
+    def fileno(self) -> int:
+        """Return the file descriptor (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support fileno()")
+
+    def isatty(self) -> bool:
+        """Return whether the pager is a TTY."""
+        return False
+
+    @property
+    def line_buffering(self) -> bool:
+        """Return whether line buffering is enabled."""
+        return True
+
+    @property
+    def mode(self) -> str:
+        """Return the mode."""
+        return "w"
+
+    @property
+    def name(self) -> str:
+        """Return the name."""
+        return "<pager>"
+
+    @property
+    def newlines(self) -> Optional[Union[str, tuple[str, ...]]]:
+        """Return the newlines mode."""
+        return None
+
+    def read(self, size: int = -1) -> str:
+        """Read from the pager (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support reading")
+
+    def readline(self, size: int = -1) -> str:
+        """Read a line from the pager (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support reading")
+
+    def readlines(self, hint: int = -1) -> list[str]:
+        """Read lines from the pager (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support reading")
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Seek in the pager (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support seeking")
+
+    def tell(self) -> int:
+        """Return the current position (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support tell()")
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        """Truncate the pager (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support truncation")
+
+    def __iter__(self) -> "Pager":
+        """Return iterator (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support iteration")
+
+    def __next__(self) -> str:
+        """Return next line (not supported)."""
+        raise io.UnsupportedOperation("Pager does not support iteration")
+
 
 class _StreamContextAdapter:
     """Adapter to make streams work with context manager protocol."""
 
-    def __init__(self, stream) -> None:
+    def __init__(self, stream: Union[TextIO, BinaryIO]) -> None:
         self.stream = stream
         # Expose buffer if it exists
         if hasattr(stream, "buffer"):
@@ -455,18 +627,26 @@ class _StreamContextAdapter:
         else:
             self.buffer = stream
 
-    def __enter__(self):
-        return self.stream
+    def __enter__(self) -> TextIO:
+        # We only use this with sys.stdout which is TextIO
+        return self.stream  # type: ignore[return-value]
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         # For stdout/stderr, we don't close them
         pass
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> object:
         return getattr(self.stream, name)
 
 
-def get_pager(config=None, cmd_name: Optional[str] = None):
+def get_pager(
+    config: Optional[Config] = None, cmd_name: Optional[str] = None
+) -> Union[_StreamContextAdapter, "Pager"]:
     """Get a pager instance if paging should be used, otherwise return sys.stdout.
 
     Args:
@@ -562,7 +742,7 @@ def enable_pager() -> None:
 class Command:
     """A Dulwich subcommand."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Run the command."""
         raise NotImplementedError(self.run)
 
@@ -570,7 +750,7 @@ class Command:
 class cmd_archive(Command):
     """Create an archive of files from a named tree."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the archive command.
 
         Args:
@@ -583,14 +763,23 @@ class cmd_archive(Command):
             help="Retrieve archive from specified remote repo",
         )
         parser.add_argument("committish", type=str, nargs="?")
-        args = parser.parse_args(args)
-        if args.remote:
-            client, path = get_transport_and_path(args.remote)
+        parsed_args = parser.parse_args(args)
+        if parsed_args.remote:
+            client, path = get_transport_and_path(parsed_args.remote)
+
+            def stdout_write(data: bytes) -> None:
+                sys.stdout.buffer.write(data)
+
+            def stderr_write(data: bytes) -> None:
+                sys.stderr.buffer.write(data)
+
             client.archive(
-                path,
-                args.committish,
-                sys.stdout.write,
-                write_error=sys.stderr.write,
+                path.encode("utf-8") if isinstance(path, str) else path,
+                parsed_args.committish.encode("utf-8")
+                if isinstance(parsed_args.committish, str)
+                else parsed_args.committish,
+                stdout_write,
+                write_error=stderr_write,
             )
         else:
             # Use binary buffer for archive output
@@ -598,7 +787,7 @@ class cmd_archive(Command):
             errstream: BinaryIO = sys.stderr.buffer
             porcelain.archive(
                 ".",
-                args.committish,
+                parsed_args.committish,
                 outstream=outstream,
                 errstream=errstream,
             )
@@ -607,7 +796,7 @@ class cmd_archive(Command):
 class cmd_add(Command):
     """Add file contents to the index."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the add command.
 
         Args:
@@ -628,7 +817,7 @@ class cmd_add(Command):
 class cmd_annotate(Command):
     """Annotate each line in a file with commit information."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the annotate command.
 
         Args:
@@ -652,7 +841,7 @@ class cmd_annotate(Command):
 class cmd_blame(Command):
     """Show what revision and author last modified each line of a file."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the blame command.
 
         Args:
@@ -665,7 +854,7 @@ class cmd_blame(Command):
 class cmd_rm(Command):
     """Remove files from the working tree and from the index."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the rm command.
 
         Args:
@@ -684,7 +873,7 @@ class cmd_rm(Command):
 class cmd_mv(Command):
     """Move or rename a file, a directory, or a symlink."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the mv command.
 
         Args:
@@ -707,7 +896,7 @@ class cmd_mv(Command):
 class cmd_fetch_pack(Command):
     """Receive missing objects from another repository."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the fetch-pack command.
 
         Args:
@@ -724,16 +913,18 @@ class cmd_fetch_pack(Command):
             determine_wants = r.object_store.determine_wants_all
         else:
 
-            def determine_wants(refs, depth: Optional[int] = None):
+            def determine_wants(
+                refs: dict[bytes, bytes], depth: Optional[int] = None
+            ) -> list[bytes]:
                 return [y.encode("utf-8") for y in args.refs if y not in r.object_store]
 
-        client.fetch(path, r, determine_wants)
+        client.fetch(path.encode("utf-8"), r, determine_wants)
 
 
 class cmd_fetch(Command):
     """Download objects and refs from another repository."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the fetch command.
 
         Args:
@@ -741,14 +932,14 @@ class cmd_fetch(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("location", help="Remote location to fetch from")
-        args = parser.parse_args(args)
-        client, path = get_transport_and_path(args.location)
+        parsed_args = parser.parse_args(args)
+        client, path = get_transport_and_path(parsed_args.location)
         r = Repo(".")
 
         def progress(msg: bytes) -> None:
             sys.stdout.buffer.write(msg)
 
-        result = client.fetch(path, r, progress=progress)
+        result = client.fetch(path.encode("utf-8"), r, progress=progress)
         logger.info("Remote refs:")
         for ref, sha in result.refs.items():
             if sha is not None:
@@ -758,7 +949,7 @@ class cmd_fetch(Command):
 class cmd_for_each_ref(Command):
     """Output information on each ref."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the for-each-ref command.
 
         Args:
@@ -766,15 +957,15 @@ class cmd_for_each_ref(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("pattern", type=str, nargs="?")
-        args = parser.parse_args(args)
-        for sha, object_type, ref in porcelain.for_each_ref(".", args.pattern):
+        parsed_args = parser.parse_args(args)
+        for sha, object_type, ref in porcelain.for_each_ref(".", parsed_args.pattern):
             logger.info("%s %s\t%s", sha.decode(), object_type.decode(), ref.decode())
 
 
 class cmd_fsck(Command):
     """Verify the connectivity and validity of objects in the database."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the fsck command.
 
         Args:
@@ -789,7 +980,7 @@ class cmd_fsck(Command):
 class cmd_log(Command):
     """Show commit logs."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the log command.
 
         Args:
@@ -807,16 +998,16 @@ class cmd_log(Command):
             help="Print name/status for each changed file",
         )
         parser.add_argument("paths", nargs="*", help="Paths to show log for")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         with Repo(".") as repo:
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="log") as outstream:
                 porcelain.log(
                     repo,
-                    paths=args.paths,
-                    reverse=args.reverse,
-                    name_status=args.name_status,
+                    paths=parsed_args.paths,
+                    reverse=parsed_args.reverse,
+                    name_status=parsed_args.name_status,
                     outstream=outstream,
                 )
 
@@ -824,7 +1015,7 @@ class cmd_log(Command):
 class cmd_diff(Command):
     """Show changes between commits, commit and working tree, etc."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the diff command.
 
         Args:
@@ -870,23 +1061,21 @@ class cmd_diff(Command):
         else:
             parsed_args = parser.parse_args(args)
 
-        args = parsed_args
-
         # Determine diff algorithm
-        diff_algorithm = args.diff_algorithm
-        if args.patience:
+        diff_algorithm = parsed_args.diff_algorithm
+        if parsed_args.patience:
             diff_algorithm = "patience"
 
         # Determine if we should use color
-        def _should_use_color():
-            if args.color == "always":
+        def _should_use_color() -> bool:
+            if parsed_args.color == "always":
                 return True
-            elif args.color == "never":
+            elif parsed_args.color == "never":
                 return False
             else:  # auto
                 return sys.stdout.isatty()
 
-        def _create_output_stream(outstream):
+        def _create_output_stream(outstream: TextIO) -> BinaryIO:
             """Create output stream, optionally with colorization."""
             if not _should_use_color():
                 return outstream.buffer
@@ -894,7 +1083,7 @@ class cmd_diff(Command):
             from .diff import ColorizedDiffStream
 
             if not ColorizedDiffStream.is_available():
-                if args.color == "always":
+                if parsed_args.color == "always":
                     raise ImportError(
                         "Rich is required for colored output. Install with: pip install 'dulwich[colordiff]'"
                     )
@@ -911,36 +1100,36 @@ class cmd_diff(Command):
             with get_pager(config=config, cmd_name="diff") as outstream:
                 output_stream = _create_output_stream(outstream)
                 try:
-                    if len(args.committish) == 0:
+                    if len(parsed_args.committish) == 0:
                         # Show diff for working tree or staged changes
                         porcelain.diff(
                             repo,
-                            staged=(args.staged or args.cached),
-                            paths=args.paths or None,
+                            staged=(parsed_args.staged or parsed_args.cached),
+                            paths=parsed_args.paths or None,
                             outstream=output_stream,
                             diff_algorithm=diff_algorithm,
                         )
-                    elif len(args.committish) == 1:
+                    elif len(parsed_args.committish) == 1:
                         # Show diff between working tree and specified commit
-                        if args.staged or args.cached:
+                        if parsed_args.staged or parsed_args.cached:
                             parser.error(
                                 "--staged/--cached cannot be used with commits"
                             )
                         porcelain.diff(
                             repo,
-                            commit=args.committish[0],
+                            commit=parsed_args.committish[0],
                             staged=False,
-                            paths=args.paths or None,
+                            paths=parsed_args.paths or None,
                             outstream=output_stream,
                             diff_algorithm=diff_algorithm,
                         )
-                    elif len(args.committish) == 2:
+                    elif len(parsed_args.committish) == 2:
                         # Show diff between two commits
                         porcelain.diff(
                             repo,
-                            commit=args.committish[0],
-                            commit2=args.committish[1],
-                            paths=args.paths or None,
+                            commit=parsed_args.committish[0],
+                            commit2=parsed_args.committish[1],
+                            paths=parsed_args.paths or None,
                             outstream=output_stream,
                             diff_algorithm=diff_algorithm,
                         )
@@ -958,7 +1147,7 @@ class cmd_diff(Command):
 class cmd_dump_pack(Command):
     """Dump the contents of a pack file for debugging."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the dump-pack command.
 
         Args:
@@ -966,9 +1155,9 @@ class cmd_dump_pack(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("filename", help="Pack file to dump")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        basename, _ = os.path.splitext(args.filename)
+        basename, _ = os.path.splitext(parsed_args.filename)
         x = Pack(basename)
         logger.info("Object names checksum: %s", x.name().decode("ascii", "replace"))
         logger.info("Checksum: %r", sha_to_hex(x.get_stored_checksum()))
@@ -994,7 +1183,7 @@ class cmd_dump_pack(Command):
 class cmd_dump_index(Command):
     """Show information about a pack index file."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the dump-index command.
 
         Args:
@@ -1002,9 +1191,9 @@ class cmd_dump_index(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("filename", help="Index file to dump")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        idx = Index(args.filename)
+        idx = Index(parsed_args.filename)
 
         for o in idx:
             logger.info("%s %s", o, idx[o])
@@ -1013,7 +1202,7 @@ class cmd_dump_index(Command):
 class cmd_init(Command):
     """Create an empty Git repository or reinitialize an existing one."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the init command.
 
         Args:
@@ -1026,15 +1215,15 @@ class cmd_init(Command):
         parser.add_argument(
             "path", nargs="?", default=os.getcwd(), help="Repository path"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        porcelain.init(args.path, bare=args.bare)
+        porcelain.init(parsed_args.path, bare=parsed_args.bare)
 
 
 class cmd_clone(Command):
     """Clone a repository into a new directory."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the clone command.
 
         Args:
@@ -1077,28 +1266,32 @@ class cmd_clone(Command):
         )
         parser.add_argument("source", help="Repository to clone from")
         parser.add_argument("target", nargs="?", help="Directory to clone into")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         try:
             porcelain.clone(
-                args.source,
-                args.target,
-                bare=args.bare,
-                depth=args.depth,
-                branch=args.branch,
-                refspec=args.refspec,
-                filter_spec=args.filter_spec,
-                protocol_version=args.protocol,
-                recurse_submodules=args.recurse_submodules,
+                parsed_args.source,
+                parsed_args.target,
+                bare=parsed_args.bare,
+                depth=parsed_args.depth,
+                branch=parsed_args.branch,
+                refspec=parsed_args.refspec,
+                filter_spec=parsed_args.filter_spec,
+                protocol_version=parsed_args.protocol,
+                recurse_submodules=parsed_args.recurse_submodules,
             )
         except GitProtocolError as e:
             logging.exception(e)
 
 
-def _get_commit_message_with_template(initial_message, repo=None, commit=None):
+def _get_commit_message_with_template(
+    initial_message: Optional[bytes],
+    repo: Optional[Repo] = None,
+    commit: Optional[Commit] = None,
+) -> bytes:
     """Get commit message with an initial message template."""
     # Start with the initial message
-    template = initial_message
+    template = initial_message or b""
     if template and not template.endswith(b"\n"):
         template += b"\n"
 
@@ -1140,7 +1333,7 @@ def _get_commit_message_with_template(initial_message, repo=None, commit=None):
 class cmd_commit(Command):
     """Record changes to the repository."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the commit command.
 
         Args:
@@ -1159,18 +1352,22 @@ class cmd_commit(Command):
             action="store_true",
             help="Replace the tip of the current branch by creating a new commit",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        message: Union[bytes, str, Callable]
+        message: Union[bytes, str, Callable[[Optional[Repo], Optional[Commit]], bytes]]
 
-        if args.message:
-            message = args.message
-        elif args.amend:
+        if parsed_args.message:
+            message = parsed_args.message
+        elif parsed_args.amend:
             # For amend, create a callable that opens editor with original message pre-populated
-            def get_amend_message(repo, commit):
+            def get_amend_message(
+                repo: Optional[Repo], commit: Optional[Commit]
+            ) -> bytes:
                 # Get the original commit message from current HEAD
+                assert repo is not None
                 try:
                     head_commit = repo[repo.head()]
+                    assert isinstance(head_commit, Commit)
                     original_message = head_commit.message
                 except KeyError:
                     original_message = b""
@@ -1181,13 +1378,17 @@ class cmd_commit(Command):
             message = get_amend_message
         else:
             # For regular commits, use empty template
-            def get_regular_message(repo, commit):
+            def get_regular_message(
+                repo: Optional[Repo], commit: Optional[Commit]
+            ) -> bytes:
                 return _get_commit_message_with_template(b"", repo, commit)
 
             message = get_regular_message
 
         try:
-            porcelain.commit(".", message=message, all=args.all, amend=args.amend)
+            porcelain.commit(
+                ".", message=message, all=parsed_args.all, amend=parsed_args.amend
+            )
         except CommitMessageError as e:
             logging.exception(e)
             return 1
@@ -1197,7 +1398,7 @@ class cmd_commit(Command):
 class cmd_commit_tree(Command):
     """Create a new commit object from a tree."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the commit-tree command.
 
         Args:
@@ -1206,14 +1407,14 @@ class cmd_commit_tree(Command):
         parser = argparse.ArgumentParser()
         parser.add_argument("--message", "-m", required=True, help="Commit message")
         parser.add_argument("tree", help="Tree SHA to commit")
-        args = parser.parse_args(args)
-        porcelain.commit_tree(".", tree=args.tree, message=args.message)
+        parsed_args = parser.parse_args(args)
+        porcelain.commit_tree(".", tree=parsed_args.tree, message=parsed_args.message)
 
 
 class cmd_update_server_info(Command):
     """Update auxiliary info file to help dumb servers."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the update-server-info command.
 
         Args:
@@ -1225,7 +1426,7 @@ class cmd_update_server_info(Command):
 class cmd_symbolic_ref(Command):
     """Read, modify and delete symbolic refs."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the symbolic-ref command.
 
         Args:
@@ -1235,15 +1436,17 @@ class cmd_symbolic_ref(Command):
         parser.add_argument("name", help="Symbolic reference name")
         parser.add_argument("ref", nargs="?", help="Target reference")
         parser.add_argument("--force", action="store_true", help="Force update")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         # If ref is provided, we're setting; otherwise we're reading
-        if args.ref:
+        if parsed_args.ref:
             # Set symbolic reference
             from .repo import Repo
 
             with Repo(".") as repo:
-                repo.refs.set_symbolic_ref(args.name.encode(), args.ref.encode())
+                repo.refs.set_symbolic_ref(
+                    parsed_args.name.encode(), parsed_args.ref.encode()
+                )
             return 0
         else:
             # Read symbolic reference
@@ -1251,21 +1454,28 @@ class cmd_symbolic_ref(Command):
 
             with Repo(".") as repo:
                 try:
-                    target = repo.refs.read_ref(args.name.encode())
-                    if target.startswith(b"ref: "):
+                    target = repo.refs.read_ref(parsed_args.name.encode())
+                    if target is None:
+                        logger.error(
+                            "fatal: ref '%s' is not a symbolic ref", parsed_args.name
+                        )
+                        return 1
+                    elif target.startswith(b"ref: "):
                         logger.info(target[5:].decode())
                     else:
                         logger.info(target.decode())
                     return 0
                 except KeyError:
-                    logging.error("fatal: ref '%s' is not a symbolic ref", args.name)
+                    logger.error(
+                        "fatal: ref '%s' is not a symbolic ref", parsed_args.name
+                    )
                     return 1
 
 
 class cmd_pack_refs(Command):
     """Pack heads and tags for efficient repository access."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the pack-refs command.
 
         Args:
@@ -1284,7 +1494,7 @@ class cmd_pack_refs(Command):
 class cmd_show(Command):
     """Show various types of objects."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the show command.
 
         Args:
@@ -1301,7 +1511,7 @@ class cmd_show(Command):
         args = parser.parse_args(argv)
 
         # Determine if we should use color
-        def _should_use_color():
+        def _should_use_color() -> bool:
             if args.color == "always":
                 return True
             elif args.color == "never":
@@ -1309,7 +1519,7 @@ class cmd_show(Command):
             else:  # auto
                 return sys.stdout.isatty()
 
-        def _create_output_stream(outstream):
+        def _create_output_stream(outstream: TextIO) -> TextIO:
             """Create output stream, optionally with colorization."""
             if not _should_use_color():
                 return outstream
@@ -1327,7 +1537,11 @@ class cmd_show(Command):
                     )
                     return outstream
 
-            return ColorizedDiffStream(outstream.buffer)
+            # Wrap the ColorizedDiffStream (BinaryIO) back to TextIO
+            import io
+
+            colorized = ColorizedDiffStream(outstream.buffer)
+            return io.TextIOWrapper(colorized, encoding="utf-8", line_buffering=True)
 
         with Repo(".") as repo:
             config = repo.get_config_stack()
@@ -1339,7 +1553,7 @@ class cmd_show(Command):
 class cmd_diff_tree(Command):
     """Compare the content and mode of trees."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the diff-tree command.
 
         Args:
@@ -1348,14 +1562,14 @@ class cmd_diff_tree(Command):
         parser = argparse.ArgumentParser()
         parser.add_argument("old_tree", help="Old tree SHA")
         parser.add_argument("new_tree", help="New tree SHA")
-        args = parser.parse_args(args)
-        porcelain.diff_tree(".", args.old_tree, args.new_tree)
+        parsed_args = parser.parse_args(args)
+        porcelain.diff_tree(".", parsed_args.old_tree, parsed_args.new_tree)
 
 
 class cmd_rev_list(Command):
     """List commit objects in reverse chronological order."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the rev-list command.
 
         Args:
@@ -1363,14 +1577,14 @@ class cmd_rev_list(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("commits", nargs="+", help="Commit IDs to list")
-        args = parser.parse_args(args)
-        porcelain.rev_list(".", args.commits)
+        parsed_args = parser.parse_args(args)
+        porcelain.rev_list(".", parsed_args.commits)
 
 
 class cmd_tag(Command):
     """Create, list, delete or verify a tag object."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the tag command.
 
         Args:
@@ -1387,16 +1601,19 @@ class cmd_tag(Command):
             "-s", "--sign", help="Sign the annotated tag.", action="store_true"
         )
         parser.add_argument("tag_name", help="Name of the tag to create")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
         porcelain.tag_create(
-            ".", args.tag_name, annotated=args.annotated, sign=args.sign
+            ".",
+            parsed_args.tag_name,
+            annotated=parsed_args.annotated,
+            sign=parsed_args.sign,
         )
 
 
 class cmd_repack(Command):
     """Pack unpacked objects in a repository."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the repack command.
 
         Args:
@@ -1410,7 +1627,7 @@ class cmd_repack(Command):
 class cmd_reflog(Command):
     """Manage reflog information."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the reflog command.
 
         Args:
@@ -1423,12 +1640,12 @@ class cmd_reflog(Command):
         parser.add_argument(
             "--all", action="store_true", help="Show reflogs for all refs"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         with Repo(".") as repo:
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="reflog") as outstream:
-                if args.all:
+                if parsed_args.all:
                     # Show reflogs for all refs
                     for ref_bytes, entry in porcelain.reflog(repo, all=True):
                         ref_str = ref_bytes.decode("utf-8", "replace")
@@ -1438,9 +1655,9 @@ class cmd_reflog(Command):
                         )
                 else:
                     ref = (
-                        args.ref.encode("utf-8")
-                        if isinstance(args.ref, str)
-                        else args.ref
+                        parsed_args.ref.encode("utf-8")
+                        if isinstance(parsed_args.ref, str)
+                        else parsed_args.ref
                     )
 
                     for i, entry in enumerate(porcelain.reflog(repo, ref)):
@@ -1462,7 +1679,7 @@ class cmd_reflog(Command):
 class cmd_reset(Command):
     """Reset current HEAD to the specified state."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the reset command.
 
         Args:
@@ -1478,26 +1695,26 @@ class cmd_reset(Command):
             "--mixed", action="store_true", help="Reset HEAD and index"
         )
         parser.add_argument("treeish", nargs="?", help="Commit/tree to reset to")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        if args.hard:
+        if parsed_args.hard:
             mode = "hard"
-        elif args.soft:
+        elif parsed_args.soft:
             mode = "soft"
-        elif args.mixed:
+        elif parsed_args.mixed:
             mode = "mixed"
         else:
             # Default to mixed behavior
             mode = "mixed"
 
         # Use the porcelain.reset function for all modes
-        porcelain.reset(".", mode=mode, treeish=args.treeish)
+        porcelain.reset(".", mode=mode, treeish=parsed_args.treeish)
 
 
 class cmd_revert(Command):
     """Revert some existing commits."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the revert command.
 
         Args:
@@ -1512,20 +1729,23 @@ class cmd_revert(Command):
         )
         parser.add_argument("-m", "--message", help="Custom commit message")
         parser.add_argument("commits", nargs="+", help="Commits to revert")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         result = porcelain.revert(
-            ".", commits=args.commits, no_commit=args.no_commit, message=args.message
+            ".",
+            commits=parsed_args.commits,
+            no_commit=parsed_args.no_commit,
+            message=parsed_args.message,
         )
 
-        if result and not args.no_commit:
+        if result and not parsed_args.no_commit:
             logger.info("[%s] Revert completed", result.decode("ascii")[:7])
 
 
 class cmd_daemon(Command):
     """Run a simple Git protocol server."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the daemon command.
 
         Args:
@@ -1552,16 +1772,20 @@ class cmd_daemon(Command):
         parser.add_argument(
             "gitdir", nargs="?", default=".", help="Git directory to serve"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         log_utils.default_logging_config()
-        porcelain.daemon(args.gitdir, address=args.listen_address, port=args.port)
+        porcelain.daemon(
+            parsed_args.gitdir,
+            address=parsed_args.listen_address,
+            port=parsed_args.port,
+        )
 
 
 class cmd_web_daemon(Command):
     """Run a simple HTTP server for Git repositories."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the web-daemon command.
 
         Args:
@@ -1586,16 +1810,20 @@ class cmd_web_daemon(Command):
         parser.add_argument(
             "gitdir", nargs="?", default=".", help="Git directory to serve"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         log_utils.default_logging_config()
-        porcelain.web_daemon(args.gitdir, address=args.listen_address, port=args.port)
+        porcelain.web_daemon(
+            parsed_args.gitdir,
+            address=parsed_args.listen_address,
+            port=parsed_args.port,
+        )
 
 
 class cmd_write_tree(Command):
     """Create a tree object from the current index."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the write-tree command.
 
         Args:
@@ -1609,7 +1837,7 @@ class cmd_write_tree(Command):
 class cmd_receive_pack(Command):
     """Receive what is pushed into the repository."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the receive-pack command.
 
         Args:
@@ -1617,14 +1845,14 @@ class cmd_receive_pack(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
-        args = parser.parse_args(args)
-        porcelain.receive_pack(args.gitdir)
+        parsed_args = parser.parse_args(args)
+        porcelain.receive_pack(parsed_args.gitdir)
 
 
 class cmd_upload_pack(Command):
     """Send objects packed back to git-fetch-pack."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the upload-pack command.
 
         Args:
@@ -1632,14 +1860,14 @@ class cmd_upload_pack(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
-        args = parser.parse_args(args)
-        porcelain.upload_pack(args.gitdir)
+        parsed_args = parser.parse_args(args)
+        porcelain.upload_pack(parsed_args.gitdir)
 
 
 class cmd_shortlog(Command):
     """Show a shortlog of commits by author."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the shortlog command with the given CLI arguments.
 
         Args:
@@ -1651,18 +1879,18 @@ class cmd_shortlog(Command):
         parser.add_argument(
             "--sort", action="store_true", help="Sort authors by commit count"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         shortlog_items: list[dict[str, str]] = porcelain.shortlog(
-            repo=args.gitdir,
-            summary_only=args.summary,
-            sort_by_commits=args.sort,
+            repo=parsed_args.gitdir,
+            summary_only=parsed_args.summary,
+            sort_by_commits=parsed_args.sort,
         )
 
         for item in shortlog_items:
             author: str = item["author"]
             messages: str = item["messages"]
-            if args.summary:
+            if parsed_args.summary:
                 count = len(messages.splitlines())
                 sys.stdout.write(f"{count}\t{author}\n")
             else:
@@ -1675,7 +1903,7 @@ class cmd_shortlog(Command):
 class cmd_status(Command):
     """Show the working tree status."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the status command.
 
         Args:
@@ -1683,8 +1911,8 @@ class cmd_status(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
-        args = parser.parse_args(args)
-        status = porcelain.status(args.gitdir)
+        parsed_args = parser.parse_args(args)
+        status = porcelain.status(parsed_args.gitdir)
         if any(names for (kind, names) in status.staged.items()):
             sys.stdout.write("Changes to be committed:\n\n")
             for kind, names in status.staged.items():
@@ -1708,7 +1936,7 @@ class cmd_status(Command):
 class cmd_ls_remote(Command):
     """List references in a remote repository."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the ls-remote command.
 
         Args:
@@ -1719,10 +1947,10 @@ class cmd_ls_remote(Command):
             "--symref", action="store_true", help="Show symbolic references"
         )
         parser.add_argument("url", help="Remote URL to list references from")
-        args = parser.parse_args(args)
-        result = porcelain.ls_remote(args.url)
+        parsed_args = parser.parse_args(args)
+        result = porcelain.ls_remote(parsed_args.url)
 
-        if args.symref:
+        if parsed_args.symref:
             # Show symrefs first, like git does
             for ref, target in sorted(result.symrefs.items()):
                 if target:
@@ -1738,7 +1966,7 @@ class cmd_ls_remote(Command):
 class cmd_ls_tree(Command):
     """List the contents of a tree object."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the ls-tree command.
 
         Args:
@@ -1755,23 +1983,23 @@ class cmd_ls_tree(Command):
             "--name-only", action="store_true", help="Only display name."
         )
         parser.add_argument("treeish", nargs="?", help="Tree-ish to list")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
         with Repo(".") as repo:
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="ls-tree") as outstream:
                 porcelain.ls_tree(
                     repo,
-                    args.treeish,
+                    parsed_args.treeish,
                     outstream=outstream,
-                    recursive=args.recursive,
-                    name_only=args.name_only,
+                    recursive=parsed_args.recursive,
+                    name_only=parsed_args.name_only,
                 )
 
 
 class cmd_pack_objects(Command):
     """Create a packed archive of objects."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the pack-objects command.
 
         Args:
@@ -1786,23 +2014,23 @@ class cmd_pack_objects(Command):
             "--no-reuse-deltas", action="store_true", help="Don't reuse existing deltas"
         )
         parser.add_argument("basename", nargs="?", help="Base name for pack files")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        if not args.stdout and not args.basename:
+        if not parsed_args.stdout and not parsed_args.basename:
             parser.error("basename required when not using --stdout")
 
         object_ids = [line.strip().encode() for line in sys.stdin.readlines()]
-        deltify = args.deltify
-        reuse_deltas = not args.no_reuse_deltas
+        deltify = parsed_args.deltify
+        reuse_deltas = not parsed_args.no_reuse_deltas
 
-        if args.stdout:
+        if parsed_args.stdout:
             packf = getattr(sys.stdout, "buffer", sys.stdout)
             assert isinstance(packf, BinaryIO)
             idxf = None
             close = []
         else:
-            packf = open(args.basename + ".pack", "wb")
-            idxf = open(args.basename + ".idx", "wb")
+            packf = open(parsed_args.basename + ".pack", "wb")
+            idxf = open(parsed_args.basename + ".idx", "wb")
             close = [packf, idxf]
 
         porcelain.pack_objects(
@@ -1815,7 +2043,7 @@ class cmd_pack_objects(Command):
 class cmd_unpack_objects(Command):
     """Unpack objects from a packed archive."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the unpack-objects command.
 
         Args:
@@ -1823,16 +2051,16 @@ class cmd_unpack_objects(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("pack_file", help="Pack file to unpack")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        count = porcelain.unpack_objects(args.pack_file)
+        count = porcelain.unpack_objects(parsed_args.pack_file)
         logger.info("Unpacked %d objects", count)
 
 
 class cmd_prune(Command):
     """Prune all unreachable objects from the object database."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the prune command.
 
         Args:
@@ -1864,33 +2092,33 @@ class cmd_prune(Command):
             action="store_true",
             help="Report all actions",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         # Parse expire grace period
         grace_period = DEFAULT_TEMPFILE_GRACE_PERIOD
-        if args.expire:
+        if parsed_args.expire:
             try:
-                grace_period = parse_relative_time(args.expire)
+                grace_period = parse_relative_time(parsed_args.expire)
             except ValueError:
                 # Try to parse as absolute date
                 try:
-                    date = datetime.datetime.strptime(args.expire, "%Y-%m-%d")
+                    date = datetime.datetime.strptime(parsed_args.expire, "%Y-%m-%d")
                     grace_period = int(time.time() - date.timestamp())
                 except ValueError:
-                    logger.error("Invalid expire date: %s", args.expire)
+                    logger.error("Invalid expire date: %s", parsed_args.expire)
                     return 1
 
         # Progress callback
-        def progress(msg):
-            if args.verbose:
-                logger.info(msg)
+        def progress(msg: str) -> None:
+            if parsed_args.verbose:
+                logger.info("%s", msg)
 
         try:
             porcelain.prune(
                 ".",
                 grace_period=grace_period,
-                dry_run=args.dry_run,
-                progress=progress if args.verbose else None,
+                dry_run=parsed_args.dry_run,
+                progress=progress if parsed_args.verbose else None,
             )
             return None
         except porcelain.Error as e:
@@ -1901,7 +2129,7 @@ class cmd_prune(Command):
 class cmd_pull(Command):
     """Fetch from and integrate with another repository or a local branch."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the pull command.
 
         Args:
@@ -1912,20 +2140,20 @@ class cmd_pull(Command):
         parser.add_argument("refspec", type=str, nargs="*")
         parser.add_argument("--filter", type=str, nargs=1)
         parser.add_argument("--protocol", type=int)
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
         porcelain.pull(
             ".",
-            args.from_location or None,
-            args.refspec or None,
-            filter_spec=args.filter,
-            protocol_version=args.protocol or None,
+            remote_location=parsed_args.from_location or None,
+            refspecs=parsed_args.refspec or None,
+            filter_spec=parsed_args.filter,
+            protocol_version=parsed_args.protocol or None,
         )
 
 
 class cmd_push(Command):
     """Update remote refs along with associated objects."""
 
-    def run(self, argv) -> Optional[int]:
+    def run(self, argv: list[str]) -> Optional[int]:
         """Execute the push command.
 
         Args:
@@ -1950,7 +2178,7 @@ class cmd_push(Command):
 class cmd_remote_add(Command):
     """Add a remote repository."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the remote-add command.
 
         Args:
@@ -1959,8 +2187,8 @@ class cmd_remote_add(Command):
         parser = argparse.ArgumentParser()
         parser.add_argument("name", help="Name of the remote")
         parser.add_argument("url", help="URL of the remote")
-        args = parser.parse_args(args)
-        porcelain.remote_add(".", args.name, args.url)
+        parsed_args = parser.parse_args(args)
+        porcelain.remote_add(".", parsed_args.name, parsed_args.url)
 
 
 class SuperCommand(Command):
@@ -1969,7 +2197,7 @@ class SuperCommand(Command):
     subcommands: ClassVar[dict[str, type[Command]]] = {}
     default_command: ClassVar[Optional[type[Command]]] = None
 
-    def run(self, args):
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the subcommand command.
 
         Args:
@@ -2003,7 +2231,7 @@ class cmd_remote(SuperCommand):
 class cmd_submodule_list(Command):
     """List submodules."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the submodule-list command.
 
         Args:
@@ -2018,7 +2246,7 @@ class cmd_submodule_list(Command):
 class cmd_submodule_init(Command):
     """Initialize submodules."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the submodule-init command.
 
         Args:
@@ -2032,7 +2260,7 @@ class cmd_submodule_init(Command):
 class cmd_submodule_add(Command):
     """Add a submodule."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the submodule-add command.
 
         Args:
@@ -2049,7 +2277,7 @@ class cmd_submodule_add(Command):
 class cmd_submodule_update(Command):
     """Update submodules."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the submodule-update command.
 
         Args:
@@ -2088,7 +2316,7 @@ class cmd_submodule(SuperCommand):
 class cmd_check_ignore(Command):
     """Check whether files are excluded by gitignore."""
 
-    def run(self, args):
+    def run(self, args: list[str]) -> int:
         """Execute the check-ignore command.
 
         Args:
@@ -2096,9 +2324,9 @@ class cmd_check_ignore(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("paths", nargs="+", help="Paths to check")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
         ret = 1
-        for path in porcelain.check_ignore(".", args.paths):
+        for path in porcelain.check_ignore(".", parsed_args.paths):
             logger.info(path)
             ret = 0
         return ret
@@ -2107,7 +2335,7 @@ class cmd_check_ignore(Command):
 class cmd_check_mailmap(Command):
     """Show canonical names and email addresses of contacts."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the check-mailmap command.
 
         Args:
@@ -2115,8 +2343,8 @@ class cmd_check_mailmap(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("identities", nargs="+", help="Identities to check")
-        args = parser.parse_args(args)
-        for identity in args.identities:
+        parsed_args = parser.parse_args(args)
+        for identity in parsed_args.identities:
             canonical_identity = porcelain.check_mailmap(".", identity)
             logger.info(canonical_identity)
 
@@ -2124,7 +2352,7 @@ class cmd_check_mailmap(Command):
 class cmd_branch(Command):
     """List, create, or delete branches."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the branch command.
 
         Args:
@@ -2170,10 +2398,10 @@ class cmd_branch(Command):
             const=None,
             help="List branches matching a pattern",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         def print_branches(
-            branches: Union[Iterator[bytes], list[bytes]], use_columns=False
+            branches: Union[Iterator[bytes], list[bytes]], use_columns: bool = False
         ) -> None:
             if use_columns:
                 write_columns(branches, sys.stdout)
@@ -2184,20 +2412,20 @@ class cmd_branch(Command):
         branches: Union[Iterator[bytes], list[bytes], None] = None
 
         try:
-            if args.all:
+            if parsed_args.all:
                 branches = porcelain.branch_list(".") + porcelain.branch_remotes_list(
                     "."
                 )
-            elif args.remotes:
+            elif parsed_args.remotes:
                 branches = porcelain.branch_remotes_list(".")
-            elif args.merged:
+            elif parsed_args.merged:
                 branches = porcelain.merged_branches(".")
-            elif args.no_merged:
+            elif parsed_args.no_merged:
                 branches = porcelain.no_merged_branches(".")
-            elif args.contains:
+            elif parsed_args.contains:
                 try:
                     branches = list(
-                        porcelain.branches_containing(".", commit=args.contains)
+                        porcelain.branches_containing(".", commit=parsed_args.contains)
                     )
 
                 except KeyError as e:
@@ -2210,23 +2438,23 @@ class cmd_branch(Command):
             sys.stderr.write(f"{e}")
             return 1
 
-        pattern = args.list
+        pattern = parsed_args.list
         if pattern is not None and branches:
             branches = porcelain.filter_branches_by_pattern(branches, pattern)
 
         if branches is not None:
-            print_branches(branches, args.column)
+            print_branches(branches, parsed_args.column)
             return 0
 
-        if not args.branch:
+        if not parsed_args.branch:
             logger.error("Usage: dulwich branch [-d] BRANCH_NAME")
             return 1
 
-        if args.delete:
-            porcelain.branch_delete(".", name=args.branch)
+        if parsed_args.delete:
+            porcelain.branch_delete(".", name=parsed_args.branch)
         else:
             try:
-                porcelain.branch_create(".", name=args.branch)
+                porcelain.branch_create(".", name=parsed_args.branch)
             except porcelain.Error as e:
                 sys.stderr.write(f"{e}")
                 return 1
@@ -2236,7 +2464,7 @@ class cmd_branch(Command):
 class cmd_checkout(Command):
     """Switch branches or restore working tree files."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the checkout command.
 
         Args:
@@ -2260,14 +2488,17 @@ class cmd_checkout(Command):
             type=str,
             help="Create a new branch at the target and switch to it",
         )
-        args = parser.parse_args(args)
-        if not args.target:
+        parsed_args = parser.parse_args(args)
+        if not parsed_args.target:
             logger.error("Usage: dulwich checkout TARGET [--force] [-b NEW_BRANCH]")
             return 1
 
         try:
             porcelain.checkout(
-                ".", target=args.target, force=args.force, new_branch=args.new_branch
+                ".",
+                target=parsed_args.target,
+                force=parsed_args.force,
+                new_branch=parsed_args.new_branch,
             )
         except porcelain.CheckoutError as e:
             sys.stderr.write(f"{e}\n")
@@ -2278,7 +2509,7 @@ class cmd_checkout(Command):
 class cmd_stash_list(Command):
     """List stash entries."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the stash-list command.
 
         Args:
@@ -2302,7 +2533,7 @@ class cmd_stash_list(Command):
 class cmd_stash_push(Command):
     """Save your local modifications to a new stash."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the stash-push command.
 
         Args:
@@ -2317,7 +2548,7 @@ class cmd_stash_push(Command):
 class cmd_stash_pop(Command):
     """Apply a stash and remove it from the stash list."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the stash-pop command.
 
         Args:
@@ -2334,7 +2565,7 @@ class cmd_bisect(SuperCommand):
 
     subcommands: ClassVar[dict[str, type[Command]]] = {}
 
-    def run(self, args):
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the bisect command.
 
         Args:
@@ -2486,7 +2717,7 @@ class cmd_stash(SuperCommand):
 class cmd_ls_files(Command):
     """Show information about files in the index and working tree."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the ls-files command.
 
         Args:
@@ -2501,7 +2732,7 @@ class cmd_ls_files(Command):
 class cmd_describe(Command):
     """Give an object a human readable name based on an available ref."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the describe command.
 
         Args:
@@ -2515,7 +2746,7 @@ class cmd_describe(Command):
 class cmd_merge(Command):
     """Join two or more development histories together."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the merge command.
 
         Args:
@@ -2530,15 +2761,15 @@ class cmd_merge(Command):
             "--no-ff", action="store_true", help="Force create a merge commit"
         )
         parser.add_argument("-m", "--message", type=str, help="Merge commit message")
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         try:
             merge_commit_id, conflicts = porcelain.merge(
                 ".",
-                args.commit,
-                no_commit=args.no_commit,
-                no_ff=args.no_ff,
-                message=args.message,
+                parsed_args.commit,
+                no_commit=parsed_args.no_commit,
+                no_ff=parsed_args.no_ff,
+                message=parsed_args.message,
             )
 
             if conflicts:
@@ -2549,9 +2780,9 @@ class cmd_merge(Command):
                     "Automatic merge failed; fix conflicts and then commit the result."
                 )
                 return 1
-            elif merge_commit_id is None and not args.no_commit:
+            elif merge_commit_id is None and not parsed_args.no_commit:
                 logger.info("Already up to date.")
-            elif args.no_commit:
+            elif parsed_args.no_commit:
                 logger.info("Automatic merge successful; not committing as requested.")
             else:
                 assert merge_commit_id is not None
@@ -2568,7 +2799,7 @@ class cmd_merge(Command):
 class cmd_notes_add(Command):
     """Add notes to a commit."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the notes-add command.
 
         Args:
@@ -2580,15 +2811,17 @@ class cmd_notes_add(Command):
         parser.add_argument(
             "--ref", default="commits", help="Notes ref (default: commits)"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        porcelain.notes_add(".", args.object, args.message, ref=args.ref)
+        porcelain.notes_add(
+            ".", parsed_args.object, parsed_args.message, ref=parsed_args.ref
+        )
 
 
 class cmd_notes_show(Command):
     """Show notes for a commit."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the notes-show command.
 
         Args:
@@ -2599,19 +2832,19 @@ class cmd_notes_show(Command):
         parser.add_argument(
             "--ref", default="commits", help="Notes ref (default: commits)"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        note = porcelain.notes_show(".", args.object, ref=args.ref)
+        note = porcelain.notes_show(".", parsed_args.object, ref=parsed_args.ref)
         if note:
             sys.stdout.buffer.write(note)
         else:
-            logger.info("No notes found for object %s", args.object)
+            logger.info("No notes found for object %s", parsed_args.object)
 
 
 class cmd_notes_remove(Command):
     """Remove notes for a commit."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the notes-remove command.
 
         Args:
@@ -2622,19 +2855,19 @@ class cmd_notes_remove(Command):
         parser.add_argument(
             "--ref", default="commits", help="Notes ref (default: commits)"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        result = porcelain.notes_remove(".", args.object, ref=args.ref)
+        result = porcelain.notes_remove(".", parsed_args.object, ref=parsed_args.ref)
         if result:
-            logger.info("Removed notes for object %s", args.object)
+            logger.info("Removed notes for object %s", parsed_args.object)
         else:
-            logger.info("No notes found for object %s", args.object)
+            logger.info("No notes found for object %s", parsed_args.object)
 
 
 class cmd_notes_list(Command):
     """List all note objects."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the notes-list command.
 
         Args:
@@ -2644,9 +2877,9 @@ class cmd_notes_list(Command):
         parser.add_argument(
             "--ref", default="commits", help="Notes ref (default: commits)"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        notes = porcelain.notes_list(".", ref=args.ref)
+        notes = porcelain.notes_list(".", ref=parsed_args.ref)
         for object_sha, note_content in notes:
             logger.info(object_sha.hex())
 
@@ -2667,7 +2900,7 @@ class cmd_notes(SuperCommand):
 class cmd_cherry_pick(Command):
     """Apply the changes introduced by some existing commits."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the cherry-pick command.
 
         Args:
@@ -2694,38 +2927,38 @@ class cmd_cherry_pick(Command):
             action="store_true",
             help="Abort the current cherry-pick operation",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         # Check argument validity
-        if args.continue_ or args.abort:
-            if args.commit is not None:
+        if parsed_args.continue_ or parsed_args.abort:
+            if parsed_args.commit is not None:
                 parser.error("Cannot specify commit with --continue or --abort")
                 return 1
         else:
-            if args.commit is None:
+            if parsed_args.commit is None:
                 parser.error("Commit argument is required")
                 return 1
 
         try:
-            commit_arg = args.commit
+            commit_arg = parsed_args.commit
 
             result = porcelain.cherry_pick(
                 ".",
                 commit_arg,
-                no_commit=args.no_commit,
-                continue_=args.continue_,
-                abort=args.abort,
+                no_commit=parsed_args.no_commit,
+                continue_=parsed_args.continue_,
+                abort=parsed_args.abort,
             )
 
-            if args.abort:
+            if parsed_args.abort:
                 logger.info("Cherry-pick aborted.")
-            elif args.continue_:
+            elif parsed_args.continue_:
                 if result:
                     logger.info("Cherry-pick completed: %s", result.decode())
                 else:
                     logger.info("Cherry-pick completed.")
             elif result is None:
-                if args.no_commit:
+                if parsed_args.no_commit:
                     logger.info("Cherry-pick applied successfully (no commit created).")
                 else:
                     # This shouldn't happen unless there were conflicts
@@ -2742,7 +2975,7 @@ class cmd_cherry_pick(Command):
 class cmd_merge_tree(Command):
     """Show three-way merge without touching index."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the merge-tree command.
 
         Args:
@@ -2764,26 +2997,26 @@ class cmd_merge_tree(Command):
             action="store_true",
             help="Output only conflict paths, null-terminated",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         try:
-            # Determine base tree - if only two args provided, base is None
-            if args.base_tree is None:
+            # Determine base tree - if only two parsed_args provided, base is None
+            if parsed_args.base_tree is None:
                 # Only two arguments provided
                 base_tree = None
-                our_tree = args.our_tree
-                their_tree = args.their_tree
+                our_tree = parsed_args.our_tree
+                their_tree = parsed_args.their_tree
             else:
                 # Three arguments provided
-                base_tree = args.base_tree
-                our_tree = args.our_tree
-                their_tree = args.their_tree
+                base_tree = parsed_args.base_tree
+                our_tree = parsed_args.our_tree
+                their_tree = parsed_args.their_tree
 
             merged_tree_id, conflicts = porcelain.merge_tree(
                 ".", base_tree, our_tree, their_tree
             )
 
-            if args.name_only:
+            if parsed_args.name_only:
                 # Output only conflict paths, null-terminated
                 for conflict_path in conflicts:
                     sys.stdout.buffer.write(conflict_path)
@@ -2811,7 +3044,7 @@ class cmd_merge_tree(Command):
 class cmd_gc(Command):
     """Cleanup unnecessary files and optimize the local repository."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the gc command.
 
         Args:
@@ -2854,45 +3087,48 @@ class cmd_gc(Command):
             action="store_true",
             help="Only report errors",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         # Parse prune grace period
         grace_period = None
-        if args.prune:
+        if parsed_args.prune:
             try:
-                grace_period = parse_relative_time(args.prune)
+                grace_period = parse_relative_time(parsed_args.prune)
             except ValueError:
                 # Try to parse as absolute date
                 try:
-                    date = datetime.datetime.strptime(args.prune, "%Y-%m-%d")
+                    date = datetime.datetime.strptime(parsed_args.prune, "%Y-%m-%d")
                     grace_period = int(time.time() - date.timestamp())
                 except ValueError:
-                    logger.error("Invalid prune date: %s", args.prune)
+                    logger.error("Invalid prune date: %s", parsed_args.prune)
                     return 1
-        elif not args.no_prune:
+        elif not parsed_args.no_prune:
             # Default to 2 weeks
             grace_period = 1209600
 
         # Progress callback
-        def progress(msg):
-            if not args.quiet:
+        def progress(msg: str) -> None:
+            if not parsed_args.quiet:
                 logger.info(msg)
 
         try:
             stats = porcelain.gc(
                 ".",
-                auto=args.auto,
-                aggressive=args.aggressive,
-                prune=not args.no_prune,
+                auto=parsed_args.auto,
+                aggressive=parsed_args.aggressive,
+                prune=not parsed_args.no_prune,
                 grace_period=grace_period,
-                dry_run=args.dry_run,
-                progress=progress if not args.quiet else None,
+                dry_run=parsed_args.dry_run,
+                progress=progress if not parsed_args.quiet else None,
             )
 
             # Report results
-            if not args.quiet:
-                if args.dry_run:
+            if not parsed_args.quiet:
+                if parsed_args.dry_run:
                     logger.info("\nDry run results:")
+            if not parsed_args.quiet:
+                if parsed_args.dry_run:
+                    print("\nDry run results:")
                 else:
                     logger.info("\nGarbage collection complete:")
 
@@ -2918,7 +3154,7 @@ class cmd_gc(Command):
 class cmd_count_objects(Command):
     """Count unpacked number of objects and their disk consumption."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the count-objects command.
 
         Args:
@@ -2931,9 +3167,9 @@ class cmd_count_objects(Command):
             action="store_true",
             help="Display verbose information.",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        if args.verbose:
+        if parsed_args.verbose:
             stats = porcelain.count_objects(".", verbose=True)
             # Display verbose output
             logger.info("count: %d", stats.count)
@@ -2953,7 +3189,7 @@ class cmd_count_objects(Command):
 class cmd_rebase(Command):
     """Reapply commits on top of another base tip."""
 
-    def run(self, args) -> int:
+    def run(self, args: list[str]) -> int:
         """Execute the rebase command.
 
         Args:
@@ -2987,25 +3223,25 @@ class cmd_rebase(Command):
         parser.add_argument(
             "--skip", action="store_true", help="Skip current commit and continue"
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         # Handle abort/continue/skip first
-        if args.abort:
+        if parsed_args.abort:
             try:
-                porcelain.rebase(".", args.upstream or "HEAD", abort=True)
+                porcelain.rebase(".", parsed_args.upstream or "HEAD", abort=True)
                 logger.info("Rebase aborted.")
             except porcelain.Error as e:
                 logger.error("%s", e)
                 return 1
             return 0
 
-        if args.continue_rebase:
+        if parsed_args.continue_rebase:
             try:
                 # Check if interactive rebase is in progress
                 if porcelain.is_interactive_rebase("."):
                     result = porcelain.rebase(
                         ".",
-                        args.upstream or "HEAD",
+                        parsed_args.upstream or "HEAD",
                         continue_rebase=True,
                         interactive=True,
                     )
@@ -3015,7 +3251,7 @@ class cmd_rebase(Command):
                         logger.info("Rebase paused. Use --continue to resume.")
                 else:
                     new_shas = porcelain.rebase(
-                        ".", args.upstream or "HEAD", continue_rebase=True
+                        ".", parsed_args.upstream or "HEAD", continue_rebase=True
                     )
                     logger.info("Rebase complete.")
             except porcelain.Error as e:
@@ -3023,10 +3259,10 @@ class cmd_rebase(Command):
                 return 1
             return 0
 
-        if args.edit_todo:
+        if parsed_args.edit_todo:
             # Edit todo list for interactive rebase
             try:
-                porcelain.rebase(".", args.upstream or "HEAD", edit_todo=True)
+                porcelain.rebase(".", parsed_args.upstream or "HEAD", edit_todo=True)
                 logger.info("Todo list updated.")
             except porcelain.Error as e:
                 logger.error("%s", e)
@@ -3034,18 +3270,18 @@ class cmd_rebase(Command):
             return 0
 
         # Normal rebase requires upstream
-        if not args.upstream:
+        if not parsed_args.upstream:
             logger.error("Missing required argument 'upstream'")
             return 1
 
         try:
-            if args.interactive:
+            if parsed_args.interactive:
                 # Interactive rebase
                 result = porcelain.rebase(
                     ".",
-                    args.upstream,
-                    onto=args.onto,
-                    branch=args.branch,
+                    parsed_args.upstream,
+                    onto=parsed_args.onto,
+                    branch=parsed_args.branch,
                     interactive=True,
                 )
                 if result:
@@ -3058,9 +3294,9 @@ class cmd_rebase(Command):
                 # Regular rebase
                 new_shas = porcelain.rebase(
                     ".",
-                    args.upstream,
-                    onto=args.onto,
-                    branch=args.branch,
+                    parsed_args.upstream,
+                    onto=parsed_args.onto,
+                    branch=parsed_args.branch,
                 )
 
                 if new_shas:
@@ -3077,7 +3313,7 @@ class cmd_rebase(Command):
 class cmd_filter_branch(Command):
     """Rewrite branches."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the filter-branch command.
 
         Args:
@@ -3123,7 +3359,7 @@ class cmd_filter_branch(Command):
             "branch", nargs="?", default="HEAD", help="Branch or ref to rewrite"
         )
 
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         # Track if any filter fails
         filter_error = False
@@ -3132,7 +3368,12 @@ class cmd_filter_branch(Command):
         env = os.environ.copy()
 
         # Helper function to run shell commands
-        def run_filter(cmd, input_data=None, cwd=None, extra_env=None):
+        def run_filter(
+            cmd: str,
+            input_data: Optional[bytes] = None,
+            cwd: Optional[str] = None,
+            extra_env: Optional[dict[str, str]] = None,
+        ) -> Optional[bytes]:
             nonlocal filter_error
             filter_env = env.copy()
             if extra_env:
@@ -3152,34 +3393,38 @@ class cmd_filter_branch(Command):
 
         # Create filter functions based on arguments
         filter_message = None
-        if args.msg_filter:
+        if parsed_args.msg_filter:
 
-            def filter_message(message):
-                result = run_filter(args.msg_filter, input_data=message)
+            def filter_message(message: bytes) -> bytes:
+                result = run_filter(parsed_args.msg_filter, input_data=message)
                 return result if result is not None else message
 
         tree_filter = None
-        if args.tree_filter:
+        if parsed_args.tree_filter:
 
-            def tree_filter(tree_sha, tmpdir):
+            def tree_filter(tree_sha: bytes, tmpdir: str) -> bytes:
                 from dulwich.objects import Blob, Tree
 
                 # Export tree to tmpdir
                 with Repo(".") as r:
                     tree = r.object_store[tree_sha]
-                    for entry in tree.items():
+                    assert isinstance(tree, Tree)
+                    for entry in tree.iteritems():
+                        assert entry.path is not None
+                        assert entry.sha is not None
                         path = Path(tmpdir) / entry.path.decode()
-                        if entry.mode & 0o040000:  # Directory
+                        obj = r.object_store[entry.sha]
+                        if isinstance(obj, Tree):
                             path.mkdir(exist_ok=True)
                         else:
-                            obj = r.object_store[entry.sha]
+                            assert isinstance(obj, Blob)
                             path.write_bytes(obj.data)
 
                     # Run the filter command in the temp directory
-                    run_filter(args.tree_filter, cwd=tmpdir)
+                    run_filter(parsed_args.tree_filter, cwd=tmpdir)
 
                     # Rebuild tree from modified temp directory
-                    def build_tree_from_dir(dir_path):
+                    def build_tree_from_dir(dir_path: str) -> bytes:
                         tree = Tree()
                         for name in sorted(os.listdir(dir_path)):
                             if name.startswith("."):
@@ -3206,18 +3451,22 @@ class cmd_filter_branch(Command):
                     return build_tree_from_dir(tmpdir)
 
         index_filter = None
-        if args.index_filter:
+        if parsed_args.index_filter:
 
-            def index_filter(tree_sha, index_path):
-                run_filter(args.index_filter, extra_env={"GIT_INDEX_FILE": index_path})
+            def index_filter(tree_sha: bytes, index_path: str) -> Optional[bytes]:
+                run_filter(
+                    parsed_args.index_filter, extra_env={"GIT_INDEX_FILE": index_path}
+                )
                 return None  # Read back from index
 
         parent_filter = None
-        if args.parent_filter:
+        if parsed_args.parent_filter:
 
-            def parent_filter(parents):
+            def parent_filter(parents: list[bytes]) -> list[bytes]:
                 parent_str = " ".join(p.hex() for p in parents)
-                result = run_filter(args.parent_filter, input_data=parent_str.encode())
+                result = run_filter(
+                    parsed_args.parent_filter, input_data=parent_str.encode()
+                )
                 if result is None:
                     return parents
 
@@ -3226,21 +3475,22 @@ class cmd_filter_branch(Command):
                     return []
                 new_parents = []
                 for sha in output.split():
-                    if valid_hexsha(sha):
-                        new_parents.append(sha)
+                    sha_bytes = sha.encode()
+                    if valid_hexsha(sha_bytes):
+                        new_parents.append(sha_bytes)
                 return new_parents
 
         commit_filter = None
-        if args.commit_filter:
+        if parsed_args.commit_filter:
 
-            def commit_filter(commit_obj, tree_sha):
+            def commit_filter(commit_obj: Commit, tree_sha: bytes) -> Optional[bytes]:
                 # The filter receives: tree parent1 parent2...
                 cmd_input = tree_sha.hex()
                 for parent in commit_obj.parents:
                     cmd_input += " " + parent.hex()
 
                 result = run_filter(
-                    args.commit_filter,
+                    parsed_args.commit_filter,
                     input_data=cmd_input.encode(),
                     extra_env={"GIT_COMMIT": commit_obj.id.hex()},
                 )
@@ -3252,44 +3502,52 @@ class cmd_filter_branch(Command):
                     return None  # Skip commit
 
                 if valid_hexsha(output):
-                    return output
+                    return output.encode()
                 return None
 
         tag_name_filter = None
-        if args.tag_name_filter:
+        if parsed_args.tag_name_filter:
 
-            def tag_name_filter(tag_name):
-                result = run_filter(args.tag_name_filter, input_data=tag_name)
-                return result.strip() if result is not None else tag_name
+            def tag_name_filter(tag_name: bytes) -> bytes:
+                result = run_filter(parsed_args.tag_name_filter, input_data=tag_name)
+                return result if result is not None else tag_name
 
         # Open repo once
         with Repo(".") as r:
             # Check for refs/original if not forcing
-            if not args.force:
-                original_prefix = args.original.encode() + b"/"
+            if not parsed_args.force:
+                original_prefix = parsed_args.original.encode() + b"/"
                 for ref in r.refs.allkeys():
                     if ref.startswith(original_prefix):
                         logger.error("Cannot create a new backup.")
                         logger.error(
-                            "A previous backup already exists in %s/", args.original
+                            "A previous backup already exists in %s/",
+                            parsed_args.original,
                         )
                         logger.error("Force overwriting the backup with -f")
+                        print("Cannot create a new backup.")
+                        print(
+                            f"A previous backup already exists in {parsed_args.original}/"
+                        )
+                        print("Force overwriting the backup with -f")
                         return 1
 
             try:
                 # Call porcelain.filter_branch with the repo object
                 result = porcelain.filter_branch(
                     r,
-                    args.branch,
+                    parsed_args.branch,
                     filter_message=filter_message,
-                    tree_filter=tree_filter if args.tree_filter else None,
-                    index_filter=index_filter if args.index_filter else None,
-                    parent_filter=parent_filter if args.parent_filter else None,
-                    commit_filter=commit_filter if args.commit_filter else None,
-                    subdirectory_filter=args.subdirectory_filter,
-                    prune_empty=args.prune_empty,
-                    tag_name_filter=tag_name_filter if args.tag_name_filter else None,
-                    force=args.force,
+                    tree_filter=tree_filter if parsed_args.tree_filter else None,
+                    index_filter=index_filter if parsed_args.index_filter else None,
+                    parent_filter=parent_filter if parsed_args.parent_filter else None,
+                    commit_filter=commit_filter if parsed_args.commit_filter else None,
+                    subdirectory_filter=parsed_args.subdirectory_filter,
+                    prune_empty=parsed_args.prune_empty,
+                    tag_name_filter=tag_name_filter
+                    if parsed_args.tag_name_filter
+                    else None,
+                    force=parsed_args.force,
                     keep_original=True,  # Always keep original with git
                 )
 
@@ -3300,13 +3558,15 @@ class cmd_filter_branch(Command):
 
                 # Git filter-branch shows progress
                 if result:
-                    logger.info("Rewrite %s (%d commits)", args.branch, len(result))
+                    logger.info(
+                        "Rewrite %s (%d commits)", parsed_args.branch, len(result)
+                    )
                     # Git shows: Ref 'refs/heads/branch' was rewritten
-                    if args.branch != "HEAD":
+                    if parsed_args.branch != "HEAD":
                         ref_name = (
-                            args.branch
-                            if args.branch.startswith("refs/")
-                            else f"refs/heads/{args.branch}"
+                            parsed_args.branch
+                            if parsed_args.branch.startswith("refs/")
+                            else f"refs/heads/{parsed_args.branch}"
                         )
                         logger.info("Ref '%s' was rewritten", ref_name)
 
@@ -3322,7 +3582,7 @@ class cmd_lfs(Command):
 
     """Git LFS management commands."""
 
-    def run(self, argv) -> None:
+    def run(self, argv: list[str]) -> None:
         """Execute the lfs command.
 
         Args:
@@ -3511,7 +3771,7 @@ class cmd_lfs(Command):
 class cmd_help(Command):
     """Display help information about git."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the help command.
 
         Args:
@@ -3524,9 +3784,9 @@ class cmd_help(Command):
             action="store_true",
             help="List all commands.",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
-        if args.all:
+        if parsed_args.all:
             logger.info("Available commands:")
             for cmd in sorted(commands):
                 logger.info("  %s", cmd)
@@ -3542,7 +3802,7 @@ class cmd_help(Command):
 class cmd_format_patch(Command):
     """Prepare patches for e-mail submission."""
 
-    def run(self, args) -> None:
+    def run(self, args: list[str]) -> None:
         """Execute the format-patch command.
 
         Args:
@@ -3572,33 +3832,33 @@ class cmd_format_patch(Command):
             action="store_true",
             help="Output patches to stdout",
         )
-        args = parser.parse_args(args)
+        parsed_args = parser.parse_args(args)
 
         # Parse committish using the new function
         committish: Optional[Union[bytes, tuple[bytes, bytes]]] = None
-        if args.committish:
+        if parsed_args.committish:
             with Repo(".") as r:
-                range_result = parse_commit_range(r, args.committish)
+                range_result = parse_commit_range(r, parsed_args.committish)
                 if range_result:
                     # Convert Commit objects to their SHAs
                     committish = (range_result[0].id, range_result[1].id)
                 else:
                     committish = (
-                        args.committish.encode()
-                        if isinstance(args.committish, str)
-                        else args.committish
+                        parsed_args.committish.encode()
+                        if isinstance(parsed_args.committish, str)
+                        else parsed_args.committish
                     )
 
         filenames = porcelain.format_patch(
             ".",
             committish=committish,
             outstream=sys.stdout,
-            outdir=args.outdir,
-            n=args.numbered,
-            stdout=args.stdout,
+            outdir=parsed_args.outdir,
+            n=parsed_args.numbered,
+            stdout=parsed_args.stdout,
         )
 
-        if not args.stdout:
+        if not parsed_args.stdout:
             for filename in filenames:
                 logger.info(filename)
 
@@ -3606,7 +3866,7 @@ class cmd_format_patch(Command):
 class cmd_bundle(Command):
     """Create, unpack, and manipulate bundle files."""
 
-    def run(self, args) -> int:
+    def run(self, args: list[str]) -> int:
         """Execute the bundle command.
 
         Args:
@@ -3631,7 +3891,7 @@ class cmd_bundle(Command):
             logger.error("Unknown bundle subcommand: %s", subcommand)
             return 1
 
-    def _create(self, args) -> int:
+    def _create(self, args: list[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle create")
         parser.add_argument(
             "-q", "--quiet", action="store_true", help="Suppress progress"
@@ -3652,8 +3912,18 @@ class cmd_bundle(Command):
         progress = None
         if parsed_args.progress and not parsed_args.quiet:
 
-            def progress(msg: str) -> None:
-                logger.error(msg)
+            def progress(*args: Union[str, int]) -> None:
+                # Handle both progress(msg) and progress(count, msg) signatures
+                if len(args) == 1:
+                    msg = args[0]
+                elif len(args) == 2:
+                    _count, msg = args
+                else:
+                    msg = str(args)
+                # Convert bytes to string if needed
+                if isinstance(msg, bytes):
+                    msg = msg.decode("utf-8", "replace")
+                logger.error("%s", msg)
 
         refs_to_include = []
         prerequisites = []
@@ -3713,7 +3983,7 @@ class cmd_bundle(Command):
 
         return 0
 
-    def _verify(self, args) -> int:
+    def _verify(self, args: list[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle verify")
         parser.add_argument(
             "-q", "--quiet", action="store_true", help="Suppress output"
@@ -3724,7 +3994,7 @@ class cmd_bundle(Command):
 
         repo = Repo(".")
 
-        def verify_bundle(bundle):
+        def verify_bundle(bundle: Bundle) -> int:
             missing_prereqs = []
             for prereq_sha, comment in bundle.prerequisites:
                 try:
@@ -3753,14 +4023,14 @@ class cmd_bundle(Command):
                 bundle = read_bundle(f)
                 return verify_bundle(bundle)
 
-    def _list_heads(self, args) -> int:
+    def _list_heads(self, args: list[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle list-heads")
         parser.add_argument("file", help="Bundle file (use - for stdin)")
         parser.add_argument("refnames", nargs="*", help="Only show these refs")
 
         parsed_args = parser.parse_args(args)
 
-        def list_heads(bundle):
+        def list_heads(bundle: Bundle) -> None:
             for ref, sha in bundle.references.items():
                 if not parsed_args.refnames or ref.decode() in parsed_args.refnames:
                     logger.info("%s %s", sha.decode(), ref.decode())
@@ -3775,7 +4045,7 @@ class cmd_bundle(Command):
 
         return 0
 
-    def _unbundle(self, args) -> int:
+    def _unbundle(self, args: list[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle unbundle")
         parser.add_argument("--progress", action="store_true", help="Show progress")
         parser.add_argument("file", help="Bundle file (use - for stdin)")
@@ -3788,8 +4058,20 @@ class cmd_bundle(Command):
         progress = None
         if parsed_args.progress:
 
-            def progress(msg: str) -> None:
-                logger.error(msg)
+            def progress(*args: Union[str, int, bytes]) -> None:
+                # Handle both progress(msg) and progress(count, msg) signatures
+                if len(args) == 1:
+                    msg = args[0]
+                elif len(args) == 2:
+                    _count, msg = args
+                else:
+                    msg = str(args)
+                # Convert bytes to string if needed
+                if isinstance(msg, bytes):
+                    msg = msg.decode("utf-8", "replace")
+                elif not isinstance(msg, str):
+                    msg = str(msg)
+                logger.error("%s", msg)
 
         if parsed_args.file == "-":
             bundle = read_bundle(sys.stdin.buffer)
@@ -3814,7 +4096,7 @@ class cmd_worktree_add(Command):
 
     """Add a new worktree to the repository."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the worktree-add command.
 
         Args:
@@ -3869,7 +4151,7 @@ class cmd_worktree_list(Command):
 
     """List details of each worktree."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the worktree-list command.
 
         Args:
@@ -3931,7 +4213,7 @@ class cmd_worktree_remove(Command):
 
     """Remove a worktree."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the worktree-remove command.
 
         Args:
@@ -3959,7 +4241,7 @@ class cmd_worktree_prune(Command):
 
     """Prune worktree information."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the worktree-prune command.
 
         Args:
@@ -4004,7 +4286,7 @@ class cmd_worktree_lock(Command):
 
     """Lock a worktree."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the worktree-lock command.
 
         Args:
@@ -4032,7 +4314,7 @@ class cmd_worktree_unlock(Command):
 
     """Unlock a worktree."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the worktree-unlock command.
 
         Args:
@@ -4057,7 +4339,7 @@ class cmd_worktree_move(Command):
 
     """Move a worktree."""
 
-    def run(self, args) -> Optional[int]:
+    def run(self, args: list[str]) -> Optional[int]:
         """Execute the worktree-move command.
 
         Args:
@@ -4169,7 +4451,7 @@ commands = {
 }
 
 
-def main(argv=None) -> Optional[int]:
+def main(argv: Optional[list[str]] = None) -> Optional[int]:
     """Main entry point for the Dulwich CLI.
 
     Args:
@@ -4235,7 +4517,7 @@ def main(argv=None) -> Optional[int]:
 
 def _main() -> None:
     if "DULWICH_PDB" in os.environ and getattr(signal, "SIGQUIT", None):
-        signal.signal(signal.SIGQUIT, signal_quit)  # type: ignore
+        signal.signal(signal.SIGQUIT, signal_quit)
     signal.signal(signal.SIGINT, signal_int)
 
     sys.exit(main())

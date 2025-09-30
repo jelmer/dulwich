@@ -192,7 +192,7 @@ class GitFastExporter:
         return marker
 
 
-class GitImportProcessor(processor.ImportProcessor):
+class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc]
     """An import processor that imports into a Git repository using Dulwich."""
 
     # FIXME: Batch creation of objects?
@@ -333,6 +333,7 @@ class GitImportProcessor(processor.ImportProcessor):
                 mode,
                 hexsha,
             ) in iter_tree_contents(self.repo.object_store, tree_id):
+                assert path is not None and mode is not None and hexsha is not None
                 self._contents[path] = (mode, hexsha)
 
     def reset_handler(self, cmd: commands.ResetCommand) -> None:

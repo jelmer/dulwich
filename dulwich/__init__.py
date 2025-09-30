@@ -62,7 +62,7 @@ except ImportError:
             import functools
             import warnings
 
-            m = f"{func.__name__} is deprecated"  # type: ignore[attr-defined]
+            m = f"{func.__name__} is deprecated"
             since_str = str(since) if since is not None else None
             remove_in_str = str(remove_in) if remove_in is not None else None
 
@@ -82,7 +82,7 @@ except ImportError:
                     DeprecationWarning,
                     stacklevel=2,
                 )
-                return func(*args, **kwargs)  # type: ignore[operator]
+                return func(*args, **kwargs)
 
             return _wrapped_func  # type: ignore[return-value]
 

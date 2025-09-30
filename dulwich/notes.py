@@ -63,9 +63,11 @@ def get_note_fanout_level(tree: Tree, object_store: "BaseObjectStore") -> int:
         """
         count = 0
         for name, mode, sha in tree.items():
+            assert mode is not None
             if stat.S_ISREG(mode):
                 count += 1
             elif stat.S_ISDIR(mode) and level < 2:  # Only recurse 2 levels deep
+                assert sha is not None
                 try:
                     subtree = object_store[sha]
                     assert isinstance(subtree, Tree)
@@ -149,6 +151,8 @@ class NotesTree:
         dir_names = []
 
         for name, mode, sha in self._tree.items():
+            assert name is not None
+            assert mode is not None
             if stat.S_ISDIR(mode):
                 has_dirs = True
                 dir_names.append(name)
@@ -159,6 +163,8 @@ class NotesTree:
         if has_files and not has_dirs:
             # Check if any file names are full 40-char hex strings
             for name, mode, sha in self._tree.items():
+                assert name is not None
+                assert mode is not None
                 if stat.S_ISREG(mode) and len(name) == 40:
                     try:
                         int(name, 16)  # Verify it's a valid hex string
@@ -184,6 +190,8 @@ class NotesTree:
                     # Check if this subtree also has 2-char hex directories
                     sub_has_dirs = False
                     for sub_name, sub_mode, sub_sha in sample_tree.items():
+                        assert sub_name is not None
+                        assert sub_mode is not None
                         if stat.S_ISDIR(sub_mode) and len(sub_name) == 2:
                             try:
                                 int(sub_name, 16)
@@ -231,7 +239,9 @@ class NotesTree:
             components = path.split(b"/")
 
             # Build new tree structure
-            def update_tree(tree: Tree, components: list, blob_sha: bytes) -> Tree:
+            def update_tree(
+                tree: Tree, components: list[bytes], blob_sha: bytes
+            ) -> Tree:
                 """Update tree with new note entry.
 
                 Args:
@@ -247,6 +257,9 @@ class NotesTree:
                     new_tree = Tree()
                     for name, mode, sha in tree.items():
                         if name != components[0]:
+                            assert name is not None
+                            assert mode is not None
+                            assert sha is not None
                             new_tree.add(name, mode, sha)
                     new_tree.add(components[0], stat.S_IFREG | 0o644, blob_sha)
                     return new_tree
@@ -257,6 +270,7 @@ class NotesTree:
                     for name, mode, sha in tree.items():
                         if name == components[0]:
                             # Update this subtree
+                            assert mode is not None and sha is not None
                             if stat.S_ISDIR(mode):
                                 subtree = self._object_store[sha]
                                 assert isinstance(subtree, Tree)
@@ -268,6 +282,11 @@ class NotesTree:
                             new_tree.add(name, stat.S_IFDIR, new_subtree.id)
                             found = True
                         else:
+                            assert (
+                                name is not None
+                                and mode is not None
+                                and sha is not None
+                            )
                             new_tree.add(name, mode, sha)
 
                     if not found:
@@ -299,6 +318,11 @@ class NotesTree:
         new_tree = Tree()
         for existing_name, existing_mode, existing_sha in tree.items():
             if existing_name != name:
+                assert (
+                    existing_name is not None
+                    and existing_mode is not None
+                    and existing_sha is not None
+                )
                 new_tree.add(existing_name, existing_mode, existing_sha)
         new_tree.add(name, mode, sha)
         self._object_store.add_object(new_tree)
@@ -358,7 +382,8 @@ class NotesTree:
             note_obj = self._object_store[note_sha]
             if not isinstance(note_obj, Blob):
                 return None
-            return note_obj.data
+            data: bytes = note_obj.data
+            return data
         except KeyError:
             return None
 
@@ -386,7 +411,7 @@ class NotesTree:
         components = path.split(b"/")
 
         # Build new tree structure
-        def update_tree(tree: Tree, components: list, blob_sha: bytes) -> Tree:
+        def update_tree(tree: Tree, components: list[bytes], blob_sha: bytes) -> Tree:
             """Update tree with new note entry.
 
             Args:
@@ -402,6 +427,7 @@ class NotesTree:
                 new_tree = Tree()
                 for name, mode, sha in tree.items():
                     if name != components[0]:
+                        assert name is not None and mode is not None and sha is not None
                         new_tree.add(name, mode, sha)
                 new_tree.add(components[0], stat.S_IFREG | 0o644, blob_sha)
                 return new_tree
@@ -412,6 +438,7 @@ class NotesTree:
                 for name, mode, sha in tree.items():
                     if name == components[0]:
                         # Update this subtree
+                        assert mode is not None and sha is not None
                         if stat.S_ISDIR(mode):
                             subtree = self._object_store[sha]
                             assert isinstance(subtree, Tree)
@@ -423,6 +450,7 @@ class NotesTree:
                         new_tree.add(name, stat.S_IFDIR, new_subtree.id)
                         found = True
                     else:
+                        assert name is not None and mode is not None and sha is not None
                         new_tree.add(name, mode, sha)
 
                 if not found:
@@ -457,7 +485,7 @@ class NotesTree:
         components = path.split(b"/")
 
         # Build new tree structure without the note
-        def remove_from_tree(tree: Tree, components: list) -> Optional[Tree]:
+        def remove_from_tree(tree: Tree, components: list[bytes]) -> Optional[Tree]:
             """Remove note entry from tree.
 
             Args:
@@ -473,6 +501,7 @@ class NotesTree:
                 found = False
                 for name, mode, sha in tree.items():
                     if name != components[0]:
+                        assert name is not None and mode is not None and sha is not None
                         new_tree.add(name, mode, sha)
                     else:
                         found = True
@@ -487,6 +516,7 @@ class NotesTree:
                 new_tree = Tree()
                 modified = False
                 for name, mode, sha in tree.items():
+                    assert name is not None and mode is not None and sha is not None
                     if name == components[0] and stat.S_ISDIR(mode):
                         # Update this subtree
                         subtree = self._object_store[sha]
@@ -532,6 +562,7 @@ class NotesTree:
                 Tuples of (object_sha, note_sha)
             """
             for name, mode, sha in tree.items():
+                assert name is not None and mode is not None and sha is not None
                 if stat.S_ISDIR(mode):  # Directory
                     subtree = self._object_store[sha]
                     assert isinstance(subtree, Tree)

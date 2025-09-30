@@ -34,8 +34,9 @@ import stat
 import sys
 import time
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator
 from io import BytesIO
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -52,15 +53,17 @@ if TYPE_CHECKING:
     # these imports.
     from .attrs import GitAttributes
     from .config import ConditionMatcher, ConfigFile, StackedConfig
+    from .diff_tree import RenameDetector
+    from .filters import FilterBlobNormalizer, FilterContext
     from .index import Index
-    from .line_ending import BlobNormalizer
     from .notes import Notes
-    from .object_store import BaseObjectStore, GraphWalker, UnpackedObject
+    from .object_store import BaseObjectStore, GraphWalker
+    from .pack import UnpackedObject
     from .rebase import RebaseStateManager
     from .walk import Walker
     from .worktree import WorkTree
 
-from . import replace_me
+from . import reflog, replace_me
 from .errors import (
     NoIndexPresent,
     NotBlobError,
@@ -121,6 +124,7 @@ from .refs import (
 
 CONTROLDIR = ".git"
 OBJECTDIR = "objects"
+DEFAULT_OFS_DELTA = True
 
 T = TypeVar("T", bound="ShaFile")
 REFSDIR = "refs"
@@ -172,7 +176,7 @@ def _get_default_identity() -> tuple[str, str]:
         fullname = None
     else:
         try:
-            entry = pwd.getpwuid(os.getuid())  # type: ignore
+            entry = pwd.getpwuid(os.getuid())  # type: ignore[attr-defined,unused-ignore]
         except KeyError:
             fullname = None
         else:
@@ -346,7 +350,7 @@ class ParentsProvider:
     def __init__(
         self,
         store: "BaseObjectStore",
-        grafts: dict = {},
+        grafts: dict[bytes, list[bytes]] = {},
         shallows: Iterable[bytes] = [],
     ) -> None:
         """Initialize ParentsProvider.
@@ -385,7 +389,9 @@ class ParentsProvider:
             obj = self.store[commit_id]
             assert isinstance(obj, Commit)
             commit = obj
-        return commit.parents
+        parents = commit.parents
+        assert isinstance(parents, list)
+        return parents
 
 
 class BaseRepo:
@@ -501,10 +507,12 @@ class BaseRepo:
     def fetch(
         self,
         target: "BaseRepo",
-        determine_wants: Optional[Callable] = None,
-        progress: Optional[Callable] = None,
+        determine_wants: Optional[
+            Callable[[dict[bytes, bytes], Optional[int]], list[bytes]]
+        ] = None,
+        progress: Optional[Callable[..., None]] = None,
         depth: Optional[int] = None,
-    ) -> dict:
+    ) -> dict[bytes, bytes]:
         """Fetch objects into another repository.
 
         Args:
@@ -528,13 +536,13 @@ class BaseRepo:
 
     def fetch_pack_data(
         self,
-        determine_wants: Callable,
+        determine_wants: Callable[[dict[bytes, bytes], Optional[int]], list[bytes]],
         graph_walker: "GraphWalker",
-        progress: Optional[Callable],
+        progress: Optional[Callable[[bytes], None]],
         *,
-        get_tagged: Optional[Callable] = None,
+        get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
         depth: Optional[int] = None,
-    ) -> tuple:
+    ) -> tuple[int, Iterator["UnpackedObject"]]:
         """Fetch the pack data required for a set of revisions.
 
         Args:
@@ -563,11 +571,11 @@ class BaseRepo:
 
     def find_missing_objects(
         self,
-        determine_wants: Callable,
+        determine_wants: Callable[[dict[bytes, bytes], Optional[int]], list[bytes]],
         graph_walker: "GraphWalker",
-        progress: Optional[Callable],
+        progress: Optional[Callable[[bytes], None]],
         *,
-        get_tagged: Optional[Callable] = None,
+        get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
         depth: Optional[int] = None,
     ) -> Optional[MissingObjectFinder]:
         """Fetch the missing objects required for a set of revisions.
@@ -587,7 +595,7 @@ class BaseRepo:
         """
         refs = serialize_refs(self.object_store, self.get_refs())
 
-        wants = determine_wants(refs)
+        wants = determine_wants(refs, depth)
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
@@ -670,8 +678,8 @@ class BaseRepo:
 
     def generate_pack_data(
         self,
-        have: Iterable[ObjectID],
-        want: Iterable[ObjectID],
+        have: set[ObjectID],
+        want: set[ObjectID],
         progress: Optional[Callable[[str], None]] = None,
         ofs_delta: Optional[bool] = None,
     ) -> tuple[int, Iterator["UnpackedObject"]]:
@@ -688,7 +696,7 @@ class BaseRepo:
             want,
             shallow=self.get_shallow(),
             progress=progress,
-            ofs_delta=ofs_delta,
+            ofs_delta=ofs_delta if ofs_delta is not None else DEFAULT_OFS_DELTA,
         )
 
     def get_graph_walker(
@@ -792,10 +800,10 @@ class BaseRepo:
         """Retrieve the worktree config object."""
         raise NotImplementedError(self.get_worktree_config)
 
-    def get_description(self) -> Optional[str]:
+    def get_description(self) -> Optional[bytes]:
         """Retrieve the description for this repository.
 
-        Returns: String with the description of the repository
+        Returns: Bytes with the description of the repository
             as set by the user.
         """
         raise NotImplementedError(self.get_description)
@@ -815,7 +823,7 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_rebase_state_manager)
 
-    def get_blob_normalizer(self) -> "BlobNormalizer":
+    def get_blob_normalizer(self) -> "FilterBlobNormalizer":
         """Return a BlobNormalizer object for checkin/checkout operations.
 
         Returns: BlobNormalizer instance
@@ -907,42 +915,67 @@ class BaseRepo:
 
         return Notes(self.object_store, self.refs)
 
-    def get_walker(self, include: Optional[list[bytes]] = None, **kwargs) -> "Walker":
+    def get_walker(
+        self,
+        include: Optional[list[bytes]] = None,
+        exclude: Optional[list[bytes]] = None,
+        order: str = "date",
+        reverse: bool = False,
+        max_entries: Optional[int] = None,
+        paths: Optional[list[bytes]] = None,
+        rename_detector: Optional["RenameDetector"] = None,
+        follow: bool = False,
+        since: Optional[int] = None,
+        until: Optional[int] = None,
+        queue_cls: Optional[type] = None,
+    ) -> "Walker":
         """Obtain a walker for this repository.
 
         Args:
           include: Iterable of SHAs of commits to include along with their
             ancestors. Defaults to [HEAD]
-          **kwargs: Additional keyword arguments including:
-
-            * exclude: Iterable of SHAs of commits to exclude along with their
-              ancestors, overriding includes.
-            * order: ORDER_* constant specifying the order of results.
-              Anything other than ORDER_DATE may result in O(n) memory usage.
-            * reverse: If True, reverse the order of output, requiring O(n)
-              memory.
-            * max_entries: The maximum number of entries to yield, or None for
-              no limit.
-            * paths: Iterable of file or subtree paths to show entries for.
-            * rename_detector: diff.RenameDetector object for detecting
-              renames.
-            * follow: If True, follow path across renames/copies. Forces a
-              default rename_detector.
-            * since: Timestamp to list commits after.
-            * until: Timestamp to list commits before.
-            * queue_cls: A class to use for a queue of commits, supporting the
-              iterator protocol. The constructor takes a single argument, the Walker.
+          exclude: Iterable of SHAs of commits to exclude along with their
+            ancestors, overriding includes.
+          order: ORDER_* constant specifying the order of results.
+            Anything other than ORDER_DATE may result in O(n) memory usage.
+          reverse: If True, reverse the order of output, requiring O(n)
+            memory.
+          max_entries: The maximum number of entries to yield, or None for
+            no limit.
+          paths: Iterable of file or subtree paths to show entries for.
+          rename_detector: diff.RenameDetector object for detecting
+            renames.
+          follow: If True, follow path across renames/copies. Forces a
+            default rename_detector.
+          since: Timestamp to list commits after.
+          until: Timestamp to list commits before.
+          queue_cls: A class to use for a queue of commits, supporting the
+            iterator protocol. The constructor takes a single argument, the Walker.
+          **kwargs: Additional keyword arguments
 
         Returns: A `Walker` object
         """
-        from .walk import Walker
+        from .walk import Walker, _CommitTimeQueue
 
         if include is None:
             include = [self.head()]
 
-        kwargs["get_parents"] = lambda commit: self.get_parents(commit.id, commit)
-
-        return Walker(self.object_store, include, **kwargs)
+        # Pass all arguments to Walker explicitly to avoid type issues with **kwargs
+        return Walker(
+            self.object_store,
+            include,
+            exclude=exclude,
+            order=order,
+            reverse=reverse,
+            max_entries=max_entries,
+            paths=paths,
+            rename_detector=rename_detector,
+            follow=follow,
+            since=since,
+            until=until,
+            get_parents=lambda commit: self.get_parents(commit.id, commit),
+            queue_cls=queue_cls if queue_cls is not None else _CommitTimeQueue,
+        )
 
     def __getitem__(self, name: Union[ObjectID, Ref]) -> "ShaFile":
         """Retrieve a Git object by SHA1 or ref.
@@ -1139,7 +1172,7 @@ def read_gitfile(f: BinaryIO) -> str:
 class UnsupportedVersion(Exception):
     """Unsupported repository version."""
 
-    def __init__(self, version) -> None:
+    def __init__(self, version: int) -> None:
         """Initialize UnsupportedVersion exception.
 
         Args:
@@ -1151,7 +1184,7 @@ class UnsupportedVersion(Exception):
 class UnsupportedExtension(Exception):
     """Unsupported repository extension."""
 
-    def __init__(self, extension) -> None:
+    def __init__(self, extension: str) -> None:
         """Initialize UnsupportedExtension exception.
 
         Args:
@@ -1181,10 +1214,11 @@ class Repo(BaseRepo):
     path: str
     bare: bool
     object_store: DiskObjectStore
+    filter_context: Optional["FilterContext"]
 
     def __init__(
         self,
-        root: Union[str, bytes, os.PathLike],
+        root: Union[str, bytes, os.PathLike[str]],
         object_store: Optional[PackBasedObjectStore] = None,
         bare: Optional[bool] = None,
     ) -> None:
@@ -1268,7 +1302,7 @@ class Repo(BaseRepo):
                 else:
                     raise UnsupportedExtension(f"refStorage = {value.decode()}")
             elif extension.lower() not in (b"worktreeconfig",):
-                raise UnsupportedExtension(extension)
+                raise UnsupportedExtension(extension.decode("utf-8"))
 
         if object_store is None:
             object_store = DiskObjectStore.from_config(
@@ -1315,7 +1349,14 @@ class Repo(BaseRepo):
         return WorkTree(self, self.path)
 
     def _write_reflog(
-        self, ref, old_sha, new_sha, committer, timestamp, timezone, message
+        self,
+        ref: bytes,
+        old_sha: bytes,
+        new_sha: bytes,
+        committer: Optional[bytes],
+        timestamp: Optional[int],
+        timezone: Optional[int],
+        message: bytes,
     ) -> None:
         from .reflog import format_reflog_line
 
@@ -1347,7 +1388,7 @@ class Repo(BaseRepo):
         base = self.controldir() if is_per_worktree_ref(ref) else self.commondir()
         return os.path.join(base, "logs", os.fsdecode(ref))
 
-    def read_reflog(self, ref):
+    def read_reflog(self, ref: bytes) -> Generator[reflog.Entry, None, None]:
         """Read reflog entries for a reference.
 
         Args:
@@ -1366,7 +1407,7 @@ class Repo(BaseRepo):
             return
 
     @classmethod
-    def discover(cls, start="."):
+    def discover(cls, start: Union[str, bytes, os.PathLike[str]] = ".") -> "Repo":
         """Iterate parent directories to discover a repository.
 
         Return a Repo object for the first parent directory that looks like a
@@ -1375,16 +1416,19 @@ class Repo(BaseRepo):
         Args:
           start: The directory to start discovery from (defaults to '.')
         """
-        remaining = True
         path = os.path.abspath(start)
-        while remaining:
+        while True:
             try:
                 return cls(path)
             except NotGitRepository:
-                path, remaining = os.path.split(path)
-        raise NotGitRepository(
-            "No git repository was found at {path}".format(**dict(path=start))
-        )
+                new_path, _tail = os.path.split(path)
+                if new_path == path:  # Root reached
+                    break
+                path = new_path
+        start_str = os.fspath(start)
+        if isinstance(start_str, bytes):
+            start_str = start_str.decode("utf-8")
+        raise NotGitRepository(f"No git repository was found at {start_str}")
 
     def controldir(self) -> str:
         """Return the path of the control directory."""
@@ -1448,7 +1492,11 @@ class Repo(BaseRepo):
         except FileNotFoundError:
             return
 
-    def get_named_file(self, path, basedir=None):
+    def get_named_file(
+        self,
+        path: Union[str, bytes],
+        basedir: Optional[str] = None,
+    ) -> Optional[BinaryIO]:
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -1465,13 +1513,15 @@ class Repo(BaseRepo):
         # the dumb web serving code.
         if basedir is None:
             basedir = self.controldir()
+        if isinstance(path, bytes):
+            path = path.decode("utf-8")
         path = path.lstrip(os.path.sep)
         try:
             return open(os.path.join(basedir, path), "rb")
         except FileNotFoundError:
             return None
 
-    def index_path(self):
+    def index_path(self) -> str:
         """Return path to the index file."""
         return os.path.join(self.controldir(), INDEX_FILENAME)
 
@@ -1522,7 +1572,7 @@ class Repo(BaseRepo):
     def stage(
         self,
         fs_paths: Union[
-            str, bytes, os.PathLike, Iterable[Union[str, bytes, os.PathLike]]
+            str, bytes, os.PathLike[str], Iterable[Union[str, bytes, os.PathLike[str]]]
         ],
     ) -> None:
         """Stage a set of paths.
@@ -1544,16 +1594,16 @@ class Repo(BaseRepo):
 
     def clone(
         self,
-        target_path,
+        target_path: Union[str, bytes, os.PathLike[str]],
         *,
-        mkdir=True,
-        bare=False,
-        origin=b"origin",
-        checkout=None,
-        branch=None,
-        progress=None,
+        mkdir: bool = True,
+        bare: bool = False,
+        origin: bytes = b"origin",
+        checkout: Optional[bool] = None,
+        branch: Optional[bytes] = None,
+        progress: Optional[Callable[[str], None]] = None,
         depth: Optional[int] = None,
-        symlinks=None,
+        symlinks: Optional[bool] = None,
     ) -> "Repo":
         """Clone this repository.
 
@@ -1638,7 +1688,7 @@ class Repo(BaseRepo):
         return target
 
     @replace_me(remove_in="0.26.0")
-    def reset_index(self, tree: Optional[bytes] = None):
+    def reset_index(self, tree: Optional[bytes] = None) -> None:
         """Reset the index back to a specific tree.
 
         Args:
@@ -1767,7 +1817,7 @@ class Repo(BaseRepo):
             ret.path = path
             return ret
 
-    def get_rebase_state_manager(self):
+    def get_rebase_state_manager(self) -> "RebaseStateManager":
         """Get the appropriate rebase state manager for this repository.
 
         Returns: DiskRebaseStateManager instance
@@ -1779,10 +1829,10 @@ class Repo(BaseRepo):
         path = os.path.join(self.controldir(), "rebase-merge")
         return DiskRebaseStateManager(path)
 
-    def get_description(self):
+    def get_description(self) -> Optional[bytes]:
         """Retrieve the description of this repository.
 
-        Returns: A string describing the repository or None.
+        Returns: Description as bytes or None.
         """
         path = os.path.join(self._controldir, "description")
         try:
@@ -1795,7 +1845,7 @@ class Repo(BaseRepo):
         """Return string representation of this repository."""
         return f"<Repo at {self.path!r}>"
 
-    def set_description(self, description) -> None:
+    def set_description(self, description: bytes) -> None:
         """Set the description for this repository.
 
         Args:
@@ -1806,15 +1856,15 @@ class Repo(BaseRepo):
     @classmethod
     def _init_maybe_bare(
         cls,
-        path: Union[str, bytes, os.PathLike],
-        controldir: Union[str, bytes, os.PathLike],
-        bare,
-        object_store=None,
-        config=None,
-        default_branch=None,
+        path: Union[str, bytes, os.PathLike[str]],
+        controldir: Union[str, bytes, os.PathLike[str]],
+        bare: bool,
+        object_store: Optional[PackBasedObjectStore] = None,
+        config: Optional["StackedConfig"] = None,
+        default_branch: Optional[bytes] = None,
         symlinks: Optional[bool] = None,
         format: Optional[int] = None,
-    ):
+    ) -> "Repo":
         path = os.fspath(path)
         if isinstance(path, bytes):
             path = os.fsdecode(path)
@@ -1842,11 +1892,11 @@ class Repo(BaseRepo):
     @classmethod
     def init(
         cls,
-        path: Union[str, bytes, os.PathLike],
+        path: Union[str, bytes, os.PathLike[str]],
         *,
         mkdir: bool = False,
-        config=None,
-        default_branch=None,
+        config: Optional["StackedConfig"] = None,
+        default_branch: Optional[bytes] = None,
         symlinks: Optional[bool] = None,
         format: Optional[int] = None,
     ) -> "Repo":
@@ -1882,11 +1932,11 @@ class Repo(BaseRepo):
     @classmethod
     def _init_new_working_directory(
         cls,
-        path: Union[str, bytes, os.PathLike],
-        main_repo,
-        identifier=None,
-        mkdir=False,
-    ):
+        path: Union[str, bytes, os.PathLike[str]],
+        main_repo: "Repo",
+        identifier: Optional[str] = None,
+        mkdir: bool = False,
+    ) -> "Repo":
         """Create a new working directory linked to a repository.
 
         Args:
@@ -1931,14 +1981,14 @@ class Repo(BaseRepo):
     @classmethod
     def init_bare(
         cls,
-        path: Union[str, bytes, os.PathLike],
+        path: Union[str, bytes, os.PathLike[str]],
         *,
-        mkdir=False,
-        object_store=None,
-        config=None,
-        default_branch=None,
+        mkdir: bool = False,
+        object_store: Optional[PackBasedObjectStore] = None,
+        config: Optional["StackedConfig"] = None,
+        default_branch: Optional[bytes] = None,
         format: Optional[int] = None,
-    ):
+    ) -> "Repo":
         """Create a new bare repository.
 
         ``path`` should already exist and be an empty directory.
@@ -1977,11 +2027,16 @@ class Repo(BaseRepo):
             self.filter_context.close()
             self.filter_context = None
 
-    def __enter__(self):
+    def __enter__(self) -> "Repo":
         """Enter context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         """Exit context manager and close repository."""
         self.close()
 
@@ -2024,7 +2079,7 @@ class Repo(BaseRepo):
 
         return gitattributes
 
-    def get_blob_normalizer(self):
+    def get_blob_normalizer(self) -> "FilterBlobNormalizer":
         """Return a BlobNormalizer object."""
         from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
@@ -2165,6 +2220,8 @@ class MemoryRepo(BaseRepo):
     those have a stronger dependency on the filesystem.
     """
 
+    filter_context: Optional["FilterContext"]
+
     def __init__(self) -> None:
         """Create a new repository in memory."""
         from .config import ConfigFile
@@ -2175,13 +2232,24 @@ class MemoryRepo(BaseRepo):
         self._named_files: dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()
-        self._description = None
+        self._description: Optional[bytes] = None
         self.filter_context = None
 
-    def _append_reflog(self, *args) -> None:
-        self._reflog.append(args)
+    def _append_reflog(
+        self,
+        ref: bytes,
+        old_sha: Optional[bytes],
+        new_sha: Optional[bytes],
+        committer: Optional[bytes],
+        timestamp: Optional[int],
+        timezone: Optional[int],
+        message: Optional[bytes],
+    ) -> None:
+        self._reflog.append(
+            (ref, old_sha, new_sha, committer, timestamp, timezone, message)
+        )
 
-    def set_description(self, description) -> None:
+    def set_description(self, description: bytes) -> None:
         """Set the description for this repository.
 
         Args:
@@ -2189,7 +2257,7 @@ class MemoryRepo(BaseRepo):
         """
         self._description = description
 
-    def get_description(self):
+    def get_description(self) -> Optional[bytes]:
         """Get the description of this repository.
 
         Returns:
@@ -2197,21 +2265,21 @@ class MemoryRepo(BaseRepo):
         """
         return self._description
 
-    def _determine_file_mode(self):
+    def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
 
         Returns: True if permissions can be trusted, False otherwise.
         """
         return sys.platform != "win32"
 
-    def _determine_symlinks(self):
+    def _determine_symlinks(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
 
         Returns: True if permissions can be trusted, False otherwise.
         """
         return sys.platform != "win32"
 
-    def _put_named_file(self, path, contents) -> None:
+    def _put_named_file(self, path: str, contents: bytes) -> None:
         """Write a file to the control dir with the given name and contents.
 
         Args:
@@ -2220,13 +2288,17 @@ class MemoryRepo(BaseRepo):
         """
         self._named_files[path] = contents
 
-    def _del_named_file(self, path) -> None:
+    def _del_named_file(self, path: str) -> None:
         try:
             del self._named_files[path]
         except KeyError:
             pass
 
-    def get_named_file(self, path, basedir=None):
+    def get_named_file(
+        self,
+        path: Union[str, bytes],
+        basedir: Optional[str] = None,
+    ) -> Optional[BytesIO]:
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -2238,7 +2310,8 @@ class MemoryRepo(BaseRepo):
           basedir: Optional base directory for the path
         Returns: An open file object, or None if the file does not exist.
         """
-        contents = self._named_files.get(path, None)
+        path_str = path.decode() if isinstance(path, bytes) else path
+        contents = self._named_files.get(path_str, None)
         if contents is None:
             return None
         return BytesIO(contents)
@@ -2251,14 +2324,14 @@ class MemoryRepo(BaseRepo):
         """
         raise NoIndexPresent
 
-    def get_config(self):
+    def get_config(self) -> "ConfigFile":
         """Retrieve the config object.
 
         Returns: `ConfigFile` object.
         """
         return self._config
 
-    def get_rebase_state_manager(self):
+    def get_rebase_state_manager(self) -> "RebaseStateManager":
         """Get the appropriate rebase state manager for this repository.
 
         Returns: MemoryRebaseStateManager instance
@@ -2267,7 +2340,7 @@ class MemoryRepo(BaseRepo):
 
         return MemoryRebaseStateManager(self)
 
-    def get_blob_normalizer(self):
+    def get_blob_normalizer(self) -> "FilterBlobNormalizer":
         """Return a BlobNormalizer object for checkin/checkout operations."""
         from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
@@ -2308,17 +2381,17 @@ class MemoryRepo(BaseRepo):
         message: Optional[bytes] = None,
         committer: Optional[bytes] = None,
         author: Optional[bytes] = None,
-        commit_timestamp=None,
-        commit_timezone=None,
-        author_timestamp=None,
-        author_timezone=None,
+        commit_timestamp: Optional[float] = None,
+        commit_timezone: Optional[int] = None,
+        author_timestamp: Optional[float] = None,
+        author_timezone: Optional[int] = None,
         tree: Optional[ObjectID] = None,
         encoding: Optional[bytes] = None,
         ref: Optional[Ref] = b"HEAD",
         merge_heads: Optional[list[ObjectID]] = None,
         no_verify: bool = False,
         sign: bool = False,
-    ):
+    ) -> bytes:
         """Create a new commit.
 
         This is a simplified implementation for in-memory repositories that
@@ -2412,7 +2485,7 @@ class MemoryRepo(BaseRepo):
                     c.id,
                     message=b"commit: " + message,
                     committer=committer,
-                    timestamp=commit_timestamp,
+                    timestamp=int(commit_timestamp),
                     timezone=commit_timezone,
                 )
             except KeyError:
@@ -2423,7 +2496,7 @@ class MemoryRepo(BaseRepo):
                     c.id,
                     message=b"commit: " + message,
                     committer=committer,
-                    timestamp=commit_timestamp,
+                    timestamp=int(commit_timestamp),
                     timezone=commit_timezone,
                 )
             if not ok:
@@ -2434,7 +2507,12 @@ class MemoryRepo(BaseRepo):
         return c.id
 
     @classmethod
-    def init_bare(cls, objects, refs, format: Optional[int] = None):
+    def init_bare(
+        cls,
+        objects: Iterable[ShaFile],
+        refs: dict[bytes, bytes],
+        format: Optional[int] = None,
+    ) -> "MemoryRepo":
         """Create a new bare repository in memory.
 
         Args:

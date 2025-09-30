@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from .config import Config
     from .diff_tree import TreeChange
     from .file import _GitFile
-    from .line_ending import BlobNormalizer
+    from .filters import FilterBlobNormalizer
     from .object_store import BaseObjectStore
     from .repo import Repo
 
@@ -62,6 +62,12 @@ from .objects import (
     sha_to_hex,
 )
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
+
+# Type alias for recursive tree structure used in commit_tree
+if sys.version_info >= (3, 10):
+    TreeDict = dict[bytes, Union["TreeDict", tuple[int, bytes]]]
+else:
+    TreeDict = dict[bytes, Any]
 
 # 2-bit stage (during merge)
 FLAG_STAGEMASK = 0x3000
@@ -971,7 +977,7 @@ class Index:
 
     def __init__(
         self,
-        filename: Union[bytes, str, os.PathLike],
+        filename: Union[bytes, str, os.PathLike[str]],
         read: bool = True,
         skip_hash: bool = False,
         version: Optional[int] = None,
@@ -1225,15 +1231,15 @@ def commit_tree(
     Returns:
       SHA1 of the created tree.
     """
-    trees: dict[bytes, Any] = {b"": {}}
+    trees: dict[bytes, TreeDict] = {b"": {}}
 
-    def add_tree(path: bytes) -> dict[bytes, Any]:
+    def add_tree(path: bytes) -> TreeDict:
         if path in trees:
             return trees[path]
         dirname, basename = pathsplit(path)
         t = add_tree(dirname)
         assert isinstance(basename, bytes)
-        newtree: dict[bytes, Any] = {}
+        newtree: TreeDict = {}
         t[basename] = newtree
         trees[path] = newtree
         return newtree
@@ -1299,6 +1305,7 @@ def changes_from_tree(
 
     if tree is not None:
         for name, mode, sha in iter_tree_contents(object_store, tree):
+            assert name is not None and mode is not None and sha is not None
             try:
                 (other_sha, other_mode) = lookup_entry(name)
             except KeyError:
@@ -1409,7 +1416,10 @@ def build_file_from_blob(
     honor_filemode: bool = True,
     tree_encoding: str = "utf-8",
     symlink_fn: Optional[
-        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+        Callable[
+            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
+            None,
+        ]
     ] = None,
 ) -> os.stat_result:
     """Build a file or symlink on disk based on a Git object.
@@ -1596,9 +1606,12 @@ def build_index_from_tree(
     honor_filemode: bool = True,
     validate_path_element: Callable[[bytes], bool] = validate_path_element_default,
     symlink_fn: Optional[
-        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+        Callable[
+            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
+            None,
+        ]
     ] = None,
-    blob_normalizer: Optional["BlobNormalizer"] = None,
+    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
     tree_encoding: str = "utf-8",
 ) -> None:
     """Generate and materialize index from a tree.
@@ -1625,6 +1638,9 @@ def build_index_from_tree(
         root_path = os.fsencode(root_path)
 
     for entry in iter_tree_contents(object_store, tree_id):
+        assert (
+            entry.path is not None and entry.mode is not None and entry.sha is not None
+        )
         if not validate_path(entry.path, validate_path_element):
             continue
         full_path = _tree_to_fs_path(root_path, entry.path, tree_encoding)
@@ -1866,7 +1882,7 @@ def _check_file_matches(
     entry_mode: int,
     current_stat: os.stat_result,
     honor_filemode: bool,
-    blob_normalizer: Optional["BlobNormalizer"] = None,
+    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
     tree_path: Optional[bytes] = None,
 ) -> bool:
     """Check if a file on disk matches the expected git object.
@@ -1946,6 +1962,7 @@ def _transition_to_submodule(
         ensure_submodule_placeholder(repo, path)
 
     st = os.lstat(full_path)
+    assert entry.sha is not None
     index[path] = index_entry_from_stat(st, entry.sha)
 
 
@@ -1958,12 +1975,16 @@ def _transition_to_file(
     index: Index,
     honor_filemode: bool,
     symlink_fn: Optional[
-        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+        Callable[
+            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
+            None,
+        ]
     ],
-    blob_normalizer: Optional["BlobNormalizer"],
+    blob_normalizer: Optional["FilterBlobNormalizer"],
     tree_encoding: str = "utf-8",
 ) -> None:
     """Transition any type to regular file or symlink."""
+    assert entry.sha is not None and entry.mode is not None
     # Check if we need to update
     if (
         current_stat is not None
@@ -2123,6 +2144,7 @@ def detect_case_only_renames(
     # Pre-normalize all paths once to avoid repeated normalization
     for change in changes:
         if change.type == CHANGE_DELETE and change.old:
+            assert change.old.path is not None
             try:
                 normalized = normalize_path(change.old.path)
             except UnicodeDecodeError:
@@ -2136,6 +2158,7 @@ def detect_case_only_renames(
                 old_paths_normalized[normalized] = change.old.path
                 old_changes[change.old.path] = change
         elif change.type == CHANGE_RENAME and change.old:
+            assert change.old.path is not None
             # Treat RENAME as DELETE + ADD for case-only detection
             try:
                 normalized = normalize_path(change.old.path)
@@ -2154,6 +2177,7 @@ def detect_case_only_renames(
             change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY)
             and change.new
         ):
+            assert change.new.path is not None
             try:
                 normalized = normalize_path(change.new.path)
             except UnicodeDecodeError:
@@ -2212,10 +2236,13 @@ def update_working_tree(
     honor_filemode: bool = True,
     validate_path_element: Optional[Callable[[bytes], bool]] = None,
     symlink_fn: Optional[
-        Callable[[Union[str, bytes, os.PathLike], Union[str, bytes, os.PathLike]], None]
+        Callable[
+            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
+            None,
+        ]
     ] = None,
     force_remove_untracked: bool = False,
-    blob_normalizer: Optional["BlobNormalizer"] = None,
+    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
     tree_encoding: str = "utf-8",
     allow_overwrite_modified: bool = False,
 ) -> None:
@@ -2278,6 +2305,7 @@ def update_working_tree(
         if change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY):
             assert change.new is not None
             path = change.new.path
+            assert path is not None
             if b"/" in path:  # This is a file inside a directory
                 # Check if any parent path exists as a file in the old tree or changes
                 parts = path.split(b"/")
@@ -2319,6 +2347,9 @@ def update_working_tree(
             if old_change:
                 # Check if file has been modified
                 assert old_change.old is not None
+                assert (
+                    old_change.old.sha is not None and old_change.old.mode is not None
+                )
                 file_matches = _check_file_matches(
                     repo.object_store,
                     full_path,
@@ -2340,6 +2371,7 @@ def update_working_tree(
             # Only check files that are being modified or deleted
             if change.type in (CHANGE_MODIFY, CHANGE_DELETE) and change.old:
                 path = change.old.path
+                assert path is not None
                 if path.startswith(b".git") or not validate_path(
                     path, validate_path_element
                 ):
@@ -2357,6 +2389,7 @@ def update_working_tree(
 
                 if stat.S_ISREG(current_stat.st_mode):
                     # Check if working tree file differs from old tree
+                    assert change.old.sha is not None and change.old.mode is not None
                     file_matches = _check_file_matches(
                         repo.object_store,
                         full_path,
@@ -2380,7 +2413,7 @@ def update_working_tree(
     for change in changes:
         if change.type in (CHANGE_DELETE, CHANGE_RENAME):
             # Remove file/directory
-            assert change.old is not None
+            assert change.old is not None and change.old.path is not None
             path = change.old.path
             if path.startswith(b".git") or not validate_path(
                 path, validate_path_element
@@ -2407,7 +2440,11 @@ def update_working_tree(
             CHANGE_RENAME,
         ):
             # Add or modify file
-            assert change.new is not None
+            assert (
+                change.new is not None
+                and change.new.path is not None
+                and change.new.mode is not None
+            )
             path = change.new.path
             if path.startswith(b".git") or not validate_path(
                 path, validate_path_element
@@ -2449,7 +2486,7 @@ def _check_entry_for_changes(
     tree_path: bytes,
     entry: Union[IndexEntry, ConflictedIndexEntry],
     root_path: bytes,
-    filter_blob_callback: Optional[Callable] = None,
+    filter_blob_callback: Optional[Callable[[bytes, bytes], bytes]] = None,
 ) -> Optional[bytes]:
     """Check a single index entry for changes.
 
@@ -2478,7 +2515,7 @@ def _check_entry_for_changes(
         blob = blob_from_path_and_stat(full_path, st)
 
         if filter_blob_callback is not None:
-            blob = filter_blob_callback(blob, tree_path)
+            blob.data = filter_blob_callback(blob.data, tree_path)
     except FileNotFoundError:
         # The file was removed, so we assume that counts as
         # different from whatever file used to exist.
@@ -2492,7 +2529,7 @@ def _check_entry_for_changes(
 def get_unstaged_changes(
     index: Index,
     root_path: Union[str, bytes],
-    filter_blob_callback: Optional[Callable] = None,
+    filter_blob_callback: Optional[Callable[..., Any]] = None,
     preload_index: bool = False,
 ) -> Generator[bytes, None, None]:
     """Walk through an index and check for differences against working tree.

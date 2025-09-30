@@ -65,7 +65,6 @@ from typing import (
     Protocol,
     TypeVar,
     Union,
-    cast,
 )
 
 try:
@@ -74,6 +73,11 @@ except ImportError:
     has_mmap = False
 else:
     has_mmap = True
+
+if sys.version_info >= (3, 12):
+    from collections.abc import Buffer
+else:
+    Buffer = Union[bytes, bytearray, memoryview]
 
 if TYPE_CHECKING:
     from _hashlib import HASH as HashObject
@@ -132,7 +136,7 @@ class ObjectContainer(Protocol):
     def add_objects(
         self,
         objects: Sequence[tuple[ShaFile, Optional[str]]],
-        progress: Optional[Callable[[str], None]] = None,
+        progress: Optional[Callable[..., None]] = None,
     ) -> Optional["Pack"]:
         """Add a set of objects to this object store.
 
@@ -190,7 +194,8 @@ class PackedObjectContainer(ObjectContainer):
 
     def iter_unpacked_subset(
         self,
-        shas: set[bytes],
+        shas: Iterable[bytes],
+        *,
         include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
@@ -458,7 +463,7 @@ def iter_sha1(iter: Iterable[bytes]) -> bytes:
     return sha.hexdigest().encode("ascii")
 
 
-def load_pack_index(path: Union[str, os.PathLike]) -> "PackIndex":
+def load_pack_index(path: Union[str, os.PathLike[str]]) -> "PackIndex":
     """Load an index file by path.
 
     Args:
@@ -501,7 +506,7 @@ def _load_file_contents(
 
 
 def load_pack_index_file(
-    path: Union[str, os.PathLike], f: Union[IO[bytes], _GitFile]
+    path: Union[str, os.PathLike[str]], f: Union[IO[bytes], _GitFile]
 ) -> "PackIndex":
     """Load an index file from a file-like object.
 
@@ -751,7 +756,7 @@ class FilePackIndex(PackIndex):
 
     def __init__(
         self,
-        filename: Union[str, os.PathLike],
+        filename: Union[str, os.PathLike[str]],
         file: Optional[Union[IO[bytes], _GitFile]] = None,
         contents: Optional[Union[bytes, "mmap.mmap"]] = None,
         size: Optional[int] = None,
@@ -944,7 +949,7 @@ class PackIndex1(FilePackIndex):
 
     def __init__(
         self,
-        filename: Union[str, os.PathLike],
+        filename: Union[str, os.PathLike[str]],
         file: Optional[Union[IO[bytes], _GitFile]] = None,
         contents: Optional[bytes] = None,
         size: Optional[int] = None,
@@ -971,7 +976,9 @@ class PackIndex1(FilePackIndex):
 
     def _unpack_offset(self, i: int) -> int:
         offset = (0x100 * 4) + (i * 24)
-        return unpack_from(">L", self._contents, offset)[0]
+        result = unpack_from(">L", self._contents, offset)[0]
+        assert isinstance(result, int)
+        return result
 
     def _unpack_crc32_checksum(self, i: int) -> None:
         # Not stored in v1 index files
@@ -983,7 +990,7 @@ class PackIndex2(FilePackIndex):
 
     def __init__(
         self,
-        filename: Union[str, os.PathLike],
+        filename: Union[str, os.PathLike[str]],
         file: Optional[Union[IO[bytes], _GitFile]] = None,
         contents: Optional[bytes] = None,
         size: Optional[int] = None,
@@ -1022,15 +1029,21 @@ class PackIndex2(FilePackIndex):
         return self._contents[offset : offset + 20]
 
     def _unpack_offset(self, i: int) -> int:
-        offset = self._pack_offset_table_offset + i * 4
-        offset = unpack_from(">L", self._contents, offset)[0]
+        offset_pos = self._pack_offset_table_offset + i * 4
+        offset = unpack_from(">L", self._contents, offset_pos)[0]
+        assert isinstance(offset, int)
         if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
-            offset = unpack_from(">Q", self._contents, offset)[0]
+            large_offset_pos = (
+                self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
+            )
+            offset = unpack_from(">Q", self._contents, large_offset_pos)[0]
+            assert isinstance(offset, int)
         return offset
 
     def _unpack_crc32_checksum(self, i: int) -> int:
-        return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+        result = unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+        assert isinstance(result, int)
+        return result
 
 
 class PackIndex3(FilePackIndex):
@@ -1041,7 +1054,7 @@ class PackIndex3(FilePackIndex):
 
     def __init__(
         self,
-        filename: Union[str, os.PathLike],
+        filename: Union[str, os.PathLike[str]],
         file: Optional[Union[IO[bytes], _GitFile]] = None,
         contents: Optional[bytes] = None,
         size: Optional[int] = None,
@@ -1096,15 +1109,21 @@ class PackIndex3(FilePackIndex):
         return self._contents[offset : offset + self.hash_size]
 
     def _unpack_offset(self, i: int) -> int:
-        offset = self._pack_offset_table_offset + i * 4
-        offset = unpack_from(">L", self._contents, offset)[0]
+        offset_pos = self._pack_offset_table_offset + i * 4
+        offset = unpack_from(">L", self._contents, offset_pos)[0]
+        assert isinstance(offset, int)
         if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
-            offset = unpack_from(">Q", self._contents, offset)[0]
+            large_offset_pos = (
+                self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
+            )
+            offset = unpack_from(">Q", self._contents, large_offset_pos)[0]
+            assert isinstance(offset, int)
         return offset
 
     def _unpack_crc32_checksum(self, i: int) -> int:
-        return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+        result = unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+        assert isinstance(result, int)
+        return result
 
 
 def read_pack_header(read: Callable[[int], bytes]) -> tuple[int, int]:
@@ -1375,9 +1394,9 @@ class PackStreamReader:
             # read buffer and (20 - N) come from the wire.
             self.read(20)
 
-        pack_sha = bytearray(self._trailer)  # type: ignore
+        pack_sha = bytearray(self._trailer)
         if pack_sha != self.sha.digest():
-            raise ChecksumMismatch(sha_to_hex(pack_sha), self.sha.hexdigest())
+            raise ChecksumMismatch(sha_to_hex(bytes(pack_sha)), self.sha.hexdigest())
 
 
 class PackStreamCopier(PackStreamReader):
@@ -1389,10 +1408,10 @@ class PackStreamCopier(PackStreamReader):
 
     def __init__(
         self,
-        read_all: Callable,
-        read_some: Callable,
+        read_all: Callable[[int], bytes],
+        read_some: Optional[Callable[[int], bytes]],
         outfile: IO[bytes],
-        delta_iter: Optional["DeltaChainIterator"] = None,
+        delta_iter: Optional["DeltaChainIterator[UnpackedObject]"] = None,
     ) -> None:
         """Initialize the copier.
 
@@ -1409,13 +1428,13 @@ class PackStreamCopier(PackStreamReader):
         self.outfile = outfile
         self._delta_iter = delta_iter
 
-    def _read(self, read: Callable, size: int) -> bytes:
+    def _read(self, read: Callable[[int], bytes], size: int) -> bytes:
         """Read data from the read callback and write it to the file."""
         data = super()._read(read, size)
         self.outfile.write(data)
         return data
 
-    def verify(self, progress: Optional[Callable] = None) -> None:
+    def verify(self, progress: Optional[Callable[..., None]] = None) -> None:
         """Verify a pack stream and write it to the output file.
 
         See PackStreamReader.iterobjects for a list of exceptions this may
@@ -1501,7 +1520,7 @@ class PackData:
 
     def __init__(
         self,
-        filename: Union[str, os.PathLike],
+        filename: Union[str, os.PathLike[str]],
         file: Optional[IO[bytes]] = None,
         size: Optional[int] = None,
         *,
@@ -1553,7 +1572,7 @@ class PackData:
         return os.path.basename(self._filename)
 
     @property
-    def path(self) -> Union[str, os.PathLike]:
+    def path(self) -> Union[str, os.PathLike[str]]:
         """Get the full path of the pack file.
 
         Returns:
@@ -1575,7 +1594,7 @@ class PackData:
         return cls(str(file), file=file, size=size)
 
     @classmethod
-    def from_path(cls, path: Union[str, os.PathLike]) -> "PackData":
+    def from_path(cls, path: Union[str, os.PathLike[str]]) -> "PackData":
         """Create a PackData object from a file path.
 
         Args:
@@ -1627,7 +1646,7 @@ class PackData:
 
         Returns: 20-byte binary SHA1 digest
         """
-        return compute_file_sha(cast(IO[bytes], self._file), end_ofs=-20).digest()
+        return compute_file_sha(self._file, end_ofs=-20).digest()
 
     def iter_unpacked(self, *, include_comp: bool = False) -> Iterator[UnpackedObject]:
         """Iterate over unpacked objects in the pack."""
@@ -1647,8 +1666,10 @@ class PackData:
             self._file.seek(-len(unused), SEEK_CUR)
 
     def iterentries(
-        self, progress=None, resolve_ext_ref: Optional[ResolveExtRefFn] = None
-    ):
+        self,
+        progress: Optional[Callable[[int, int], None]] = None,
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
+    ) -> Iterator[tuple[bytes, int, Optional[int]]]:
         """Yield entries summarizing the contents of this pack.
 
         Args:
@@ -1678,14 +1699,14 @@ class PackData:
         Returns: Iterator of tuples with (sha, offset, crc32)
         """
         return sorted(
-            self.iterentries(progress=progress, resolve_ext_ref=resolve_ext_ref)
+            self.iterentries(progress=progress, resolve_ext_ref=resolve_ext_ref)  # type: ignore
         )
 
     def create_index_v1(
         self,
         filename: str,
-        progress: Optional[Callable] = None,
-        resolve_ext_ref: Optional[Callable] = None,
+        progress: Optional[Callable[..., None]] = None,
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
     ) -> bytes:
         """Create a version 1 file for this data file.
 
@@ -1701,8 +1722,8 @@ class PackData:
         checksum = self.calculate_checksum()
         with GitFile(filename, "wb") as f:
             write_pack_index_v1(
-                cast(BinaryIO, f),
-                cast(list[tuple[bytes, int, Optional[int]]], entries),
+                f,
+                entries,
                 checksum,
             )
         return checksum
@@ -1710,8 +1731,8 @@ class PackData:
     def create_index_v2(
         self,
         filename: str,
-        progress: Optional[Callable] = None,
-        resolve_ext_ref: Optional[Callable] = None,
+        progress: Optional[Callable[..., None]] = None,
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
     ) -> bytes:
         """Create a version 2 index file for this data file.
 
@@ -1730,8 +1751,8 @@ class PackData:
     def create_index_v3(
         self,
         filename: str,
-        progress: Optional[Callable] = None,
-        resolve_ext_ref: Optional[Callable] = None,
+        progress: Optional[Callable[..., None]] = None,
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
         hash_algorithm: int = 1,
     ) -> bytes:
         """Create a version 3 index file for this data file.
@@ -1754,9 +1775,9 @@ class PackData:
     def create_index(
         self,
         filename: str,
-        progress: Optional[Callable] = None,
+        progress: Optional[Callable[..., None]] = None,
         version: int = 2,
-        resolve_ext_ref: Optional[Callable] = None,
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
         hash_algorithm: int = 1,
     ) -> bytes:
         """Create an  index file for this data file.
@@ -1853,9 +1874,9 @@ class DeltaChainIterator(Generic[T]):
 
     def __init__(
         self,
-        file_obj: Optional[BinaryIO],
+        file_obj: Optional[IO[bytes]],
         *,
-        resolve_ext_ref: Optional[Callable] = None,
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
     ) -> None:
         """Initialize DeltaChainIterator.
 
@@ -1872,8 +1893,8 @@ class DeltaChainIterator(Generic[T]):
 
     @classmethod
     def for_pack_data(
-        cls, pack_data: PackData, resolve_ext_ref: Optional[Callable] = None
-    ) -> "DeltaChainIterator":
+        cls, pack_data: PackData, resolve_ext_ref: Optional[ResolveExtRefFn] = None
+    ) -> "DeltaChainIterator[T]":
         """Create a DeltaChainIterator from pack data.
 
         Args:
@@ -1896,8 +1917,8 @@ class DeltaChainIterator(Generic[T]):
         shas: Iterable[bytes],
         *,
         allow_missing: bool = False,
-        resolve_ext_ref: Optional[Callable] = None,
-    ) -> "DeltaChainIterator":
+        resolve_ext_ref: Optional[ResolveExtRefFn] = None,
+    ) -> "DeltaChainIterator[T]":
         """Create a DeltaChainIterator for a subset of objects.
 
         Args:
@@ -1967,7 +1988,7 @@ class DeltaChainIterator(Generic[T]):
         Args:
           pack_data: PackData object to use
         """
-        self._file = cast(BinaryIO, pack_data._file)
+        self._file = pack_data._file
 
     def _walk_all_chains(self) -> Iterator[T]:
         for offset, type_num in self._full_ofs:
@@ -1997,7 +2018,7 @@ class DeltaChainIterator(Generic[T]):
             self._ext_refs.append(base_sha)
             self._pending_ref.pop(base_sha)
             for new_offset in pending:
-                yield from self._follow_chain(new_offset, type_num, chunks)
+                yield from self._follow_chain(new_offset, type_num, chunks)  # type: ignore[arg-type]
 
         self._ensure_no_pending()
 
@@ -2073,7 +2094,7 @@ class PackIndexer(DeltaChainIterator[PackIndexEntry]):
 
     _compute_crc32 = True
 
-    def _result(self, unpacked: UnpackedObject) -> tuple:
+    def _result(self, unpacked: UnpackedObject) -> tuple[bytes, int, Optional[int]]:
         """Convert unpacked object to pack index entry.
 
         Args:
@@ -2082,6 +2103,7 @@ class PackIndexer(DeltaChainIterator[PackIndexEntry]):
         Returns:
             Tuple of (sha, offset, crc32) for index entry
         """
+        assert unpacked.offset is not None
         return unpacked.sha(), unpacked.offset, unpacked.crc32
 
 
@@ -2261,7 +2283,7 @@ class SHA1Reader(BinaryIO):
 class SHA1Writer(BinaryIO):
     """Wrapper for file-like object that remembers the SHA1 of its data."""
 
-    def __init__(self, f) -> None:
+    def __init__(self, f: Union[BinaryIO, IO[bytes]]) -> None:
         """Initialize SHA1Writer.
 
         Args:
@@ -2272,7 +2294,7 @@ class SHA1Writer(BinaryIO):
         self.sha1 = sha1(b"")
         self.digest: Optional[bytes] = None
 
-    def write(self, data) -> int:
+    def write(self, data: Union[bytes, bytearray, memoryview], /) -> int:  # type: ignore[override]
         """Write data and update SHA1.
 
         Args:
@@ -2282,9 +2304,9 @@ class SHA1Writer(BinaryIO):
             Number of bytes written
         """
         self.sha1.update(data)
-        self.f.write(data)
-        self.length += len(data)
-        return len(data)
+        written = self.f.write(data)
+        self.length += written
+        return written
 
     def write_sha(self) -> bytes:
         """Write the SHA1 digest to the file.
@@ -2457,9 +2479,7 @@ def pack_object_header(
 
 def pack_object_chunks(
     type: int,
-    object: Union[
-        ShaFile, bytes, list[bytes], tuple[Union[bytes, int], Union[bytes, list[bytes]]]
-    ],
+    object: Union[list[bytes], tuple[Union[bytes, int], list[bytes]]],
     compression_level: int = -1,
 ) -> Iterator[bytes]:
     """Generate chunks for a pack object.
@@ -2499,7 +2519,7 @@ def pack_object_chunks(
 def write_pack_object(
     write: Callable[[bytes], int],
     type: int,
-    object: ShaFile,
+    object: Union[list[bytes], tuple[Union[bytes, int], list[bytes]]],
     sha: Optional["HashObject"] = None,
     compression_level: int = -1,
 ) -> int:
@@ -2523,13 +2543,13 @@ def write_pack_object(
 
 
 def write_pack(
-    filename,
+    filename: str,
     objects: Union[Sequence[ShaFile], Sequence[tuple[ShaFile, Optional[bytes]]]],
     *,
     deltify: Optional[bool] = None,
     delta_window_size: Optional[int] = None,
     compression_level: int = -1,
-):
+) -> tuple[bytes, bytes]:
     """Write a new pack data file.
 
     Args:
@@ -2542,15 +2562,16 @@ def write_pack(
     """
     with GitFile(filename + ".pack", "wb") as f:
         entries, data_sum = write_pack_objects(
-            f.write,
+            f,
             objects,
             delta_window_size=delta_window_size,
             deltify=deltify,
             compression_level=compression_level,
         )
-    entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
+    entries_list = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + ".idx", "wb") as f:
-        return data_sum, write_pack_index(f, entries, data_sum)
+        idx_sha = write_pack_index(f, entries_list, data_sum)
+    return data_sum, idx_sha
 
 
 def pack_header_chunks(num_objects: int) -> Iterator[bytes]:
@@ -2560,17 +2581,22 @@ def pack_header_chunks(num_objects: int) -> Iterator[bytes]:
     yield struct.pack(b">L", num_objects)  # Number of objects in pack
 
 
-def write_pack_header(write, num_objects) -> None:
+def write_pack_header(
+    write: Union[Callable[[bytes], int], IO[bytes]], num_objects: int
+) -> None:
     """Write a pack header for the given number of objects."""
+    write_fn: Callable[[bytes], int]
     if hasattr(write, "write"):
-        write = write.write
+        write_fn = write.write
         warnings.warn(
             "write_pack_header() now takes a write rather than file argument",
             DeprecationWarning,
             stacklevel=2,
         )
+    else:
+        write_fn = write
     for chunk in pack_header_chunks(num_objects):
-        write(chunk)
+        write_fn(chunk)
 
 
 def find_reusable_deltas(
@@ -2578,7 +2604,7 @@ def find_reusable_deltas(
     object_ids: set[bytes],
     *,
     other_haves: Optional[set[bytes]] = None,
-    progress=None,
+    progress: Optional[Callable[..., None]] = None,
 ) -> Iterator[UnpackedObject]:
     """Find deltas in a pack that can be reused.
 
@@ -2614,7 +2640,7 @@ def deltify_pack_objects(
     objects: Union[Iterator[ShaFile], Iterator[tuple[ShaFile, Optional[bytes]]]],
     *,
     window_size: Optional[int] = None,
-    progress=None,
+    progress: Optional[Callable[..., None]] = None,
 ) -> Iterator[UnpackedObject]:
     """Generate deltas for pack objects.
 
@@ -2633,8 +2659,9 @@ def deltify_pack_objects(
             else:
                 yield (e[0], (e[0].type_num, e[1]))
 
+    sorted_objs = sort_objects_for_delta(objects_with_hints())
     yield from deltas_from_sorted_objects(
-        sort_objects_for_delta(objects_with_hints()),
+        sorted_objs,
         window_size=window_size,
         progress=progress,
     )
@@ -2642,14 +2669,14 @@ def deltify_pack_objects(
 
 def sort_objects_for_delta(
     objects: Union[Iterator[ShaFile], Iterator[tuple[ShaFile, Optional[PackHint]]]],
-) -> Iterator[ShaFile]:
+) -> Iterator[tuple[ShaFile, Optional[bytes]]]:
     """Sort objects for optimal delta compression.
 
     Args:
       objects: Iterator of objects or (object, hint) tuples
 
     Returns:
-      Iterator of sorted ShaFile objects
+      Iterator of sorted (ShaFile, path) tuples
     """
     magic = []
     for entry in objects:
@@ -2662,16 +2689,20 @@ def sort_objects_for_delta(
                 (type_num, path) = hint
         else:
             obj = entry
+            type_num = None
+            path = None
         magic.append((type_num, path, -obj.raw_length(), obj))
     # Build a list of objects ordered by the magic Linus heuristic
     # This helps us find good objects to diff against us
     magic.sort()
-    return (x[3] for x in magic)
+    return ((x[3], x[1]) for x in magic)
 
 
 def deltas_from_sorted_objects(
-    objects, window_size: Optional[int] = None, progress=None
-):
+    objects: Iterator[tuple[ShaFile, Optional[bytes]]],
+    window_size: Optional[int] = None,
+    progress: Optional[Callable[..., None]] = None,
+) -> Iterator[UnpackedObject]:
     """Create deltas from sorted objects.
 
     Args:
@@ -2687,7 +2718,7 @@ def deltas_from_sorted_objects(
         window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
 
     possible_bases: deque[tuple[bytes, int, list[bytes]]] = deque()
-    for i, o in enumerate(objects):
+    for i, (o, path) in enumerate(objects):
         if progress is not None and i % 1000 == 0:
             progress((f"generating deltas: {i}\r").encode())
         raw = o.as_raw_chunks()
@@ -2721,12 +2752,16 @@ def deltas_from_sorted_objects(
 
 
 def pack_objects_to_data(
-    objects: Union[Sequence[ShaFile], Sequence[tuple[ShaFile, Optional[bytes]]]],
+    objects: Union[
+        Sequence[ShaFile],
+        Sequence[tuple[ShaFile, Optional[bytes]]],
+        Sequence[tuple[ShaFile, Optional[PackHint]]],
+    ],
     *,
     deltify: Optional[bool] = None,
     delta_window_size: Optional[int] = None,
     ofs_delta: bool = True,
-    progress=None,
+    progress: Optional[Callable[..., None]] = None,
 ) -> tuple[int, Iterator[UnpackedObject]]:
     """Create pack data from objects.
 
@@ -2773,7 +2808,7 @@ def generate_unpacked_objects(
     reuse_deltas: bool = True,
     ofs_delta: bool = True,
     other_haves: Optional[set[bytes]] = None,
-    progress=None,
+    progress: Optional[Callable[..., None]] = None,
 ) -> Iterator[UnpackedObject]:
     """Create pack data from objects.
 
@@ -2794,8 +2829,9 @@ def generate_unpacked_objects(
         objects_to_delta = container.iterobjects_subset(
             todo.keys(), allow_missing=False
         )
+        sorted_objs = sort_objects_for_delta((o, todo[o.id]) for o in objects_to_delta)
         yield from deltas_from_sorted_objects(
-            sort_objects_for_delta((o, todo[o.id]) for o in objects_to_delta),
+            sorted_objs,
             window_size=delta_window_size,
             progress=progress,
         )
@@ -2823,7 +2859,11 @@ def full_unpacked_object(o: ShaFile) -> UnpackedObject:
 
 
 def write_pack_from_container(
-    write,
+    write: Union[
+        Callable[[bytes], None],
+        Callable[[Union[bytes, bytearray, memoryview]], int],
+        IO[bytes],
+    ],
     container: PackedObjectContainer,
     object_ids: Sequence[tuple[ObjectID, Optional[PackHint]]],
     delta_window_size: Optional[int] = None,
@@ -2831,7 +2871,7 @@ def write_pack_from_container(
     reuse_deltas: bool = True,
     compression_level: int = -1,
     other_haves: Optional[set[bytes]] = None,
-):
+) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
     Args:
@@ -2865,13 +2905,13 @@ def write_pack_from_container(
 
 
 def write_pack_objects(
-    write,
+    write: Union[Callable[[bytes], None], IO[bytes]],
     objects: Union[Sequence[ShaFile], Sequence[tuple[ShaFile, Optional[bytes]]]],
     *,
     delta_window_size: Optional[int] = None,
     deltify: Optional[bool] = None,
     compression_level: int = -1,
-):
+) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
     Args:
@@ -2898,11 +2938,11 @@ class PackChunkGenerator:
 
     def __init__(
         self,
-        num_records=None,
-        records=None,
-        progress=None,
-        compression_level=-1,
-        reuse_compressed=True,
+        num_records: Optional[int] = None,
+        records: Optional[Iterator[UnpackedObject]] = None,
+        progress: Optional[Callable[..., None]] = None,
+        compression_level: int = -1,
+        reuse_compressed: bool = True,
     ) -> None:
         """Initialize PackChunkGenerator.
 
@@ -2914,10 +2954,12 @@ class PackChunkGenerator:
             reuse_compressed: Whether to reuse compressed chunks
         """
         self.cs = sha1(b"")
-        self.entries: dict[Union[int, bytes], tuple[int, int]] = {}
+        self.entries: dict[bytes, tuple[int, int]] = {}
+        if records is None:
+            records = iter([])  # Empty iterator if None
         self._it = self._pack_data_chunks(
-            num_records=num_records,
             records=records,
+            num_records=num_records,
             progress=progress,
             compression_level=compression_level,
             reuse_compressed=reuse_compressed,
@@ -2935,8 +2977,8 @@ class PackChunkGenerator:
         self,
         records: Iterator[UnpackedObject],
         *,
-        num_records=None,
-        progress=None,
+        num_records: Optional[int] = None,
+        progress: Optional[Callable[..., None]] = None,
         compression_level: int = -1,
         reuse_compressed: bool = True,
     ) -> Iterator[bytes]:
@@ -2965,6 +3007,9 @@ class PackChunkGenerator:
                 progress((f"writing pack data: {i}/{num_records}\r").encode("ascii"))
             raw: Union[list[bytes], tuple[int, list[bytes]], tuple[bytes, list[bytes]]]
             if unpacked.delta_base is not None:
+                assert isinstance(unpacked.delta_base, bytes), (
+                    f"Expected bytes, got {type(unpacked.delta_base)}"
+                )
                 try:
                     base_offset, _base_crc32 = self.entries[unpacked.delta_base]
                 except KeyError:
@@ -3002,13 +3047,17 @@ class PackChunkGenerator:
 
 
 def write_pack_data(
-    write,
+    write: Union[
+        Callable[[bytes], None],
+        Callable[[Union[bytes, bytearray, memoryview]], int],
+        IO[bytes],
+    ],
     records: Iterator[UnpackedObject],
     *,
-    num_records=None,
-    progress=None,
-    compression_level=-1,
-):
+    num_records: Optional[int] = None,
+    progress: Optional[Callable[..., None]] = None,
+    compression_level: int = -1,
+) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
     Args:
@@ -3026,12 +3075,17 @@ def write_pack_data(
         compression_level=compression_level,
     )
     for chunk in chunk_generator:
-        write(chunk)
+        if callable(write):
+            write(chunk)
+        else:
+            write.write(chunk)
     return chunk_generator.entries, chunk_generator.sha1digest()
 
 
 def write_pack_index_v1(
-    f: BinaryIO, entries: list[tuple[bytes, int, Optional[int]]], pack_checksum: bytes
+    f: IO[bytes],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
+    pack_checksum: bytes,
 ) -> bytes:
     """Write a new pack index file.
 
@@ -3059,7 +3113,7 @@ def write_pack_index_v1(
     return f.write_sha()
 
 
-def _delta_encode_size(size) -> bytes:
+def _delta_encode_size(size: int) -> bytes:
     ret = bytearray()
     c = size & 0x7F
     size >>= 7
@@ -3129,11 +3183,11 @@ def create_delta(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
             o = j1
             while s > 127:
                 yield bytes([127])
-                yield memoryview(target_buf)[o : o + 127]
+                yield bytes(memoryview(target_buf)[o : o + 127])
                 s -= 127
                 o += 127
             yield bytes([s])
-            yield memoryview(target_buf)[o : o + s]
+            yield bytes(memoryview(target_buf)[o : o + s])
 
 
 def apply_delta(
@@ -3213,7 +3267,9 @@ def apply_delta(
 
 
 def write_pack_index_v2(
-    f, entries: Iterable[PackIndexEntry], pack_checksum: bytes
+    f: IO[bytes],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
+    pack_checksum: bytes,
 ) -> bytes:
     """Write a new pack index file.
 
@@ -3253,7 +3309,10 @@ def write_pack_index_v2(
 
 
 def write_pack_index_v3(
-    f, entries: Iterable[PackIndexEntry], pack_checksum: bytes, hash_algorithm: int = 1
+    f: IO[bytes],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
+    pack_checksum: bytes,
+    hash_algorithm: int = 1,
 ) -> bytes:
     """Write a new pack index file in v3 format.
 
@@ -3330,12 +3389,16 @@ def write_pack_index_v3(
 
 
 def write_pack_index(
-    index_filename, entries, pack_checksum, progress=None, version=None
-):
+    f: IO[bytes],
+    entries: Iterable[tuple[bytes, int, Union[int, None]]],
+    pack_checksum: bytes,
+    progress: Optional[Callable[..., None]] = None,
+    version: Optional[int] = None,
+) -> bytes:
     """Write a pack index file.
 
     Args:
-      index_filename: Index filename.
+      f: File-like object to write to.
       entries: List of (checksum, offset, crc32) tuples
       pack_checksum: Checksum of the pack file.
       progress: Progress function (not currently used)
@@ -3348,11 +3411,11 @@ def write_pack_index(
         version = DEFAULT_PACK_INDEX_VERSION
 
     if version == 1:
-        return write_pack_index_v1(index_filename, entries, pack_checksum)
+        return write_pack_index_v1(f, entries, pack_checksum)
     elif version == 2:
-        return write_pack_index_v2(index_filename, entries, pack_checksum)
+        return write_pack_index_v2(f, entries, pack_checksum)
     elif version == 3:
-        return write_pack_index_v3(index_filename, entries, pack_checksum)
+        return write_pack_index_v3(f, entries, pack_checksum)
     else:
         raise ValueError(f"Unsupported pack index version: {version}")
 
@@ -3368,15 +3431,15 @@ class Pack:
 
     def __init__(
         self,
-        basename,
+        basename: str,
         resolve_ext_ref: Optional[ResolveExtRefFn] = None,
         *,
-        delta_window_size=None,
-        window_memory=None,
-        delta_cache_size=None,
-        depth=None,
-        threads=None,
-        big_file_threshold=None,
+        delta_window_size: Optional[int] = None,
+        window_memory: Optional[int] = None,
+        delta_cache_size: Optional[int] = None,
+        depth: Optional[int] = None,
+        threads: Optional[int] = None,
+        big_file_threshold: Optional[int] = None,
     ) -> None:
         """Initialize a Pack object.
 
@@ -3414,7 +3477,9 @@ class Pack:
         self.resolve_ext_ref = resolve_ext_ref
 
     @classmethod
-    def from_lazy_objects(cls, data_fn: Callable, idx_fn: Callable) -> "Pack":
+    def from_lazy_objects(
+        cls, data_fn: Callable[[], PackData], idx_fn: Callable[[], PackIndex]
+    ) -> "Pack":
         """Create a new pack object from callables to load pack data and index objects."""
         ret = cls("")
         ret._data_load = data_fn
@@ -3543,7 +3608,7 @@ class Pack:
         offset = self.index.object_offset(sha1)
         obj_type, obj = self.data.get_object_at(offset)
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
-        return type_num, b"".join(chunks)
+        return type_num, b"".join(chunks)  # type: ignore[arg-type]
 
     def __getitem__(self, sha1: bytes) -> ShaFile:
         """Retrieve the specified SHA1."""
@@ -3654,8 +3719,14 @@ class Pack:
         return offset, type, obj
 
     def resolve_object(
-        self, offset: int, type: int, obj, get_ref=None
-    ) -> tuple[int, Iterable[bytes]]:
+        self,
+        offset: int,
+        type: int,
+        obj: OldUnpackedObject,
+        get_ref: Optional[
+            Callable[[bytes], tuple[Optional[int], int, OldUnpackedObject]]
+        ] = None,
+    ) -> tuple[int, OldUnpackedObject]:
         """Resolve an object, possibly resolving deltas when necessary.
 
         Returns: Tuple with object type and contents.
@@ -3673,13 +3744,16 @@ class Pack:
             if base_type == OFS_DELTA:
                 (delta_offset, delta) = base_obj
                 # TODO: clean up asserts and replace with nicer error messages
+                assert isinstance(delta_offset, int), (
+                    f"Expected int, got {delta_offset.__class__}"
+                )
                 base_offset = base_offset - delta_offset
                 base_type, base_obj = self.data.get_object_at(base_offset)
                 assert isinstance(base_type, int)
             elif base_type == REF_DELTA:
                 (basename, delta) = base_obj
                 assert isinstance(basename, bytes) and len(basename) == 20
-                base_offset, base_type, base_obj = get_ref(basename)
+                base_offset, base_type, base_obj = get_ref(basename)  # type: ignore[assignment]
                 assert isinstance(base_type, int)
                 if base_offset == prev_offset:  # object is based on itself
                     raise UnresolvedDeltas([basename])
@@ -3710,7 +3784,7 @@ class Pack:
         return base_type, chunks
 
     def entries(
-        self, progress: Optional[ProgressFn] = None
+        self, progress: Optional[Callable[[int, int], None]] = None
     ) -> Iterator[PackIndexEntry]:
         """Yield entries summarizing the contents of this pack.
 
@@ -3761,11 +3835,11 @@ class Pack:
 def extend_pack(
     f: BinaryIO,
     object_ids: set[ObjectID],
-    get_raw,
+    get_raw: Callable[[ObjectID], tuple[int, bytes]],
     *,
-    compression_level=-1,
-    progress=None,
-) -> tuple[bytes, list]:
+    compression_level: int = -1,
+    progress: Optional[Callable[[bytes], None]] = None,
+) -> tuple[bytes, list[tuple[bytes, int, int]]]:
     """Extend a pack file with more objects.
 
     The caller should make sure that object_ids does not contain any objects
@@ -3802,7 +3876,7 @@ def extend_pack(
         crc32 = write_pack_object(
             f.write,
             type_num,
-            data,
+            [data],  # Convert bytes to list[bytes]
             sha=new_sha,
             compression_level=compression_level,
         )
@@ -3814,8 +3888,8 @@ def extend_pack(
 
 try:
     from dulwich._pack import (  # type: ignore
-        apply_delta,  # type: ignore
-        bisect_find_sha,  # type: ignore
+        apply_delta,
+        bisect_find_sha,
     )
 except ImportError:
     pass

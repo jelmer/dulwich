@@ -39,7 +39,7 @@ import os
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, BinaryIO, Optional, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Optional, Union
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
@@ -328,7 +328,7 @@ class LFSFilterDriver:
         """Clean up any resources held by this filter driver."""
         # LFSFilterDriver doesn't hold any resources that need cleanup
 
-    def reuse(self, config, filter_name: str) -> bool:
+    def reuse(self, config: Optional["Config"], filter_name: str) -> bool:
         """Check if this filter driver should be reused with the given configuration."""
         # LFSFilterDriver is stateless and lightweight, no need to cache
         return False
@@ -415,7 +415,7 @@ class LFSClient:
         if self._pool_manager is None:
             from dulwich.client import default_urllib3_manager
 
-            self._pool_manager = default_urllib3_manager(self.config)  # type: ignore[assignment]
+            self._pool_manager = default_urllib3_manager(self.config)
         return self._pool_manager
 
     def _make_request(
@@ -442,7 +442,7 @@ class LFSClient:
             raise ValueError(
                 f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}"
             )
-        return response.data  # type: ignore[return-value]
+        return response.data
 
     def batch(
         self,
@@ -478,7 +478,7 @@ class LFSClient:
         response_data = json.loads(response)
         return self._parse_batch_response(response_data)
 
-    def _parse_batch_response(self, data: dict) -> LFSBatchResponse:
+    def _parse_batch_response(self, data: dict[str, Any]) -> LFSBatchResponse:
         """Parse JSON response into LFSBatchResponse dataclass."""
         objects = []
         for obj_data in data.get("objects", []):
@@ -558,7 +558,7 @@ class LFSClient:
         if actual_oid != oid:
             raise LFSError(f"Downloaded OID {actual_oid} != expected {oid}")
 
-        return content  # type: ignore[return-value]
+        return content
 
     def upload(
         self, oid: str, size: int, content: bytes, ref: Optional[str] = None

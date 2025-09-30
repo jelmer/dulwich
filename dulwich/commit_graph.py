@@ -288,7 +288,7 @@ class CommitGraph:
         entry = self.get_entry_by_oid(oid)
         return entry.generation if entry else None
 
-    def get_parents(self, oid: ObjectID) -> Optional[list[ObjectID]]:
+    def get_parents(self, oid: ObjectID) -> Optional[list[bytes]]:
         """Get parent commit IDs for a commit."""
         entry = self.get_entry_by_oid(oid)
         return entry.parents if entry else None

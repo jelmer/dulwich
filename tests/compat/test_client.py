@@ -32,6 +32,7 @@ import sys
 import tarfile
 import tempfile
 import threading
+from collections.abc import Iterator
 from contextlib import suppress
 from io import BytesIO
 from typing import NoReturn
@@ -88,10 +89,19 @@ class DulwichClientTestBase:
         with repo.Repo(srcpath) as src:
             sendrefs = dict(src.get_refs())
             del sendrefs[b"HEAD"]
+
+            # Wrap generate_pack_data to match expected signature
+            def generate_pack_data_wrapper(
+                have: set[bytes], want: set[bytes], ofs_delta: bool = False
+            ) -> tuple[int, Iterator]:
+                return src.generate_pack_data(
+                    have, want, progress=None, ofs_delta=ofs_delta
+                )
+
             c.send_pack(
                 self._build_path("/dest"),
                 lambda _: sendrefs,
-                src.generate_pack_data,
+                generate_pack_data_wrapper,
             )
 
     def test_send_pack(self) -> None:
@@ -137,7 +147,16 @@ class DulwichClientTestBase:
                 )
             sendrefs = dict(local.get_refs())
             del sendrefs[b"HEAD"]
-            c.send_pack(remote_path, lambda _: sendrefs, local.generate_pack_data)
+
+            # Wrap generate_pack_data to match expected signature
+            def generate_pack_data_wrapper(
+                have: set[bytes], want: set[bytes], ofs_delta: bool = False
+            ) -> tuple[int, Iterator]:
+                return local.generate_pack_data(
+                    have, want, progress=None, ofs_delta=ofs_delta
+                )
+
+            c.send_pack(remote_path, lambda _: sendrefs, generate_pack_data_wrapper)
         with repo.Repo(server_new_path) as remote:
             self.assertEqual(remote.head(), commit_id)
 
@@ -148,10 +167,19 @@ class DulwichClientTestBase:
         with repo.Repo(srcpath) as src:
             sendrefs = dict(src.get_refs())
             del sendrefs[b"HEAD"]
+
+            # Wrap generate_pack_data to match expected signature
+            def generate_pack_data_wrapper(
+                have: set[bytes], want: set[bytes], ofs_delta: bool = False
+            ) -> tuple[int, Iterator]:
+                return src.generate_pack_data(
+                    have, want, progress=None, ofs_delta=ofs_delta
+                )
+
             c.send_pack(
                 self._build_path("/dest"),
                 lambda _: sendrefs,
-                src.generate_pack_data,
+                generate_pack_data_wrapper,
             )
             self.assertDestEqualsSrc()
 
@@ -180,7 +208,16 @@ class DulwichClientTestBase:
     def compute_send(self, src):
         sendrefs = dict(src.get_refs())
         del sendrefs[b"HEAD"]
-        return sendrefs, src.generate_pack_data
+
+        # Wrap generate_pack_data to match expected signature
+        def generate_pack_data_wrapper(
+            have: set[bytes], want: set[bytes], ofs_delta: bool = False
+        ) -> tuple[int, Iterator]:
+            return src.generate_pack_data(
+                have, want, progress=None, ofs_delta=ofs_delta
+            )
+
+        return sendrefs, generate_pack_data_wrapper
 
     def test_send_pack_one_error(self) -> None:
         dest, dummy_commit = self.disable_ff_and_make_dummy_commit()
@@ -494,9 +531,15 @@ class TestSSHVendor:
         key_filename=None,
         protocol_version=None,
     ):
-        cmd, path = command.split(" ")
-        cmd = cmd.split("-", 1)
-        path = path.replace("'", "")
+        # Handle both bytes and string commands
+        if isinstance(command, bytes):
+            cmd, path = command.split(b" ")
+            cmd = cmd.decode("utf-8").split("-", 1)
+            path = path.decode("utf-8").replace("'", "")
+        else:
+            cmd, path = command.split(" ")
+            cmd = cmd.split("-", 1)
+            path = path.replace("'", "")
         env = dict(os.environ)
         if protocol_version is None:
             protocol_version = protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH

@@ -108,7 +108,7 @@ def make_object(cls: type[T], **attrs: Any) -> T:
 
     TestObject.__name__ = "TestObject_" + cls.__name__
 
-    obj = TestObject()  # type: ignore[abstract]
+    obj = TestObject()
     for name, value in attrs.items():
         if name == "id":
             # id property is read-only, so we overwrite sha instead.
@@ -233,7 +233,7 @@ def build_pack(
     """
     sf = SHA1Writer(f)
     num_objects = len(objects_spec)
-    write_pack_header(sf.write, num_objects)
+    write_pack_header(sf, num_objects)
 
     full_objects: dict[int, tuple[int, bytes, bytes]] = {}
     offsets: dict[int, int] = {}
@@ -242,7 +242,7 @@ def build_pack(
     while len(full_objects) < num_objects:
         for i, (type_num, data) in enumerate(objects_spec):
             if type_num not in DELTA_TYPES:
-                full_objects[i] = (type_num, data, obj_sha(type_num, [data]))  # type: ignore[no-untyped-call]
+                full_objects[i] = (type_num, data, obj_sha(type_num, [data]))
                 continue
             base, data = data
             if isinstance(base, int):
@@ -255,7 +255,7 @@ def build_pack(
             full_objects[i] = (
                 base_type_num,
                 data,
-                obj_sha(base_type_num, [data]),  # type: ignore[no-untyped-call]
+                obj_sha(base_type_num, [data]),
             )
 
     for i, (type_num, obj) in enumerate(objects_spec):
@@ -264,7 +264,7 @@ def build_pack(
             base_index, data = obj
             base = offset - offsets[base_index]
             _, base_data, _ = full_objects[base_index]
-            obj = (base, list(create_delta(base_data, data)))  # type: ignore[no-untyped-call]
+            obj = (base, list(create_delta(base_data, data)))
         elif type_num == REF_DELTA:
             base_ref, data = obj
             if isinstance(base_ref, int):
@@ -272,10 +272,10 @@ def build_pack(
             else:
                 assert store is not None
                 base_type_num, base_data = store.get_raw(base_ref)
-                base = obj_sha(base_type_num, base_data)  # type: ignore[no-untyped-call]
-            obj = (base, list(create_delta(base_data, data)))  # type: ignore[no-untyped-call]
+                base = obj_sha(base_type_num, base_data)
+            obj = (base, list(create_delta(base_data, data)))
 
-        crc32 = write_pack_object(sf.write, type_num, obj)  # type: ignore[no-untyped-call]
+        crc32 = write_pack_object(sf.write, type_num, obj)
         offsets[i] = offset
         crc32s[i] = crc32
 
@@ -285,7 +285,7 @@ def build_pack(
         assert len(sha) == 20
         expected.append((offsets[i], type_num, data, sha, crc32s[i]))
 
-    sf.write_sha()  # type: ignore[no-untyped-call]
+    sf.write_sha()
     f.seek(0)
     return expected
 

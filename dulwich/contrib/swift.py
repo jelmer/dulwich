@@ -39,16 +39,17 @@ import zlib
 from collections.abc import Iterator
 from configparser import ConfigParser
 from io import BytesIO
-from typing import BinaryIO, Callable, Optional, Union, cast
+from typing import Any, BinaryIO, Callable, Optional, Union, cast
 
 from geventhttpclient import HTTPClient
 
 from ..file import _GitFile
 from ..greenthreads import GreenThreadsMissingObjectFinder
 from ..lru_cache import LRUSizeCache
-from ..object_store import INFODIR, PACKDIR, ObjectContainer, PackBasedObjectStore
+from ..object_store import INFODIR, PACKDIR, PackBasedObjectStore
 from ..objects import S_ISGITLINK, Blob, Commit, Tag, Tree
 from ..pack import (
+    ObjectContainer,
     Pack,
     PackData,
     PackIndex,
@@ -123,11 +124,14 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
                             item.sha,
                             item.path
                             if isinstance(item.path, bytes)
-                            else item.path.encode("utf-8"),
+                            else item.path.encode("utf-8")
+                            if item.path is not None
+                            else b"",
                             None,
                             False,
                         )
                         for item in obj.items()
+                        if item.sha is not None
                     ]
                     self.add_todo(tree_items)
                 elif isinstance(obj, Tag):
@@ -137,7 +141,7 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
             except KeyError:
                 pass
         self.sha_done.add(sha)
-        self.progress(f"counting objects: {len(self.sha_done)}\r")
+        self.progress(f"counting objects: {len(self.sha_done)}\r".encode())
         return (
             sha,
             0,
@@ -197,7 +201,7 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
       Compressed JSON bytes containing pack information
     """
     pack = Pack.from_objects(pack_data, pack_index)
-    info: dict = {}
+    info: dict[bytes, Any] = {}
     for obj in pack.iterobjects():
         # Commit
         if obj.type_num == Commit.type_num:
@@ -211,7 +215,7 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
             shas = [
                 (s, n, not stat.S_ISDIR(m))
                 for n, m, s in tree_obj.items()
-                if not S_ISGITLINK(m)
+                if m is not None and not S_ISGITLINK(m)
             ]
             info[obj.id] = (obj.type_num, shas)
         # Blob
@@ -229,7 +233,7 @@ def load_pack_info(
     filename: str,
     scon: Optional["SwiftConnector"] = None,
     file: Optional[BinaryIO] = None,
-) -> Optional[dict]:
+) -> Optional[dict[str, Any]]:
     """Load pack info from Swift or file.
 
     Args:
@@ -247,13 +251,13 @@ def load_pack_info(
         if obj is None:
             return None
         if isinstance(obj, bytes):
-            return json.loads(zlib.decompress(obj))
+            return cast(dict[str, Any], json.loads(zlib.decompress(obj)))
         else:
             f: BinaryIO = obj
     else:
         f = file
     try:
-        return json.loads(zlib.decompress(f.read()))
+        return cast(dict[str, Any], json.loads(zlib.decompress(f.read())))
     finally:
         if hasattr(f, "close"):
             f.close()
@@ -412,7 +416,7 @@ class SwiftConnector:
                     f"PUT request failed with error code {ret.status_code}"
                 )
 
-    def get_container_objects(self) -> Optional[list[dict]]:
+    def get_container_objects(self) -> Optional[list[dict[str, Any]]]:
         """Retrieve objects list in a container.
 
         Returns: A list of dict that describe objects
@@ -428,9 +432,9 @@ class SwiftConnector:
                 f"GET request failed with error code {ret.status_code}"
             )
         content = ret.read()
-        return json.loads(content)
+        return cast(list[dict[str, Any]], json.loads(content))
 
-    def get_object_stat(self, name: str) -> Optional[dict]:
+    def get_object_stat(self, name: str) -> Optional[dict[str, Any]]:
         """Retrieve object stat.
 
         Args:
@@ -504,7 +508,7 @@ class SwiftConnector:
             raise SwiftException(
                 f"GET request failed with error code {ret.status_code}"
             )
-        content = ret.read()
+        content = cast(bytes, ret.read())
 
         if range:
             return content
@@ -633,7 +637,9 @@ class SwiftPackData(PackData):
     using the Range header feature of Swift.
     """
 
-    def __init__(self, scon: SwiftConnector, filename: Union[str, os.PathLike]) -> None:
+    def __init__(
+        self, scon: SwiftConnector, filename: Union[str, os.PathLike[str]]
+    ) -> None:
         """Initialize a SwiftPackReader.
 
         Args:
@@ -703,17 +709,19 @@ class SwiftPack(Pack):
           *args: Arguments to pass to parent class
           **kwargs: Keyword arguments, must include 'scon' (SwiftConnector)
         """
-        self.scon = kwargs["scon"]
+        self.scon: SwiftConnector = kwargs["scon"]  # type: ignore
         del kwargs["scon"]
         super().__init__(*args, **kwargs)  # type: ignore
         self._pack_info_path = self._basename + ".info"
-        self._pack_info: Optional[dict] = None
-        self._pack_info_load = lambda: load_pack_info(self._pack_info_path, self.scon)  # type: ignore
-        self._idx_load = lambda: swift_load_pack_index(self.scon, self._idx_path)  # type: ignore
-        self._data_load = lambda: SwiftPackData(self.scon, self._data_path)  # type: ignore
+        self._pack_info: Optional[dict[str, Any]] = None
+        self._pack_info_load: Callable[[], Optional[dict[str, Any]]] = (
+            lambda: load_pack_info(self._pack_info_path, self.scon)
+        )
+        self._idx_load = lambda: swift_load_pack_index(self.scon, self._idx_path)
+        self._data_load = lambda: SwiftPackData(self.scon, self._data_path)
 
     @property
-    def pack_info(self) -> Optional[dict]:
+    def pack_info(self) -> Optional[dict[str, Any]]:
         """The pack data object being used."""
         if self._pack_info is None:
             self._pack_info = self._pack_info_load()
@@ -739,7 +747,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         self.pack_dir = posixpath.join(OBJECTDIR, PACKDIR)
         self._alternates = None
 
-    def _update_pack_cache(self) -> list:
+    def _update_pack_cache(self) -> list[Any]:
         objects = self.scon.get_container_objects()
         if objects is None:
             return []
@@ -755,11 +763,11 @@ class SwiftObjectStore(PackBasedObjectStore):
             ret.append(pack)
         return ret
 
-    def _iter_loose_objects(self) -> Iterator:
+    def _iter_loose_objects(self) -> Iterator[Any]:
         """Loose objects are not supported by this repository."""
         return iter([])
 
-    def pack_info_get(self, sha: bytes) -> Optional[tuple]:
+    def pack_info_get(self, sha: bytes) -> Optional[tuple[Any, ...]]:
         """Get pack info for a specific SHA.
 
         Args:
@@ -773,23 +781,23 @@ class SwiftObjectStore(PackBasedObjectStore):
                 if hasattr(pack, "pack_info"):
                     pack_info = pack.pack_info
                     if pack_info is not None:
-                        return pack_info.get(sha)
+                        return cast(Optional[tuple[Any, ...]], pack_info.get(sha))
         return None
 
     def _collect_ancestors(
-        self, heads: list, common: Optional[set] = None
-    ) -> tuple[set, set]:
+        self, heads: list[Any], common: Optional[set[Any]] = None
+    ) -> tuple[set[Any], set[Any]]:
         if common is None:
             common = set()
 
-        def _find_parents(commit: bytes) -> list:
+        def _find_parents(commit: bytes) -> list[Any]:
             for pack in self.packs:
                 if commit in pack:
                     try:
                         if hasattr(pack, "pack_info"):
                             pack_info = pack.pack_info
                             if pack_info is not None:
-                                return pack_info[commit][1]
+                                return cast(list[Any], pack_info[commit][1])
                     except KeyError:
                         # Seems to have no parents
                         return []
@@ -809,7 +817,7 @@ class SwiftObjectStore(PackBasedObjectStore):
                 queue.extend(parents)
         return (commits, bases)
 
-    def add_pack(self) -> tuple[BytesIO, Callable, Callable]:
+    def add_pack(self) -> tuple[BytesIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack to this object store.
 
         Returns: Fileobject to write to and a commit function to
@@ -851,7 +859,11 @@ class SwiftObjectStore(PackBasedObjectStore):
         def abort() -> None:
             """Abort the pack operation (no-op)."""
 
-        return f, commit, abort
+        def commit_wrapper() -> None:
+            """Wrapper that discards the return value."""
+            commit()
+
+        return f, commit_wrapper, abort
 
     def add_object(self, obj: object) -> None:
         """Add a single object to the store.
@@ -871,7 +883,9 @@ class SwiftObjectStore(PackBasedObjectStore):
     def _get_loose_object(self, sha: bytes) -> None:
         return None
 
-    def add_thin_pack(self, read_all: Callable, read_some: Callable) -> "SwiftPack":
+    def add_thin_pack(
+        self, read_all: Callable[[int], bytes], read_some: Callable[[int], bytes]
+    ) -> "SwiftPack":
         """Read a thin pack.
 
         Read it from a stream and complete it in a temporary file.
@@ -882,7 +896,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         try:
             pack_data = PackData(file=cast(_GitFile, f), filename=path)
             indexer = PackIndexer(cast(BinaryIO, pack_data._file), resolve_ext_ref=None)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)
+            copier = PackStreamCopier(read_all, read_some, f, delta_iter=None)
             copier.verify()
             return self._complete_thin_pack(f, path, copier, indexer)
         finally:
@@ -974,7 +988,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
     def _load_check_ref(
         self, name: bytes, old_ref: Optional[bytes]
-    ) -> Union[dict, bool]:
+    ) -> Union[dict[bytes, bytes], bool]:
         self._check_refname(name)
         obj = self.scon.get_object(self.filename)
         if not obj:
@@ -990,7 +1004,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
                 return False
         return refs
 
-    def _write_refs(self, refs: dict) -> None:
+    def _write_refs(self, refs: dict[bytes, bytes]) -> None:
         f = BytesIO()
         f.writelines(write_info_refs(refs, cast("ObjectContainer", self.store)))
         self.scon.put_object(self.filename, f)
@@ -1006,7 +1020,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         message: Optional[bytes] = None,
     ) -> bool:
         """Set a refname to new_ref only if it currently equals old_ref."""
-        if name == "HEAD":
+        if name == b"HEAD":
             return True
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
@@ -1026,7 +1040,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         message: object = None,
     ) -> bool:
         """Remove a refname only if it currently equals old_ref."""
-        if name == "HEAD":
+        if name == b"HEAD":
             return True
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
@@ -1069,8 +1083,8 @@ class SwiftRepo(BaseRepo):
         objects = self.scon.get_container_objects()
         if not objects:
             raise Exception(f"There is not any GIT repo here : {self.root}")
-        objects = [o["name"].split("/")[0] for o in objects]
-        if OBJECTDIR not in objects:
+        object_names = [o["name"].split("/")[0] for o in objects]
+        if OBJECTDIR not in object_names:
             raise Exception(f"This repository ({self.root}) is not bare.")
         self.bare = True
         self._controldir = self.root
@@ -1143,7 +1157,7 @@ class SwiftSystemBackend(Backend):
         return cast("BackendRepo", SwiftRepo(path, self.conf))
 
 
-def cmd_daemon(args: list) -> None:
+def cmd_daemon(args: list[str]) -> None:
     """Start a TCP git server for Swift repositories.
 
     Args:
@@ -1199,7 +1213,7 @@ def cmd_daemon(args: list) -> None:
     server.serve_forever()
 
 
-def cmd_init(args: list) -> None:
+def cmd_init(args: list[str]) -> None:
     """Initialize a new Git repository in Swift.
 
     Args:
@@ -1225,7 +1239,7 @@ def cmd_init(args: list) -> None:
     SwiftRepo.init_bare(scon, conf)
 
 
-def main(argv: list = sys.argv) -> None:
+def main(argv: list[str] = sys.argv) -> None:
     """Main entry point for Swift Git command line interface.
 
     Args:

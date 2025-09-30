@@ -434,9 +434,10 @@ class DumbRemoteHTTPRepo:
 
     def fetch_pack_data(
         self,
+        determine_wants: Callable[[dict[Ref, ObjectID], Optional[int]], list[ObjectID]],
         graph_walker: object,
-        determine_wants: Callable[[dict[Ref, ObjectID]], list[ObjectID]],
         progress: Optional[Callable[[bytes], None]] = None,
+        *,
         get_tagged: Optional[bool] = None,
         depth: Optional[int] = None,
     ) -> Iterator[UnpackedObject]:
@@ -447,8 +448,8 @@ class DumbRemoteHTTPRepo:
         all objects reachable from the wanted refs.
 
         Args:
-          graph_walker: GraphWalker instance (not used for dumb HTTP)
           determine_wants: Function that returns list of wanted SHAs
+          graph_walker: GraphWalker instance (not used for dumb HTTP)
           progress: Optional progress callback
           get_tagged: Whether to get tagged objects
           depth: Depth for shallow clones (not supported for dumb HTTP)
@@ -457,7 +458,7 @@ class DumbRemoteHTTPRepo:
           Iterator of UnpackedObject instances
         """
         refs = self.get_refs()
-        wants = determine_wants(refs)
+        wants = determine_wants(refs, depth)
 
         if not wants:
             return
@@ -493,6 +494,7 @@ class DumbRemoteHTTPRepo:
                 to_fetch.add(obj.object[1])
             elif isinstance(obj, Tree):  # Tree
                 for _, _, item_sha in obj.items():
+                    assert item_sha is not None
                     to_fetch.add(item_sha)
 
             if progress:

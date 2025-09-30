@@ -302,7 +302,7 @@ class PagerBuffer(BinaryIO):
         """
         self.pager = pager
 
-    def write(self, data: Buffer) -> int:
+    def write(self, data: Union[bytes, bytearray, memoryview]) -> int:  # type: ignore[override]
         """Write bytes to pager."""
         # Convert to bytes and decode to string for the pager
         text = bytes(data).decode("utf-8", errors="replace")
@@ -312,7 +312,7 @@ class PagerBuffer(BinaryIO):
         """Flush the pager."""
         return self.pager.flush()
 
-    def writelines(self, lines: Iterable[Buffer]) -> None:
+    def writelines(self, lines: Iterable[Union[bytes, bytearray, memoryview]]) -> None:  # type: ignore[override]
         """Write multiple lines to pager."""
         for line in lines:
             self.write(line)
@@ -4517,7 +4517,7 @@ def main(argv: Optional[list[str]] = None) -> Optional[int]:
 
 def _main() -> None:
     if "DULWICH_PDB" in os.environ and getattr(signal, "SIGQUIT", None):
-        signal.signal(signal.SIGQUIT, signal_quit)
+        signal.signal(signal.SIGQUIT, signal_quit)  # type: ignore[attr-defined,unused-ignore]
     signal.signal(signal.SIGINT, signal_int)
 
     sys.exit(main())

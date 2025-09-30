@@ -2297,7 +2297,7 @@ def reset(
                     source: Union[str, bytes, os.PathLike[str]],
                     target: Union[str, bytes, os.PathLike[str]],
                 ) -> None:
-                    symlink(source, target)
+                    symlink(source, target)  # type: ignore[arg-type,unused-ignore]
 
                 symlink_fn = symlink_wrapper
             else:
@@ -4186,7 +4186,7 @@ def checkout(
                 source: Union[str, bytes, os.PathLike[str]],
                 target: Union[str, bytes, os.PathLike[str]],
             ) -> None:
-                symlink(source, target)
+                symlink(source, target)  # type: ignore[arg-type,unused-ignore]
 
             symlink_fn = symlink_wrapper
         else:

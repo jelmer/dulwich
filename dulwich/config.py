@@ -1353,11 +1353,11 @@ def _find_git_in_win_reg() -> Iterator[str]:
     else:
         subkey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Git_is1"
 
-    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore
+    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore[attr-defined,unused-ignore]
         with suppress(OSError):
-            with winreg.OpenKey(key, subkey) as k:  # type: ignore
-                val, typ = winreg.QueryValueEx(k, "InstallLocation")  # type: ignore
-                if typ == winreg.REG_SZ:  # type: ignore
+            with winreg.OpenKey(key, subkey) as k:  # type: ignore[attr-defined,unused-ignore]
+                val, typ = winreg.QueryValueEx(k, "InstallLocation")  # type: ignore[attr-defined,unused-ignore]
+                if typ == winreg.REG_SZ:  # type: ignore[attr-defined,unused-ignore]
                     yield val
 
 

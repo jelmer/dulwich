@@ -215,7 +215,9 @@ def unified_diff(
                     yield b"+" + line
 
 
-def _get_sequence_matcher(algorithm: str, a: list[bytes], b: list[bytes]):
+def _get_sequence_matcher(
+    algorithm: str, a: list[bytes], b: list[bytes]
+) -> SequenceMatcher[bytes]:
     """Get appropriate sequence matcher for the given algorithm.
 
     Args:
@@ -233,7 +235,7 @@ def _get_sequence_matcher(algorithm: str, a: list[bytes], b: list[bytes]):
         try:
             from patiencediff import PatienceSequenceMatcher
 
-            return PatienceSequenceMatcher(None, a, b)
+            return PatienceSequenceMatcher(None, a, b)  # type: ignore[no-any-return,unused-ignore]
         except ImportError:
             raise DiffAlgorithmNotAvailable(
                 "patience", "Install with: pip install 'dulwich[patiencediff]'"

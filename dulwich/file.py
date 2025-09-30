@@ -34,7 +34,9 @@ else:
     Buffer = Union[bytes, bytearray, memoryview]
 
 
-def ensure_dir_exists(dirname: Union[str, bytes, os.PathLike]) -> None:
+def ensure_dir_exists(
+    dirname: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+) -> None:
     """Ensure a directory exists, creating if necessary."""
     try:
         os.makedirs(dirname)
@@ -66,7 +68,7 @@ def _fancy_rename(oldname: Union[str, bytes], newname: Union[str, bytes]) -> Non
 
 @overload
 def GitFile(
-    filename: Union[str, bytes, os.PathLike],
+    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
     mode: Literal["wb"],
     bufsize: int = -1,
     mask: int = 0o644,
@@ -75,7 +77,7 @@ def GitFile(
 
 @overload
 def GitFile(
-    filename: Union[str, bytes, os.PathLike],
+    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
     mode: Literal["rb"] = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
@@ -84,7 +86,7 @@ def GitFile(
 
 @overload
 def GitFile(
-    filename: Union[str, bytes, os.PathLike],
+    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
     mode: str = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
@@ -92,7 +94,7 @@ def GitFile(
 
 
 def GitFile(
-    filename: Union[str, bytes, os.PathLike],
+    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
     mode: str = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
@@ -128,7 +130,9 @@ class FileLocked(Exception):
     """File is already locked."""
 
     def __init__(
-        self, filename: Union[str, bytes, os.PathLike], lockfilename: Union[str, bytes]
+        self,
+        filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+        lockfilename: Union[str, bytes],
     ) -> None:
         """Initialize FileLocked.
 
@@ -151,6 +155,11 @@ class _GitFile(IO[bytes]):
     Note: You *must* call close() or abort() on a _GitFile for the lock to be
         released. Typically this will happen in a finally block.
     """
+
+    _file: IO[bytes]
+    _filename: Union[str, bytes]
+    _lockfilename: Union[str, bytes]
+    _closed: bool
 
     PROXY_PROPERTIES: ClassVar[set[str]] = {
         "encoding",
@@ -181,7 +190,7 @@ class _GitFile(IO[bytes]):
 
     def __init__(
         self,
-        filename: Union[str, bytes, os.PathLike],
+        filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
         mode: str,
         bufsize: int,
         mask: int,
@@ -272,6 +281,10 @@ class _GitFile(IO[bytes]):
         else:
             self.close()
 
+    def __fspath__(self) -> Union[str, bytes]:
+        """Return the file path for os.fspath() compatibility."""
+        return self._filename
+
     @property
     def closed(self) -> bool:
         """Return whether the file is closed."""
@@ -289,7 +302,7 @@ class _GitFile(IO[bytes]):
 
     # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
     # Python 3.9/3.10 have issues with IO[bytes] overload signatures
-    def write(self, data: Buffer, /) -> int:  # type: ignore[override]
+    def write(self, data: Buffer, /) -> int:  # type: ignore[override,unused-ignore]
         return self._file.write(data)
 
     def readline(self, size: int = -1) -> bytes:
@@ -300,7 +313,7 @@ class _GitFile(IO[bytes]):
 
     # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
     # Python 3.9/3.10 have issues with IO[bytes] overload signatures
-    def writelines(self, lines: Iterable[Buffer], /) -> None:  # type: ignore[override]
+    def writelines(self, lines: Iterable[Buffer], /) -> None:  # type: ignore[override,unused-ignore]
         return self._file.writelines(lines)
 
     def seek(self, offset: int, whence: int = 0) -> int:

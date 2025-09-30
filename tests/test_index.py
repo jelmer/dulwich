@@ -1434,10 +1434,9 @@ class TestIndexEntryFromPath(TestCase):
         self.assertEqual(sorted(changes), [b"conflict", b"file1", b"file3", b"file4"])
 
         # Create a custom blob filter function
-        def filter_blob_callback(blob, path):
-            # Modify blob to make it look changed
-            blob.data = b"modified " + blob.data
-            return blob
+        def filter_blob_callback(data, path):
+            # Modify blob data to make it look changed
+            return b"modified " + data
 
         # Get unstaged changes with blob filter
         changes = list(get_unstaged_changes(index, repo_dir, filter_blob_callback))

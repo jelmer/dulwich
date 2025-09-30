@@ -1,11 +1,15 @@
 """Git merge implementation."""
 
-from typing import Optional
+from difflib import SequenceMatcher
+from typing import TYPE_CHECKING, Optional
 
-try:
+if TYPE_CHECKING:
     import merge3
-except ImportError:
-    merge3 = None  # type: ignore
+else:
+    try:
+        import merge3
+    except ImportError:
+        merge3 = None  # type: ignore[assignment]
 
 from dulwich.attrs import GitAttributes
 from dulwich.config import Config
@@ -14,14 +18,20 @@ from dulwich.object_store import BaseObjectStore
 from dulwich.objects import S_ISGITLINK, Blob, Commit, Tree, is_blob, is_tree
 
 
-def make_merge3(*args, **kwargs) -> "merge3.Merge3":
+def make_merge3(
+    base: list[bytes],
+    a: list[bytes],
+    b: list[bytes],
+    is_cherrypick: bool = False,
+    sequence_matcher: Optional[type[SequenceMatcher[bytes]]] = None,
+) -> "merge3.Merge3":
     """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
     if merge3 is None:
         raise ImportError(
             "merge3 module is required for three-way merging. "
             "Install it with: pip install merge3"
         )
-    return merge3.Merge3(*args, **kwargs)
+    return merge3.Merge3(base, a, b, is_cherrypick, sequence_matcher)
 
 
 class MergeConflict(Exception):
@@ -55,7 +65,7 @@ def _can_merge_lines(
 
 if merge3 is not None:
 
-    def _merge3_to_bytes(m: merge3.Merge3) -> bytes:
+    def _merge3_to_bytes(m: "merge3.Merge3") -> bytes:
         """Convert merge3 result to bytes with conflict markers.
 
         Args:
@@ -65,7 +75,7 @@ if merge3 is not None:
             Merged content as bytes
         """
         result = []
-        for group in m.merge_groups():
+        for group in m.merge_groups():  # type: ignore[no-untyped-call,unused-ignore]
             if group[0] == "unchanged":
                 result.extend(group[1])
             elif group[0] == "a":
@@ -291,20 +301,23 @@ class Merger:
         Returns:
             tuple of (merged_tree, list_of_conflicted_paths)
         """
-        conflicts = []
-        merged_entries = {}
+        conflicts: list[bytes] = []
+        merged_entries: dict[bytes, tuple[Optional[int], Optional[bytes]]] = {}
 
         # Get all paths from all trees
         all_paths = set()
 
         if base_tree:
             for entry in base_tree.items():
+                assert entry.path is not None
                 all_paths.add(entry.path)
 
         for entry in ours_tree.items():
+            assert entry.path is not None
             all_paths.add(entry.path)
 
         for entry in theirs_tree.items():
+            assert entry.path is not None
             all_paths.add(entry.path)
 
         # Process each path

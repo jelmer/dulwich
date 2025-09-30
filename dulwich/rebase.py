@@ -26,7 +26,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Protocol
+from typing import Callable, Optional, Protocol, TypedDict
 
 from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
@@ -526,6 +526,16 @@ class DiskRebaseStateManager:
         return None
 
 
+class RebaseState(TypedDict):
+    """Type definition for rebase state."""
+
+    original_head: Optional[bytes]
+    rebasing_branch: Optional[bytes]
+    onto: Optional[bytes]
+    todo: list[Commit]
+    done: list[Commit]
+
+
 class MemoryRebaseStateManager:
     """Manages rebase state in memory for MemoryRepo."""
 
@@ -536,7 +546,7 @@ class MemoryRebaseStateManager:
           repo: Repository instance
         """
         self.repo = repo
-        self._state: Optional[dict] = None
+        self._state: Optional[RebaseState] = None
         self._todo: Optional[RebaseTodo] = None
 
     def save(
@@ -548,13 +558,13 @@ class MemoryRebaseStateManager:
         done: list[Commit],
     ) -> None:
         """Save rebase state in memory."""
-        self._state = {
-            "original_head": original_head,
-            "rebasing_branch": rebasing_branch,
-            "onto": onto,
-            "todo": todo[:],  # Copy the lists
-            "done": done[:],
-        }
+        self._state = RebaseState(
+            original_head=original_head,
+            rebasing_branch=rebasing_branch,
+            onto=onto,
+            todo=todo[:],  # Copy the lists
+            done=done[:],
+        )
 
     def load(
         self,
@@ -940,7 +950,7 @@ def start_interactive(
     upstream: bytes,
     onto: Optional[bytes] = None,
     branch: Optional[bytes] = None,
-    editor_callback=None,
+    editor_callback: Optional[Callable[[bytes], bytes]] = None,
 ) -> RebaseTodo:
     """Start an interactive rebase.
 
@@ -1000,7 +1010,7 @@ def start_interactive(
     return todo
 
 
-def edit_todo(repo: Repo, editor_callback) -> RebaseTodo:
+def edit_todo(repo: Repo, editor_callback: Callable[[bytes], bytes]) -> RebaseTodo:
     """Edit the todo list of an in-progress interactive rebase.
 
     Args:
@@ -1041,7 +1051,7 @@ def edit_todo(repo: Repo, editor_callback) -> RebaseTodo:
 def process_interactive_rebase(
     repo: Repo,
     todo: Optional[RebaseTodo] = None,
-    editor_callback=None,
+    editor_callback: Optional[Callable[[bytes], bytes]] = None,
 ) -> tuple[bool, Optional[str]]:
     """Process an interactive rebase.
 
@@ -1189,7 +1199,7 @@ def _squash_commits(
     rebaser: Rebaser,
     entry: RebaseTodoEntry,
     keep_message: bool,
-    editor_callback=None,
+    editor_callback: Optional[Callable[[bytes], bytes]] = None,
 ) -> Optional[str]:
     """Helper to squash/fixup commits.
 

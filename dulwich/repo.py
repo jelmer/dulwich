@@ -176,7 +176,7 @@ def _get_default_identity() -> tuple[str, str]:
         fullname = None
     else:
         try:
-            entry = pwd.getpwuid(os.getuid())
+            entry = pwd.getpwuid(os.getuid())  # type: ignore[attr-defined,unused-ignore]
         except KeyError:
             fullname = None
         else:

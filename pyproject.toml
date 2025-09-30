@@ -76,6 +76,29 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "fastimport"
 ignore_missing_imports = true
+no_implicit_reexport = false
+disallow_untyped_calls = false
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = "fastimport.*"
+ignore_missing_imports = true
+no_implicit_reexport = false
+disallow_untyped_calls = false
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = "patiencediff"
+ignore_missing_imports = true
+no_implicit_reexport = false
+disallow_untyped_calls = false
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = "merge3"
+ignore_missing_imports = true
+disallow_untyped_calls = false
+warn_return_any = false
 
 [tool.setuptools]
 packages = [

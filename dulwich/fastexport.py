@@ -140,6 +140,7 @@ class GitFastExporter:
                 yield commands.FileRenameCommand(old_path, new_path)  # type: ignore[no-untyped-call,unused-ignore]
             if old_mode != new_mode or old_hexsha != new_hexsha:
                 prefixed_marker = b":" + marker
+                assert new_mode is not None
                 yield commands.FileModifyCommand(  # type: ignore[no-untyped-call,unused-ignore]
                     new_path, new_mode, prefixed_marker, None
                 )
@@ -258,19 +259,28 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
         """Process a CommitCommand."""
         commit = Commit()
         if cmd.author is not None:
-            author = cmd.author
+            (author_name, author_email, author_timestamp, author_timezone) = cmd.author
         else:
-            author = cmd.committer
-        (author_name, author_email, author_timestamp, author_timezone) = author
+            (author_name, author_email, author_timestamp, author_timezone) = (
+                cmd.committer
+            )
         (
             committer_name,
             committer_email,
             commit_timestamp,
             commit_timezone,
         ) = cmd.committer
+        if isinstance(author_name, str):
+            author_name = author_name.encode("utf-8")
+        if isinstance(author_email, str):
+            author_email = author_email.encode("utf-8")
         commit.author = author_name + b" <" + author_email + b">"
         commit.author_timezone = author_timezone
         commit.author_time = int(author_timestamp)
+        if isinstance(committer_name, str):
+            committer_name = committer_name.encode("utf-8")
+        if isinstance(committer_email, str):
+            committer_email = committer_email.encode("utf-8")
         commit.committer = committer_name + b" <" + committer_email + b">"
         commit.commit_timezone = commit_timezone
         commit.commit_time = int(commit_timestamp)
@@ -281,24 +291,29 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
             self._reset_base(cmd.from_)
         for filecmd in cmd.iter_files():  # type: ignore[no-untyped-call,unused-ignore]
             if filecmd.name == b"filemodify":
+                assert isinstance(filecmd, commands.FileModifyCommand)
                 if filecmd.data is not None:
                     blob = Blob.from_string(filecmd.data)
                     self.repo.object_store.add_object(blob)
                     blob_id = blob.id
                 else:
+                    assert filecmd.dataref is not None
                     blob_id = self.lookup_object(filecmd.dataref)
                 self._contents[filecmd.path] = (filecmd.mode, blob_id)
             elif filecmd.name == b"filedelete":
+                assert isinstance(filecmd, commands.FileDeleteCommand)
                 del self._contents[filecmd.path]
             elif filecmd.name == b"filecopy":
+                assert isinstance(filecmd, commands.FileCopyCommand)
                 self._contents[filecmd.dest_path] = self._contents[filecmd.src_path]
             elif filecmd.name == b"filerename":
+                assert isinstance(filecmd, commands.FileRenameCommand)
                 self._contents[filecmd.new_path] = self._contents[filecmd.old_path]
                 del self._contents[filecmd.old_path]
             elif filecmd.name == b"filedeleteall":
                 self._contents = {}
             else:
-                raise Exception(f"Command {filecmd.name} not supported")
+                raise Exception(f"Command {filecmd.name!r} not supported")
         commit.tree = commit_tree(
             self.repo.object_store,
             ((path, hexsha, mode) for (path, (mode, hexsha)) in self._contents.items()),
@@ -311,7 +326,12 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
         self.repo[cmd.ref] = commit.id
         self.last_commit = commit.id
         if cmd.mark:
-            self.markers[cmd.mark] = commit.id
+            mark_bytes = (
+                cmd.mark
+                if isinstance(cmd.mark, bytes)
+                else str(cmd.mark).encode("ascii")
+            )
+            self.markers[mark_bytes] = commit.id
 
     def progress_handler(self, cmd: commands.ProgressCommand) -> None:
         """Process a ProgressCommand."""
@@ -356,4 +376,9 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
 
     def feature_handler(self, cmd: commands.FeatureCommand) -> None:
         """Process a FeatureCommand."""
-        raise fastimport_errors.UnknownFeature(cmd.feature_name)  # type: ignore[no-untyped-call,unused-ignore]
+        feature_name = (
+            cmd.feature_name.decode("utf-8")
+            if isinstance(cmd.feature_name, bytes)
+            else cmd.feature_name
+        )
+        raise fastimport_errors.UnknownFeature(feature_name)  # type: ignore[no-untyped-call,unused-ignore]

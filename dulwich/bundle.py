@@ -28,6 +28,7 @@ from typing import (
     Callable,
     Optional,
     Protocol,
+    cast,
     runtime_checkable,
 )
 
@@ -213,7 +214,7 @@ def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
     if bundle.pack_data is None:
         raise ValueError("bundle.pack_data is not loaded")
     write_pack_data(
-        f.write,
+        cast(Callable[[bytes], None], f.write),
         num_records=len(bundle.pack_data),
         records=bundle.pack_data.iter_unpacked(),
     )
@@ -251,7 +252,7 @@ def create_bundle_from_repo(
 
     # Build the references dictionary for the bundle
     bundle_refs = {}
-    want_objects = []
+    want_objects = set()
 
     for ref in refs:
         if ref in repo.refs:
@@ -265,11 +266,11 @@ def create_bundle_from_repo(
                     bundle_refs[ref] = ref_value
             except KeyError:
                 bundle_refs[ref] = ref_value
-            want_objects.append(bundle_refs[ref])
+            want_objects.add(bundle_refs[ref])
 
     # Convert prerequisites to proper format
     bundle_prerequisites = []
-    have_objects = []
+    have_objects = set()
     for prereq in prerequisites:
         if isinstance(prereq, str):
             prereq = prereq.encode("utf-8")
@@ -280,7 +281,7 @@ def create_bundle_from_repo(
                     bytes.fromhex(prereq.decode("utf-8"))
                     # Store hex in bundle and for pack generation
                     bundle_prerequisites.append((prereq, b""))
-                    have_objects.append(prereq)
+                    have_objects.add(prereq)
                 except ValueError:
                     # Not a valid hex string, invalid prerequisite
                     raise ValueError(f"Invalid prerequisite format: {prereq!r}")
@@ -288,7 +289,7 @@ def create_bundle_from_repo(
                 # Binary SHA, convert to hex for both bundle and pack generation
                 hex_prereq = prereq.hex().encode("ascii")
                 bundle_prerequisites.append((hex_prereq, b""))
-                have_objects.append(hex_prereq)
+                have_objects.add(hex_prereq)
             else:
                 # Invalid length
                 raise ValueError(f"Invalid prerequisite SHA length: {len(prereq)}")

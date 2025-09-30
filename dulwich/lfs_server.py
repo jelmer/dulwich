@@ -24,6 +24,7 @@
 import hashlib
 import json
 import tempfile
+import typing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
@@ -35,7 +36,7 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
 
     server: "LFSServer"  # Type annotation for the server attribute
 
-    def send_json_response(self, status_code: int, data: dict) -> None:
+    def send_json_response(self, status_code: int, data: dict[str, typing.Any]) -> None:
         """Send a JSON response."""
         response = json.dumps(data).encode("utf-8")
         self.send_response(status_code)

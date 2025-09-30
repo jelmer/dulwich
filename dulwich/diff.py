@@ -44,10 +44,18 @@ Example usage:
     diff_index_to_tree(repo, sys.stdout.buffer, paths=[b'src/', b'README.md'])
 """
 
+import io
 import logging
 import os
 import stat
-from typing import BinaryIO, Optional
+import sys
+from collections.abc import Iterable
+from typing import BinaryIO, Optional, Union
+
+if sys.version_info >= (3, 12):
+    from collections.abc import Buffer
+else:
+    Buffer = Union[bytes, bytearray, memoryview]
 
 from .index import ConflictedIndexEntry, commit_index
 from .object_store import iter_tree_contents
@@ -138,7 +146,7 @@ def diff_working_tree_to_tree(
     assert isinstance(commit, Commit)
     tree = commit.tree
     normalizer = repo.get_blob_normalizer()
-    filter_callback = normalizer.checkin_normalize
+    filter_callback = normalizer.checkin_normalize if normalizer is not None else None
 
     # Get index for tracking new files
     index = repo.open_index()
@@ -147,6 +155,9 @@ def diff_working_tree_to_tree(
 
     # Process files from the committed tree lazily
     for entry in iter_tree_contents(repo.object_store, tree):
+        assert (
+            entry.path is not None and entry.mode is not None and entry.sha is not None
+        )
         path = entry.path
         if not should_include_path(path, paths):
             continue
@@ -377,7 +388,7 @@ def diff_working_tree_to_index(
     """
     index = repo.open_index()
     normalizer = repo.get_blob_normalizer()
-    filter_callback = normalizer.checkin_normalize
+    filter_callback = normalizer.checkin_normalize if normalizer is not None else None
 
     # Process each file in the index
     for tree_path, entry in index.iteritems():
@@ -521,7 +532,7 @@ def diff_working_tree_to_index(
             )
 
 
-class ColorizedDiffStream:
+class ColorizedDiffStream(BinaryIO):
     """Stream wrapper that colorizes diff output line by line using Rich.
 
     This class wraps a binary output stream and applies color formatting
@@ -561,13 +572,18 @@ class ColorizedDiffStream:
         self.console = Console(file=self.text_wrapper, force_terminal=True)
         self.buffer = b""
 
-    def write(self, data: bytes) -> None:
+    def write(self, data: Union[bytes, Buffer]) -> int:  # type: ignore[override,unused-ignore]
         """Write data to the stream, applying colorization.
 
         Args:
             data: Bytes to write
+
+        Returns:
+            Number of bytes written
         """
         # Add new data to buffer
+        if not isinstance(data, bytes):
+            data = bytes(data)
         self.buffer += data
 
         # Process complete lines
@@ -575,7 +591,9 @@ class ColorizedDiffStream:
             line, self.buffer = self.buffer.split(b"\n", 1)
             self._colorize_and_write_line(line + b"\n")
 
-    def writelines(self, lines: list[bytes]) -> None:
+        return len(data)
+
+    def writelines(self, lines: Iterable[Union[bytes, Buffer]]) -> None:  # type: ignore[override,unused-ignore]
         """Write a list of lines to the stream.
 
         Args:
@@ -619,3 +637,80 @@ class ColorizedDiffStream:
             self.text_wrapper.flush()
         if hasattr(self.output_stream, "flush"):
             self.output_stream.flush()
+
+    # BinaryIO interface methods
+    def close(self) -> None:
+        """Close the stream."""
+        self.flush()
+        if hasattr(self.output_stream, "close"):
+            self.output_stream.close()
+
+    @property
+    def closed(self) -> bool:
+        """Check if the stream is closed."""
+        return getattr(self.output_stream, "closed", False)
+
+    def fileno(self) -> int:
+        """Return the file descriptor."""
+        return self.output_stream.fileno()
+
+    def isatty(self) -> bool:
+        """Check if the stream is a TTY."""
+        return getattr(self.output_stream, "isatty", lambda: False)()
+
+    def read(self, n: int = -1) -> bytes:
+        """Read is not supported on this write-only stream."""
+        raise io.UnsupportedOperation("not readable")
+
+    def readable(self) -> bool:
+        """This stream is not readable."""
+        return False
+
+    def readline(self, limit: int = -1) -> bytes:
+        """Read is not supported on this write-only stream."""
+        raise io.UnsupportedOperation("not readable")
+
+    def readlines(self, hint: int = -1) -> list[bytes]:
+        """Read is not supported on this write-only stream."""
+        raise io.UnsupportedOperation("not readable")
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Seek is not supported on this stream."""
+        raise io.UnsupportedOperation("not seekable")
+
+    def seekable(self) -> bool:
+        """This stream is not seekable."""
+        return False
+
+    def tell(self) -> int:
+        """Tell is not supported on this stream."""
+        raise io.UnsupportedOperation("not seekable")
+
+    def truncate(self, size: Optional[int] = None) -> int:
+        """Truncate is not supported on this stream."""
+        raise io.UnsupportedOperation("not truncatable")
+
+    def writable(self) -> bool:
+        """This stream is writable."""
+        return True
+
+    def __enter__(self) -> "ColorizedDiffStream":
+        """Context manager entry."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[object],
+    ) -> None:
+        """Context manager exit."""
+        self.flush()
+
+    def __iter__(self) -> "ColorizedDiffStream":
+        """Iterator interface - not supported."""
+        raise io.UnsupportedOperation("not iterable")
+
+    def __next__(self) -> bytes:
+        """Iterator interface - not supported."""
+        raise io.UnsupportedOperation("not iterable")

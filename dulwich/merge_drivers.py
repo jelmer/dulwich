@@ -23,7 +23,7 @@
 import os
 import subprocess
 import tempfile
-from typing import Any, Callable, Optional, Protocol
+from typing import Callable, Optional, Protocol
 
 from .config import Config
 
@@ -143,7 +143,7 @@ class MergeDriverRegistry:
             config: Git configuration object
         """
         self._drivers: dict[str, MergeDriver] = {}
-        self._factories: dict[str, Any] = {}
+        self._factories: dict[str, Callable[[], MergeDriver]] = {}
         self._config = config
 
         # Register built-in drivers
@@ -193,10 +193,10 @@ class MergeDriverRegistry:
 
         # Finally check configuration
         if self._config:
-            driver = self._create_from_config(name)
-            if driver:
-                self._drivers[name] = driver
-                return driver
+            config_driver = self._create_from_config(name)
+            if config_driver is not None:
+                self._drivers[name] = config_driver
+                return config_driver
 
         return None
 

@@ -34,7 +34,6 @@ from .index import (
     commit_tree,
     index_entry_from_stat,
     iter_fresh_objects,
-    iter_tree_contents,
     symlink,
     update_working_tree,
     validate_path,
@@ -42,7 +41,8 @@ from .index import (
     validate_path_element_hfs,
     validate_path_element_ntfs,
 )
-from .objects import S_IFGITLINK, Blob, Commit, ObjectID
+from .object_store import iter_tree_contents
+from .objects import S_IFGITLINK, Blob, Commit, ObjectID, TreeEntry
 from .reflog import drop_reflog_entry, read_reflog
 from .refs import Ref
 
@@ -162,9 +162,9 @@ class Stash:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(
-                src: Union[str, bytes, os.PathLike],
-                dst: Union[str, bytes, os.PathLike],
+            def symlink_fn(  # type: ignore[misc,unused-ignore]
+                src: Union[str, bytes],
+                dst: Union[str, bytes],
                 target_is_directory: bool = False,
                 *,
                 dir_fd: Optional[int] = None,
@@ -191,26 +191,40 @@ class Stash:
             index_tree_id = index_commit.tree
 
             # Update index entries from the stashed index tree
-            for entry in iter_tree_contents(self._repo.object_store, index_tree_id):
-                if not validate_path(entry.path, validate_path_element):
+            tree_entry: TreeEntry
+            for tree_entry in iter_tree_contents(
+                self._repo.object_store, index_tree_id
+            ):
+                assert (
+                    tree_entry.path is not None
+                    and tree_entry.mode is not None
+                    and tree_entry.sha is not None
+                )
+                if not validate_path(tree_entry.path, validate_path_element):
                     continue
 
                 # Add to index with stage 0 (normal)
                 # Get file stats for the entry
-                full_path = _tree_to_fs_path(repo_path, entry.path)
+                full_path = _tree_to_fs_path(repo_path, tree_entry.path)
                 try:
                     st = os.lstat(full_path)
                 except FileNotFoundError:
                     # File doesn't exist yet, use dummy stats
-                    st = os.stat_result((entry.mode, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-                repo_index[entry.path] = index_entry_from_stat(st, entry.sha)
+                    st = os.stat_result((tree_entry.mode, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+                repo_index[tree_entry.path] = index_entry_from_stat(st, tree_entry.sha)
 
         # Apply working tree changes from the stash
-        for entry in iter_tree_contents(self._repo.object_store, stash_tree_id):
-            if not validate_path(entry.path, validate_path_element):
+        tree_entry2: TreeEntry
+        for tree_entry2 in iter_tree_contents(self._repo.object_store, stash_tree_id):
+            assert (
+                tree_entry2.path is not None
+                and tree_entry2.mode is not None
+                and tree_entry2.sha is not None
+            )
+            if not validate_path(tree_entry2.path, validate_path_element):
                 continue
 
-            full_path = _tree_to_fs_path(repo_path, entry.path)
+            full_path = _tree_to_fs_path(repo_path, tree_entry2.path)
 
             # Create parent directories if needed
             parent_dir = os.path.dirname(full_path)
@@ -218,39 +232,43 @@ class Stash:
                 os.makedirs(parent_dir)
 
             # Write the file
-            if entry.mode == S_IFGITLINK:
+            if tree_entry2.mode == S_IFGITLINK:
                 # Submodule - just create directory
                 if not os.path.isdir(full_path):
                     os.mkdir(full_path)
                 st = os.lstat(full_path)
             else:
-                obj = self._repo.object_store[entry.sha]
+                obj = self._repo.object_store[tree_entry2.sha]
                 assert isinstance(obj, Blob)
                 # Apply blob normalization for checkout if normalizer is provided
                 if blob_normalizer is not None:
-                    obj = blob_normalizer.checkout_normalize(obj, entry.path)
+                    obj = blob_normalizer.checkout_normalize(obj, tree_entry2.path)
                 st = build_file_from_blob(
                     obj,
-                    entry.mode,
+                    tree_entry2.mode,
                     full_path,
                     honor_filemode=honor_filemode,
-                    symlink_fn=symlink_fn,  # type: ignore[arg-type]
+                    symlink_fn=symlink_fn,  # type: ignore[arg-type,unused-ignore]
                 )
 
             # Update index if the file wasn't already staged
-            if entry.path not in repo_index:
+            if tree_entry2.path not in repo_index:
                 # Update with file stats from disk
-                repo_index[entry.path] = index_entry_from_stat(st, entry.sha)
+                repo_index[tree_entry2.path] = index_entry_from_stat(
+                    st, tree_entry2.sha
+                )
             else:
-                existing_entry = repo_index[entry.path]
+                existing_entry = repo_index[tree_entry2.path]
 
                 if (
                     isinstance(existing_entry, IndexEntry)
-                    and existing_entry.mode == entry.mode
-                    and existing_entry.sha == entry.sha
+                    and existing_entry.mode == tree_entry2.mode
+                    and existing_entry.sha == tree_entry2.sha
                 ):
                     # Update with file stats from disk
-                    repo_index[entry.path] = index_entry_from_stat(st, entry.sha)
+                    repo_index[tree_entry2.path] = index_entry_from_stat(
+                        st, tree_entry2.sha
+                    )
 
         # Write the updated index
         repo_index.write()

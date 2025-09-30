@@ -153,7 +153,7 @@ class WorkTreeContainer:
 
     def add(
         self,
-        path: str | bytes | os.PathLike,
+        path: str | bytes | os.PathLike[str],
         branch: str | bytes | None = None,
         commit: ObjectID | None = None,
         force: bool = False,
@@ -183,7 +183,7 @@ class WorkTreeContainer:
             exist_ok=exist_ok,
         )
 
-    def remove(self, path: str | bytes | os.PathLike, force: bool = False) -> None:
+    def remove(self, path: str | bytes | os.PathLike[str], force: bool = False) -> None:
         """Remove a worktree.
 
         Args:
@@ -207,7 +207,9 @@ class WorkTreeContainer:
         return prune_worktrees(self._repo, expire=expire, dry_run=dry_run)
 
     def move(
-        self, old_path: str | bytes | os.PathLike, new_path: str | bytes | os.PathLike
+        self,
+        old_path: str | bytes | os.PathLike[str],
+        new_path: str | bytes | os.PathLike[str],
     ) -> None:
         """Move a worktree to a new location.
 
@@ -217,7 +219,9 @@ class WorkTreeContainer:
         """
         move_worktree(self._repo, old_path, new_path)
 
-    def lock(self, path: str | bytes | os.PathLike, reason: str | None = None) -> None:
+    def lock(
+        self, path: str | bytes | os.PathLike[str], reason: str | None = None
+    ) -> None:
         """Lock a worktree to prevent it from being pruned.
 
         Args:
@@ -226,7 +230,7 @@ class WorkTreeContainer:
         """
         lock_worktree(self._repo, path, reason=reason)
 
-    def unlock(self, path: str | bytes | os.PathLike) -> None:
+    def unlock(self, path: str | bytes | os.PathLike[str]) -> None:
         """Unlock a worktree.
 
         Args:
@@ -246,7 +250,7 @@ class WorkTree:
     such as staging files, committing changes, and resetting the index.
     """
 
-    def __init__(self, repo: Repo, path: str | bytes | os.PathLike) -> None:
+    def __init__(self, repo: Repo, path: str | bytes | os.PathLike[str]) -> None:
         """Initialize a WorkTree for the given repository.
 
         Args:
@@ -263,7 +267,10 @@ class WorkTree:
 
     def stage(
         self,
-        fs_paths: str | bytes | os.PathLike | Iterable[str | bytes | os.PathLike],
+        fs_paths: str
+        | bytes
+        | os.PathLike[str]
+        | Iterable[str | bytes | os.PathLike[str]],
     ) -> None:
         """Stage a set of paths.
 
@@ -637,9 +644,9 @@ class WorkTree:
             symlink_fn = symlink
         else:
 
-            def symlink_fn(
-                src: Union[str, bytes, os.PathLike],
-                dst: Union[str, bytes, os.PathLike],
+            def symlink_fn(  # type: ignore[misc,unused-ignore]
+                src: Union[str, bytes],
+                dst: Union[str, bytes],
                 target_is_directory: bool = False,
                 *,
                 dir_fd: int | None = None,
@@ -655,7 +662,7 @@ class WorkTree:
             tree,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
-            symlink_fn=symlink_fn,  # type: ignore[arg-type]
+            symlink_fn=symlink_fn,  # type: ignore[arg-type,unused-ignore]
             blob_normalizer=blob_normalizer,
         )
 
@@ -852,7 +859,7 @@ def list_worktrees(repo: Repo) -> list[WorkTreeInfo]:
 
 def add_worktree(
     repo: Repo,
-    path: str | bytes | os.PathLike,
+    path: str | bytes | os.PathLike[str],
     branch: str | bytes | None = None,
     commit: ObjectID | None = None,
     force: bool = False,
@@ -937,6 +944,7 @@ def add_worktree(
             f.write(checkout_ref + b"\n")
     else:
         # Point to branch
+        assert branch is not None  # Should be guaranteed by logic above
         wt_repo.refs.set_symbolic_ref(b"HEAD", branch)
 
     # Reset index to match HEAD
@@ -946,7 +954,7 @@ def add_worktree(
 
 
 def remove_worktree(
-    repo: Repo, path: str | bytes | os.PathLike, force: bool = False
+    repo: Repo, path: str | bytes | os.PathLike[str], force: bool = False
 ) -> None:
     """Remove a worktree.
 
@@ -1078,7 +1086,7 @@ def prune_worktrees(
 
 
 def lock_worktree(
-    repo: Repo, path: str | bytes | os.PathLike, reason: str | None = None
+    repo: Repo, path: str | bytes | os.PathLike[str], reason: str | None = None
 ) -> None:
     """Lock a worktree to prevent it from being pruned.
 
@@ -1096,7 +1104,7 @@ def lock_worktree(
             f.write(reason)
 
 
-def unlock_worktree(repo: Repo, path: str | bytes | os.PathLike) -> None:
+def unlock_worktree(repo: Repo, path: str | bytes | os.PathLike[str]) -> None:
     """Unlock a worktree.
 
     Args:
@@ -1111,7 +1119,7 @@ def unlock_worktree(repo: Repo, path: str | bytes | os.PathLike) -> None:
         os.remove(lock_path)
 
 
-def _find_worktree_id(repo: Repo, path: str | bytes | os.PathLike) -> str:
+def _find_worktree_id(repo: Repo, path: str | bytes | os.PathLike[str]) -> str:
     """Find the worktree identifier for the given path.
 
     Args:
@@ -1153,8 +1161,8 @@ def _find_worktree_id(repo: Repo, path: str | bytes | os.PathLike) -> str:
 
 def move_worktree(
     repo: Repo,
-    old_path: str | bytes | os.PathLike,
-    new_path: str | bytes | os.PathLike,
+    old_path: str | bytes | os.PathLike[str],
+    new_path: str | bytes | os.PathLike[str],
 ) -> None:
     """Move a worktree to a new location.
 

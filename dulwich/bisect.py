@@ -367,7 +367,7 @@ class BisectState:
         return next_commit
 
     def _find_bisect_candidates(
-        self, bad_sha: bytes, good_shas: list[bytes], skip_shas: set
+        self, bad_sha: bytes, good_shas: list[bytes], skip_shas: set[bytes]
     ) -> list[bytes]:
         """Find all commits between good and bad commits.
 

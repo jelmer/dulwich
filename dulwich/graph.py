@@ -22,13 +22,13 @@
 
 from collections.abc import Iterator
 from heapq import heappop, heappush
-from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
 
 if TYPE_CHECKING:
     from .repo import BaseRepo
 
 from .lru_cache import LRUCache
-from .objects import ObjectID
+from .objects import Commit, ObjectID
 
 T = TypeVar("T")
 
@@ -212,13 +212,17 @@ def find_merge_base(repo: "BaseRepo", commit_ids: list[ObjectID]) -> list[Object
     Returns:
       list of lowest common ancestor commit_ids
     """
-    cmtcache: LRUCache[ObjectID, Any] = LRUCache(max_cache=128)
+    cmtcache: LRUCache[ObjectID, Commit] = LRUCache(max_cache=128)
     parents_provider = repo.parents_provider()
 
     def lookup_stamp(cmtid: ObjectID) -> int:
         if cmtid not in cmtcache:
-            cmtcache[cmtid] = repo.object_store[cmtid]
-        return cmtcache[cmtid].commit_time
+            obj = repo.object_store[cmtid]
+            assert isinstance(obj, Commit)
+            cmtcache[cmtid] = obj
+        commit_time = cmtcache[cmtid].commit_time
+        assert isinstance(commit_time, int)
+        return commit_time
 
     def lookup_parents(cmtid: ObjectID) -> list[ObjectID]:
         commit = None
@@ -250,13 +254,17 @@ def find_octopus_base(repo: "BaseRepo", commit_ids: list[ObjectID]) -> list[Obje
     Returns:
       list of lowest common ancestor commit_ids
     """
-    cmtcache: LRUCache[ObjectID, Any] = LRUCache(max_cache=128)
+    cmtcache: LRUCache[ObjectID, Commit] = LRUCache(max_cache=128)
     parents_provider = repo.parents_provider()
 
     def lookup_stamp(cmtid: ObjectID) -> int:
         if cmtid not in cmtcache:
-            cmtcache[cmtid] = repo.object_store[cmtid]
-        return cmtcache[cmtid].commit_time
+            obj = repo.object_store[cmtid]
+            assert isinstance(obj, Commit)
+            cmtcache[cmtid] = obj
+        commit_time = cmtcache[cmtid].commit_time
+        assert isinstance(commit_time, int)
+        return commit_time
 
     def lookup_parents(cmtid: ObjectID) -> list[ObjectID]:
         commit = None
@@ -294,13 +302,17 @@ def can_fast_forward(repo: "BaseRepo", c1: bytes, c2: bytes) -> bool:
       c1: Commit id for first commit
       c2: Commit id for second commit
     """
-    cmtcache: LRUCache[ObjectID, Any] = LRUCache(max_cache=128)
+    cmtcache: LRUCache[ObjectID, Commit] = LRUCache(max_cache=128)
     parents_provider = repo.parents_provider()
 
     def lookup_stamp(cmtid: ObjectID) -> int:
         if cmtid not in cmtcache:
-            cmtcache[cmtid] = repo.object_store[cmtid]
-        return cmtcache[cmtid].commit_time
+            obj = repo.object_store[cmtid]
+            assert isinstance(obj, Commit)
+            cmtcache[cmtid] = obj
+        commit_time = cmtcache[cmtid].commit_time
+        assert isinstance(commit_time, int)
+        return commit_time
 
     def lookup_parents(cmtid: ObjectID) -> list[ObjectID]:
         commit = None

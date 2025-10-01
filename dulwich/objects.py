@@ -1162,16 +1162,17 @@ class Tag(ShaFile):
             # provide our own implementation that shells out to "sq"
             def fetch_certificates(keyids):
                 certs = []
-                for kid in keyids:
+                for keyid in keyids:
                     try:
                         cert_bytes = subprocess.check_output(
-                            ["sq", "cert", "export", "--cert", kid]
+                            ["sq", "cert", "export", "--cert", keyid]
                         )
                         certs.append(
                             pysequoia.Cert.from_bytes(cert_bytes)
                         )
                     except Exception as e:
-                        print(f"{kid}: failed to find Cert: {e}")
+                        # todo: is this an error, or do we just skip?
+                        print(f"{keyid}: failed to find Cert: {e}")
                         continue
                 return certs
         sig = pysequoia.Sig.from_bytes(self._signature)

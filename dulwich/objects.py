@@ -1086,9 +1086,9 @@ class Tag(ShaFile):
         """Sign this tag with an OpenPGP key.
 
         Args:
-          keyid: A valid Cert instance containing secrets suitable for signing.
-                 This can be gotten from a Cert by calling .secrets.signer()
-                 optionally with a passphrase (if the key is encrypted)
+          signer: A valid PySigner instance containing secrets suitable for signing.
+                  This can be gotten from a Cert by calling .secrets.signer()
+                  optionally with a passphrase (if the key is encrypted)
         """
         import pysequoia
         data_to_sign = self.as_raw_string()
@@ -1137,14 +1137,18 @@ class Tag(ShaFile):
 
         return payload, self._signature, sig_type
 
-    def verify(self, certifier: "pysequoia.PySigner") -> None:
+    def verify(self, fetch_certificates: Optional[Callable[[Iterable[str]], Iterable["pysequoia.Cert"]]] = None) -> None:
         """Verify OpenPGP signature for this tag (if it is signed).
 
         Args:
-          keyids: Optional iterable of trusted keyids for this tag.
-            If this tag is not signed by any key in keyids verification will
-            fail. If not specified, this function only verifies that the tag
-            has a valid signature.
+          fetch_certificates: a callable taking a collection of keyids.
+            This should return a collection of pysequoia.Cert instances
+            matching the requested keyids; the signature will only verify
+            if at least one of the Certificates in this list has correctly
+            signed the Tag.
+
+            If not provided, a default implementation shells out to "sq"
+            with "sq cert export --cert key-id" attempting to find the Cert.
 
         Raises:
           RuntimeError: if anything fails verifying the signature
@@ -1152,34 +1156,26 @@ class Tag(ShaFile):
         if self._signature is None:
             return
 
-        # the signature cannot be provided via stdin (unless we tried
-        # to "build our own" clearsigned message from the pieces)
-        with NamedTemporaryFile(delete_on_close=False) as sigfile:
-            sigfile.write(self._signature)
-            sigfile.close()
-            args = [
-                "sq", "verify",
-                "--signature-file", sigfile.name,
-            ]
-            if keyids is not None:
-                for keyid in keyids:
-                    args.append("--signer")
-                    args.append(keyid)
+        import pysequoia
 
-            proc = subprocess.Popen(
-                args,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            try:
-                # deliver the data to be verified
-                proc.stdin.write(self.raw_without_sig())
-                proc.stdin.close()
-                if proc.wait() != 0:
-                    raise RuntimeError("Verify failed: {}".format(proc.stderr.read().decode("utf8")))
-            finally:
-                proc.terminate()
+        if fetch_certificates is None:
+            # provide our own implementation that shells out to "sq"
+            def fetch_certificates(keyids):
+                certs = []
+                for kid in keyids:
+                    try:
+                        cert_bytes = subprocess.check_output(
+                            ["sq", "cert", "export", "--cert", kid]
+                        )
+                        certs.append(
+                            pysequoia.Cert.from_bytes(cert_bytes)
+                        )
+                    except Exception as e:
+                        print(f"{kid}: failed to find Cert: {e}")
+                        continue
+                return certs
+        sig = pysequoia.Sig.from_bytes(self._signature)
+        pysequoia.verify(self.raw_without_sig(), fetch_certificates, signature=sig)
         return True
 
 

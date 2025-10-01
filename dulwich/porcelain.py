@@ -2425,45 +2425,25 @@ def tag_create(
                 tag_timezone = parse_timezone(tag_timezone.encode())
             tag_obj.tag_timezone = tag_timezone
 
+            # todo: this used to check "tag->gpgSign" config and/or
+            # "user->signingKey" to find GnuPG keys to use; provide
+            # attempts at backwards-compat by shelling to "sq" or
+            # leave that to user code?
+
             # Check if we should sign the tag
-            config = r.get_config_stack()
-
-            if sign is None:
-                # Check tag.gpgSign configuration when sign is not explicitly set
-                try:
-                    should_sign = config.get_boolean(
-                        (b"tag",), b"gpgsign", default=False
+            if sign is not None:
+                if isinstance(sign, str):
+                    # backwards-"compat"?
+                    raise RuntimeError(
+                        'sign no longer takes a keyid\n\n'
+                        'To get an object suitable to pass to "sign" using the "sq" tool:\n'
+                        '  keyid = "<hex key fingerprint>"\n'
+                        '  args = ["sq", "key", "export", "--cert", keyid]\n'
+                        '  certdata = subprocess.check_output(args)\n'
+                        '  cert = pysequoia.Cert.from_bytes(certdata)\n'
+                        '  signer = cert.secrets.signer("optional passphrase")\n'
                     )
-                except KeyError:
-                    should_sign = False  # Default to not signing if no config
-            else:
-                should_sign = sign
-
-            # Get the signing key from config if signing is enabled
-            keyid = None
-            if should_sign:
-                keyid = sign if isinstance(sign, str) else None
-                # If sign is True but no keyid specified, check user.signingKey config
-                if should_sign is True and keyid is None:
-                    config = r.get_config_stack()
-                    try:
-                        keyid = config.get((b"user",), b"signingKey").decode("ascii")
-                    except KeyError:
-                        # No user.signingKey configured, will use default GPG key
-                        pass
-
-                # export the correct key from any keystore "sq" knows about
-                args = ["sq", "key", "export", "--cert", keyid]
-                import subprocess
-                proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-                if proc.wait() != 0:
-                    errmsg = proc.stderr.read().decode("utf8")
-                    raise RuntimeError(f"sq failed to export {keyid}: {errmsg}")
-                certdata = proc.stdout.read()
-                import pysequoia
-                cert = pysequoia.Cert.from_bytes(certdata)
-                signer = cert.secrets.signer(open("DANGER-passphrase", "r").read())
-                tag_obj.sign(signer)
+                tag_obj.sign(sign)
 
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id

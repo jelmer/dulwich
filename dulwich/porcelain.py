@@ -2431,7 +2431,7 @@ def tag_create(
             # leave that to user code?
 
             # Check if we should sign the tag
-            if sign is not None:
+            if sign not in (None, False):
                 if isinstance(sign, str):
                     # backwards-"compat"?
                     raise RuntimeError(

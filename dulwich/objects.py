@@ -1111,7 +1111,8 @@ class Tag(ShaFile):
             proc.stdin.write(data_to_sign)
             proc.stdin.close()
             if proc.wait() != 0:
-                raise RuntimeError("Signature failed: {}".format(proc.stderr.read()))
+                errmsg = proc.stderr.read().decode("utf8")
+                raise RuntimeError(f"Signature failed: {errmsg}")
             self.signature = proc.stdout.read()  # bytes
         finally:
             proc.terminate()

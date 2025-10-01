@@ -26,15 +26,18 @@ import binascii
 import os
 import posixpath
 import stat
+import subprocess
 import sys
 import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from hashlib import sha1
 from io import BufferedIOBase, BytesIO
+from tempfile import NamedTemporaryFile
 from typing import (
     IO,
     TYPE_CHECKING,
     NamedTuple,
+    Optional,
     TypeVar,
 )
 
@@ -1079,26 +1082,39 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
-    def sign(self, keyid: str | None = None) -> None:
-        """Sign this tag with a GPG key.
+    def sign(self, keyid: Optional[str] = None) -> None:
+        """Sign this tag with an OpenPGP key.
 
         Args:
-          keyid: Optional GPG key ID to use for signing. If not specified,
-                 the default GPG key will be used.
+          keyid: Optional OpenPGP key ID (aka fingerprint) to use for signing.
+                 If not specified, the default key will be used.
         """
-        import gnupg
-        gpg = gnupg.GPG()
-
-        sig = gpg.sign(
-            self.as_raw_string(),
-            keyid=keyid,
-            clearsign=True,
-            detach=True,
-        )
-        if not sig:
-            raise RuntimeError("signing failed")
+        data_to_sign = self.as_raw_string()
+        args = [
+            "sq", "sign",
+            "--signature-file", "-",
+        ]
+        if keyid is None:
+            args.append("--signer-self")
         else:
-            self.signature = str(sig).encode("utf8")
+            # there's also --signer-userid, --signer-email etc
+            args.append("--signer")
+            args.append(str(keyid))
+
+        proc = subprocess.Popen(
+            args,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            proc.stdin.write(data_to_sign)
+            proc.stdin.close()
+            if proc.wait() != 0:
+                raise RuntimeError("Signature failed: {}".format(proc.stderr.read()))
+            self.signature = proc.stdout.read()  # bytes
+        finally:
+            proc.terminate()
 
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
@@ -1138,8 +1154,8 @@ class Tag(ShaFile):
 
         return payload, self._signature, sig_type
 
-    def verify(self, keyids: Iterable[str] | None = None) -> None:
-        """Verify GPG signature for this tag (if it is signed).
+    def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
+        """Verify OpenPGP signature for this tag (if it is signed).
 
         Args:
           keyids: Optional iterable of trusted keyids for this tag.
@@ -1148,35 +1164,40 @@ class Tag(ShaFile):
             has a valid signature.
 
         Raises:
-          gpg.errors.BadSignatures: if GPG signature verification fails
-          gpg.errors.MissingSignatures: if tag was not signed by a key
-            specified in keyids
+          RuntimeError: if anything fails verifying the signature
         """
         if self._signature is None:
             return
 
-        import gnupg
-        gpg = gnupg.GPG()
+        # the signature cannot be provided via stdin (unless we tried
+        # to "build our own" clearsigned message from the pieces)
+        with NamedTemporaryFile(delete_on_close=False) as sigfile:
+            sigfile.write(self._signature)
+            sigfile.close()
+            args = [
+                "sq", "verify",
+                "--signature-file", sigfile.name,
+            ]
+            if keyids is not None:
+                for keyid in keyids:
+                    args.append("--signer")
+                    args.append(keyid)
 
-        # no way to confirm with in-memory signature AND file (nor in
-        # Isis Lovecruft's version)
-
-        import tempfile
-        from io import BytesIO
-        datafname = tempfile.mktemp()
-        with open(datafname, 'wb') as f:
-            f.write(self.raw_without_sig())
-        verified = gpg.verify_file(BytesIO(self._signature), datafname)
-        if not verified:
-            raise RuntimeError("Bad signature")
-
-        if keyids:
-            available_keys = gpg.list_keys(keys=keyids)
-            for sig in verified.sig_info.values():
-                if sig["fingerprint"] in available_keys or \
-                   sig["pubkey_fingerprint"] in available_keys:
-                    return
-            raise RuntimeError("No valid signatures from specified keys")
+            proc = subprocess.Popen(
+                args,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            try:
+                # deliver the data to be verified
+                proc.stdin.write(self.raw_without_sig())
+                proc.stdin.close()
+                if proc.wait() != 0:
+                    raise RuntimeError("Verify failed: {}".format(proc.stderr.read().decode("utf8")))
+            finally:
+                proc.terminate()
+        return True
 
 
 class TreeEntry(NamedTuple):

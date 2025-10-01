@@ -294,9 +294,10 @@
    parallel stat operations when checking for unstaged changes. This improves
    performance on slow filesystems like NFS. (Jelmer Vernooĳ, #1851)
 
- * Use Sequoia for tag signing and verification instead of GnuPG. The
-   API remains the same but uses the "sq" tool to accomplish OpenPGP
-   operations (instead of importing "gpg" as before). (meejah, #1369)
+ * Use PySequoia for tag signing and verification instead of GnuPG.
+   This changes the API of sign() and verify() to take PySequoia objects
+   and to import "pysequoia" instead of "gpg" in those methods.
+   (meejah, #1369)
 
 0.24.1	2025-08-01
 

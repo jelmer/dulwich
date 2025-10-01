@@ -1046,8 +1046,7 @@ class Tag(ShaFile):
     signature = serializable_property("signature", "Optional detached GPG signature")
 
     def sign(self, keyid: Optional[str] = None) -> None:
-        """
-        Sign this tag with an OpenPGP key.
+        """Sign this tag with an OpenPGP key.
 
         Args:
           keyid: Optional OpenPGP key ID (aka fingerprint) to use for signing.
@@ -1075,7 +1074,8 @@ class Tag(ShaFile):
             proc.stdin.write(data_to_sign)
             proc.stdin.close()
             if proc.wait() != 0:
-                raise RuntimeError("Signature failed: {}".format(proc.stderr.read()))
+                errmsg = proc.stderr.read().decode("utf8")
+                raise RuntimeError(f"Signature failed: {errmsg}")
             self.signature = proc.stdout.read()  # bytes
         finally:
             proc.terminate()

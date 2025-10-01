@@ -1082,40 +1082,22 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
-    def sign(self, keyid: Optional[str] = None) -> None:
+    def sign(self, signer: "pysequoia.PySigner") -> None:
         """Sign this tag with an OpenPGP key.
 
         Args:
-          keyid: Optional OpenPGP key ID (aka fingerprint) to use for signing.
-                 If not specified, the default key will be used.
+          keyid: A valid Cert instance containing secrets suitable for signing.
+                 This can be gotten from a Cert by calling .secrets.signer()
+                 optionally with a passphrase (if the key is encrypted)
         """
+        import pysequoia
         data_to_sign = self.as_raw_string()
-        args = [
-            "sq", "sign",
-            "--signature-file", "-",
-        ]
-        if keyid is None:
-            args.append("--signer-self")
-        else:
-            # there's also --signer-userid, --signer-email etc
-            args.append("--signer")
-            args.append(str(keyid))
-
-        proc = subprocess.Popen(
-            args,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        self.signature = pysequoia.sign(
+            signer,
+            data_to_sign,
+            mode=pysequoia.SignatureMode.DETACHED,
         )
-        try:
-            proc.stdin.write(data_to_sign)
-            proc.stdin.close()
-            if proc.wait() != 0:
-                errmsg = proc.stderr.read().decode("utf8")
-                raise RuntimeError(f"Signature failed: {errmsg}")
-            self.signature = proc.stdout.read()  # bytes
-        finally:
-            proc.terminate()
+
 
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
@@ -1155,7 +1137,7 @@ class Tag(ShaFile):
 
         return payload, self._signature, sig_type
 
-    def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
+    def verify(self, certifier: "pysequoia.PySigner") -> None:
         """Verify OpenPGP signature for this tag (if it is signed).
 
         Args:

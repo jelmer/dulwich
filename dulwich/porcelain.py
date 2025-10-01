@@ -2388,9 +2388,7 @@ def tag_create(
       objectish: object the tag should point at, defaults to HEAD
       tag_time: Optional time for annotated tag
       tag_timezone: Optional timezone for annotated tag
-      sign: GPG Sign the tag (bool, defaults to False,
-        pass True to use default GPG key,
-        pass a str containing Key ID to use a specific GPG key)
+      sign: False or pysequoia.PySigner instance, gotten from Cert.secrets.signer()
       encoding: Encoding to use for tag messages
     """
     with open_repo_closing(repo) as r:
@@ -2444,12 +2442,28 @@ def tag_create(
             # Get the signing key from config if signing is enabled
             keyid = None
             if should_sign:
-                try:
-                    keyid_bytes = config.get((b"user",), b"signingkey")
-                    keyid = keyid_bytes.decode() if keyid_bytes else None
-                except KeyError:
-                    keyid = None
-                tag_obj.sign(keyid)
+                keyid = sign if isinstance(sign, str) else None
+                # If sign is True but no keyid specified, check user.signingKey config
+                if should_sign is True and keyid is None:
+                    config = r.get_config_stack()
+                    try:
+                        keyid = config.get((b"user",), b"signingKey").decode("ascii")
+                    except KeyError:
+                        # No user.signingKey configured, will use default GPG key
+                        pass
+
+                # export the correct key from any keystore "sq" knows about
+                args = ["sq", "key", "export", "--cert", keyid]
+                import subprocess
+                proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+                if proc.wait() != 0:
+                    errmsg = proc.stderr.read().decode("utf8")
+                    raise RuntimeError(f"sq failed to export {keyid}: {errmsg}")
+                certdata = proc.stdout.read()
+                import pysequoia
+                cert = pysequoia.Cert.from_bytes(certdata)
+                signer = cert.secrets.signer(open("DANGER-passphrase", "r").read())
+                tag_obj.sign(signer)
 
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id

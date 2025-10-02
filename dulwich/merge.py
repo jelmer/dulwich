@@ -1,5 +1,6 @@
 """Git merge implementation."""
 
+from collections.abc import Sequence
 from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Optional
 
@@ -19,9 +20,9 @@ from dulwich.objects import S_ISGITLINK, Blob, Commit, Tree, is_blob, is_tree
 
 
 def make_merge3(
-    base: list[bytes],
-    a: list[bytes],
-    b: list[bytes],
+    base: Sequence[bytes],
+    a: Sequence[bytes],
+    b: Sequence[bytes],
     is_cherrypick: bool = False,
     sequence_matcher: Optional[type[SequenceMatcher[bytes]]] = None,
 ) -> "merge3.Merge3":
@@ -49,7 +50,7 @@ class MergeConflict(Exception):
 
 
 def _can_merge_lines(
-    base_lines: list[bytes], a_lines: list[bytes], b_lines: list[bytes]
+    base_lines: Sequence[bytes], a_lines: Sequence[bytes], b_lines: Sequence[bytes]
 ) -> bool:
     """Check if lines can be merged without conflict."""
     # If one side is unchanged, we can take the other side

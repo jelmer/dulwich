@@ -38,7 +38,7 @@ import subprocess
 import sys
 import tempfile
 import types
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -220,7 +220,9 @@ def detect_terminal_width() -> int:
 
 
 def write_columns(
-    items: Union[Iterator[bytes], list[bytes]], out: TextIO, width: Optional[int] = None
+    items: Union[Iterator[bytes], Sequence[bytes]],
+    out: TextIO,
+    width: Optional[int] = None,
 ) -> None:
     """Display items in formatted columns based on terminal width.
 
@@ -240,7 +242,9 @@ def write_columns(
 
     item_names = [item.decode() for item in items]
 
-    def columns(names: list[str], width: int, num_cols: int) -> tuple[bool, list[int]]:
+    def columns(
+        names: Sequence[str], width: int, num_cols: int
+    ) -> tuple[bool, list[int]]:
         if num_cols <= 0:
             return False, []
 
@@ -742,7 +746,7 @@ def enable_pager() -> None:
 class Command:
     """A Dulwich subcommand."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Run the command."""
         raise NotImplementedError(self.run)
 
@@ -750,7 +754,7 @@ class Command:
 class cmd_archive(Command):
     """Create an archive of files from a named tree."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the archive command.
 
         Args:
@@ -796,7 +800,7 @@ class cmd_archive(Command):
 class cmd_add(Command):
     """Add file contents to the index."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the add command.
 
         Args:
@@ -817,7 +821,7 @@ class cmd_add(Command):
 class cmd_annotate(Command):
     """Annotate each line in a file with commit information."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the annotate command.
 
         Args:
@@ -841,7 +845,7 @@ class cmd_annotate(Command):
 class cmd_blame(Command):
     """Show what revision and author last modified each line of a file."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the blame command.
 
         Args:
@@ -854,7 +858,7 @@ class cmd_blame(Command):
 class cmd_rm(Command):
     """Remove files from the working tree and from the index."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the rm command.
 
         Args:
@@ -873,7 +877,7 @@ class cmd_rm(Command):
 class cmd_mv(Command):
     """Move or rename a file, a directory, or a symlink."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the mv command.
 
         Args:
@@ -896,7 +900,7 @@ class cmd_mv(Command):
 class cmd_fetch_pack(Command):
     """Receive missing objects from another repository."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the fetch-pack command.
 
         Args:
@@ -914,7 +918,7 @@ class cmd_fetch_pack(Command):
         else:
 
             def determine_wants(
-                refs: dict[bytes, bytes], depth: Optional[int] = None
+                refs: Mapping[bytes, bytes], depth: Optional[int] = None
             ) -> list[bytes]:
                 return [y.encode("utf-8") for y in args.refs if y not in r.object_store]
 
@@ -924,7 +928,7 @@ class cmd_fetch_pack(Command):
 class cmd_fetch(Command):
     """Download objects and refs from another repository."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the fetch command.
 
         Args:
@@ -949,7 +953,7 @@ class cmd_fetch(Command):
 class cmd_for_each_ref(Command):
     """Output information on each ref."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the for-each-ref command.
 
         Args:
@@ -965,7 +969,7 @@ class cmd_for_each_ref(Command):
 class cmd_fsck(Command):
     """Verify the connectivity and validity of objects in the database."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the fsck command.
 
         Args:
@@ -980,7 +984,7 @@ class cmd_fsck(Command):
 class cmd_log(Command):
     """Show commit logs."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the log command.
 
         Args:
@@ -1015,7 +1019,7 @@ class cmd_log(Command):
 class cmd_diff(Command):
     """Show changes between commits, commit and working tree, etc."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the diff command.
 
         Args:
@@ -1147,7 +1151,7 @@ class cmd_diff(Command):
 class cmd_dump_pack(Command):
     """Dump the contents of a pack file for debugging."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the dump-pack command.
 
         Args:
@@ -1183,7 +1187,7 @@ class cmd_dump_pack(Command):
 class cmd_dump_index(Command):
     """Show information about a pack index file."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the dump-index command.
 
         Args:
@@ -1202,7 +1206,7 @@ class cmd_dump_index(Command):
 class cmd_init(Command):
     """Create an empty Git repository or reinitialize an existing one."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the init command.
 
         Args:
@@ -1223,7 +1227,7 @@ class cmd_init(Command):
 class cmd_clone(Command):
     """Clone a repository into a new directory."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the clone command.
 
         Args:
@@ -1333,7 +1337,7 @@ def _get_commit_message_with_template(
 class cmd_commit(Command):
     """Record changes to the repository."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the commit command.
 
         Args:
@@ -1398,7 +1402,7 @@ class cmd_commit(Command):
 class cmd_commit_tree(Command):
     """Create a new commit object from a tree."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the commit-tree command.
 
         Args:
@@ -1414,7 +1418,7 @@ class cmd_commit_tree(Command):
 class cmd_update_server_info(Command):
     """Update auxiliary info file to help dumb servers."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the update-server-info command.
 
         Args:
@@ -1426,7 +1430,7 @@ class cmd_update_server_info(Command):
 class cmd_symbolic_ref(Command):
     """Read, modify and delete symbolic refs."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the symbolic-ref command.
 
         Args:
@@ -1475,7 +1479,7 @@ class cmd_symbolic_ref(Command):
 class cmd_pack_refs(Command):
     """Pack heads and tags for efficient repository access."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the pack-refs command.
 
         Args:
@@ -1494,7 +1498,7 @@ class cmd_pack_refs(Command):
 class cmd_show(Command):
     """Show various types of objects."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the show command.
 
         Args:
@@ -1553,7 +1557,7 @@ class cmd_show(Command):
 class cmd_diff_tree(Command):
     """Compare the content and mode of trees."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the diff-tree command.
 
         Args:
@@ -1569,7 +1573,7 @@ class cmd_diff_tree(Command):
 class cmd_rev_list(Command):
     """List commit objects in reverse chronological order."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the rev-list command.
 
         Args:
@@ -1584,7 +1588,7 @@ class cmd_rev_list(Command):
 class cmd_tag(Command):
     """Create, list, delete or verify a tag object."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the tag command.
 
         Args:
@@ -1613,7 +1617,7 @@ class cmd_tag(Command):
 class cmd_repack(Command):
     """Pack unpacked objects in a repository."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the repack command.
 
         Args:
@@ -1627,7 +1631,7 @@ class cmd_repack(Command):
 class cmd_reflog(Command):
     """Manage reflog information."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the reflog command.
 
         Args:
@@ -1679,7 +1683,7 @@ class cmd_reflog(Command):
 class cmd_reset(Command):
     """Reset current HEAD to the specified state."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the reset command.
 
         Args:
@@ -1714,7 +1718,7 @@ class cmd_reset(Command):
 class cmd_revert(Command):
     """Revert some existing commits."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the revert command.
 
         Args:
@@ -1745,7 +1749,7 @@ class cmd_revert(Command):
 class cmd_daemon(Command):
     """Run a simple Git protocol server."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the daemon command.
 
         Args:
@@ -1785,7 +1789,7 @@ class cmd_daemon(Command):
 class cmd_web_daemon(Command):
     """Run a simple HTTP server for Git repositories."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the web-daemon command.
 
         Args:
@@ -1823,7 +1827,7 @@ class cmd_web_daemon(Command):
 class cmd_write_tree(Command):
     """Create a tree object from the current index."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the write-tree command.
 
         Args:
@@ -1837,7 +1841,7 @@ class cmd_write_tree(Command):
 class cmd_receive_pack(Command):
     """Receive what is pushed into the repository."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the receive-pack command.
 
         Args:
@@ -1852,7 +1856,7 @@ class cmd_receive_pack(Command):
 class cmd_upload_pack(Command):
     """Send objects packed back to git-fetch-pack."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the upload-pack command.
 
         Args:
@@ -1867,7 +1871,7 @@ class cmd_upload_pack(Command):
 class cmd_shortlog(Command):
     """Show a shortlog of commits by author."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the shortlog command with the given CLI arguments.
 
         Args:
@@ -1903,7 +1907,7 @@ class cmd_shortlog(Command):
 class cmd_status(Command):
     """Show the working tree status."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the status command.
 
         Args:
@@ -1936,7 +1940,7 @@ class cmd_status(Command):
 class cmd_ls_remote(Command):
     """List references in a remote repository."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the ls-remote command.
 
         Args:
@@ -1966,7 +1970,7 @@ class cmd_ls_remote(Command):
 class cmd_ls_tree(Command):
     """List the contents of a tree object."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the ls-tree command.
 
         Args:
@@ -1999,7 +2003,7 @@ class cmd_ls_tree(Command):
 class cmd_pack_objects(Command):
     """Create a packed archive of objects."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the pack-objects command.
 
         Args:
@@ -2043,7 +2047,7 @@ class cmd_pack_objects(Command):
 class cmd_unpack_objects(Command):
     """Unpack objects from a packed archive."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the unpack-objects command.
 
         Args:
@@ -2060,7 +2064,7 @@ class cmd_unpack_objects(Command):
 class cmd_prune(Command):
     """Prune all unreachable objects from the object database."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the prune command.
 
         Args:
@@ -2129,7 +2133,7 @@ class cmd_prune(Command):
 class cmd_pull(Command):
     """Fetch from and integrate with another repository or a local branch."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the pull command.
 
         Args:
@@ -2153,7 +2157,7 @@ class cmd_pull(Command):
 class cmd_push(Command):
     """Update remote refs along with associated objects."""
 
-    def run(self, argv: list[str]) -> Optional[int]:
+    def run(self, argv: Sequence[str]) -> Optional[int]:
         """Execute the push command.
 
         Args:
@@ -2178,7 +2182,7 @@ class cmd_push(Command):
 class cmd_remote_add(Command):
     """Add a remote repository."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the remote-add command.
 
         Args:
@@ -2197,7 +2201,7 @@ class SuperCommand(Command):
     subcommands: ClassVar[dict[str, type[Command]]] = {}
     default_command: ClassVar[Optional[type[Command]]] = None
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the subcommand command.
 
         Args:
@@ -2231,7 +2235,7 @@ class cmd_remote(SuperCommand):
 class cmd_submodule_list(Command):
     """List submodules."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the submodule-list command.
 
         Args:
@@ -2246,7 +2250,7 @@ class cmd_submodule_list(Command):
 class cmd_submodule_init(Command):
     """Initialize submodules."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the submodule-init command.
 
         Args:
@@ -2260,7 +2264,7 @@ class cmd_submodule_init(Command):
 class cmd_submodule_add(Command):
     """Add a submodule."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the submodule-add command.
 
         Args:
@@ -2277,7 +2281,7 @@ class cmd_submodule_add(Command):
 class cmd_submodule_update(Command):
     """Update submodules."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the submodule-update command.
 
         Args:
@@ -2316,7 +2320,7 @@ class cmd_submodule(SuperCommand):
 class cmd_check_ignore(Command):
     """Check whether files are excluded by gitignore."""
 
-    def run(self, args: list[str]) -> int:
+    def run(self, args: Sequence[str]) -> int:
         """Execute the check-ignore command.
 
         Args:
@@ -2335,7 +2339,7 @@ class cmd_check_ignore(Command):
 class cmd_check_mailmap(Command):
     """Show canonical names and email addresses of contacts."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the check-mailmap command.
 
         Args:
@@ -2352,7 +2356,7 @@ class cmd_check_mailmap(Command):
 class cmd_branch(Command):
     """List, create, or delete branches."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the branch command.
 
         Args:
@@ -2401,7 +2405,7 @@ class cmd_branch(Command):
         parsed_args = parser.parse_args(args)
 
         def print_branches(
-            branches: Union[Iterator[bytes], list[bytes]], use_columns: bool = False
+            branches: Union[Iterator[bytes], Sequence[bytes]], use_columns: bool = False
         ) -> None:
             if use_columns:
                 write_columns(branches, sys.stdout)
@@ -2464,7 +2468,7 @@ class cmd_branch(Command):
 class cmd_checkout(Command):
     """Switch branches or restore working tree files."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the checkout command.
 
         Args:
@@ -2509,7 +2513,7 @@ class cmd_checkout(Command):
 class cmd_stash_list(Command):
     """List stash entries."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the stash-list command.
 
         Args:
@@ -2533,7 +2537,7 @@ class cmd_stash_list(Command):
 class cmd_stash_push(Command):
     """Save your local modifications to a new stash."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the stash-push command.
 
         Args:
@@ -2548,7 +2552,7 @@ class cmd_stash_push(Command):
 class cmd_stash_pop(Command):
     """Apply a stash and remove it from the stash list."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the stash-pop command.
 
         Args:
@@ -2565,7 +2569,7 @@ class cmd_bisect(SuperCommand):
 
     subcommands: ClassVar[dict[str, type[Command]]] = {}
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the bisect command.
 
         Args:
@@ -2717,7 +2721,7 @@ class cmd_stash(SuperCommand):
 class cmd_ls_files(Command):
     """Show information about files in the index and working tree."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the ls-files command.
 
         Args:
@@ -2732,7 +2736,7 @@ class cmd_ls_files(Command):
 class cmd_describe(Command):
     """Give an object a human readable name based on an available ref."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the describe command.
 
         Args:
@@ -2746,7 +2750,7 @@ class cmd_describe(Command):
 class cmd_merge(Command):
     """Join two or more development histories together."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the merge command.
 
         Args:
@@ -2799,7 +2803,7 @@ class cmd_merge(Command):
 class cmd_notes_add(Command):
     """Add notes to a commit."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the notes-add command.
 
         Args:
@@ -2821,7 +2825,7 @@ class cmd_notes_add(Command):
 class cmd_notes_show(Command):
     """Show notes for a commit."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the notes-show command.
 
         Args:
@@ -2844,7 +2848,7 @@ class cmd_notes_show(Command):
 class cmd_notes_remove(Command):
     """Remove notes for a commit."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the notes-remove command.
 
         Args:
@@ -2867,7 +2871,7 @@ class cmd_notes_remove(Command):
 class cmd_notes_list(Command):
     """List all note objects."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the notes-list command.
 
         Args:
@@ -2900,7 +2904,7 @@ class cmd_notes(SuperCommand):
 class cmd_cherry_pick(Command):
     """Apply the changes introduced by some existing commits."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the cherry-pick command.
 
         Args:
@@ -2975,7 +2979,7 @@ class cmd_cherry_pick(Command):
 class cmd_merge_tree(Command):
     """Show three-way merge without touching index."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the merge-tree command.
 
         Args:
@@ -3044,7 +3048,7 @@ class cmd_merge_tree(Command):
 class cmd_gc(Command):
     """Cleanup unnecessary files and optimize the local repository."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the gc command.
 
         Args:
@@ -3154,7 +3158,7 @@ class cmd_gc(Command):
 class cmd_count_objects(Command):
     """Count unpacked number of objects and their disk consumption."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the count-objects command.
 
         Args:
@@ -3189,7 +3193,7 @@ class cmd_count_objects(Command):
 class cmd_rebase(Command):
     """Reapply commits on top of another base tip."""
 
-    def run(self, args: list[str]) -> int:
+    def run(self, args: Sequence[str]) -> int:
         """Execute the rebase command.
 
         Args:
@@ -3313,7 +3317,7 @@ class cmd_rebase(Command):
 class cmd_filter_branch(Command):
     """Rewrite branches."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the filter-branch command.
 
         Args:
@@ -3462,13 +3466,13 @@ class cmd_filter_branch(Command):
         parent_filter = None
         if parsed_args.parent_filter:
 
-            def parent_filter(parents: list[bytes]) -> list[bytes]:
+            def parent_filter(parents: Sequence[bytes]) -> list[bytes]:
                 parent_str = " ".join(p.hex() for p in parents)
                 result = run_filter(
                     parsed_args.parent_filter, input_data=parent_str.encode()
                 )
                 if result is None:
-                    return parents
+                    return list(parents)
 
                 output = result.decode().strip()
                 if not output:
@@ -3582,7 +3586,7 @@ class cmd_lfs(Command):
 
     """Git LFS management commands."""
 
-    def run(self, argv: list[str]) -> None:
+    def run(self, argv: Sequence[str]) -> None:
         """Execute the lfs command.
 
         Args:
@@ -3771,7 +3775,7 @@ class cmd_lfs(Command):
 class cmd_help(Command):
     """Display help information about git."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the help command.
 
         Args:
@@ -3802,7 +3806,7 @@ class cmd_help(Command):
 class cmd_format_patch(Command):
     """Prepare patches for e-mail submission."""
 
-    def run(self, args: list[str]) -> None:
+    def run(self, args: Sequence[str]) -> None:
         """Execute the format-patch command.
 
         Args:
@@ -3866,7 +3870,7 @@ class cmd_format_patch(Command):
 class cmd_bundle(Command):
     """Create, unpack, and manipulate bundle files."""
 
-    def run(self, args: list[str]) -> int:
+    def run(self, args: Sequence[str]) -> int:
         """Execute the bundle command.
 
         Args:
@@ -3891,7 +3895,7 @@ class cmd_bundle(Command):
             logger.error("Unknown bundle subcommand: %s", subcommand)
             return 1
 
-    def _create(self, args: list[str]) -> int:
+    def _create(self, args: Sequence[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle create")
         parser.add_argument(
             "-q", "--quiet", action="store_true", help="Suppress progress"
@@ -3983,7 +3987,7 @@ class cmd_bundle(Command):
 
         return 0
 
-    def _verify(self, args: list[str]) -> int:
+    def _verify(self, args: Sequence[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle verify")
         parser.add_argument(
             "-q", "--quiet", action="store_true", help="Suppress output"
@@ -4023,7 +4027,7 @@ class cmd_bundle(Command):
                 bundle = read_bundle(f)
                 return verify_bundle(bundle)
 
-    def _list_heads(self, args: list[str]) -> int:
+    def _list_heads(self, args: Sequence[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle list-heads")
         parser.add_argument("file", help="Bundle file (use - for stdin)")
         parser.add_argument("refnames", nargs="*", help="Only show these refs")
@@ -4045,7 +4049,7 @@ class cmd_bundle(Command):
 
         return 0
 
-    def _unbundle(self, args: list[str]) -> int:
+    def _unbundle(self, args: Sequence[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle unbundle")
         parser.add_argument("--progress", action="store_true", help="Show progress")
         parser.add_argument("file", help="Bundle file (use - for stdin)")
@@ -4096,7 +4100,7 @@ class cmd_worktree_add(Command):
 
     """Add a new worktree to the repository."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the worktree-add command.
 
         Args:
@@ -4151,7 +4155,7 @@ class cmd_worktree_list(Command):
 
     """List details of each worktree."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the worktree-list command.
 
         Args:
@@ -4213,7 +4217,7 @@ class cmd_worktree_remove(Command):
 
     """Remove a worktree."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the worktree-remove command.
 
         Args:
@@ -4241,7 +4245,7 @@ class cmd_worktree_prune(Command):
 
     """Prune worktree information."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the worktree-prune command.
 
         Args:
@@ -4286,7 +4290,7 @@ class cmd_worktree_lock(Command):
 
     """Lock a worktree."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the worktree-lock command.
 
         Args:
@@ -4314,7 +4318,7 @@ class cmd_worktree_unlock(Command):
 
     """Unlock a worktree."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the worktree-unlock command.
 
         Args:
@@ -4339,7 +4343,7 @@ class cmd_worktree_move(Command):
 
     """Move a worktree."""
 
-    def run(self, args: list[str]) -> Optional[int]:
+    def run(self, args: Sequence[str]) -> Optional[int]:
         """Execute the worktree-move command.
 
         Args:
@@ -4451,7 +4455,7 @@ commands = {
 }
 
 
-def main(argv: Optional[list[str]] = None) -> Optional[int]:
+def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
     """Main entry point for the Dulwich CLI.
 
     Args:

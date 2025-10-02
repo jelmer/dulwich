@@ -27,7 +27,7 @@ on.
 
 import email.parser
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from difflib import SequenceMatcher
 from typing import (
     IO,
@@ -165,8 +165,8 @@ def _format_range_unified(start: int, stop: int) -> str:
 
 
 def unified_diff(
-    a: list[bytes],
-    b: list[bytes],
+    a: Sequence[bytes],
+    b: Sequence[bytes],
     fromfile: bytes = b"",
     tofile: bytes = b"",
     fromfiledate: str = "",
@@ -216,7 +216,7 @@ def unified_diff(
 
 
 def _get_sequence_matcher(
-    algorithm: str, a: list[bytes], b: list[bytes]
+    algorithm: str, a: Sequence[bytes], b: Sequence[bytes]
 ) -> SequenceMatcher[bytes]:
     """Get appropriate sequence matcher for the given algorithm.
 
@@ -245,8 +245,8 @@ def _get_sequence_matcher(
 
 
 def unified_diff_with_algorithm(
-    a: list[bytes],
-    b: list[bytes],
+    a: Sequence[bytes],
+    b: Sequence[bytes],
     fromfile: bytes = b"",
     tofile: bytes = b"",
     fromfiledate: str = "",

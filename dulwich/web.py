@@ -51,7 +51,7 @@ import os
 import re
 import sys
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from io import BytesIO
 from types import TracebackType
 from typing import (
@@ -613,7 +613,7 @@ class HTTPGitRequest:
         self,
         status: str = HTTP_OK,
         content_type: Optional[str] = None,
-        headers: Optional[list[tuple[str, str]]] = None,
+        headers: Optional[Sequence[tuple[str, str]]] = None,
     ) -> Callable[[bytes], object]:
         """Begin a response with the given status and other headers."""
         if headers:

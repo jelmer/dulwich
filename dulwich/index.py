@@ -28,7 +28,7 @@ import stat
 import struct
 import sys
 import types
-from collections.abc import Generator, Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -876,9 +876,9 @@ def read_index_dict(
 
 def write_index(
     f: IO[bytes],
-    entries: list[SerializedIndexEntry],
+    entries: Sequence[SerializedIndexEntry],
     version: Optional[int] = None,
-    extensions: Optional[list[IndexExtension]] = None,
+    extensions: Optional[Sequence[IndexExtension]] = None,
 ) -> None:
     """Write an index file.
 
@@ -917,9 +917,9 @@ def write_index(
 
 def write_index_dict(
     f: IO[bytes],
-    entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]],
+    entries: Mapping[bytes, Union[IndexEntry, ConflictedIndexEntry]],
     version: Optional[int] = None,
-    extensions: Optional[list[IndexExtension]] = None,
+    extensions: Optional[Sequence[IndexExtension]] = None,
 ) -> None:
     """Write an index file based on the contents of a dictionary.
 
@@ -2102,7 +2102,7 @@ def _transition_to_absent(
 
 
 def detect_case_only_renames(
-    changes: list["TreeChange"],
+    changes: Sequence["TreeChange"],
     config: "Config",
 ) -> list["TreeChange"]:
     """Detect and transform case-only renames in a list of tree changes.

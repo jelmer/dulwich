@@ -34,7 +34,7 @@ import stat
 import sys
 import time
 import warnings
-from collections.abc import Generator, Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from io import BytesIO
 from types import TracebackType
 from typing import (
@@ -300,7 +300,7 @@ def parse_graftpoints(
     return grafts
 
 
-def serialize_graftpoints(graftpoints: dict[bytes, list[bytes]]) -> bytes:
+def serialize_graftpoints(graftpoints: Mapping[bytes, Sequence[bytes]]) -> bytes:
     """Convert a dictionary of grafts into string.
 
     The graft dictionary is:
@@ -508,7 +508,7 @@ class BaseRepo:
         self,
         target: "BaseRepo",
         determine_wants: Optional[
-            Callable[[dict[bytes, bytes], Optional[int]], list[bytes]]
+            Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]]
         ] = None,
         progress: Optional[Callable[..., None]] = None,
         depth: Optional[int] = None,
@@ -536,7 +536,7 @@ class BaseRepo:
 
     def fetch_pack_data(
         self,
-        determine_wants: Callable[[dict[bytes, bytes], Optional[int]], list[bytes]],
+        determine_wants: Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]],
         graph_walker: "GraphWalker",
         progress: Optional[Callable[[bytes], None]],
         *,
@@ -571,7 +571,7 @@ class BaseRepo:
 
     def find_missing_objects(
         self,
-        determine_wants: Callable[[dict[bytes, bytes], Optional[int]], list[bytes]],
+        determine_wants: Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]],
         graph_walker: "GraphWalker",
         progress: Optional[Callable[[bytes], None]],
         *,
@@ -917,12 +917,12 @@ class BaseRepo:
 
     def get_walker(
         self,
-        include: Optional[list[bytes]] = None,
-        exclude: Optional[list[bytes]] = None,
+        include: Optional[Sequence[bytes]] = None,
+        exclude: Optional[Sequence[bytes]] = None,
         order: str = "date",
         reverse: bool = False,
         max_entries: Optional[int] = None,
-        paths: Optional[list[bytes]] = None,
+        paths: Optional[Sequence[bytes]] = None,
         rename_detector: Optional["RenameDetector"] = None,
         follow: bool = False,
         since: Optional[int] = None,
@@ -1060,7 +1060,7 @@ class BaseRepo:
 
         self._graftpoints.update(updated_graftpoints)
 
-    def _remove_graftpoints(self, to_remove: list[bytes] = []) -> None:
+    def _remove_graftpoints(self, to_remove: Sequence[bytes] = ()) -> None:
         """Remove graftpoints.
 
         Args:
@@ -1583,7 +1583,7 @@ class Repo(BaseRepo):
         return self.get_worktree().stage(fs_paths)
 
     @replace_me(remove_in="0.26.0")
-    def unstage(self, fs_paths: list[str]) -> None:
+    def unstage(self, fs_paths: Sequence[str]) -> None:
         """Unstage specific file in the index.
 
         Args:
@@ -2192,7 +2192,7 @@ class Repo(BaseRepo):
         return self.get_worktree().get_sparse_checkout_patterns()
 
     @replace_me(remove_in="0.26.0")
-    def set_sparse_checkout_patterns(self, patterns: list[str]) -> None:
+    def set_sparse_checkout_patterns(self, patterns: Sequence[str]) -> None:
         """Write the given sparse-checkout patterns into info/sparse-checkout.
 
         Creates the info/ directory if it does not exist.
@@ -2203,7 +2203,7 @@ class Repo(BaseRepo):
         return self.get_worktree().set_sparse_checkout_patterns(patterns)
 
     @replace_me(remove_in="0.26.0")
-    def set_cone_mode_patterns(self, dirs: Union[list[str], None] = None) -> None:
+    def set_cone_mode_patterns(self, dirs: Union[Sequence[str], None] = None) -> None:
         """Write the given cone-mode directory patterns into info/sparse-checkout.
 
         For each directory to include, add an inclusion line that "undoes" the prior
@@ -2510,7 +2510,7 @@ class MemoryRepo(BaseRepo):
     def init_bare(
         cls,
         objects: Iterable[ShaFile],
-        refs: dict[bytes, bytes],
+        refs: Mapping[bytes, bytes],
         format: Optional[int] = None,
     ) -> "MemoryRepo":
         """Create a new bare repository in memory.

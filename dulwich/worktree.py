@@ -31,7 +31,7 @@ import sys
 import tempfile
 import time
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Union
@@ -332,7 +332,7 @@ class WorkTree:
                     index[tree_path] = index_entry_from_stat(st, blob.id)
         index.write()
 
-    def unstage(self, fs_paths: list[str]) -> None:
+    def unstage(self, fs_paths: Sequence[str]) -> None:
         """Unstage specific file in the index.
 
         Args:
@@ -411,7 +411,7 @@ class WorkTree:
         tree: ObjectID | None = None,
         encoding: bytes | None = None,
         ref: Ref | None = b"HEAD",
-        merge_heads: list[ObjectID] | None = None,
+        merge_heads: Sequence[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool = False,
     ) -> ObjectID:
@@ -700,7 +700,7 @@ class WorkTree:
         except FileNotFoundError:
             return []
 
-    def set_sparse_checkout_patterns(self, patterns: list[str]) -> None:
+    def set_sparse_checkout_patterns(self, patterns: Sequence[str]) -> None:
         """Write the given sparse-checkout patterns into info/sparse-checkout.
 
         Creates the info/ directory if it does not exist.
@@ -716,7 +716,7 @@ class WorkTree:
             for pat in patterns:
                 f.write(pat + "\n")
 
-    def set_cone_mode_patterns(self, dirs: list[str] | None = None) -> None:
+    def set_cone_mode_patterns(self, dirs: Sequence[str] | None = None) -> None:
         """Write the given cone-mode directory patterns into info/sparse-checkout.
 
         For each directory to include, add an inclusion line that "undoes" the prior

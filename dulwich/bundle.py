@@ -21,7 +21,7 @@
 
 """Bundle format support."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import (
     TYPE_CHECKING,
     BinaryIO,
@@ -222,8 +222,8 @@ def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
 
 def create_bundle_from_repo(
     repo: "BaseRepo",
-    refs: Optional[list[bytes]] = None,
-    prerequisites: Optional[list[bytes]] = None,
+    refs: Optional[Sequence[bytes]] = None,
+    prerequisites: Optional[Sequence[bytes]] = None,
     version: Optional[int] = None,
     capabilities: Optional[dict[str, Optional[str]]] = None,
     progress: Optional[Callable[[str], None]] = None,

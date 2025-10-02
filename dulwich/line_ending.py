@@ -138,6 +138,7 @@ Sources:
 """
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 if TYPE_CHECKING:
@@ -424,7 +425,7 @@ def get_clean_filter_autocrlf(
 # Backwards compatibility wrappers
 @replace_me(since="0.23.1", remove_in="0.25.0")
 def get_checkout_filter(
-    core_eol: str, core_autocrlf: Union[bool, str], git_attributes: dict[str, Any]
+    core_eol: str, core_autocrlf: Union[bool, str], git_attributes: Mapping[str, Any]
 ) -> Optional[Callable[[bytes], bytes]]:
     """Deprecated: Use get_smudge_filter instead."""
     # Convert core_autocrlf to bytes for compatibility
@@ -441,7 +442,7 @@ def get_checkout_filter(
 
 @replace_me(since="0.23.1", remove_in="0.25.0")
 def get_checkin_filter(
-    core_eol: str, core_autocrlf: Union[bool, str], git_attributes: dict[str, Any]
+    core_eol: str, core_autocrlf: Union[bool, str], git_attributes: Mapping[str, Any]
 ) -> Optional[Callable[[bytes], bytes]]:
     """Deprecated: Use get_clean_filter instead."""
     # Convert core_autocrlf to bytes for compatibility
@@ -481,7 +482,7 @@ class BlobNormalizer(FilterBlobNormalizer):
     def __init__(
         self,
         config_stack: "StackedConfig",
-        gitattributes: dict[str, Any],
+        gitattributes: Mapping[str, Any],
         core_eol: str = "native",
         autocrlf: bytes = b"false",
         safecrlf: bytes = b"false",
@@ -634,7 +635,7 @@ class TreeBlobNormalizer(BlobNormalizer):
     def __init__(
         self,
         config_stack: "StackedConfig",
-        git_attributes: dict[str, Any],
+        git_attributes: Mapping[str, Any],
         object_store: "BaseObjectStore",
         tree: Optional[ObjectID] = None,
         core_eol: str = "native",

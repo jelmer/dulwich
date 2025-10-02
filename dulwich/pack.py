@@ -48,7 +48,7 @@ import struct
 import sys
 import warnings
 import zlib
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence, Set
 from hashlib import sha1
 from itertools import chain
 from os import SEEK_CUR, SEEK_END
@@ -2601,9 +2601,9 @@ def write_pack_header(
 
 def find_reusable_deltas(
     container: PackedObjectContainer,
-    object_ids: set[bytes],
+    object_ids: Set[bytes],
     *,
-    other_haves: Optional[set[bytes]] = None,
+    other_haves: Optional[Set[bytes]] = None,
     progress: Optional[Callable[..., None]] = None,
 ) -> Iterator[UnpackedObject]:
     """Find deltas in a pack that can be reused.
@@ -3834,7 +3834,7 @@ class Pack:
 
 def extend_pack(
     f: BinaryIO,
-    object_ids: set[ObjectID],
+    object_ids: Set[ObjectID],
     get_raw: Callable[[ObjectID], tuple[int, bytes]],
     *,
     compression_level: int = -1,

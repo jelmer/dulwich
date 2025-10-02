@@ -24,7 +24,7 @@
 import os
 import tempfile
 import zlib
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from io import BytesIO
 from typing import Any, Callable, Optional
 from urllib.parse import urljoin
@@ -434,7 +434,9 @@ class DumbRemoteHTTPRepo:
 
     def fetch_pack_data(
         self,
-        determine_wants: Callable[[dict[Ref, ObjectID], Optional[int]], list[ObjectID]],
+        determine_wants: Callable[
+            [Mapping[Ref, ObjectID], Optional[int]], list[ObjectID]
+        ],
         graph_walker: object,
         progress: Optional[Callable[[bytes], None]] = None,
         *,

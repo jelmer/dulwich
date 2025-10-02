@@ -32,7 +32,6 @@ import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from hashlib import sha1
 from io import BufferedIOBase, BytesIO
-from tempfile import NamedTemporaryFile
 from typing import (
     IO,
     TYPE_CHECKING,
@@ -1082,7 +1081,7 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
-    def sign(self, signer: "pysequoia.PySigner") -> None:
+    def sign(self, signer) -> None:
         """Sign this tag with an OpenPGP key.
 
         Args:
@@ -1090,6 +1089,9 @@ class Tag(ShaFile):
                   This can be gotten from a Cert by calling .secrets.signer()
                   optionally with a passphrase (if the key is encrypted)
         """
+        # todo: how can we reference types (e.g. signer:
+        # pysequoia.PySigner) if we only want to import pysequoia
+        # inside the methods like this?
         import pysequoia
         data_to_sign = self.as_raw_string()
         self.signature = pysequoia.sign(
@@ -1137,7 +1139,7 @@ class Tag(ShaFile):
 
         return payload, self._signature, sig_type
 
-    def verify(self, fetch_certificates: Optional[Callable[[Iterable[str]], Iterable["pysequoia.Cert"]]] = None) -> None:
+    def verify(self, fetch_certificates=None) -> None:
         """Verify OpenPGP signature for this tag (if it is signed).
 
         Args:

@@ -50,7 +50,8 @@ import socketserver
 import sys
 import time
 import zlib
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from functools import partial
 from typing import IO, TYPE_CHECKING, Callable, Optional, Union
 from typing import Protocol as TypingProtocol
@@ -176,7 +177,7 @@ class BackendRepo(TypingProtocol):
 
     def find_missing_objects(
         self,
-        determine_wants: Callable[[dict[bytes, bytes], Optional[int]], list[bytes]],
+        determine_wants: Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]],
         graph_walker: "_ProtocolGraphWalker",
         progress: Optional[Callable[[bytes], None]],
         *,
@@ -395,7 +396,7 @@ class UploadPackHandler(PackHandler):
     def __init__(
         self,
         backend: Backend,
-        args: list[str],
+        args: Sequence[str],
         proto: Protocol,
         stateless_rpc: bool = False,
         advertise_refs: bool = False,
@@ -472,7 +473,7 @@ class UploadPackHandler(PackHandler):
 
     def get_tagged(
         self,
-        refs: Optional[dict[bytes, bytes]] = None,
+        refs: Optional[Mapping[bytes, bytes]] = None,
         repo: Optional[BackendRepo] = None,
     ) -> dict[ObjectID, ObjectID]:
         """Get a dict of peeled values of tags to their original tag shas.
@@ -526,7 +527,7 @@ class UploadPackHandler(PackHandler):
         wants = []
 
         def wants_wrapper(
-            refs: dict[bytes, bytes], depth: Optional[int] = None
+            refs: Mapping[bytes, bytes], depth: Optional[int] = None
         ) -> list[bytes]:
             wants.extend(graph_walker.determine_wants(refs, depth))
             return wants
@@ -652,7 +653,7 @@ def _want_satisfied(
 
 
 def _all_wants_satisfied(
-    store: ObjectContainer, haves: set[bytes], wants: set[bytes]
+    store: ObjectContainer, haves: AbstractSet[bytes], wants: set[bytes]
 ) -> bool:
     """Check whether all the current wants are satisfied by a set of haves.
 
@@ -746,7 +747,7 @@ class _ProtocolGraphWalker:
         self._impl: Optional[AckGraphWalkerImpl] = None
 
     def determine_wants(
-        self, heads: dict[bytes, bytes], depth: Optional[int] = None
+        self, heads: Mapping[bytes, bytes], depth: Optional[int] = None
     ) -> list[bytes]:
         """Determine the wants for a set of heads.
 
@@ -897,7 +898,7 @@ class _ProtocolGraphWalker:
         """
         return _split_proto_line(self.proto.read_pkt_line(), allowed)
 
-    def _handle_shallow_request(self, wants: list[bytes]) -> None:
+    def _handle_shallow_request(self, wants: Sequence[bytes]) -> None:
         """Handle shallow clone requests from the client.
 
         Args:
@@ -923,7 +924,9 @@ class _ProtocolGraphWalker:
 
         self.update_shallow(new_shallow, unshallow)
 
-    def update_shallow(self, new_shallow: set[bytes], unshallow: set[bytes]) -> None:
+    def update_shallow(
+        self, new_shallow: AbstractSet[bytes], unshallow: AbstractSet[bytes]
+    ) -> None:
         """Update shallow/unshallow information to the client.
 
         Args:
@@ -975,7 +978,7 @@ class _ProtocolGraphWalker:
         """
         self._wants = wants
 
-    def all_wants_satisfied(self, haves: set[bytes]) -> bool:
+    def all_wants_satisfied(self, haves: AbstractSet[bytes]) -> bool:
         """Check whether all the current wants are satisfied by a set of haves.
 
         Args:
@@ -1253,7 +1256,7 @@ class ReceivePackHandler(PackHandler):
     def __init__(
         self,
         backend: Backend,
-        args: list[str],
+        args: Sequence[str],
         proto: Protocol,
         stateless_rpc: bool = False,
         advertise_refs: bool = False,
@@ -1351,7 +1354,7 @@ class ReceivePackHandler(PackHandler):
                 ref_status = b"bad ref"
             yield (ref, ref_status)
 
-    def _report_status(self, status: list[tuple[bytes, bytes]]) -> None:
+    def _report_status(self, status: Sequence[tuple[bytes, bytes]]) -> None:
         """Report status to client.
 
         Args:
@@ -1456,7 +1459,7 @@ class UploadArchiveHandler(Handler):
     def __init__(
         self,
         backend: Backend,
-        args: list[str],
+        args: Sequence[str],
         proto: Protocol,
         stateless_rpc: bool = False,
     ) -> None:

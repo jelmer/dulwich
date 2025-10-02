@@ -23,6 +23,7 @@
 
 """Utility module for querying an ObjectStore with gevent."""
 
+from collections.abc import Sequence
 from typing import Callable, Optional
 
 import gevent
@@ -39,7 +40,7 @@ from .objects import Commit, ObjectID, Tag
 
 def _split_commits_and_tags(
     obj_store: BaseObjectStore,
-    lst: list[ObjectID],
+    lst: Sequence[ObjectID],
     *,
     ignore_unknown: bool = False,
     pool: pool.Pool,
@@ -82,8 +83,8 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
     def __init__(
         self,
         object_store: BaseObjectStore,
-        haves: list[ObjectID],
-        wants: list[ObjectID],
+        haves: Sequence[ObjectID],
+        wants: Sequence[ObjectID],
         progress: Optional[Callable[[bytes], None]] = None,
         get_tagged: Optional[Callable[[], dict[ObjectID, ObjectID]]] = None,
         concurrency: int = 1,

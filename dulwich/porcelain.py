@@ -87,7 +87,8 @@ import stat
 import sys
 import time
 from collections import namedtuple
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Set as AbstractSet
 from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
@@ -757,7 +758,7 @@ def clone(
     filter_spec: Optional[str] = None,
     protocol_version: Optional[int] = None,
     recurse_submodules: bool = False,
-    **kwargs: Union[Union[str, bytes], list[Union[str, bytes]]],
+    **kwargs: Union[Union[str, bytes], Sequence[Union[str, bytes]]],
 ) -> Repo:
     """Clone a local or remote git repository.
 
@@ -865,7 +866,9 @@ def clone(
 def add(
     repo: Union[str, os.PathLike[str], Repo] = ".",
     paths: Optional[
-        Union[list[Union[str, bytes, os.PathLike[str]]], str, bytes, os.PathLike[str]]
+        Union[
+            Sequence[Union[str, bytes, os.PathLike[str]]], str, bytes, os.PathLike[str]
+        ]
     ] = None,
 ) -> tuple[list[str], set[str]]:
     """Add files to the staging area.
@@ -916,7 +919,7 @@ def add(
             # When no paths specified, add all untracked and modified files from repo root
             paths = [str(repo_path)]
         relpaths = []
-        if not isinstance(paths, list):
+        if isinstance(paths, (str, bytes, os.PathLike)):
             paths = [paths]
         for p in paths:
             # Handle bytes paths by decoding them
@@ -1067,7 +1070,7 @@ def clean(
 
 def remove(
     repo: Union[str, os.PathLike[str], Repo] = ".",
-    paths: list[Union[str, bytes, os.PathLike[str]]] = [],
+    paths: Sequence[Union[str, bytes, os.PathLike[str]]] = [],
     cached: bool = False,
 ) -> None:
     """Remove files from the staging area.
@@ -1498,7 +1501,7 @@ def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
 
 def log(
     repo: RepoPath = ".",
-    paths: Optional[list[Union[str, bytes]]] = None,
+    paths: Optional[Sequence[Union[str, bytes]]] = None,
     outstream: TextIO = sys.stdout,
     max_entries: Optional[int] = None,
     reverse: bool = False,
@@ -1547,7 +1550,7 @@ def log(
 # TODO(jelmer): better default for encoding?
 def show(
     repo: RepoPath = ".",
-    objects: Optional[list[Union[str, bytes]]] = None,
+    objects: Optional[Sequence[Union[str, bytes]]] = None,
     outstream: TextIO = sys.stdout,
     default_encoding: str = DEFAULT_ENCODING,
 ) -> None:
@@ -1562,7 +1565,7 @@ def show(
     """
     if objects is None:
         objects = ["HEAD"]
-    if not isinstance(objects, list):
+    if isinstance(objects, (str, bytes)):
         objects = [objects]
     with open_repo_closing(repo) as r:
         for objectish in objects:
@@ -1618,7 +1621,7 @@ def diff(
     commit: Optional[Union[str, bytes, Commit]] = None,
     commit2: Optional[Union[str, bytes, Commit]] = None,
     staged: bool = False,
-    paths: Optional[list[Union[str, bytes]]] = None,
+    paths: Optional[Sequence[Union[str, bytes]]] = None,
     outstream: BinaryIO = default_bytes_out_stream,
     diff_algorithm: Optional[str] = None,
 ) -> None:
@@ -1724,7 +1727,7 @@ def diff(
 
 def rev_list(
     repo: RepoPath,
-    commits: list[Union[str, bytes]],
+    commits: Sequence[Union[str, bytes]],
     outstream: BinaryIO = default_bytes_out_stream,
 ) -> None:
     """Lists commit objects in reverse chronological order.
@@ -1815,7 +1818,7 @@ def submodule_list(repo: RepoPath) -> Iterator[tuple[str, str]]:
 
 def submodule_update(
     repo: Union[str, os.PathLike[str], Repo],
-    paths: Optional[list[Union[str, bytes, os.PathLike[str]]]] = None,
+    paths: Optional[Sequence[Union[str, bytes, os.PathLike[str]]]] = None,
     init: bool = False,
     force: bool = False,
     errstream: Optional[BinaryIO] = None,
@@ -2378,7 +2381,7 @@ def get_remote_repo(
 def push(
     repo: RepoPath,
     remote_location: Optional[Union[str, bytes]] = None,
-    refspecs: Optional[Union[Union[str, bytes], list[Union[str, bytes]]]] = None,
+    refspecs: Optional[Union[Union[str, bytes], Sequence[Union[str, bytes]]]] = None,
     outstream: BinaryIO = default_bytes_out_stream,
     errstream: Union[BinaryIO, RawIOBase] = default_bytes_err_stream,
     force: bool = False,
@@ -2483,11 +2486,14 @@ def push(
         try:
 
             def generate_pack_data_wrapper(
-                have: set[bytes], want: set[bytes], ofs_delta: bool = False
+                have: AbstractSet[bytes],
+                want: AbstractSet[bytes],
+                ofs_delta: bool = False,
             ) -> tuple[int, Iterator[UnpackedObject]]:
                 # Wrap to match the expected signature
+                # Convert AbstractSet to set since generate_pack_data expects set
                 return r.generate_pack_data(
-                    have, want, progress=None, ofs_delta=ofs_delta
+                    set(have), set(want), progress=None, ofs_delta=ofs_delta
                 )
 
             result = client.send_pack(
@@ -2528,7 +2534,7 @@ def push(
 def pull(
     repo: RepoPath,
     remote_location: Optional[Union[str, bytes]] = None,
-    refspecs: Optional[Union[Union[str, bytes], list[Union[str, bytes]]]] = None,
+    refspecs: Optional[Union[Union[str, bytes], Sequence[Union[str, bytes]]]] = None,
     outstream: BinaryIO = default_bytes_out_stream,
     errstream: Union[BinaryIO, RawIOBase] = default_bytes_err_stream,
     fast_forward: bool = True,
@@ -3154,7 +3160,7 @@ def _make_tag_ref(name: Union[str, bytes]) -> Ref:
 
 
 def branch_delete(
-    repo: RepoPath, name: Union[str, bytes, list[Union[str, bytes]]]
+    repo: RepoPath, name: Union[str, bytes, Sequence[Union[str, bytes]]]
 ) -> None:
     """Delete a branch.
 
@@ -3163,12 +3169,12 @@ def branch_delete(
       name: Name of the branch
     """
     with open_repo_closing(repo) as r:
-        if isinstance(name, list):
+        if isinstance(name, (list, tuple)):
             names = name
         else:
             names = [name]
-        for name in names:
-            del r.refs[_make_branch_ref(name)]
+        for branch_name in names:
+            del r.refs[_make_branch_ref(branch_name)]
 
 
 def branch_create(
@@ -3753,7 +3759,7 @@ def repack(repo: RepoPath) -> None:
 
 def pack_objects(
     repo: RepoPath,
-    object_ids: list[bytes],
+    object_ids: Sequence[bytes],
     packf: BinaryIO,
     idxf: Optional[BinaryIO],
     delta_window_size: Optional[int] = None,
@@ -3913,7 +3919,7 @@ def _quote_path(path: str) -> str:
 
 def check_ignore(
     repo: RepoPath,
-    paths: list[Union[str, bytes, os.PathLike[str]]],
+    paths: Sequence[Union[str, bytes, os.PathLike[str]]],
     no_index: bool = False,
     quote_path: bool = True,
 ) -> Iterator[str]:
@@ -4400,7 +4406,7 @@ def cone_mode_init(repo: Union[str, os.PathLike[str], Repo]) -> None:
 
 
 def cone_mode_set(
-    repo: Union[str, os.PathLike[str], Repo], dirs: list[str], force: bool = False
+    repo: Union[str, os.PathLike[str], Repo], dirs: Sequence[str], force: bool = False
 ) -> None:
     """Overwrite the existing 'cone-mode' sparse patterns with a new set of directories.
 
@@ -4425,7 +4431,7 @@ def cone_mode_set(
 
 
 def cone_mode_add(
-    repo: Union[str, os.PathLike[str], Repo], dirs: list[str], force: bool = False
+    repo: Union[str, os.PathLike[str], Repo], dirs: Sequence[str], force: bool = False
 ) -> None:
     """Add new directories to the existing 'cone-mode' sparse-checkout patterns.
 
@@ -4450,7 +4456,7 @@ def cone_mode_add(
             for pat in repo_obj.get_worktree().get_sparse_checkout_patterns()
             if pat not in base_patterns
         ]
-        added_dirs = existing_dirs + (dirs or [])
+        added_dirs = existing_dirs + list(dirs or [])
         repo_obj.get_worktree().set_cone_mode_patterns(dirs=added_dirs)
         new_patterns = repo_obj.get_worktree().get_sparse_checkout_patterns()
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
@@ -5135,7 +5141,7 @@ def cherry_pick(  # noqa: D417
 
 def revert(
     repo: Union[str, os.PathLike[str], Repo],
-    commits: Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]],
+    commits: Union[str, bytes, Commit, Tag, Sequence[Union[str, bytes, Commit, Tag]]],
     no_commit: bool = False,
     message: Optional[Union[str, bytes]] = None,
     author: Optional[bytes] = None,
@@ -5614,7 +5620,7 @@ def filter_branch(
     filter_message: Optional[Callable[[bytes], Optional[bytes]]] = None,
     tree_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
     index_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
-    parent_filter: Optional[Callable[[list[bytes]], list[bytes]]] = None,
+    parent_filter: Optional[Callable[[Sequence[bytes]], list[bytes]]] = None,
     commit_filter: Optional[Callable[[Commit, bytes], Optional[bytes]]] = None,
     subdirectory_filter: Optional[Union[str, bytes]] = None,
     prune_empty: bool = False,
@@ -5872,9 +5878,9 @@ def bisect_start(
     repo: Union[str, os.PathLike[str], Repo] = ".",
     bad: Optional[Union[str, bytes, Commit, Tag]] = None,
     good: Optional[
-        Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
+        Union[str, bytes, Commit, Tag, Sequence[Union[str, bytes, Commit, Tag]]]
     ] = None,
-    paths: Optional[list[bytes]] = None,
+    paths: Optional[Sequence[bytes]] = None,
     no_checkout: bool = False,
     term_bad: str = "bad",
     term_good: str = "good",
@@ -5893,8 +5899,8 @@ def bisect_start(
     with open_repo_closing(repo) as r:
         state = BisectState(r)
 
-        # Convert single good commit to list
-        if good is not None and not isinstance(good, list):
+        # Convert single good commit to sequence
+        if good is not None and isinstance(good, (str, bytes, Commit, Tag)):
             good = [good]
 
         # Parse commits
@@ -5987,7 +5993,7 @@ def bisect_good(
 def bisect_skip(
     repo: Union[str, os.PathLike[str], Repo] = ".",
     revs: Optional[
-        Union[str, bytes, Commit, Tag, list[Union[str, bytes, Commit, Tag]]]
+        Union[str, bytes, Commit, Tag, Sequence[Union[str, bytes, Commit, Tag]]]
     ] = None,
 ) -> Optional[bytes]:
     """Skip one or more commits.
@@ -6005,8 +6011,8 @@ def bisect_skip(
         if revs is None:
             rev_shas = None
         else:
-            # Convert single rev to list
-            if not isinstance(revs, list):
+            # Convert single rev to sequence
+            if isinstance(revs, (str, bytes, Commit, Tag)):
                 revs = [revs]
             rev_shas = [parse_commit(r, rev).id for rev in revs]
 
@@ -6135,7 +6141,8 @@ def reflog(
 
 
 def lfs_track(
-    repo: Union[str, os.PathLike[str], Repo] = ".", patterns: Optional[list[str]] = None
+    repo: Union[str, os.PathLike[str], Repo] = ".",
+    patterns: Optional[Sequence[str]] = None,
 ) -> list[str]:
     """Track file patterns with Git LFS.
 
@@ -6187,7 +6194,8 @@ def lfs_track(
 
 
 def lfs_untrack(
-    repo: Union[str, os.PathLike[str], Repo] = ".", patterns: Optional[list[str]] = None
+    repo: Union[str, os.PathLike[str], Repo] = ".",
+    patterns: Optional[Sequence[str]] = None,
 ) -> list[str]:
     """Untrack file patterns from Git LFS.
 
@@ -6472,7 +6480,8 @@ def lfs_migrate(
 
 
 def lfs_pointer_check(
-    repo: Union[str, os.PathLike[str], Repo] = ".", paths: Optional[list[str]] = None
+    repo: Union[str, os.PathLike[str], Repo] = ".",
+    paths: Optional[Sequence[str]] = None,
 ) -> dict[str, Optional[Any]]:
     """Check if files are valid LFS pointers.
 

@@ -23,6 +23,7 @@
 
 import os
 import tempfile
+from collections.abc import Sequence
 
 from dulwich import porcelain
 from dulwich.repo import Repo
@@ -65,7 +66,7 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         full_path = os.path.join(self.test_dir, path)
         os.makedirs(full_path, exist_ok=True)
 
-    def _git_check_ignore(self, paths: list[str]) -> set[str]:
+    def _git_check_ignore(self, paths: Sequence[str]) -> set[str]:
         """Run git check-ignore and return set of ignored paths."""
         try:
             output = run_git_or_fail(
@@ -80,7 +81,7 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
             # git check-ignore returns non-zero when no paths are ignored
             return set()
 
-    def _dulwich_check_ignore(self, paths: list[str]) -> set[str]:
+    def _dulwich_check_ignore(self, paths: Sequence[str]) -> set[str]:
         """Run dulwich check_ignore and return set of ignored paths."""
         # Convert to absolute paths relative to the test directory
         abs_paths = [os.path.join(self.test_dir, path) for path in paths]
@@ -112,7 +113,7 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
                 result.add(path.replace("\\", "/"))
         return result
 
-    def _assert_ignore_match(self, paths: list[str]) -> None:
+    def _assert_ignore_match(self, paths: Sequence[str]) -> None:
         """Assert that dulwich and git return the same ignored paths."""
         git_ignored = self._git_check_ignore(paths)
         dulwich_ignored = self._dulwich_check_ignore(paths)
@@ -1158,7 +1159,7 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         ]
         self._assert_ignore_match(paths)
 
-    def _git_check_ignore_quoted(self, paths: list[str]) -> set[str]:
+    def _git_check_ignore_quoted(self, paths: Sequence[str]) -> set[str]:
         """Run git check-ignore with default quoting and return set of ignored paths."""
         try:
             # Use default git settings (core.quotePath=true by default)
@@ -1174,7 +1175,7 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
             # git check-ignore returns non-zero when no paths are ignored
             return set()
 
-    def _dulwich_check_ignore_quoted(self, paths: list[str]) -> set[str]:
+    def _dulwich_check_ignore_quoted(self, paths: Sequence[str]) -> set[str]:
         """Run dulwich check_ignore with quote_path=True and return set of ignored paths."""
         # Convert to absolute paths relative to the test directory
         abs_paths = [os.path.join(self.test_dir, path) for path in paths]

@@ -36,7 +36,7 @@ import sys
 import tempfile
 import urllib.parse as urlparse
 import zlib
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from configparser import ConfigParser
 from io import BytesIO
 from typing import Any, BinaryIO, Callable, Optional, Union, cast
@@ -1004,7 +1004,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
                 return False
         return refs
 
-    def _write_refs(self, refs: dict[bytes, bytes]) -> None:
+    def _write_refs(self, refs: Mapping[bytes, bytes]) -> None:
         f = BytesIO()
         f.writelines(write_info_refs(refs, cast("ObjectContainer", self.store)))
         self.scon.put_object(self.filename, f)
@@ -1250,17 +1250,15 @@ def main(argv: list[str] = sys.argv) -> None:
         "daemon": cmd_daemon,
     }
 
-    if len(sys.argv) < 2:
-        print(
-            "Usage: {} <{}> [OPTIONS...]".format(sys.argv[0], "|".join(commands.keys()))
-        )
+    if len(argv) < 2:
+        print("Usage: {} <{}> [OPTIONS...]".format(argv[0], "|".join(commands.keys())))
         sys.exit(1)
 
-    cmd = sys.argv[1]
+    cmd = argv[1]
     if cmd not in commands:
         print(f"No such subcommand: {cmd}")
         sys.exit(1)
-    commands[cmd](sys.argv[2:])
+    commands[cmd](argv[2:])
 
 
 if __name__ == "__main__":

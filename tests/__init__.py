@@ -38,6 +38,7 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
+from collections.abc import Sequence
 from typing import ClassVar, Optional
 from unittest import SkipTest, expectedFailure, skipIf
 from unittest import TestCase as _TestCase
@@ -88,7 +89,7 @@ class BlackboxTestCase(TestCase):
         else:
             raise SkipTest(f"Unable to find binary {name}")
 
-    def run_command(self, name: str, args: list[str]) -> subprocess.Popen[bytes]:
+    def run_command(self, name: str, args: Sequence[str]) -> subprocess.Popen[bytes]:
         """Run a Dulwich command.
 
         Args:

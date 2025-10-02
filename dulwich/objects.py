@@ -28,7 +28,7 @@ import posixpath
 import stat
 import sys
 import zlib
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from hashlib import sha1
 from io import BufferedIOBase, BytesIO
 from typing import (
@@ -832,7 +832,7 @@ def _parse_message(
 
 
 def _format_message(
-    headers: list[tuple[bytes, bytes]], body: Optional[bytes]
+    headers: Sequence[tuple[bytes, bytes]], body: Optional[bytes]
 ) -> Iterator[bytes]:
     for field, value in headers:
         lines = value.split(b"\n")

@@ -24,6 +24,7 @@
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Optional, Protocol, TypedDict
@@ -341,7 +342,7 @@ class RebaseTodo:
         return cls(entries)
 
     @classmethod
-    def from_commits(cls, commits: list[Commit]) -> "RebaseTodo":
+    def from_commits(cls, commits: Sequence[Commit]) -> "RebaseTodo":
         """Create a todo list from a list of commits.
 
         Args:

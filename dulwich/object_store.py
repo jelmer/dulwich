@@ -29,7 +29,7 @@ import stat
 import sys
 import time
 import warnings
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence, Set
 from contextlib import suppress
 from io import BytesIO
 from pathlib import Path
@@ -232,7 +232,7 @@ class BaseObjectStore:
     """Object store interface."""
 
     def determine_wants_all(
-        self, refs: dict[Ref, ObjectID], depth: Optional[int] = None
+        self, refs: Mapping[Ref, ObjectID], depth: Optional[int] = None
     ) -> list[ObjectID]:
         """Determine which objects are wanted based on refs."""
 
@@ -314,7 +314,7 @@ class BaseObjectStore:
         include_trees: bool = False,
         change_type_same: bool = False,
         rename_detector: Optional["RenameDetector"] = None,
-        paths: Optional[list[bytes]] = None,
+        paths: Optional[Sequence[bytes]] = None,
     ) -> Iterator[
         tuple[
             tuple[Optional[bytes], Optional[bytes]],
@@ -444,7 +444,7 @@ class BaseObjectStore:
         self,
         haves: Iterable[bytes],
         wants: Iterable[bytes],
-        shallow: Optional[set[bytes]] = None,
+        shallow: Optional[Set[bytes]] = None,
         progress: Optional[Callable[..., None]] = None,
         get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
         get_parents: Callable[..., list[bytes]] = lambda commit: commit.parents,
@@ -495,7 +495,7 @@ class BaseObjectStore:
         self,
         have: Iterable[bytes],
         want: Iterable[bytes],
-        shallow: Optional[set[bytes]] = None,
+        shallow: Optional[Set[bytes]] = None,
         progress: Optional[Callable[..., None]] = None,
         ofs_delta: bool = True,
     ) -> tuple[int, Iterator[UnpackedObject]]:
@@ -590,7 +590,7 @@ class BaseObjectStore:
         return None
 
     def write_commit_graph(
-        self, refs: Optional[list[bytes]] = None, reachable: bool = True
+        self, refs: Optional[Sequence[bytes]] = None, reachable: bool = True
     ) -> None:
         """Write a commit graph file for this object store.
 
@@ -740,7 +740,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
         self,
         have: Iterable[bytes],
         want: Iterable[bytes],
-        shallow: Optional[set[bytes]] = None,
+        shallow: Optional[Set[bytes]] = None,
         progress: Optional[Callable[..., None]] = None,
         ofs_delta: bool = True,
     ) -> tuple[int, Iterator[UnpackedObject]]:
@@ -850,7 +850,7 @@ class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
 
     def repack(
         self,
-        exclude: Optional[set[bytes]] = None,
+        exclude: Optional[Set[bytes]] = None,
         progress: Optional[Callable[[str], None]] = None,
     ) -> int:
         """Repack the packs in this repository.
@@ -2126,7 +2126,7 @@ class MissingObjectFinder:
         haves: Iterable[bytes],
         wants: Iterable[bytes],
         *,
-        shallow: Optional[set[bytes]] = None,
+        shallow: Optional[Set[bytes]] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
         get_parents: Callable[[Commit], list[bytes]] = lambda commit: commit.parents,
@@ -2370,7 +2370,7 @@ class ObjectStoreGraphWalker:
 def commit_tree_changes(
     object_store: BaseObjectStore,
     tree: Union[ObjectID, Tree],
-    changes: list[tuple[bytes, Optional[int], Optional[bytes]]],
+    changes: Sequence[tuple[bytes, Optional[int], Optional[bytes]]],
 ) -> ObjectID:
     """Commit a specified set of changes to a tree structure.
 
@@ -2434,7 +2434,9 @@ class OverlayObjectStore(BaseObjectStore):
     """Object store that can overlay multiple object stores."""
 
     def __init__(
-        self, bases: list[BaseObjectStore], add_store: Optional[BaseObjectStore] = None
+        self,
+        bases: list[BaseObjectStore],
+        add_store: Optional[BaseObjectStore] = None,
     ) -> None:
         """Initialize an OverlayObjectStore.
 

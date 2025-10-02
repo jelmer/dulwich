@@ -37,7 +37,7 @@ import json
 import logging
 import os
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, BinaryIO, Optional, Union
 from urllib.parse import urljoin, urlparse
@@ -478,7 +478,7 @@ class LFSClient:
         response_data = json.loads(response)
         return self._parse_batch_response(response_data)
 
-    def _parse_batch_response(self, data: dict[str, Any]) -> LFSBatchResponse:
+    def _parse_batch_response(self, data: Mapping[str, Any]) -> LFSBatchResponse:
         """Parse JSON response into LFSBatchResponse dataclass."""
         objects = []
         for obj_data in data.get("objects", []):

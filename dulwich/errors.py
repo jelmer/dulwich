@@ -27,6 +27,7 @@
 # that raises the error.
 
 import binascii
+from collections.abc import Sequence
 from typing import Optional, Union
 
 
@@ -197,7 +198,7 @@ class SendPackError(GitProtocolError):
 class HangupException(GitProtocolError):
     """Hangup exception."""
 
-    def __init__(self, stderr_lines: Optional[list[bytes]] = None) -> None:
+    def __init__(self, stderr_lines: Optional[Sequence[bytes]] = None) -> None:
         """Initialize a HangupException.
 
         Args:

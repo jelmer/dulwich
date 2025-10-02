@@ -18,7 +18,7 @@ https://git-scm.com/docs/gitformat-commit-graph
 
 import os
 import struct
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 
 from .file import _GitFile
@@ -246,7 +246,7 @@ class CommitGraph:
             )
             self.entries.append(entry)
 
-    def _parse_extra_edges(self, offset: int, oids: list[bytes]) -> list[bytes]:
+    def _parse_extra_edges(self, offset: int, oids: Sequence[bytes]) -> list[bytes]:
         """Parse extra parent edges for commits with 3+ parents."""
         if CHUNK_EXTRA_EDGE_LIST not in self.chunks:
             return []
@@ -425,7 +425,7 @@ def find_commit_graph_file(git_dir: Union[str, bytes]) -> Optional[bytes]:
 
 
 def generate_commit_graph(
-    object_store: "BaseObjectStore", commit_ids: list[ObjectID]
+    object_store: "BaseObjectStore", commit_ids: Sequence[ObjectID]
 ) -> CommitGraph:
     """Generate a commit graph from a set of commits.
 
@@ -540,7 +540,7 @@ def generate_commit_graph(
 def write_commit_graph(
     git_dir: Union[str, bytes],
     object_store: "BaseObjectStore",
-    commit_ids: list[ObjectID],
+    commit_ids: Sequence[ObjectID],
 ) -> None:
     """Write a commit graph file for the given commits.
 
@@ -571,7 +571,7 @@ def write_commit_graph(
 
 
 def get_reachable_commits(
-    object_store: "BaseObjectStore", start_commits: list[ObjectID]
+    object_store: "BaseObjectStore", start_commits: Sequence[ObjectID]
 ) -> list[ObjectID]:
     """Get all commits reachable from the given starting commits.
 

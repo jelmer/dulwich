@@ -22,6 +22,7 @@
 """Tests for dumb HTTP git repositories."""
 
 import zlib
+from collections.abc import Mapping
 from typing import Callable, Optional, Union
 from unittest import TestCase
 from unittest.mock import Mock
@@ -264,7 +265,7 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         graph_walker = Mock()
 
         def determine_wants(
-            refs: dict[bytes, bytes], depth: Optional[int] = None
+            refs: Mapping[bytes, bytes], depth: Optional[int] = None
         ) -> list[bytes]:
             return []
 
@@ -291,7 +292,7 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
         graph_walker.ack.return_value = []  # No existing objects
 
         def determine_wants(
-            refs: dict[bytes, bytes], depth: Optional[int] = None
+            refs: Mapping[bytes, bytes], depth: Optional[int] = None
         ) -> list[bytes]:
             return [blob_sha]
 

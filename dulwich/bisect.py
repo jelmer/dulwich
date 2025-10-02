@@ -21,6 +21,7 @@
 """Git bisect implementation."""
 
 import os
+from collections.abc import Sequence, Set
 from typing import Optional
 
 from dulwich.object_store import peel_sha
@@ -48,8 +49,8 @@ class BisectState:
     def start(
         self,
         bad: Optional[bytes] = None,
-        good: Optional[list[bytes]] = None,
-        paths: Optional[list[bytes]] = None,
+        good: Optional[Sequence[bytes]] = None,
+        paths: Optional[Sequence[bytes]] = None,
         no_checkout: bool = False,
         term_bad: str = "bad",
         term_good: str = "good",
@@ -186,7 +187,7 @@ class BisectState:
 
         return self._find_next_commit()
 
-    def skip(self, revs: Optional[list[bytes]] = None) -> Optional[bytes]:
+    def skip(self, revs: Optional[Sequence[bytes]] = None) -> Optional[bytes]:
         """Skip one or more commits.
 
         Args:
@@ -367,7 +368,7 @@ class BisectState:
         return next_commit
 
     def _find_bisect_candidates(
-        self, bad_sha: bytes, good_shas: list[bytes], skip_shas: set[bytes]
+        self, bad_sha: bytes, good_shas: Sequence[bytes], skip_shas: Set[bytes]
     ) -> list[bytes]:
         """Find all commits between good and bad commits.
 

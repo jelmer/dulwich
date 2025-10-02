@@ -13,6 +13,7 @@ import shutil
 import struct
 import time
 import zlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from io import BytesIO
 from types import TracebackType
@@ -1082,14 +1083,14 @@ class ReftableRefsContainer(RefsContainer):
         table_name = f"0x{min_idx:016x}-0x{max_idx:016x}-{hash_part:08x}.ref"
         return os.path.join(self.reftable_dir, table_name)
 
-    def add_packed_refs(self, new_refs: dict[bytes, Optional[bytes]]) -> None:
+    def add_packed_refs(self, new_refs: Mapping[bytes, Optional[bytes]]) -> None:
         """Add packed refs. Creates a new reftable file with all refs consolidated."""
         if not new_refs:
             return
 
         self._write_batch_updates(new_refs)
 
-    def _write_batch_updates(self, updates: dict[bytes, Optional[bytes]]) -> None:
+    def _write_batch_updates(self, updates: Mapping[bytes, Optional[bytes]]) -> None:
         """Write multiple ref updates to a single reftable file."""
         if not updates:
             return

@@ -20,7 +20,7 @@
 
 """Implementation of merge-base following the approach of git."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from heapq import heappop, heappush
 from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
 
@@ -77,7 +77,7 @@ class WorkList(Generic[T]):
 def _find_lcas(
     lookup_parents: Callable[[ObjectID], list[ObjectID]],
     c1: ObjectID,
-    c2s: list[ObjectID],
+    c2s: Sequence[ObjectID],
     lookup_stamp: Callable[[ObjectID], int],
     min_stamp: int = 0,
     shallows: Optional[set[ObjectID]] = None,
@@ -104,7 +104,9 @@ def _find_lcas(
     _DNC = 4  # Do Not Consider
     _LCA = 8  # potential LCA (Lowest Common Ancestor)
 
-    def _has_candidates(wlst: WorkList[ObjectID], cstates: dict[ObjectID, int]) -> bool:
+    def _has_candidates(
+        wlst: WorkList[ObjectID], cstates: Mapping[ObjectID, int]
+    ) -> bool:
         """Check if there are any candidate commits in the work list.
 
         Args:
@@ -203,7 +205,7 @@ def _find_lcas(
 
 
 # actual git sorts these based on commit times
-def find_merge_base(repo: "BaseRepo", commit_ids: list[ObjectID]) -> list[ObjectID]:
+def find_merge_base(repo: "BaseRepo", commit_ids: Sequence[ObjectID]) -> list[ObjectID]:
     """Find lowest common ancestors of commit_ids[0] and *any* of commits_ids[1:].
 
     Args:
@@ -236,7 +238,7 @@ def find_merge_base(repo: "BaseRepo", commit_ids: list[ObjectID]) -> list[Object
     c1 = commit_ids[0]
     if not len(commit_ids) > 1:
         return [c1]
-    c2s = commit_ids[1:]
+    c2s = list(commit_ids[1:])
     if c1 in c2s:
         return [c1]
     lcas = _find_lcas(
@@ -245,7 +247,9 @@ def find_merge_base(repo: "BaseRepo", commit_ids: list[ObjectID]) -> list[Object
     return lcas
 
 
-def find_octopus_base(repo: "BaseRepo", commit_ids: list[ObjectID]) -> list[ObjectID]:
+def find_octopus_base(
+    repo: "BaseRepo", commit_ids: Sequence[ObjectID]
+) -> list[ObjectID]:
     """Find lowest common ancestors of *all* provided commit_ids.
 
     Args:

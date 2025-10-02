@@ -23,6 +23,7 @@
 
 import os
 import subprocess
+from collections.abc import Sequence
 from typing import Any, Callable, Optional
 
 from .errors import HookError
@@ -188,7 +189,9 @@ class PostReceiveShellHook(ShellHook):
         filepath = os.path.join(controldir, "hooks", "post-receive")
         ShellHook.__init__(self, "post-receive", path=filepath, numparam=0)
 
-    def execute(self, client_refs: list[tuple[bytes, bytes, bytes]]) -> Optional[bytes]:
+    def execute(
+        self, client_refs: Sequence[tuple[bytes, bytes, bytes]]
+    ) -> Optional[bytes]:
         """Execute the post-receive hook.
 
         Args:

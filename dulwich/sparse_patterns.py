@@ -22,6 +22,7 @@
 """Sparse checkout pattern handling."""
 
 import os
+from collections.abc import Sequence, Set
 from fnmatch import fnmatch
 
 from .file import ensure_dir_exists
@@ -38,7 +39,9 @@ class BlobNotFoundError(Exception):
     """Raised when a requested blob is not found in the repository's object store."""
 
 
-def determine_included_paths(index: Index, lines: list[str], cone: bool) -> set[str]:
+def determine_included_paths(
+    index: Index, lines: Sequence[str], cone: bool
+) -> set[str]:
     """Determine which paths in the index should be included based on either a full-pattern match or a cone-mode approach.
 
     Args:
@@ -55,7 +58,7 @@ def determine_included_paths(index: Index, lines: list[str], cone: bool) -> set[
         return compute_included_paths_full(index, lines)
 
 
-def compute_included_paths_full(index: Index, lines: list[str]) -> set[str]:
+def compute_included_paths_full(index: Index, lines: Sequence[str]) -> set[str]:
     """Use .gitignore-style parsing and matching to determine included paths.
 
     Each file path in the index is tested against the parsed sparse patterns.
@@ -78,7 +81,7 @@ def compute_included_paths_full(index: Index, lines: list[str]) -> set[str]:
     return included
 
 
-def compute_included_paths_cone(index: Index, lines: list[str]) -> set[str]:
+def compute_included_paths_cone(index: Index, lines: Sequence[str]) -> set[str]:
     """Implement a simplified 'cone' approach for sparse-checkout.
 
     By default, this can include top-level files, exclude all subdirectories,
@@ -135,7 +138,7 @@ def compute_included_paths_cone(index: Index, lines: list[str]) -> set[str]:
 
 
 def apply_included_paths(
-    repo: Repo, included_paths: set[str], force: bool = False
+    repo: Repo, included_paths: Set[str], force: bool = False
 ) -> None:
     """Apply the sparse-checkout inclusion set to the index and working tree.
 
@@ -226,7 +229,7 @@ def apply_included_paths(
                         f.write(blob.data)
 
 
-def parse_sparse_patterns(lines: list[str]) -> list[tuple[str, bool, bool, bool]]:
+def parse_sparse_patterns(lines: Sequence[str]) -> list[tuple[str, bool, bool, bool]]:
     """Parse pattern lines from a sparse-checkout file (.git/info/sparse-checkout).
 
     This simplified parser:
@@ -277,7 +280,7 @@ def parse_sparse_patterns(lines: list[str]) -> list[tuple[str, bool, bool, bool]
 
 def match_gitignore_patterns(
     path_str: str,
-    parsed_patterns: list[tuple[str, bool, bool, bool]],
+    parsed_patterns: Sequence[tuple[str, bool, bool, bool]],
     path_is_dir: bool = False,
 ) -> bool:
     """Check whether a path is included based on .gitignore-style patterns.

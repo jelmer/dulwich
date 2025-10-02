@@ -66,6 +66,11 @@
    parallel stat operations when checking for unstaged changes. This improves
    performance on slow filesystems like NFS. (Jelmer Vernooĳ, #1851)
 
+ * Use PySequoia for tag signing and verification instead of GnuPG.
+   This changes the API of sign() and verify() to take PySequoia objects
+   and to import "pysequoia" instead of "gpg" in those methods.
+   (meejah, #1369)
+
 0.24.1	2025-08-01
 
  * Require ``typing_extensions`` on Python 3.10.

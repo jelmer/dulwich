@@ -26,11 +26,13 @@ import binascii
 import os
 import posixpath
 import stat
+import subprocess
 import sys
 import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from hashlib import sha1
 from io import BufferedIOBase, BytesIO
+from tempfile import NamedTemporaryFile
 from typing import (
     IO,
     TYPE_CHECKING,
@@ -1045,27 +1047,22 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
-    def sign(self, keyid: Optional[str] = None) -> None:
-        """Sign this tag with a GPG key.
+    def sign(self, signer: "pysequoia.PySigner") -> None:
+        """Sign this tag with an OpenPGP key.
 
         Args:
-          keyid: Optional GPG key ID to use for signing. If not specified,
-                 the default GPG key will be used.
+          signer: A valid PySigner instance containing secrets suitable for signing.
+                  This can be gotten from a Cert by calling .secrets.signer()
+                  optionally with a passphrase (if the key is encrypted)
         """
-        import gpg
+        import pysequoia
+        data_to_sign = self.as_raw_string()
+        self.signature = pysequoia.sign(
+            signer,
+            data_to_sign,
+            mode=pysequoia.SignatureMode.DETACHED,
+        )
 
-        with gpg.Context(armor=True) as c:
-            if keyid is not None:
-                key = c.get_key(keyid)
-                with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.signature, _unused_result = ctx.sign(
-                        self.as_raw_string(),
-                        mode=gpg.constants.sig.mode.DETACH,
-                    )
-            else:
-                self.signature, _unused_result = c.sign(
-                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
-                )
 
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
@@ -1077,38 +1074,47 @@ class Tag(ShaFile):
             ret = ret[: -len(self._signature)]
         return ret
 
-    def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
-        """Verify GPG signature for this tag (if it is signed).
+    def verify(self, fetch_certificates: Optional[Callable[[Iterable[str]], Iterable["pysequoia.Cert"]]] = None) -> None:
+        """Verify OpenPGP signature for this tag (if it is signed).
 
         Args:
-          keyids: Optional iterable of trusted keyids for this tag.
-            If this tag is not signed by any key in keyids verification will
-            fail. If not specified, this function only verifies that the tag
-            has a valid signature.
+          fetch_certificates: a callable taking a collection of keyids.
+            This should return a collection of pysequoia.Cert instances
+            matching the requested keyids; the signature will only verify
+            if at least one of the Certificates in this list has correctly
+            signed the Tag.
+
+            If not provided, a default implementation shells out to "sq"
+            with "sq cert export --cert key-id" attempting to find the Cert.
 
         Raises:
-          gpg.errors.BadSignatures: if GPG signature verification fails
-          gpg.errors.MissingSignatures: if tag was not signed by a key
-            specified in keyids
+          RuntimeError: if anything fails verifying the signature
         """
         if self._signature is None:
             return
 
-        import gpg
+        import pysequoia
 
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._signature,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in keys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
+        if fetch_certificates is None:
+            # provide our own implementation that shells out to "sq"
+            def fetch_certificates(keyids):
+                certs = []
+                for keyid in keyids:
+                    try:
+                        cert_bytes = subprocess.check_output(
+                            ["sq", "cert", "export", "--cert", keyid]
+                        )
+                        certs.append(
+                            pysequoia.Cert.from_bytes(cert_bytes)
+                        )
+                    except Exception as e:
+                        # todo: is this an error, or do we just skip?
+                        print(f"{keyid}: failed to find Cert: {e}")
+                        continue
+                return certs
+        sig = pysequoia.Sig.from_bytes(self._signature)
+        pysequoia.verify(self.raw_without_sig(), fetch_certificates, signature=sig)
+        return True
 
 
 class TreeEntry(NamedTuple):

@@ -23,7 +23,7 @@
 
 import collections
 import heapq
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
 
@@ -274,12 +274,12 @@ class Walker:
     def __init__(
         self,
         store: "BaseObjectStore",
-        include: list[bytes],
-        exclude: Optional[list[bytes]] = None,
+        include: Sequence[bytes],
+        exclude: Optional[Sequence[bytes]] = None,
         order: str = "date",
         reverse: bool = False,
         max_entries: Optional[int] = None,
-        paths: Optional[list[bytes]] = None,
+        paths: Optional[Sequence[bytes]] = None,
         rename_detector: Optional[RenameDetector] = None,
         follow: bool = False,
         since: Optional[int] = None,

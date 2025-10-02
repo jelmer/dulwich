@@ -34,6 +34,7 @@ from collections.abc import (
     Iterable,
     Iterator,
     KeysView,
+    Mapping,
     MutableMapping,
     ValuesView,
 )
@@ -932,7 +933,7 @@ class ConfigFile(ConfigDict):
         include_depth: int = 0,
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
         file_opener: Optional[FileOpener] = None,
-        condition_matchers: Optional[dict[str, ConditionMatcher]] = None,
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
     ) -> "ConfigFile":
         """Read configuration from a file-like object.
 
@@ -1038,7 +1039,7 @@ class ConfigFile(ConfigDict):
         include_depth: int,
         max_include_depth: int,
         file_opener: Optional[FileOpener],
-        condition_matchers: Optional[dict[str, ConditionMatcher]],
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]],
     ) -> None:
         """Handle include/includeIf directives during config parsing."""
         if (
@@ -1068,7 +1069,7 @@ class ConfigFile(ConfigDict):
         include_depth: int,
         max_include_depth: int,
         file_opener: Optional[FileOpener],
-        condition_matchers: Optional[dict[str, ConditionMatcher]],
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]],
     ) -> None:
         """Process an include or includeIf directive."""
         path_str = path_value.decode(self.encoding, errors="replace")
@@ -1156,7 +1157,7 @@ class ConfigFile(ConfigDict):
         self,
         condition: str,
         config_dir: Optional[str] = None,
-        condition_matchers: Optional[dict[str, ConditionMatcher]] = None,
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
     ) -> bool:
         """Evaluate an includeIf condition."""
         # Try custom matchers first if provided
@@ -1246,7 +1247,7 @@ class ConfigFile(ConfigDict):
         *,
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
         file_opener: Optional[FileOpener] = None,
-        condition_matchers: Optional[dict[str, ConditionMatcher]] = None,
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
     ) -> "ConfigFile":
         """Read configuration from a file on disk.
 

@@ -23,7 +23,7 @@
 """Generic functions for talking the git smart server protocol."""
 
 import types
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from io import BytesIO
 from os import SEEK_END
 from typing import Callable, Optional
@@ -714,7 +714,7 @@ def format_capability_line(capabilities: Iterable[bytes]) -> bytes:
 
 
 def format_ref_line(
-    ref: bytes, sha: bytes, capabilities: Optional[list[bytes]] = None
+    ref: bytes, sha: bytes, capabilities: Optional[Sequence[bytes]] = None
 ) -> bytes:
     """Format a ref advertisement line.
 

@@ -47,7 +47,7 @@ import select
 import socket
 import subprocess
 import sys
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping, Sequence, Set
 from contextlib import closing
 from io import BufferedReader, BytesIO
 from typing import (
@@ -87,8 +87,8 @@ if TYPE_CHECKING:
 
         def __call__(
             self,
-            have: set[bytes],
-            want: set[bytes],
+            have: Set[bytes],
+            want: Set[bytes],
             ofs_delta: bool = False,
         ) -> tuple[int, Iterator[UnpackedObject]]:
             """Generate pack data for the given have and want sets."""
@@ -99,7 +99,7 @@ if TYPE_CHECKING:
 
         def __call__(
             self,
-            refs: dict[bytes, bytes],
+            refs: Mapping[bytes, bytes],
             depth: Optional[int] = None,
         ) -> list[bytes]:
             """Determine the objects to fetch from the given refs."""
@@ -188,7 +188,7 @@ logger = logging.getLogger(__name__)
 class InvalidWants(Exception):
     """Invalid wants."""
 
-    def __init__(self, wants: set[bytes]) -> None:
+    def __init__(self, wants: Set[bytes]) -> None:
         """Initialize InvalidWants exception.
 
         Args:
@@ -214,7 +214,7 @@ class HTTPUnauthorized(Exception):
         self.url = url
 
 
-def _to_optional_dict(refs: dict[bytes, bytes]) -> dict[bytes, Optional[bytes]]:
+def _to_optional_dict(refs: Mapping[bytes, bytes]) -> dict[bytes, Optional[bytes]]:
     """Convert a dict[bytes, bytes] to dict[bytes, Optional[bytes]].
 
     This is needed for compatibility with result types that expect Optional values.
@@ -614,9 +614,9 @@ def _read_shallow_updates(pkt_seq: Iterable[bytes]) -> tuple[set[bytes], set[byt
 class _v1ReceivePackHeader:
     def __init__(
         self,
-        capabilities: list[bytes],
-        old_refs: dict[bytes, bytes],
-        new_refs: dict[bytes, bytes],
+        capabilities: Sequence[bytes],
+        old_refs: Mapping[bytes, bytes],
+        new_refs: Mapping[bytes, bytes],
     ) -> None:
         self.want: set[bytes] = set()
         self.have: set[bytes] = set()
@@ -628,9 +628,9 @@ class _v1ReceivePackHeader:
 
     def _handle_receive_pack_head(
         self,
-        capabilities: list[bytes],
-        old_refs: dict[bytes, bytes],
-        new_refs: dict[bytes, bytes],
+        capabilities: Sequence[bytes],
+        old_refs: Mapping[bytes, bytes],
+        new_refs: Mapping[bytes, bytes],
     ) -> Iterator[Optional[bytes]]:
         """Handle the head of a 'git-receive-pack' request.
 
@@ -798,7 +798,7 @@ def _handle_upload_pack_head(
 
 def _handle_upload_pack_tail(
     proto: "Protocol",
-    capabilities: set[bytes],
+    capabilities: Set[bytes],
     graph_walker: "GraphWalker",
     pack_data: Callable[[bytes], int],
     progress: Optional[Callable[[bytes], None]] = None,
@@ -996,7 +996,7 @@ class GitClient:
         branch: Optional[str] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> Repo:
@@ -1093,7 +1093,7 @@ class GitClient:
         determine_wants: Optional["DetermineWantsFunc"] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -1171,7 +1171,7 @@ class GitClient:
         *,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -1205,7 +1205,7 @@ class GitClient:
         self,
         path: bytes,
         protocol_version: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
     ) -> LsRemoteResult:
         """Retrieve the current refs from a git smart server.
 
@@ -1220,7 +1220,7 @@ class GitClient:
         raise NotImplementedError(self.get_refs)
 
     @staticmethod
-    def _should_send_pack(new_refs: dict[bytes, bytes]) -> bool:
+    def _should_send_pack(new_refs: Mapping[bytes, bytes]) -> bool:
         # The packfile MUST NOT be sent if the only command used is delete.
         return any(sha != ZERO_SHA for sha in new_refs.values())
 
@@ -1236,7 +1236,7 @@ class GitClient:
     def _handle_receive_pack_tail(
         self,
         proto: Protocol,
-        capabilities: set[bytes],
+        capabilities: Set[bytes],
         progress: Optional[Callable[[bytes], None]] = None,
     ) -> Optional[dict[bytes, Optional[str]]]:
         """Handle the tail of a 'git-receive-pack' request.
@@ -1317,7 +1317,7 @@ class GitClient:
         progress: Optional[Callable[[bytes], None]] = None,
         write_error: Optional[Callable[[bytes], None]] = None,
         format: Optional[bytes] = None,
-        subdirs: Optional[list[bytes]] = None,
+        subdirs: Optional[Sequence[bytes]] = None,
         prefix: Optional[bytes] = None,
     ) -> None:
         """Retrieve an archive of the specified tree."""
@@ -1333,7 +1333,7 @@ class GitClient:
         )
 
 
-def check_wants(wants: set[bytes], refs: dict[bytes, bytes]) -> None:
+def check_wants(wants: Set[bytes], refs: Mapping[bytes, bytes]) -> None:
     """Check that a set of wants is valid.
 
     Args:
@@ -1527,7 +1527,7 @@ class TraditionalGitClient(GitClient):
         pack_data: Callable[[bytes], int],
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -1675,7 +1675,7 @@ class TraditionalGitClient(GitClient):
         self,
         path: bytes,
         protocol_version: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
     ) -> LsRemoteResult:
         """Retrieve the current refs from a git smart server."""
         # stock `git ls-remote` uses upload-pack
@@ -1739,7 +1739,7 @@ class TraditionalGitClient(GitClient):
         progress: Optional[Callable[[bytes], None]] = None,
         write_error: Optional[Callable[[bytes], None]] = None,
         format: Optional[bytes] = None,
-        subdirs: Optional[list[bytes]] = None,
+        subdirs: Optional[Sequence[bytes]] = None,
         prefix: Optional[bytes] = None,
     ) -> None:
         """Request an archive of a specific commit.
@@ -2266,7 +2266,7 @@ class LocalGitClient(GitClient):
         determine_wants: Optional["DetermineWantsFunc"] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[bytes]] = None,
+        ref_prefix: Optional[Sequence[bytes]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -2311,7 +2311,7 @@ class LocalGitClient(GitClient):
         pack_data: Callable[[bytes], int],
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -2368,7 +2368,7 @@ class LocalGitClient(GitClient):
         self,
         path: Union[str, bytes],
         protocol_version: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
     ) -> LsRemoteResult:
         """Retrieve the current refs from a local on-disk repository."""
         with self._open_repo(path) as target:
@@ -2586,7 +2586,7 @@ class BundleClient(GitClient):
         determine_wants: Optional["DetermineWantsFunc"] = None,
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -2638,7 +2638,7 @@ class BundleClient(GitClient):
         pack_data: Callable[[bytes], int],
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -2681,7 +2681,7 @@ class BundleClient(GitClient):
         self,
         path: Union[str, bytes],
         protocol_version: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
     ) -> LsRemoteResult:
         """Retrieve the current refs from a bundle file."""
         bundle = self._open_bundle(path)
@@ -3358,7 +3358,7 @@ class AbstractHttpGitClient(GitClient):
         service: bytes,
         base_url: str,
         protocol_version: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
     ) -> tuple[
         dict[Ref, Optional[ObjectID]],
         set[bytes],
@@ -3632,7 +3632,7 @@ class AbstractHttpGitClient(GitClient):
         pack_data: Callable[[bytes], int],
         progress: Optional[Callable[[bytes], None]] = None,
         depth: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
     ) -> FetchPackResult:
@@ -3772,7 +3772,7 @@ class AbstractHttpGitClient(GitClient):
         self,
         path: Union[str, bytes],
         protocol_version: Optional[int] = None,
-        ref_prefix: Optional[list[Ref]] = None,
+        ref_prefix: Optional[Sequence[Ref]] = None,
     ) -> LsRemoteResult:
         """Retrieve the current refs from a git smart server."""
         url = self._get_url(path)

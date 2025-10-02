@@ -23,7 +23,8 @@
 
 import stat
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from io import BytesIO
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional, TypeVar
@@ -143,7 +144,7 @@ def walk_trees(
     tree1_id: Optional[ObjectID],
     tree2_id: Optional[ObjectID],
     prune_identical: bool = False,
-    paths: Optional[list[bytes]] = None,
+    paths: Optional[Sequence[bytes]] = None,
 ) -> Iterator[tuple[Optional[TreeEntry], Optional[TreeEntry]]]:
     """Recursively walk all the entries of two trees.
 
@@ -262,7 +263,7 @@ def tree_changes(
     rename_detector: Optional["RenameDetector"] = None,
     include_trees: bool = False,
     change_type_same: bool = False,
-    paths: Optional[list[bytes]] = None,
+    paths: Optional[Sequence[bytes]] = None,
 ) -> Iterator[TreeChange]:
     """Find the differences between the contents of two trees.
 
@@ -331,20 +332,20 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
-def _all_eq(seq: list[T], key: Callable[[T], U], value: U) -> bool:
+def _all_eq(seq: Sequence[T], key: Callable[[T], U], value: U) -> bool:
     for e in seq:
         if key(e) != value:
             return False
     return True
 
 
-def _all_same(seq: list[Any], key: Callable[[Any], Any]) -> bool:
+def _all_same(seq: Sequence[Any], key: Callable[[Any], Any]) -> bool:
     return _all_eq(seq[1:], key, key(seq[0]))
 
 
 def tree_changes_for_merge(
     store: BaseObjectStore,
-    parent_tree_ids: list[ObjectID],
+    parent_tree_ids: Sequence[ObjectID],
     tree_id: ObjectID,
     rename_detector: Optional["RenameDetector"] = None,
 ) -> Iterator[list[Optional[TreeChange]]]:
@@ -451,7 +452,7 @@ def _count_blocks(obj: ShaFile) -> dict[int, int]:
     return block_counts
 
 
-def _common_bytes(blocks1: dict[int, int], blocks2: dict[int, int]) -> int:
+def _common_bytes(blocks1: Mapping[int, int], blocks2: Mapping[int, int]) -> int:
     """Count the number of common bytes in two block count dicts.
 
     Args:
@@ -608,7 +609,9 @@ class RenameDetector:
         ):
             self._add_change(change)
 
-    def _prune(self, add_paths: set[bytes], delete_paths: set[bytes]) -> None:
+    def _prune(
+        self, add_paths: AbstractSet[bytes], delete_paths: AbstractSet[bytes]
+    ) -> None:
         def check_add(a: TreeChange) -> bool:
             assert a.new is not None
             return a.new.path not in add_paths

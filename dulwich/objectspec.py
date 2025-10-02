@@ -21,6 +21,7 @@
 
 """Object specification."""
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional, Union
 
 from .objects import Commit, ShaFile, Tag, Tree
@@ -288,7 +289,7 @@ def parse_reftuple(
 def parse_reftuples(
     lh_container: Union["Repo", "RefsContainer"],
     rh_container: Union["Repo", "RefsContainer"],
-    refspecs: Union[bytes, list[bytes]],
+    refspecs: Union[bytes, Sequence[bytes]],
     force: bool = False,
 ) -> list[tuple[Optional["Ref"], Optional["Ref"], bool]]:
     """Parse a list of reftuple specs to a list of reftuples.
@@ -302,7 +303,7 @@ def parse_reftuples(
     Raises:
       KeyError: If one of the refs can not be found
     """
-    if not isinstance(refspecs, list):
+    if isinstance(refspecs, bytes):
         refspecs = [refspecs]
     ret = []
     # TODO: Support * in refspecs
@@ -313,7 +314,7 @@ def parse_reftuples(
 
 def parse_refs(
     container: Union["Repo", "RefsContainer"],
-    refspecs: Union[bytes, str, list[Union[bytes, str]]],
+    refspecs: Union[bytes, str, Sequence[Union[bytes, str]]],
 ) -> list["Ref"]:
     """Parse a list of refspecs to a list of refs.
 
@@ -325,7 +326,7 @@ def parse_refs(
       KeyError: If one of the refs can not be found
     """
     # TODO: Support * in refspecs
-    if not isinstance(refspecs, list):
+    if isinstance(refspecs, (bytes, str)):
         refspecs = [refspecs]
     ret = []
     for refspec in refspecs:

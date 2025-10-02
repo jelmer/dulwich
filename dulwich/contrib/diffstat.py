@@ -45,6 +45,7 @@ statistics about changes, including:
 
 import re
 import sys
+from collections.abc import Sequence
 from typing import Optional
 
 # only needs to detect git style diffs as this is for
@@ -67,7 +68,7 @@ _GIT_UNCHANGED_START = b" "
 
 
 def _parse_patch(
-    lines: list[bytes],
+    lines: Sequence[bytes],
 ) -> tuple[list[bytes], list[bool], list[tuple[int, int]]]:
     """Parse a git style diff or patch to generate diff stats.
 
@@ -121,7 +122,7 @@ def _parse_patch(
 
 # note must all done using bytes not string because on linux filenames
 # may not be encodable even to utf-8
-def diffstat(lines: list[bytes], max_width: int = 80) -> bytes:
+def diffstat(lines: Sequence[bytes], max_width: int = 80) -> bytes:
     """Generate summary statistics from a git style diff ala (git diff tag1 tag2 --stat).
 
     Args:

@@ -21,7 +21,7 @@
 """Git notes handling."""
 
 import stat
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, Optional
 
 from .objects import Blob, Tree
@@ -240,7 +240,7 @@ class NotesTree:
 
             # Build new tree structure
             def update_tree(
-                tree: Tree, components: list[bytes], blob_sha: bytes
+                tree: Tree, components: Sequence[bytes], blob_sha: bytes
             ) -> Tree:
                 """Update tree with new note entry.
 
@@ -411,7 +411,9 @@ class NotesTree:
         components = path.split(b"/")
 
         # Build new tree structure
-        def update_tree(tree: Tree, components: list[bytes], blob_sha: bytes) -> Tree:
+        def update_tree(
+            tree: Tree, components: Sequence[bytes], blob_sha: bytes
+        ) -> Tree:
             """Update tree with new note entry.
 
             Args:
@@ -485,7 +487,7 @@ class NotesTree:
         components = path.split(b"/")
 
         # Build new tree structure without the note
-        def remove_from_tree(tree: Tree, components: list[bytes]) -> Optional[Tree]:
+        def remove_from_tree(tree: Tree, components: Sequence[bytes]) -> Optional[Tree]:
             """Remove note entry from tree.
 
             Args:

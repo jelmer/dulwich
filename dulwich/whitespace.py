@@ -24,6 +24,7 @@ This module implements Git's core.whitespace configuration and related
 whitespace error detection capabilities.
 """
 
+from collections.abc import Sequence, Set
 from typing import Optional
 
 # Default whitespace errors Git checks for
@@ -217,7 +218,9 @@ class WhitespaceChecker:
 
 
 def fix_whitespace_errors(
-    content: bytes, errors: list[tuple[str, int]], fix_types: Optional[set[str]] = None
+    content: bytes,
+    errors: Sequence[tuple[str, int]],
+    fix_types: Optional[Set[str]] = None,
 ) -> bytes:
     """Fix whitespace errors in content.
 

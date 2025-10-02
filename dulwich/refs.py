@@ -25,7 +25,7 @@
 import os
 import types
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import suppress
 from typing import (
     IO,
@@ -218,7 +218,7 @@ class RefsContainer:
         """
         raise NotImplementedError(self.get_packed_refs)
 
-    def add_packed_refs(self, new_refs: dict[Ref, Optional[ObjectID]]) -> None:
+    def add_packed_refs(self, new_refs: Mapping[Ref, Optional[ObjectID]]) -> None:
         """Add the given refs as packed refs.
 
         Args:
@@ -241,7 +241,7 @@ class RefsContainer:
     def import_refs(
         self,
         base: Ref,
-        other: dict[Ref, ObjectID],
+        other: Mapping[Ref, ObjectID],
         committer: Optional[bytes] = None,
         timestamp: Optional[bytes] = None,
         timezone: Optional[bytes] = None,
@@ -756,14 +756,14 @@ class DictRefsContainer(RefsContainer):
         """Get peeled version of a reference."""
         return self._peeled.get(name)
 
-    def _update(self, refs: dict[bytes, bytes]) -> None:
+    def _update(self, refs: Mapping[bytes, bytes]) -> None:
         """Update multiple refs; intended only for testing."""
         # TODO(dborowitz): replace this with a public function that uses
         # set_if_equal.
         for ref, sha in refs.items():
             self.set_if_equals(ref, None, sha)
 
-    def _update_peeled(self, peeled: dict[bytes, bytes]) -> None:
+    def _update_peeled(self, peeled: Mapping[bytes, bytes]) -> None:
         """Update cached peeled refs; intended only for testing."""
         self._peeled.update(peeled)
 
@@ -940,7 +940,7 @@ class DiskRefsContainer(RefsContainer):
                         self._packed_refs[name] = sha
         return self._packed_refs
 
-    def add_packed_refs(self, new_refs: dict[Ref, Optional[ObjectID]]) -> None:
+    def add_packed_refs(self, new_refs: Mapping[Ref, Optional[ObjectID]]) -> None:
         """Add the given refs as packed refs.
 
         Args:
@@ -1405,8 +1405,8 @@ def read_packed_refs_with_peeled(
 
 def write_packed_refs(
     f: IO[bytes],
-    packed_refs: dict[bytes, bytes],
-    peeled_refs: Optional[dict[bytes, bytes]] = None,
+    packed_refs: Mapping[bytes, bytes],
+    peeled_refs: Optional[Mapping[bytes, bytes]] = None,
 ) -> None:
     """Write a packed refs file.
 
@@ -1442,7 +1442,7 @@ def read_info_refs(f: BinaryIO) -> dict[bytes, bytes]:
 
 
 def write_info_refs(
-    refs: dict[bytes, bytes], store: ObjectContainer
+    refs: Mapping[bytes, bytes], store: ObjectContainer
 ) -> Iterator[bytes]:
     """Generate info refs."""
     # TODO: Avoid recursive import :(
@@ -1593,7 +1593,7 @@ def _import_remote_refs(
 
 
 def serialize_refs(
-    store: ObjectContainer, refs: dict[bytes, bytes]
+    store: ObjectContainer, refs: Mapping[bytes, bytes]
 ) -> dict[bytes, bytes]:
     """Serialize refs with peeled refs.
 

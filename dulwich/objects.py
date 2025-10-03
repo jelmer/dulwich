@@ -91,6 +91,11 @@ S_IFGITLINK = 0o160000
 MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
 
 BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
+BEGIN_SSH_SIGNATURE = b"-----BEGIN SSH SIGNATURE-----"
+
+# Signature type constants
+SIGNATURE_PGP = b"pgp"
+SIGNATURE_SSH = b"ssh"
 
 
 ObjectID = bytes
@@ -1002,14 +1007,22 @@ class Tag(ShaFile):
                     self._message = None
                     self._signature = None
                 else:
+                    # Try to find either PGP or SSH signature
+                    sig_idx = None
                     try:
                         sig_idx = value.index(BEGIN_PGP_SIGNATURE)
                     except ValueError:
-                        self._message = value
-                        self._signature = None
-                    else:
+                        try:
+                            sig_idx = value.index(BEGIN_SSH_SIGNATURE)
+                        except ValueError:
+                            pass
+
+                    if sig_idx is not None:
                         self._message = value[:sig_idx]
                         self._signature = value[sig_idx:]
+                    else:
+                        self._message = value
+                        self._signature = None
             else:
                 raise ObjectFormatException(
                     f"Unknown field {field.decode('ascii', 'replace')}"
@@ -1076,6 +1089,33 @@ class Tag(ShaFile):
         if self._signature:
             ret = ret[: -len(self._signature)]
         return ret
+
+    def extract_signature(self) -> tuple[bytes, Optional[bytes], Optional[bytes]]:
+        """Extract the payload, signature, and signature type from this tag.
+
+        Returns:
+          Tuple of (payload, signature, signature_type) where:
+          - payload: The raw tag data without the signature
+          - signature: The signature bytes if present, None otherwise
+          - signature_type: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
+
+        Raises:
+          ObjectFormatException: If signature has unknown format
+        """
+        if self._signature is None:
+            return self.as_raw_string(), None, None
+
+        payload = self.raw_without_sig()
+
+        # Determine signature type
+        if self._signature.startswith(BEGIN_PGP_SIGNATURE):
+            sig_type = SIGNATURE_PGP
+        elif self._signature.startswith(BEGIN_SSH_SIGNATURE):
+            sig_type = SIGNATURE_SSH
+        else:
+            raise ObjectFormatException("Unknown signature format")
+
+        return payload, self._signature, sig_type
 
     def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this tag (if it is signed).
@@ -1796,6 +1836,33 @@ class Commit(ShaFile):
         tmp._gpgsig = None
         tmp.gpgsig = None
         return tmp.as_raw_string()
+
+    def extract_signature(self) -> tuple[bytes, Optional[bytes], Optional[bytes]]:
+        """Extract the payload, signature, and signature type from this commit.
+
+        Returns:
+          Tuple of (payload, signature, signature_type) where:
+          - payload: The raw commit data without the signature
+          - signature: The signature bytes if present, None otherwise
+          - signature_type: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
+
+        Raises:
+          ObjectFormatException: If signature has unknown format
+        """
+        if self._gpgsig is None:
+            return self.as_raw_string(), None, None
+
+        payload = self.raw_without_sig()
+
+        # Determine signature type
+        if self._gpgsig.startswith(BEGIN_PGP_SIGNATURE):
+            sig_type = SIGNATURE_PGP
+        elif self._gpgsig.startswith(BEGIN_SSH_SIGNATURE):
+            sig_type = SIGNATURE_SSH
+        else:
+            raise ObjectFormatException("Unknown signature format")
+
+        return payload, self._gpgsig, sig_type
 
     def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this commit (if it is signed).

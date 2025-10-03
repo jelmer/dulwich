@@ -1,5 +1,9 @@
 0.24.3	UNRELEASED
 
+ * Add ``extract_signature()`` method to ``Commit`` and ``Tag`` classes that
+   returns (payload, signature, signature_type) tuple. Supports both PGP and SSH
+   signature detection. (Jelmer Vernooĳ)
+
 0.24.2	2025-09-25
 
  * Added ``porcelain.shortlog`` function to summarize commits by author,

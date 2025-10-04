@@ -837,6 +837,88 @@ nHxksHfeNln9RKseIDcy4b2ATjhDNIJZARHNfr6oy4u3XPW4svRqtBsLoMiIeuI=
         self.assertEqual(gpgsig, c.gpgsig)
         self.assertEqual(b"3.3.0 version bump and docs\n", c.message)
 
+    def test_commit_extract_signature_pgp(self) -> None:
+        from dulwich.objects import SIGNATURE_PGP
+
+        gpgsig = b"""-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAABCgAGBQJULCdfAAoJEACAbyvXKaRXuKwP/RyP9PA49uAvu8tQVCC/uBa8
+vi975+xvO14R8Pp8k2nps7lSxCdtCd+xVT1VRHs0wNhOZo2YCVoU1HATkPejqSeV
+NScTHcxnk4/+bxyfk14xvJkNp7FlQ3npmBkA+lbV0Ubr33rvtIE5jiJPyz+SgWAg
+-----END PGP SIGNATURE-----"""
+
+        c = Commit()
+        c.tree = b"d80c186a03f423a81b39df39dc87fd269736ca86"
+        c.parents = [
+            b"ab64bbdcc51b170d21588e5c5d391ee5c0c96dfd",
+            b"4cffe90e0a41ad3f5190079d7c8f036bde29cbe6",
+        ]
+        c.author = c.committer = b"James Westby <jw+debian@jameswestby.net>"
+        c.commit_time = c.author_time = 1174773719
+        c.commit_timezone = c.author_timezone = 0
+        c.message = b"Merge ../b\n"
+        c.gpgsig = gpgsig
+
+        payload, signature, sig_type = c.extract_signature()
+        self.assertEqual(payload, c.raw_without_sig())
+        self.assertEqual(signature, gpgsig)
+        self.assertEqual(sig_type, SIGNATURE_PGP)
+
+    def test_commit_extract_signature_ssh(self) -> None:
+        from dulwich.objects import SIGNATURE_SSH
+
+        ssh_sig = b"""-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgJwKO3yOmR5JlXCyN5bys
+ZTpDKBGsVP6ydcKdZxAvJlUAAAAEZmlsZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtz
+-----END SSH SIGNATURE-----"""
+
+        c = Commit()
+        c.tree = b"d80c186a03f423a81b39df39dc87fd269736ca86"
+        c.parents = []
+        c.author = c.committer = b"Test User <test@example.com>"
+        c.commit_time = c.author_time = 1234567890
+        c.commit_timezone = c.author_timezone = 0
+        c.message = b"Test commit with SSH signature\n"
+        c.gpgsig = ssh_sig
+
+        payload, signature, sig_type = c.extract_signature()
+        self.assertEqual(payload, c.raw_without_sig())
+        self.assertEqual(signature, ssh_sig)
+        self.assertEqual(sig_type, SIGNATURE_SSH)
+
+    def test_commit_extract_signature_none(self) -> None:
+        c = Commit()
+        c.tree = b"d80c186a03f423a81b39df39dc87fd269736ca86"
+        c.parents = []
+        c.author = c.committer = b"Test User <test@example.com>"
+        c.commit_time = c.author_time = 1234567890
+        c.commit_timezone = c.author_timezone = 0
+        c.message = b"Test commit without signature\n"
+
+        payload, signature, sig_type = c.extract_signature()
+        self.assertEqual(payload, c.as_raw_string())
+        self.assertIsNone(signature)
+        self.assertIsNone(sig_type)
+
+    def test_commit_extract_signature_unknown(self) -> None:
+        from dulwich.objects import ObjectFormatException
+
+        unknown_sig = b"UNKNOWN SIGNATURE FORMAT DATA"
+
+        c = Commit()
+        c.tree = b"d80c186a03f423a81b39df39dc87fd269736ca86"
+        c.parents = []
+        c.author = c.committer = b"Test User <test@example.com>"
+        c.commit_time = c.author_time = 1234567890
+        c.commit_timezone = c.author_timezone = 0
+        c.message = b"Test commit with unknown signature\n"
+        c.gpgsig = unknown_sig
+
+        # Unknown signature format should raise an exception
+        with self.assertRaises(ObjectFormatException):
+            c.extract_signature()
+
 
 _TREE_ITEMS = {
     b"a-c": (0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),
@@ -1341,6 +1423,69 @@ OK2XeQOiEeXtT76rV4t2WR4=
 """,
             x.signature,
         )
+
+    def test_tag_extract_signature_pgp(self) -> None:
+        from dulwich.objects import SIGNATURE_PGP
+
+        x = Tag()
+        x.set_raw_string(self.make_tag_text())
+        payload, signature, sig_type = x.extract_signature()
+        self.assertEqual(payload, x.raw_without_sig())
+        self.assertEqual(signature, x.signature)
+        self.assertEqual(sig_type, SIGNATURE_PGP)
+
+    def test_tag_extract_signature_ssh(self) -> None:
+        from dulwich.objects import SIGNATURE_SSH
+
+        tag_text_lines = self.make_tag_lines()
+        # Replace PGP signature with SSH signature
+        tag_text_lines[-1] = b"""\
+-----BEGIN SSH SIGNATURE-----
+U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgJwKO3yOmR5JlXCyN5bys
+ZTpDKBGsVP6ydcKdZxAvJlUAAAAEZmlsZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtz
+-----END SSH SIGNATURE-----
+"""
+        tag_text = b"\n".join(tag_text_lines)
+        x = Tag()
+        x.set_raw_string(tag_text)
+        payload, signature, sig_type = x.extract_signature()
+        self.assertEqual(payload, x.raw_without_sig())
+        self.assertEqual(signature, x.signature)
+        self.assertEqual(sig_type, SIGNATURE_SSH)
+
+    def test_tag_extract_signature_none(self) -> None:
+        tag_lines = self.make_tag_lines(message=b"Test tag\n")
+        x = Tag()
+        x.set_raw_string(b"\n".join(tag_lines))
+        payload, signature, sig_type = x.extract_signature()
+        self.assertEqual(payload, bytes(x))
+        self.assertIsNone(signature)
+        self.assertIsNone(sig_type)
+
+    def test_tag_extract_signature_unknown(self) -> None:
+        from dulwich.objects import ObjectFormatException
+
+        # Create a tag with a signature that has an unknown format
+        # It needs to look like a signature to be detected but not be PGP or SSH
+        tag_text = b"""object a38d6181ff27824c79fc7df825164a212eff6a3f
+type commit
+tag v2.6.22-rc7
+tagger Linus Torvalds <torvalds@woody.linux-foundation.org> 1183319674 +0000
+
+Linux 2.6.22-rc7
+-----BEGIN UNKNOWN SIGNATURE-----
+Some unknown signature format
+-----END UNKNOWN SIGNATURE-----
+"""
+        x = Tag()
+        # First we need to manually set the signature to test the extract_signature method
+        x.set_raw_string(tag_text[: tag_text.index(b"-----BEGIN")])
+        x._signature = b"-----BEGIN UNKNOWN SIGNATURE-----\nSome unknown signature format\n-----END UNKNOWN SIGNATURE-----\n"
+        x._needs_serialization = False
+
+        # Unknown signature format should raise an exception
+        with self.assertRaises(ObjectFormatException):
+            x.extract_signature()
 
 
 class CheckTests(TestCase):

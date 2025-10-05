@@ -34,6 +34,7 @@ import os
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 
 # If Python itself provides an exception, use that
@@ -70,7 +71,8 @@ class BlackboxTestCase(TestCase):
 
     # TODO(jelmer): Include more possible binary paths.
     bin_directories: ClassVar[list[str]] = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bin")),
+        sysconfig.get_path("scripts"),
         "/usr/bin",
         "/usr/local/bin",
     ]

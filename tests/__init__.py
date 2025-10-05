@@ -71,6 +71,7 @@ class BlackboxTestCase(TestCase):
 
     # TODO(jelmer): Include more possible binary paths.
     bin_directories: ClassVar[list[str]] = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bin")),
         sysconfig.get_path("scripts"),
         "/usr/bin",
         "/usr/local/bin",

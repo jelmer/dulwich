@@ -27,7 +27,7 @@ from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import build_commit_graph
 
-from . import SkipTest, TestCase
+from . import DependencyMissing, TestCase
 
 
 class GitFastExporterTests(TestCase):
@@ -40,7 +40,7 @@ class GitFastExporterTests(TestCase):
         try:
             from dulwich.fastexport import GitFastExporter
         except ImportError as exc:
-            raise SkipTest("python-fastimport not available") from exc
+            raise DependencyMissing("python-fastimport") from exc
         self.fastexporter = GitFastExporter(self.stream, self.store)
 
     def test_emit_blob(self) -> None:
@@ -88,7 +88,7 @@ class GitImportProcessorTests(TestCase):
         try:
             from dulwich.fastexport import GitImportProcessor
         except ImportError as exc:
-            raise SkipTest("python-fastimport not available") from exc
+            raise DependencyMissing("python-fastimport") from exc
         self.processor = GitImportProcessor(self.repo)
 
     def test_reset_handler(self) -> None:

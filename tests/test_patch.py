@@ -37,7 +37,7 @@ from dulwich.patch import (
     write_tree_diff,
 )
 
-from . import SkipTest, TestCase
+from . import DependencyMissing, SkipTest, TestCase
 
 
 class WriteCommitPatchTests(TestCase):
@@ -701,7 +701,7 @@ class PatienceDiffTests(TestCase):
         try:
             import patiencediff  # noqa: F401
         except ImportError:
-            raise SkipTest("patiencediff not available")
+            raise DependencyMissing("patiencediff")
 
     def test_unified_diff_with_patience_available(self) -> None:
         """Test unified_diff_with_algorithm with patience if available."""

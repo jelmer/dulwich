@@ -45,6 +45,11 @@ from unittest import SkipTest, expectedFailure, skipIf
 from unittest import TestCase as _TestCase
 
 
+class DependencyMissing(SkipTest):
+    def __init__(self, dependency: str) -> None:
+        super().__init__(f"Dependency {dependency} missing")
+
+
 class TestCase(_TestCase):
     def setUp(self) -> None:
         super().setUp()

@@ -21,6 +21,7 @@
 
 """Tests for the object store interface."""
 
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, Any, Callable
 from unittest import TestCase
 from unittest.mock import patch
@@ -36,6 +37,9 @@ from dulwich.object_store import (
 )
 from dulwich.objects import (
     Blob,
+    Commit,
+    ShaFile,
+    Tag,
     Tree,
     TreeEntry,
 )
@@ -244,7 +248,7 @@ class ObjectStoreTests:
         actual = iter_tree_contents(self.store, tree_id, include_trees=True)
         self.assertEqual(expected, list(actual))
 
-    def make_tag(self, name, obj):
+    def make_tag(self, name: bytes, obj: ShaFile) -> Tag:
         """Helper to create and add a tag object."""
         tag = make_tag(obj, name=name)
         self.store.add_object(tag)
@@ -431,12 +435,12 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
 class CommitTestHelper:
     """Helper for tests which iterate over commits."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixture."""
-        super().setUp()
+        super().setUp()  # type: ignore[misc]
         self._store = MemoryObjectStore()
 
-    def make_commit(self, **attrs):
+    def make_commit(self, **attrs: Any) -> Commit:  # noqa: ANN401
         """Helper to create and store a commit."""
         commit = make_commit(**attrs)
         self._store.add_object(commit)
@@ -446,7 +450,7 @@ class CommitTestHelper:
 class IterCommitContentsTests(CommitTestHelper, TestCase):
     """Tests for iter_commit_contents."""
 
-    def make_commits_with_contents(self):
+    def make_commits_with_contents(self) -> Commit:
         """Helper to prepare test commits."""
         files = [
             # (path, contents)
@@ -469,9 +473,16 @@ class IterCommitContentsTests(CommitTestHelper, TestCase):
 
         return commit
 
-    def assertCommitEntries(self, results, expected):
+    def assertCommitEntries(
+        self, results: Iterator[TreeEntry], expected: list[tuple[bytes, bytes]]
+    ) -> None:
         """Assert that iter_commit_contents results are equal to expected."""
-        actual = [(entry.path, self._store[entry.sha].data) for entry in results]
+        actual = []
+        for entry in results:
+            assert entry.sha is not None
+            obj = self._store[entry.sha]
+            assert isinstance(obj, Blob)
+            actual.append((entry.path, obj.data))
         self.assertEqual(actual, expected)
 
     def test_iter_commit_contents_no_includes(self) -> None:
@@ -585,7 +596,7 @@ class IterCommitContentsTests(CommitTestHelper, TestCase):
 class FindShallowTests(CommitTestHelper, TestCase):
     """Tests for finding shallow commits."""
 
-    def make_linear_commits(self, n, message=b""):
+    def make_linear_commits(self, n: int, message: bytes = b"") -> list[Commit]:
         """Create a linear chain of commits."""
         commits = []
         parents: list[bytes] = []
@@ -594,11 +605,13 @@ class FindShallowTests(CommitTestHelper, TestCase):
             parents = [commits[-1].id]
         return commits
 
-    def assertSameElements(self, expected, actual):
+    def assertSameElements(
+        self, expected: Sequence[object], actual: Sequence[object]
+    ) -> None:
         """Assert that two sequences contain the same elements."""
         self.assertEqual(set(expected), set(actual))
 
-    def test_linear(self):
+    def test_linear(self) -> None:
         """Test finding shallow commits in a linear history."""
         c1, c2, c3 = self.make_linear_commits(3)
 
@@ -616,7 +629,7 @@ class FindShallowTests(CommitTestHelper, TestCase):
             find_shallow(self._store, [c3.id], 4),
         )
 
-    def test_multiple_independent(self):
+    def test_multiple_independent(self) -> None:
         """Test finding shallow commits with multiple independent branches."""
         a = self.make_linear_commits(2, message=b"a")
         b = self.make_linear_commits(2, message=b"b")
@@ -628,7 +641,7 @@ class FindShallowTests(CommitTestHelper, TestCase):
             find_shallow(self._store, heads, 2),
         )
 
-    def test_multiple_overlapping(self):
+    def test_multiple_overlapping(self) -> None:
         """Test finding shallow commits with overlapping branches."""
         # Create the following commit tree:
         # 1--2
@@ -644,7 +657,7 @@ class FindShallowTests(CommitTestHelper, TestCase):
             find_shallow(self._store, [c2.id, c4.id], 3),
         )
 
-    def test_merge(self):
+    def test_merge(self) -> None:
         """Test finding shallow commits with merge commits."""
         c1 = self.make_commit()
         c2 = self.make_commit()
@@ -655,7 +668,7 @@ class FindShallowTests(CommitTestHelper, TestCase):
             find_shallow(self._store, [c3.id], 2),
         )
 
-    def test_tag(self):
+    def test_tag(self) -> None:
         """Test finding shallow commits with tags."""
         c1, c2 = self.make_linear_commits(2)
         tag = make_tag(c2, name=b"tag")

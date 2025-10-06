@@ -28,7 +28,7 @@ For example, use "dir/" instead of "dir" to check if a directory is ignored.
 
 import os.path
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from contextlib import suppress
 from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 
@@ -47,7 +47,7 @@ def _pattern_to_str(pattern: Union["Pattern", bytes, str]) -> str:
     return pattern_data.decode() if isinstance(pattern_data, bytes) else pattern_data
 
 
-def _check_parent_exclusion(path: str, matching_patterns: list) -> bool:
+def _check_parent_exclusion(path: str, matching_patterns: Sequence["Pattern"]) -> bool:
     """Check if a parent directory exclusion prevents negation patterns from taking effect.
 
     Args:
@@ -163,7 +163,7 @@ def _translate_segment(segment: bytes) -> bytes:
     return res
 
 
-def _handle_double_asterisk(segments: list[bytes], i: int) -> tuple[bytes, bool]:
+def _handle_double_asterisk(segments: Sequence[bytes], i: int) -> tuple[bytes, bool]:
     """Handle ** segment processing, returns (regex_part, skip_next)."""
     # Check if ** is at end
     remaining = segments[i + 1 :]
@@ -484,7 +484,7 @@ class IgnoreFilter:
 
     @classmethod
     def from_path(
-        cls, path: Union[str, os.PathLike], ignorecase: bool = False
+        cls, path: Union[str, os.PathLike[str]], ignorecase: bool = False
     ) -> "IgnoreFilter":
         """Create an IgnoreFilter from a file path.
 
@@ -665,7 +665,9 @@ class IgnoreFilterManager:
 
         return result
 
-    def _apply_directory_traversal_rule(self, path: str, matches: list) -> bool:
+    def _apply_directory_traversal_rule(
+        self, path: str, matches: list["Pattern"]
+    ) -> bool:
         """Apply directory traversal rule for issue #1203.
 
         If a directory would be ignored by a ** pattern, but there are negation

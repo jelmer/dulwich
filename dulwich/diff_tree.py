@@ -23,7 +23,8 @@
 
 import stat
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from io import BytesIO
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional, TypeVar
@@ -115,10 +116,10 @@ def _merge_entries(
     while i1 < len1 and i2 < len2:
         entry1 = entries1[i1]
         entry2 = entries2[i2]
-        if entry1.path < entry2.path:
+        if entry1.path < entry2.path:  # type: ignore[operator]
             result.append((entry1, None))
             i1 += 1
-        elif entry1.path > entry2.path:
+        elif entry1.path > entry2.path:  # type: ignore[operator]
             result.append((None, entry2))
             i2 += 1
         else:
@@ -133,7 +134,7 @@ def _merge_entries(
 
 
 def _is_tree(entry: Optional[TreeEntry]) -> bool:
-    if entry is None:
+    if entry is None or entry.mode is None:
         return False
     return stat.S_ISDIR(entry.mode)
 
@@ -143,7 +144,7 @@ def walk_trees(
     tree1_id: Optional[ObjectID],
     tree2_id: Optional[ObjectID],
     prune_identical: bool = False,
-    paths: Optional[list[bytes]] = None,
+    paths: Optional[Sequence[bytes]] = None,
 ) -> Iterator[tuple[Optional[TreeEntry], Optional[TreeEntry]]]:
     """Recursively walk all the entries of two trees.
 
@@ -174,8 +175,8 @@ def walk_trees(
         if prune_identical and is_tree1 and is_tree2 and entry1 == entry2:
             continue
 
-        tree1 = (is_tree1 and entry1 and store[entry1.sha]) or None
-        tree2 = (is_tree2 and entry2 and store[entry2.sha]) or None
+        tree1 = (is_tree1 and entry1 and store[entry1.sha]) or None  # type: ignore[index]
+        tree2 = (is_tree2 and entry2 and store[entry2.sha]) or None  # type: ignore[index]
         path = (
             (entry1.path if entry1 else None)
             or (entry2.path if entry2 else None)
@@ -183,7 +184,7 @@ def walk_trees(
         )
 
         # If we have path filters, check if we should process this tree
-        if paths is not None and (is_tree1 or is_tree2):
+        if paths is not None and (is_tree1 or is_tree2) and path is not None:
             # Special case for root tree
             if path == b"":
                 should_recurse = True
@@ -219,6 +220,7 @@ def walk_trees(
                 tree1 = Tree()
             if tree2 is None:
                 tree2 = Tree()
+            assert path is not None
             todo.extend(reversed(_merge_entries(path, tree1, tree2)))
 
         # Only yield entries that match our path filters
@@ -231,18 +233,24 @@ def walk_trees(
                     # Exact match
                     yield entry1, entry2
                     break
-                elif path.startswith(filter_path + b"/"):
+                elif path is not None and path.startswith(filter_path + b"/"):
                     # This entry is under a filter directory
                     yield entry1, entry2
                     break
-                elif filter_path.startswith(path + b"/") and (is_tree1 or is_tree2):
+                elif (
+                    path is not None
+                    and filter_path.startswith(path + b"/")
+                    and (is_tree1 or is_tree2)
+                ):
                     # This is a parent directory of a filter path
                     yield entry1, entry2
                     break
 
 
 def _skip_tree(entry: Optional[TreeEntry], include_trees: bool) -> Optional[TreeEntry]:
-    if entry is None or (not include_trees and stat.S_ISDIR(entry.mode)):
+    if entry is None or entry.mode is None:
+        return None
+    if not include_trees and stat.S_ISDIR(entry.mode):
         return None
     return entry
 
@@ -255,7 +263,7 @@ def tree_changes(
     rename_detector: Optional["RenameDetector"] = None,
     include_trees: bool = False,
     change_type_same: bool = False,
-    paths: Optional[list[bytes]] = None,
+    paths: Optional[Sequence[bytes]] = None,
 ) -> Iterator[TreeChange]:
     """Find the differences between the contents of two trees.
 
@@ -297,7 +305,9 @@ def tree_changes(
 
         if entry1 is not None and entry2 is not None:
             if (
-                stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode)
+                entry1.mode is not None
+                and entry2.mode is not None
+                and stat.S_IFMT(entry1.mode) != stat.S_IFMT(entry2.mode)
                 and not change_type_same
             ):
                 # File type changed: report as delete/add.
@@ -322,20 +332,20 @@ T = TypeVar("T")
 U = TypeVar("U")
 
 
-def _all_eq(seq: list[T], key: Callable[[T], U], value: U) -> bool:
+def _all_eq(seq: Sequence[T], key: Callable[[T], U], value: U) -> bool:
     for e in seq:
         if key(e) != value:
             return False
     return True
 
 
-def _all_same(seq: list[Any], key: Callable[[Any], Any]) -> bool:
+def _all_same(seq: Sequence[Any], key: Callable[[Any], Any]) -> bool:
     return _all_eq(seq[1:], key, key(seq[0]))
 
 
 def tree_changes_for_merge(
     store: BaseObjectStore,
-    parent_tree_ids: list[ObjectID],
+    parent_tree_ids: Sequence[ObjectID],
     tree_id: ObjectID,
     rename_detector: Optional["RenameDetector"] = None,
 ) -> Iterator[list[Optional[TreeChange]]]:
@@ -377,6 +387,7 @@ def tree_changes_for_merge(
             else:
                 assert change.new is not None
                 path = change.new.path
+            assert path is not None
             changes_by_path[path][i] = change
 
     def old_sha(c: TreeChange) -> Optional[ObjectID]:
@@ -441,7 +452,7 @@ def _count_blocks(obj: ShaFile) -> dict[int, int]:
     return block_counts
 
 
-def _common_bytes(blocks1: dict[int, int], blocks2: dict[int, int]) -> int:
+def _common_bytes(blocks1: Mapping[int, int], blocks2: Mapping[int, int]) -> int:
     """Count the number of common bytes in two block count dicts.
 
     Args:
@@ -503,7 +514,8 @@ def _tree_change_key(entry: TreeChange) -> tuple[bytes, bytes]:
         path1 = path2
     if path2 is None:
         path2 = path1
-    assert path1 is not None and path2 is not None
+    assert path1 is not None
+    assert path2 is not None
     return (path1, path2)
 
 
@@ -558,6 +570,8 @@ class RenameDetector:
         assert change.old is not None and change.new is not None
         if change.old.sha == change.new.sha:
             return False
+        assert change.old.sha is not None
+        assert change.new.sha is not None
         old_obj = self._store[change.old.sha]
         new_obj = self._store[change.new.sha]
         return _similarity_score(old_obj, new_obj) < self._rewrite_threshold
@@ -595,7 +609,9 @@ class RenameDetector:
         ):
             self._add_change(change)
 
-    def _prune(self, add_paths: set[bytes], delete_paths: set[bytes]) -> None:
+    def _prune(
+        self, add_paths: AbstractSet[bytes], delete_paths: AbstractSet[bytes]
+    ) -> None:
         def check_add(a: TreeChange) -> bool:
             assert a.new is not None
             return a.new.path not in add_paths
@@ -625,10 +641,14 @@ class RenameDetector:
         for sha, sha_deletes in delete_map.items():
             sha_adds = add_map[sha]
             for (old, is_delete), new in zip(sha_deletes, sha_adds):
+                assert old.mode is not None
+                assert new.mode is not None
                 if stat.S_IFMT(old.mode) != stat.S_IFMT(new.mode):
                     continue
                 if is_delete:
+                    assert old.path is not None
                     delete_paths.add(old.path)
+                assert new.path is not None
                 add_paths.add(new.path)
                 new_type = (is_delete and CHANGE_RENAME) or CHANGE_COPY
                 self._changes.append(TreeChange(new_type, old, new))
@@ -638,6 +658,7 @@ class RenameDetector:
             old = sha_deletes[0][0]
             if num_extra_adds > 0:
                 for new in sha_adds[-num_extra_adds:]:
+                    assert new.path is not None
                     add_paths.add(new.path)
                     self._changes.append(TreeChange(CHANGE_COPY, old, new))
         self._prune(add_paths, delete_paths)
@@ -677,15 +698,19 @@ class RenameDetector:
         check_paths = self._rename_threshold is not None
         for delete in self._deletes:
             assert delete.old is not None
+            assert delete.old.mode is not None
             if S_ISGITLINK(delete.old.mode):
                 continue  # Git links don't exist in this repo.
+            assert delete.old.sha is not None
             old_sha = delete.old.sha
             old_obj = self._store[old_sha]
             block_cache[old_sha] = _count_blocks(old_obj)
             for add in self._adds:
                 assert add.new is not None
+                assert add.new.mode is not None
                 if stat.S_IFMT(delete.old.mode) != stat.S_IFMT(add.new.mode):
                     continue
+                assert add.new.sha is not None
                 new_obj = self._store[add.new.sha]
                 score = _similarity_score(old_obj, new_obj, block_cache=block_cache)
                 if score > self._rename_threshold:
@@ -703,9 +728,11 @@ class RenameDetector:
         for _, change in self._candidates:
             assert change.old is not None and change.new is not None
             new_path = change.new.path
+            assert new_path is not None
             if new_path in add_paths:
                 continue
             old_path = change.old.path
+            assert old_path is not None
             orig_type = change.type
             if old_path in delete_paths:
                 change = TreeChange(CHANGE_COPY, change.old, change.new)
@@ -731,10 +758,14 @@ class RenameDetector:
             assert add.new is not None
             path = add.new.path
             delete = delete_map.get(path)
-            if delete is not None:
-                assert delete.old is not None
-                if stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode):
-                    modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
+            if (
+                delete is not None
+                and delete.old is not None
+                and delete.old.mode is not None
+                and add.new.mode is not None
+                and stat.S_IFMT(delete.old.mode) == stat.S_IFMT(add.new.mode)
+            ):
+                modifies[path] = TreeChange(CHANGE_MODIFY, delete.old, add.new)
 
         def check_add_mod(a: TreeChange) -> bool:
             assert a.new is not None

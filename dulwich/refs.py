@@ -25,7 +25,7 @@
 import os
 import types
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import suppress
 from typing import (
     IO,
@@ -36,7 +36,6 @@ from typing import (
     Optional,
     TypeVar,
     Union,
-    cast,
 )
 
 if TYPE_CHECKING:
@@ -153,12 +152,12 @@ class RefsContainer:
             Callable[
                 [
                     bytes,
-                    Optional[bytes],
-                    Optional[bytes],
+                    bytes,
+                    bytes,
                     Optional[bytes],
                     Optional[int],
                     Optional[int],
-                    Optional[bytes],
+                    bytes,
                 ],
                 None,
             ]
@@ -181,6 +180,11 @@ class RefsContainer:
             return
         if message is None:
             return
+        # Use ZERO_SHA for None values, matching git behavior
+        if old_sha is None:
+            old_sha = ZERO_SHA
+        if new_sha is None:
+            new_sha = ZERO_SHA
         self._logger(ref, old_sha, new_sha, committer, timestamp, timezone, message)
 
     def set_symbolic_ref(
@@ -214,7 +218,7 @@ class RefsContainer:
         """
         raise NotImplementedError(self.get_packed_refs)
 
-    def add_packed_refs(self, new_refs: dict[Ref, Optional[ObjectID]]) -> None:
+    def add_packed_refs(self, new_refs: Mapping[Ref, Optional[ObjectID]]) -> None:
         """Add the given refs as packed refs.
 
         Args:
@@ -237,7 +241,7 @@ class RefsContainer:
     def import_refs(
         self,
         base: Ref,
-        other: dict[Ref, ObjectID],
+        other: Mapping[Ref, ObjectID],
         committer: Optional[bytes] = None,
         timestamp: Optional[bytes] = None,
         timezone: Optional[bytes] = None,
@@ -282,7 +286,7 @@ class RefsContainer:
         """Iterate over all reference keys."""
         return iter(self.allkeys())
 
-    def keys(self, base=None):
+    def keys(self, base: Optional[bytes] = None) -> set[bytes]:
         """Refs present in this container.
 
         Args:
@@ -752,14 +756,14 @@ class DictRefsContainer(RefsContainer):
         """Get peeled version of a reference."""
         return self._peeled.get(name)
 
-    def _update(self, refs: dict[bytes, bytes]) -> None:
+    def _update(self, refs: Mapping[bytes, bytes]) -> None:
         """Update multiple refs; intended only for testing."""
         # TODO(dborowitz): replace this with a public function that uses
         # set_if_equal.
         for ref, sha in refs.items():
             self.set_if_equals(ref, None, sha)
 
-    def _update_peeled(self, peeled: dict[bytes, bytes]) -> None:
+    def _update_peeled(self, peeled: Mapping[bytes, bytes]) -> None:
         """Update cached peeled refs; intended only for testing."""
         self._peeled.update(peeled)
 
@@ -799,18 +803,18 @@ class DiskRefsContainer(RefsContainer):
 
     def __init__(
         self,
-        path: Union[str, bytes, os.PathLike],
-        worktree_path: Optional[Union[str, bytes, os.PathLike]] = None,
+        path: Union[str, bytes, os.PathLike[str]],
+        worktree_path: Optional[Union[str, bytes, os.PathLike[str]]] = None,
         logger: Optional[
             Callable[
                 [
                     bytes,
-                    Optional[bytes],
-                    Optional[bytes],
+                    bytes,
+                    bytes,
                     Optional[bytes],
                     Optional[int],
                     Optional[int],
-                    Optional[bytes],
+                    bytes,
                 ],
                 None,
             ]
@@ -936,7 +940,7 @@ class DiskRefsContainer(RefsContainer):
                         self._packed_refs[name] = sha
         return self._packed_refs
 
-    def add_packed_refs(self, new_refs: dict[Ref, Optional[ObjectID]]) -> None:
+    def add_packed_refs(self, new_refs: Mapping[Ref, Optional[ObjectID]]) -> None:
         """Add the given refs as packed refs.
 
         Args:
@@ -1378,7 +1382,7 @@ def read_packed_refs_with_peeled(
     """
     last = None
     for line in f:
-        if line[0] == b"#":
+        if line.startswith(b"#"):
             continue
         line = line.rstrip(b"\r\n")
         if line.startswith(b"^"):
@@ -1401,8 +1405,8 @@ def read_packed_refs_with_peeled(
 
 def write_packed_refs(
     f: IO[bytes],
-    packed_refs: dict[bytes, bytes],
-    peeled_refs: Optional[dict[bytes, bytes]] = None,
+    packed_refs: Mapping[bytes, bytes],
+    peeled_refs: Optional[Mapping[bytes, bytes]] = None,
 ) -> None:
     """Write a packed refs file.
 
@@ -1438,7 +1442,7 @@ def read_info_refs(f: BinaryIO) -> dict[bytes, bytes]:
 
 
 def write_info_refs(
-    refs: dict[bytes, bytes], store: ObjectContainer
+    refs: Mapping[bytes, bytes], store: ObjectContainer
 ) -> Iterator[bytes]:
     """Generate info refs."""
     # TODO: Avoid recursive import :(
@@ -1504,7 +1508,7 @@ def _set_default_branch(
     refs: RefsContainer,
     origin: bytes,
     origin_head: Optional[bytes],
-    branch: bytes,
+    branch: Optional[bytes],
     ref_message: Optional[bytes],
 ) -> bytes:
     """Set the default branch."""
@@ -1589,7 +1593,7 @@ def _import_remote_refs(
 
 
 def serialize_refs(
-    store: ObjectContainer, refs: dict[bytes, bytes]
+    store: ObjectContainer, refs: Mapping[bytes, bytes]
 ) -> dict[bytes, bytes]:
     """Serialize refs with peeled refs.
 
@@ -1764,7 +1768,7 @@ def filter_ref_prefix(refs: T, prefixes: Iterable[bytes]) -> T:
       prefixes: The prefixes to filter by.
     """
     filtered = {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
-    return cast(T, filtered)
+    return filtered
 
 
 def is_per_worktree_ref(ref: bytes) -> bool:

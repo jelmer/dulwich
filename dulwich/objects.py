@@ -29,7 +29,7 @@ import stat
 import subprocess
 import sys
 import zlib
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from hashlib import sha1
 from io import BufferedIOBase, BytesIO
 from typing import (
@@ -37,6 +37,7 @@ from typing import (
     TYPE_CHECKING,
     NamedTuple,
     Optional,
+    TypeVar,
     Union,
 )
 
@@ -91,6 +92,11 @@ S_IFGITLINK = 0o160000
 MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
 
 BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
+BEGIN_SSH_SIGNATURE = b"-----BEGIN SSH SIGNATURE-----"
+
+# Signature type constants
+SIGNATURE_PGP = b"pgp"
+SIGNATURE_SSH = b"ssh"
 
 
 ObjectID = bytes
@@ -154,9 +160,10 @@ def valid_hexsha(hex: Union[bytes, str]) -> bool:
         return True
 
 
-def hex_to_filename(
-    path: Union[str, bytes], hex: Union[str, bytes]
-) -> Union[str, bytes]:
+PathT = TypeVar("PathT", str, bytes)
+
+
+def hex_to_filename(path: PathT, hex: Union[str, bytes]) -> PathT:
     """Takes a hex sha and returns its filename relative to the given path."""
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
@@ -831,7 +838,7 @@ def _parse_message(
 
 
 def _format_message(
-    headers: list[tuple[bytes, bytes]], body: Optional[bytes]
+    headers: Sequence[tuple[bytes, bytes]], body: Optional[bytes]
 ) -> Iterator[bytes]:
     for field, value in headers:
         lines = value.split(b"\n")
@@ -1001,14 +1008,22 @@ class Tag(ShaFile):
                     self._message = None
                     self._signature = None
                 else:
+                    # Try to find either PGP or SSH signature
+                    sig_idx = None
                     try:
                         sig_idx = value.index(BEGIN_PGP_SIGNATURE)
                     except ValueError:
-                        self._message = value
-                        self._signature = None
-                    else:
+                        try:
+                            sig_idx = value.index(BEGIN_SSH_SIGNATURE)
+                        except ValueError:
+                            pass
+
+                    if sig_idx is not None:
                         self._message = value[:sig_idx]
                         self._signature = value[sig_idx:]
+                    else:
+                        self._message = value
+                        self._signature = None
             else:
                 raise ObjectFormatException(
                     f"Unknown field {field.decode('ascii', 'replace')}"
@@ -1074,6 +1089,33 @@ class Tag(ShaFile):
             ret = ret[: -len(self._signature)]
         return ret
 
+    def extract_signature(self) -> tuple[bytes, Optional[bytes], Optional[bytes]]:
+        """Extract the payload, signature, and signature type from this tag.
+
+        Returns:
+          Tuple of (payload, signature, signature_type) where:
+          - payload: The raw tag data without the signature
+          - signature: The signature bytes if present, None otherwise
+          - signature_type: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
+
+        Raises:
+          ObjectFormatException: If signature has unknown format
+        """
+        if self._signature is None:
+            return self.as_raw_string(), None, None
+
+        payload = self.raw_without_sig()
+
+        # Determine signature type
+        if self._signature.startswith(BEGIN_PGP_SIGNATURE):
+            sig_type = SIGNATURE_PGP
+        elif self._signature.startswith(BEGIN_SSH_SIGNATURE):
+            sig_type = SIGNATURE_SSH
+        else:
+            raise ObjectFormatException("Unknown signature format")
+
+        return payload, self._signature, sig_type
+
     def verify(self, fetch_certificates = None) -> Iterable[str]:
         """Verify OpenPGP signature for this tag (if it is signed).
 
@@ -1137,9 +1179,9 @@ class Tag(ShaFile):
 class TreeEntry(NamedTuple):
     """Named tuple encapsulating a single tree entry."""
 
-    path: bytes
-    mode: int
-    sha: bytes
+    path: Optional[bytes]
+    mode: Optional[int]
+    sha: Optional[bytes]
 
     def in_path(self, path: bytes) -> "TreeEntry":
         """Return a copy of this entry with the given path prepended."""
@@ -1415,7 +1457,7 @@ class Tree(ShaFile):
             last = entry
 
     def _serialize(self) -> list[bytes]:
-        return list(serialize_tree(self.iteritems()))
+        return list(serialize_tree(self.iteritems()))  # type: ignore[arg-type]
 
     def as_pretty_string(self) -> str:
         """Return a human-readable string representation of this tree.
@@ -1424,8 +1466,13 @@ class Tree(ShaFile):
           Pretty-printed tree entries
         """
         text: list[str] = []
-        for name, mode, hexsha in self.iteritems():
-            text.append(pretty_format_tree_entry(name, mode, hexsha))
+        for entry in self.iteritems():
+            if (
+                entry.path is not None
+                and entry.mode is not None
+                and entry.sha is not None
+            ):
+                text.append(pretty_format_tree_entry(entry.path, entry.mode, entry.sha))
         return "".join(text)
 
     def lookup_path(
@@ -1814,6 +1861,33 @@ class Commit(ShaFile):
         tmp._gpgsig = None
         tmp.gpgsig = None
         return tmp.as_raw_string()
+
+    def extract_signature(self) -> tuple[bytes, Optional[bytes], Optional[bytes]]:
+        """Extract the payload, signature, and signature type from this commit.
+
+        Returns:
+          Tuple of (payload, signature, signature_type) where:
+          - payload: The raw commit data without the signature
+          - signature: The signature bytes if present, None otherwise
+          - signature_type: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
+
+        Raises:
+          ObjectFormatException: If signature has unknown format
+        """
+        if self._gpgsig is None:
+            return self.as_raw_string(), None, None
+
+        payload = self.raw_without_sig()
+
+        # Determine signature type
+        if self._gpgsig.startswith(BEGIN_PGP_SIGNATURE):
+            sig_type = SIGNATURE_PGP
+        elif self._gpgsig.startswith(BEGIN_SSH_SIGNATURE):
+            sig_type = SIGNATURE_SSH
+        else:
+            raise ObjectFormatException("Unknown signature format")
+
+        return payload, self._gpgsig, sig_type
 
     def verify(self, keyids: Optional[Iterable[str]] = None) -> None:
         """Verify GPG signature for this commit (if it is signed).

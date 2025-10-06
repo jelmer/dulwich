@@ -34,6 +34,7 @@ from collections.abc import (
     Iterable,
     Iterator,
     KeysView,
+    Mapping,
     MutableMapping,
     ValuesView,
 )
@@ -57,7 +58,7 @@ ConfigValue = Union[str, bytes, bool, int]
 logger = logging.getLogger(__name__)
 
 # Type for file opener callback
-FileOpener = Callable[[Union[str, os.PathLike]], IO[bytes]]
+FileOpener = Callable[[Union[str, os.PathLike[str]]], IO[bytes]]
 
 # Type for includeIf condition matcher
 # Takes the condition value (e.g., "main" for onbranch:main) and returns bool
@@ -254,7 +255,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
             def __contains__(self, key: object) -> bool:
                 return key in self._keys
 
-            def __iter__(self):
+            def __iter__(self) -> Iterator[K]:
                 return iter(self._keys)
 
             def __len__(self) -> int:
@@ -726,16 +727,16 @@ _WHITESPACE_CHARS = [ord(b"\t"), ord(b" ")]
 
 
 def _parse_string(value: bytes) -> bytes:
-    value = bytearray(value.strip())
+    value_array = bytearray(value.strip())
     ret = bytearray()
     whitespace = bytearray()
     in_quotes = False
     i = 0
-    while i < len(value):
-        c = value[i]
+    while i < len(value_array):
+        c = value_array[i]
         if c == ord(b"\\"):
             i += 1
-            if i >= len(value):
+            if i >= len(value_array):
                 # Backslash at end of string - treat as literal backslash
                 if whitespace:
                     ret.extend(whitespace)
@@ -743,7 +744,7 @@ def _parse_string(value: bytes) -> bytes:
                 ret.append(ord(b"\\"))
             else:
                 try:
-                    v = _ESCAPE_TABLE[value[i]]
+                    v = _ESCAPE_TABLE[value_array[i]]
                     if whitespace:
                         ret.extend(whitespace)
                         whitespace = bytearray()
@@ -932,7 +933,7 @@ class ConfigFile(ConfigDict):
         include_depth: int = 0,
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
         file_opener: Optional[FileOpener] = None,
-        condition_matchers: Optional[dict[str, ConditionMatcher]] = None,
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
     ) -> "ConfigFile":
         """Read configuration from a file-like object.
 
@@ -1038,7 +1039,7 @@ class ConfigFile(ConfigDict):
         include_depth: int,
         max_include_depth: int,
         file_opener: Optional[FileOpener],
-        condition_matchers: Optional[dict[str, ConditionMatcher]],
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]],
     ) -> None:
         """Handle include/includeIf directives during config parsing."""
         if (
@@ -1068,7 +1069,7 @@ class ConfigFile(ConfigDict):
         include_depth: int,
         max_include_depth: int,
         file_opener: Optional[FileOpener],
-        condition_matchers: Optional[dict[str, ConditionMatcher]],
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]],
     ) -> None:
         """Process an include or includeIf directive."""
         path_str = path_value.decode(self.encoding, errors="replace")
@@ -1102,7 +1103,7 @@ class ConfigFile(ConfigDict):
             opener: FileOpener
             if file_opener is None:
 
-                def opener(path: Union[str, os.PathLike]) -> IO[bytes]:
+                def opener(path: Union[str, os.PathLike[str]]) -> IO[bytes]:
                     return GitFile(path, "rb")
             else:
                 opener = file_opener
@@ -1156,7 +1157,7 @@ class ConfigFile(ConfigDict):
         self,
         condition: str,
         config_dir: Optional[str] = None,
-        condition_matchers: Optional[dict[str, ConditionMatcher]] = None,
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
     ) -> bool:
         """Evaluate an includeIf condition."""
         # Try custom matchers first if provided
@@ -1242,11 +1243,11 @@ class ConfigFile(ConfigDict):
     @classmethod
     def from_path(
         cls,
-        path: Union[str, os.PathLike],
+        path: Union[str, os.PathLike[str]],
         *,
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
         file_opener: Optional[FileOpener] = None,
-        condition_matchers: Optional[dict[str, ConditionMatcher]] = None,
+        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
     ) -> "ConfigFile":
         """Read configuration from a file on disk.
 
@@ -1263,7 +1264,7 @@ class ConfigFile(ConfigDict):
         opener: FileOpener
         if file_opener is None:
 
-            def opener(p: Union[str, os.PathLike]) -> IO[bytes]:
+            def opener(p: Union[str, os.PathLike[str]]) -> IO[bytes]:
                 return GitFile(p, "rb")
         else:
             opener = file_opener
@@ -1279,12 +1280,14 @@ class ConfigFile(ConfigDict):
             ret.path = abs_path
             return ret
 
-    def write_to_path(self, path: Optional[Union[str, os.PathLike]] = None) -> None:
+    def write_to_path(
+        self, path: Optional[Union[str, os.PathLike[str]]] = None
+    ) -> None:
         """Write configuration to a file on disk."""
         if path is None:
             if self.path is None:
                 raise ValueError("No path specified and no default path available")
-            path_to_use: Union[str, os.PathLike] = self.path
+            path_to_use: Union[str, os.PathLike[str]] = self.path
         else:
             path_to_use = path
         with GitFile(path_to_use, "wb") as f:
@@ -1351,11 +1354,11 @@ def _find_git_in_win_reg() -> Iterator[str]:
     else:
         subkey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Git_is1"
 
-    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore
+    for key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):  # type: ignore[attr-defined,unused-ignore]
         with suppress(OSError):
-            with winreg.OpenKey(key, subkey) as k:  # type: ignore
-                val, typ = winreg.QueryValueEx(k, "InstallLocation")  # type: ignore
-                if typ == winreg.REG_SZ:  # type: ignore
+            with winreg.OpenKey(key, subkey) as k:  # type: ignore[attr-defined,unused-ignore]
+                val, typ = winreg.QueryValueEx(k, "InstallLocation")  # type: ignore[attr-defined,unused-ignore]
+                if typ == winreg.REG_SZ:  # type: ignore[attr-defined,unused-ignore]
                     yield val
 
 
@@ -1502,7 +1505,7 @@ class StackedConfig(Config):
 
 
 def read_submodules(
-    path: Union[str, os.PathLike],
+    path: Union[str, os.PathLike[str]],
 ) -> Iterator[tuple[bytes, bytes, bytes]]:
     """Read a .gitmodules file."""
     cfg = ConfigFile.from_path(path)

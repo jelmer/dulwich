@@ -7,6 +7,8 @@ from dulwich.merge import MergeConflict, Merger, three_way_merge
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
 
+from . import DependencyMissing
+
 
 class MergeTests(unittest.TestCase):
     """Tests for merge functionality."""
@@ -15,7 +17,7 @@ class MergeTests(unittest.TestCase):
         self.repo = MemoryRepo()
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
-            raise unittest.SkipTest("merge3 module not available, skipping merge tests")
+            raise DependencyMissing("merge3")
         self.merger = Merger(self.repo.object_store)
 
     def test_merge_blobs_no_conflict(self):

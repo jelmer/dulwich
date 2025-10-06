@@ -23,7 +23,7 @@
 
 import os
 import re
-from collections.abc import Generator, Iterator, Mapping
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from typing import (
     IO,
     Optional,
@@ -199,7 +199,7 @@ class Pattern:
 
 
 def match_path(
-    patterns: list[tuple[Pattern, Mapping[bytes, AttributeValue]]], path: bytes
+    patterns: Sequence[tuple[Pattern, Mapping[bytes, AttributeValue]]], path: bytes
 ) -> dict[bytes, AttributeValue]:
     """Get attributes for a path by matching against patterns.
 
@@ -297,7 +297,7 @@ class GitAttributes:
         return match_path(self._patterns, path)
 
     def add_patterns(
-        self, patterns: list[tuple[Pattern, Mapping[bytes, AttributeValue]]]
+        self, patterns: Sequence[tuple[Pattern, Mapping[bytes, AttributeValue]]]
     ) -> None:
         """Add patterns to the collection.
 

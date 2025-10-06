@@ -135,6 +135,7 @@ def tar_stream(
             buf.seek(0, SEEK_END)
 
         for entry_abspath, entry in _walk_tree(store, tree, prefix):
+            assert entry.sha is not None
             try:
                 blob = store[entry.sha]
             except KeyError:
@@ -151,6 +152,7 @@ def tar_stream(
             # tarfile only works with ascii.
             info.name = entry_abspath.decode("utf-8", "surrogateescape")
             info.size = blob.raw_length()
+            assert entry.mode is not None
             info.mode = entry.mode
             info.mtime = mtime
 
@@ -166,8 +168,11 @@ def _walk_tree(
 ) -> Generator[tuple[bytes, "TreeEntry"], None, None]:
     """Recursively walk a dulwich Tree, yielding tuples of (absolute path, TreeEntry) along the way."""
     for entry in tree.iteritems():
+        assert entry.path is not None
         entry_abspath = posixpath.join(root, entry.path)
+        assert entry.mode is not None
         if stat.S_ISDIR(entry.mode):
+            assert entry.sha is not None
             subtree = store[entry.sha]
             if isinstance(subtree, Tree):
                 yield from _walk_tree(store, subtree, entry_abspath)

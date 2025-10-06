@@ -96,6 +96,7 @@ def find_reachable_objects(
         elif isinstance(obj, Tree):
             # Tree entries
             for entry in obj.items():
+                assert entry.sha is not None
                 if entry.sha not in reachable:
                     pending.append(entry.sha)
                     reachable.add(entry.sha)
@@ -369,7 +370,9 @@ def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
 
 
 def maybe_auto_gc(
-    repo: "Repo", config: Optional["Config"] = None, progress: Optional[Callable] = None
+    repo: "Repo",
+    config: Optional["Config"] = None,
+    progress: Optional[Callable[[str], None]] = None,
 ) -> bool:
     """Run automatic garbage collection if needed.
 

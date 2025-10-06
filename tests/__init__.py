@@ -34,13 +34,20 @@ import os
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
+from collections.abc import Sequence
 from typing import ClassVar, Optional
 from unittest import SkipTest, expectedFailure, skipIf
 from unittest import TestCase as _TestCase
+
+
+class DependencyMissing(SkipTest):
+    def __init__(self, dependency: str) -> None:
+        super().__init__(f"Dependency {dependency} missing")
 
 
 class TestCase(_TestCase):
@@ -69,7 +76,8 @@ class BlackboxTestCase(TestCase):
 
     # TODO(jelmer): Include more possible binary paths.
     bin_directories: ClassVar[list[str]] = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bin")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bin")),
+        sysconfig.get_path("scripts"),
         "/usr/bin",
         "/usr/local/bin",
     ]
@@ -88,7 +96,7 @@ class BlackboxTestCase(TestCase):
         else:
             raise SkipTest(f"Unable to find binary {name}")
 
-    def run_command(self, name: str, args: list[str]) -> subprocess.Popen[bytes]:
+    def run_command(self, name: str, args: Sequence[str]) -> subprocess.Popen[bytes]:
         """Run a Dulwich command.
 
         Args:

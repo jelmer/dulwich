@@ -934,16 +934,18 @@ class CommitTreeChangesTests(TestCase):
         self.tree_id = commit_tree(self.store, blobs)
 
     def test_no_changes(self) -> None:
+        # When no changes, should return the same tree SHA
         self.assertEqual(
-            self.store[self.tree_id],
+            self.tree_id,
             commit_tree_changes(self.store, self.store[self.tree_id], []),
         )
 
     def test_add_blob(self) -> None:
         blob_d = make_object(Blob, data=b"d")
-        new_tree = commit_tree_changes(
+        new_tree_id = commit_tree_changes(
             self.store, self.store[self.tree_id], [(b"d", 0o100644, blob_d.id)]
         )
+        new_tree = self.store[new_tree_id]
         self.assertEqual(
             new_tree[b"d"],
             (33188, b"c59d9b6344f1af00e504ba698129f07a34bbed8d"),
@@ -951,11 +953,12 @@ class CommitTreeChangesTests(TestCase):
 
     def test_add_blob_in_dir(self) -> None:
         blob_d = make_object(Blob, data=b"d")
-        new_tree = commit_tree_changes(
+        new_tree_id = commit_tree_changes(
             self.store,
             self.store[self.tree_id],
             [(b"e/f/d", 0o100644, blob_d.id)],
         )
+        new_tree = self.store[new_tree_id]
         self.assertEqual(
             new_tree.items(),
             [
@@ -991,9 +994,10 @@ class CommitTreeChangesTests(TestCase):
         )
 
     def test_delete_blob(self) -> None:
-        new_tree = commit_tree_changes(
+        new_tree_id = commit_tree_changes(
             self.store, self.store[self.tree_id], [(b"ad/bd/c", None, None)]
         )
+        new_tree = self.store[new_tree_id]
         self.assertEqual(set(new_tree), {b"a", b"ad", b"c"})
         ad_tree = self.store[new_tree[b"ad"][1]]
         self.assertEqual(set(ad_tree), {b"b", b"c"})

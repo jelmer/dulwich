@@ -1,8 +1,9 @@
+---
 name: Build Python distributions
 
-on:
+"on":
   push:
-    branches: [ main, master ]
+    branches: [main, master]
     tags:
       - 'dulwich-*'
   pull_request:
@@ -20,7 +21,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v5.3.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
           cache: pip
@@ -67,7 +68,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v5.3.0
+      - uses: actions/setup-python@v6
         with:
           cache: pip
       - name: Install dependencies
@@ -75,51 +76,54 @@ jobs:
           python -m pip install --upgrade pip
           pip install setuptools wheel cibuildwheel setuptools-rust
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.2.0
+        uses: docker/setup-qemu-action@v3.6.0
         if: "matrix.os == 'ubuntu-latest'"
       - name: Build wheels
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_BUILD: "${{ matrix.build-identifier }}*"
       - name: Upload wheels
-        uses: actions/upload-artifact@v4.5.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: artifact-${{ matrix.build-identifier }}
           path: ./wheelhouse/*.whl
 
-  build-android-wheels:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v5.3.0
-        with:
-          cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install setuptools wheel cibuildwheel setuptools-rust
-      - name: Build Android wheels
-        run: python -m cibuildwheel --output-dir wheelhouse
-        env:
-          CIBW_PLATFORM: android
-          CIBW_ARCHS_ANDROID: arm64_v8a x86_64
-      - name: Upload Android wheels
-        uses: actions/upload-artifact@v4.5.0
-        with:
-          name: artifact-android
-          path: ./wheelhouse/*.whl
+  # Android wheels build disabled due to HTTP 403 Forbidden error when downloading
+  # Python 3.13.7 for Android from Maven repository (python-3.13.7-aarch64-linux-android.tar.gz)
+  # The download from https://repo.maven.apache.org fails during cibuildwheel setup
+  # build-android-wheels:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v5.0.0
+  #     - uses: actions/setup-python@v6
+  #       with:
+  #         cache: pip
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install setuptools wheel cibuildwheel setuptools-rust
+  #     - name: Build Android wheels
+  #       run: python -m cibuildwheel --output-dir wheelhouse
+  #       env:
+  #         CIBW_PLATFORM: android
+  #         CIBW_ARCHS_ANDROID: arm64_v8a x86_64
+  #     - name: Upload Android wheels
+  #       uses: actions/upload-artifact@v4.6.2
+  #       with:
+  #         name: artifact-android
+  #         path: ./wheelhouse/*.whl
 
   build-pure-wheels:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v5.3.0
+      - uses: actions/setup-python@v6
         with:
           cache: pip
       - run: pip install build
       - run: PURE=true python -m build --wheel
       - name: Upload pure wheels
-        uses: actions/upload-artifact@v4.5.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: artifact-pure
           path: ./dist/*.whl
@@ -128,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v5.3.0
+      - uses: actions/setup-python@v6
         with:
           cache: pip
       - name: Install dependencies
@@ -138,7 +142,7 @@ jobs:
       - name: Build sdist
         run: python -m build --sdist
       - name: Upload sdist
-        uses: actions/upload-artifact@v4.5.0
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: artifact-source
           path: ./dist/*.tar.gz
@@ -148,7 +152,7 @@ jobs:
       - build-sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5.3.0
+      - uses: actions/setup-python@v6
         with:
           cache: pip
       - name: Install dependencies
@@ -171,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build-wheels
-      - build-android-wheels
+      # - build-android-wheels
       - build-sdist
       - build-pure-wheels
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/dulwich-')
@@ -188,4 +192,4 @@ jobs:
           pattern: artifact-*
           path: dist
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.10.4
+        uses: pypa/gh-action-pypi-publish@v1.13

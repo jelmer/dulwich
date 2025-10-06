@@ -100,7 +100,7 @@ from .objects import (
     check_hexsha,
     valid_hexsha,
 )
-from .pack import generate_unpacked_objects
+from .pack import PackHint, generate_unpacked_objects
 from .refs import (
     ANNOTATED_TAG_SUFFIX,  # noqa: F401
     LOCAL_BRANCH_PREFIX,
@@ -608,7 +608,8 @@ class BaseRepo:
             if hasattr(graph_walker, "shallow"):
                 graph_walker.shallow.update(shallow - not_shallow)
                 new_shallow = graph_walker.shallow - current_shallow
-                unshallow = graph_walker.unshallow = not_shallow & current_shallow  # type: ignore[attr-defined]
+                unshallow = not_shallow & current_shallow
+                setattr(graph_walker, "unshallow", unshallow)
                 if hasattr(graph_walker, "update_shallow"):
                     graph_walker.update_shallow(new_shallow, unshallow)
         else:
@@ -622,24 +623,12 @@ class BaseRepo:
                 # Do not send a pack in shallow short-circuit path
                 return None
 
-            class DummyMissingObjectFinder:
-                """Dummy finder that returns no missing objects."""
-
-                def get_remote_has(self) -> None:
-                    """Get remote has (always returns None).
-
-                    Returns:
-                      None
-                    """
-                    return None
-
-                def __len__(self) -> int:
-                    return 0
-
-                def __iter__(self) -> Iterator[tuple[bytes, Optional[bytes]]]:
-                    yield from []
-
-            return DummyMissingObjectFinder()  # type: ignore
+            # Return an actual MissingObjectFinder with empty wants
+            return MissingObjectFinder(
+                self.object_store,
+                haves=[],
+                wants=[],
+            )
 
         # If the graph walker is set up with an implementation that can
         # ACK/NAK to the wire, it will write data to the client through

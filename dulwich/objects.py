@@ -1139,7 +1139,7 @@ class Tag(ShaFile):
 
         return payload, self._signature, sig_type
 
-    def verify(self, fetch_certificates=None) -> None:
+    def verify(self, fetch_certificates=None) -> Iterable[str]:
         """Verify OpenPGP signature for this tag (if it is signed).
 
         Args:
@@ -1152,17 +1152,27 @@ class Tag(ShaFile):
             If not provided, a default implementation shells out to "sq"
             with "sq cert export --cert key-id" attempting to find the Cert.
 
+        Returns:
+          An iterable of key-ids (as str) of all verified signatures;
+          if you need a particular Key-ID to sign this tag the caller
+          should verify the correct fingerprint is in this list.
+
         Raises:
-          RuntimeError: if anything fails verifying the signature
+          RuntimeError: if anything fails verifying the signature(s)
         """
         if self._signature is None:
-            return
+            return []
 
         import pysequoia
 
         if fetch_certificates is None:
-            # provide our own implementation that shells out to "sq"
+
             def fetch_certificates(keyids):
+                """A default version of fetch_certificates.
+
+                Shells out to 'sq', which should inter-operate with
+                gnupg-agent if it is available and set up properly.
+                """
                 certs = []
                 for keyid in keyids:
                     try:
@@ -1173,13 +1183,20 @@ class Tag(ShaFile):
                             pysequoia.Cert.from_bytes(cert_bytes)
                         )
                     except Exception as e:
-                        # todo: is this an error, or do we just skip?
-                        print(f"{keyid}: failed to find Cert: {e}")
-                        continue
+                        raise RuntimeError(
+                            f"{keyid}: failed to find Cert: {e}"
+                        )
                 return certs
         sig = pysequoia.Sig.from_bytes(self._signature)
-        pysequoia.verify(self.raw_without_sig(), fetch_certificates, signature=sig)
-        return True
+        decrypted = pysequoia.verify(
+            self.raw_without_sig(),
+            fetch_certificates,
+            signature=sig,
+        )
+        return [
+            valid_sig.certificate  # string; the fingerprint
+            for valid_sig in decrypted.valid_sigs
+        ]
 
 
 class TreeEntry(NamedTuple):

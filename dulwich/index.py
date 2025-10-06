@@ -2776,7 +2776,6 @@ class locked_index:
     def __enter__(self) -> Index:
         """Enter context manager and lock index."""
         f = GitFile(self._path, "wb")
-        assert isinstance(f, _GitFile)  # GitFile in write mode always returns _GitFile
         self._file = f
         self._index = Index(self._path)
         return self._index

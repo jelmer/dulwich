@@ -24,7 +24,7 @@
 """Python implementation of the Git file formats and protocols."""
 
 import sys
-from typing import Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar, Union
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -37,7 +37,7 @@ __all__ = ["__version__", "replace_me"]
 
 P = ParamSpec("P")
 R = TypeVar("R")
-F = TypeVar("F", bound=Callable[..., object])
+F = TypeVar("F", bound=Callable[..., Any])
 
 try:
     from dissolve import replace_me
@@ -47,7 +47,7 @@ except ImportError:
     def replace_me(
         since: Optional[Union[str, tuple[int, ...]]] = None,
         remove_in: Optional[Union[str, tuple[int, ...]]] = None,
-    ) -> Callable[[F], F]:
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Decorator to mark functions as deprecated.
 
         Args:
@@ -58,7 +58,7 @@ except ImportError:
             Decorator function
         """
 
-        def decorator(func: F) -> F:
+        def decorator(func: Callable[P, R]) -> Callable[P, R]:
             import functools
             import warnings
 
@@ -76,7 +76,7 @@ except ImportError:
                 m += " and will be removed in a future version"
 
             @functools.wraps(func)
-            def _wrapped_func(*args, **kwargs):  # type: ignore[no-untyped-def]
+            def _wrapped_func(*args: P.args, **kwargs: P.kwargs) -> R:
                 warnings.warn(
                     m,
                     DeprecationWarning,
@@ -84,6 +84,6 @@ except ImportError:
                 )
                 return func(*args, **kwargs)
 
-            return _wrapped_func  # type: ignore[return-value]
+            return _wrapped_func
 
         return decorator

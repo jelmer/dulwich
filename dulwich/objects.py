@@ -1093,13 +1093,13 @@ class Tag(ShaFile):
         # pysequoia.PySigner) if we only want to import pysequoia
         # inside the methods like this?
         import pysequoia
+
         data_to_sign = self.as_raw_string()
         self.signature = pysequoia.sign(
             signer,
             data_to_sign,
             mode=pysequoia.SignatureMode.DETACHED,
         )
-
 
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
@@ -1179,14 +1179,11 @@ class Tag(ShaFile):
                         cert_bytes = subprocess.check_output(
                             ["sq", "cert", "export", "--cert", keyid]
                         )
-                        certs.append(
-                            pysequoia.Cert.from_bytes(cert_bytes)
-                        )
+                        certs.append(pysequoia.Cert.from_bytes(cert_bytes))
                     except Exception as e:
-                        raise RuntimeError(
-                            f"{keyid}: failed to find Cert: {e}"
-                        )
+                        raise RuntimeError(f"{keyid}: failed to find Cert: {e}")
                 return certs
+
         sig = pysequoia.Sig.from_bytes(self._signature)
         decrypted = pysequoia.verify(
             self.raw_without_sig(),

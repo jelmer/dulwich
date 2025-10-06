@@ -2435,12 +2435,12 @@ def tag_create(
                 if isinstance(sign, str):
                     # backwards-"compat"?
                     raise RuntimeError(
-                        'sign no longer takes a keyid\n\n'
+                        "sign no longer takes a keyid\n\n"
                         'To get an object suitable to pass to "sign" using the "sq" tool:\n'
                         '  keyid = "<hex key fingerprint>"\n'
                         '  args = ["sq", "key", "export", "--cert", keyid]\n'
-                        '  certdata = subprocess.check_output(args)\n'
-                        '  cert = pysequoia.Cert.from_bytes(certdata)\n'
+                        "  certdata = subprocess.check_output(args)\n"
+                        "  cert = pysequoia.Cert.from_bytes(certdata)\n"
                         '  signer = cert.secrets.signer("optional passphrase")\n'
                     )
                 tag_obj.sign(sign)

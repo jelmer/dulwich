@@ -788,7 +788,8 @@ class Blob(ShaFile):
         if not chunks:
             return []
         if len(chunks) == 1:
-            return chunks[0].splitlines(True)  # type: ignore[no-any-return]
+            result: list[bytes] = chunks[0].splitlines(True)
+            return result
         remaining = None
         ret = []
         for chunk in chunks:
@@ -1181,9 +1182,9 @@ class Tag(ShaFile):
 class TreeEntry(NamedTuple):
     """Named tuple encapsulating a single tree entry."""
 
-    path: Optional[bytes]
-    mode: Optional[int]
-    sha: Optional[bytes]
+    path: bytes
+    mode: int
+    sha: bytes
 
     def in_path(self, path: bytes) -> "TreeEntry":
         """Return a copy of this entry with the given path prepended."""
@@ -1459,7 +1460,7 @@ class Tree(ShaFile):
             last = entry
 
     def _serialize(self) -> list[bytes]:
-        return list(serialize_tree(self.iteritems()))  # type: ignore[arg-type]
+        return list(serialize_tree(self.iteritems()))
 
     def as_pretty_string(self) -> str:
         """Return a human-readable string representation of this tree.

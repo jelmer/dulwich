@@ -100,7 +100,7 @@ from .objects import (
     check_hexsha,
     valid_hexsha,
 )
-from .pack import PackHint, generate_unpacked_objects
+from .pack import generate_unpacked_objects
 from .refs import (
     ANNOTATED_TAG_SUFFIX,  # noqa: F401
     LOCAL_BRANCH_PREFIX,

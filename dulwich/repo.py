@@ -87,6 +87,7 @@ from .object_store import (
     MissingObjectFinder,
     ObjectStoreGraphWalker,
     PackBasedObjectStore,
+    PackCapableObjectStore,
     find_shallow,
     peel_sha,
 )
@@ -407,7 +408,9 @@ class BaseRepo:
         repository
     """
 
-    def __init__(self, object_store: PackBasedObjectStore, refs: RefsContainer) -> None:
+    def __init__(
+        self, object_store: "PackCapableObjectStore", refs: RefsContainer
+    ) -> None:
         """Open a repository.
 
         This shouldn't be called directly, but rather through one of the
@@ -2217,7 +2220,7 @@ class MemoryRepo(BaseRepo):
 
         self._reflog: list[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
-        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)  # type: ignore[arg-type]
+        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)
         self._named_files: dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()

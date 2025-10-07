@@ -40,14 +40,14 @@ R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Any])
 
 try:
-    from dissolve import replace_me
+    from dissolve import replace_me as replace_me
 except ImportError:
     # if dissolve is not installed, then just provide a basic implementation
     # of its replace_me decorator
     def replace_me(
-        since: Optional[Union[str, tuple[int, ...]]] = None,
-        remove_in: Optional[Union[str, tuple[int, ...]]] = None,
-    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+        since: Optional[Union[tuple[int, ...], str]] = None,
+        remove_in: Optional[Union[tuple[int, ...], str]] = None,
+    ) -> Callable[[F], F]:
         """Decorator to mark functions as deprecated.
 
         Args:
@@ -86,4 +86,4 @@ except ImportError:
 
             return _wrapped_func
 
-        return decorator
+        return decorator  # type: ignore[return-value]

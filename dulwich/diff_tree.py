@@ -116,10 +116,10 @@ def _merge_entries(
     while i1 < len1 and i2 < len2:
         entry1 = entries1[i1]
         entry2 = entries2[i2]
-        if entry1.path < entry2.path:  # type: ignore[operator]
+        if entry1.path < entry2.path:
             result.append((entry1, None))
             i1 += 1
-        elif entry1.path > entry2.path:  # type: ignore[operator]
+        elif entry1.path > entry2.path:
             result.append((None, entry2))
             i2 += 1
         else:
@@ -175,8 +175,8 @@ def walk_trees(
         if prune_identical and is_tree1 and is_tree2 and entry1 == entry2:
             continue
 
-        tree1 = (is_tree1 and entry1 and store[entry1.sha]) or None  # type: ignore[index]
-        tree2 = (is_tree2 and entry2 and store[entry2.sha]) or None  # type: ignore[index]
+        tree1 = (is_tree1 and entry1 and store[entry1.sha]) or None
+        tree2 = (is_tree2 and entry2 and store[entry2.sha]) or None
         path = (
             (entry1.path if entry1 else None)
             or (entry2.path if entry2 else None)

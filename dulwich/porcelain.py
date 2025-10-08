@@ -575,9 +575,10 @@ def commit(
     commit_timezone: Optional[int] = None,
     encoding: Optional[bytes] = None,
     no_verify: bool = False,
-    signoff: bool = False,
+    signoff: Optional[bool] = None,
     all: bool = False,
     amend: bool = False,
+    sign: Optional[bool] = None,
 ) -> bytes:
     """Create a new commit.
 
@@ -591,11 +592,11 @@ def commit(
       commit_timezone: Commit timestamp timezone
       encoding: Encoding to use for commit message
       no_verify: Skip pre-commit and commit-msg hooks
-      signoff: GPG Sign the commit (bool, defaults to False,
-        pass True to use default GPG key,
-        pass a str containing Key ID to use a specific GPG key)
+      signoff: Add Signed-off-by line to commit message. If None, uses format.signoff config.
       all: Automatically stage all tracked files that have been modified
       amend: Replace the tip of the current branch by creating a new commit
+      sign: GPG sign the commit. If None, uses commit.gpgsign config.
+        If True, signs with default GPG key. If False, does not sign.
     Returns: SHA1 of the new commit
     """
     encoding_str = encoding.decode("ascii") if encoding else DEFAULT_ENCODING
@@ -676,7 +677,7 @@ def commit(
                 commit_timezone=commit_timezone,
                 encoding=encoding,
                 no_verify=no_verify,
-                sign=bool(signoff),
+                sign=sign,
                 merge_heads=merge_heads,
                 ref=None,
             )
@@ -692,7 +693,7 @@ def commit(
                 commit_timezone=commit_timezone,
                 encoding=encoding,
                 no_verify=no_verify,
-                sign=bool(signoff),
+                sign=sign,
                 merge_heads=merge_heads,
             )
 
@@ -1960,7 +1961,7 @@ def tag_create(
     objectish: Union[str, bytes] = "HEAD",
     tag_time: Optional[int] = None,
     tag_timezone: Optional[int] = None,
-    sign: bool = False,
+    sign: Optional[bool] = None,
     encoding: str = DEFAULT_ENCODING,
 ) -> None:
     """Creates a tag in git via dulwich calls.
@@ -2014,24 +2015,27 @@ def tag_create(
             tag_obj.tag_timezone = tag_timezone
 
             # Check if we should sign the tag
-            should_sign = sign
+            config = r.get_config_stack()
+
             if sign is None:
                 # Check tag.gpgSign configuration when sign is not explicitly set
-                config = r.get_config_stack()
                 try:
-                    should_sign = config.get_boolean((b"tag",), b"gpgSign")
+                    should_sign = config.get_boolean(
+                        (b"tag",), b"gpgsign", default=False
+                    )
                 except KeyError:
                     should_sign = False  # Default to not signing if no config
+            else:
+                should_sign = sign
+
+            # Get the signing key from config if signing is enabled
+            keyid = None
             if should_sign:
-                keyid = sign if isinstance(sign, str) else None
-                # If sign is True but no keyid specified, check user.signingKey config
-                if should_sign is True and keyid is None:
-                    config = r.get_config_stack()
-                    try:
-                        keyid = config.get((b"user",), b"signingKey").decode("ascii")
-                    except KeyError:
-                        # No user.signingKey configured, will use default GPG key
-                        pass
+                try:
+                    keyid_bytes = config.get((b"user",), b"signingkey")
+                    keyid = keyid_bytes.decode() if keyid_bytes else None
+                except KeyError:
+                    keyid = None
                 tag_obj.sign(keyid)
 
             r.object_store.add_object(tag_obj)
@@ -2040,6 +2044,60 @@ def tag_create(
             tag_id = object.id
 
         r.refs[_make_tag_ref(tag)] = tag_id
+
+
+def verify_commit(
+    repo: RepoPath,
+    committish: Union[str, bytes] = "HEAD",
+    keyids: Optional[list[str]] = None,
+) -> None:
+    """Verify GPG signature on a commit.
+
+    Args:
+      repo: Path to repository
+      committish: Commit to verify (defaults to HEAD)
+      keyids: Optional list of trusted key IDs. If provided, the commit
+        must be signed by one of these keys. If not provided, just verifies
+        that the commit has a valid signature.
+
+    Raises:
+      gpg.errors.BadSignatures: if GPG signature verification fails
+      gpg.errors.MissingSignatures: if commit was not signed by a key
+        specified in keyids
+    """
+    with open_repo_closing(repo) as r:
+        commit = parse_commit(r, committish)
+        commit.verify(keyids)
+
+
+def verify_tag(
+    repo: RepoPath,
+    tagname: Union[str, bytes],
+    keyids: Optional[list[str]] = None,
+) -> None:
+    """Verify GPG signature on a tag.
+
+    Args:
+      repo: Path to repository
+      tagname: Name of tag to verify
+      keyids: Optional list of trusted key IDs. If provided, the tag
+        must be signed by one of these keys. If not provided, just verifies
+        that the tag has a valid signature.
+
+    Raises:
+      gpg.errors.BadSignatures: if GPG signature verification fails
+      gpg.errors.MissingSignatures: if tag was not signed by a key
+        specified in keyids
+    """
+    with open_repo_closing(repo) as r:
+        if isinstance(tagname, str):
+            tagname = tagname.encode()
+        tag_ref = _make_tag_ref(tagname)
+        tag_id = r.refs[tag_ref]
+        tag_obj = r[tag_id]
+        if not isinstance(tag_obj, Tag):
+            raise Error(f"{tagname!r} does not point to a tag object")
+        tag_obj.verify(keyids)
 
 
 def tag_list(repo: RepoPath, outstream: TextIO = sys.stdout) -> list[bytes]:

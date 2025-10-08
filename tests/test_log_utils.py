@@ -24,6 +24,7 @@
 import logging
 import os
 import tempfile
+from typing import Optional
 
 from dulwich.log_utils import (
     _DULWICH_LOGGER,
@@ -59,7 +60,7 @@ class LogUtilsTests(TestCase):
             os.environ["GIT_TRACE"] = self.original_git_trace
         super().tearDown()
 
-    def _set_git_trace(self, value: str | None) -> None:
+    def _set_git_trace(self, value: Optional[str]) -> None:
         """Helper to set GIT_TRACE environment variable."""
         if value is None:
             os.environ.pop("GIT_TRACE", None)

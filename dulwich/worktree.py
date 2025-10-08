@@ -413,7 +413,7 @@ class WorkTree:
         ref: Ref | None = b"HEAD",
         merge_heads: Sequence[ObjectID] | None = None,
         no_verify: bool = False,
-        sign: bool = False,
+        sign: bool | None = None,
     ) -> ObjectID:
         """Create a new commit.
 
@@ -501,15 +501,25 @@ class WorkTree:
         message = None  # Will be set later after parents are set
 
         # Check if we should sign the commit
-        should_sign = sign
         if sign is None:
             # Check commit.gpgSign configuration when sign is not explicitly set
-            config = self._repo.get_config_stack()
             try:
-                should_sign = config.get_boolean((b"commit",), b"gpgSign")
+                should_sign = config.get_boolean(
+                    (b"commit",), b"gpgsign", default=False
+                )
             except KeyError:
                 should_sign = False  # Default to not signing if no config
-        keyid = sign if isinstance(sign, str) else None
+        else:
+            should_sign = sign
+
+        # Get the signing key from config if signing is enabled
+        keyid = None
+        if should_sign:
+            try:
+                keyid_bytes = config.get((b"user",), b"signingkey")
+                keyid = keyid_bytes.decode() if keyid_bytes else None
+            except KeyError:
+                keyid = None
 
         if ref is None:
             # Create a dangling commit

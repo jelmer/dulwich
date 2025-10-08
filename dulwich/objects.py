@@ -167,23 +167,50 @@ def hex_to_filename(path: PathT, hex: Union[str, bytes]) -> PathT:
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
     # as path.
-    if type(path) is not type(hex) and isinstance(path, str):
-        hex = hex.decode("ascii")  # type: ignore
-    dir_name = hex[:2]
-    file_name = hex[2:]
-    # Check from object dir
-    return os.path.join(path, dir_name, file_name)  # type: ignore
+    if isinstance(path, str):
+        if isinstance(hex, bytes):
+            hex_str = hex.decode("ascii")
+        else:
+            hex_str = hex
+        dir_name = hex_str[:2]
+        file_name = hex_str[2:]
+        result = os.path.join(path, dir_name, file_name)
+        assert isinstance(result, str)
+        return result
+    else:
+        # path is bytes
+        if isinstance(hex, str):
+            hex_bytes = hex.encode("ascii")
+        else:
+            hex_bytes = hex
+        dir_name_b = hex_bytes[:2]
+        file_name_b = hex_bytes[2:]
+        result_b = os.path.join(path, dir_name_b, file_name_b)
+        assert isinstance(result_b, bytes)
+        return result_b
 
 
 def filename_to_hex(filename: Union[str, bytes]) -> str:
     """Takes an object filename and returns its corresponding hex sha."""
     # grab the last (up to) two path components
-    names = filename.rsplit(os.path.sep, 2)[-2:]  # type: ignore
     errmsg = f"Invalid object filename: {filename!r}"
-    assert len(names) == 2, errmsg
-    base, rest = names
-    assert len(base) == 2 and len(rest) == 38, errmsg
-    hex_bytes = (base + rest).encode("ascii")  # type: ignore
+    if isinstance(filename, str):
+        names = filename.rsplit(os.path.sep, 2)[-2:]
+        assert len(names) == 2, errmsg
+        base, rest = names
+        assert len(base) == 2 and len(rest) == 38, errmsg
+        hex_str = base + rest
+        hex_bytes = hex_str.encode("ascii")
+    else:
+        # filename is bytes
+        sep = (
+            os.path.sep.encode("ascii") if isinstance(os.path.sep, str) else os.path.sep
+        )
+        names_b = filename.rsplit(sep, 2)[-2:]
+        assert len(names_b) == 2, errmsg
+        base_b, rest_b = names_b
+        assert len(base_b) == 2 and len(rest_b) == 38, errmsg
+        hex_bytes = base_b + rest_b
     hex_to_sha(hex_bytes)
     return hex_bytes.decode("ascii")
 
@@ -761,7 +788,8 @@ class Blob(ShaFile):
         if not chunks:
             return []
         if len(chunks) == 1:
-            return chunks[0].splitlines(True)  # type: ignore[no-any-return]
+            result: list[bytes] = chunks[0].splitlines(True)
+            return result
         remaining = None
         ret = []
         for chunk in chunks:
@@ -1154,9 +1182,9 @@ class Tag(ShaFile):
 class TreeEntry(NamedTuple):
     """Named tuple encapsulating a single tree entry."""
 
-    path: Optional[bytes]
-    mode: Optional[int]
-    sha: Optional[bytes]
+    path: bytes
+    mode: int
+    sha: bytes
 
     def in_path(self, path: bytes) -> "TreeEntry":
         """Return a copy of this entry with the given path prepended."""
@@ -1432,7 +1460,7 @@ class Tree(ShaFile):
             last = entry
 
     def _serialize(self) -> list[bytes]:
-        return list(serialize_tree(self.iteritems()))  # type: ignore[arg-type]
+        return list(serialize_tree(self.iteritems()))
 
     def as_pretty_string(self) -> str:
         """Return a human-readable string representation of this tree.

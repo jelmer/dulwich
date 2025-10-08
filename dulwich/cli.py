@@ -62,6 +62,7 @@ from .client import get_transport_and_path
 from .config import Config
 from .errors import ApplyDeltaError, GitProtocolError
 from .index import Index
+from .log_utils import _configure_logging_from_trace
 from .objects import Commit, sha_to_hex, valid_hexsha
 from .objectspec import parse_commit_range
 from .pack import Pack
@@ -4501,10 +4502,12 @@ def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
         parser.print_help()
         return 1
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-    )
+    # Try to configure from GIT_TRACE, fall back to default if it fails
+    if not _configure_logging_from_trace():
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(message)s",
+        )
 
     # First remaining arg is the command
     cmd = remaining[0]

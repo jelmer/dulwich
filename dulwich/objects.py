@@ -1172,7 +1172,7 @@ class Tag(ShaFile):
             if keyids:
                 keys = [ctx.get_key(key) for key in keyids]
                 for key in keys:
-                    for subkey in keys:
+                    for subkey in key.subkeys:
                         for sig in result.signatures:
                             if subkey.can_sign and subkey.fpr == sig.fpr:
                                 return
@@ -1919,7 +1919,7 @@ class Commit(ShaFile):
             if keyids:
                 keys = [ctx.get_key(key) for key in keyids]
                 for key in keys:
-                    for subkey in keys:
+                    for subkey in key.subkeys:
                         for sig in result.signatures:
                             if subkey.can_sign and subkey.fpr == sig.fpr:
                                 return

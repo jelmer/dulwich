@@ -109,7 +109,7 @@ class CommitCreateSignTestCase(PorcelainGpgTestCase, CompatTestCase):
             self.repo.path,
             b"messy message messiah",
             b"foo <foo@b.ar>",
-            signoff=True,
+            sign=True,
         )
 
         run_git_or_fail(

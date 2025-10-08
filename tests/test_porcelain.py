@@ -625,7 +625,7 @@ class CommitSignTests(PorcelainGpgTestCase):
             message="Some message",
             author="Joe <joe@example.com>",
             committer="Bob <bob@example.com>",
-            signoff=True,
+            sign=True,
         )
         self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
@@ -694,7 +694,7 @@ class CommitSignTests(PorcelainGpgTestCase):
             message="Signed with configured key",
             author="Joe <joe@example.com>",
             committer="Bob <bob@example.com>",
-            signoff=True,  # This should read user.signingKey from config
+            sign=True,  # This should read user.signingKey from config
         )
 
         self.assertIsInstance(sha, bytes)
@@ -809,7 +809,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         )
         self.repo.refs[b"HEAD"] = c3.id
 
-        # Set up commit.gpgSign=false but explicitly pass signoff=True
+        # Set up commit.gpgSign=false but explicitly pass sign=True
         cfg = self.repo.get_config()
         cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
         cfg.set(("commit",), "gpgSign", False)
@@ -817,13 +817,13 @@ class CommitSignTests(PorcelainGpgTestCase):
 
         self.import_default_key()
 
-        # Create commit with explicit signoff=True (should override config)
+        # Create commit with explicit sign=True (should override config)
         sha = porcelain.commit(
             self.repo.path,
             message="Explicitly signed commit",
             author="Joe <joe@example.com>",
             committer="Bob <bob@example.com>",
-            signoff=True,  # This should override commit.gpgSign=false
+            sign=True,  # This should override commit.gpgSign=false
         )
 
         self.assertIsInstance(sha, bytes)
@@ -842,7 +842,7 @@ class CommitSignTests(PorcelainGpgTestCase):
         )
         self.repo.refs[b"HEAD"] = c3.id
 
-        # Set up commit.gpgSign=true but explicitly pass signoff=False
+        # Set up commit.gpgSign=true but explicitly pass sign=False
         cfg = self.repo.get_config()
         cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
         cfg.set(("commit",), "gpgSign", True)
@@ -850,13 +850,13 @@ class CommitSignTests(PorcelainGpgTestCase):
 
         self.import_default_key()
 
-        # Create commit with explicit signoff=False (should disable signing)
+        # Create commit with explicit sign=False (should disable signing)
         sha = porcelain.commit(
             self.repo.path,
             message="Explicitly unsigned commit",
             author="Joe <joe@example.com>",
             committer="Bob <bob@example.com>",
-            signoff=False,  # This should override commit.gpgSign=true
+            sign=False,  # This should override commit.gpgSign=true
         )
 
         self.assertIsInstance(sha, bytes)
@@ -866,6 +866,165 @@ class CommitSignTests(PorcelainGpgTestCase):
         assert isinstance(commit, Commit)
         # Verify the commit is NOT signed despite config=true
         self.assertIsNone(commit._gpgsig)
+
+
+@skipIf(
+    platform.python_implementation() == "PyPy" or sys.platform == "win32",
+    "gpgme not easily available or supported on Windows and PyPy",
+)
+class VerifyCommitTests(PorcelainGpgTestCase):
+    def test_verify_commit_valid_signature(self) -> None:
+        """Test verifying a commit with a valid GPG signature."""
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.write_to_path()
+        self.import_default_key()
+
+        # Create a signed commit
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Signed commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            sign=True,
+        )
+
+        # Verify should not raise
+        porcelain.verify_commit(self.repo.path, sha)
+        porcelain.verify_commit(
+            self.repo.path, sha, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
+        )
+
+    def test_verify_commit_with_wrong_key(self) -> None:
+        """Test that verifying with wrong keyid raises MissingSignatures."""
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.write_to_path()
+        self.import_default_key()
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Signed commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            sign=True,
+        )
+
+        self.import_non_default_key()
+        self.assertRaises(
+            gpg.errors.MissingSignatures,
+            porcelain.verify_commit,
+            self.repo.path,
+            sha,
+            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
+        )
+
+    def test_verify_commit_unsigned(self) -> None:
+        """Test that verifying an unsigned commit succeeds (no signature to verify)."""
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Unsigned commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            sign=False,
+        )
+
+        # Verify should not raise for unsigned commits
+        porcelain.verify_commit(self.repo.path, sha)
+
+
+@skipIf(
+    platform.python_implementation() == "PyPy" or sys.platform == "win32",
+    "gpgme not easily available or supported on Windows and PyPy",
+)
+class VerifyTagTests(PorcelainGpgTestCase):
+    def test_verify_tag_valid_signature(self) -> None:
+        """Test verifying a tag with a valid GPG signature."""
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.write_to_path()
+        self.import_default_key()
+
+        # Create a signed tag
+        porcelain.tag_create(
+            self.repo.path,
+            b"signed-tag",
+            b"Tagger <tagger@example.com>",
+            b"Signed tag message",
+            annotated=True,
+            sign=True,
+        )
+
+        # Verify should not raise
+        porcelain.verify_tag(self.repo.path, b"signed-tag")
+        porcelain.verify_tag(
+            self.repo.path, b"signed-tag", keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
+        )
+
+    def test_verify_tag_with_wrong_key(self) -> None:
+        """Test that verifying with wrong keyid raises MissingSignatures."""
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        cfg = self.repo.get_config()
+        cfg.set(("user",), "signingKey", PorcelainGpgTestCase.DEFAULT_KEY_ID)
+        cfg.write_to_path()
+        self.import_default_key()
+
+        porcelain.tag_create(
+            self.repo.path,
+            b"signed-tag",
+            b"Tagger <tagger@example.com>",
+            b"Signed tag message",
+            annotated=True,
+            sign=True,
+        )
+
+        self.import_non_default_key()
+        self.assertRaises(
+            gpg.errors.MissingSignatures,
+            porcelain.verify_tag,
+            self.repo.path,
+            b"signed-tag",
+            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
+        )
+
+    def test_verify_tag_unsigned(self) -> None:
+        """Test that verifying an unsigned tag succeeds (no signature to verify)."""
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        porcelain.tag_create(
+            self.repo.path,
+            b"unsigned-tag",
+            b"Tagger <tagger@example.com>",
+            b"Unsigned tag message",
+            annotated=True,
+            sign=False,
+        )
+
+        # Verify should not raise for unsigned tags
+        porcelain.verify_tag(self.repo.path, b"unsigned-tag")
 
 
 class TimezoneTests(PorcelainTestCase):

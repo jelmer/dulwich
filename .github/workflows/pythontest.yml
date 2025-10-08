@@ -46,7 +46,7 @@ jobs:
           # Install build-time dependencies
           python -m pip install --upgrade "setuptools>=77"
           python -m pip install --upgrade pip
-          pip install --upgrade ".[merge,fastimport,paramiko,https]"  setuptools-rust
+          pip install --upgrade ".[merge,fastimport,paramiko,https,patiencediff,colordiff]"  setuptools-rust
       - name: Install gpg on supported platforms
         run: pip install --upgrade ".[pgp]"
         if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"

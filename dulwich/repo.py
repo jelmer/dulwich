@@ -87,6 +87,7 @@ from .object_store import (
     MissingObjectFinder,
     ObjectStoreGraphWalker,
     PackBasedObjectStore,
+    PackCapableObjectStore,
     find_shallow,
     peel_sha,
 )
@@ -407,7 +408,9 @@ class BaseRepo:
         repository
     """
 
-    def __init__(self, object_store: PackBasedObjectStore, refs: RefsContainer) -> None:
+    def __init__(
+        self, object_store: "PackCapableObjectStore", refs: RefsContainer
+    ) -> None:
         """Open a repository.
 
         This shouldn't be called directly, but rather through one of the
@@ -608,7 +611,8 @@ class BaseRepo:
             if hasattr(graph_walker, "shallow"):
                 graph_walker.shallow.update(shallow - not_shallow)
                 new_shallow = graph_walker.shallow - current_shallow
-                unshallow = graph_walker.unshallow = not_shallow & current_shallow  # type: ignore[attr-defined]
+                unshallow = not_shallow & current_shallow
+                setattr(graph_walker, "unshallow", unshallow)
                 if hasattr(graph_walker, "update_shallow"):
                     graph_walker.update_shallow(new_shallow, unshallow)
         else:
@@ -622,24 +626,12 @@ class BaseRepo:
                 # Do not send a pack in shallow short-circuit path
                 return None
 
-            class DummyMissingObjectFinder:
-                """Dummy finder that returns no missing objects."""
-
-                def get_remote_has(self) -> None:
-                    """Get remote has (always returns None).
-
-                    Returns:
-                      None
-                    """
-                    return None
-
-                def __len__(self) -> int:
-                    return 0
-
-                def __iter__(self) -> Iterator[tuple[bytes, Optional[bytes]]]:
-                    yield from []
-
-            return DummyMissingObjectFinder()  # type: ignore
+            # Return an actual MissingObjectFinder with empty wants
+            return MissingObjectFinder(
+                self.object_store,
+                haves=[],
+                wants=[],
+            )
 
         # If the graph walker is set up with an implementation that can
         # ACK/NAK to the wire, it will write data to the client through
@@ -2228,7 +2220,7 @@ class MemoryRepo(BaseRepo):
 
         self._reflog: list[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
-        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)  # type: ignore[arg-type]
+        BaseRepo.__init__(self, MemoryObjectStore(), refs_container)
         self._named_files: dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()

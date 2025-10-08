@@ -622,7 +622,73 @@ class BaseObjectStore:
         raise KeyError(sha)
 
 
-class PackBasedObjectStore(BaseObjectStore, PackedObjectContainer):
+class PackCapableObjectStore(BaseObjectStore, PackedObjectContainer):
+    """Object store that supports pack operations.
+
+    This is a base class for object stores that can handle pack files,
+    including both disk-based and memory-based stores.
+    """
+
+    def add_pack(self) -> tuple[BinaryIO, Callable[[], None], Callable[[], None]]:
+        """Add a new pack to this object store.
+
+        Returns: Tuple of (file, commit_func, abort_func)
+        """
+        raise NotImplementedError(self.add_pack)
+
+    def add_pack_data(
+        self,
+        count: int,
+        unpacked_objects: Iterator["UnpackedObject"],
+        progress: Optional[Callable[..., None]] = None,
+    ) -> Optional["Pack"]:
+        """Add pack data to this object store.
+
+        Args:
+          count: Number of objects
+          unpacked_objects: Iterator over unpacked objects
+          progress: Optional progress callback
+        """
+        raise NotImplementedError(self.add_pack_data)
+
+    def get_unpacked_object(
+        self, sha1: bytes, *, include_comp: bool = False
+    ) -> "UnpackedObject":
+        """Get a raw unresolved object.
+
+        Args:
+            sha1: SHA-1 hash of the object
+            include_comp: Whether to include compressed data
+
+        Returns:
+            UnpackedObject instance
+        """
+        from .pack import UnpackedObject
+
+        obj = self[sha1]
+        return UnpackedObject(obj.type_num, sha=sha1, decomp_chunks=obj.as_raw_chunks())
+
+    def iterobjects_subset(
+        self, shas: Iterable[bytes], *, allow_missing: bool = False
+    ) -> Iterator[ShaFile]:
+        """Iterate over a subset of objects.
+
+        Args:
+            shas: Iterable of object SHAs to retrieve
+            allow_missing: If True, skip missing objects
+
+        Returns:
+            Iterator of ShaFile objects
+        """
+        for sha in shas:
+            try:
+                yield self[sha]
+            except KeyError:
+                if not allow_missing:
+                    raise
+
+
+class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
     """Object store that uses pack files for storage.
 
     This class provides a base implementation for object stores that use
@@ -1836,7 +1902,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     os.remove(pack_path)
 
 
-class MemoryObjectStore(BaseObjectStore):
+class MemoryObjectStore(PackCapableObjectStore):
     """Object store that keeps all objects in memory."""
 
     def __init__(self) -> None:

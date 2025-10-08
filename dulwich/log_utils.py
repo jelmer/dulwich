@@ -93,7 +93,7 @@ def _get_trace_target() -> Optional[Union[str, int]]:
         pass
 
     # If it's an absolute path, return it as a string
-    if trace_value.startswith("/"):
+    if os.path.isabs(trace_value):
         return trace_value
 
     # For any other value, treat it as disabled

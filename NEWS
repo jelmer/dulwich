@@ -9,6 +9,12 @@
    returns (payload, signature, signature_type) tuple. Supports both PGP and SSH
    signature detection. (Jelmer Vernooĳ)
 
+ * Fix Git filter protocol implementation to properly handle the two-phase
+   response format (initial headers, content, final headers) as specified in
+   the Git protocol documentation. This fixes compatibility with Git LFS and
+   other filters that send status messages in final headers.
+   (Jelmer Vernooĳ, #1889)
+
 0.24.2	2025-09-25
 
  * Added ``porcelain.shortlog`` function to summarize commits by author,

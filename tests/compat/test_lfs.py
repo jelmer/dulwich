@@ -337,6 +337,8 @@ class LFSStatusCompatTest(LFSCompatTestCase):
         """
         repo_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=repo_dir)
+        # Disable autocrlf to avoid line ending issues on Windows
+        run_git_or_fail(["config", "core.autocrlf", "false"], cwd=repo_dir)
         run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)
@@ -369,6 +371,8 @@ class LFSStatusCompatTest(LFSCompatTestCase):
         """Test git status with modified LFS files."""
         repo_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=repo_dir)
+        # Disable autocrlf to avoid line ending issues on Windows
+        run_git_or_fail(["config", "core.autocrlf", "false"], cwd=repo_dir)
         run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)
@@ -398,6 +402,8 @@ class LFSStatusCompatTest(LFSCompatTestCase):
         """Test git status with multiple LFS files."""
         repo_dir = self.make_temp_dir()
         run_git_or_fail(["init"], cwd=repo_dir)
+        # Disable autocrlf to avoid line ending issues on Windows
+        run_git_or_fail(["config", "core.autocrlf", "false"], cwd=repo_dir)
         run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)

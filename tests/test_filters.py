@@ -469,11 +469,14 @@ while True:
     # Send response
     write_pkt(b"status=success")
     write_pkt(None)
-    
+
     # Send result
     chunk_size = 65516
     for i in range(0, len(result), chunk_size):
         write_pkt(result[i:i+chunk_size])
+    write_pkt(None)
+
+    # Send final headers (empty list to keep status=success)
     write_pkt(None)
 """
 
@@ -915,11 +918,14 @@ while True:
     # Send response
     write_pkt(b"status=success")
     write_pkt(None)
-    
+
     # Send result
     chunk_size = 65516
     for i in range(0, len(result), chunk_size):
         write_pkt(result[i:i+chunk_size])
+    write_pkt(None)
+
+    # Send final headers (empty list to keep status=success)
     write_pkt(None)
 """
 
@@ -1183,3 +1189,390 @@ protocol.write_pkt_line(None)
             driver.clean(b"test data")
 
         self.assertIn("Failed to start process filter", str(cm.exception))
+
+    def test_two_phase_response_protocol(self):
+        """Test filter protocol with two-phase response (initial + final headers).
+
+        This test verifies that the filter correctly handles the Git LFS protocol
+        where filters send:
+        1. Initial headers with status
+        2. Content data
+        3. Final headers with status
+
+        This is the format used by git-lfs and documented in the Git filter protocol.
+        """
+        import sys
+        import tempfile
+
+        # Create a filter that follows the two-phase protocol
+        filter_script = """import sys
+
+def read_exact(n):
+    data = b""
+    while len(data) < n:
+        chunk = sys.stdin.buffer.read(n - len(data))
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+def write_pkt(data):
+    if data is None:
+        sys.stdout.buffer.write(b"0000")
+    else:
+        length = len(data) + 4
+        sys.stdout.buffer.write(("{:04x}".format(length)).encode())
+        sys.stdout.buffer.write(data)
+    sys.stdout.buffer.flush()
+
+def read_pkt():
+    size_bytes = read_exact(4)
+    if not size_bytes:
+        return None
+    size = int(size_bytes.decode(), 16)
+    if size == 0:
+        return None
+    return read_exact(size - 4)
+
+# Handshake
+client_hello = read_pkt()
+version = read_pkt()
+flush = read_pkt()
+
+write_pkt(b"git-filter-server")
+write_pkt(b"version=2")
+write_pkt(None)
+
+# Read and echo capabilities
+caps = []
+while True:
+    cap = read_pkt()
+    if cap is None:
+        break
+    caps.append(cap)
+
+for cap in caps:
+    write_pkt(cap)
+write_pkt(None)
+
+# Process commands
+while True:
+    headers = {}
+    while True:
+        line = read_pkt()
+        if line is None:
+            break
+        if b"=" in line:
+            k, v = line.split(b"=", 1)
+            headers[k.decode()] = v.decode()
+
+    if not headers:
+        break
+
+    # Read data
+    data_chunks = []
+    while True:
+        chunk = read_pkt()
+        if chunk is None:
+            break
+        data_chunks.append(chunk)
+
+    data = b"".join(data_chunks)
+
+    # Process
+    if headers.get("command") == "clean":
+        result = data.upper()
+    elif headers.get("command") == "smudge":
+        result = data.lower()
+    else:
+        result = data
+
+    # TWO-PHASE RESPONSE: Send initial headers
+    write_pkt(b"status=success")
+    write_pkt(None)
+
+    # Send result data
+    chunk_size = 65516
+    for i in range(0, len(result), chunk_size):
+        write_pkt(result[i:i+chunk_size])
+    write_pkt(None)
+
+    # TWO-PHASE RESPONSE: Send final headers (empty list to keep status=success)
+    write_pkt(None)
+"""
+
+        fd, filter_path = tempfile.mkstemp(
+            suffix=".py", prefix="test_filter_two_phase_"
+        )
+        try:
+            os.write(fd, filter_script.encode())
+            os.close(fd)
+
+            if os.name != "nt":
+                os.chmod(filter_path, 0o755)
+
+            driver = ProcessFilterDriver(
+                process_cmd=f"{sys.executable} {filter_path}", required=True
+            )
+
+            # Test clean operation
+            test_data = b"hello world"
+            result = driver.clean(test_data)
+            self.assertEqual(result, b"HELLO WORLD")
+
+            # Test smudge operation
+            result = driver.smudge(b"HELLO WORLD", b"test.txt")
+            self.assertEqual(result, b"hello world")
+
+            driver.cleanup()
+
+        finally:
+            if os.path.exists(filter_path):
+                os.unlink(filter_path)
+
+    def test_two_phase_response_with_status_messages(self):
+        """Test filter that sends status messages in final headers.
+
+        Some filters (like git-lfs) may send progress or status messages
+        in the final headers. This test verifies that we can handle those.
+        """
+        import sys
+        import tempfile
+
+        # Create a filter that sends extra status info in final headers
+        filter_script = """import sys
+
+def read_exact(n):
+    data = b""
+    while len(data) < n:
+        chunk = sys.stdin.buffer.read(n - len(data))
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+def write_pkt(data):
+    if data is None:
+        sys.stdout.buffer.write(b"0000")
+    else:
+        length = len(data) + 4
+        sys.stdout.buffer.write(("{:04x}".format(length)).encode())
+        sys.stdout.buffer.write(data)
+    sys.stdout.buffer.flush()
+
+def read_pkt():
+    size_bytes = read_exact(4)
+    if not size_bytes:
+        return None
+    size = int(size_bytes.decode(), 16)
+    if size == 0:
+        return None
+    return read_exact(size - 4)
+
+# Handshake
+client_hello = read_pkt()
+version = read_pkt()
+flush = read_pkt()
+
+write_pkt(b"git-filter-server")
+write_pkt(b"version=2")
+write_pkt(None)
+
+# Read and echo capabilities
+caps = []
+while True:
+    cap = read_pkt()
+    if cap is None:
+        break
+    caps.append(cap)
+
+for cap in caps:
+    write_pkt(cap)
+write_pkt(None)
+
+# Process commands
+while True:
+    headers = {}
+    while True:
+        line = read_pkt()
+        if line is None:
+            break
+        if b"=" in line:
+            k, v = line.split(b"=", 1)
+            headers[k.decode()] = v.decode()
+
+    if not headers:
+        break
+
+    # Read data
+    data_chunks = []
+    while True:
+        chunk = read_pkt()
+        if chunk is None:
+            break
+        data_chunks.append(chunk)
+
+    data = b"".join(data_chunks)
+
+    # Process
+    result = data.upper()
+
+    # Send initial headers
+    write_pkt(b"status=success")
+    write_pkt(None)
+
+    # Send result data
+    chunk_size = 65516
+    for i in range(0, len(result), chunk_size):
+        write_pkt(result[i:i+chunk_size])
+    write_pkt(None)
+
+    # Send final headers with progress messages (like git-lfs does)
+    write_pkt(b"status=success")
+    write_pkt(None)
+"""
+
+        fd, filter_path = tempfile.mkstemp(suffix=".py", prefix="test_filter_status_")
+        try:
+            os.write(fd, filter_script.encode())
+            os.close(fd)
+
+            if os.name != "nt":
+                os.chmod(filter_path, 0o755)
+
+            driver = ProcessFilterDriver(
+                process_cmd=f"{sys.executable} {filter_path}", required=True
+            )
+
+            # Test clean operation with status messages
+            test_data = b"test data with status"
+            result = driver.clean(test_data)
+            self.assertEqual(result, b"TEST DATA WITH STATUS")
+
+            driver.cleanup()
+
+        finally:
+            if os.path.exists(filter_path):
+                os.unlink(filter_path)
+
+    def test_two_phase_response_with_final_error(self):
+        """Test filter that reports error in final headers.
+
+        The Git protocol allows filters to report success initially,
+        then report an error in the final headers. This test ensures
+        we handle that correctly.
+        """
+        import sys
+        import tempfile
+
+        # Create a filter that sends error in final headers
+        filter_script = """import sys
+
+def read_exact(n):
+    data = b""
+    while len(data) < n:
+        chunk = sys.stdin.buffer.read(n - len(data))
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+def write_pkt(data):
+    if data is None:
+        sys.stdout.buffer.write(b"0000")
+    else:
+        length = len(data) + 4
+        sys.stdout.buffer.write(("{:04x}".format(length)).encode())
+        sys.stdout.buffer.write(data)
+    sys.stdout.buffer.flush()
+
+def read_pkt():
+    size_bytes = read_exact(4)
+    if not size_bytes:
+        return None
+    size = int(size_bytes.decode(), 16)
+    if size == 0:
+        return None
+    return read_exact(size - 4)
+
+# Handshake
+client_hello = read_pkt()
+version = read_pkt()
+flush = read_pkt()
+
+write_pkt(b"git-filter-server")
+write_pkt(b"version=2")
+write_pkt(None)
+
+# Read and echo capabilities
+caps = []
+while True:
+    cap = read_pkt()
+    if cap is None:
+        break
+    caps.append(cap)
+
+for cap in caps:
+    write_pkt(cap)
+write_pkt(None)
+
+# Process commands
+while True:
+    headers = {}
+    while True:
+        line = read_pkt()
+        if line is None:
+            break
+        if b"=" in line:
+            k, v = line.split(b"=", 1)
+            headers[k.decode()] = v.decode()
+
+    if not headers:
+        break
+
+    # Read data
+    data_chunks = []
+    while True:
+        chunk = read_pkt()
+        if chunk is None:
+            break
+        data_chunks.append(chunk)
+
+    data = b"".join(data_chunks)
+
+    # Send initial headers with success
+    write_pkt(b"status=success")
+    write_pkt(None)
+
+    # Send partial result
+    write_pkt(b"PARTIAL")
+    write_pkt(None)
+
+    # Send final headers with error (simulating processing failure)
+    write_pkt(b"status=error")
+    write_pkt(None)
+"""
+
+        fd, filter_path = tempfile.mkstemp(suffix=".py", prefix="test_filter_error_")
+        try:
+            os.write(fd, filter_script.encode())
+            os.close(fd)
+
+            if os.name != "nt":
+                os.chmod(filter_path, 0o755)
+
+            driver = ProcessFilterDriver(
+                process_cmd=f"{sys.executable} {filter_path}", required=True
+            )
+
+            # Should raise FilterError due to final status being error
+            with self.assertRaises(FilterError) as cm:
+                driver.clean(b"test data")
+
+            self.assertIn("final status: error", str(cm.exception))
+
+            driver.cleanup()
+
+        finally:
+            if os.path.exists(filter_path):
+                os.unlink(filter_path)

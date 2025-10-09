@@ -249,7 +249,7 @@ class ProcessFilterDriver:
                     self._protocol.write_pkt_line(chunk)
                 self._protocol.write_pkt_line(None)  # flush packet to end data
 
-                # Read response
+                # Read response (initial headers)
                 response_headers = {}
                 while True:
                     pkt = self._protocol.read_pkt_line()
@@ -270,6 +270,23 @@ class ProcessFilterDriver:
                     if pkt is None:  # flush packet ends data
                         break
                     result_chunks.append(pkt)
+
+                # Read final headers per Git filter protocol
+                # Filters send: headers + flush + content + flush + final_headers + flush
+                final_headers = {}
+                while True:
+                    pkt = self._protocol.read_pkt_line()
+                    if pkt is None:  # flush packet ends final headers
+                        break
+                    key, _, value = pkt.decode().rstrip("\n\r").partition("=")
+                    final_headers[key] = value
+
+                # Check final status (if provided, it overrides the initial status)
+                final_status = final_headers.get("status", status)
+                if final_status != "success":
+                    raise FilterError(
+                        f"Process filter {operation} failed with final status: {final_status}"
+                    )
 
                 return b"".join(result_chunks)
 

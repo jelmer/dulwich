@@ -1,5 +1,10 @@
 0.24.3	UNRELEASED
 
+ * Add support for ``GIT_TRACE`` environment variable for debugging. Supports
+   output to stderr (values "1", "2", or "true"), file descriptors (3-9),
+   file paths, and directories (creates per-process trace files).
+   (Jelmer Vernooĳ, #1863)
+
  * Add ``extract_signature()`` method to ``Commit`` and ``Tag`` classes that
    returns (payload, signature, signature_type) tuple. Supports both PGP and SSH
    signature detection. (Jelmer Vernooĳ)

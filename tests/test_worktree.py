@@ -39,6 +39,7 @@ from dulwich.worktree import (
     move_worktree,
     prune_worktrees,
     remove_worktree,
+    repair_worktree,
     temporary_worktree,
     unlock_worktree,
 )
@@ -720,6 +721,180 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         with self.assertRaises(ValueError) as cm:
             move_worktree(self.repo, wt_path, new_path)
         self.assertIn("Path already exists", str(cm.exception))
+
+    def test_repair_worktree_after_manual_move(self) -> None:
+        """Test repairing a worktree after manually moving it."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "original")
+        add_worktree(self.repo, wt_path)
+
+        # Manually move the worktree directory (simulating external move)
+        new_path = os.path.join(self.tempdir, "moved")
+        shutil.move(wt_path, new_path)
+
+        # At this point, the connection is broken
+        # Repair from the moved worktree
+        repaired = repair_worktree(self.repo, paths=[new_path])
+
+        # Should have repaired the worktree
+        self.assertEqual(len(repaired), 1)
+        self.assertEqual(repaired[0], new_path)
+
+        # Verify the worktree is now properly connected
+        worktrees = list_worktrees(self.repo)
+        paths = [wt.path for wt in worktrees]
+        self.assertIn(new_path, paths)
+
+    def test_repair_worktree_from_main_repo(self) -> None:
+        """Test repairing worktree connections from main repository."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "worktree")
+        add_worktree(self.repo, wt_path)
+
+        # Read the .git file to get the control directory
+        gitdir_file = os.path.join(wt_path, ".git")
+        with open(gitdir_file, "rb") as f:
+            content = f.read().strip()
+            control_dir = content[8:].decode()  # Remove "gitdir: " prefix
+
+        # Manually corrupt the .git file to point to wrong location
+        with open(gitdir_file, "wb") as f:
+            f.write(b"gitdir: /wrong/path\n")
+
+        # Repair from main repository
+        repaired = repair_worktree(self.repo)
+
+        # Should have repaired the connection
+        self.assertEqual(len(repaired), 1)
+        self.assertEqual(repaired[0], wt_path)
+
+        # Verify .git file now points to correct location
+        with open(gitdir_file, "rb") as f:
+            content = f.read().strip()
+            new_control_dir = content[8:].decode()
+            self.assertEqual(
+                os.path.abspath(new_control_dir), os.path.abspath(control_dir)
+            )
+
+    def test_repair_worktree_no_repairs_needed(self) -> None:
+        """Test repair when no repairs are needed."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "worktree")
+        add_worktree(self.repo, wt_path)
+
+        # Repair - should return empty list since nothing is broken
+        repaired = repair_worktree(self.repo)
+        self.assertEqual(len(repaired), 0)
+
+    def test_repair_invalid_worktree_path(self) -> None:
+        """Test that repairing an invalid path raises an error."""
+        with self.assertRaises(ValueError) as cm:
+            repair_worktree(self.repo, paths=["/nonexistent/path"])
+        self.assertIn("Not a valid worktree", str(cm.exception))
+
+    def test_repair_multiple_worktrees(self) -> None:
+        """Test repairing multiple worktrees at once."""
+        # Create two worktrees
+        wt_path1 = os.path.join(self.tempdir, "wt1")
+        wt_path2 = os.path.join(self.tempdir, "wt2")
+        add_worktree(self.repo, wt_path1, branch=b"branch1")
+        add_worktree(self.repo, wt_path2, branch=b"branch2")
+
+        # Manually move both worktrees
+        new_path1 = os.path.join(self.tempdir, "moved1")
+        new_path2 = os.path.join(self.tempdir, "moved2")
+        shutil.move(wt_path1, new_path1)
+        shutil.move(wt_path2, new_path2)
+
+        # Repair both at once
+        repaired = repair_worktree(self.repo, paths=[new_path1, new_path2])
+
+        # Both should be repaired
+        self.assertEqual(len(repaired), 2)
+        self.assertIn(new_path1, repaired)
+        self.assertIn(new_path2, repaired)
+
+    def test_repair_worktree_with_relative_paths(self) -> None:
+        """Test that repair handles worktrees with relative paths in gitdir."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "worktree")
+        add_worktree(self.repo, wt_path)
+
+        # Manually move the worktree
+        new_path = os.path.join(self.tempdir, "new-location")
+        shutil.move(wt_path, new_path)
+
+        # Repair from the new location
+        repaired = repair_worktree(self.repo, paths=[new_path])
+
+        # Should have repaired successfully
+        self.assertEqual(len(repaired), 1)
+        self.assertEqual(repaired[0], new_path)
+
+        # Verify the gitdir pointer was updated
+        from dulwich.repo import GITDIR, WORKTREES
+
+        worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
+        for entry in os.listdir(worktrees_dir):
+            gitdir_path = os.path.join(worktrees_dir, entry, GITDIR)
+            if os.path.exists(gitdir_path):
+                with open(gitdir_path, "rb") as f:
+                    content = f.read().strip()
+                    gitdir_location = os.fsdecode(content)
+                    # Should point to the new .git file location
+                    self.assertTrue(gitdir_location.endswith(".git"))
+
+    def test_repair_worktree_container_method(self) -> None:
+        """Test the WorkTreeContainer.repair() method."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "worktree")
+        add_worktree(self.repo, wt_path)
+
+        # Manually move it
+        new_path = os.path.join(self.tempdir, "moved")
+        shutil.move(wt_path, new_path)
+
+        # Use the container method to repair
+        repaired = self.repo.worktrees.repair(paths=[new_path])
+
+        # Should have repaired
+        self.assertEqual(len(repaired), 1)
+        self.assertEqual(repaired[0], new_path)
+
+    def test_repair_with_missing_gitdir_pointer(self) -> None:
+        """Test repair when gitdir pointer file is missing."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "worktree")
+        add_worktree(self.repo, wt_path)
+
+        # Find and remove the gitdir pointer file
+        from dulwich.repo import GITDIR, WORKTREES
+
+        worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
+        for entry in os.listdir(worktrees_dir):
+            gitdir_path = os.path.join(worktrees_dir, entry, GITDIR)
+            if os.path.exists(gitdir_path):
+                os.remove(gitdir_path)
+
+        # Repair should not crash, but won't repair anything
+        repaired = repair_worktree(self.repo, paths=[wt_path])
+        self.assertEqual(len(repaired), 0)
+
+    def test_repair_worktree_with_corrupted_git_file(self) -> None:
+        """Test repair with a corrupted .git file."""
+        # Create a worktree
+        wt_path = os.path.join(self.tempdir, "worktree")
+        add_worktree(self.repo, wt_path)
+
+        # Corrupt the .git file
+        gitdir_file = os.path.join(wt_path, ".git")
+        with open(gitdir_file, "wb") as f:
+            f.write(b"invalid content\n")
+
+        # Attempting to repair should raise an error
+        with self.assertRaises(ValueError) as cm:
+            repair_worktree(self.repo, paths=[wt_path])
+        self.assertIn("Invalid .git file", str(cm.exception))
 
 
 class TemporaryWorktreeTests(TestCase):

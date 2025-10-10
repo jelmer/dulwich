@@ -15,6 +15,10 @@
    other filters that send status messages in final headers.
    (Jelmer Vernooĳ, #1889)
 
+ * Add ``git worktree repair`` command to repair worktree administrative files
+   after worktrees or the main repository have been moved.
+   (Jelmer Vernooĳ, #1799)
+
 0.24.2	2025-09-25
 
  * Added ``porcelain.shortlog`` function to summarize commits by author,

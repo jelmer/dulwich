@@ -865,6 +865,46 @@ class TagCommandTest(DulwichCliTestCase):
         self.assertIn(b"refs/tags/v1.0", self.repo.refs.keys())
 
 
+class VerifyTagCommandTest(DulwichCliTestCase):
+    """Tests for verify-tag command."""
+
+    def test_verify_tag_basic(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Create an annotated tag
+        self._run_cli("tag", "--annotated", "v1.0")
+
+        # Mock the porcelain.verify_tag function since we don't have GPG setup
+        with patch("dulwich.cli.porcelain.verify_tag") as mock_verify:
+            _result, stdout, _stderr = self._run_cli("verify-tag", "v1.0")
+            mock_verify.assert_called_once_with(".", "v1.0")
+            self.assertIn("Good signature", stdout)
+
+    def test_verify_tag_multiple(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Create multiple annotated tags
+        self._run_cli("tag", "--annotated", "v1.0")
+        self._run_cli("tag", "--annotated", "v2.0")
+
+        # Mock the porcelain.verify_tag function
+        with patch("dulwich.cli.porcelain.verify_tag") as mock_verify:
+            _result, stdout, _stderr = self._run_cli("verify-tag", "v1.0", "v2.0")
+            self.assertEqual(mock_verify.call_count, 2)
+            self.assertIn("v1.0", stdout)
+            self.assertIn("v2.0", stdout)
+
+
 class DiffCommandTest(DulwichCliTestCase):
     """Tests for diff command."""
 

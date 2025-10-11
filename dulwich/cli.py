@@ -1496,6 +1496,51 @@ class cmd_pack_refs(Command):
         porcelain.pack_refs(".", all=args.all)
 
 
+class cmd_var(Command):
+    """Display Git logical variables."""
+
+    def run(self, argv: Sequence[str]) -> Optional[int]:
+        """Execute the var command.
+
+        Args:
+            argv: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "variable",
+            nargs="?",
+            help="Variable to query (e.g., GIT_AUTHOR_IDENT)",
+        )
+        parser.add_argument(
+            "-l",
+            "--list",
+            action="store_true",
+            help="List all variables",
+        )
+        args = parser.parse_args(argv)
+
+        if args.list:
+            # List all variables
+            variables = porcelain.var_list(".")
+            for key, value in sorted(variables.items()):
+                print(f"{key}={value}")
+            return 0
+        elif args.variable:
+            # Query specific variable
+            try:
+                value = porcelain.var(".", variable=args.variable)
+                print(value)
+                return 0
+            except KeyError:
+                logger.error("error: variable '%s' has no value", args.variable)
+                return 1
+        else:
+            # No arguments - print error
+            logger.error("error: variable or -l is required")
+            parser.print_help()
+            return 1
+
+
 class cmd_show(Command):
     """Show various types of objects."""
 
@@ -4539,6 +4584,7 @@ commands = {
     "unpack-objects": cmd_unpack_objects,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
+    "var": cmd_var,
     "verify-tag": cmd_verify_tag,
     "web-daemon": cmd_web_daemon,
     "worktree": cmd_worktree,

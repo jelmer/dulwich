@@ -865,6 +865,59 @@ class TagCommandTest(DulwichCliTestCase):
         self.assertIn(b"refs/tags/v1.0", self.repo.refs.keys())
 
 
+class VerifyCommitCommandTest(DulwichCliTestCase):
+    """Tests for verify-commit command."""
+
+    def test_verify_commit_basic(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Mock the porcelain.verify_commit function since we don't have GPG setup
+        with patch("dulwich.cli.porcelain.verify_commit") as mock_verify:
+            _result, stdout, _stderr = self._run_cli("verify-commit", "HEAD")
+            mock_verify.assert_called_once_with(".", "HEAD")
+            self.assertIn("Good signature", stdout)
+
+    def test_verify_commit_multiple(self):
+        # Create multiple commits
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test1")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=First")
+
+        with open(test_file, "w") as f:
+            f.write("test2")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Second")
+
+        # Mock the porcelain.verify_commit function
+        with patch("dulwich.cli.porcelain.verify_commit") as mock_verify:
+            _result, stdout, _stderr = self._run_cli("verify-commit", "HEAD", "HEAD~1")
+            self.assertEqual(mock_verify.call_count, 2)
+            self.assertIn("HEAD", stdout)
+            self.assertIn("HEAD~1", stdout)
+
+    def test_verify_commit_default_head(self):
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Mock the porcelain.verify_commit function
+        with patch("dulwich.cli.porcelain.verify_commit") as mock_verify:
+            # Test that verify-commit without arguments defaults to HEAD
+            _result, stdout, _stderr = self._run_cli("verify-commit")
+            mock_verify.assert_called_once_with(".", "HEAD")
+            self.assertIn("Good signature", stdout)
+
+
 class VerifyTagCommandTest(DulwichCliTestCase):
     """Tests for verify-tag command."""
 

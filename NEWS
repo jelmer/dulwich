@@ -1,5 +1,10 @@
 0.24.3	UNRELEASED
 
+ * Add support for ``git var`` command to display Git's logical variables
+   (GIT_AUTHOR_IDENT, GIT_COMMITTER_IDENT, GIT_EDITOR, GIT_SEQUENCE_EDITOR,
+   GIT_PAGER, GIT_DEFAULT_BRANCH). Available as ``porcelain.var()`` and
+   ``dulwich var`` CLI command. (Jelmer Vernooĳ, #1841)
+
  * Add support for ``GIT_TRACE`` environment variable for debugging. Supports
    output to stderr (values "1", "2", or "true"), file descriptors (3-9),
    file paths, and directories (creates per-process trace files).

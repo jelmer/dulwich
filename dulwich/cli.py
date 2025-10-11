@@ -1615,6 +1615,57 @@ class cmd_tag(Command):
         )
 
 
+class cmd_verify_tag(Command):
+    """Check the GPG signature of tags."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the verify-tag command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (1 on error, None on success)
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            help="Print the contents of the tag object before validating it.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--raw",
+            help="Print the raw gpg status output to standard error.",
+            action="store_true",
+        )
+        parser.add_argument("tags", nargs="+", help="Tags to verify")
+        parsed_args = parser.parse_args(args)
+
+        exit_code = None
+        for tag in parsed_args.tags:
+            try:
+                if parsed_args.verbose:
+                    # Show tag contents before verification
+                    porcelain.show(
+                        ".",
+                        objects=[tag],
+                        outstream=sys.stdout,
+                    )
+                porcelain.verify_tag(".", tag)
+                if not parsed_args.raw:
+                    print(f"gpg: Good signature from tag '{tag}'")
+            except Exception as e:
+                if not parsed_args.raw:
+                    print(f"error: {tag}: {e}", file=sys.stderr)
+                else:
+                    # In raw mode, let the exception propagate
+                    raise
+                exit_code = 1
+
+        return exit_code
+
+
 class cmd_repack(Command):
     """Pack unpacked objects in a repository."""
 
@@ -4488,6 +4539,7 @@ commands = {
     "unpack-objects": cmd_unpack_objects,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
+    "verify-tag": cmd_verify_tag,
     "web-daemon": cmd_web_daemon,
     "worktree": cmd_worktree,
     "write-tree": cmd_write_tree,

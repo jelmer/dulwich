@@ -1660,6 +1660,62 @@ class cmd_tag(Command):
         )
 
 
+class cmd_verify_commit(Command):
+    """Check the GPG signature of commits."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the verify-commit command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (1 on error, None on success)
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            help="Print the contents of the commit object before validating it.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--raw",
+            help="Print the raw gpg status output to standard error.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "commits",
+            nargs="*",
+            default=["HEAD"],
+            help="Commits to verify (defaults to HEAD)",
+        )
+        parsed_args = parser.parse_args(args)
+
+        exit_code = None
+        for commit in parsed_args.commits:
+            try:
+                if parsed_args.verbose:
+                    # Show commit contents before verification
+                    porcelain.show(
+                        ".",
+                        objects=[commit],
+                        outstream=sys.stdout,
+                    )
+                porcelain.verify_commit(".", commit)
+                if not parsed_args.raw:
+                    print(f"gpg: Good signature from commit '{commit}'")
+            except Exception as e:
+                if not parsed_args.raw:
+                    print(f"error: {commit}: {e}", file=sys.stderr)
+                else:
+                    # In raw mode, let the exception propagate
+                    raise
+                exit_code = 1
+
+        return exit_code
+
+
 class cmd_verify_tag(Command):
     """Check the GPG signature of tags."""
 
@@ -4585,6 +4641,7 @@ commands = {
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
     "var": cmd_var,
+    "verify-commit": cmd_verify_commit,
     "verify-tag": cmd_verify_tag,
     "web-daemon": cmd_web_daemon,
     "worktree": cmd_worktree,

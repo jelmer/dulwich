@@ -9744,3 +9744,126 @@ class WorktreePorcelainTests(PorcelainTestCase):
         paths = [wt.path for wt in worktrees]
         self.assertIn(new_path, paths)
         self.assertNotIn(old_path, paths)
+
+
+class VarTests(PorcelainTestCase):
+    """Tests for the var command."""
+
+    def test_var_author_ident(self):
+        """Test getting GIT_AUTHOR_IDENT."""
+        # Set up user config
+        config = self.repo.get_config()
+        config.set((b"user",), b"name", b"Test Author")
+        config.set((b"user",), b"email", b"author@example.com")
+        config.write_to_path()
+
+        result = porcelain.var(self.repo_path, variable="GIT_AUTHOR_IDENT")
+        self.assertIn("Test Author <author@example.com>", result)
+        # Check that timestamp and timezone are included
+        # Format: Name <email> timestamp timezone
+        # "Test Author" is 2 words, so we have: Test, Author, <email>, timestamp, timezone
+        parts = result.split()
+        self.assertGreaterEqual(
+            len(parts), 4
+        )  # At least name, <email>, timestamp, timezone
+        # Check last two parts are timestamp and timezone
+        self.assertTrue(parts[-2].isdigit())  # timestamp
+        self.assertRegex(parts[-1], r"[+-]\d{4}")  # timezone
+
+    def test_var_committer_ident(self):
+        """Test getting GIT_COMMITTER_IDENT."""
+        # Set up user config
+        config = self.repo.get_config()
+        config.set((b"user",), b"name", b"Test Committer")
+        config.set((b"user",), b"email", b"committer@example.com")
+        config.write_to_path()
+
+        result = porcelain.var(self.repo_path, variable="GIT_COMMITTER_IDENT")
+        self.assertIn("Test Committer <committer@example.com>", result)
+        # Check that timestamp and timezone are included
+        parts = result.split()
+        self.assertGreaterEqual(
+            len(parts), 4
+        )  # At least name, <email>, timestamp, timezone
+        # Check last two parts are timestamp and timezone
+        self.assertTrue(parts[-2].isdigit())  # timestamp
+        self.assertRegex(parts[-1], r"[+-]\d{4}")  # timezone
+
+    def test_var_editor(self):
+        """Test getting GIT_EDITOR."""
+        # Test with environment variable
+        self.overrideEnv("GIT_EDITOR", "vim")
+        result = porcelain.var(self.repo_path, variable="GIT_EDITOR")
+        self.assertEqual(result, "vim")
+
+    def test_var_editor_from_config(self):
+        """Test getting GIT_EDITOR from config."""
+        # Set up editor in config
+        config = self.repo.get_config()
+        config.set((b"core",), b"editor", b"emacs")
+        config.write_to_path()
+
+        # Make sure env var is not set
+        self.overrideEnv("GIT_EDITOR", None)
+        result = porcelain.var(self.repo_path, variable="GIT_EDITOR")
+        self.assertEqual(result, "emacs")
+
+    def test_var_pager(self):
+        """Test getting GIT_PAGER."""
+        # Test with environment variable
+        self.overrideEnv("GIT_PAGER", "less")
+        result = porcelain.var(self.repo_path, variable="GIT_PAGER")
+        self.assertEqual(result, "less")
+
+    def test_var_pager_from_config(self):
+        """Test getting GIT_PAGER from config."""
+        # Set up pager in config
+        config = self.repo.get_config()
+        config.set((b"core",), b"pager", b"more")
+        config.write_to_path()
+
+        # Make sure env var is not set
+        self.overrideEnv("GIT_PAGER", None)
+        result = porcelain.var(self.repo_path, variable="GIT_PAGER")
+        self.assertEqual(result, "more")
+
+    def test_var_default_branch(self):
+        """Test getting GIT_DEFAULT_BRANCH."""
+        # Set up default branch in config
+        config = self.repo.get_config()
+        config.set((b"init",), b"defaultBranch", b"main")
+        config.write_to_path()
+
+        result = porcelain.var(self.repo_path, variable="GIT_DEFAULT_BRANCH")
+        self.assertEqual(result, "main")
+
+    def test_var_default_branch_default(self):
+        """Test getting GIT_DEFAULT_BRANCH with default value."""
+        result = porcelain.var(self.repo_path, variable="GIT_DEFAULT_BRANCH")
+        self.assertEqual(result, "master")
+
+    def test_var_list_all(self):
+        """Test listing all logical variables."""
+        # Set up some config
+        config = self.repo.get_config()
+        config.set((b"user",), b"name", b"Test User")
+        config.set((b"user",), b"email", b"test@example.com")
+        config.write_to_path()
+
+        result = porcelain.var_list(self.repo_path)
+        self.assertIsInstance(result, dict)
+        # Check that logical variables are present
+        self.assertIn("GIT_AUTHOR_IDENT", result)
+        self.assertIn("GIT_COMMITTER_IDENT", result)
+        self.assertIn("GIT_DEFAULT_BRANCH", result)
+        # Config variables should NOT be included (deprecated feature)
+        self.assertNotIn("user.name", result)
+        self.assertNotIn("user.email", result)
+        # Verify only logical variables are present
+        for key in result.keys():
+            self.assertTrue(key.startswith("GIT_"))
+
+    def test_var_unknown_variable(self):
+        """Test requesting an unknown variable."""
+        with self.assertRaises(KeyError):
+            porcelain.var(self.repo_path, variable="UNKNOWN_VARIABLE")

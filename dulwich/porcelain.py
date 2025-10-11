@@ -62,6 +62,7 @@ Currently implemented:
  * tag{_create,_delete,_list}
  * upload_pack
  * update_server_info
+ * var
  * write_commit_graph
  * status
  * shortlog
@@ -564,6 +565,136 @@ def pack_refs(repo: RepoPath, all: bool = False) -> None:
     """Pack loose references into packed-refs file."""
     with open_repo_closing(repo) as repo_obj:
         repo_obj.refs.pack_refs(all=all)
+
+
+def _get_variables(repo: RepoPath = ".") -> dict[str, str]:
+    """Internal function to get all Git logical variables.
+
+    Args:
+      repo: Path to the repository
+
+    Returns:
+      A dictionary of all logical variables with values
+    """
+    from .repo import get_user_identity
+
+    with open_repo_closing(repo) as repo_obj:
+        config = repo_obj.get_config_stack()
+
+        # Define callbacks for each logical variable
+        def get_author_ident() -> Optional[str]:
+            """Get GIT_AUTHOR_IDENT."""
+            try:
+                author_identity = get_user_identity(config, kind="AUTHOR")
+                author_tz, _ = get_user_timezones()
+                timestamp = int(time.time())
+                return f"{author_identity.decode('utf-8', 'replace')} {timestamp} {author_tz:+05d}"
+            except Exception:
+                return None
+
+        def get_committer_ident() -> Optional[str]:
+            """Get GIT_COMMITTER_IDENT."""
+            try:
+                committer_identity = get_user_identity(config, kind="COMMITTER")
+                _, committer_tz = get_user_timezones()
+                timestamp = int(time.time())
+                return f"{committer_identity.decode('utf-8', 'replace')} {timestamp} {committer_tz:+05d}"
+            except Exception:
+                return None
+
+        def get_editor() -> Optional[str]:
+            """Get GIT_EDITOR."""
+            editor = os.environ.get("GIT_EDITOR")
+            if editor is None:
+                try:
+                    editor_bytes = config.get(("core",), "editor")
+                    editor = editor_bytes.decode("utf-8", "replace")
+                except KeyError:
+                    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+            return editor
+
+        def get_sequence_editor() -> Optional[str]:
+            """Get GIT_SEQUENCE_EDITOR."""
+            sequence_editor = os.environ.get("GIT_SEQUENCE_EDITOR")
+            if sequence_editor is None:
+                try:
+                    seq_editor_bytes = config.get(("sequence",), "editor")
+                    sequence_editor = seq_editor_bytes.decode("utf-8", "replace")
+                except KeyError:
+                    # Falls back to GIT_EDITOR if not set
+                    sequence_editor = get_editor()
+            return sequence_editor
+
+        def get_pager() -> Optional[str]:
+            """Get GIT_PAGER."""
+            pager = os.environ.get("GIT_PAGER")
+            if pager is None:
+                try:
+                    pager_bytes = config.get(("core",), "pager")
+                    pager = pager_bytes.decode("utf-8", "replace")
+                except KeyError:
+                    pager = os.environ.get("PAGER")
+            return pager
+
+        def get_default_branch() -> str:
+            """Get GIT_DEFAULT_BRANCH."""
+            try:
+                default_branch_bytes = config.get(("init",), "defaultBranch")
+                return default_branch_bytes.decode("utf-8", "replace")
+            except KeyError:
+                # Git's default is "master"
+                return "master"
+
+        # Dictionary mapping variable names to their getter callbacks
+        variable_callbacks: dict[str, Callable[[], Optional[str]]] = {
+            "GIT_AUTHOR_IDENT": get_author_ident,
+            "GIT_COMMITTER_IDENT": get_committer_ident,
+            "GIT_EDITOR": get_editor,
+            "GIT_SEQUENCE_EDITOR": get_sequence_editor,
+            "GIT_PAGER": get_pager,
+            "GIT_DEFAULT_BRANCH": get_default_branch,
+        }
+
+        # Build the variables dictionary by calling callbacks
+        variables: dict[str, str] = {}
+        for var_name, callback in variable_callbacks.items():
+            value = callback()
+            if value is not None:
+                variables[var_name] = value
+
+        return variables
+
+
+def var_list(repo: RepoPath = ".") -> dict[str, str]:
+    """List all Git logical variables.
+
+    Args:
+      repo: Path to the repository
+
+    Returns:
+      A dictionary of all logical variables with their values
+    """
+    return _get_variables(repo)
+
+
+def var(repo: RepoPath = ".", variable: str = "GIT_AUTHOR_IDENT") -> str:
+    """Get the value of a specific Git logical variable.
+
+    Args:
+      repo: Path to the repository
+      variable: The variable to query (e.g., 'GIT_AUTHOR_IDENT')
+
+    Returns:
+      The value of the requested variable as a string
+
+    Raises:
+      KeyError: If the requested variable has no value
+    """
+    variables = _get_variables(repo)
+    if variable in variables:
+        return variables[variable]
+    else:
+        raise KeyError(f"Variable {variable} has no value")
 
 
 def commit(

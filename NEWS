@@ -27,6 +27,9 @@
  * Add ``dulwich verify-tag`` command to check GPG signatures of tags.
    (Jelmer Vernooĳ, #1833)
 
+ * Add ``dulwich verify-commit`` command to check GPG signatures of tags.
+   (Jelmer Vernooĳ, #1832)
+
 0.24.2	2025-09-25
 
  * Added ``porcelain.shortlog`` function to summarize commits by author,

@@ -7016,3 +7016,23 @@ def worktree_move(
 
     with open_repo_closing(repo) as r:
         move_worktree(r, old_path, new_path)
+
+
+def worktree_repair(
+    repo: RepoPath = ".",
+    paths: Optional[list[Union[str, os.PathLike[str]]]] = None,
+) -> list[str]:
+    """Repair worktree administrative files.
+
+    Args:
+        repo: Path to repository
+        paths: Optional list of worktree paths to repair. If None, repairs
+               connections from the main repository to all linked worktrees.
+
+    Returns:
+        List of repaired worktree paths
+    """
+    from .worktree import repair_worktree
+
+    with open_repo_closing(repo) as r:
+        return repair_worktree(r, paths=paths)

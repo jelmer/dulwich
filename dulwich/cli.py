@@ -4369,6 +4369,43 @@ class cmd_worktree_move(Command):
         return 0
 
 
+class cmd_worktree_repair(Command):
+    """Repair worktree administrative files."""
+
+    """Repair worktree administrative files."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the worktree-repair command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser(
+            description="Repair worktree administrative files",
+            prog="dulwich worktree repair",
+        )
+        parser.add_argument(
+            "path",
+            nargs="*",
+            help="Paths to worktrees to repair (if not specified, repairs all)",
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        from dulwich import porcelain
+
+        paths = parsed_args.path if parsed_args.path else None
+        repaired = porcelain.worktree_repair(repo=".", paths=paths)
+
+        if repaired:
+            for path in repaired:
+                logger.info("Repaired worktree: %s", path)
+        else:
+            logger.info("No worktrees needed repair")
+
+        return 0
+
+
 class cmd_worktree(SuperCommand):
     """Manage multiple working trees."""
 
@@ -4382,6 +4419,7 @@ class cmd_worktree(SuperCommand):
         "lock": cmd_worktree_lock,
         "unlock": cmd_worktree_unlock,
         "move": cmd_worktree_move,
+        "repair": cmd_worktree_repair,
     }
     default_command = cmd_worktree_list
 

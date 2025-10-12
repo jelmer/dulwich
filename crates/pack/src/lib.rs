@@ -24,7 +24,7 @@ use pyo3::types::{PyBytes, PyList};
 
 pyo3::import_exception!(dulwich.errors, ApplyDeltaError);
 
-fn py_is_sha(sha: &PyObject, py: Python) -> PyResult<bool> {
+fn py_is_sha(sha: &Py<PyAny>, py: Python) -> PyResult<bool> {
     // Check if the object is a bytes object
     if sha.bind(py).is_instance_of::<PyBytes>() {
         // Check if the bytes object has a size of 20
@@ -44,7 +44,7 @@ fn bisect_find_sha(
     start: i32,
     end: i32,
     sha: Py<PyBytes>,
-    unpack_name: PyObject,
+    unpack_name: Py<PyAny>,
 ) -> PyResult<Option<i32>> {
     // Convert sha_obj to a byte slice
     let sha = sha.as_bytes(py);
@@ -107,7 +107,7 @@ fn get_delta_header_size(delta: &[u8], index: &mut usize, length: usize) -> usiz
 
 fn py_chunked_as_string<'a>(
     py: Python<'a>,
-    py_buf: &'a PyObject,
+    py_buf: &'a Py<PyAny>,
 ) -> PyResult<std::borrow::Cow<'a, [u8]>> {
     if let Ok(py_list) = py_buf.extract::<Bound<PyList>>(py) {
         let mut buf = Vec::new();
@@ -134,7 +134,7 @@ fn py_chunked_as_string<'a>(
 }
 
 #[pyfunction]
-fn apply_delta(py: Python, py_src_buf: PyObject, py_delta: PyObject) -> PyResult<Vec<PyObject>> {
+fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResult<Vec<Py<PyAny>>> {
     let src_buf = py_chunked_as_string(py, &py_src_buf)?;
     let delta = py_chunked_as_string(py, &py_delta)?;
 

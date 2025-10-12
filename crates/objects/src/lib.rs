@@ -39,7 +39,7 @@ fn bytehex(byte: u8) -> u8 {
     }
 }
 
-fn sha_to_pyhex(py: Python, sha: &[u8]) -> PyResult<PyObject> {
+fn sha_to_pyhex(py: Python, sha: &[u8]) -> PyResult<Py<PyAny>> {
     let mut hexsha = Vec::new();
     for c in sha {
         hexsha.push(bytehex((c & 0xF0) >> 4));
@@ -55,7 +55,7 @@ fn parse_tree(
     py: Python,
     mut text: &[u8],
     strict: Option<bool>,
-) -> PyResult<Vec<(PyObject, u32, PyObject)>> {
+) -> PyResult<Vec<(Py<PyAny>, u32, Py<PyAny>)>> {
     let mut entries = Vec::new();
     let strict = strict.unwrap_or(false);
     while !text.is_empty() {
@@ -119,7 +119,7 @@ fn sorted_tree_items(
     py: Python,
     entries: &Bound<PyDict>,
     name_order: bool,
-) -> PyResult<Vec<PyObject>> {
+) -> PyResult<Vec<Py<PyAny>>> {
     let mut qsort_entries = entries
         .iter()
         .map(|(name, value)| -> PyResult<(Vec<u8>, u32, Vec<u8>)> {
@@ -138,7 +138,7 @@ fn sorted_tree_items(
     let tree_entry_cls = objectsm.getattr("TreeEntry")?;
     qsort_entries
         .into_iter()
-        .map(|(name, mode, hexsha)| -> PyResult<PyObject> {
+        .map(|(name, mode, hexsha)| -> PyResult<Py<PyAny>> {
             Ok(tree_entry_cls
                 .call1((
                     PyBytes::new(py, name.as_slice())
@@ -154,7 +154,7 @@ fn sorted_tree_items(
                 .unbind()
                 .into())
         })
-        .collect::<PyResult<Vec<PyObject>>>()
+        .collect::<PyResult<Vec<Py<PyAny>>>>()
 }
 
 #[pymodule]

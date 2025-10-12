@@ -2953,6 +2953,72 @@ class cmd_merge(Command):
             return 1
 
 
+class cmd_merge_base(Command):
+    """Find the best common ancestor between commits."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the merge-base command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser(
+            description="Find the best common ancestor between commits",
+            prog="dulwich merge-base",
+        )
+        parser.add_argument("commits", nargs="+", help="Commits to find merge base for")
+        parser.add_argument("--all", action="store_true", help="Output all merge bases")
+        parser.add_argument(
+            "--octopus",
+            action="store_true",
+            help="Compute common ancestor of all commits",
+        )
+        parser.add_argument(
+            "--is-ancestor",
+            action="store_true",
+            help="Check if first commit is ancestor of second",
+        )
+        parser.add_argument(
+            "--independent",
+            action="store_true",
+            help="List commits not reachable from others",
+        )
+        parsed_args = parser.parse_args(args)
+
+        try:
+            if parsed_args.is_ancestor:
+                if len(parsed_args.commits) != 2:
+                    logger.error("--is-ancestor requires exactly two commits")
+                    return 1
+                is_anc = porcelain.is_ancestor(
+                    ".",
+                    ancestor=parsed_args.commits[0],
+                    descendant=parsed_args.commits[1],
+                )
+                return 0 if is_anc else 1
+            elif parsed_args.independent:
+                commits = porcelain.independent_commits(".", parsed_args.commits)
+                for commit_id in commits:
+                    print(commit_id.decode())
+                return 0
+            else:
+                if len(parsed_args.commits) < 2:
+                    logger.error("At least two commits are required")
+                    return 1
+                merge_bases = porcelain.merge_base(
+                    ".",
+                    parsed_args.commits,
+                    all=parsed_args.all,
+                    octopus=parsed_args.octopus,
+                )
+                for commit_id in merge_bases:
+                    print(commit_id.decode())
+                return 0
+        except (ValueError, KeyError) as e:
+            logger.error("%s", e)
+            return 1
+
+
 class cmd_notes_add(Command):
     """Add notes to a commit."""
 
@@ -4613,6 +4679,7 @@ commands = {
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "merge": cmd_merge,
+    "merge-base": cmd_merge_base,
     "merge-tree": cmd_merge_tree,
     "notes": cmd_notes,
     "pack-objects": cmd_pack_objects,

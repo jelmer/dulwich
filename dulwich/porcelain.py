@@ -7167,3 +7167,119 @@ def worktree_repair(
 
     with open_repo_closing(repo) as r:
         return repair_worktree(r, paths=paths)
+
+
+def merge_base(
+    repo: RepoPath = ".",
+    committishes: Optional[Sequence[Union[str, bytes]]] = None,
+    all: bool = False,
+    octopus: bool = False,
+) -> list[bytes]:
+    """Find the best common ancestor(s) between commits.
+
+    Args:
+        repo: Path to repository
+        committishes: List of commit references (branches, tags, commit IDs)
+        all: If True, return all merge bases, not just one
+        octopus: If True, find merge base of all commits (n-way merge)
+
+    Returns:
+        List of commit IDs that are merge bases
+    """
+    from .graph import find_merge_base, find_octopus_base
+    from .objects import Commit
+    from .objectspec import parse_object
+
+    if committishes is None or len(committishes) < 2:
+        raise ValueError("At least two commits are required")
+
+    with open_repo_closing(repo) as r:
+        # Resolve committish references to commit IDs
+        commit_ids = []
+        for committish in committishes:
+            obj = parse_object(r, committish)
+            if not isinstance(obj, Commit):
+                raise ValueError(f"Expected commit, got {obj.type_name.decode()}")
+            commit_ids.append(obj.id)
+
+        # Find merge base
+        if octopus:
+            result = find_octopus_base(r, commit_ids)
+        else:
+            result = find_merge_base(r, commit_ids)
+
+        # Return first result only if all=False
+        if not all and result:
+            return [result[0]]
+        return result
+
+
+def is_ancestor(
+    repo: RepoPath = ".",
+    ancestor: Optional[Union[str, bytes]] = None,
+    descendant: Optional[Union[str, bytes]] = None,
+) -> bool:
+    """Check if one commit is an ancestor of another.
+
+    Args:
+        repo: Path to repository
+        ancestor: Commit that might be the ancestor
+        descendant: Commit that might be the descendant
+
+    Returns:
+        True if ancestor is an ancestor of descendant, False otherwise
+    """
+    from .graph import find_merge_base
+    from .objects import Commit
+    from .objectspec import parse_object
+
+    if ancestor is None or descendant is None:
+        raise ValueError("Both ancestor and descendant are required")
+
+    with open_repo_closing(repo) as r:
+        # Resolve committish references to commit IDs
+        ancestor_obj = parse_object(r, ancestor)
+        if not isinstance(ancestor_obj, Commit):
+            raise ValueError(f"Expected commit, got {ancestor_obj.type_name.decode()}")
+        descendant_obj = parse_object(r, descendant)
+        if not isinstance(descendant_obj, Commit):
+            raise ValueError(
+                f"Expected commit, got {descendant_obj.type_name.decode()}"
+            )
+
+        # If ancestor is the merge base of (ancestor, descendant), then it's an ancestor
+        merge_bases = find_merge_base(r, [ancestor_obj.id, descendant_obj.id])
+        return merge_bases == [ancestor_obj.id]
+
+
+def independent_commits(
+    repo: RepoPath = ".",
+    committishes: Optional[Sequence[Union[str, bytes]]] = None,
+) -> list[bytes]:
+    """Filter commits to only those that are not reachable from others.
+
+    Args:
+        repo: Path to repository
+        committishes: List of commit references to filter
+
+    Returns:
+        List of commit IDs that are not ancestors of any other commits in the list
+    """
+    from .graph import independent
+    from .objects import Commit
+    from .objectspec import parse_object
+
+    if committishes is None or len(committishes) == 0:
+        return []
+
+    with open_repo_closing(repo) as r:
+        # Resolve committish references to commit IDs
+        commit_ids = []
+        for committish in committishes:
+            obj = parse_object(r, committish)
+            if not isinstance(obj, Commit):
+                raise ValueError(f"Expected commit, got {obj.type_name.decode()}")
+            commit_ids.append(obj.id)
+
+        # Filter to independent commits
+        return independent(r, commit_ids)

@@ -350,3 +350,38 @@ def can_fast_forward(repo: "BaseRepo", c1: bytes, c2: bytes) -> bool:
         shallows=parents_provider.shallows,
     )
     return lcas == [c1]
+
+
+def independent(repo: "BaseRepo", commit_ids: Sequence[ObjectID]) -> list[ObjectID]:
+    """Filter commits to only those that are not reachable from others.
+
+    Args:
+      repo: Repository object
+      commit_ids: list of commit ids to filter
+
+    Returns:
+      list of commit ids that are not ancestors of any other commits in the list
+    """
+    if not commit_ids:
+        return []
+    if len(commit_ids) == 1:
+        return list(commit_ids)
+
+    # Filter out commits that are ancestors of other commits
+    independent_commits = []
+    for i, commit_id in enumerate(commit_ids):
+        is_independent = True
+        # Check if this commit is an ancestor of any other commit
+        for j, other_id in enumerate(commit_ids):
+            if i == j:
+                continue
+            # If merge base of (commit_id, other_id) is commit_id,
+            # then commit_id is an ancestor of other_id
+            merge_bases = find_merge_base(repo, [commit_id, other_id])
+            if merge_bases == [commit_id]:
+                is_independent = False
+                break
+        if is_independent:
+            independent_commits.append(commit_id)
+
+    return independent_commits

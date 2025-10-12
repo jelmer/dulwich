@@ -3015,5 +3015,87 @@ class WorktreeCliTests(DulwichCliTestCase):
                 cmd.run(["invalid"])
 
 
+class MergeBaseCommandTest(DulwichCliTestCase):
+    """Tests for merge-base command."""
+
+    def _create_commits(self):
+        """Helper to create a commit history for testing."""
+        # Create three commits in linear history
+        for i in range(1, 4):
+            test_file = os.path.join(self.repo_path, f"file{i}.txt")
+            with open(test_file, "w") as f:
+                f.write(f"content{i}")
+            self._run_cli("add", f"file{i}.txt")
+            self._run_cli("commit", f"--message=Commit {i}")
+
+    def test_merge_base_linear_history(self):
+        """Test merge-base with linear history."""
+        self._create_commits()
+
+        result, stdout, _stderr = self._run_cli("merge-base", "HEAD", "HEAD~1")
+        self.assertEqual(result, 0)
+
+        # Should return HEAD~1 as the merge base
+        output = stdout.strip()
+        # Verify it's a valid commit ID (40 hex chars)
+        self.assertEqual(len(output), 40)
+        self.assertTrue(all(c in "0123456789abcdef" for c in output))
+
+    def test_merge_base_is_ancestor_true(self):
+        """Test merge-base --is-ancestor when true."""
+        self._create_commits()
+
+        result, _stdout, _stderr = self._run_cli(
+            "merge-base", "--is-ancestor", "HEAD~1", "HEAD"
+        )
+        self.assertEqual(result, 0)  # Exit code 0 means true
+
+    def test_merge_base_is_ancestor_false(self):
+        """Test merge-base --is-ancestor when false."""
+        self._create_commits()
+
+        result, _stdout, _stderr = self._run_cli(
+            "merge-base", "--is-ancestor", "HEAD", "HEAD~1"
+        )
+        self.assertEqual(result, 1)  # Exit code 1 means false
+
+    def test_merge_base_independent(self):
+        """Test merge-base --independent."""
+        self._create_commits()
+
+        # All three commits in linear history - only HEAD should be independent
+        head = self.repo.refs[b"HEAD"]
+        head_1 = self.repo[head].parents[0]
+        head_2 = self.repo[head_1].parents[0]
+
+        result, stdout, _stderr = self._run_cli(
+            "merge-base",
+            "--independent",
+            head.decode(),
+            head_1.decode(),
+            head_2.decode(),
+        )
+        self.assertEqual(result, 0)
+
+        # Only HEAD should be in output (as it's the only independent commit)
+        lines = stdout.strip().split("\n")
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0], head.decode())
+
+    def test_merge_base_requires_two_commits(self):
+        """Test merge-base requires at least two commits."""
+        self._create_commits()
+
+        result, _stdout, _stderr = self._run_cli("merge-base", "HEAD")
+        self.assertEqual(result, 1)
+
+    def test_merge_base_is_ancestor_requires_two_commits(self):
+        """Test merge-base --is-ancestor requires exactly two commits."""
+        self._create_commits()
+
+        result, _stdout, _stderr = self._run_cli("merge-base", "--is-ancestor", "HEAD")
+        self.assertEqual(result, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

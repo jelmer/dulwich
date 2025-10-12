@@ -26,6 +26,7 @@ from dulwich.graph import (
     can_fast_forward,
     find_merge_base,
     find_octopus_base,
+    independent,
 )
 from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import make_commit
@@ -546,3 +547,56 @@ class WorkListTest(TestCase):
         # get should raise IndexError when heap is empty
         with self.assertRaises(IndexError):
             wlst.get()
+
+
+class IndependentTests(TestCase):
+    def test_independent_empty(self) -> None:
+        r = MemoryRepo()
+        # Empty list of commits
+        self.assertEqual([], independent(r, []))
+
+    def test_independent_single(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        r.object_store.add_objects([(base, None)])
+        # Single commit is independent
+        self.assertEqual([base.id], independent(r, [base.id]))
+
+    def test_independent_linear(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        c1 = make_commit(parents=[base.id])
+        c2 = make_commit(parents=[c1.id])
+        r.object_store.add_objects([(base, None), (c1, None), (c2, None)])
+        # In linear history, only the tip is independent
+        self.assertEqual([c2.id], independent(r, [base.id, c1.id, c2.id]))
+
+    def test_independent_diverged(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        c1 = make_commit(parents=[base.id])
+        c2a = make_commit(parents=[c1.id], message=b"2a")
+        c2b = make_commit(parents=[c1.id], message=b"2b")
+        r.object_store.add_objects([(base, None), (c1, None), (c2a, None), (c2b, None)])
+        # c2a and c2b are independent from each other
+        result = independent(r, [c2a.id, c2b.id])
+        self.assertEqual(2, len(result))
+        self.assertIn(c2a.id, result)
+        self.assertIn(c2b.id, result)
+
+    def test_independent_mixed(self) -> None:
+        r = MemoryRepo()
+        base = make_commit()
+        c1 = make_commit(parents=[base.id])
+        c2a = make_commit(parents=[c1.id], message=b"2a")
+        c2b = make_commit(parents=[c1.id], message=b"2b")
+        c3a = make_commit(parents=[c2a.id], message=b"3a")
+        r.object_store.add_objects(
+            [(base, None), (c1, None), (c2a, None), (c2b, None), (c3a, None)]
+        )
+        # c3a and c2b are independent; c2a is ancestor of c3a
+        result = independent(r, [c2a.id, c2b.id, c3a.id])
+        self.assertEqual(2, len(result))
+        self.assertIn(c2b.id, result)
+        self.assertIn(c3a.id, result)
+        self.assertNotIn(c2a.id, result)  # c2a is ancestor of c3a

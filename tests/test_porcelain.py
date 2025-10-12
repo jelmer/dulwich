@@ -9867,3 +9867,177 @@ class VarTests(PorcelainTestCase):
         """Test requesting an unknown variable."""
         with self.assertRaises(KeyError):
             porcelain.var(self.repo_path, variable="UNKNOWN_VARIABLE")
+
+
+class MergeBaseTests(PorcelainTestCase):
+    """Tests for merge-base, is_ancestor, and independent_commits."""
+
+    def test_merge_base_linear_history(self):
+        """Test merge-base with linear history."""
+        # Create linear history: c1 <- c2 <- c3
+        _c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+        self.repo.refs[b"refs/heads/branch1"] = c2.id
+        self.repo.refs[b"refs/heads/branch2"] = c3.id
+
+        result = porcelain.merge_base(
+            self.repo.path, committishes=["refs/heads/branch1", "refs/heads/branch2"]
+        )
+        self.assertEqual([c2.id], result)
+
+    def test_merge_base_diverged(self):
+        """Test merge-base with diverged branches."""
+        # Create diverged history: c1 <- c2a, c1 <- c2b
+        c1, c2a, c2b = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 1]])
+        self.repo.refs[b"refs/heads/branch-a"] = c2a.id
+        self.repo.refs[b"refs/heads/branch-b"] = c2b.id
+
+        result = porcelain.merge_base(
+            self.repo.path, committishes=["refs/heads/branch-a", "refs/heads/branch-b"]
+        )
+        self.assertEqual([c1.id], result)
+
+    def test_merge_base_all(self):
+        """Test merge-base with --all flag."""
+        # Create history with multiple common ancestors
+        commits = build_commit_graph(
+            self.repo.object_store,
+            [[1], [2, 1], [3, 1], [4, 2, 3], [5, 2, 3]],
+        )
+        _c1, c2, c3, c4, c5 = commits
+        self.repo.refs[b"refs/heads/branch1"] = c4.id
+        self.repo.refs[b"refs/heads/branch2"] = c5.id
+
+        # Without --all, should return only first result
+        result = porcelain.merge_base(
+            self.repo.path,
+            committishes=["refs/heads/branch1", "refs/heads/branch2"],
+            all=False,
+        )
+        self.assertEqual(1, len(result))
+
+        # With --all, should return all merge bases
+        result_all = porcelain.merge_base(
+            self.repo.path,
+            committishes=["refs/heads/branch1", "refs/heads/branch2"],
+            all=True,
+        )
+        self.assertEqual(2, len(result_all))
+        self.assertIn(c2.id, result_all)
+        self.assertIn(c3.id, result_all)
+
+    def test_merge_base_octopus(self):
+        """Test merge-base with --octopus flag."""
+        # Create three-way diverged history
+        commits = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1], [4, 1]]
+        )
+        c1, c2, c3, c4 = commits
+        self.repo.refs[b"refs/heads/a"] = c2.id
+        self.repo.refs[b"refs/heads/b"] = c3.id
+        self.repo.refs[b"refs/heads/c"] = c4.id
+
+        result = porcelain.merge_base(
+            self.repo.path,
+            committishes=["refs/heads/a", "refs/heads/b", "refs/heads/c"],
+            octopus=True,
+        )
+        self.assertEqual([c1.id], result)
+
+    def test_merge_base_requires_two_commits(self):
+        """Test merge-base requires at least two commits."""
+        with self.assertRaises(ValueError):
+            porcelain.merge_base(self.repo.path, committishes=["HEAD"])
+
+    def test_is_ancestor_true(self):
+        """Test is_ancestor returns True when commit is an ancestor."""
+        # Create linear history: c1 <- c2 <- c3
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+        self.repo.refs[b"refs/heads/main"] = c3.id
+
+        # c1 is ancestor of c3
+        result = porcelain.is_ancestor(
+            self.repo.path, ancestor=c1.id.decode(), descendant=c3.id.decode()
+        )
+        self.assertTrue(result)
+
+        # c2 is ancestor of c3
+        result = porcelain.is_ancestor(
+            self.repo.path, ancestor=c2.id.decode(), descendant=c3.id.decode()
+        )
+        self.assertTrue(result)
+
+    def test_is_ancestor_false(self):
+        """Test is_ancestor returns False when commit is not an ancestor."""
+        # Create diverged history: c1 <- c2a, c1 <- c2b
+        _c1, c2a, c2b = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1]]
+        )
+
+        # c2a is not ancestor of c2b
+        result = porcelain.is_ancestor(
+            self.repo.path, ancestor=c2a.id.decode(), descendant=c2b.id.decode()
+        )
+        self.assertFalse(result)
+
+        # c2b is not ancestor of c2a
+        result = porcelain.is_ancestor(
+            self.repo.path, ancestor=c2b.id.decode(), descendant=c2a.id.decode()
+        )
+        self.assertFalse(result)
+
+    def test_is_ancestor_requires_both(self):
+        """Test is_ancestor requires both ancestor and descendant."""
+        with self.assertRaises(ValueError):
+            porcelain.is_ancestor(self.repo.path, ancestor="HEAD", descendant=None)
+        with self.assertRaises(ValueError):
+            porcelain.is_ancestor(self.repo.path, ancestor=None, descendant="HEAD")
+
+    def test_independent_commits_linear(self):
+        """Test independent_commits with linear history."""
+        # Create linear history: c1 <- c2 <- c3
+        c1, c2, c3 = build_commit_graph(self.repo.object_store, [[1], [2, 1], [3, 2]])
+
+        # Only c3 is independent (c1 and c2 are ancestors)
+        result = porcelain.independent_commits(
+            self.repo.path,
+            committishes=[c1.id.decode(), c2.id.decode(), c3.id.decode()],
+        )
+        self.assertEqual([c3.id], result)
+
+    def test_independent_commits_diverged(self):
+        """Test independent_commits with diverged branches."""
+        # Create diverged history: c1 <- c2a, c1 <- c2b
+        _c1, c2a, c2b = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1]]
+        )
+
+        # c2a and c2b are both independent (neither is ancestor of the other)
+        result = porcelain.independent_commits(
+            self.repo.path, committishes=[c2a.id.decode(), c2b.id.decode()]
+        )
+        self.assertEqual(2, len(result))
+        self.assertIn(c2a.id, result)
+        self.assertIn(c2b.id, result)
+
+    def test_independent_commits_mixed(self):
+        """Test independent_commits with mixed history."""
+        # Create mixed history
+        commits = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1], [4, 2]]
+        )
+        _c1, c2, c3, c4 = commits
+
+        # c4 and c3 are independent; c2 is ancestor of c4
+        result = porcelain.independent_commits(
+            self.repo.path,
+            committishes=[c2.id.decode(), c3.id.decode(), c4.id.decode()],
+        )
+        self.assertEqual(2, len(result))
+        self.assertIn(c3.id, result)
+        self.assertIn(c4.id, result)
+        self.assertNotIn(c2.id, result)
+
+    def test_independent_commits_empty(self):
+        """Test independent_commits with empty list."""
+        result = porcelain.independent_commits(self.repo.path, committishes=[])
+        self.assertEqual([], result)

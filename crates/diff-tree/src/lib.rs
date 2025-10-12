@@ -40,7 +40,7 @@ fn add_hash(get: &Bound<PyAny>, set: &Bound<PyAny>, string: &[u8], py: Python) -
 }
 
 #[pyfunction]
-fn _count_blocks(py: Python, obj: &Bound<PyAny>) -> PyResult<PyObject> {
+fn _count_blocks(py: Python, obj: &Bound<PyAny>) -> PyResult<Py<PyAny>> {
     let default_dict_cls = PyModule::import(py, "collections")?.getattr("defaultdict")?;
     let int_cls = PyModule::import(py, "builtins")?.getattr("int")?;
 
@@ -55,7 +55,7 @@ fn _count_blocks(py: Python, obj: &Bound<PyAny>) -> PyResult<PyObject> {
         ));
     }
 
-    let num_chunks = chunks.extract::<Vec<PyObject>>()?.len();
+    let num_chunks = chunks.extract::<Vec<Py<PyAny>>>()?.len();
     let pym = py.import("dulwich.diff_tree")?;
     let block_size = pym.getattr("_BLOCK_SIZE")?.extract::<usize>()?;
     let mut block: Vec<u8> = Vec::with_capacity(block_size);
@@ -98,7 +98,7 @@ fn _is_tree(_py: Python, entry: &Bound<PyAny>) -> PyResult<bool> {
     }
 }
 
-fn tree_entries(path: &[u8], tree: &Bound<PyAny>, py: Python) -> PyResult<Vec<PyObject>> {
+fn tree_entries(path: &[u8], tree: &Bound<PyAny>, py: Python) -> PyResult<Vec<Py<PyAny>>> {
     if tree.is_none() {
         return Ok(Vec::new());
     }
@@ -108,11 +108,11 @@ fn tree_entries(path: &[u8], tree: &Bound<PyAny>, py: Python) -> PyResult<Vec<Py
 
     let items = tree
         .call_method1("iteritems", (true,))?
-        .extract::<Vec<PyObject>>()?;
+        .extract::<Vec<Py<PyAny>>>()?;
 
     let mut result = Vec::new();
     for item in items {
-        let (name, mode, sha) = item.extract::<(Vec<u8>, u32, PyObject)>(py)?;
+        let (name, mode, sha) = item.extract::<(Vec<u8>, u32, Py<PyAny>)>(py)?;
 
         let mut new_path = Vec::with_capacity(path.len() + name.len() + 1);
         if !path.is_empty() {
@@ -142,7 +142,7 @@ fn _merge_entries(
     path: &[u8],
     tree1: &Bound<PyAny>,
     tree2: &Bound<PyAny>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let entries1 = tree_entries(path, tree1, py)?;
     let entries2 = tree_entries(path, tree2, py)?;
 

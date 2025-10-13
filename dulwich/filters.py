@@ -142,7 +142,7 @@ class ProcessFilterDriver:
     def _get_or_start_process(self) -> Optional["Protocol"]:
         """Get or start the long-running process filter."""
         if self._process is None and self.process_cmd:
-            from .errors import HangupException
+            from .errors import GitProtocolError, HangupException
             from .protocol import Protocol
 
             try:
@@ -216,7 +216,12 @@ class ProcessFilterDriver:
                     if cap.startswith(b"capability="):
                         self._capabilities.add(cap[11:])  # Remove "capability=" prefix
 
-            except (OSError, subprocess.SubprocessError, HangupException) as e:
+            except (
+                OSError,
+                subprocess.SubprocessError,
+                HangupException,
+                GitProtocolError,
+            ) as e:
                 self.cleanup()
                 raise FilterError(f"Failed to start process filter: {e}")
         return self._protocol

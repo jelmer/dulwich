@@ -1,4 +1,8 @@
-0.24.4	UNRELEASED
+0.24.4	2025-10-14
+
+ * Add compatibility for Python 3.14.  (Jelmer Vernooĳ)
+
+ * Re-enable android build. (Malcolm Smith)
 
 0.24.3	2025-10-12
 

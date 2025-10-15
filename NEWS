@@ -1,3 +1,11 @@
+0.24.5	UNRELEASED
+
+ * Fix HTTP authentication to preserve credentials from URLs when storing
+   remote configuration. URLs with embedded credentials (like
+   ``https://token@github.com/user/repo.git``) now correctly save those
+   credentials to git config, allowing subsequent push operations to succeed.
+   (Jelmer Vernooĳ, #1925)
+
 0.24.4	2025-10-14
 
  * Add compatibility for Python 3.14.  (Jelmer Vernooĳ)

@@ -1,11 +1,11 @@
 """Git merge implementation."""
 
 from collections.abc import Sequence
-from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     import merge3
+    from merge3 import SequenceMatcherProtocol
 else:
     try:
         import merge3
@@ -24,8 +24,8 @@ def make_merge3(
     a: Sequence[bytes],
     b: Sequence[bytes],
     is_cherrypick: bool = False,
-    sequence_matcher: Optional[type[SequenceMatcher[bytes]]] = None,
-) -> "merge3.Merge3":
+    sequence_matcher: Optional[type["SequenceMatcherProtocol[bytes]"]] = None,
+) -> "merge3.Merge3[bytes]":
     """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
     if merge3 is None:
         raise ImportError(
@@ -66,7 +66,7 @@ def _can_merge_lines(
 
 if merge3 is not None:
 
-    def _merge3_to_bytes(m: "merge3.Merge3") -> bytes:
+    def _merge3_to_bytes(m: "merge3.Merge3[bytes]") -> bytes:
         """Convert merge3 result to bytes with conflict markers.
 
         Args:
@@ -75,7 +75,7 @@ if merge3 is not None:
         Returns:
             Merged content as bytes
         """
-        result = []
+        result: list[bytes] = []
         for group in m.merge_groups():  # type: ignore[no-untyped-call,unused-ignore]
             if group[0] == "unchanged":
                 result.extend(group[1])
@@ -105,8 +105,8 @@ if merge3 is not None:
 
 
 def _merge_lines(
-    base_lines: list[bytes], a_lines: list[bytes], b_lines: list[bytes]
-) -> list[bytes]:
+    base_lines: Sequence[bytes], a_lines: Sequence[bytes], b_lines: Sequence[bytes]
+) -> Sequence[bytes]:
     """Merge lines when possible."""
     if base_lines == a_lines:
         return b_lines

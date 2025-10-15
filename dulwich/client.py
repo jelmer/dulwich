@@ -3315,9 +3315,15 @@ class AbstractHttpGitClient(GitClient):
         report_activity: Optional[Callable[[int, str], None]] = None,
         quiet: bool = False,
         include_tags: bool = False,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
     ) -> None:
         """Initialize AbstractHttpGitClient."""
         self._base_url = base_url.rstrip("/") + "/"
+        self._username = username
+        self._password = password
+        # Track original URL with credentials (set by from_parsedurl when credentials come from URL)
+        self._url_with_auth: Optional[str] = None
         self.dumb = dumb
         GitClient.__init__(
             self,
@@ -3788,7 +3794,37 @@ class AbstractHttpGitClient(GitClient):
 
     def get_url(self, path: str) -> str:
         """Get the HTTP URL for a path."""
-        return self._get_url(path).rstrip("/")
+        url = self._get_url(path).rstrip("/")
+
+        # Include credentials in the URL only if they came from a URL (not passed explicitly)
+        # This preserves credentials that were in the original URL for git config storage
+        if self._url_with_auth is not None:
+            from urllib.parse import quote, urlparse, urlunparse
+
+            assert self._username is not None
+            parsed = urlparse(url)
+            # Construct netloc with credentials
+            if self._password is not None:
+                netloc = f"{quote(self._username, safe='')}:{quote(self._password, safe='')}@{parsed.hostname}"
+            else:
+                netloc = f"{quote(self._username, safe='')}@{parsed.hostname}"
+
+            if parsed.port:
+                netloc += f":{parsed.port}"
+
+            # Reconstruct URL with credentials
+            url = urlunparse(
+                (
+                    parsed.scheme,
+                    netloc,
+                    parsed.path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment,
+                )
+            )
+
+        return url
 
     def _get_url(self, path: Union[str, bytes]) -> str:
         path_str = path if isinstance(path, str) else path.decode("utf-8")
@@ -3842,7 +3878,7 @@ class AbstractHttpGitClient(GitClient):
 
         # Pass credentials to constructor if it's a subclass that supports them
         if cls is Urllib3HttpGitClient:
-            return cls(  # type: ignore[call-arg]
+            client = cls(  # type: ignore[call-arg]
                 urlunparse(base_parsed),
                 dumb=dumb,
                 thin_packs=thin_packs,
@@ -3854,15 +3890,23 @@ class AbstractHttpGitClient(GitClient):
                 config=config,
             )
         else:
-            # Base class doesn't support credentials in constructor
-            return cls(
+            # Base class now supports credentials in constructor
+            client = cls(
                 urlunparse(base_parsed),
                 dumb=dumb,
                 thin_packs=thin_packs,
                 report_activity=report_activity,
                 quiet=quiet,
                 include_tags=include_tags,
+                username=final_username,
+                password=final_password,
             )
+
+        # Mark that credentials came from URL (not passed explicitly) if URL had credentials
+        if url_username is not None or url_password is not None:
+            client._url_with_auth = urlunparse(parsedurl)
+
+        return client
 
     def __repr__(self) -> str:
         """Return string representation of this client."""
@@ -3902,8 +3946,6 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         include_tags: bool = False,
     ) -> None:
         """Initialize Urllib3HttpGitClient."""
-        self._username = username
-        self._password = password
         self._timeout = timeout
         self._extra_headers = extra_headers or {}
 
@@ -3932,6 +3974,8 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             report_activity=report_activity,
             quiet=quiet,
             include_tags=include_tags,
+            username=username,
+            password=password,
         )
 
     def _get_url(self, path: Union[str, bytes]) -> str:

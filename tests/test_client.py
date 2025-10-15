@@ -1641,6 +1641,82 @@ class HttpGitClientTests(TestCase):
         self.assertIn("Authorization", c.pool_manager.headers)
         self.assertEqual(c.pool_manager.headers["Authorization"], "Bearer token123")
 
+    def test_get_url_preserves_credentials_from_url(self) -> None:
+        """Test that credentials from URL are preserved in get_url() (issue #1925)."""
+        # When credentials come from the URL (not passed explicitly),
+        # they should be included in get_url() so they're saved to git config
+        username = "ghp_token123"
+        url = f"https://{username}@github.com/jelmer/dulwich"
+        path = "/jelmer/dulwich"
+
+        c = HttpGitClient.from_parsedurl(urlparse(url))
+        reconstructed_url = c.get_url(path)
+
+        # Credentials should be preserved in the URL
+        self.assertIn(username, reconstructed_url)
+        self.assertEqual(
+            f"https://{username}@github.com/jelmer/dulwich", reconstructed_url
+        )
+
+    def test_get_url_preserves_credentials_with_password_from_url(self) -> None:
+        """Test that username:password from URL are preserved in get_url()."""
+        username = "user"
+        password = "pass"
+        url = f"https://{username}:{password}@github.com/jelmer/dulwich"
+        path = "/jelmer/dulwich"
+
+        c = HttpGitClient.from_parsedurl(urlparse(url))
+        reconstructed_url = c.get_url(path)
+
+        # Both username and password should be preserved
+        self.assertIn(username, reconstructed_url)
+        self.assertIn(password, reconstructed_url)
+        self.assertEqual(
+            f"https://{username}:{password}@github.com/jelmer/dulwich",
+            reconstructed_url,
+        )
+
+    def test_get_url_preserves_special_chars_in_credentials(self) -> None:
+        """Test that special characters in credentials are properly escaped."""
+        # URL-encoded credentials with special characters
+        original_username = "user@domain"
+        original_password = "p@ss:word"
+        quoted_username = urlquote(original_username, safe="")
+        quoted_password = urlquote(original_password, safe="")
+
+        url = f"https://{quoted_username}:{quoted_password}@github.com/jelmer/dulwich"
+        path = "/jelmer/dulwich"
+
+        c = HttpGitClient.from_parsedurl(urlparse(url))
+        reconstructed_url = c.get_url(path)
+
+        # The reconstructed URL should have properly escaped credentials
+        self.assertIn(quoted_username, reconstructed_url)
+        self.assertIn(quoted_password, reconstructed_url)
+        # Verify the URL is valid by parsing it back
+        parsed = urlparse(reconstructed_url)
+        from urllib.parse import unquote
+
+        self.assertEqual(unquote(parsed.username), original_username)
+        self.assertEqual(unquote(parsed.password), original_password)
+
+    def test_get_url_explicit_credentials_not_in_url(self) -> None:
+        """Test that explicitly passed credentials are NOT included in get_url()."""
+        # When credentials are passed explicitly (not from URL),
+        # they should NOT appear in get_url() for security
+        base_url = "https://github.com/jelmer/dulwich"
+        path = "/jelmer/dulwich"
+        username = "explicit_user"
+        password = "explicit_pass"
+
+        c = HttpGitClient(base_url, username=username, password=password)
+        url = c.get_url(path)
+
+        # Credentials should NOT be in the URL
+        self.assertNotIn(username, url)
+        self.assertNotIn(password, url)
+        self.assertEqual("https://github.com/jelmer/dulwich", url)
+
 
 class TCPGitClientTests(TestCase):
     def test_get_url(self) -> None:

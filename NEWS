@@ -33,6 +33,10 @@
 
  * Add ``dulwich merge-base`` command. (Jelmer Vernooĳ, #1831)
 
+ * Add support for ``git mailsplit`` command to split mbox files and Maildir
+   into individual message files. Supports mboxrd format, custom precision,
+   and all standard git mailsplit options. (Jelmer Vernooĳ, #1840)
+
  * Add support for ``git var`` command to display Git's logical variables
    (GIT_AUTHOR_IDENT, GIT_COMMITTER_IDENT, GIT_EDITOR, GIT_SEQUENCE_EDITOR,
    GIT_PAGER, GIT_DEFAULT_BRANCH). Available as ``porcelain.var()`` and

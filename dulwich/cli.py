@@ -60,7 +60,12 @@ from dulwich import porcelain
 from .bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
 from .client import get_transport_and_path
 from .config import Config
-from .errors import ApplyDeltaError, GitProtocolError
+from .errors import (
+    ApplyDeltaError,
+    FileFormatException,
+    GitProtocolError,
+    NotGitRepository,
+)
 from .index import Index
 from .log_utils import _configure_logging_from_trace
 from .objects import Commit, sha_to_hex, valid_hexsha
@@ -1598,6 +1603,138 @@ class cmd_show(Command):
             with get_pager(config=config, cmd_name="show") as outstream:
                 output_stream = _create_output_stream(outstream)
                 porcelain.show(repo, args.objectish or None, outstream=output_stream)
+
+
+class cmd_show_ref(Command):
+    """List references in a local repository."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the show-ref command.
+
+        Args:
+            args: Command line arguments
+        Returns:
+            Exit code (0 for success, 1 for error/no matches, 2 for missing ref with --exists)
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--head",
+            action="store_true",
+            help="Show the HEAD reference",
+        )
+        parser.add_argument(
+            "--branches",
+            action="store_true",
+            help="Limit to local branches",
+        )
+        parser.add_argument(
+            "--tags",
+            action="store_true",
+            help="Limit to local tags",
+        )
+        parser.add_argument(
+            "-d",
+            "--dereference",
+            action="store_true",
+            help="Dereference tags into object IDs",
+        )
+        parser.add_argument(
+            "-s",
+            "--hash",
+            nargs="?",
+            const=40,
+            type=int,
+            metavar="n",
+            help="Only show the OID, not the reference name",
+        )
+        parser.add_argument(
+            "--abbrev",
+            nargs="?",
+            const=7,
+            type=int,
+            metavar="n",
+            help="Abbreviate the object name",
+        )
+        parser.add_argument(
+            "--verify",
+            action="store_true",
+            help="Enable stricter reference checking (exact path match)",
+        )
+        parser.add_argument(
+            "--exists",
+            action="store_true",
+            help="Check whether the given reference exists",
+        )
+        parser.add_argument(
+            "-q",
+            "--quiet",
+            action="store_true",
+            help="Do not print any results to stdout",
+        )
+        parser.add_argument(
+            "patterns",
+            nargs="*",
+            help="Show references matching patterns",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Handle --exists mode
+        if parsed_args.exists:
+            if not parsed_args.patterns or len(parsed_args.patterns) != 1:
+                logger.error("--exists requires exactly one reference argument")
+                return 1
+
+            try:
+                with Repo(".") as repo:
+                    repo_refs = repo.get_refs()
+                    pattern_bytes = os.fsencode(parsed_args.patterns[0])
+                    if pattern_bytes in repo_refs:
+                        return 0  # Reference exists
+                    else:
+                        return 2  # Reference missing
+            except (NotGitRepository, OSError, FileFormatException) as e:
+                logger.error(f"Error looking up reference: {e}")
+                return 1  # Error looking up reference
+
+        # Regular show-ref mode
+        try:
+            matched_refs = porcelain.show_ref(
+                ".",
+                patterns=parsed_args.patterns if parsed_args.patterns else None,
+                head=parsed_args.head,
+                branches=parsed_args.branches,
+                tags=parsed_args.tags,
+                dereference=parsed_args.dereference,
+                verify=parsed_args.verify,
+            )
+        except (NotGitRepository, OSError, FileFormatException) as e:
+            logger.error(f"Error: {e}")
+            return 1
+
+        # Return error if no matches found (unless quiet)
+        if not matched_refs:
+            if parsed_args.verify and not parsed_args.quiet:
+                logger.error("error: no matching refs found")
+            return 1
+
+        # Output results
+        if not parsed_args.quiet:
+            abbrev_len = parsed_args.abbrev if parsed_args.abbrev else 40
+            hash_only = parsed_args.hash is not None
+            if hash_only and parsed_args.hash:
+                abbrev_len = parsed_args.hash
+
+            for sha, ref in matched_refs:
+                sha_str = sha.decode()
+                if abbrev_len < 40:
+                    sha_str = sha_str[:abbrev_len]
+
+                if hash_only:
+                    logger.info(sha_str)
+                else:
+                    logger.info(f"{sha_str} {ref.decode()}")
+
+        return 0
 
 
 class cmd_diff_tree(Command):
@@ -4698,6 +4835,7 @@ commands = {
     "rm": cmd_rm,
     "mv": cmd_mv,
     "show": cmd_show,
+    "show-ref": cmd_show_ref,
     "stash": cmd_stash,
     "status": cmd_status,
     "shortlog": cmd_shortlog,

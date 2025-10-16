@@ -1,4 +1,4 @@
-0.24.5	UNRELEASED
+0.24.5	2025-10-15
 
  * Fix HTTP authentication to preserve credentials from URLs when storing
    remote configuration. URLs with embedded credentials (like

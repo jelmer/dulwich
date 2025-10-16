@@ -191,6 +191,7 @@ from .refs import (
     Ref,
     SymrefLoop,
     _import_remote_refs,
+    filter_ref_prefix,
 )
 from .repo import BaseRepo, Repo, get_user_identity
 from .server import (
@@ -3893,6 +3894,107 @@ def for_each_ref(
     ]
 
     return ret
+
+
+def show_ref(
+    repo: Union[Repo, str] = ".",
+    patterns: Optional[list[Union[str, bytes]]] = None,
+    head: bool = False,
+    branches: bool = False,
+    tags: bool = False,
+    dereference: bool = False,
+    verify: bool = False,
+) -> list[tuple[bytes, bytes]]:
+    """List references in a local repository.
+
+    Args:
+      repo: Path to the repository
+      patterns: Optional list of patterns to filter refs (matched from the end)
+      head: Show the HEAD reference
+      branches: Limit to local branches (refs/heads/)
+      tags: Limit to local tags (refs/tags/)
+      dereference: Dereference tags into object IDs
+      verify: Enable stricter reference checking (exact path match)
+    Returns: List of tuples with (sha, ref_name) or (sha, ref_name^{}) for dereferenced tags
+    """
+    # Convert string patterns to bytes
+    byte_patterns: Optional[list[bytes]] = None
+    if patterns:
+        byte_patterns = [os.fsencode(p) if isinstance(p, str) else p for p in patterns]
+
+    with open_repo_closing(repo) as r:
+        refs = r.get_refs()
+
+        # Filter by branches/tags if specified
+        if branches or tags:
+            prefixes = []
+            if branches:
+                prefixes.append(LOCAL_BRANCH_PREFIX)
+            if tags:
+                prefixes.append(LOCAL_TAG_PREFIX)
+            filtered_refs = filter_ref_prefix(refs, prefixes)
+        else:
+            # By default, show tags, heads, and remote refs (but not HEAD)
+            filtered_refs = filter_ref_prefix(refs, [b"refs/"])
+
+        # Add HEAD if requested
+        if head and b"HEAD" in refs:
+            filtered_refs[b"HEAD"] = refs[b"HEAD"]
+
+        # Filter by patterns if specified
+        if byte_patterns:
+            matching_refs: dict[bytes, bytes] = {}
+            for ref, sha in filtered_refs.items():
+                for pattern in byte_patterns:
+                    if verify:
+                        # Verify mode requires exact match
+                        if ref == pattern:
+                            matching_refs[ref] = sha
+                            break
+                    else:
+                        # Pattern matching from the end of the full name
+                        # Only complete parts are matched
+                        # E.g., "master" matches "refs/heads/master" but not "refs/heads/mymaster"
+                        pattern_parts = pattern.split(b"/")
+                        ref_parts = ref.split(b"/")
+
+                        # Try to match from the end
+                        if len(pattern_parts) <= len(ref_parts):
+                            # Check if the end of ref matches the pattern
+                            matches = True
+                            for i in range(len(pattern_parts)):
+                                if ref_parts[-(len(pattern_parts) - i)] != pattern_parts[i]:
+                                    matches = False
+                                    break
+                            if matches:
+                                matching_refs[ref] = sha
+                                break
+            filtered_refs = matching_refs
+
+        # Sort by ref name
+        sorted_refs = sorted(filtered_refs.items(), key=lambda x: x[0])
+
+        # Build result list
+        result: list[tuple[bytes, bytes]] = []
+        for ref, sha in sorted_refs:
+            result.append((sha, ref))
+
+            # Dereference tags if requested
+            if dereference and ref.startswith(LOCAL_TAG_PREFIX):
+                try:
+                    obj = r.get_object(sha)
+                    # Peel tag objects to get the underlying commit/object
+                    from .objects import Tag
+                    while obj.type_name == b"tag":
+                        assert isinstance(obj, Tag)
+                        _obj_class, sha = obj.object
+                        obj = r.get_object(sha)
+                    result.append((sha, ref + b"^{}"))
+                except KeyError:
+                    # Object not found, skip dereferencing
+                    pass
+
+    return result
 
 
 def ls_remote(

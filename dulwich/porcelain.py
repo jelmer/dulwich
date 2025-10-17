@@ -7173,7 +7173,8 @@ def lfs_fetch(
                         if pointer and pointer.is_valid_oid():
                             # Check if we already have it
                             try:
-                                store.open_object(pointer.oid)
+                                with store.open_object(pointer.oid):
+                                    pass  # Object exists, no need to fetch
                             except KeyError:
                                 pointers_to_fetch.append((pointer.oid, pointer.size))
 
@@ -7360,7 +7361,8 @@ def lfs_status(repo: Union[str, os.PathLike[str], Repo] = ".") -> dict[str, list
 
                     # Check if object exists locally
                     try:
-                        store.open_object(pointer.oid)
+                        with store.open_object(pointer.oid):
+                            pass  # Object exists locally
                     except KeyError:
                         status["missing"].append(path_str)
 

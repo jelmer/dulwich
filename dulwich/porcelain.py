@@ -5430,20 +5430,155 @@ def _do_merge(
     return (merge_commit_obj.id, [])
 
 
-def merge(
-    repo: Union[str, os.PathLike[str], Repo],
-    committish: Union[str, bytes, Commit, Tag],
+def _do_octopus_merge(
+    r: Repo,
+    merge_commit_ids: list[bytes],
     no_commit: bool = False,
     no_ff: bool = False,
     message: Optional[bytes] = None,
     author: Optional[bytes] = None,
     committer: Optional[bytes] = None,
 ) -> tuple[Optional[bytes], list[bytes]]:
-    """Merge a commit into the current branch.
+    """Internal octopus merge implementation that operates on an open repository.
+
+    Args:
+      r: Open repository object
+      merge_commit_ids: List of commit SHAs to merge
+      no_commit: If True, do not create a merge commit
+      no_ff: If True, force creation of a merge commit (ignored for octopus)
+      message: Optional merge commit message
+      author: Optional author for merge commit
+      committer: Optional committer for merge commit
+
+    Returns:
+      Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
+      if no_commit=True or there were conflicts
+    """
+    from .graph import find_octopus_base
+    from .merge import octopus_merge
+
+    # Get HEAD commit
+    try:
+        head_commit_id = r.refs[b"HEAD"]
+    except KeyError:
+        raise Error("No HEAD reference found")
+
+    head_commit = r[head_commit_id]
+    assert isinstance(head_commit, Commit), "Expected a Commit object"
+
+    # Get all commits to merge
+    other_commits = []
+    for merge_commit_id in merge_commit_ids:
+        merge_commit = r[merge_commit_id]
+        assert isinstance(merge_commit, Commit), "Expected a Commit object"
+
+        # Check if we're trying to merge the same commit as HEAD
+        if head_commit_id == merge_commit_id:
+            # Skip this commit, it's already merged
+            continue
+
+        other_commits.append(merge_commit)
+
+    # If no commits to merge after filtering, we're already up to date
+    if not other_commits:
+        return (None, [])
+
+    # If only one commit to merge, use regular merge
+    if len(other_commits) == 1:
+        return _do_merge(
+            r, other_commits[0].id, no_commit, no_ff, message, author, committer
+        )
+
+    # Find the octopus merge base
+    all_commit_ids = [head_commit_id] + [c.id for c in other_commits]
+    merge_bases = find_octopus_base(r, all_commit_ids)
+
+    if not merge_bases:
+        raise Error("No common ancestor found")
+
+    # Check if this is a fast-forward (HEAD is the merge base)
+    # For octopus merges, fast-forward doesn't really apply, so we always create a merge commit
+
+    # Perform octopus merge
+    gitattributes = r.get_gitattributes()
+    config = r.get_config()
+    merged_tree, conflicts = octopus_merge(
+        r.object_store, merge_bases, head_commit, other_commits, gitattributes, config
+    )
+
+    # Add merged tree to object store
+    r.object_store.add_object(merged_tree)
+
+    # Update index and working directory
+    changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
+    update_working_tree(r, head_commit.tree, merged_tree.id, change_iterator=changes)
+
+    if conflicts:
+        # Don't create a commit if there are conflicts
+        # Octopus merge refuses to proceed with conflicts
+        return (None, conflicts)
+
+    if no_commit:
+        # Don't create a commit if no_commit is True
+        return (None, [])
+
+    # Create merge commit with multiple parents
+    merge_commit_obj = Commit()
+    merge_commit_obj.tree = merged_tree.id
+    merge_commit_obj.parents = [head_commit_id] + [c.id for c in other_commits]
+
+    # Set author/committer
+    if author is None:
+        author = get_user_identity(r.get_config_stack())
+    if committer is None:
+        committer = author
+
+    merge_commit_obj.author = author
+    merge_commit_obj.committer = committer
+
+    # Set timestamps
+    timestamp = int(time.time())
+    timezone = 0  # UTC
+    merge_commit_obj.author_time = timestamp
+    merge_commit_obj.author_timezone = timezone
+    merge_commit_obj.commit_time = timestamp
+    merge_commit_obj.commit_timezone = timezone
+
+    # Set commit message
+    if message is None:
+        # Generate default message for octopus merge
+        branch_names = []
+        for commit_id in merge_commit_ids:
+            branch_names.append(commit_id.decode()[:7])
+        message = f"Merge commits {', '.join(branch_names)}\n".encode()
+    merge_commit_obj.message = message.encode() if isinstance(message, str) else message
+
+    # Add commit to object store
+    r.object_store.add_object(merge_commit_obj)
+
+    # Update HEAD
+    r.refs[b"HEAD"] = merge_commit_obj.id
+
+    return (merge_commit_obj.id, [])
+
+
+def merge(
+    repo: Union[str, os.PathLike[str], Repo],
+    committish: Union[
+        str, bytes, Commit, Tag, Sequence[Union[str, bytes, Commit, Tag]]
+    ],
+    no_commit: bool = False,
+    no_ff: bool = False,
+    message: Optional[bytes] = None,
+    author: Optional[bytes] = None,
+    committer: Optional[bytes] = None,
+) -> tuple[Optional[bytes], list[bytes]]:
+    """Merge one or more commits into the current branch.
 
     Args:
       repo: Repository to merge into
-      committish: Commit to merge
+      committish: Commit(s) to merge. Can be a single commit or a sequence of commits.
+                  When merging more than two heads, the octopus merge strategy is used.
       no_commit: If True, do not create a merge commit
       no_ff: If True, force creation of a merge commit
       message: Optional merge commit message
@@ -5458,17 +5593,42 @@ def merge(
       Error: If there is no HEAD reference or commit cannot be found
     """
     with open_repo_closing(repo) as r:
-        # Parse the commit to merge
-        try:
-            merge_commit_id = parse_commit(r, committish).id
-        except KeyError:
-            raise Error(
-                f"Cannot find commit '{committish.decode() if isinstance(committish, bytes) else committish}'"
-            )
+        # Handle both single commit and multiple commits
+        if isinstance(committish, (list, tuple)):
+            # Multiple commits - use octopus merge
+            merge_commit_ids = []
+            for c in committish:
+                try:
+                    merge_commit_ids.append(parse_commit(r, c).id)
+                except KeyError:
+                    raise Error(
+                        f"Cannot find commit '{c.decode() if isinstance(c, bytes) else c}'"
+                    )
 
-        result = _do_merge(
-            r, merge_commit_id, no_commit, no_ff, message, author, committer
-        )
+            if len(merge_commit_ids) == 1:
+                # Only one commit, use regular merge
+                result = _do_merge(
+                    r, merge_commit_ids[0], no_commit, no_ff, message, author, committer
+                )
+            else:
+                # Multiple commits, use octopus merge
+                result = _do_octopus_merge(
+                    r, merge_commit_ids, no_commit, no_ff, message, author, committer
+                )
+        else:
+            # Single commit - use regular merge
+            # Type narrowing: committish is not a sequence in this branch
+            single_committish = cast(Union[str, bytes, Commit, Tag], committish)
+            try:
+                merge_commit_id = parse_commit(r, single_committish).id
+            except KeyError:
+                raise Error(
+                    f"Cannot find commit '{single_committish.decode() if isinstance(single_committish, bytes) else single_committish}'"
+                )
+
+            result = _do_merge(
+                r, merge_commit_id, no_commit, no_ff, message, author, committer
+            )
 
         # Trigger auto GC if needed
         from .gc import maybe_auto_gc

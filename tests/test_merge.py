@@ -301,3 +301,207 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(exc.path, b"test/path")
         self.assertIn("test/path", str(exc))
         self.assertIn("test message", str(exc))
+
+
+class OctopusMergeTests(unittest.TestCase):
+    """Tests for octopus merge functionality."""
+
+    def setUp(self):
+        self.repo = MemoryRepo()
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
+    def test_octopus_merge_three_branches(self):
+        """Test octopus merge with three branches."""
+        from dulwich.merge import octopus_merge
+
+        # Create base commit
+        base_tree = Tree()
+        blob1 = Blob.from_string(b"file1 content\n")
+        blob2 = Blob.from_string(b"file2 content\n")
+        blob3 = Blob.from_string(b"file3 content\n")
+        self.repo.object_store.add_object(blob1)
+        self.repo.object_store.add_object(blob2)
+        self.repo.object_store.add_object(blob3)
+        base_tree.add(b"file1.txt", 0o100644, blob1.id)
+        base_tree.add(b"file2.txt", 0o100644, blob2.id)
+        base_tree.add(b"file3.txt", 0o100644, blob3.id)
+        self.repo.object_store.add_object(base_tree)
+
+        base_commit = Commit()
+        base_commit.tree = base_tree.id
+        base_commit.author = b"Test <test@example.com>"
+        base_commit.committer = b"Test <test@example.com>"
+        base_commit.message = b"Base commit"
+        base_commit.commit_time = base_commit.author_time = 12345
+        base_commit.commit_timezone = base_commit.author_timezone = 0
+        self.repo.object_store.add_object(base_commit)
+
+        # Create HEAD commit (modifies file1)
+        head_tree = Tree()
+        head_blob1 = Blob.from_string(b"file1 modified by head\n")
+        self.repo.object_store.add_object(head_blob1)
+        head_tree.add(b"file1.txt", 0o100644, head_blob1.id)
+        head_tree.add(b"file2.txt", 0o100644, blob2.id)
+        head_tree.add(b"file3.txt", 0o100644, blob3.id)
+        self.repo.object_store.add_object(head_tree)
+
+        head_commit = Commit()
+        head_commit.tree = head_tree.id
+        head_commit.parents = [base_commit.id]
+        head_commit.author = b"Test <test@example.com>"
+        head_commit.committer = b"Test <test@example.com>"
+        head_commit.message = b"Head commit"
+        head_commit.commit_time = head_commit.author_time = 12346
+        head_commit.commit_timezone = head_commit.author_timezone = 0
+        self.repo.object_store.add_object(head_commit)
+
+        # Create branch1 commit (modifies file2)
+        branch1_tree = Tree()
+        branch1_blob2 = Blob.from_string(b"file2 modified by branch1\n")
+        self.repo.object_store.add_object(branch1_blob2)
+        branch1_tree.add(b"file1.txt", 0o100644, blob1.id)
+        branch1_tree.add(b"file2.txt", 0o100644, branch1_blob2.id)
+        branch1_tree.add(b"file3.txt", 0o100644, blob3.id)
+        self.repo.object_store.add_object(branch1_tree)
+
+        branch1_commit = Commit()
+        branch1_commit.tree = branch1_tree.id
+        branch1_commit.parents = [base_commit.id]
+        branch1_commit.author = b"Test <test@example.com>"
+        branch1_commit.committer = b"Test <test@example.com>"
+        branch1_commit.message = b"Branch1 commit"
+        branch1_commit.commit_time = branch1_commit.author_time = 12347
+        branch1_commit.commit_timezone = branch1_commit.author_timezone = 0
+        self.repo.object_store.add_object(branch1_commit)
+
+        # Create branch2 commit (modifies file3)
+        branch2_tree = Tree()
+        branch2_blob3 = Blob.from_string(b"file3 modified by branch2\n")
+        self.repo.object_store.add_object(branch2_blob3)
+        branch2_tree.add(b"file1.txt", 0o100644, blob1.id)
+        branch2_tree.add(b"file2.txt", 0o100644, blob2.id)
+        branch2_tree.add(b"file3.txt", 0o100644, branch2_blob3.id)
+        self.repo.object_store.add_object(branch2_tree)
+
+        branch2_commit = Commit()
+        branch2_commit.tree = branch2_tree.id
+        branch2_commit.parents = [base_commit.id]
+        branch2_commit.author = b"Test <test@example.com>"
+        branch2_commit.committer = b"Test <test@example.com>"
+        branch2_commit.message = b"Branch2 commit"
+        branch2_commit.commit_time = branch2_commit.author_time = 12348
+        branch2_commit.commit_timezone = branch2_commit.author_timezone = 0
+        self.repo.object_store.add_object(branch2_commit)
+
+        # Perform octopus merge
+        merged_tree, conflicts = octopus_merge(
+            self.repo.object_store,
+            [base_commit.id],
+            head_commit,
+            [branch1_commit, branch2_commit],
+        )
+
+        # Should have no conflicts since each branch modified different files
+        self.assertEqual(len(conflicts), 0)
+
+        # Check that all three modifications are in the merged tree
+        self.assertIn(b"file1.txt", [item.path for item in merged_tree.items()])
+        self.assertIn(b"file2.txt", [item.path for item in merged_tree.items()])
+        self.assertIn(b"file3.txt", [item.path for item in merged_tree.items()])
+
+    def test_octopus_merge_with_conflict(self):
+        """Test that octopus merge refuses to proceed with conflicts."""
+        from dulwich.merge import octopus_merge
+
+        # Create base commit
+        base_tree = Tree()
+        blob1 = Blob.from_string(b"original content\n")
+        self.repo.object_store.add_object(blob1)
+        base_tree.add(b"file.txt", 0o100644, blob1.id)
+        self.repo.object_store.add_object(base_tree)
+
+        base_commit = Commit()
+        base_commit.tree = base_tree.id
+        base_commit.author = b"Test <test@example.com>"
+        base_commit.committer = b"Test <test@example.com>"
+        base_commit.message = b"Base commit"
+        base_commit.commit_time = base_commit.author_time = 12345
+        base_commit.commit_timezone = base_commit.author_timezone = 0
+        self.repo.object_store.add_object(base_commit)
+
+        # Create HEAD commit
+        head_tree = Tree()
+        head_blob = Blob.from_string(b"head content\n")
+        self.repo.object_store.add_object(head_blob)
+        head_tree.add(b"file.txt", 0o100644, head_blob.id)
+        self.repo.object_store.add_object(head_tree)
+
+        head_commit = Commit()
+        head_commit.tree = head_tree.id
+        head_commit.parents = [base_commit.id]
+        head_commit.author = b"Test <test@example.com>"
+        head_commit.committer = b"Test <test@example.com>"
+        head_commit.message = b"Head commit"
+        head_commit.commit_time = head_commit.author_time = 12346
+        head_commit.commit_timezone = head_commit.author_timezone = 0
+        self.repo.object_store.add_object(head_commit)
+
+        # Create branch1 commit (conflicts with head)
+        branch1_tree = Tree()
+        branch1_blob = Blob.from_string(b"branch1 content\n")
+        self.repo.object_store.add_object(branch1_blob)
+        branch1_tree.add(b"file.txt", 0o100644, branch1_blob.id)
+        self.repo.object_store.add_object(branch1_tree)
+
+        branch1_commit = Commit()
+        branch1_commit.tree = branch1_tree.id
+        branch1_commit.parents = [base_commit.id]
+        branch1_commit.author = b"Test <test@example.com>"
+        branch1_commit.committer = b"Test <test@example.com>"
+        branch1_commit.message = b"Branch1 commit"
+        branch1_commit.commit_time = branch1_commit.author_time = 12347
+        branch1_commit.commit_timezone = branch1_commit.author_timezone = 0
+        self.repo.object_store.add_object(branch1_commit)
+
+        # Perform octopus merge
+        _merged_tree, conflicts = octopus_merge(
+            self.repo.object_store,
+            [base_commit.id],
+            head_commit,
+            [branch1_commit],
+        )
+
+        # Should have conflicts and refuse to merge
+        self.assertEqual(len(conflicts), 1)
+        self.assertEqual(conflicts[0], b"file.txt")
+
+    def test_octopus_merge_no_commits(self):
+        """Test that octopus merge raises error with no commits to merge."""
+        from dulwich.merge import octopus_merge
+
+        # Create a simple commit
+        tree = Tree()
+        blob = Blob.from_string(b"content\n")
+        self.repo.object_store.add_object(blob)
+        tree.add(b"file.txt", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test <test@example.com>"
+        commit.committer = b"Test <test@example.com>"
+        commit.message = b"Commit"
+        commit.commit_time = commit.author_time = 12345
+        commit.commit_timezone = commit.author_timezone = 0
+        self.repo.object_store.add_object(commit)
+
+        # Try to do octopus merge with no commits
+        with self.assertRaises(ValueError):
+            octopus_merge(
+                self.repo.object_store,
+                [commit.id],
+                commit,
+                [],
+            )

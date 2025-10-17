@@ -28,8 +28,10 @@ from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
 from dulwich.patch import (
     DiffAlgorithmNotAvailable,
+    commit_patch_id,
     get_summary,
     git_am_patch_split,
+    patch_id,
     unified_diff_with_algorithm,
     write_blob_diff,
     write_commit_patch,
@@ -797,3 +799,97 @@ class PatienceDiffTests(TestCase):
         self.assertIn(b"diff --git", diff)
         self.assertIn(b"-line2", diff)
         self.assertIn(b"+line2 modified", diff)
+
+
+class PatchIdTests(TestCase):
+    """Tests for patch_id and commit_patch_id functions."""
+
+    def test_patch_id_simple(self) -> None:
+        """Test patch_id computation with a simple diff."""
+        diff = b"""diff --git a/file.txt b/file.txt
+index 3b0f961..a116b51 644
+--- a/file.txt
++++ b/file.txt
+@@ -1,2 +1,2 @@
+-old
++new
+ same
+"""
+        pid = patch_id(diff)
+        # Patch ID should be a 40-byte hex string
+        self.assertEqual(40, len(pid))
+        self.assertTrue(all(c in b"0123456789abcdef" for c in pid))
+
+    def test_patch_id_same_for_equivalent_diffs(self) -> None:
+        """Test that equivalent patches have the same ID."""
+        # Two diffs with different line numbers but same changes
+        diff1 = b"""diff --git a/file.txt b/file.txt
+--- a/file.txt
++++ b/file.txt
+@@ -1,3 +1,3 @@
+ context
+-old line
++new line
+ context
+"""
+        diff2 = b"""diff --git a/file.txt b/file.txt
+--- a/file.txt
++++ b/file.txt
+@@ -10,3 +10,3 @@
+ context
+-old line
++new line
+ context
+"""
+        pid1 = patch_id(diff1)
+        pid2 = patch_id(diff2)
+        # Same patch content should give same patch ID
+        self.assertEqual(pid1, pid2)
+
+    def test_commit_patch_id(self) -> None:
+        """Test commit_patch_id computation."""
+        store = MemoryObjectStore()
+
+        # Create two trees
+        blob1 = Blob.from_string(b"content1\n")
+        blob2 = Blob.from_string(b"content2\n")
+        store.add_objects([(blob1, None), (blob2, None)])
+
+        tree1 = Tree()
+        tree1.add(b"file.txt", 0o644, blob1.id)
+        store.add_object(tree1)
+
+        tree2 = Tree()
+        tree2.add(b"file.txt", 0o644, blob2.id)
+        store.add_object(tree2)
+
+        # Create a commit
+        commit = Commit()
+        commit.tree = tree2.id
+        commit.parents = [b"0" * 40]  # Fake parent
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 1234567890
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"Test commit\n"
+        commit.encoding = b"UTF-8"
+        store.add_object(commit)
+
+        # Create parent commit
+        parent_commit = Commit()
+        parent_commit.tree = tree1.id
+        parent_commit.parents = []
+        parent_commit.author = parent_commit.committer = b"Test <test@example.com>"
+        parent_commit.author_time = parent_commit.commit_time = 1234567880
+        parent_commit.author_timezone = parent_commit.commit_timezone = 0
+        parent_commit.message = b"Parent commit\n"
+        parent_commit.encoding = b"UTF-8"
+        store.add_object(parent_commit)
+
+        # Update commit to have real parent
+        commit.parents = [parent_commit.id]
+        store.add_object(commit)
+
+        # Compute patch ID
+        pid = commit_patch_id(store, commit.id)
+        self.assertEqual(40, len(pid))
+        self.assertTrue(all(c in b"0123456789abcdef" for c in pid))

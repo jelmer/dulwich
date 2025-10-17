@@ -1340,6 +1340,222 @@ def _get_commit_message_with_template(
     return message
 
 
+class cmd_config(Command):
+    """Get and set repository or global options."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the config command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--global",
+            dest="global_config",
+            action="store_true",
+            help="Use global config file",
+        )
+        parser.add_argument(
+            "--local",
+            action="store_true",
+            help="Use repository config file (default)",
+        )
+        parser.add_argument(
+            "-l",
+            "--list",
+            action="store_true",
+            help="List all variables",
+        )
+        parser.add_argument(
+            "--unset",
+            action="store_true",
+            help="Remove a variable",
+        )
+        parser.add_argument(
+            "--unset-all",
+            action="store_true",
+            help="Remove all matches for a variable",
+        )
+        parser.add_argument(
+            "--get-all",
+            action="store_true",
+            help="Get all values for a multivar",
+        )
+        parser.add_argument(
+            "key",
+            nargs="?",
+            help="Config key (e.g., user.name)",
+        )
+        parser.add_argument(
+            "value",
+            nargs="?",
+            help="Config value to set",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Determine which config file to use
+        if parsed_args.global_config:
+            # Use global config file
+            config_path = os.path.expanduser("~/.gitconfig")
+            try:
+                from .config import ConfigFile
+
+                config = ConfigFile.from_path(config_path)
+            except FileNotFoundError:
+                from .config import ConfigFile
+
+                config = ConfigFile()
+                config.path = config_path
+        else:
+            # Use local repository config (default)
+            try:
+                repo = Repo(".")
+                config = repo.get_config()
+            except NotGitRepository:
+                logger.error("error: not a git repository")
+                return 1
+
+        # Handle --list
+        if parsed_args.list:
+            for section in config.sections():
+                for key, value in config.items(section):
+                    section_str = ".".join(
+                        s.decode("utf-8") if isinstance(s, bytes) else s
+                        for s in section
+                    )
+                    key_str = key.decode("utf-8") if isinstance(key, bytes) else key
+                    value_str = (
+                        value.decode("utf-8") if isinstance(value, bytes) else value
+                    )
+                    print(f"{section_str}.{key_str}={value_str}")
+            return 0
+
+        # Handle --unset or --unset-all
+        if parsed_args.unset or parsed_args.unset_all:
+            if not parsed_args.key:
+                logger.error("error: key is required for --unset")
+                return 1
+
+            # Parse the key (e.g., "user.name" or "remote.origin.url")
+            parts = parsed_args.key.split(".")
+            if len(parts) < 2:
+                logger.error("error: invalid key format")
+                return 1
+
+            if len(parts) == 2:
+                section = (parts[0],)
+                name = parts[1]
+            else:
+                # For keys like "remote.origin.url", section is ("remote", "origin")
+                section = tuple(parts[:-1])
+                name = parts[-1]
+
+            try:
+                # Check if the key exists first
+                try:
+                    config.get(section, name)
+                except KeyError:
+                    logger.error(f"error: key '{parsed_args.key}' not found")
+                    return 1
+
+                # Delete the configuration key using ConfigDict's delete method
+                section_bytes = tuple(
+                    s.encode("utf-8") if isinstance(s, str) else s for s in section
+                )
+                name_bytes = name.encode("utf-8") if isinstance(name, str) else name
+
+                section_dict = config._values.get(section_bytes)
+                if section_dict:
+                    del section_dict[name_bytes]
+                    config.write_to_path()
+                else:
+                    logger.error(f"error: key '{parsed_args.key}' not found")
+                    return 1
+            except Exception as e:
+                logger.error(f"error: {e}")
+                return 1
+
+            return 0
+
+        # Handle --get-all
+        if parsed_args.get_all:
+            if not parsed_args.key:
+                logger.error("error: key is required for --get-all")
+                return 1
+
+            parts = parsed_args.key.split(".")
+            if len(parts) < 2:
+                logger.error("error: invalid key format")
+                return 1
+
+            if len(parts) == 2:
+                section = (parts[0],)
+                name = parts[1]
+            else:
+                section = tuple(parts[:-1])
+                name = parts[-1]
+
+            try:
+                for value in config.get_multivar(section, name):
+                    value_str = (
+                        value.decode("utf-8") if isinstance(value, bytes) else value
+                    )
+                    print(value_str)
+                return 0
+            except KeyError:
+                return 1
+
+        # Handle get (no value provided)
+        if parsed_args.key and not parsed_args.value:
+            parts = parsed_args.key.split(".")
+            if len(parts) < 2:
+                logger.error("error: invalid key format")
+                return 1
+
+            if len(parts) == 2:
+                section = (parts[0],)
+                name = parts[1]
+            else:
+                # For keys like "remote.origin.url", section is ("remote", "origin")
+                section = tuple(parts[:-1])
+                name = parts[-1]
+
+            try:
+                value = config.get(section, name)
+                value_str = value.decode("utf-8") if isinstance(value, bytes) else value
+                print(value_str)
+                return 0
+            except KeyError:
+                return 1
+
+        # Handle set (key and value provided)
+        if parsed_args.key and parsed_args.value:
+            parts = parsed_args.key.split(".")
+            if len(parts) < 2:
+                logger.error("error: invalid key format")
+                return 1
+
+            if len(parts) == 2:
+                section = (parts[0],)
+                name = parts[1]
+            else:
+                # For keys like "remote.origin.url", section is ("remote", "origin")
+                section = tuple(parts[:-1])
+                name = parts[-1]
+
+            config.set(section, name, parsed_args.value)
+            if parsed_args.global_config:
+                config.write_to_path()
+            else:
+                config.write_to_path()
+            return 0
+
+        # No action specified
+        parser.print_help()
+        return 1
+
+
 class cmd_commit(Command):
     """Record changes to the repository."""
 
@@ -4976,6 +5192,7 @@ commands = {
     "clone": cmd_clone,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
+    "config": cmd_config,
     "count-objects": cmd_count_objects,
     "describe": cmd_describe,
     "daemon": cmd_daemon,

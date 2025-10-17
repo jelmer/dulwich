@@ -1717,6 +1717,30 @@ class HttpGitClientTests(TestCase):
         self.assertNotIn(password, url)
         self.assertEqual("https://github.com/jelmer/dulwich", url)
 
+    def test_pool_manager_parameter(self) -> None:
+        """Test that pool_manager parameter is properly passed through."""
+        import urllib3
+
+        # Create a custom pool manager
+        custom_pool_manager = urllib3.PoolManager()
+
+        # Test with get_transport_and_path_from_url
+        url = "https://github.com/jelmer/dulwich"
+        client, _path = get_transport_and_path_from_url(
+            url, pool_manager=custom_pool_manager
+        )
+
+        # Verify the client is an HTTP client and has our custom pool manager
+        self.assertIsInstance(client, HttpGitClient)
+        self.assertIs(client.pool_manager, custom_pool_manager)
+
+        # Test with get_transport_and_path
+        client2, _path2 = get_transport_and_path(url, pool_manager=custom_pool_manager)
+
+        # Verify the client is an HTTP client and has our custom pool manager
+        self.assertIsInstance(client2, HttpGitClient)
+        self.assertIs(client2.pool_manager, custom_pool_manager)
+
 
 class TCPGitClientTests(TestCase):
     def test_get_url(self) -> None:

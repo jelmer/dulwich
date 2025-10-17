@@ -33,6 +33,7 @@ from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
 from dulwich.objects import Commit
 from dulwich.objectspec import parse_commit
+from dulwich.refs import local_branch_name
 from dulwich.repo import BaseRepo, Repo
 
 
@@ -762,7 +763,7 @@ class Rebaser:
                 self._rebasing_branch = branch
             else:
                 # Assume it's a branch name
-                self._rebasing_branch = b"refs/heads/" + branch
+                self._rebasing_branch = local_branch_name(branch)
         else:
             # Use current branch
             if self._original_head is not None and self._original_head.startswith(

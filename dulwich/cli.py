@@ -3569,6 +3569,71 @@ class cmd_notes(SuperCommand):
     default_command = cmd_notes_list
 
 
+class cmd_cherry(Command):
+    """Find commits not merged upstream."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the cherry command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        parser = argparse.ArgumentParser(description="Find commits not merged upstream")
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            help="Show commit messages",
+        )
+        parser.add_argument(
+            "upstream",
+            nargs="?",
+            help="Upstream branch (default: tracking branch or HEAD^)",
+        )
+        parser.add_argument(
+            "head",
+            nargs="?",
+            help="Head branch (default: HEAD)",
+        )
+        parser.add_argument(
+            "limit",
+            nargs="?",
+            help="Limit commits to those after this ref",
+        )
+        parsed_args = parser.parse_args(args)
+
+        try:
+            results = porcelain.cherry(
+                ".",
+                upstream=parsed_args.upstream,
+                head=parsed_args.head,
+                limit=parsed_args.limit,
+                verbose=parsed_args.verbose,
+            )
+        except (NotGitRepository, OSError, FileFormatException, ValueError) as e:
+            logger.error(f"Error: {e}")
+            return 1
+
+        # Output results
+        for status, commit_sha, message in results:
+            # Convert commit_sha to hex string
+            if isinstance(commit_sha, bytes):
+                commit_hex = commit_sha.hex()
+            else:
+                commit_hex = commit_sha
+
+            if parsed_args.verbose and message:
+                message_str = message.decode("utf-8", errors="replace")
+                logger.info(f"{status} {commit_hex} {message_str}")
+            else:
+                logger.info(f"{status} {commit_hex}")
+
+        return 0
+
+
 class cmd_cherry_pick(Command):
     """Apply the changes introduced by some existing commits."""
 
@@ -5188,6 +5253,7 @@ commands = {
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
     "checkout": cmd_checkout,
+    "cherry": cmd_cherry,
     "cherry-pick": cmd_cherry_pick,
     "clone": cmd_clone,
     "commit": cmd_commit,

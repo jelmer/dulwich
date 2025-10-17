@@ -5708,6 +5708,144 @@ def merge_tree(
         return merged_tree.id, conflicts
 
 
+def cherry(
+    repo: Union[str, os.PathLike[str], Repo],
+    upstream: Optional[Union[str, bytes]] = None,
+    head: Optional[Union[str, bytes]] = None,
+    limit: Optional[Union[str, bytes]] = None,
+    verbose: bool = False,
+) -> list[tuple[str, bytes, Optional[bytes]]]:
+    """Find commits not merged upstream.
+
+    Args:
+        repo: Repository path or object
+        upstream: Upstream branch (default: tracking branch or @{upstream})
+        head: Head branch (default: HEAD)
+        limit: Limit commits to those after this ref
+        verbose: Include commit messages in output
+
+    Returns:
+        List of tuples (status, commit_sha, message) where status is '+' or '-'
+        '+' means commit is not in upstream, '-' means equivalent patch exists upstream
+        message is None unless verbose=True
+    """
+    from .patch import commit_patch_id
+
+    with open_repo_closing(repo) as r:
+        # Resolve upstream
+        if upstream is None:
+            # Try to find tracking branch
+            upstream_found = False
+            head_refs, _ = r.refs.follow(b"HEAD")
+            if head_refs:
+                head_ref = head_refs[0]
+                if head_ref.startswith(b"refs/heads/"):
+                    config = r.get_config()
+                    branch_name = head_ref[len(b"refs/heads/") :]
+
+                    try:
+                        upstream_ref = config.get((b"branch", branch_name), b"merge")
+                    except KeyError:
+                        upstream_ref = None
+
+                    if upstream_ref:
+                        try:
+                            remote_name = config.get(
+                                (b"branch", branch_name), b"remote"
+                            )
+                        except KeyError:
+                            remote_name = None
+
+                        if remote_name:
+                            # Build the tracking branch ref
+                            upstream_refname = (
+                                b"refs/remotes/"
+                                + remote_name
+                                + b"/"
+                                + upstream_ref.split(b"/")[-1]
+                            )
+                            if upstream_refname in r.refs:
+                                upstream = upstream_refname
+                                upstream_found = True
+
+            if not upstream_found:
+                # Default to HEAD^ if no tracking branch found
+                head_commit = r[b"HEAD"]
+                if isinstance(head_commit, Commit) and head_commit.parents:
+                    upstream = head_commit.parents[0]
+                else:
+                    raise ValueError("Could not determine upstream branch")
+
+        # Resolve head
+        if head is None:
+            head = b"HEAD"
+
+        # Convert strings to bytes
+        if isinstance(upstream, str):
+            upstream = upstream.encode("utf-8")
+        if isinstance(head, str):
+            head = head.encode("utf-8")
+        if limit is not None and isinstance(limit, str):
+            limit = limit.encode("utf-8")
+
+        # Resolve refs to commit IDs
+        assert upstream is not None
+        upstream_obj = r[upstream]
+        head_obj = r[head]
+        upstream_id = upstream_obj.id
+        head_id = head_obj.id
+
+        # Get limit commit ID if specified
+        limit_id = None
+        if limit is not None:
+            limit_id = r[limit].id
+
+        # Find all commits reachable from head but not from upstream
+        # This is equivalent to: git rev-list ^upstream head
+
+        # Get commits from head that are not in upstream
+        walker = r.get_walker([head_id], exclude=[upstream_id])
+        head_commits = []
+        for entry in walker:
+            commit = entry.commit
+            # Apply limit if specified
+            if limit_id is not None:
+                # Stop when we reach the limit commit
+                if commit.id == limit_id:
+                    break
+            head_commits.append(commit.id)
+
+        # Compute patch IDs for upstream commits
+        upstream_walker = r.get_walker([upstream_id])
+        upstream_patch_ids = {}  # Maps patch_id -> commit_id for debugging
+        for entry in upstream_walker:
+            commit = entry.commit
+            pid = commit_patch_id(r.object_store, commit.id)
+            upstream_patch_ids[pid] = commit.id
+
+        # For each head commit, check if equivalent patch exists in upstream
+        results: list[tuple[str, bytes, Optional[bytes]]] = []
+        for commit_id in reversed(head_commits):  # Show oldest first
+            obj = r.object_store[commit_id]
+            assert isinstance(obj, Commit)
+            commit = obj
+
+            pid = commit_patch_id(r.object_store, commit_id)
+
+            if pid in upstream_patch_ids:
+                status = "-"
+            else:
+                status = "+"
+
+            message = None
+            if verbose:
+                message = commit.message.split(b"\n")[0]  # First line only
+
+            results.append((status, commit_id, message))
+
+        return results
+
+
 def cherry_pick(  # noqa: D417
     repo: Union[str, os.PathLike[str], Repo],
     committish: Union[str, bytes, Commit, Tag, None],
@@ -7333,7 +7471,8 @@ def lfs_fetch(
                         if pointer and pointer.is_valid_oid():
                             # Check if we already have it
                             try:
-                                store.open_object(pointer.oid)
+                                with store.open_object(pointer.oid):
+                                    pass  # Object exists, no need to fetch
                             except KeyError:
                                 pointers_to_fetch.append((pointer.oid, pointer.size))
 
@@ -7520,7 +7659,8 @@ def lfs_status(repo: Union[str, os.PathLike[str], Repo] = ".") -> dict[str, list
 
                     # Check if object exists locally
                     try:
-                        store.open_object(pointer.oid)
+                        with store.open_object(pointer.oid):
+                            pass  # Object exists locally
                     except KeyError:
                         status["missing"].append(path_str)
 

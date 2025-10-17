@@ -10157,3 +10157,124 @@ class CherryTests(PorcelainTestCase):
         status, commit_sha, _message = results[0]
         self.assertEqual("-", status)
         self.assertEqual(head_commit, commit_sha)
+
+
+class GrepTests(PorcelainTestCase):
+    def test_basic_grep(self) -> None:
+        """Test basic pattern matching in files."""
+        # Create some test files
+        with open(os.path.join(self.repo_path, "foo.txt"), "w") as f:
+            f.write("hello world\ngoodbye world\n")
+        with open(os.path.join(self.repo_path, "bar.txt"), "w") as f:
+            f.write("foo bar\nbaz qux\n")
+
+        porcelain.add(self.repo, paths=["foo.txt", "bar.txt"])
+        porcelain.commit(self.repo, message=b"Add test files")
+
+        # Search for "world"
+        outstream = StringIO()
+        porcelain.grep(self.repo, "world", outstream=outstream)
+        output = outstream.getvalue().replace("\r\n", "\n")
+
+        self.assertEqual("foo.txt:hello world\nfoo.txt:goodbye world\n", output)
+
+    def test_grep_with_line_numbers(self) -> None:
+        """Test grep with line numbers."""
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("line one\nline two\nline three\n")
+
+        porcelain.add(self.repo, paths=["test.txt"])
+        porcelain.commit(self.repo, message=b"Add test file")
+
+        outstream = StringIO()
+        porcelain.grep(self.repo, "line", outstream=outstream, line_number=True)
+        output = outstream.getvalue().replace("\r\n", "\n")
+
+        self.assertEqual(
+            "test.txt:1:line one\ntest.txt:2:line two\ntest.txt:3:line three\n",
+            output,
+        )
+
+    def test_grep_case_insensitive(self) -> None:
+        """Test case-insensitive grep."""
+        with open(os.path.join(self.repo_path, "case.txt"), "w") as f:
+            f.write("Hello WORLD\nGoodbye world\n")
+
+        porcelain.add(self.repo, paths=["case.txt"])
+        porcelain.commit(self.repo, message=b"Add case file")
+
+        outstream = StringIO()
+        porcelain.grep(self.repo, "HELLO", outstream=outstream, ignore_case=True)
+        output = outstream.getvalue().replace("\r\n", "\n")
+
+        self.assertEqual("case.txt:Hello WORLD\n", output)
+
+    def test_grep_with_pathspec(self) -> None:
+        """Test grep with pathspec filtering."""
+        os.makedirs(os.path.join(self.repo_path, "subdir"))
+        with open(os.path.join(self.repo_path, "file1.txt"), "w") as f:
+            f.write("pattern match\n")
+        with open(os.path.join(self.repo_path, "subdir", "file2.txt"), "w") as f:
+            f.write("pattern match\n")
+
+        porcelain.add(self.repo, paths=["file1.txt", "subdir/file2.txt"])
+        porcelain.commit(self.repo, message=b"Add files")
+
+        # Search only in subdir
+        outstream = StringIO()
+        porcelain.grep(self.repo, "pattern", outstream=outstream, pathspecs=["subdir/"])
+        output = outstream.getvalue().replace("\r\n", "\n")
+
+        self.assertEqual("subdir/file2.txt:pattern match\n", output)
+
+    def test_grep_no_matches(self) -> None:
+        """Test grep with no matches."""
+        with open(os.path.join(self.repo_path, "empty.txt"), "w") as f:
+            f.write("nothing to see here\n")
+
+        porcelain.add(self.repo, paths=["empty.txt"])
+        porcelain.commit(self.repo, message=b"Add empty file")
+
+        outstream = StringIO()
+        porcelain.grep(self.repo, "nonexistent", outstream=outstream)
+        output = outstream.getvalue()
+
+        self.assertEqual("", output)
+
+    def test_grep_regex_pattern(self) -> None:
+        """Test grep with regex patterns."""
+        with open(os.path.join(self.repo_path, "regex.txt"), "w") as f:
+            f.write("test123\ntest456\nnotest\n")
+
+        porcelain.add(self.repo, paths=["regex.txt"])
+        porcelain.commit(self.repo, message=b"Add regex file")
+
+        # Search for "test" followed by digits
+        outstream = StringIO()
+        porcelain.grep(self.repo, r"test\d+", outstream=outstream)
+        output = outstream.getvalue().replace("\r\n", "\n")
+
+        self.assertEqual("regex.txt:test123\nregex.txt:test456\n", output)
+
+    def test_grep_invalid_pattern(self) -> None:
+        """Test grep with invalid regex pattern."""
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("test\n")
+
+        porcelain.add(self.repo, paths=["test.txt"])
+        porcelain.commit(self.repo, message=b"Add test file")
+
+        outstream = StringIO()
+        with self.assertRaises(ValueError):
+            porcelain.grep(self.repo, "[invalid", outstream=outstream)
+
+    def test_grep_no_head(self) -> None:
+        """Test grep fails when there's no HEAD commit."""
+        # Create a fresh repo with no commits
+        empty_repo_path = os.path.join(self.test_dir, "empty_repo")
+        empty_repo = Repo.init(empty_repo_path, mkdir=True)
+        self.addCleanup(empty_repo.close)
+
+        outstream = StringIO()
+        with self.assertRaises(ValueError):
+            porcelain.grep(empty_repo, "pattern", outstream=outstream)

@@ -3842,6 +3842,7 @@ class AbstractHttpGitClient(GitClient):
         username: Optional[str] = None,
         password: Optional[str] = None,
         config: Optional[Config] = None,
+        pool_manager: Optional["urllib3.PoolManager"] = None,
     ) -> "AbstractHttpGitClient":
         """Create an AbstractHttpGitClient from a parsed URL.
 
@@ -3855,6 +3856,7 @@ class AbstractHttpGitClient(GitClient):
           username: Optional username for authentication
           password: Optional password for authentication
           config: Configuration object
+          pool_manager: Optional urllib3 PoolManager for HTTP(S) connections
 
         Returns:
           An AbstractHttpGitClient instance
@@ -3888,6 +3890,7 @@ class AbstractHttpGitClient(GitClient):
                 username=final_username,
                 password=final_password,
                 config=config,
+                pool_manager=pool_manager,
             )
         else:
             # Base class now supports credentials in constructor
@@ -4079,6 +4082,7 @@ def get_transport_and_path_from_url(
     password: Optional[str] = None,
     key_filename: Optional[str] = None,
     ssh_command: Optional[str] = None,
+    pool_manager: Optional["urllib3.PoolManager"] = None,
 ) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
@@ -4094,6 +4098,7 @@ def get_transport_and_path_from_url(
       password: Optional password for authentication
       key_filename: Optional SSH key file
       ssh_command: Optional custom SSH command
+      pool_manager: Optional urllib3 PoolManager for HTTP(S) connections
 
     Returns:
       Tuple with client instance and relative path.
@@ -4114,6 +4119,7 @@ def get_transport_and_path_from_url(
         password=password,
         key_filename=key_filename,
         ssh_command=ssh_command,
+        pool_manager=pool_manager,
     )
 
 
@@ -4129,6 +4135,7 @@ def _get_transport_and_path_from_url(
     password: Optional[str] = None,
     key_filename: Optional[str] = None,
     ssh_command: Optional[str] = None,
+    pool_manager: Optional["urllib3.PoolManager"] = None,
 ) -> tuple[GitClient, str]:
     parsed = urlparse(url)
     if parsed.scheme == "git":
@@ -4164,6 +4171,7 @@ def _get_transport_and_path_from_url(
                 report_activity=report_activity,
                 quiet=quiet,
                 include_tags=include_tags,
+                pool_manager=pool_manager,
             ),
             parsed.path,
         )
@@ -4220,6 +4228,7 @@ def get_transport_and_path(
     password: Optional[str] = None,
     key_filename: Optional[str] = None,
     ssh_command: Optional[str] = None,
+    pool_manager: Optional["urllib3.PoolManager"] = None,
 ) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
@@ -4235,6 +4244,7 @@ def get_transport_and_path(
       password: Optional password for authentication
       key_filename: Optional SSH key file
       ssh_command: Optional custom SSH command
+      pool_manager: Optional urllib3 PoolManager for HTTP(S) connections
 
     Returns:
       Tuple with client instance and relative path.
@@ -4257,6 +4267,7 @@ def get_transport_and_path(
             password=password,
             key_filename=key_filename,
             ssh_command=ssh_command,
+            pool_manager=pool_manager,
         )
     except ValueError:
         pass

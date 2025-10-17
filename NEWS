@@ -5,6 +5,11 @@
    list mode, independent branch detection, and merge base calculation.
    (Jelmer Vernooĳ, #1829)
 
+ * Add ``dulwich config`` command to get and set repository or global
+   configuration options. Supports getting/setting values, listing all config,
+   getting all values for multivars, and unsetting values.
+   (Jelmer Vernooĳ, #1775)
+
 0.24.5	2025-10-15
 
  * Add support for ``git show-ref`` command to list references in a local

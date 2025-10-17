@@ -268,6 +268,165 @@ class CLIMergeTests(TestCase):
             finally:
                 os.chdir(old_cwd)
 
+    def test_octopus_merge_three_branches(self):
+        """Test CLI octopus merge with three branches."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit with three files
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("File 1 content\n")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("File 2 content\n")
+            with open(os.path.join(tmpdir, "file3.txt"), "w") as f:
+                f.write("File 3 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt", "file2.txt", "file3.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create branch1 and modify file1
+            porcelain.branch_create(tmpdir, "branch1")
+            porcelain.checkout(tmpdir, "branch1")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch1 modified file1\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch1 modifies file1")
+
+            # Create branch2 and modify file2
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch2")
+            porcelain.checkout(tmpdir, "branch2")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Branch2 modified file2\n")
+            porcelain.add(tmpdir, paths=["file2.txt"])
+            porcelain.commit(tmpdir, message=b"Branch2 modifies file2")
+
+            # Create branch3 and modify file3
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch3")
+            porcelain.checkout(tmpdir, "branch3")
+            with open(os.path.join(tmpdir, "file3.txt"), "w") as f:
+                f.write("Branch3 modified file3\n")
+            porcelain.add(tmpdir, paths=["file3.txt"])
+            porcelain.commit(tmpdir, message=b"Branch3 modifies file3")
+
+            # Go back to master and octopus merge all three branches via CLI
+            porcelain.checkout(tmpdir, "master")
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                with self.assertLogs("dulwich.cli", level="INFO") as cm:
+                    ret = main(["merge", "branch1", "branch2", "branch3"])
+                    log_output = "\n".join(cm.output)
+
+                self.assertEqual(ret, 0)  # Success
+                self.assertIn("Octopus merge successful", log_output)
+
+                # Check that all modifications are present
+                with open(os.path.join(tmpdir, "file1.txt")) as f:
+                    self.assertEqual(f.read(), "Branch1 modified file1\n")
+                with open(os.path.join(tmpdir, "file2.txt")) as f:
+                    self.assertEqual(f.read(), "Branch2 modified file2\n")
+                with open(os.path.join(tmpdir, "file3.txt")) as f:
+                    self.assertEqual(f.read(), "Branch3 modified file3\n")
+            finally:
+                os.chdir(old_cwd)
+
+    def test_octopus_merge_with_conflicts(self):
+        """Test CLI octopus merge with conflicts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Initial content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create branch1 and modify file1
+            porcelain.branch_create(tmpdir, "branch1")
+            porcelain.checkout(tmpdir, "branch1")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch1 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch1 modifies file1")
+
+            # Create branch2 and modify file1 differently
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch2")
+            porcelain.checkout(tmpdir, "branch2")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch2 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch2 modifies file1")
+
+            # Go back to master and try octopus merge via CLI - should fail
+            porcelain.checkout(tmpdir, "master")
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                with self.assertLogs("dulwich.cli", level="WARNING") as cm:
+                    ret = main(["merge", "branch1", "branch2"])
+                    log_output = "\n".join(cm.output)
+
+                self.assertEqual(ret, 1)  # Error
+                self.assertIn("Octopus merge failed", log_output)
+                self.assertIn("refusing to merge with conflicts", log_output)
+            finally:
+                os.chdir(old_cwd)
+
+    def test_octopus_merge_no_commit(self):
+        """Test CLI octopus merge with --no-commit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("File 1 content\n")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("File 2 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt", "file2.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create branch1 and modify file1
+            porcelain.branch_create(tmpdir, "branch1")
+            porcelain.checkout(tmpdir, "branch1")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch1 modified file1\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch1 modifies file1")
+
+            # Create branch2 and modify file2
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch2")
+            porcelain.checkout(tmpdir, "branch2")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Branch2 modified file2\n")
+            porcelain.add(tmpdir, paths=["file2.txt"])
+            porcelain.commit(tmpdir, message=b"Branch2 modifies file2")
+
+            # Go back to master and octopus merge with --no-commit
+            porcelain.checkout(tmpdir, "master")
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                with self.assertLogs("dulwich.cli", level="INFO") as cm:
+                    ret = main(["merge", "--no-commit", "branch1", "branch2"])
+                    log_output = "\n".join(cm.output)
+
+                self.assertEqual(ret, 0)  # Success
+                self.assertIn("not committing", log_output)
+
+                # Check that files are merged
+                with open(os.path.join(tmpdir, "file1.txt")) as f:
+                    self.assertEqual(f.read(), "Branch1 modified file1\n")
+                with open(os.path.join(tmpdir, "file2.txt")) as f:
+                    self.assertEqual(f.read(), "Branch2 modified file2\n")
+            finally:
+                os.chdir(old_cwd)
+
 
 if __name__ == "__main__":
     unittest.main()

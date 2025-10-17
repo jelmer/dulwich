@@ -1,5 +1,7 @@
 0.24.6	2025-10-17
 
+ * Add support for octopus merge strategy. (Jelmer Vernooĳ, #1816)
+
  * Add support for ``git show-branch`` command to display branches and their
    commits. Supports filtering by local/remote branches, topological ordering,
    list mode, independent branch detection, and merge base calculation.

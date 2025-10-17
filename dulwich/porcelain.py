@@ -2980,6 +2980,7 @@ def shortlog(
 
     Returns:
         A list of dictionaries, each containing:
+
             - "author": the author's name as a string
             - "messages": all commit messages concatenated into a single string
     """
@@ -3621,9 +3622,10 @@ def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
         repo: Path to the repository
 
     Yields:
-        Tuple of (branch_name, is_merged) where:
-        - branch_name: Branch name without refs/heads/ prefix
-        - is_merged: True if branch is merged into HEAD, False otherwise
+        Tuple of (``branch_name``, ``is_merged``) where:
+
+        - ``branch_name``: Branch name without refs/heads/ prefix
+        - ``is_merged``: True if branch is merged into HEAD, False otherwise
     """
     with open_repo_closing(repo) as r:
         current_sha = r.refs[b"HEAD"]
@@ -5336,7 +5338,7 @@ def _do_merge(
       if no_commit=True or there were conflicts
     """
     from .graph import find_merge_base
-    from .merge import three_way_merge
+    from .merge import recursive_merge
 
     # Get HEAD commit
     try:
@@ -5355,7 +5357,7 @@ def _do_merge(
     if not merge_bases:
         raise Error("No common ancestor found")
 
-    # Use the first merge base
+    # Use the first merge base for fast-forward checks
     base_commit_id = merge_bases[0]
 
     # Check if we're trying to merge the same commit
@@ -5378,13 +5380,11 @@ def _do_merge(
         # Already up to date
         return (None, [])
 
-    # Perform three-way merge
-    base_commit = r[base_commit_id]
-    assert isinstance(base_commit, Commit), "Expected a Commit object"
+    # Perform recursive merge (handles multiple merge bases automatically)
     gitattributes = r.get_gitattributes()
     config = r.get_config()
-    merged_tree, conflicts = three_way_merge(
-        r.object_store, base_commit, head_commit, merge_commit, gitattributes, config
+    merged_tree, conflicts = recursive_merge(
+        r.object_store, merge_bases, head_commit, merge_commit, gitattributes, config
     )
 
     # Add merged tree to object store

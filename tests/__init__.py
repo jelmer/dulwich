@@ -157,6 +157,7 @@ def self_test_suite() -> unittest.TestSuite:
         "log_utils",
         "lru_cache",
         "mailmap",
+        "mbox",
         "merge",
         "merge_drivers",
         "missing_obj_finder",

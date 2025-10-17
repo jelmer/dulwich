@@ -5,6 +5,10 @@
    commit metadata. Supports automatic upstream detection from tracking branches
    and verbose mode to display commit messages. (Jelmer Vernooĳ, #1782)
 
+ * Add support for ``git mailsplit`` command to split mbox files and Maildir
+   into individual message files. Supports mboxrd format, custom precision,
+   and all standard git mailsplit options. (Jelmer Vernooĳ, #1840)
+
  * Add support for ``dulwich show-branch`` command to display branches and their
    commits. Supports filtering by local/remote branches, topological ordering,
    list mode, independent branch detection, and merge base calculation.

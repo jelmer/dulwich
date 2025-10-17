@@ -41,6 +41,7 @@ from dulwich.refs import (
     parse_symref_value,
     read_packed_refs,
     read_packed_refs_with_peeled,
+    shorten_ref_name,
     split_peeled_refs,
     strip_peeled_refs,
     write_packed_refs,
@@ -1196,3 +1197,43 @@ class StripPeeledRefsTests(TestCase):
                 b"refs/tags/1.0.0": b"a93db4b0360cc635a2b93675010bac8d101f73f0",
             },
         )
+
+
+class ShortenRefNameTests(TestCase):
+    """Tests for shorten_ref_name function."""
+
+    def test_branch_ref(self) -> None:
+        """Test shortening branch references."""
+        self.assertEqual(b"master", shorten_ref_name(b"refs/heads/master"))
+        self.assertEqual(b"develop", shorten_ref_name(b"refs/heads/develop"))
+        self.assertEqual(
+            b"feature/new-ui", shorten_ref_name(b"refs/heads/feature/new-ui")
+        )
+
+    def test_remote_ref(self) -> None:
+        """Test shortening remote references."""
+        self.assertEqual(b"origin/main", shorten_ref_name(b"refs/remotes/origin/main"))
+        self.assertEqual(
+            b"upstream/master", shorten_ref_name(b"refs/remotes/upstream/master")
+        )
+        self.assertEqual(
+            b"origin/feature/test",
+            shorten_ref_name(b"refs/remotes/origin/feature/test"),
+        )
+
+    def test_tag_ref(self) -> None:
+        """Test shortening tag references."""
+        self.assertEqual(b"v1.0", shorten_ref_name(b"refs/tags/v1.0"))
+        self.assertEqual(b"release-2.0", shorten_ref_name(b"refs/tags/release-2.0"))
+
+    def test_special_refs(self) -> None:
+        """Test that special refs are not shortened."""
+        self.assertEqual(b"HEAD", shorten_ref_name(b"HEAD"))
+        self.assertEqual(b"FETCH_HEAD", shorten_ref_name(b"FETCH_HEAD"))
+        self.assertEqual(b"ORIG_HEAD", shorten_ref_name(b"ORIG_HEAD"))
+
+    def test_other_refs(self) -> None:
+        """Test refs that don't match standard prefixes."""
+        # Refs that don't match any standard prefix are returned as-is
+        self.assertEqual(b"refs/stash", shorten_ref_name(b"refs/stash"))
+        self.assertEqual(b"refs/bisect/good", shorten_ref_name(b"refs/bisect/good"))

@@ -30,7 +30,7 @@ from typing import Callable, Optional, TypedDict
 from .index import Index, build_index_from_tree
 from .object_store import BaseObjectStore
 from .objects import Commit, Tag, Tree
-from .refs import RefsContainer
+from .refs import RefsContainer, local_tag_name
 
 
 class CommitData(TypedDict, total=False):
@@ -483,12 +483,12 @@ def filter_refs(
                                 new_tag.tag_timezone = tag_obj.tag_timezone
                                 object_store.add_object(new_tag)
                                 # Update ref to point to new tag object
-                                refs[b"refs/tags/" + new_tag_name] = new_tag.id
+                                refs[local_tag_name(new_tag_name)] = new_tag.id
                                 # Delete old tag
                                 del refs[ref]
                             else:
                                 # Just rename the tag
-                                new_ref = b"refs/tags/" + new_tag_name
+                                new_ref = local_tag_name(new_tag_name)
                                 tag_callback(ref, new_ref)
                 elif isinstance(tag_obj, Commit):
                     # Lightweight tag - points directly to a commit
@@ -496,7 +496,7 @@ def filter_refs(
                     if tag_sha in mapping or commit_filter.tag_name_filter is not None:
                         new_tag_name = commit_filter.tag_name_filter(tag_name)
                         if new_tag_name and new_tag_name != tag_name:
-                            new_ref = b"refs/tags/" + new_tag_name
+                            new_ref = local_tag_name(new_tag_name)
                             if tag_sha in mapping:
                                 # Point to rewritten commit
                                 refs[new_ref] = mapping[tag_sha]

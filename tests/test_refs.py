@@ -1237,3 +1237,67 @@ class ShortenRefNameTests(TestCase):
         # Refs that don't match any standard prefix are returned as-is
         self.assertEqual(b"refs/stash", shorten_ref_name(b"refs/stash"))
         self.assertEqual(b"refs/bisect/good", shorten_ref_name(b"refs/bisect/good"))
+
+
+class RefUtilityFunctionsTests(TestCase):
+    """Tests for the new ref utility functions."""
+
+    def test_local_branch_name(self) -> None:
+        """Test local_branch_name function."""
+        from dulwich.refs import local_branch_name
+
+        # Test adding prefix to branch name
+        self.assertEqual(b"refs/heads/master", local_branch_name(b"master"))
+        self.assertEqual(b"refs/heads/develop", local_branch_name(b"develop"))
+        self.assertEqual(
+            b"refs/heads/feature/new-ui", local_branch_name(b"feature/new-ui")
+        )
+
+        # Test idempotency - already has prefix
+        self.assertEqual(b"refs/heads/master", local_branch_name(b"refs/heads/master"))
+
+    def test_local_tag_name(self) -> None:
+        """Test local_tag_name function."""
+        from dulwich.refs import local_tag_name
+
+        # Test adding prefix to tag name
+        self.assertEqual(b"refs/tags/v1.0", local_tag_name(b"v1.0"))
+        self.assertEqual(b"refs/tags/release-2.0", local_tag_name(b"release-2.0"))
+
+        # Test idempotency - already has prefix
+        self.assertEqual(b"refs/tags/v1.0", local_tag_name(b"refs/tags/v1.0"))
+
+    def test_extract_branch_name(self) -> None:
+        """Test extract_branch_name function."""
+        from dulwich.refs import extract_branch_name
+
+        # Test extracting branch name from full ref
+        self.assertEqual(b"master", extract_branch_name(b"refs/heads/master"))
+        self.assertEqual(b"develop", extract_branch_name(b"refs/heads/develop"))
+        self.assertEqual(
+            b"feature/new-ui", extract_branch_name(b"refs/heads/feature/new-ui")
+        )
+
+        # Test error on invalid ref
+        with self.assertRaises(ValueError) as cm:
+            extract_branch_name(b"refs/tags/v1.0")
+        self.assertIn("Not a local branch ref", str(cm.exception))
+
+        with self.assertRaises(ValueError):
+            extract_branch_name(b"master")
+
+    def test_extract_tag_name(self) -> None:
+        """Test extract_tag_name function."""
+        from dulwich.refs import extract_tag_name
+
+        # Test extracting tag name from full ref
+        self.assertEqual(b"v1.0", extract_tag_name(b"refs/tags/v1.0"))
+        self.assertEqual(b"release-2.0", extract_tag_name(b"refs/tags/release-2.0"))
+
+        # Test error on invalid ref
+        with self.assertRaises(ValueError) as cm:
+            extract_tag_name(b"refs/heads/master")
+        self.assertIn("Not a local tag ref", str(cm.exception))
+
+        with self.assertRaises(ValueError):
+            extract_tag_name(b"v1.0")

@@ -104,7 +104,6 @@ from .objects import (
 from .pack import generate_unpacked_objects
 from .refs import (
     ANNOTATED_TAG_SUFFIX,  # noqa: F401
-    LOCAL_BRANCH_PREFIX,
     LOCAL_TAG_PREFIX,  # noqa: F401
     SYMREF,  # noqa: F401
     DictRefsContainer,
@@ -116,7 +115,9 @@ from .refs import (
     _set_head,
     _set_origin_head,
     check_ref_format,  # noqa: F401
+    extract_branch_name,
     is_per_worktree_ref,
+    local_branch_name,
     read_packed_refs,  # noqa: F401
     read_packed_refs_with_peeled,  # noqa: F401
     serialize_refs,
@@ -1762,7 +1763,9 @@ class Repo(BaseRepo):
             else:
                 if head_ref and head_ref.startswith(b"refs/heads/"):
                     # Extract branch name from ref
-                    branch = head_ref[11:].decode("utf-8", errors="replace")
+                    branch = extract_branch_name(head_ref).decode(
+                        "utf-8", errors="replace"
+                    )
                     return match_glob_pattern(branch, pattern)
             return False
 
@@ -1877,7 +1880,7 @@ class Repo(BaseRepo):
                 default_branch = config.get("init", "defaultBranch")
             except KeyError:
                 default_branch = DEFAULT_BRANCH
-        ret.refs.set_symbolic_ref(b"HEAD", LOCAL_BRANCH_PREFIX + default_branch)
+        ret.refs.set_symbolic_ref(b"HEAD", local_branch_name(default_branch))
         ret._init_files(bare=bare, symlinks=symlinks, format=format)
         return ret
 

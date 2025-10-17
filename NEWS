@@ -6,6 +6,10 @@
    credentials to git config, allowing subsequent push operations to succeed.
    (Jelmer Vernooĳ, #1925)
 
+ * Restore ``pool_manager`` parameter to ``get_transport_and_path`` and
+   ``get_transport_and_path_from_url`` functions that was accidentally removed
+   during type annotation refactoring. (Jelmer Vernooĳ, #1928)
+
 0.24.4	2025-10-14
 
  * Add compatibility for Python 3.14.  (Jelmer Vernooĳ)

@@ -1,4 +1,17 @@
+0.24.6	2025-10-17
+
+ * Add support for ``git show-branch`` command to display branches and their
+   commits. Supports filtering by local/remote branches, topological ordering,
+   list mode, independent branch detection, and merge base calculation.
+   (Jelmer Vernooĳ, #1829)
+
 0.24.5	2025-10-15
+
+ * Add support for ``git show-ref`` command to list references in a local
+   repository. Supports filtering by branches/tags, pattern matching,
+   dereferencing tags, verification mode, and existence checking. Available
+   as ``porcelain.show_ref()`` and ``dulwich show-ref`` CLI command.
+   (Jelmer Vernooĳ, #1830)
 
  * Fix HTTP authentication to preserve credentials from URLs when storing
    remote configuration. URLs with embedded credentials (like

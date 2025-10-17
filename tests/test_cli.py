@@ -1678,6 +1678,139 @@ class ShowRefCommandTest(DulwichCliTestCase):
         self.assertEqual(result, 1)
 
 
+class ShowBranchCommandTest(DulwichCliTestCase):
+    """Tests for show-branch command."""
+
+    def test_show_branch_basic(self):
+        """Test basic show-branch functionality."""
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Create a branch and add a commit
+        self._run_cli("branch", "branch1")
+        self._run_cli("checkout", "branch1")
+        with open(test_file, "a") as f:
+            f.write("\nbranch1 content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Branch1 commit")
+
+        # Switch back to master
+        self._run_cli("checkout", "master")
+
+        # Run show-branch
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            _result, _stdout, _stderr = self._run_cli(
+                "show-branch", "master", "branch1"
+            )
+            output = "\n".join([record.message for record in cm.records])
+
+        # Check exact output
+        expected = (
+            "! [branch1] Branch1 commit\n"
+            " ![master] Initial commit\n"
+            "----\n"
+            "*  [Branch1 commit]\n"
+            "+* [Initial commit]"
+        )
+        self.assertEqual(expected, output)
+
+    def test_show_branch_list(self):
+        """Test show-branch with --list option."""
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Create branches
+        self._run_cli("branch", "branch1")
+        self._run_cli("branch", "branch2")
+
+        # Run show-branch --list
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            _result, _stdout, _stderr = self._run_cli("show-branch", "--list")
+            output = "\n".join([record.message for record in cm.records])
+
+        # Check exact output (only branch headers, no separator)
+        expected = (
+            "!  [branch1] Initial commit\n"
+            " ! [branch2] Initial commit\n"
+            "  ![master] Initial commit"
+        )
+        self.assertEqual(expected, output)
+
+    def test_show_branch_independent(self):
+        """Test show-branch with --independent option."""
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Create a branch and add a commit
+        self._run_cli("branch", "branch1")
+        self._run_cli("checkout", "branch1")
+        with open(test_file, "a") as f:
+            f.write("\nbranch1 content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Branch1 commit")
+
+        # Run show-branch --independent
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            _result, _stdout, _stderr = self._run_cli(
+                "show-branch", "--independent", "master", "branch1"
+            )
+            output = "\n".join([record.message for record in cm.records])
+
+        # Only branch1 should be shown (it's not reachable from master)
+        expected = "branch1"
+        self.assertEqual(expected, output)
+
+    def test_show_branch_merge_base(self):
+        """Test show-branch with --merge-base option."""
+        # Create initial commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Get the initial commit SHA
+        initial_sha = self.repo.refs[b"HEAD"]
+
+        # Create a branch and add a commit
+        self._run_cli("branch", "branch1")
+        self._run_cli("checkout", "branch1")
+        with open(test_file, "a") as f:
+            f.write("\nbranch1 content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Branch1 commit")
+
+        # Switch back to master and add a different commit
+        self._run_cli("checkout", "master")
+        with open(test_file, "a") as f:
+            f.write("\nmaster content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Master commit")
+
+        # Run show-branch --merge-base
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            _result, _stdout, _stderr = self._run_cli(
+                "show-branch", "--merge-base", "master", "branch1"
+            )
+            output = "\n".join([record.message for record in cm.records])
+
+        # The merge base should be the initial commit SHA
+        expected = initial_sha.decode("ascii")
+        self.assertEqual(expected, output)
+
+
 class FormatPatchCommandTest(DulwichCliTestCase):
     """Tests for format-patch command."""
 

@@ -1122,10 +1122,11 @@ class Tag(ShaFile):
         """Extract the payload, signature, and signature type from this tag.
 
         Returns:
-          Tuple of (payload, signature, signature_type) where:
-          - payload: The raw tag data without the signature
-          - signature: The signature bytes if present, None otherwise
-          - signature_type: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
+          Tuple of (``payload``, ``signature``, ``signature_type``) where:
+
+          - ``payload``: The raw tag data without the signature
+          - ``signature``: The signature bytes if present, None otherwise
+          - ``signature_type``: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
 
         Raises:
           ObjectFormatException: If signature has unknown format
@@ -1869,10 +1870,11 @@ class Commit(ShaFile):
         """Extract the payload, signature, and signature type from this commit.
 
         Returns:
-          Tuple of (payload, signature, signature_type) where:
-          - payload: The raw commit data without the signature
-          - signature: The signature bytes if present, None otherwise
-          - signature_type: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
+          Tuple of (``payload``, ``signature``, ``signature_type``) where:
+
+          - ``payload``: The raw commit data without the signature
+          - ``signature``: The signature bytes if present, None otherwise
+          - ``signature_type``: SIGNATURE_PGP for PGP, SIGNATURE_SSH for SSH, None if no signature
 
         Raises:
           ObjectFormatException: If signature has unknown format

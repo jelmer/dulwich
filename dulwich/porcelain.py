@@ -43,6 +43,7 @@ Currently implemented:
  * ls_files
  * ls_remote
  * ls_tree
+ * mailsplit
  * merge
  * merge_tree
  * mv/move
@@ -7667,3 +7668,80 @@ def independent_commits(
 
         # Filter to independent commits
         return independent(r, commit_ids)
+
+
+def mailsplit(
+    input_path: Optional[Union[str, os.PathLike[str], IO[bytes]]] = None,
+    output_dir: Union[str, os.PathLike[str]] = ".",
+    start_number: int = 1,
+    precision: int = 4,
+    keep_cr: bool = False,
+    mboxrd: bool = False,
+    is_maildir: bool = False,
+) -> list[str]:
+    r"""Split an mbox file or Maildir into individual message files.
+
+    This is similar to git mailsplit.
+
+    Args:
+        input_path: Path to mbox file, Maildir, or file-like object. If None, reads from stdin.
+        output_dir: Directory where individual messages will be written
+        start_number: Starting number for output files (default: 1)
+        precision: Number of digits for output filenames (default: 4)
+        keep_cr: If True, preserve \r in lines ending with \r\n (default: False)
+        mboxrd: If True, treat input as mboxrd format and reverse escaping (default: False)
+        is_maildir: If True, treat input_path as a Maildir (default: False)
+
+    Returns:
+        List of output file paths that were created
+
+    Raises:
+        ValueError: If output_dir doesn't exist or input is invalid
+        OSError: If there are issues reading/writing files
+    """
+    from .mbox import split_maildir, split_mbox
+
+    if is_maildir:
+        if input_path is None:
+            raise ValueError("input_path is required for Maildir splitting")
+        if not isinstance(input_path, (str, bytes, os.PathLike)):
+            raise ValueError("Maildir splitting requires a path, not a file object")
+        # Convert PathLike to str for split_maildir
+        maildir_path: Union[str, bytes] = (
+            os.fspath(input_path) if isinstance(input_path, os.PathLike) else input_path
+        )
+        out_dir: Union[str, bytes] = (
+            os.fspath(output_dir) if isinstance(output_dir, os.PathLike) else output_dir
+        )
+        return split_maildir(
+            maildir_path,
+            out_dir,
+            start_number=start_number,
+            precision=precision,
+            keep_cr=keep_cr,
+        )
+    else:
+        from typing import BinaryIO, cast
+
+        if input_path is None:
+            # Read from stdin
+            input_file: Union[str, bytes, BinaryIO] = sys.stdin.buffer
+        else:
+            # Convert PathLike to str if needed
+            if isinstance(input_path, os.PathLike):
+                input_file = os.fspath(input_path)
+            else:
+                # input_path is either str or IO[bytes] here
+                input_file = cast(Union[str, BinaryIO], input_path)
+
+        out_dir = (
+            os.fspath(output_dir) if isinstance(output_dir, os.PathLike) else output_dir
+        )
+        return split_mbox(
+            input_file,
+            out_dir,
+            start_number=start_number,
+            precision=precision,
+            keep_cr=keep_cr,
+            mboxrd=mboxrd,
+        )

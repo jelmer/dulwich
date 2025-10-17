@@ -3906,6 +3906,79 @@ class cmd_gc(Command):
         return None
 
 
+class cmd_grep(Command):
+    """Search for patterns in tracked files."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the grep command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("pattern", help="Regular expression pattern to search for")
+        parser.add_argument(
+            "revision",
+            nargs="?",
+            default=None,
+            help="Revision to search (defaults to HEAD)",
+        )
+        parser.add_argument(
+            "pathspecs",
+            nargs="*",
+            help="Path patterns to limit search",
+        )
+        parser.add_argument(
+            "-i",
+            "--ignore-case",
+            action="store_true",
+            help="Perform case-insensitive matching",
+        )
+        parser.add_argument(
+            "-n",
+            "--line-number",
+            action="store_true",
+            help="Show line numbers for matches",
+        )
+        parser.add_argument(
+            "--max-depth",
+            type=int,
+            default=None,
+            help="Maximum directory depth to search",
+        )
+        parser.add_argument(
+            "--no-ignore",
+            action="store_true",
+            help="Do not respect .gitignore patterns",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Handle the case where revision might be a pathspec
+        revision = parsed_args.revision
+        pathspecs = parsed_args.pathspecs
+
+        # If revision looks like a pathspec (contains wildcards or slashes),
+        # treat it as a pathspec instead
+        if revision and ("*" in revision or "/" in revision or "." in revision):
+            pathspecs = [revision, *pathspecs]
+            revision = None
+
+        with Repo(".") as repo:
+            config = repo.get_config_stack()
+            with get_pager(config=config, cmd_name="grep") as outstream:
+                porcelain.grep(
+                    repo,
+                    parsed_args.pattern,
+                    outstream=outstream,
+                    rev=revision,
+                    pathspecs=pathspecs if pathspecs else None,
+                    ignore_case=parsed_args.ignore_case,
+                    line_number=parsed_args.line_number,
+                    max_depth=parsed_args.max_depth,
+                    respect_ignores=not parsed_args.no_ignore,
+                )
+
+
 class cmd_count_objects(Command):
     """Count unpacked number of objects and their disk consumption."""
 
@@ -5291,6 +5364,7 @@ commands = {
     "format-patch": cmd_format_patch,
     "fsck": cmd_fsck,
     "gc": cmd_gc,
+    "grep": cmd_grep,
     "help": cmd_help,
     "init": cmd_init,
     "lfs": cmd_lfs,

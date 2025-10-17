@@ -1468,6 +1468,90 @@ def is_local_branch(x: bytes) -> bool:
     return x.startswith(LOCAL_BRANCH_PREFIX)
 
 
+def local_branch_name(name: bytes) -> bytes:
+    """Build a full branch ref from a short name.
+
+    Args:
+      name: Short branch name (e.g., b"master") or full ref
+
+    Returns:
+      Full branch ref name (e.g., b"refs/heads/master")
+
+    Examples:
+      >>> local_branch_name(b"master")
+      b'refs/heads/master'
+      >>> local_branch_name(b"refs/heads/master")
+      b'refs/heads/master'
+    """
+    if name.startswith(LOCAL_BRANCH_PREFIX):
+        return name
+    return LOCAL_BRANCH_PREFIX + name
+
+
+def local_tag_name(name: bytes) -> bytes:
+    """Build a full tag ref from a short name.
+
+    Args:
+      name: Short tag name (e.g., b"v1.0") or full ref
+
+    Returns:
+      Full tag ref name (e.g., b"refs/tags/v1.0")
+
+    Examples:
+      >>> local_tag_name(b"v1.0")
+      b'refs/tags/v1.0'
+      >>> local_tag_name(b"refs/tags/v1.0")
+      b'refs/tags/v1.0'
+    """
+    if name.startswith(LOCAL_TAG_PREFIX):
+        return name
+    return LOCAL_TAG_PREFIX + name
+
+
+def extract_branch_name(ref: bytes) -> bytes:
+    """Extract branch name from a full branch ref.
+
+    Args:
+      ref: Full branch ref (e.g., b"refs/heads/master")
+
+    Returns:
+      Short branch name (e.g., b"master")
+
+    Raises:
+      ValueError: If ref is not a local branch
+
+    Examples:
+      >>> extract_branch_name(b"refs/heads/master")
+      b'master'
+      >>> extract_branch_name(b"refs/heads/feature/foo")
+      b'feature/foo'
+    """
+    if not ref.startswith(LOCAL_BRANCH_PREFIX):
+        raise ValueError(f"Not a local branch ref: {ref!r}")
+    return ref[len(LOCAL_BRANCH_PREFIX) :]
+
+
+def extract_tag_name(ref: bytes) -> bytes:
+    """Extract tag name from a full tag ref.
+
+    Args:
+      ref: Full tag ref (e.g., b"refs/tags/v1.0")
+
+    Returns:
+      Short tag name (e.g., b"v1.0")
+
+    Raises:
+      ValueError: If ref is not a local tag
+
+    Examples:
+      >>> extract_tag_name(b"refs/tags/v1.0")
+      b'v1.0'
+    """
+    if not ref.startswith(LOCAL_TAG_PREFIX):
+        raise ValueError(f"Not a local tag ref: {ref!r}")
+    return ref[len(LOCAL_TAG_PREFIX) :]
+
+
 def shorten_ref_name(ref: bytes) -> bytes:
     """Convert a full ref name to its short form.
 
@@ -1527,7 +1611,7 @@ def _set_origin_head(
     origin_base = b"refs/remotes/" + origin + b"/"
     if origin_head and origin_head.startswith(LOCAL_BRANCH_PREFIX):
         origin_ref = origin_base + HEADREF
-        target_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
+        target_ref = origin_base + extract_branch_name(origin_head)
         if target_ref in refs:
             refs.set_symbolic_ref(origin_ref, target_ref)
 
@@ -1544,17 +1628,17 @@ def _set_default_branch(
     if branch:
         origin_ref = origin_base + branch
         if origin_ref in refs:
-            local_ref = LOCAL_BRANCH_PREFIX + branch
+            local_ref = local_branch_name(branch)
             refs.add_if_new(local_ref, refs[origin_ref], ref_message)
             head_ref = local_ref
-        elif LOCAL_TAG_PREFIX + branch in refs:
-            head_ref = LOCAL_TAG_PREFIX + branch
+        elif local_tag_name(branch) in refs:
+            head_ref = local_tag_name(branch)
         else:
             raise ValueError(f"{os.fsencode(branch)!r} is not a valid branch or tag")
     elif origin_head:
         head_ref = origin_head
         if origin_head.startswith(LOCAL_BRANCH_PREFIX):
-            origin_ref = origin_base + origin_head[len(LOCAL_BRANCH_PREFIX) :]
+            origin_ref = origin_base + extract_branch_name(origin_head)
         else:
             origin_ref = origin_head
         try:
@@ -1598,7 +1682,7 @@ def _import_remote_refs(
 ) -> None:
     stripped_refs = strip_peeled_refs(refs)
     branches = {
-        n[len(LOCAL_BRANCH_PREFIX) :]: v
+        extract_branch_name(n): v
         for (n, v) in stripped_refs.items()
         if n.startswith(LOCAL_BRANCH_PREFIX) and v is not None
     }
@@ -1609,7 +1693,7 @@ def _import_remote_refs(
         prune=prune,
     )
     tags = {
-        n[len(LOCAL_TAG_PREFIX) :]: v
+        extract_tag_name(n): v
         for (n, v) in stripped_refs.items()
         if n.startswith(LOCAL_TAG_PREFIX)
         and not n.endswith(PEELED_TAG_SUFFIX)

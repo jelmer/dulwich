@@ -193,6 +193,8 @@ from .refs import (
     SymrefLoop,
     _import_remote_refs,
     filter_ref_prefix,
+    local_branch_name,
+    local_tag_name,
     shorten_ref_name,
 )
 from .repo import BaseRepo, Repo, get_user_identity
@@ -3354,13 +3356,13 @@ def receive_pack(
 def _make_branch_ref(name: Union[str, bytes]) -> Ref:
     if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
-    return LOCAL_BRANCH_PREFIX + name
+    return local_branch_name(name)
 
 
 def _make_tag_ref(name: Union[str, bytes]) -> Ref:
     if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
-    return LOCAL_TAG_PREFIX + name
+    return local_tag_name(name)
 
 
 def branch_delete(
@@ -3406,10 +3408,11 @@ def branch_create(
             if isinstance(objectish, str)
             else objectish
         )
+
         if b"refs/remotes/" + objectish_bytes in r.refs:
             objectish = b"refs/remotes/" + objectish_bytes
-        elif b"refs/heads/" + objectish_bytes in r.refs:
-            objectish = b"refs/heads/" + objectish_bytes
+        elif local_branch_name(objectish_bytes) in r.refs:
+            objectish = local_branch_name(objectish_bytes)
 
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
@@ -3441,12 +3444,13 @@ def branch_create(
                 if isinstance(original_objectish, str)
                 else original_objectish
             )
+
             if objectish_bytes in r.refs:
                 objectish_ref = objectish_bytes
             elif b"refs/remotes/" + objectish_bytes in r.refs:
                 objectish_ref = b"refs/remotes/" + objectish_bytes
-            elif b"refs/heads/" + objectish_bytes in r.refs:
-                objectish_ref = b"refs/heads/" + objectish_bytes
+            elif local_branch_name(objectish_bytes) in r.refs:
+                objectish_ref = local_branch_name(objectish_bytes)
         else:
             # HEAD might point to a remote-tracking branch
             head_ref = r.refs.follow(b"HEAD")[0][1]
@@ -3466,7 +3470,7 @@ def branch_create(
                 parts = objectish_ref[len(b"refs/remotes/") :].split(b"/", 1)
                 if len(parts) == 2:
                     remote_name = parts[0]
-                    remote_branch = b"refs/heads/" + parts[1]
+                    remote_branch = local_branch_name(parts[1])
 
                     # Set up tracking
                     repo_config = r.get_config()
@@ -3529,7 +3533,7 @@ def branch_list(repo: RepoPath) -> list[bytes]:
         elif sort_key in ("committerdate", "authordate"):
             # Sort by date
             def get_commit_date(branch_name: bytes) -> int:
-                ref = LOCAL_BRANCH_PREFIX + branch_name
+                ref = local_branch_name(branch_name)
                 sha = r.refs[ref]
                 commit = r.object_store[sha]
                 assert isinstance(commit, Commit)
@@ -4051,16 +4055,16 @@ def show_branch(
                 # Try as full ref name first
                 if branch_bytes in refs:
                     branch_refs[branch_bytes] = refs[branch_bytes]
-                # Try as branch name
-                elif LOCAL_BRANCH_PREFIX + branch_bytes in refs:
-                    branch_refs[LOCAL_BRANCH_PREFIX + branch_bytes] = refs[
-                        LOCAL_BRANCH_PREFIX + branch_bytes
-                    ]
-                # Try as remote branch
-                elif LOCAL_REMOTE_PREFIX + branch_bytes in refs:
-                    branch_refs[LOCAL_REMOTE_PREFIX + branch_bytes] = refs[
-                        LOCAL_REMOTE_PREFIX + branch_bytes
-                    ]
+                else:
+                    # Try as branch name
+                    branch_ref = local_branch_name(branch_bytes)
+                    if branch_ref in refs:
+                        branch_refs[branch_ref] = refs[branch_ref]
+                    # Try as remote branch
+                    elif LOCAL_REMOTE_PREFIX + branch_bytes in refs:
+                        branch_refs[LOCAL_REMOTE_PREFIX + branch_bytes] = refs[
+                            LOCAL_REMOTE_PREFIX + branch_bytes
+                        ]
         else:
             # Default behavior: show local branches
             if all_branches:
@@ -4817,7 +4821,7 @@ def checkout(
             update_head(r, new_branch)
 
             # Set up tracking if creating from a remote branch
-            from .refs import LOCAL_REMOTE_PREFIX, parse_remote_ref
+            from .refs import LOCAL_REMOTE_PREFIX, local_branch_name, parse_remote_ref
 
             if isinstance(original_target, bytes) and target_bytes.startswith(
                 LOCAL_REMOTE_PREFIX
@@ -4826,7 +4830,7 @@ def checkout(
                     remote_name, branch_name = parse_remote_ref(target_bytes)
                     # Set tracking to refs/heads/<branch> on the remote
                     set_branch_tracking(
-                        r, new_branch, remote_name, b"refs/heads/" + branch_name
+                        r, new_branch, remote_name, local_branch_name(branch_name)
                     )
                 except ValueError:
                     # Invalid remote ref format, skip tracking setup
@@ -6575,7 +6579,7 @@ def filter_branch(
             else:
                 # Convert branch name to full ref if needed
                 if not branch.startswith(b"refs/"):
-                    branch = b"refs/heads/" + branch
+                    branch = local_branch_name(branch)
                 refs = [branch]
 
         # Convert subdirectory filter to bytes if needed

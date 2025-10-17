@@ -38,7 +38,7 @@ from typing import Any, Callable, Union
 
 from .errors import CommitError, HookError
 from .objects import Blob, Commit, ObjectID, Tag, Tree
-from .refs import SYMREF, Ref
+from .refs import SYMREF, Ref, local_branch_name
 from .repo import (
     GITDIR,
     WORKTREES,
@@ -921,8 +921,7 @@ def add_worktree(
     if branch is not None:
         if isinstance(branch, str):
             branch = branch.encode()
-        if not branch.startswith(b"refs/heads/"):
-            branch = b"refs/heads/" + branch
+        branch = local_branch_name(branch)
 
     # Check if branch is already checked out in another worktree
     if branch and not force:

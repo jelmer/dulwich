@@ -4384,6 +4384,92 @@ class cmd_format_patch(Command):
                 logger.info(filename)
 
 
+class cmd_mailsplit(Command):
+    """Split mbox or Maildir into individual message files."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the mailsplit command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "mbox",
+            nargs="?",
+            help="Path to mbox file or Maildir. If not specified, reads from stdin.",
+        )
+        parser.add_argument(
+            "-o",
+            "--output-directory",
+            dest="output_dir",
+            required=True,
+            help="Directory in which to place the individual messages",
+        )
+        parser.add_argument(
+            "-b",
+            action="store_true",
+            dest="single_mail",
+            help="If any file doesn't begin with a From line, assume it is a single mail message",
+        )
+        parser.add_argument(
+            "-d",
+            dest="precision",
+            type=int,
+            default=4,
+            help="Number of digits for generated filenames (default: 4)",
+        )
+        parser.add_argument(
+            "-f",
+            dest="start_number",
+            type=int,
+            default=1,
+            help="Skip the first <nn> numbers (default: 1)",
+        )
+        parser.add_argument(
+            "--keep-cr",
+            action="store_true",
+            help="Do not remove \\r from lines ending with \\r\\n",
+        )
+        parser.add_argument(
+            "--mboxrd",
+            action="store_true",
+            help='Input is of the "mboxrd" format and "^>+From " line escaping is reversed',
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Determine if input is a Maildir
+        is_maildir = False
+        if parsed_args.mbox:
+            input_path = Path(parsed_args.mbox)
+            if input_path.is_dir():
+                # Check if it's a Maildir (has cur, tmp, new subdirectories)
+                if (
+                    (input_path / "cur").exists()
+                    and (input_path / "tmp").exists()
+                    and (input_path / "new").exists()
+                ):
+                    is_maildir = True
+        else:
+            input_path = None
+
+        # Call porcelain function
+        output_files = porcelain.mailsplit(
+            input_path=input_path,
+            output_dir=parsed_args.output_dir,
+            start_number=parsed_args.start_number,
+            precision=parsed_args.precision,
+            keep_cr=parsed_args.keep_cr,
+            mboxrd=parsed_args.mboxrd,
+            is_maildir=is_maildir,
+        )
+
+        # Print information about the split
+        logger.info(
+            "Split %d messages into %s", len(output_files), parsed_args.output_dir
+        )
+
+
 class cmd_bundle(Command):
     """Create, unpack, and manipulate bundle files."""
 
@@ -4977,6 +5063,7 @@ commands = {
     "ls-files": cmd_ls_files,
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
+    "mailsplit": cmd_mailsplit,
     "merge": cmd_merge,
     "merge-base": cmd_merge_base,
     "merge-tree": cmd_merge_tree,

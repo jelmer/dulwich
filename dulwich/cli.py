@@ -1737,6 +1737,102 @@ class cmd_show_ref(Command):
         return 0
 
 
+class cmd_show_branch(Command):
+    """Show branches and their commits."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the show-branch command.
+
+        Args:
+            args: Command line arguments
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-r",
+            "--remotes",
+            action="store_true",
+            help="Show remote-tracking branches",
+        )
+        parser.add_argument(
+            "-a",
+            "--all",
+            dest="all_branches",
+            action="store_true",
+            help="Show both remote-tracking and local branches",
+        )
+        parser.add_argument(
+            "--current",
+            action="store_true",
+            help="Include current branch if not given on command line",
+        )
+        parser.add_argument(
+            "--topo-order",
+            dest="topo_order",
+            action="store_true",
+            help="Show commits in topological order",
+        )
+        parser.add_argument(
+            "--date-order",
+            action="store_true",
+            help="Show commits in date order (default)",
+        )
+        parser.add_argument(
+            "--more",
+            type=int,
+            metavar="n",
+            help="Show n more commits beyond common ancestor",
+        )
+        parser.add_argument(
+            "--list",
+            dest="list_branches",
+            action="store_true",
+            help="Show only branch names and their tip commits",
+        )
+        parser.add_argument(
+            "--independent",
+            dest="independent_branches",
+            action="store_true",
+            help="Show only branches not reachable from any other",
+        )
+        parser.add_argument(
+            "--merge-base",
+            dest="merge_base",
+            action="store_true",
+            help="Show merge base of specified branches",
+        )
+        parser.add_argument(
+            "branches",
+            nargs="*",
+            help="Branches to show (default: all local branches)",
+        )
+        parsed_args = parser.parse_args(args)
+
+        try:
+            output_lines = porcelain.show_branch(
+                ".",
+                branches=parsed_args.branches if parsed_args.branches else None,
+                all_branches=parsed_args.all_branches,
+                remotes=parsed_args.remotes,
+                current=parsed_args.current,
+                topo_order=parsed_args.topo_order,
+                more=parsed_args.more,
+                list_branches=parsed_args.list_branches,
+                independent_branches=parsed_args.independent_branches,
+                merge_base=parsed_args.merge_base,
+            )
+        except (NotGitRepository, OSError, FileFormatException) as e:
+            logger.error(f"Error: {e}")
+            return 1
+
+        # Output results
+        for line in output_lines:
+            logger.info(line)
+
+        return 0
+
+
 class cmd_diff_tree(Command):
     """Compare the content and mode of trees."""
 
@@ -4835,6 +4931,7 @@ commands = {
     "rm": cmd_rm,
     "mv": cmd_mv,
     "show": cmd_show,
+    "show-branch": cmd_show_branch,
     "show-ref": cmd_show_ref,
     "stash": cmd_stash,
     "status": cmd_status,

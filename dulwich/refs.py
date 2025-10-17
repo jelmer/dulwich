@@ -1468,6 +1468,34 @@ def is_local_branch(x: bytes) -> bool:
     return x.startswith(LOCAL_BRANCH_PREFIX)
 
 
+def shorten_ref_name(ref: bytes) -> bytes:
+    """Convert a full ref name to its short form.
+
+    Args:
+      ref: Full ref name (e.g., b"refs/heads/master")
+
+    Returns:
+      Short ref name (e.g., b"master")
+
+    Examples:
+      >>> shorten_ref_name(b"refs/heads/master")
+      b'master'
+      >>> shorten_ref_name(b"refs/remotes/origin/main")
+      b'origin/main'
+      >>> shorten_ref_name(b"refs/tags/v1.0")
+      b'v1.0'
+      >>> shorten_ref_name(b"HEAD")
+      b'HEAD'
+    """
+    if ref.startswith(LOCAL_BRANCH_PREFIX):
+        return ref[len(LOCAL_BRANCH_PREFIX) :]
+    elif ref.startswith(LOCAL_REMOTE_PREFIX):
+        return ref[len(LOCAL_REMOTE_PREFIX) :]
+    elif ref.startswith(LOCAL_TAG_PREFIX):
+        return ref[len(LOCAL_TAG_PREFIX) :]
+    return ref
+
+
 T = TypeVar("T", dict[bytes, bytes], dict[bytes, Optional[bytes]])
 
 

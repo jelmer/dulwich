@@ -10041,3 +10041,119 @@ class MergeBaseTests(PorcelainTestCase):
         """Test independent_commits with empty list."""
         result = porcelain.independent_commits(self.repo.path, committishes=[])
         self.assertEqual([], result)
+
+
+class CherryTests(PorcelainTestCase):
+    """Tests for cherry command."""
+
+    def test_cherry_no_changes(self):
+        """Test cherry when head and upstream are the same."""
+        # Create a simple commit
+        commit_sha = self.repo.do_commit(
+            b"Initial commit", committer=b"Test <test@example.com>"
+        )
+
+        # Cherry should return empty when comparing a commit to itself
+        results = porcelain.cherry(
+            self.repo.path, upstream=commit_sha.decode(), head=commit_sha.decode()
+        )
+        self.assertEqual([], results)
+
+    def test_cherry_unique_commits(self):
+        """Test cherry with commits unique to head."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "file1.txt"), "w") as f:
+            f.write("base content\n")
+        self.repo.stage(["file1.txt"])
+        base_commit = self.repo.do_commit(
+            b"Base commit", committer=b"Test <test@example.com>"
+        )
+
+        # Create a new commit on head
+        with open(os.path.join(self.repo_path, "file2.txt"), "w") as f:
+            f.write("new content\n")
+        self.repo.stage(["file2.txt"])
+        head_commit = self.repo.do_commit(
+            b"New commit", committer=b"Test <test@example.com>"
+        )
+
+        # Cherry should show the new commit as unique
+        results = porcelain.cherry(
+            self.repo.path, upstream=base_commit.decode(), head=head_commit.decode()
+        )
+        self.assertEqual(1, len(results))
+        status, commit_sha, message = results[0]
+        self.assertEqual("+", status)
+        self.assertEqual(head_commit, commit_sha)
+        self.assertIsNone(message)
+
+    def test_cherry_verbose(self):
+        """Test cherry with verbose flag."""
+        # Create initial commit
+        with open(os.path.join(self.repo_path, "file1.txt"), "w") as f:
+            f.write("base content\n")
+        self.repo.stage(["file1.txt"])
+        base_commit = self.repo.do_commit(
+            b"Base commit", committer=b"Test <test@example.com>"
+        )
+
+        # Create a new commit on head
+        with open(os.path.join(self.repo_path, "file2.txt"), "w") as f:
+            f.write("new content\n")
+        self.repo.stage(["file2.txt"])
+        head_commit = self.repo.do_commit(
+            b"New commit on head", committer=b"Test <test@example.com>"
+        )
+
+        # Cherry with verbose should include commit message
+        results = porcelain.cherry(
+            self.repo.path,
+            upstream=base_commit.decode(),
+            head=head_commit.decode(),
+            verbose=True,
+        )
+        self.assertEqual(1, len(results))
+        status, commit_sha, message = results[0]
+        self.assertEqual("+", status)
+        self.assertEqual(head_commit, commit_sha)
+        self.assertEqual(b"New commit on head", message)
+
+    def test_cherry_equivalent_patches(self):
+        """Test cherry with equivalent patches (cherry-picked commits)."""
+        # Create base commit
+        with open(os.path.join(self.repo_path, "file.txt"), "w") as f:
+            f.write("line1\n")
+        self.repo.stage(["file.txt"])
+        base_commit = self.repo.do_commit(
+            b"Base commit", committer=b"Test <test@example.com>"
+        )
+
+        # Create upstream branch with a change
+        with open(os.path.join(self.repo_path, "file.txt"), "w") as f:
+            f.write("line1\nline2\n")
+        self.repo.stage(["file.txt"])
+        upstream_commit = self.repo.do_commit(
+            b"Add line2", committer=b"Test <test@example.com>"
+        )
+
+        # Reset to base and create same change on head branch
+        self.repo.refs[b"HEAD"] = base_commit
+        self.repo.reset_index()
+        with open(os.path.join(self.repo_path, "file.txt"), "w") as f:
+            f.write("line1\nline2\n")
+        self.repo.stage(["file.txt"])
+        head_commit = self.repo.do_commit(
+            b"Add line2 (different metadata)",
+            committer=b"Different <different@example.com>",
+        )
+
+        # Cherry should mark this as equivalent (-)
+        results = porcelain.cherry(
+            self.repo.path,
+            upstream=upstream_commit.decode(),
+            head=head_commit.decode(),
+        )
+        self.assertEqual(1, len(results))
+        status, commit_sha, _message = results[0]
+        self.assertEqual("-", status)
+        self.assertEqual(head_commit, commit_sha)

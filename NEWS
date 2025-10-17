@@ -13,6 +13,12 @@
    into individual message files. Supports mboxrd format, custom precision,
    and all standard git mailsplit options. (Jelmer Vernooĳ, #1840)
 
+ * Implement recursive merge strategy for handling multiple merge bases
+   (criss-cross merges). When multiple common ancestors exist, the algorithm
+   creates a virtual merge base by recursively merging them, reducing false
+   conflicts in complex merge scenarios. The recursive strategy is now used
+   automatically by ``porcelain.merge()``. (Jelmer Vernooĳ, #1815)
+
  * Add support for ``dulwich show-branch`` command to display branches and their
    commits. Supports filtering by local/remote branches, topological ordering,
    list mode, independent branch detection, and merge base calculation.

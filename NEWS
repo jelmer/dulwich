@@ -1,3 +1,10 @@
+0.24.6	2025-10-17
+
+ * Add support for ``git show-branch`` command to display branches and their
+   commits. Supports filtering by local/remote branches, topological ordering,
+   list mode, independent branch detection, and merge base calculation.
+   (Jelmer Vernooĳ, #1829)
+
 0.24.5	2025-10-15
 
  * Add support for ``git show-ref`` command to list references in a local

@@ -273,6 +273,201 @@ class PorcelainMergeTests(TestCase):
             # Try to merge nonexistent commit
             self.assertRaises(porcelain.Error, porcelain.merge, tmpdir, "nonexistent")
 
+    def test_octopus_merge_three_branches(self):
+        """Test octopus merge with three branches."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit with three files
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("File 1 content\n")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("File 2 content\n")
+            with open(os.path.join(tmpdir, "file3.txt"), "w") as f:
+                f.write("File 3 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt", "file2.txt", "file3.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create branch1 and modify file1
+            porcelain.branch_create(tmpdir, "branch1")
+            porcelain.checkout(tmpdir, "branch1")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch1 modified file1\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch1 modifies file1")
+
+            # Create branch2 and modify file2
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch2")
+            porcelain.checkout(tmpdir, "branch2")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Branch2 modified file2\n")
+            porcelain.add(tmpdir, paths=["file2.txt"])
+            porcelain.commit(tmpdir, message=b"Branch2 modifies file2")
+
+            # Create branch3 and modify file3
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch3")
+            porcelain.checkout(tmpdir, "branch3")
+            with open(os.path.join(tmpdir, "file3.txt"), "w") as f:
+                f.write("Branch3 modified file3\n")
+            porcelain.add(tmpdir, paths=["file3.txt"])
+            porcelain.commit(tmpdir, message=b"Branch3 modifies file3")
+
+            # Go back to master and octopus merge all three branches
+            porcelain.checkout(tmpdir, "master")
+            merge_commit, conflicts = porcelain.merge(
+                tmpdir, ["branch1", "branch2", "branch3"]
+            )
+
+            # Should succeed with no conflicts
+            self.assertIsNotNone(merge_commit)
+            self.assertEqual(conflicts, [])
+
+            # Check that the merge commit has 4 parents (master + 3 branches)
+            with Repo(tmpdir) as repo:
+                commit = repo[merge_commit]
+                self.assertEqual(len(commit.parents), 4)
+
+            # Check that all modifications are present
+            with open(os.path.join(tmpdir, "file1.txt")) as f:
+                self.assertEqual(f.read(), "Branch1 modified file1\n")
+            with open(os.path.join(tmpdir, "file2.txt")) as f:
+                self.assertEqual(f.read(), "Branch2 modified file2\n")
+            with open(os.path.join(tmpdir, "file3.txt")) as f:
+                self.assertEqual(f.read(), "Branch3 modified file3\n")
+
+    def test_octopus_merge_with_conflicts(self):
+        """Test that octopus merge refuses to proceed with conflicts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Initial content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create branch1 and modify file1
+            porcelain.branch_create(tmpdir, "branch1")
+            porcelain.checkout(tmpdir, "branch1")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch1 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch1 modifies file1")
+
+            # Create branch2 and modify file1 differently
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch2")
+            porcelain.checkout(tmpdir, "branch2")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch2 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch2 modifies file1")
+
+            # Go back to master and try octopus merge - should fail
+            porcelain.checkout(tmpdir, "master")
+            merge_commit, conflicts = porcelain.merge(tmpdir, ["branch1", "branch2"])
+
+            # Should have conflicts and no merge commit
+            self.assertIsNone(merge_commit)
+            self.assertEqual(len(conflicts), 1)
+            self.assertEqual(conflicts[0], b"file1.txt")
+
+    def test_octopus_merge_no_commit_flag(self):
+        """Test octopus merge with no_commit flag."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("File 1 content\n")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("File 2 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt", "file2.txt"])
+            master_commit = porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create branch1 and modify file1
+            porcelain.branch_create(tmpdir, "branch1")
+            porcelain.checkout(tmpdir, "branch1")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch1 modified file1\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch1 modifies file1")
+
+            # Create branch2 and modify file2
+            porcelain.checkout(tmpdir, "master")
+            porcelain.branch_create(tmpdir, "branch2")
+            porcelain.checkout(tmpdir, "branch2")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Branch2 modified file2\n")
+            porcelain.add(tmpdir, paths=["file2.txt"])
+            porcelain.commit(tmpdir, message=b"Branch2 modifies file2")
+
+            # Go back to master and octopus merge with no_commit
+            porcelain.checkout(tmpdir, "master")
+            merge_commit, conflicts = porcelain.merge(
+                tmpdir, ["branch1", "branch2"], no_commit=True
+            )
+
+            # Should not create commit
+            self.assertIsNone(merge_commit)
+            self.assertEqual(conflicts, [])
+
+            # Check that files are merged but no commit was created
+            with open(os.path.join(tmpdir, "file1.txt")) as f:
+                self.assertEqual(f.read(), "Branch1 modified file1\n")
+            with open(os.path.join(tmpdir, "file2.txt")) as f:
+                self.assertEqual(f.read(), "Branch2 modified file2\n")
+
+            # HEAD should still point to master_commit
+            with Repo(tmpdir) as repo:
+                self.assertEqual(repo.refs[b"HEAD"], master_commit)
+
+    def test_octopus_merge_single_branch(self):
+        """Test that octopus merge with single branch falls back to regular merge."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Initial content\n")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Initial file2\n")
+            porcelain.add(tmpdir, paths=["file1.txt", "file2.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create branch and modify file1
+            porcelain.branch_create(tmpdir, "branch1")
+            porcelain.checkout(tmpdir, "branch1")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Branch1 content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Branch1 changes")
+
+            # Go back to master and modify file2 to prevent fast-forward
+            porcelain.checkout(tmpdir, "master")
+            with open(os.path.join(tmpdir, "file2.txt"), "w") as f:
+                f.write("Master file2\n")
+            porcelain.add(tmpdir, paths=["file2.txt"])
+            porcelain.commit(tmpdir, message=b"Master changes")
+
+            # Merge with list containing one branch
+            merge_commit, conflicts = porcelain.merge(tmpdir, ["branch1"])
+
+            # Should create a regular merge commit
+            self.assertIsNotNone(merge_commit)
+            self.assertEqual(conflicts, [])
+
+            # Check the merge commit (should have 2 parents for regular merge)
+            with Repo(tmpdir) as repo:
+                commit = repo[merge_commit]
+                self.assertEqual(len(commit.parents), 2)
+
 
 class PorcelainMergeTreeTests(TestCase):
     """Tests for the porcelain merge_tree functionality."""

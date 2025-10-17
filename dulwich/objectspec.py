@@ -25,6 +25,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional, Union
 
 from .objects import Commit, ShaFile, Tag, Tree
+from .refs import local_branch_name, local_tag_name
 from .repo import BaseRepo
 
 if TYPE_CHECKING:
@@ -232,8 +233,8 @@ def parse_ref(
     possible_refs = [
         refspec,
         b"refs/" + refspec,
-        b"refs/tags/" + refspec,
-        b"refs/heads/" + refspec,
+        local_tag_name(refspec),
+        local_branch_name(refspec),
         b"refs/remotes/" + refspec,
         b"refs/remotes/" + refspec + b"/HEAD",
     ]
@@ -282,7 +283,7 @@ def parse_reftuple(
         except KeyError:
             # TODO: check force?
             if b"/" not in rh:
-                rh = b"refs/heads/" + rh
+                rh = local_branch_name(rh)
     return (lh, rh, force)
 
 

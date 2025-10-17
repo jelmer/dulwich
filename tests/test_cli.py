@@ -2434,6 +2434,56 @@ class FsckCommandTest(DulwichCliTestCase):
         # Should complete without errors
 
 
+class GrepCommandTest(DulwichCliTestCase):
+    """Tests for grep command."""
+
+    def test_grep_basic(self):
+        # Create test files
+        with open(os.path.join(self.repo_path, "file1.txt"), "w") as f:
+            f.write("hello world\n")
+        with open(os.path.join(self.repo_path, "file2.txt"), "w") as f:
+            f.write("foo bar\n")
+
+        self._run_cli("add", "file1.txt", "file2.txt")
+        self._run_cli("commit", "--message=Add files")
+
+        _result, stdout, _stderr = self._run_cli("grep", "world")
+        self.assertEqual("file1.txt:hello world\n", stdout.replace("\r\n", "\n"))
+
+    def test_grep_line_numbers(self):
+        with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
+            f.write("line1\nline2\nline3\n")
+
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Add test")
+
+        _result, stdout, _stderr = self._run_cli("grep", "-n", "line")
+        self.assertEqual(
+            "test.txt:1:line1\ntest.txt:2:line2\ntest.txt:3:line3\n",
+            stdout.replace("\r\n", "\n"),
+        )
+
+    def test_grep_case_insensitive(self):
+        with open(os.path.join(self.repo_path, "case.txt"), "w") as f:
+            f.write("Hello World\n")
+
+        self._run_cli("add", "case.txt")
+        self._run_cli("commit", "--message=Add case")
+
+        _result, stdout, _stderr = self._run_cli("grep", "-i", "hello")
+        self.assertEqual("case.txt:Hello World\n", stdout.replace("\r\n", "\n"))
+
+    def test_grep_no_matches(self):
+        with open(os.path.join(self.repo_path, "empty.txt"), "w") as f:
+            f.write("nothing here\n")
+
+        self._run_cli("add", "empty.txt")
+        self._run_cli("commit", "--message=Add empty")
+
+        _result, stdout, _stderr = self._run_cli("grep", "nonexistent")
+        self.assertEqual("", stdout)
+
+
 class RepackCommandTest(DulwichCliTestCase):
     """Tests for repack command."""
 

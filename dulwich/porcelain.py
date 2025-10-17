@@ -39,6 +39,7 @@ Currently implemented:
  * fetch
  * filter_branch
  * for_each_ref
+ * grep
  * init
  * ls_files
  * ls_remote
@@ -85,6 +86,7 @@ import fnmatch
 import logging
 import os
 import posixpath
+import re
 import stat
 import sys
 import time
@@ -3195,6 +3197,128 @@ def get_untracked_paths(
         yield from untracked_dir_list
 
     yield from ignored_dirs
+
+
+def grep(
+    repo: RepoPath,
+    pattern: Union[str, bytes],
+    *,
+    outstream: TextIO = sys.stdout,
+    rev: Optional[Union[str, bytes]] = None,
+    pathspecs: Optional[Sequence[Union[str, bytes]]] = None,
+    ignore_case: bool = False,
+    line_number: bool = False,
+    max_depth: Optional[int] = None,
+    respect_ignores: bool = True,
+) -> None:
+    """Search for a pattern in tracked files.
+
+    Args:
+      repo: Path to repository or Repo object
+      pattern: Regular expression pattern to search for
+      outstream: Stream to write results to
+      rev: Revision to search in (defaults to HEAD)
+      pathspecs: Optional list of path patterns to limit search
+      ignore_case: Whether to perform case-insensitive matching
+      line_number: Whether to output line numbers
+      max_depth: Maximum directory depth to search
+      respect_ignores: Whether to respect .gitignore patterns
+    """
+    from .object_store import iter_tree_contents
+
+    # Compile the pattern
+    flags = re.IGNORECASE if ignore_case else 0
+    try:
+        if isinstance(pattern, bytes):
+            compiled_pattern = re.compile(pattern, flags)
+        else:
+            compiled_pattern = re.compile(pattern.encode("utf-8"), flags)
+    except re.error as e:
+        raise ValueError(f"Invalid regular expression: {e}") from e
+
+    with open_repo_closing(repo) as r:
+        # Get the tree to search
+        if rev is None:
+            try:
+                commit = r[b"HEAD"]
+                assert isinstance(commit, Commit)
+            except KeyError as e:
+                raise ValueError("No HEAD commit found") from e
+        else:
+            rev_bytes = rev if isinstance(rev, bytes) else rev.encode("utf-8")
+            commit_obj = parse_commit(r, rev_bytes)
+            if commit_obj is None:
+                raise ValueError(f"Invalid revision: {rev}")
+            commit = commit_obj
+
+        tree = r[commit.tree]
+        assert isinstance(tree, Tree)
+
+        # Set up ignore filter if requested
+        ignore_manager = None
+        if respect_ignores:
+            ignore_manager = IgnoreFilterManager.from_repo(r)
+
+        # Convert pathspecs to bytes
+        pathspecs_bytes: Optional[list[bytes]] = None
+        if pathspecs:
+            pathspecs_bytes = [
+                p if isinstance(p, bytes) else p.encode("utf-8") for p in pathspecs
+            ]
+
+        # Iterate through all files in the tree
+        for entry in iter_tree_contents(r.object_store, tree.id):
+            path, mode, sha = entry.path, entry.mode, entry.sha
+            assert path is not None
+            assert mode is not None
+            assert sha is not None
+
+            # Skip directories
+            if stat.S_ISDIR(mode):
+                continue
+
+            # Check max depth
+            if max_depth is not None:
+                depth = path.count(b"/")
+                if depth > max_depth:
+                    continue
+
+            # Check pathspecs
+            if pathspecs_bytes:
+                matches_pathspec = False
+                for pathspec in pathspecs_bytes:
+                    # Simple prefix matching (could be enhanced with full pathspec support)
+                    if path.startswith(pathspec) or fnmatch.fnmatch(
+                        path.decode("utf-8", errors="replace"),
+                        pathspec.decode("utf-8", errors="replace"),
+                    ):
+                        matches_pathspec = True
+                        break
+                if not matches_pathspec:
+                    continue
+
+            # Check ignore patterns
+            if ignore_manager:
+                path_str = path.decode("utf-8", errors="replace")
+                if ignore_manager.is_ignored(path_str) is True:
+                    continue
+
+            # Get the blob content
+            blob = r[sha]
+            assert isinstance(blob, Blob)
+
+            # Search for pattern in the blob
+            content = blob.data
+            lines = content.split(b"\n")
+
+            for line_num, line in enumerate(lines, 1):
+                if compiled_pattern.search(line):
+                    path_str = path.decode("utf-8", errors="replace")
+                    line_str = line.decode("utf-8", errors="replace")
+                    if line_number:
+                        outstream.write(f"{path_str}:{line_num}:{line_str}\n")
+                    else:
+                        outstream.write(f"{path_str}:{line_str}\n")
 
 
 def get_tree_changes(repo: RepoPath) -> dict[str, list[Union[str, bytes]]]:

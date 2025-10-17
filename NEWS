@@ -1,5 +1,9 @@
 0.24.6	2025-10-17
 
+ * Add ``dulwich grep`` command.
+   Supports regular expressions, case-insensitive search, line numbers, pathspec
+   filtering, and respecting .gitignore patterns. (Jelmer Vernooĳ, #1776)
+
  * Add support for octopus merge strategy. (Jelmer Vernooĳ, #1816)
 
  * Add support for ``git show-branch`` command to display branches and their

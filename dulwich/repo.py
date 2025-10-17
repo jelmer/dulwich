@@ -943,7 +943,6 @@ class BaseRepo:
           until: Timestamp to list commits before.
           queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the Walker.
-          **kwargs: Additional keyword arguments
 
         Returns: A `Walker` object
         """

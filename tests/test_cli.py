@@ -3464,5 +3464,118 @@ class MergeBaseCommandTest(DulwichCliTestCase):
         self.assertEqual(result, 1)
 
 
+class ConfigCommandTest(DulwichCliTestCase):
+    """Tests for config command."""
+
+    def test_config_set_and_get(self):
+        """Test setting and getting a config value."""
+        # Set a config value
+        result, stdout, _stderr = self._run_cli("config", "user.name", "Test User")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "")
+
+        # Get the value back
+        result, stdout, _stderr = self._run_cli("config", "user.name")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "Test User\n")
+
+    def test_config_set_and_get_subsection(self):
+        """Test setting and getting a config value with subsection."""
+        # Set a config value with subsection (e.g., remote.origin.url)
+        result, stdout, _stderr = self._run_cli(
+            "config", "remote.origin.url", "https://example.com/repo.git"
+        )
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "")
+
+        # Get the value back
+        result, stdout, _stderr = self._run_cli("config", "remote.origin.url")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "https://example.com/repo.git\n")
+
+    def test_config_list(self):
+        """Test listing all config values."""
+        # Set some config values
+        self._run_cli("config", "user.name", "Test User")
+        self._run_cli("config", "user.email", "test@example.com")
+
+        # Get the actual config values that may vary by platform
+        config = self.repo.get_config()
+        filemode = config.get((b"core",), b"filemode")
+        try:
+            symlinks = config.get((b"core",), b"symlinks")
+        except KeyError:
+            symlinks = None
+
+        # List all values
+        result, stdout, _stderr = self._run_cli("config", "--list")
+        self.assertEqual(result, 0)
+
+        # Build expected output with platform-specific values
+        expected = "core.repositoryformatversion=0\n"
+        expected += f"core.filemode={filemode.decode('utf-8')}\n"
+        if symlinks is not None:
+            expected += f"core.symlinks={symlinks.decode('utf-8')}\n"
+        expected += (
+            "core.bare=false\n"
+            "core.logallrefupdates=true\n"
+            "user.name=Test User\n"
+            "user.email=test@example.com\n"
+        )
+
+        self.assertEqual(stdout, expected)
+
+    def test_config_unset(self):
+        """Test unsetting a config value."""
+        # Set a config value
+        self._run_cli("config", "user.name", "Test User")
+
+        # Verify it's set
+        result, stdout, _stderr = self._run_cli("config", "user.name")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "Test User\n")
+
+        # Unset it
+        result, stdout, _stderr = self._run_cli("config", "--unset", "user.name")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "")
+
+        # Verify it's gone
+        result, stdout, _stderr = self._run_cli("config", "user.name")
+        self.assertEqual(result, 1)
+        self.assertEqual(stdout, "")
+
+    def test_config_get_nonexistent(self):
+        """Test getting a nonexistent config value."""
+        result, stdout, _stderr = self._run_cli("config", "nonexistent.key")
+        self.assertEqual(result, 1)
+        self.assertEqual(stdout, "")
+
+    def test_config_unset_nonexistent(self):
+        """Test unsetting a nonexistent config value."""
+        result, _stdout, _stderr = self._run_cli("config", "--unset", "nonexistent.key")
+        self.assertEqual(result, 1)
+
+    def test_config_invalid_key_format(self):
+        """Test config with invalid key format."""
+        result, stdout, _stderr = self._run_cli("config", "invalidkey")
+        self.assertEqual(result, 1)
+        self.assertEqual(stdout, "")
+
+    def test_config_get_all(self):
+        """Test getting all values for a multivar."""
+        # Set multiple values for the same key
+        config = self.repo.get_config()
+        config.set(("test",), "multivar", "value1")
+        config.add(("test",), "multivar", "value2")
+        config.add(("test",), "multivar", "value3")
+        config.write_to_path()
+
+        # Get all values
+        result, stdout, _stderr = self._run_cli("config", "--get-all", "test.multivar")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "value1\nvalue2\nvalue3\n")
+
+
 if __name__ == "__main__":
     unittest.main()

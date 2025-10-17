@@ -648,3 +648,115 @@ def parse_patch_message(
     except StopIteration:
         version = None
     return c, diff, version
+
+
+def patch_id(diff_data: bytes) -> bytes:
+    """Compute patch ID for a diff.
+
+    The patch ID is computed by normalizing the diff and computing a SHA1 hash.
+    This follows git's patch-id algorithm which:
+    1. Removes whitespace from lines starting with + or -
+    2. Replaces line numbers in @@ headers with a canonical form
+    3. Computes SHA1 of the result
+
+    Args:
+        diff_data: Raw diff data as bytes
+
+    Returns:
+        SHA1 hash of normalized diff (40-byte hex string)
+
+    TODO: This implementation uses a simple line-by-line approach. For better
+    compatibility with git's patch-id, consider using proper patch parsing that:
+    - Handles edge cases in diff format (binary diffs, mode changes, etc.)
+    - Properly parses unified diff format according to the spec
+    - Matches git's exact normalization algorithm byte-for-byte
+    See git's patch-id.c for reference implementation.
+    """
+    import hashlib
+    import re
+
+    # Normalize the diff for patch-id computation
+    normalized_lines = []
+
+    for line in diff_data.split(b"\n"):
+        # Skip diff headers (diff --git, index, ---, +++)
+        if line.startswith(
+            (
+                b"diff --git ",
+                b"index ",
+                b"--- ",
+                b"+++ ",
+                b"new file mode ",
+                b"old file mode ",
+                b"deleted file mode ",
+                b"new mode ",
+                b"old mode ",
+                b"similarity index ",
+                b"dissimilarity index ",
+                b"rename from ",
+                b"rename to ",
+                b"copy from ",
+                b"copy to ",
+            )
+        ):
+            continue
+
+        # Normalize @@ headers to a canonical form
+        if line.startswith(b"@@"):
+            # Replace line numbers with canonical form
+            match = re.match(rb"^@@\s+-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s+@@", line)
+            if match:
+                # Use canonical hunk header without line numbers
+                normalized_lines.append(b"@@")
+                continue
+
+        # For +/- lines, strip all whitespace
+        if line.startswith((b"+", b"-")):
+            # Keep the +/- prefix but remove all whitespace from the rest
+            if len(line) > 1:
+                # Remove all whitespace from the content
+                content = line[1:].replace(b" ", b"").replace(b"\t", b"")
+                normalized_lines.append(line[:1] + content)
+            else:
+                # Just +/- alone
+                normalized_lines.append(line[:1])
+            continue
+
+        # Keep context lines and other content as-is
+        if line.startswith(b" ") or line == b"":
+            normalized_lines.append(line)
+
+    # Join normalized lines and compute SHA1
+    normalized = b"\n".join(normalized_lines)
+    return hashlib.sha1(normalized).hexdigest().encode("ascii")
+
+
+def commit_patch_id(store: "BaseObjectStore", commit_id: bytes) -> bytes:
+    """Compute patch ID for a commit.
+
+    Args:
+        store: Object store to read objects from
+        commit_id: Commit ID (40-byte hex string)
+
+    Returns:
+        Patch ID (40-byte hex string)
+    """
+    from io import BytesIO
+
+    commit = store[commit_id]
+    assert isinstance(commit, Commit)
+
+    # Get the parent tree (or empty tree for root commit)
+    if commit.parents:
+        parent = store[commit.parents[0]]
+        assert isinstance(parent, Commit)
+        parent_tree = parent.tree
+    else:
+        # Root commit - compare against empty tree
+        parent_tree = None
+
+    # Generate diff
+    diff_output = BytesIO()
+    write_tree_diff(diff_output, store, parent_tree, commit.tree)
+
+    return patch_id(diff_output.getvalue())

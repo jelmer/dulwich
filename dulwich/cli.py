@@ -3143,7 +3143,7 @@ class cmd_merge(Command):
             args: Command line arguments
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument("commit", type=str, help="Commit to merge")
+        parser.add_argument("commit", type=str, nargs="+", help="Commit(s) to merge")
         parser.add_argument(
             "--no-commit", action="store_true", help="Do not create a merge commit"
         )
@@ -3154,9 +3154,16 @@ class cmd_merge(Command):
         parsed_args = parser.parse_args(args)
 
         try:
+            # If multiple commits are provided, pass them as a list
+            # If only one commit is provided, pass it as a string
+            if len(parsed_args.commit) == 1:
+                committish = parsed_args.commit[0]
+            else:
+                committish = parsed_args.commit
+
             merge_commit_id, conflicts = porcelain.merge(
                 ".",
-                parsed_args.commit,
+                committish,
                 no_commit=parsed_args.no_commit,
                 no_ff=parsed_args.no_ff,
                 message=parsed_args.message,
@@ -3166,9 +3173,14 @@ class cmd_merge(Command):
                 logger.warning("Merge conflicts in %d file(s):", len(conflicts))
                 for conflict_path in conflicts:
                     logger.warning("  %s", conflict_path.decode())
-                logger.error(
-                    "Automatic merge failed; fix conflicts and then commit the result."
-                )
+                if len(parsed_args.commit) > 1:
+                    logger.error(
+                        "Octopus merge failed; refusing to merge with conflicts."
+                    )
+                else:
+                    logger.error(
+                        "Automatic merge failed; fix conflicts and then commit the result."
+                    )
                 return 1
             elif merge_commit_id is None and not parsed_args.no_commit:
                 logger.info("Already up to date.")
@@ -3176,10 +3188,16 @@ class cmd_merge(Command):
                 logger.info("Automatic merge successful; not committing as requested.")
             else:
                 assert merge_commit_id is not None
-                logger.info(
-                    "Merge successful. Created merge commit %s",
-                    merge_commit_id.decode(),
-                )
+                if len(parsed_args.commit) > 1:
+                    logger.info(
+                        "Octopus merge successful. Created merge commit %s",
+                        merge_commit_id.decode(),
+                    )
+                else:
+                    logger.info(
+                        "Merge successful. Created merge commit %s",
+                        merge_commit_id.decode(),
+                    )
             return 0
         except porcelain.Error as e:
             logger.error("%s", e)

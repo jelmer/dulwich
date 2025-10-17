@@ -3,13 +3,29 @@
  * Add support for octopus merge strategy. (Jelmer Vernooĳ, #1816)
 
  * Add support for ``git show-branch`` command to display branches and their
+
+ * Add ``dulwich cherry`` command to find commits not merged upstream.
+   Compares commits by patch ID to identify equivalent patches regardless of
+   commit metadata. Supports automatic upstream detection from tracking branches
+   and verbose mode to display commit messages. (Jelmer Vernooĳ, #1782)
+
+ * Add support for ``git mailsplit`` command to split mbox files and Maildir
+   into individual message files. Supports mboxrd format, custom precision,
+   and all standard git mailsplit options. (Jelmer Vernooĳ, #1840)
+
+ * Add support for ``dulwich show-branch`` command to display branches and their
    commits. Supports filtering by local/remote branches, topological ordering,
    list mode, independent branch detection, and merge base calculation.
    (Jelmer Vernooĳ, #1829)
 
+ * Add ``dulwich config`` command to get and set repository or global
+   configuration options. Supports getting/setting values, listing all config,
+   getting all values for multivars, and unsetting values.
+   (Jelmer Vernooĳ, #1775)
+
 0.24.5	2025-10-15
 
- * Add support for ``git show-ref`` command to list references in a local
+ * Add support for ``dulwich show-ref`` command to list references in a local
    repository. Supports filtering by branches/tags, pattern matching,
    dereferencing tags, verification mode, and existence checking. Available
    as ``porcelain.show_ref()`` and ``dulwich show-ref`` CLI command.
@@ -35,11 +51,7 @@
 
  * Add ``dulwich merge-base`` command. (Jelmer Vernooĳ, #1831)
 
- * Add support for ``git mailsplit`` command to split mbox files and Maildir
-   into individual message files. Supports mboxrd format, custom precision,
-   and all standard git mailsplit options. (Jelmer Vernooĳ, #1840)
-
- * Add support for ``git var`` command to display Git's logical variables
+ * Add support for ``dulwich var`` command to display Git's logical variables
    (GIT_AUTHOR_IDENT, GIT_COMMITTER_IDENT, GIT_EDITOR, GIT_SEQUENCE_EDITOR,
    GIT_PAGER, GIT_DEFAULT_BRANCH). Available as ``porcelain.var()`` and
    ``dulwich var`` CLI command. (Jelmer Vernooĳ, #1841)
@@ -59,7 +71,7 @@
    other filters that send status messages in final headers.
    (Jelmer Vernooĳ, #1889)
 
- * Add ``git worktree repair`` command to repair worktree administrative files
+ * Add ``dulwich worktree repair`` command to repair worktree administrative files
    after worktrees or the main repository have been moved.
    (Jelmer Vernooĳ, #1799)
 
@@ -96,7 +108,7 @@
  * Fix Windows config loading to only use current Git config path,
    avoiding loading older config files.  (Jelmer Vernooĳ, #1732)
 
- * Add interactive rebase support with ``git rebase -i``, including support
+ * Add interactive rebase support with ``dulwich rebase -i``, including support
    for pick, reword, edit, squash, fixup, drop, exec, and break commands.
    (Jelmer Vernooĳ, #1696)
 
@@ -119,7 +131,7 @@
 
  * Optimize LFS filter performance by avoiding redundant disk writes when
    checking file status. The LFS store now checks if objects already exist
-   before writing them to disk, significantly improving ``git status``
+   before writing them to disk, significantly improving ``dulwich status``
    performance in repositories with many LFS-tracked files.
    (Jelmer Vernooĳ, #1789)
 

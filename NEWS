@@ -1,5 +1,10 @@
 0.24.6	2025-10-17
 
+ * Fix import failure when ``sys.stdin`` is ``None``. The ``dulwich.server``
+   module can now be imported in environments where ``sys.stdin`` is ``None``,
+   such as Windows GUI apps, apps started with ``pythonw``, or apps using
+   ``ProcessPoolExecutor``. (Jelmer Vernooĳ, #1939)
+
  * Add ``dulwich grep`` command.
    Supports regular expressions, case-insensitive search, line numbers, pathspec
    filtering, and respecting .gitignore patterns. (Jelmer Vernooĳ, #1776)

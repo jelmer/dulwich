@@ -5,6 +5,9 @@
    such as Windows GUI apps, apps started with ``pythonw``, or apps using
    ``ProcessPoolExecutor``. (Jelmer Vernooĳ, #1939)
 
+ * Add support for ``dulwich reflog expire`` and ``dulwich reflog delete`` commands.
+   (Jelmer Vernooĳ, #1798)
+
  * Add ``dulwich grep`` command.
    Supports regular expressions, case-insensitive search, line numbers, pathspec
    filtering, and respecting .gitignore patterns. (Jelmer Vernooĳ, #1776)

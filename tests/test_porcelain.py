@@ -9455,6 +9455,322 @@ class ReflogTest(PorcelainTestCase):
         self.assertIn(b"HEAD", refs_seen)
         self.assertIn(b"refs/heads/master", refs_seen)
 
+    def test_reflog_expire_by_time(self):
+        """Test expiring reflog entries by timestamp."""
+        # Create commits
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit1 = Commit()
+        commit1.tree = tree.id
+        commit1.author = b"Test Author <test@example.com>"
+        commit1.committer = b"Test Author <test@example.com>"
+        commit1.commit_time = 1000000000
+        commit1.commit_timezone = 0
+        commit1.author_time = 1000000000
+        commit1.author_timezone = 0
+        commit1.message = b"Old commit"
+        self.repo.object_store.add_object(commit1)
+
+        commit2 = Commit()
+        commit2.tree = tree.id
+        commit2.author = b"Test Author <test@example.com>"
+        commit2.committer = b"Test Author <test@example.com>"
+        commit2.commit_time = 2000000000
+        commit2.commit_timezone = 0
+        commit2.author_time = 2000000000
+        commit2.author_timezone = 0
+        commit2.message = b"Recent commit"
+        self.repo.object_store.add_object(commit2)
+
+        # Write reflog entries with different timestamps
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit1.id,
+            b"Test Author <test@example.com>",
+            1000000000,
+            0,
+            b"commit: Old commit",
+        )
+        self.repo._write_reflog(
+            b"HEAD",
+            commit1.id,
+            commit2.id,
+            b"Test Author <test@example.com>",
+            2000000000,
+            0,
+            b"commit: Recent commit",
+        )
+
+        # Expire entries older than timestamp 1500000000
+        result = porcelain.reflog_expire(
+            self.repo_path, ref=b"HEAD", expire_time=1500000000
+        )
+        self.assertEqual(1, result[b"HEAD"])
+
+        # Check that only the recent entry remains
+        entries = list(porcelain.reflog(self.repo_path, b"HEAD"))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(commit2.id, entries[0].new_sha)
+
+    def test_reflog_expire_all(self):
+        """Test expiring reflog entries for all refs."""
+        # Create a commit
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = 1000000000
+        commit.commit_timezone = 0
+        commit.author_time = 1000000000
+        commit.author_timezone = 0
+        commit.message = b"Test commit"
+        self.repo.object_store.add_object(commit)
+
+        # Write old reflog entries for multiple refs
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1000000000,
+            0,
+            b"commit: Test commit",
+        )
+        self.repo._write_reflog(
+            b"refs/heads/master",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1000000000,
+            0,
+            b"commit: Test commit",
+        )
+
+        # Expire all old entries
+        result = porcelain.reflog_expire(
+            self.repo_path, all=True, expire_time=2000000000
+        )
+
+        # Should have expired entries from both refs
+        self.assertIn(b"HEAD", result)
+        self.assertIn(b"refs/heads/master", result)
+        self.assertEqual(1, result[b"HEAD"])
+        self.assertEqual(1, result[b"refs/heads/master"])
+
+    def test_reflog_expire_dry_run(self):
+        """Test dry-run mode for reflog expire."""
+        # Create a commit
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = 1000000000
+        commit.commit_timezone = 0
+        commit.author_time = 1000000000
+        commit.author_timezone = 0
+        commit.message = b"Test commit"
+        self.repo.object_store.add_object(commit)
+
+        # Write old reflog entry
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit.id,
+            b"Test Author <test@example.com>",
+            1000000000,
+            0,
+            b"commit: Test commit",
+        )
+
+        # Dry run expire
+        result = porcelain.reflog_expire(
+            self.repo_path, ref=b"HEAD", expire_time=2000000000, dry_run=True
+        )
+        self.assertEqual(1, result[b"HEAD"])
+
+        # Entry should still exist
+        entries = list(porcelain.reflog(self.repo_path, b"HEAD"))
+        self.assertEqual(1, len(entries))
+
+    def test_reflog_delete(self):
+        """Test deleting specific reflog entry."""
+        # Create commits
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        commit1 = Commit()
+        commit1.tree = tree.id
+        commit1.author = b"Test Author <test@example.com>"
+        commit1.committer = b"Test Author <test@example.com>"
+        commit1.commit_time = 1000000000
+        commit1.commit_timezone = 0
+        commit1.author_time = 1000000000
+        commit1.author_timezone = 0
+        commit1.message = b"First commit"
+        self.repo.object_store.add_object(commit1)
+
+        commit2 = Commit()
+        commit2.tree = tree.id
+        commit2.author = b"Test Author <test@example.com>"
+        commit2.committer = b"Test Author <test@example.com>"
+        commit2.commit_time = 2000000000
+        commit2.commit_timezone = 0
+        commit2.author_time = 2000000000
+        commit2.author_timezone = 0
+        commit2.message = b"Second commit"
+        self.repo.object_store.add_object(commit2)
+
+        # Write two reflog entries
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit1.id,
+            b"Test Author <test@example.com>",
+            1000000000,
+            0,
+            b"commit: First commit",
+        )
+        self.repo._write_reflog(
+            b"HEAD",
+            commit1.id,
+            commit2.id,
+            b"Test Author <test@example.com>",
+            2000000000,
+            0,
+            b"commit: Second commit",
+        )
+
+        # Delete the most recent entry (index 0)
+        porcelain.reflog_delete(self.repo_path, ref=b"HEAD", index=0)
+
+        # Should only have one entry left
+        entries = list(porcelain.reflog(self.repo_path, b"HEAD"))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(commit1.id, entries[0].new_sha)
+
+    def test_reflog_expire_unreachable(self):
+        """Test expiring unreachable reflog entries."""
+        # Create commits
+        blob = Blob.from_string(b"test content")
+        self.repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"test", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        # Create commit 1 - will be reachable (pointed to by HEAD)
+        commit1 = Commit()
+        commit1.tree = tree.id
+        commit1.author = b"Test Author <test@example.com>"
+        commit1.committer = b"Test Author <test@example.com>"
+        commit1.commit_time = 1000000000
+        commit1.commit_timezone = 0
+        commit1.author_time = 1000000000
+        commit1.author_timezone = 0
+        commit1.message = b"Reachable commit"
+        self.repo.object_store.add_object(commit1)
+
+        # Create commit 2 - will be unreachable
+        commit2 = Commit()
+        commit2.tree = tree.id
+        commit2.author = b"Test Author <test@example.com>"
+        commit2.committer = b"Test Author <test@example.com>"
+        commit2.commit_time = 1500000000
+        commit2.commit_timezone = 0
+        commit2.author_time = 1500000000
+        commit2.author_timezone = 0
+        commit2.message = b"Unreachable commit"
+        self.repo.object_store.add_object(commit2)
+
+        # Create commit 3 - will also be reachable (pointed to by master)
+        commit3 = Commit()
+        commit3.tree = tree.id
+        commit3.author = b"Test Author <test@example.com>"
+        commit3.committer = b"Test Author <test@example.com>"
+        commit3.commit_time = 2000000000
+        commit3.commit_timezone = 0
+        commit3.author_time = 2000000000
+        commit3.author_timezone = 0
+        commit3.message = b"Another reachable commit"
+        self.repo.object_store.add_object(commit3)
+
+        # Set up refs to make commit1 and commit3 reachable
+        # HEAD is a symbolic ref to refs/heads/master by default, so we set master first
+        self.repo.refs[b"refs/heads/master"] = commit1.id
+        # Create another branch pointing to commit3
+        self.repo.refs[b"refs/heads/feature"] = commit3.id
+
+        # Write reflog entries for all three commits
+        self.repo._write_reflog(
+            b"HEAD",
+            ZERO_SHA,
+            commit1.id,
+            b"Test Author <test@example.com>",
+            1000000000,
+            0,
+            b"commit: Reachable commit",
+        )
+        self.repo._write_reflog(
+            b"HEAD",
+            commit1.id,
+            commit2.id,
+            b"Test Author <test@example.com>",
+            1500000000,
+            0,
+            b"commit: Unreachable commit",
+        )
+        self.repo._write_reflog(
+            b"HEAD",
+            commit2.id,
+            commit3.id,
+            b"Test Author <test@example.com>",
+            2000000000,
+            0,
+            b"commit: Another reachable commit",
+        )
+
+        # Expire unreachable entries older than a time that includes commit2
+        # but not the reachable commits
+        result = porcelain.reflog_expire(
+            self.repo_path,
+            ref=b"HEAD",
+            expire_unreachable_time=1600000000,  # After commit2, before commit3
+        )
+
+        # Should have expired only commit2
+        self.assertEqual(1, result[b"HEAD"])
+
+        # Verify the remaining entries
+        entries = list(porcelain.reflog(self.repo_path, b"HEAD"))
+        self.assertEqual(2, len(entries))
+        # commit1 and commit3 should remain (both reachable)
+        self.assertEqual(commit1.id, entries[0].new_sha)
+        self.assertEqual(commit3.id, entries[1].new_sha)
+
 
 class WriteCommitGraphTests(PorcelainTestCase):
     """Tests for the write_commit_graph porcelain function."""

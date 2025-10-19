@@ -27,14 +27,60 @@ from io import BytesIO
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.reflog import (
     drop_reflog_entry,
+    expire_reflog,
     format_reflog_line,
     iter_reflogs,
     parse_reflog_line,
+    parse_reflog_spec,
     read_reflog,
 )
 from dulwich.repo import Repo
 
 from . import TestCase
+
+
+class ReflogSpecTests(TestCase):
+    def test_parse_reflog_spec_basic(self) -> None:
+        # Test basic reflog spec
+        ref, index = parse_reflog_spec("HEAD@{1}")
+        self.assertEqual(b"HEAD", ref)
+        self.assertEqual(1, index)
+
+    def test_parse_reflog_spec_with_full_ref(self) -> None:
+        # Test with full ref name
+        ref, index = parse_reflog_spec("refs/heads/master@{5}")
+        self.assertEqual(b"refs/heads/master", ref)
+        self.assertEqual(5, index)
+
+    def test_parse_reflog_spec_bytes(self) -> None:
+        # Test with bytes input
+        ref, index = parse_reflog_spec(b"develop@{0}")
+        self.assertEqual(b"develop", ref)
+        self.assertEqual(0, index)
+
+    def test_parse_reflog_spec_no_ref(self) -> None:
+        # Test with no ref (defaults to HEAD)
+        ref, index = parse_reflog_spec("@{2}")
+        self.assertEqual(b"HEAD", ref)
+        self.assertEqual(2, index)
+
+    def test_parse_reflog_spec_invalid_no_brace(self) -> None:
+        # Test invalid spec without @{
+        with self.assertRaises(ValueError) as cm:
+            parse_reflog_spec("HEAD")
+        self.assertIn("Expected format: ref@{n}", str(cm.exception))
+
+    def test_parse_reflog_spec_invalid_no_closing_brace(self) -> None:
+        # Test invalid spec without closing brace
+        with self.assertRaises(ValueError) as cm:
+            parse_reflog_spec("HEAD@{1")
+        self.assertIn("Expected format: ref@{n}", str(cm.exception))
+
+    def test_parse_reflog_spec_invalid_non_numeric(self) -> None:
+        # Test invalid spec with non-numeric index
+        with self.assertRaises(ValueError) as cm:
+            parse_reflog_spec("HEAD@{foo}")
+        self.assertIn("Expected integer", str(cm.exception))
 
 
 class ReflogLineTests(TestCase):
@@ -264,3 +310,95 @@ class RepoReflogTests(TestCase):
         self.assertIn(b"HEAD", reflogs)
         self.assertIn(b"refs/heads/master", reflogs)
         self.assertIn(b"refs/heads/develop", reflogs)
+
+
+class ReflogExpireTests(TestCase):
+    def setUp(self) -> None:
+        TestCase.setUp(self)
+        # Create a reflog with entries at different timestamps
+        self.f = BytesIO()
+        # Old entry (timestamp: 1000000000)
+        self.f.write(
+            b"0000000000000000000000000000000000000000 "
+            b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+            b"Test <test@example.com> 1000000000 +0000\told entry\n"
+        )
+        # Medium entry (timestamp: 1500000000)
+        self.f.write(
+            b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+            b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb "
+            b"Test <test@example.com> 1500000000 +0000\tmedium entry\n"
+        )
+        # Recent entry (timestamp: 2000000000)
+        self.f.write(
+            b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb "
+            b"cccccccccccccccccccccccccccccccccccccccc "
+            b"Test <test@example.com> 2000000000 +0000\trecent entry\n"
+        )
+        self.f.seek(0)
+
+    def _read_log(self):
+        self.f.seek(0)
+        return list(read_reflog(self.f))
+
+    def test_expire_no_criteria(self) -> None:
+        # If no expiration criteria, nothing should be expired
+        count = expire_reflog(self.f)
+        self.assertEqual(0, count)
+        log = self._read_log()
+        self.assertEqual(3, len(log))
+
+    def test_expire_by_time(self) -> None:
+        # Expire entries older than timestamp 1600000000
+        # Should remove the first two entries
+        count = expire_reflog(self.f, expire_time=1600000000)
+        self.assertEqual(2, count)
+        log = self._read_log()
+        self.assertEqual(1, len(log))
+        self.assertEqual(b"recent entry", log[0].message)
+
+    def test_expire_unreachable(self) -> None:
+        # Test expiring unreachable entries
+        # Mark the middle entry as unreachable
+        def reachable_checker(sha):
+            return sha != b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+        count = expire_reflog(
+            self.f,
+            expire_unreachable_time=1600000000,
+            reachable_checker=reachable_checker,
+        )
+        self.assertEqual(1, count)
+        log = self._read_log()
+        self.assertEqual(2, len(log))
+        # First and third entries should remain
+        self.assertEqual(b"old entry", log[0].message)
+        self.assertEqual(b"recent entry", log[1].message)
+
+    def test_expire_mixed(self) -> None:
+        # Test with both expire_time and expire_unreachable_time
+        def reachable_checker(sha):
+            # Only the most recent entry is reachable
+            return sha == b"cccccccccccccccccccccccccccccccccccccccc"
+
+        count = expire_reflog(
+            self.f,
+            expire_time=1800000000,  # Would expire first two if reachable
+            expire_unreachable_time=1200000000,  # Would expire first if unreachable
+            reachable_checker=reachable_checker,
+        )
+        # First entry is unreachable and old enough -> expired
+        # Second entry is unreachable but not old enough -> kept
+        # Third entry is reachable and recent -> kept
+        self.assertEqual(1, count)
+        log = self._read_log()
+        self.assertEqual(2, len(log))
+        self.assertEqual(b"medium entry", log[0].message)
+        self.assertEqual(b"recent entry", log[1].message)
+
+    def test_expire_all_entries(self) -> None:
+        # Expire all entries
+        count = expire_reflog(self.f, expire_time=3000000000)
+        self.assertEqual(3, count)
+        log = self._read_log()
+        self.assertEqual(0, len(log))

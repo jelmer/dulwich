@@ -7149,6 +7149,147 @@ def reflog(
                     yield (ref_bytes, entry)
 
 
+def reflog_expire(
+    repo: RepoPath = ".",
+    ref: Optional[Union[str, bytes]] = None,
+    all: bool = False,
+    expire_time: Optional[int] = None,
+    expire_unreachable_time: Optional[int] = None,
+    dry_run: bool = False,
+) -> dict[bytes, int]:
+    """Expire reflog entries based on age and reachability.
+
+    Args:
+        repo: Path to repository or a Repo object
+        ref: Reference name (if not using --all)
+        all: If True, expire reflogs for all refs
+        expire_time: Expire entries older than this timestamp (seconds since epoch)
+        expire_unreachable_time: Expire unreachable entries older than this timestamp
+        dry_run: If True, show what would be expired without making changes
+
+    Returns:
+        Dictionary mapping ref names to number of expired entries
+    """
+    import os
+    import time
+
+    from .reflog import expire_reflog, iter_reflogs
+
+    if not all and ref is None:
+        raise ValueError("Must specify either ref or all=True")
+
+    if isinstance(ref, str):
+        ref = ref.encode("utf-8")
+
+    # Default expire times if not specified
+    if expire_time is None and expire_unreachable_time is None:
+        # Default: expire entries older than 90 days, unreachable older than 30 days
+        now = int(time.time())
+        expire_time = now - (90 * 24 * 60 * 60)
+        expire_unreachable_time = now - (30 * 24 * 60 * 60)
+
+    result = {}
+
+    with open_repo_closing(repo) as r:
+        # Determine which refs to process
+        refs_to_process: list[bytes] = []
+        if all:
+            logs_dir = os.path.join(r.controldir(), "logs")
+            refs_to_process = list(iter_reflogs(logs_dir))
+        else:
+            assert ref is not None  # Already checked above
+            refs_to_process = [ref]
+
+        # Build set of reachable objects if we have unreachable expiration time
+        reachable_objects: Optional[set[bytes]] = None
+        if expire_unreachable_time is not None:
+            from .gc import find_reachable_objects
+
+            reachable_objects = find_reachable_objects(
+                r.object_store, r.refs, include_reflogs=False
+            )
+
+        # Process each ref
+        for ref_name in refs_to_process:
+            reflog_path = r._reflog_path(ref_name)
+            if not os.path.exists(reflog_path):
+                continue
+
+            # Create reachability checker
+            def is_reachable(sha: bytes) -> bool:
+                if reachable_objects is None:
+                    # No unreachable expiration, so assume everything is reachable
+                    return True
+                return sha in reachable_objects
+
+            # Open the reflog file
+            if dry_run:
+                # For dry run, just read and count what would be expired
+                with open(reflog_path, "rb") as f:
+                    from .reflog import read_reflog
+
+                    count = 0
+                    for entry in read_reflog(f):
+                        is_obj_reachable = is_reachable(entry.new_sha)
+                        should_expire = False
+
+                        if is_obj_reachable and expire_time is not None:
+                            if entry.timestamp < expire_time:
+                                should_expire = True
+                        elif (
+                            not is_obj_reachable and expire_unreachable_time is not None
+                        ):
+                            if entry.timestamp < expire_unreachable_time:
+                                should_expire = True
+
+                        if should_expire:
+                            count += 1
+
+                    result[ref_name] = count
+            else:
+                # Actually expire entries
+                with open(reflog_path, "r+b") as f:  # type: ignore[assignment]
+                    count = expire_reflog(
+                        f,
+                        expire_time=expire_time,
+                        expire_unreachable_time=expire_unreachable_time,
+                        reachable_checker=is_reachable,
+                    )
+                    result[ref_name] = count
+
+    return result
+
+
+def reflog_delete(
+    repo: RepoPath = ".",
+    ref: Union[str, bytes] = b"HEAD",
+    index: int = 0,
+    rewrite: bool = False,
+) -> None:
+    """Delete a specific reflog entry.
+
+    Args:
+        repo: Path to repository or a Repo object
+        ref: Reference name
+        index: Reflog entry index (0 = newest, in Git reflog order)
+        rewrite: If True, rewrite old_sha of subsequent entries to maintain consistency
+    """
+    import os
+
+    from .reflog import drop_reflog_entry
+
+    if isinstance(ref, str):
+        ref = ref.encode("utf-8")
+
+    with open_repo_closing(repo) as r:
+        reflog_path = r._reflog_path(ref)
+        if not os.path.exists(reflog_path):
+            raise ValueError(f"No reflog for ref {ref.decode()}")
+
+        with open(reflog_path, "r+b") as f:
+            drop_reflog_entry(f, index, rewrite=rewrite)
+
+
 def lfs_track(
     repo: Union[str, os.PathLike[str], Repo] = ".",
     patterns: Optional[Sequence[str]] = None,

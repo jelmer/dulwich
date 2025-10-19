@@ -143,6 +143,51 @@ class HelperFunctionsTest(TestCase):
         result = launch_editor(b"Test template content")
         self.assertEqual(b"Test template content", result)
 
+    def test_parse_relative_time(self):
+        """Test parsing relative time strings."""
+        from dulwich.cli import parse_relative_time
+
+        self.assertEqual(0, parse_relative_time("now"))
+        self.assertEqual(60, parse_relative_time("1 minute ago"))
+        self.assertEqual(120, parse_relative_time("2 minutes ago"))
+        self.assertEqual(3600, parse_relative_time("1 hour ago"))
+        self.assertEqual(7200, parse_relative_time("2 hours ago"))
+        self.assertEqual(86400, parse_relative_time("1 day ago"))
+        self.assertEqual(172800, parse_relative_time("2 days ago"))
+        self.assertEqual(604800, parse_relative_time("1 week ago"))
+        self.assertEqual(1209600, parse_relative_time("2 weeks ago"))
+        self.assertEqual(2592000, parse_relative_time("1 month ago"))
+        self.assertEqual(31536000, parse_relative_time("1 year ago"))
+
+        # Test invalid formats
+        with self.assertRaises(ValueError):
+            parse_relative_time("invalid")
+        with self.assertRaises(ValueError):
+            parse_relative_time("2 days")  # Missing "ago"
+        with self.assertRaises(ValueError):
+            parse_relative_time("two days ago")  # Not a number
+
+    def test_parse_time_to_timestamp(self):
+        """Test parsing time specifications to Unix timestamps."""
+        import time
+
+        from dulwich.cli import parse_time_to_timestamp
+
+        # Test special values
+        self.assertEqual(0, parse_time_to_timestamp("never"))
+        future_time = parse_time_to_timestamp("all")
+        self.assertGreater(future_time, int(time.time()))
+
+        # Test Unix timestamp
+        self.assertEqual(1234567890, parse_time_to_timestamp("1234567890"))
+
+        # Test relative time
+        now = int(time.time())
+        result = parse_time_to_timestamp("1 day ago")
+        expected = now - 86400
+        # Allow 2 second tolerance for test execution time
+        self.assertAlmostEqual(expected, result, delta=2)
+
 
 class AddCommandTest(DulwichCliTestCase):
     """Tests for add command."""
@@ -3076,12 +3121,12 @@ class ParseRelativeTimeTestCase(TestCase):
     def test_invalid_unit(self):
         """Test invalid time units."""
         with self.assertRaises(ValueError) as cm:
-            parse_relative_time("5 months ago")
-        self.assertIn("Unknown time unit: months", str(cm.exception))
+            parse_relative_time("5 fortnights ago")
+        self.assertIn("Unknown time unit: fortnights", str(cm.exception))
 
         with self.assertRaises(ValueError) as cm:
-            parse_relative_time("2 years ago")
-        self.assertIn("Unknown time unit: years", str(cm.exception))
+            parse_relative_time("2 decades ago")
+        self.assertIn("Unknown time unit: decades", str(cm.exception))
 
     def test_singular_plural(self):
         """Test that both singular and plural forms work."""

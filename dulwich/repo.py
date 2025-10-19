@@ -343,6 +343,71 @@ def _set_filesystem_hidden(path: str) -> None:
     # Could implement other platform specific filesystem hiding here
 
 
+def parse_shared_repository(
+    value: str | bytes | bool,
+) -> tuple[int | None, int | None]:
+    """Parse core.sharedRepository configuration value.
+
+    Args:
+      value: Configuration value (string, bytes, or boolean)
+
+    Returns:
+      tuple of (file_mask, directory_mask) or (None, None) if not shared
+
+    The masks are permission bits to apply via chmod.
+    """
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+
+    # Handle boolean values
+    if isinstance(value, bool):
+        if value:
+            # true = group (same as "group")
+            return (0o664, 0o2775)
+        else:
+            # false = umask (use system umask, no adjustment)
+            return (None, None)
+
+    # Handle string values
+    value_lower = value.lower()
+
+    if value_lower in ("false", "0", ""):
+        # Use umask (no adjustment)
+        return (None, None)
+
+    if value_lower in ("true", "1", "group"):
+        # Group writable (with setgid bit)
+        return (0o664, 0o2775)
+
+    if value_lower in ("all", "world", "everybody", "2"):
+        # World readable/writable (with setgid bit)
+        return (0o666, 0o2777)
+
+    if value_lower == "umask":
+        # Explicitly use umask
+        return (None, None)
+
+    # Try to parse as octal
+    if value.startswith("0"):
+        try:
+            mode = int(value, 8)
+            # For directories, add execute bits where read bits are set
+            # and add setgid bit for shared repositories
+            dir_mode = mode | 0o2000  # Add setgid bit
+            if mode & 0o004:
+                dir_mode |= 0o001
+            if mode & 0o040:
+                dir_mode |= 0o010
+            if mode & 0o400:
+                dir_mode |= 0o100
+            return (mode, dir_mode)
+        except ValueError:
+            pass
+
+    # Default to umask for unrecognized values
+    return (None, None)
+
+
 class ParentsProvider:
     """Provider for commit parent information."""
 
@@ -440,7 +505,11 @@ class BaseRepo:
         return sys.platform != "win32"
 
     def _init_files(
-        self, bare: bool, symlinks: bool | None = None, format: int | None = None
+        self,
+        bare: bool,
+        symlinks: bool | None = None,
+        format: int | None = None,
+        shared_repository: str | bool | None = None,
     ) -> None:
         """Initialize a default set of named files."""
         from .config import ConfigFile
@@ -466,6 +535,14 @@ class BaseRepo:
 
         cf.set("core", "bare", bare)
         cf.set("core", "logallrefupdates", True)
+
+        # Set shared repository if specified
+        if shared_repository is not None:
+            if isinstance(shared_repository, bool):
+                cf.set("core", "sharedRepository", shared_repository)
+            else:
+                cf.set("core", "sharedRepository", shared_repository)
+
         cf.write_to_file(f)
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")
@@ -1298,8 +1375,18 @@ class Repo(BaseRepo):
                 raise UnsupportedExtension(extension.decode("utf-8"))
 
         if object_store is None:
+            # Get shared repository permissions from config
+            try:
+                shared_value = config.get(("core",), "sharedRepository")
+                file_mode, dir_mode = parse_shared_repository(shared_value)
+            except KeyError:
+                file_mode, dir_mode = None, None
+
             object_store = DiskObjectStore.from_config(
-                os.path.join(self.commondir(), OBJECTDIR), config
+                os.path.join(self.commondir(), OBJECTDIR),
+                config,
+                file_mode=file_mode,
+                dir_mode=dir_mode,
             )
 
         # Use reftable if extension is configured
@@ -1354,10 +1441,23 @@ class Repo(BaseRepo):
         from .reflog import format_reflog_line
 
         path = self._reflog_path(ref)
-        try:
-            os.makedirs(os.path.dirname(path))
-        except FileExistsError:
-            pass
+
+        # Get shared repository permissions
+        file_mode, dir_mode = self._get_shared_repository_permissions()
+
+        # Create directory with appropriate permissions
+        parent_dir = os.path.dirname(path)
+        # Create directory tree, setting permissions on each level if needed
+        parts = []
+        current = parent_dir
+        while current and not os.path.exists(current):
+            parts.append(current)
+            current = os.path.dirname(current)
+        parts.reverse()
+        for part in parts:
+            os.mkdir(part)
+            if dir_mode is not None:
+                os.chmod(part, dir_mode)
         if committer is None:
             config = self.get_config_stack()
             committer = get_user_identity(config)
@@ -1373,6 +1473,11 @@ class Repo(BaseRepo):
                 )
                 + b"\n"
             )
+
+        # Set file permissions (open() respects umask, so we need chmod to set the actual mode)
+        # Always chmod to ensure correct permissions even if file already existed
+        if file_mode is not None:
+            os.chmod(path, file_mode)
 
     def _reflog_path(self, ref: bytes) -> str:
         if ref.startswith((b"main-worktree/", b"worktrees/")):
@@ -1468,6 +1573,21 @@ class Repo(BaseRepo):
         # TODO(jelmer): Actually probe disk / look at filesystem
         return sys.platform != "win32"
 
+    def _get_shared_repository_permissions(
+        self,
+    ) -> tuple[int | None, int | None]:
+        """Get shared repository file and directory permissions from config.
+
+        Returns:
+            tuple of (file_mask, directory_mask) or (None, None) if not shared
+        """
+        try:
+            config = self.get_config()
+            value = config.get(("core",), "sharedRepository")
+            return parse_shared_repository(value)
+        except KeyError:
+            return (None, None)
+
     def _put_named_file(self, path: str, contents: bytes) -> None:
         """Write a file to the control dir with the given name and contents.
 
@@ -1476,8 +1596,19 @@ class Repo(BaseRepo):
           contents: A string to write to the file.
         """
         path = path.lstrip(os.path.sep)
-        with GitFile(os.path.join(self.controldir(), path), "wb") as f:
-            f.write(contents)
+
+        # Get shared repository permissions
+        file_mode, _ = self._get_shared_repository_permissions()
+
+        # Create file with appropriate permissions
+        if file_mode is not None:
+            with GitFile(
+                os.path.join(self.controldir(), path), "wb", mask=file_mode
+            ) as f:
+                f.write(contents)
+        else:
+            with GitFile(os.path.join(self.controldir(), path), "wb") as f:
+                f.write(contents)
 
     def _del_named_file(self, path: str) -> None:
         try:
@@ -1553,7 +1684,15 @@ class Repo(BaseRepo):
                 index_version = None
             skip_hash = config.get_boolean(b"index", b"skipHash", False)
 
-        return Index(self.index_path(), skip_hash=skip_hash, version=index_version)
+        # Get shared repository permissions for index file
+        file_mode, _ = self._get_shared_repository_permissions()
+
+        return Index(
+            self.index_path(),
+            skip_hash=skip_hash,
+            version=index_version,
+            file_mode=file_mode,
+        )
 
     def has_index(self) -> bool:
         """Check if an index is present."""
@@ -1860,6 +1999,7 @@ class Repo(BaseRepo):
         default_branch: bytes | None = None,
         symlinks: bool | None = None,
         format: int | None = None,
+        shared_repository: str | bool | None = None,
     ) -> "Repo":
         path = os.fspath(path)
         if isinstance(path, bytes):
@@ -1867,10 +2007,26 @@ class Repo(BaseRepo):
         controldir = os.fspath(controldir)
         if isinstance(controldir, bytes):
             controldir = os.fsdecode(controldir)
+
+        # Determine shared repository permissions early
+        file_mode: int | None = None
+        dir_mode: int | None = None
+        if shared_repository is not None:
+            file_mode, dir_mode = parse_shared_repository(shared_repository)
+
+        # Create base directories with appropriate permissions
         for d in BASE_DIRECTORIES:
-            os.mkdir(os.path.join(controldir, *d))
+            dir_path = os.path.join(controldir, *d)
+            os.mkdir(dir_path)
+            if dir_mode is not None:
+                os.chmod(dir_path, dir_mode)
+
         if object_store is None:
-            object_store = DiskObjectStore.init(os.path.join(controldir, OBJECTDIR))
+            object_store = DiskObjectStore.init(
+                os.path.join(controldir, OBJECTDIR),
+                file_mode=file_mode,
+                dir_mode=dir_mode,
+            )
         ret = cls(path, bare=bare, object_store=object_store)
         if default_branch is None:
             if config is None:
@@ -1882,7 +2038,12 @@ class Repo(BaseRepo):
             except KeyError:
                 default_branch = DEFAULT_BRANCH
         ret.refs.set_symbolic_ref(b"HEAD", local_branch_name(default_branch))
-        ret._init_files(bare=bare, symlinks=symlinks, format=format)
+        ret._init_files(
+            bare=bare,
+            symlinks=symlinks,
+            format=format,
+            shared_repository=shared_repository,
+        )
         return ret
 
     @classmethod
@@ -1895,6 +2056,7 @@ class Repo(BaseRepo):
         default_branch: bytes | None = None,
         symlinks: bool | None = None,
         format: int | None = None,
+        shared_repository: str | bool | None = None,
     ) -> "Repo":
         """Create a new repository.
 
@@ -1905,6 +2067,7 @@ class Repo(BaseRepo):
           default_branch: Default branch name
           symlinks: Whether to support symlinks
           format: Repository format version (defaults to 0)
+          shared_repository: Shared repository setting (group, all, umask, or octal)
         Returns: `Repo` instance
         """
         path = os.fspath(path)
@@ -1923,6 +2086,7 @@ class Repo(BaseRepo):
             default_branch=default_branch,
             symlinks=symlinks,
             format=format,
+            shared_repository=shared_repository,
         )
 
     @classmethod
@@ -1956,12 +2120,21 @@ class Repo(BaseRepo):
         gitdirfile = os.path.join(path, CONTROLDIR)
         with open(gitdirfile, "wb") as f:
             f.write(b"gitdir: " + os.fsencode(worktree_controldir) + b"\n")
+
+        # Get shared repository permissions from main repository
+        _, dir_mode = main_repo._get_shared_repository_permissions()
+
+        # Create directories with appropriate permissions
         try:
             os.mkdir(main_worktreesdir)
+            if dir_mode is not None:
+                os.chmod(main_worktreesdir, dir_mode)
         except FileExistsError:
             pass
         try:
             os.mkdir(worktree_controldir)
+            if dir_mode is not None:
+                os.chmod(worktree_controldir, dir_mode)
         except FileExistsError:
             pass
         with open(os.path.join(worktree_controldir, GITDIR), "wb") as f:
@@ -1984,6 +2157,7 @@ class Repo(BaseRepo):
         config: "StackedConfig | None" = None,
         default_branch: bytes | None = None,
         format: int | None = None,
+        shared_repository: str | bool | None = None,
     ) -> "Repo":
         """Create a new bare repository.
 
@@ -1996,6 +2170,7 @@ class Repo(BaseRepo):
           config: Configuration object
           default_branch: Default branch name
           format: Repository format version (defaults to 0)
+          shared_repository: Shared repository setting (group, all, umask, or octal)
         Returns: a `Repo` instance
         """
         path = os.fspath(path)
@@ -2011,6 +2186,7 @@ class Repo(BaseRepo):
             config=config,
             default_branch=default_branch,
             format=format,
+            shared_repository=shared_repository,
         )
 
     create = init_bare

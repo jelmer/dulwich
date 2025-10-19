@@ -336,6 +336,57 @@ class DulwichClientTestBase:
                 },
             )
 
+    def test_fetch_pack_deepen_since(self) -> None:
+        c = self._client()
+        with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
+            # Fetch commits since a specific date
+            # Using Unix timestamp - the test repo has commits around 1265755064 (Feb 2010)
+            # So we use a timestamp between first and last commit
+            result = c.fetch(
+                self._build_path("/server_new.export"),
+                dest,
+                shallow_since="1265755100",
+            )
+            for r in result.refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            # Verify that shallow commits were created
+            shallow = dest.get_shallow()
+            self.assertIsNotNone(shallow)
+            self.assertGreater(len(shallow), 0)
+
+    def test_fetch_pack_deepen_not(self) -> None:
+        c = self._client()
+        with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
+            # Fetch excluding commits reachable from a specific ref
+            result = c.fetch(
+                self._build_path("/server_new.export"),
+                dest,
+                shallow_exclude=["refs/heads/branch"],
+            )
+            for r in result.refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            # Verify that shallow commits were created
+            shallow = dest.get_shallow()
+            self.assertIsNotNone(shallow)
+            self.assertGreater(len(shallow), 0)
+
+    def test_fetch_pack_deepen_since_and_not(self) -> None:
+        c = self._client()
+        with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
+            # Fetch combining deepen-since and deepen-not
+            result = c.fetch(
+                self._build_path("/server_new.export"),
+                dest,
+                shallow_since="1265755100",
+                shallow_exclude=["refs/heads/branch"],
+            )
+            for r in result.refs.items():
+                dest.refs.set_if_equals(r[0], None, r[1])
+            # Verify that shallow commits were created
+            shallow = dest.get_shallow()
+            self.assertIsNotNone(shallow)
+            self.assertGreater(len(shallow), 0)
+
     def test_repeat(self) -> None:
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:

@@ -941,19 +941,88 @@ class cmd_fetch(Command):
             args: Command line arguments
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument("location", help="Remote location to fetch from")
+
+        # Mutually exclusive group for location vs --all
+        location_group = parser.add_mutually_exclusive_group(required=True)
+        location_group.add_argument(
+            "location", nargs="?", default=None, help="Remote location to fetch from"
+        )
+        location_group.add_argument(
+            "--all", action="store_true", help="Fetch all remotes"
+        )
+
+        # Mutually exclusive group for tag handling
+        tag_group = parser.add_mutually_exclusive_group()
+        tag_group.add_argument(
+            "--tags", action="store_true", help="Fetch all tags from remote"
+        )
+        tag_group.add_argument(
+            "--no-tags", action="store_true", help="Don't fetch any tags from remote"
+        )
+
+        parser.add_argument(
+            "--depth",
+            type=int,
+            help="Create a shallow clone with a history truncated to the specified number of commits",
+        )
+        parser.add_argument(
+            "--shallow-since",
+            type=str,
+            help="Deepen or shorten the history of a shallow repository to include all reachable commits after <date>",
+        )
+        parser.add_argument(
+            "--shallow-exclude",
+            type=str,
+            action="append",
+            help="Deepen or shorten the history of a shallow repository to exclude commits reachable from a specified remote branch or tag",
+        )
         parsed_args = parser.parse_args(args)
-        client, path = get_transport_and_path(parsed_args.location)
+
         r = Repo(".")
 
         def progress(msg: bytes) -> None:
             sys.stdout.buffer.write(msg)
 
-        result = client.fetch(path.encode("utf-8"), r, progress=progress)
-        logger.info("Remote refs:")
-        for ref, sha in result.refs.items():
-            if sha is not None:
-                logger.info("%s → %s", ref.decode(), sha.decode())
+        # Determine include_tags setting
+        include_tags = False
+        if parsed_args.tags:
+            include_tags = True
+        elif not parsed_args.no_tags:
+            # Default behavior - don't force tag inclusion
+            include_tags = False
+
+        if parsed_args.all:
+            # Fetch from all remotes
+            config = r.get_config()
+            remotes = set()
+            for section in config.sections():
+                if len(section) == 2 and section[0] == b"remote":
+                    remotes.add(section[1].decode())
+
+            if not remotes:
+                logger.warning("No remotes configured")
+                return
+
+            for remote_name in sorted(remotes):
+                logger.info("Fetching %s", remote_name)
+                porcelain.fetch(
+                    r,
+                    remote_location=remote_name,
+                    depth=parsed_args.depth,
+                    include_tags=include_tags,
+                    shallow_since=parsed_args.shallow_since,
+                    shallow_exclude=parsed_args.shallow_exclude,
+                )
+        else:
+            # Fetch from specific location
+            porcelain.fetch(
+                r,
+                remote_location=parsed_args.location,
+                depth=parsed_args.depth,
+                include_tags=include_tags,
+                shallow_since=parsed_args.shallow_since,
+                shallow_exclude=parsed_args.shallow_exclude,
+            )
 
 
 class cmd_for_each_ref(Command):

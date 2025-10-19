@@ -3909,6 +3909,8 @@ def fetch(
     password: Optional[str] = None,
     key_filename: Optional[str] = None,
     ssh_command: Optional[str] = None,
+    shallow_since: Optional[str] = None,
+    shallow_exclude: Optional[list[str]] = None,
 ) -> FetchPackResult:
     """Fetch objects from a remote server.
 
@@ -3931,6 +3933,8 @@ def fetch(
       password: Password for authentication
       key_filename: SSH key filename
       ssh_command: SSH command to use
+      shallow_since: Deepen or shorten the history to include commits after this date
+      shallow_exclude: Deepen or shorten the history to exclude commits reachable from these refs
     Returns:
       Dictionary with refs on the remote
     """
@@ -3955,7 +3959,14 @@ def fetch(
         def progress(data: bytes) -> None:
             errstream.write(data)
 
-        fetch_result = client.fetch(path.encode(), r, progress=progress, depth=depth)
+        fetch_result = client.fetch(
+            path.encode(),
+            r,
+            progress=progress,
+            depth=depth,
+            shallow_since=shallow_since,
+            shallow_exclude=shallow_exclude,
+        )
         if remote_name is not None:
             _import_remote_refs(
                 r.refs,

@@ -981,6 +981,8 @@ class Index:
         read: bool = True,
         skip_hash: bool = False,
         version: Optional[int] = None,
+        *,
+        file_mode: Optional[int] = None,
     ) -> None:
         """Create an index object associated with the given filename.
 
@@ -989,11 +991,13 @@ class Index:
           read: Whether to initialize the index from the given file, should it exist.
           skip_hash: Whether to skip SHA1 hash when writing (for manyfiles feature)
           version: Index format version to use (None = auto-detect from file or use default)
+          file_mode: Optional file permission mask for shared repository
         """
         self._filename = os.fspath(filename)
         # TODO(jelmer): Store the version returned by read_index
         self._version = version
         self._skip_hash = skip_hash
+        self._file_mode = file_mode
         self._extensions: list[IndexExtension] = []
         self.clear()
         if read:
@@ -1014,7 +1018,8 @@ class Index:
 
     def write(self) -> None:
         """Write current contents of index to disk."""
-        f = GitFile(self._filename, "wb")
+        mask = self._file_mode if self._file_mode is not None else 0o644
+        f = GitFile(self._filename, "wb", mask=mask)
         try:
             # Filter out extensions with no meaningful data
             meaningful_extensions = []

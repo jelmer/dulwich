@@ -1680,8 +1680,8 @@ def serve_command(
     handler_cls: type[Handler],
     argv: list[str] = sys.argv,
     backend: Optional[Backend] = None,
-    inf: IO[bytes] = sys.stdin.buffer,
-    outf: IO[bytes] = sys.stdout.buffer,
+    inf: Optional[IO[bytes]] = None,
+    outf: Optional[IO[bytes]] = None,
 ) -> int:
     """Serve a single command.
 
@@ -1698,6 +1698,11 @@ def serve_command(
     """
     if backend is None:
         backend = FileSystemBackend()
+
+    if inf is None:
+        inf = sys.stdin.buffer
+    if outf is None:
+        outf = sys.stdout.buffer
 
     def send_fn(data: bytes) -> None:
         outf.write(data)

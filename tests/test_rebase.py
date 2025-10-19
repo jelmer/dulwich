@@ -59,16 +59,17 @@ class RebaserTestCase(TestCase):
         tree.add(b"file.txt", 0o100644, blob.id)
         self.repo.object_store.add_object(tree)
 
-        self.initial_commit = Commit()
-        self.initial_commit.tree = tree.id
-        self.initial_commit.parents = []
-        self.initial_commit.message = b"Initial commit"
-        self.initial_commit.committer = b"Test User <test@example.com>"
-        self.initial_commit.author = b"Test User <test@example.com>"
-        self.initial_commit.commit_time = 1000000
-        self.initial_commit.author_time = 1000000
-        self.initial_commit.commit_timezone = 0
-        self.initial_commit.author_timezone = 0
+        self.initial_commit = make_commit(
+            tree=tree.id,
+            parents=[],
+            message=b"Initial commit",
+            committer=b"Test User <test@example.com>",
+            author=b"Test User <test@example.com>",
+            commit_time=1000000,
+            author_time=1000000,
+            commit_timezone=0,
+            author_timezone=0,
+        )
         self.repo.object_store.add_object(self.initial_commit)
 
         # Set up branches
@@ -484,16 +485,17 @@ class InteractiveRebaseTestCase(TestCase):
         tree.add(b"file.txt", 0o100644, blob.id)
         self.repo.object_store.add_object(tree)
 
-        self.initial_commit = Commit()
-        self.initial_commit.tree = tree.id
-        self.initial_commit.parents = []
-        self.initial_commit.message = b"Initial commit"
-        self.initial_commit.committer = b"Test User <test@example.com>"
-        self.initial_commit.author = b"Test User <test@example.com>"
-        self.initial_commit.commit_time = 1000000
-        self.initial_commit.author_time = 1000000
-        self.initial_commit.commit_timezone = 0
-        self.initial_commit.author_timezone = 0
+        self.initial_commit = make_commit(
+            tree=tree.id,
+            parents=[],
+            message=b"Initial commit",
+            committer=b"Test User <test@example.com>",
+            author=b"Test User <test@example.com>",
+            commit_time=1000000,
+            author_time=1000000,
+            commit_timezone=0,
+            author_timezone=0,
+        )
         self.repo.object_store.add_object(self.initial_commit)
 
         # Set up branches

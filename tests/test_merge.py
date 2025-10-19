@@ -6,6 +6,7 @@ import unittest
 from dulwich.merge import MergeConflict, Merger, recursive_merge, three_way_merge
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
+from dulwich.tests.utils import make_commit
 
 from . import DependencyMissing
 
@@ -243,13 +244,10 @@ class MergeTests(unittest.TestCase):
         base_tree.add(b"file.txt", 0o100644, blob.id)
         self.repo.object_store.add_object(base_tree)
 
-        base_commit = Commit()
-        base_commit.tree = base_tree.id
-        base_commit.author = b"Test Author <test@example.com>"
-        base_commit.committer = b"Test Author <test@example.com>"
-        base_commit.message = b"Base commit"
-        base_commit.commit_time = base_commit.author_time = 12345
-        base_commit.commit_timezone = base_commit.author_timezone = 0
+        base_commit = make_commit(
+            tree=base_tree.id,
+            message=b"Base commit",
+        )
         self.repo.object_store.add_object(base_commit)
 
         # Create ours commit
@@ -259,14 +257,11 @@ class MergeTests(unittest.TestCase):
         ours_tree.add(b"file.txt", 0o100644, ours_blob.id)
         self.repo.object_store.add_object(ours_tree)
 
-        ours_commit = Commit()
-        ours_commit.tree = ours_tree.id
-        ours_commit.parents = [base_commit.id]
-        ours_commit.author = b"Test Author <test@example.com>"
-        ours_commit.committer = b"Test Author <test@example.com>"
-        ours_commit.message = b"Ours commit"
-        ours_commit.commit_time = ours_commit.author_time = 12346
-        ours_commit.commit_timezone = ours_commit.author_timezone = 0
+        ours_commit = make_commit(
+            tree=ours_tree.id,
+            parents=[base_commit.id],
+            message=b"Ours commit",
+        )
         self.repo.object_store.add_object(ours_commit)
 
         # Create theirs commit
@@ -276,14 +271,11 @@ class MergeTests(unittest.TestCase):
         theirs_tree.add(b"file.txt", 0o100644, theirs_blob.id)
         self.repo.object_store.add_object(theirs_tree)
 
-        theirs_commit = Commit()
-        theirs_commit.tree = theirs_tree.id
-        theirs_commit.parents = [base_commit.id]
-        theirs_commit.author = b"Test Author <test@example.com>"
-        theirs_commit.committer = b"Test Author <test@example.com>"
-        theirs_commit.message = b"Theirs commit"
-        theirs_commit.commit_time = theirs_commit.author_time = 12347
-        theirs_commit.commit_timezone = theirs_commit.author_timezone = 0
+        theirs_commit = make_commit(
+            tree=theirs_tree.id,
+            parents=[base_commit.id],
+            message=b"Theirs commit",
+        )
         self.repo.object_store.add_object(theirs_commit)
 
         # Perform three-way merge
@@ -316,14 +308,11 @@ class RecursiveMergeTests(unittest.TestCase):
         self, tree_id: bytes, parents: list[bytes], message: bytes
     ) -> Commit:
         """Helper to create a commit."""
-        commit = Commit()
-        commit.tree = tree_id
-        commit.parents = parents
-        commit.author = b"Test Author <test@example.com>"
-        commit.committer = b"Test Author <test@example.com>"
-        commit.message = message
-        commit.commit_time = commit.author_time = 12345
-        commit.commit_timezone = commit.author_timezone = 0
+        commit = make_commit(
+            tree=tree_id,
+            parents=parents,
+            message=message,
+        )
         self.repo.object_store.add_object(commit)
         return commit
 
@@ -770,13 +759,16 @@ class OctopusMergeTests(unittest.TestCase):
         base_tree.add(b"file3.txt", 0o100644, blob3.id)
         self.repo.object_store.add_object(base_tree)
 
-        base_commit = Commit()
-        base_commit.tree = base_tree.id
-        base_commit.author = b"Test <test@example.com>"
-        base_commit.committer = b"Test <test@example.com>"
-        base_commit.message = b"Base commit"
-        base_commit.commit_time = base_commit.author_time = 12345
-        base_commit.commit_timezone = base_commit.author_timezone = 0
+        base_commit = make_commit(
+            tree=base_tree.id,
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+            message=b"Base commit",
+            commit_time=12345,
+            author_time=12345,
+            commit_timezone=0,
+            author_timezone=0,
+        )
         self.repo.object_store.add_object(base_commit)
 
         # Create HEAD commit (modifies file1)
@@ -788,14 +780,11 @@ class OctopusMergeTests(unittest.TestCase):
         head_tree.add(b"file3.txt", 0o100644, blob3.id)
         self.repo.object_store.add_object(head_tree)
 
-        head_commit = Commit()
-        head_commit.tree = head_tree.id
-        head_commit.parents = [base_commit.id]
-        head_commit.author = b"Test <test@example.com>"
-        head_commit.committer = b"Test <test@example.com>"
-        head_commit.message = b"Head commit"
-        head_commit.commit_time = head_commit.author_time = 12346
-        head_commit.commit_timezone = head_commit.author_timezone = 0
+        head_commit = make_commit(
+            tree=head_tree.id,
+            parents=[base_commit.id],
+            message=b"Head commit",
+        )
         self.repo.object_store.add_object(head_commit)
 
         # Create branch1 commit (modifies file2)
@@ -807,14 +796,11 @@ class OctopusMergeTests(unittest.TestCase):
         branch1_tree.add(b"file3.txt", 0o100644, blob3.id)
         self.repo.object_store.add_object(branch1_tree)
 
-        branch1_commit = Commit()
-        branch1_commit.tree = branch1_tree.id
-        branch1_commit.parents = [base_commit.id]
-        branch1_commit.author = b"Test <test@example.com>"
-        branch1_commit.committer = b"Test <test@example.com>"
-        branch1_commit.message = b"Branch1 commit"
-        branch1_commit.commit_time = branch1_commit.author_time = 12347
-        branch1_commit.commit_timezone = branch1_commit.author_timezone = 0
+        branch1_commit = make_commit(
+            tree=branch1_tree.id,
+            parents=[base_commit.id],
+            message=b"Branch1 commit",
+        )
         self.repo.object_store.add_object(branch1_commit)
 
         # Create branch2 commit (modifies file3)
@@ -826,14 +812,11 @@ class OctopusMergeTests(unittest.TestCase):
         branch2_tree.add(b"file3.txt", 0o100644, branch2_blob3.id)
         self.repo.object_store.add_object(branch2_tree)
 
-        branch2_commit = Commit()
-        branch2_commit.tree = branch2_tree.id
-        branch2_commit.parents = [base_commit.id]
-        branch2_commit.author = b"Test <test@example.com>"
-        branch2_commit.committer = b"Test <test@example.com>"
-        branch2_commit.message = b"Branch2 commit"
-        branch2_commit.commit_time = branch2_commit.author_time = 12348
-        branch2_commit.commit_timezone = branch2_commit.author_timezone = 0
+        branch2_commit = make_commit(
+            tree=branch2_tree.id,
+            parents=[base_commit.id],
+            message=b"Branch2 commit",
+        )
         self.repo.object_store.add_object(branch2_commit)
 
         # Perform octopus merge
@@ -863,13 +846,16 @@ class OctopusMergeTests(unittest.TestCase):
         base_tree.add(b"file.txt", 0o100644, blob1.id)
         self.repo.object_store.add_object(base_tree)
 
-        base_commit = Commit()
-        base_commit.tree = base_tree.id
-        base_commit.author = b"Test <test@example.com>"
-        base_commit.committer = b"Test <test@example.com>"
-        base_commit.message = b"Base commit"
-        base_commit.commit_time = base_commit.author_time = 12345
-        base_commit.commit_timezone = base_commit.author_timezone = 0
+        base_commit = make_commit(
+            tree=base_tree.id,
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+            message=b"Base commit",
+            commit_time=12345,
+            author_time=12345,
+            commit_timezone=0,
+            author_timezone=0,
+        )
         self.repo.object_store.add_object(base_commit)
 
         # Create HEAD commit
@@ -879,14 +865,11 @@ class OctopusMergeTests(unittest.TestCase):
         head_tree.add(b"file.txt", 0o100644, head_blob.id)
         self.repo.object_store.add_object(head_tree)
 
-        head_commit = Commit()
-        head_commit.tree = head_tree.id
-        head_commit.parents = [base_commit.id]
-        head_commit.author = b"Test <test@example.com>"
-        head_commit.committer = b"Test <test@example.com>"
-        head_commit.message = b"Head commit"
-        head_commit.commit_time = head_commit.author_time = 12346
-        head_commit.commit_timezone = head_commit.author_timezone = 0
+        head_commit = make_commit(
+            tree=head_tree.id,
+            parents=[base_commit.id],
+            message=b"Head commit",
+        )
         self.repo.object_store.add_object(head_commit)
 
         # Create branch1 commit (conflicts with head)
@@ -896,14 +879,11 @@ class OctopusMergeTests(unittest.TestCase):
         branch1_tree.add(b"file.txt", 0o100644, branch1_blob.id)
         self.repo.object_store.add_object(branch1_tree)
 
-        branch1_commit = Commit()
-        branch1_commit.tree = branch1_tree.id
-        branch1_commit.parents = [base_commit.id]
-        branch1_commit.author = b"Test <test@example.com>"
-        branch1_commit.committer = b"Test <test@example.com>"
-        branch1_commit.message = b"Branch1 commit"
-        branch1_commit.commit_time = branch1_commit.author_time = 12347
-        branch1_commit.commit_timezone = branch1_commit.author_timezone = 0
+        branch1_commit = make_commit(
+            tree=branch1_tree.id,
+            parents=[base_commit.id],
+            message=b"Branch1 commit",
+        )
         self.repo.object_store.add_object(branch1_commit)
 
         # Perform octopus merge
@@ -929,13 +909,10 @@ class OctopusMergeTests(unittest.TestCase):
         tree.add(b"file.txt", 0o100644, blob.id)
         self.repo.object_store.add_object(tree)
 
-        commit = Commit()
-        commit.tree = tree.id
-        commit.author = b"Test <test@example.com>"
-        commit.committer = b"Test <test@example.com>"
-        commit.message = b"Commit"
-        commit.commit_time = commit.author_time = 12345
-        commit.commit_timezone = commit.author_timezone = 0
+        commit = make_commit(
+            tree=tree.id,
+            message=b"Commit",
+        )
         self.repo.object_store.add_object(commit)
 
         # Try to do octopus merge with no commits

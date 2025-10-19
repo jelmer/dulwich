@@ -201,6 +201,8 @@ def symref_capabilities(symrefs: Iterable[tuple[bytes, bytes]]) -> list[bytes]:
 
 
 COMMAND_DEEPEN = b"deepen"
+COMMAND_DEEPEN_SINCE = b"deepen-since"
+COMMAND_DEEPEN_NOT = b"deepen-not"
 COMMAND_SHALLOW = b"shallow"
 COMMAND_UNSHALLOW = b"unshallow"
 COMMAND_DONE = b"done"

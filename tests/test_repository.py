@@ -28,6 +28,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import time
 import warnings
 
 from dulwich import errors, objects, porcelain
@@ -2080,3 +2081,343 @@ class RepoConfigIncludeIfTests(TestCase):
             config = r.get_config()
             self.assertEqual(b"true", config.get((b"core",), b"autocrlf"))
             r.close()
+
+
+class SharedRepositoryTests(TestCase):
+    """Tests for core.sharedRepository functionality."""
+
+    def setUp(self):
+        super().setUp()
+        self._orig_umask = os.umask(0o022)
+
+    def tearDown(self):
+        os.umask(self._orig_umask)
+        super().tearDown()
+
+    def _get_file_mode(self, path):
+        """Get the file mode bits (without file type bits)."""
+        return stat.S_IMODE(os.stat(path).st_mode)
+
+    def _check_permissions(self, repo, expected_file_mode, expected_dir_mode):
+        """Check that repository files and directories have expected permissions."""
+        objects_dir = os.path.join(repo.commondir(), "objects")
+
+        # Check objects directory
+        actual_dir_mode = self._get_file_mode(objects_dir)
+        self.assertEqual(
+            expected_dir_mode,
+            actual_dir_mode,
+            f"objects dir mode: expected {oct(expected_dir_mode)}, got {oct(actual_dir_mode)}",
+        )
+
+        # Check pack directory
+        pack_dir = os.path.join(objects_dir, "pack")
+        actual_dir_mode = self._get_file_mode(pack_dir)
+        self.assertEqual(
+            expected_dir_mode,
+            actual_dir_mode,
+            f"pack dir mode: expected {oct(expected_dir_mode)}, got {oct(actual_dir_mode)}",
+        )
+
+        # Check info directory
+        info_dir = os.path.join(objects_dir, "info")
+        actual_dir_mode = self._get_file_mode(info_dir)
+        self.assertEqual(
+            expected_dir_mode,
+            actual_dir_mode,
+            f"info dir mode: expected {oct(expected_dir_mode)}, got {oct(actual_dir_mode)}",
+        )
+
+    def test_init_bare_shared_group(self):
+        """Test initializing bare repo with sharedRepository=group."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="group")
+        self.addCleanup(repo.close)
+
+        # Expected permissions for group sharing
+        expected_dir_mode = 0o2775  # setgid + rwxrwxr-x
+        expected_file_mode = 0o664  # rw-rw-r--
+
+        self._check_permissions(repo, expected_file_mode, expected_dir_mode)
+
+    def test_init_bare_shared_all(self):
+        """Test initializing bare repo with sharedRepository=all."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="all")
+        self.addCleanup(repo.close)
+
+        # Expected permissions for world sharing
+        expected_dir_mode = 0o2777  # setgid + rwxrwxrwx
+        expected_file_mode = 0o666  # rw-rw-rw-
+
+        self._check_permissions(repo, expected_file_mode, expected_dir_mode)
+
+    def test_init_bare_shared_umask(self):
+        """Test initializing bare repo with sharedRepository=umask (default)."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="umask")
+        self.addCleanup(repo.close)
+
+        # With umask, no special permissions should be set
+        # The actual permissions will depend on the umask, but we can
+        # at least verify that setgid is NOT set
+        objects_dir = os.path.join(repo.commondir(), "objects")
+        actual_mode = os.stat(objects_dir).st_mode
+
+        # Verify setgid bit is NOT set
+        self.assertEqual(0, actual_mode & stat.S_ISGID)
+
+    def test_loose_object_permissions_group(self):
+        """Test that loose objects get correct permissions with sharedRepository=group."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="group")
+        self.addCleanup(repo.close)
+
+        # Create a blob object
+        blob = objects.Blob.from_string(b"test content")
+        repo.object_store.add_object(blob)
+
+        # Find the object file
+        obj_path = repo.object_store._get_shafile_path(blob.id)
+
+        # Check file permissions
+        actual_mode = self._get_file_mode(obj_path)
+        expected_mode = 0o664  # rw-rw-r--
+        self.assertEqual(
+            expected_mode,
+            actual_mode,
+            f"loose object mode: expected {oct(expected_mode)}, got {oct(actual_mode)}",
+        )
+
+        # Check directory permissions
+        obj_dir = os.path.dirname(obj_path)
+        actual_dir_mode = self._get_file_mode(obj_dir)
+        expected_dir_mode = 0o2775  # setgid + rwxrwxr-x
+        self.assertEqual(
+            expected_dir_mode,
+            actual_dir_mode,
+            f"object dir mode: expected {oct(expected_dir_mode)}, got {oct(actual_dir_mode)}",
+        )
+
+    def test_loose_object_permissions_all(self):
+        """Test that loose objects get correct permissions with sharedRepository=all."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="all")
+        self.addCleanup(repo.close)
+
+        # Create a blob object
+        blob = objects.Blob.from_string(b"test content")
+        repo.object_store.add_object(blob)
+
+        # Find the object file
+        obj_path = repo.object_store._get_shafile_path(blob.id)
+
+        # Check file permissions
+        actual_mode = self._get_file_mode(obj_path)
+        expected_mode = 0o666  # rw-rw-rw-
+        self.assertEqual(
+            expected_mode,
+            actual_mode,
+            f"loose object mode: expected {oct(expected_mode)}, got {oct(actual_mode)}",
+        )
+
+    def test_pack_file_permissions_group(self):
+        """Test that pack files get correct permissions with sharedRepository=group."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="group")
+        self.addCleanup(repo.close)
+
+        # Create some objects
+        blobs = [
+            objects.Blob.from_string(f"test content {i}".encode()) for i in range(5)
+        ]
+        repo.object_store.add_objects([(blob, None) for blob in blobs])
+
+        # Find the pack files
+        pack_dir = os.path.join(repo.commondir(), "objects", "pack")
+        pack_files = [f for f in os.listdir(pack_dir) if f.endswith(".pack")]
+        self.assertGreater(len(pack_files), 0, "No pack files created")
+
+        # Check pack file permissions
+        pack_path = os.path.join(pack_dir, pack_files[0])
+        actual_mode = self._get_file_mode(pack_path)
+        expected_mode = 0o664  # rw-rw-r--
+        self.assertEqual(
+            expected_mode,
+            actual_mode,
+            f"pack file mode: expected {oct(expected_mode)}, got {oct(actual_mode)}",
+        )
+
+    def test_pack_index_permissions_group(self):
+        """Test that pack index files get correct permissions with sharedRepository=group."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="group")
+        self.addCleanup(repo.close)
+
+        # Create some objects
+        blobs = [
+            objects.Blob.from_string(f"test content {i}".encode()) for i in range(5)
+        ]
+        repo.object_store.add_objects([(blob, None) for blob in blobs])
+
+        # Find the pack index files
+        pack_dir = os.path.join(repo.commondir(), "objects", "pack")
+        idx_files = [f for f in os.listdir(pack_dir) if f.endswith(".idx")]
+        self.assertGreater(len(idx_files), 0, "No pack index files created")
+
+        # Check pack index file permissions
+        idx_path = os.path.join(pack_dir, idx_files[0])
+        actual_mode = self._get_file_mode(idx_path)
+        expected_mode = 0o664  # rw-rw-r--
+        self.assertEqual(
+            expected_mode,
+            actual_mode,
+            f"pack index mode: expected {oct(expected_mode)}, got {oct(actual_mode)}",
+        )
+
+    def test_index_file_permissions_group(self):
+        """Test that index file gets correct permissions with sharedRepository=group."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        # Create non-bare repo (index only exists in non-bare repos)
+        repo = Repo.init(tmp_dir, shared_repository="group")
+        self.addCleanup(repo.close)
+
+        # Make a change to trigger index write
+        blob = objects.Blob.from_string(b"test content")
+        repo.object_store.add_object(blob)
+        test_file = os.path.join(tmp_dir, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content")
+        # Stage the file
+        porcelain.add(repo, [test_file])
+
+        # Check index file permissions
+        index_path = repo.index_path()
+        actual_mode = self._get_file_mode(index_path)
+        expected_mode = 0o664  # rw-rw-r--
+        self.assertEqual(
+            expected_mode,
+            actual_mode,
+            f"index file mode: expected {oct(expected_mode)}, got {oct(actual_mode)}",
+        )
+
+    def test_existing_repo_respects_config(self):
+        """Test that opening an existing repo respects core.sharedRepository config."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        # Create repo with shared=group
+        repo = Repo.init_bare(tmp_dir, shared_repository="group")
+        repo.close()
+
+        # Reopen the repo
+        repo = Repo(tmp_dir)
+        self.addCleanup(repo.close)
+
+        # Add an object and check permissions
+        blob = objects.Blob.from_string(b"test content after reopen")
+        repo.object_store.add_object(blob)
+
+        obj_path = repo.object_store._get_shafile_path(blob.id)
+        actual_mode = self._get_file_mode(obj_path)
+        expected_mode = 0o664  # rw-rw-r--
+        self.assertEqual(
+            expected_mode,
+            actual_mode,
+            f"loose object mode after reopen: expected {oct(expected_mode)}, got {oct(actual_mode)}",
+        )
+
+    def test_reflog_permissions_group(self):
+        """Test that reflog files get correct permissions with sharedRepository=group."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        # Set umask to 0 to see what permissions are actually set
+        os.umask(0)
+
+        repo = Repo.init(tmp_dir, shared_repository="group")
+        self.addCleanup(repo.close)
+
+        # Create a commit to trigger reflog creation
+        blob = objects.Blob.from_string(b"test content")
+        tree = objects.Tree()
+        tree.add(b"test.txt", 0o100644, blob.id)
+
+        c = objects.Commit()
+        c.tree = tree.id
+        c.author = c.committer = b"Test <test@example.com>"
+        c.author_time = c.commit_time = int(time.time())
+        c.author_timezone = c.commit_timezone = 0
+        c.encoding = b"UTF-8"
+        c.message = b"Test commit"
+
+        repo.object_store.add_object(blob)
+        repo.object_store.add_object(tree)
+        repo.object_store.add_object(c)
+
+        # Update ref to trigger reflog creation
+        repo.refs.set_if_equals(
+            b"refs/heads/master", None, c.id, message=b"commit: initial commit"
+        )
+
+        # Check reflog file permissions
+        reflog_path = os.path.join(repo.controldir(), "logs", "refs", "heads", "master")
+        self.assertTrue(os.path.exists(reflog_path), "Reflog file should exist")
+
+        actual_mode = self._get_file_mode(reflog_path)
+        expected_mode = 0o664  # rw-rw-r--
+        self.assertEqual(
+            expected_mode,
+            actual_mode,
+            f"reflog file mode: expected {oct(expected_mode)}, got {oct(actual_mode)}",
+        )
+
+        # Check reflog directory permissions
+        reflog_dir = os.path.dirname(reflog_path)
+        actual_dir_mode = self._get_file_mode(reflog_dir)
+        expected_dir_mode = 0o2775  # setgid + rwxrwxr-x
+        self.assertEqual(
+            expected_dir_mode,
+            actual_dir_mode,
+            f"reflog dir mode: expected {oct(expected_dir_mode)}, got {oct(actual_dir_mode)}",
+        )

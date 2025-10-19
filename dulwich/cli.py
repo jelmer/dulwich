@@ -154,6 +154,10 @@ def parse_relative_time(time_str: str) -> int:
             "days": 86400,
             "week": 604800,
             "weeks": 604800,
+            "month": 2592000,  # 30 days
+            "months": 2592000,
+            "year": 31536000,  # 365 days
+            "years": 31536000,
         }
 
         if unit in multipliers:
@@ -164,6 +168,44 @@ def parse_relative_time(time_str: str) -> int:
         if "invalid literal" in str(e):
             raise ValueError(f"Invalid number in relative time: {parts[0]}")
         raise
+
+
+def parse_time_to_timestamp(time_spec: str) -> int:
+    """Parse a time specification and return a Unix timestamp.
+
+    Args:
+        time_spec: Time specification. Can be:
+            - A Unix timestamp (integer as string)
+            - A relative time like "2 weeks ago"
+            - "now" for current time
+            - "all" to expire all entries (returns future time)
+            - "never" to never expire (returns 0 - epoch start)
+
+    Returns:
+        Unix timestamp
+
+    Raises:
+        ValueError: If the time specification cannot be parsed
+    """
+    import time
+
+    # Handle special cases
+    if time_spec == "all":
+        # Expire all entries - set to future time so everything is "older"
+        return int(time.time()) + (100 * 365 * 24 * 60 * 60)  # 100 years in future
+    if time_spec == "never":
+        # Never expire - set to epoch start so nothing is older
+        return 0
+
+    # Try parsing as direct Unix timestamp
+    try:
+        return int(time_spec)
+    except ValueError:
+        pass
+
+    # Parse relative time and convert to timestamp
+    seconds_ago = parse_relative_time(time_spec)
+    return int(time.time()) - seconds_ago
 
 
 def format_bytes(bytes: float) -> str:
@@ -2239,15 +2281,71 @@ class cmd_reflog(Command):
         Args:
             args: Command line arguments
         """
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
+        parser = argparse.ArgumentParser(prog="dulwich reflog")
+        subparsers = parser.add_subparsers(dest="subcommand", help="Subcommand")
+
+        # Show subcommand (default when no subcommand is specified)
+        show_parser = subparsers.add_parser(
+            "show", help="Show reflog entries (default)", add_help=False
+        )
+        show_parser.add_argument(
             "ref", nargs="?", default="HEAD", help="Reference to show reflog for"
         )
-        parser.add_argument(
+        show_parser.add_argument(
             "--all", action="store_true", help="Show reflogs for all refs"
         )
-        parsed_args = parser.parse_args(args)
 
+        # Expire subcommand
+        expire_parser = subparsers.add_parser("expire", help="Expire reflog entries")
+        expire_parser.add_argument(
+            "ref", nargs="?", help="Reference to expire reflog for"
+        )
+        expire_parser.add_argument(
+            "--all", action="store_true", help="Expire reflogs for all refs"
+        )
+        expire_parser.add_argument(
+            "--expire",
+            type=str,
+            help="Expire entries older than time (e.g., '90 days ago', 'all', 'never')",
+        )
+        expire_parser.add_argument(
+            "--expire-unreachable",
+            type=str,
+            help="Expire unreachable entries older than time",
+        )
+        expire_parser.add_argument(
+            "--dry-run", "-n", action="store_true", help="Show what would be expired"
+        )
+
+        # Delete subcommand
+        delete_parser = subparsers.add_parser(
+            "delete", help="Delete specific reflog entry"
+        )
+        delete_parser.add_argument(
+            "refspec", help="Reference specification (e.g., HEAD@{1})"
+        )
+        delete_parser.add_argument(
+            "--rewrite",
+            action="store_true",
+            help="Rewrite subsequent entries to maintain consistency",
+        )
+
+        # If no arguments or first arg is not a subcommand, treat as show
+        if not args or (args[0] not in ["show", "expire", "delete"]):
+            # Parse as show command
+            parsed_args = parser.parse_args(["show", *list(args)])
+        else:
+            parsed_args = parser.parse_args(args)
+
+        if parsed_args.subcommand == "expire":
+            self._run_expire(parsed_args)
+        elif parsed_args.subcommand == "delete":
+            self._run_delete(parsed_args)
+        else:  # show or default
+            self._run_show(parsed_args)
+
+    def _run_show(self, parsed_args: argparse.Namespace) -> None:
+        """Show reflog entries."""
         with Repo(".") as repo:
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="reflog") as outstream:
@@ -2280,6 +2378,53 @@ class cmd_reflog(Command):
                         outstream.write(
                             f"{short_new} {ref.decode('utf-8', 'replace')}@{{{i}}}: {message}\n"
                         )
+
+    def _run_expire(self, parsed_args: argparse.Namespace) -> None:
+        """Expire reflog entries."""
+        # Parse time specifications
+        expire_time = None
+        expire_unreachable_time = None
+
+        if parsed_args.expire:
+            expire_time = parse_time_to_timestamp(parsed_args.expire)
+        if parsed_args.expire_unreachable:
+            expire_unreachable_time = parse_time_to_timestamp(
+                parsed_args.expire_unreachable
+            )
+
+        # Execute expire
+        result = porcelain.reflog_expire(
+            repo=".",
+            ref=parsed_args.ref,
+            all=parsed_args.all,
+            expire_time=expire_time,
+            expire_unreachable_time=expire_unreachable_time,
+            dry_run=parsed_args.dry_run,
+        )
+
+        # Print results
+        for ref_name, count in result.items():
+            ref_str = ref_name.decode("utf-8", "replace")
+            if parsed_args.dry_run:
+                print(f"Would expire {count} entries from {ref_str}")
+            else:
+                print(f"Expired {count} entries from {ref_str}")
+
+    def _run_delete(self, parsed_args: argparse.Namespace) -> None:
+        """Delete a specific reflog entry."""
+        from dulwich.reflog import parse_reflog_spec
+
+        # Parse refspec (e.g., "HEAD@{1}" or "refs/heads/master@{2}")
+        ref, index = parse_reflog_spec(parsed_args.refspec)
+
+        # Execute delete
+        porcelain.reflog_delete(
+            repo=".",
+            ref=ref,
+            index=index,
+            rewrite=parsed_args.rewrite,
+        )
+        print(f"Deleted entry {ref.decode('utf-8', 'replace')}@{{{index}}}")
 
 
 class cmd_reset(Command):

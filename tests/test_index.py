@@ -69,8 +69,9 @@ from dulwich.index import (
     write_index_dict,
 )
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree, TreeEntry
+from dulwich.objects import S_IFGITLINK, Blob, Tree, TreeEntry
 from dulwich.repo import Repo
+from dulwich.tests.utils import make_commit
 
 from . import TestCase, skipIf
 
@@ -705,13 +706,17 @@ class BuildIndexTests(TestCase):
             subtree = Tree()
             subtree[b"a"] = (stat.S_IFREG | 0o644, filea.id)
 
-            c = Commit()
-            c.tree = subtree.id
-            c.committer = c.author = b"Somebody <somebody@example.com>"
-            c.commit_time = c.author_time = 42342
-            c.commit_timezone = c.author_timezone = 0
-            c.parents = []
-            c.message = b"Subcommit"
+            c = make_commit(
+                tree=subtree.id,
+                author=b"Somebody <somebody@example.com>",
+                committer=b"Somebody <somebody@example.com>",
+                author_time=42342,
+                commit_time=42342,
+                author_timezone=0,
+                commit_timezone=0,
+                parents=[],
+                message=b"Subcommit",
+            )
 
             tree = Tree()
             tree[b"c"] = (S_IFGITLINK, c.id)
@@ -745,13 +750,17 @@ class BuildIndexTests(TestCase):
             subtree = Tree()
             subtree[b"a"] = (stat.S_IFREG | 0o644, filea.id)
 
-            c = Commit()
-            c.tree = subtree.id
-            c.committer = c.author = b"Somebody <somebody@example.com>"
-            c.commit_time = c.author_time = 42342
-            c.commit_timezone = c.author_timezone = 0
-            c.parents = []
-            c.message = b"Subcommit"
+            c = make_commit(
+                tree=subtree.id,
+                author=b"Somebody <somebody@example.com>",
+                committer=b"Somebody <somebody@example.com>",
+                author_time=42342,
+                commit_time=42342,
+                author_timezone=0,
+                commit_timezone=0,
+                parents=[],
+                message=b"Subcommit",
+            )
 
             tree = Tree()
             tree[b"c"] = (S_IFGITLINK, c.id)

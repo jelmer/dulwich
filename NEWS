@@ -1,4 +1,4 @@
-0.24.6	2025-10-17
+0.24.6	2025-10-19
 
  * Fix import failure when ``sys.stdin`` is ``None``. The ``dulwich.server``
    module can now be imported in environments where ``sys.stdin`` is ``None``,

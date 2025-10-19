@@ -10,7 +10,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "diff-tree-py"
-version = "0.24.5"
+version = "0.24.6"
 dependencies = [
  "pyo3",
 ]
@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "objects-py"
-version = "0.24.5"
+version = "0.24.6"
 dependencies = [
  "memchr",
  "pyo3",
@@ -64,7 +64,7 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "pack-py"
-version = "0.24.5"
+version = "0.24.6"
 dependencies = [
  "memchr",
  "pyo3",
@@ -157,9 +157,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.106"
+version = "2.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ede7c438028d4436d71104916910f5bb611972c5cfd7f89b8300a8186e6fada6"
+checksum = "2a26dbd934e5451d21ef060c018dae56fc073894c5a7896f882928a76e6d081b"
 dependencies = [
  "proc-macro2",
  "quote",

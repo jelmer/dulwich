@@ -25,7 +25,7 @@ from io import BytesIO
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
-from dulwich.tests.utils import build_commit_graph
+from dulwich.tests.utils import build_commit_graph, make_commit
 
 from . import DependencyMissing, TestCase
 
@@ -54,12 +54,16 @@ class GitFastExporterTests(TestCase):
         b.data = b"FOO"
         t = Tree()
         t.add(b"foo", stat.S_IFREG | 0o644, b.id)
-        c = Commit()
-        c.committer = c.author = b"Jelmer <jelmer@host>"
-        c.author_time = c.commit_time = 1271345553
-        c.author_timezone = c.commit_timezone = 0
-        c.message = b"msg"
-        c.tree = t.id
+        c = make_commit(
+            author=b"Jelmer <jelmer@host>",
+            committer=b"Jelmer <jelmer@host>",
+            author_time=1271345553,
+            commit_time=1271345553,
+            author_timezone=0,
+            commit_timezone=0,
+            message=b"msg",
+            tree=t.id,
+        )
         self.store.add_objects([(b, None), (t, None), (c, None)])
         self.fastexporter.emit_commit(c, b"refs/heads/master")
         self.assertEqual(

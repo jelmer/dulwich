@@ -186,6 +186,145 @@ class GitClientTests(TestCase):
         self.assertEqual({}, ret.symrefs)
         self.assertEqual(self.rout.getvalue(), b"0000")
 
+    def test_handle_upload_pack_head_deepen_since(self) -> None:
+        # Test that deepen-since command is properly sent
+        from dulwich.client import _handle_upload_pack_head
+
+        self.rin.write(b"0008NAK\n0000")
+        self.rin.seek(0)
+
+        class DummyGraphWalker:
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                return None
+
+        proto = Protocol(self.rin.read, self.rout.write)
+        capabilities = [b"shallow", b"deepen-since"]
+        wants = [b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"]
+        graph_walker = DummyGraphWalker()
+
+        _handle_upload_pack_head(
+            proto=proto,
+            capabilities=capabilities,
+            graph_walker=graph_walker,
+            wants=wants,
+            can_read=None,
+            depth=None,
+            protocol_version=0,
+            shallow_since="2023-01-01T00:00:00Z",
+        )
+
+        # Verify the deepen-since command was sent
+        output = self.rout.getvalue()
+        self.assertIn(b"deepen-since 2023-01-01T00:00:00Z\n", output)
+
+    def test_handle_upload_pack_head_deepen_not(self) -> None:
+        # Test that deepen-not command is properly sent
+        from dulwich.client import _handle_upload_pack_head
+
+        self.rin.write(b"0008NAK\n0000")
+        self.rin.seek(0)
+
+        class DummyGraphWalker:
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                return None
+
+        proto = Protocol(self.rin.read, self.rout.write)
+        capabilities = [b"shallow", b"deepen-not"]
+        wants = [b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"]
+        graph_walker = DummyGraphWalker()
+
+        _handle_upload_pack_head(
+            proto=proto,
+            capabilities=capabilities,
+            graph_walker=graph_walker,
+            wants=wants,
+            can_read=None,
+            depth=None,
+            protocol_version=0,
+            shallow_exclude=["refs/heads/excluded"],
+        )
+
+        # Verify the deepen-not command was sent
+        output = self.rout.getvalue()
+        self.assertIn(b"deepen-not refs/heads/excluded\n", output)
+
+    def test_handle_upload_pack_head_deepen_not_multiple(self) -> None:
+        # Test that multiple deepen-not commands are properly sent
+        from dulwich.client import _handle_upload_pack_head
+
+        self.rin.write(b"0008NAK\n0000")
+        self.rin.seek(0)
+
+        class DummyGraphWalker:
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                return None
+
+        proto = Protocol(self.rin.read, self.rout.write)
+        capabilities = [b"shallow", b"deepen-not"]
+        wants = [b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"]
+        graph_walker = DummyGraphWalker()
+
+        _handle_upload_pack_head(
+            proto=proto,
+            capabilities=capabilities,
+            graph_walker=graph_walker,
+            wants=wants,
+            can_read=None,
+            depth=None,
+            protocol_version=0,
+            shallow_exclude=["refs/heads/excluded1", "refs/heads/excluded2"],
+        )
+
+        # Verify both deepen-not commands were sent
+        output = self.rout.getvalue()
+        self.assertIn(b"deepen-not refs/heads/excluded1\n", output)
+        self.assertIn(b"deepen-not refs/heads/excluded2\n", output)
+
+    def test_handle_upload_pack_head_deepen_since_and_not(self) -> None:
+        # Test that deepen-since and deepen-not can be used together
+        from dulwich.client import _handle_upload_pack_head
+
+        self.rin.write(b"0008NAK\n0000")
+        self.rin.seek(0)
+
+        class DummyGraphWalker:
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                return None
+
+        proto = Protocol(self.rin.read, self.rout.write)
+        capabilities = [b"shallow", b"deepen-since", b"deepen-not"]
+        wants = [b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"]
+        graph_walker = DummyGraphWalker()
+
+        _handle_upload_pack_head(
+            proto=proto,
+            capabilities=capabilities,
+            graph_walker=graph_walker,
+            wants=wants,
+            can_read=None,
+            depth=None,
+            protocol_version=0,
+            shallow_since="2023-01-01T00:00:00Z",
+            shallow_exclude=["refs/heads/excluded"],
+        )
+
+        # Verify both deepen-since and deepen-not commands were sent
+        output = self.rout.getvalue()
+        self.assertIn(b"deepen-since 2023-01-01T00:00:00Z\n", output)
+        self.assertIn(b"deepen-not refs/heads/excluded\n", output)
+
     def test_send_pack_no_sideband64k_with_update_ref_error(self) -> None:
         # No side-bank-64k reported by server shouldn't try to parse
         # side band data

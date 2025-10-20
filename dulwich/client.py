@@ -134,6 +134,8 @@ from .protocol import (
     CAPABILITY_SYMREF,
     CAPABILITY_THIN_PACK,
     COMMAND_DEEPEN,
+    COMMAND_DEEPEN_NOT,
+    COMMAND_DEEPEN_SINCE,
     COMMAND_DONE,
     COMMAND_HAVE,
     COMMAND_SHALLOW,
@@ -715,6 +717,8 @@ def _handle_upload_pack_head(
     can_read: Optional[Callable[[], bool]],
     depth: Optional[int],
     protocol_version: Optional[int],
+    shallow_since: Optional[str] = None,
+    shallow_exclude: Optional[list[str]] = None,
 ) -> tuple[Optional[set[bytes]], Optional[set[bytes]]]:
     """Handle the head of a 'git-upload-pack' request.
 
@@ -727,6 +731,8 @@ def _handle_upload_pack_head(
     whether there is extra graph data to read on proto
       depth: Depth for request
       protocol_version: Neogiated Git protocol version.
+      shallow_since: Deepen the history to include commits after this date
+      shallow_exclude: Deepen the history to exclude commits reachable from these refs
     """
     new_shallow: Optional[set[bytes]]
     new_unshallow: Optional[set[bytes]]
@@ -740,8 +746,11 @@ def _handle_upload_pack_head(
     proto.write_pkt_line(wantcmd)
     for want in wants[1:]:
         proto.write_pkt_line(COMMAND_WANT + b" " + want + b"\n")
-    if depth not in (0, None) or (
-        hasattr(graph_walker, "shallow") and graph_walker.shallow
+    if (
+        depth not in (0, None)
+        or shallow_since is not None
+        or shallow_exclude
+        or (hasattr(graph_walker, "shallow") and graph_walker.shallow)
     ):
         if protocol_version == 2:
             if not find_capability(capabilities, CAPABILITY_FETCH, CAPABILITY_SHALLOW):
@@ -759,6 +768,15 @@ def _handle_upload_pack_head(
             proto.write_pkt_line(
                 COMMAND_DEEPEN + b" " + str(depth).encode("ascii") + b"\n"
             )
+        if shallow_since is not None:
+            proto.write_pkt_line(
+                COMMAND_DEEPEN_SINCE + b" " + shallow_since.encode("ascii") + b"\n"
+            )
+        if shallow_exclude:
+            for ref in shallow_exclude:
+                proto.write_pkt_line(
+                    COMMAND_DEEPEN_NOT + b" " + ref.encode("ascii") + b"\n"
+                )
     if protocol_version != 2:
         proto.write_pkt_line(None)
 
@@ -784,7 +802,7 @@ def _handle_upload_pack_head(
     if protocol_version == 2:
         proto.write_pkt_line(None)
 
-    if depth not in (0, None):
+    if depth not in (0, None) or shallow_since is not None or shallow_exclude:
         if can_read is not None:
             (new_shallow, new_unshallow) = _read_shallow_updates(proto.read_pkt_seq())
         else:
@@ -1096,6 +1114,8 @@ class GitClient:
         ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Fetch into a target repository.
 
@@ -1115,6 +1135,8 @@ class GitClient:
             feature, and ignored otherwise.
           protocol_version: Desired Git protocol version. By default the highest
             mutually supported protocol version will be used.
+          shallow_since: Deepen the history to include commits after this date
+          shallow_exclude: Deepen the history to exclude commits reachable from these refs
 
         Returns:
           Dictionary with all remote refs (not just those fetched)
@@ -1153,6 +1175,8 @@ class GitClient:
                 ref_prefix=ref_prefix,
                 filter_spec=filter_spec,
                 protocol_version=protocol_version,
+                shallow_since=shallow_since,
+                shallow_exclude=shallow_exclude,
             )
         except BaseException:
             abort()
@@ -1174,6 +1198,8 @@ class GitClient:
         ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
@@ -1194,6 +1220,8 @@ class GitClient:
             feature, and ignored otherwise.
           protocol_version: Desired Git protocol version. By default the highest
             mutually supported protocol version will be used.
+          shallow_since: Deepen the history to include commits after this date
+          shallow_exclude: Deepen the history to exclude commits reachable from these refs
 
         Returns:
           FetchPackResult object
@@ -1530,6 +1558,8 @@ class TraditionalGitClient(GitClient):
         ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
@@ -1550,6 +1580,8 @@ class TraditionalGitClient(GitClient):
             feature, and ignored otherwise.
           protocol_version: Desired Git protocol version. By default the highest
             mutually supported protocol version will be used.
+          shallow_since: Deepen the history to include commits after this date
+          shallow_exclude: Deepen the history to exclude commits reachable from these refs
 
         Returns:
           FetchPackResult object
@@ -1660,6 +1692,8 @@ class TraditionalGitClient(GitClient):
                 can_read,
                 depth=depth,
                 protocol_version=self.protocol_version,
+                shallow_since=shallow_since,
+                shallow_exclude=shallow_exclude,
             )
             _handle_upload_pack_tail(
                 proto,
@@ -2269,6 +2303,8 @@ class LocalGitClient(GitClient):
         ref_prefix: Optional[Sequence[bytes]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Fetch into a target repository.
 
@@ -2287,6 +2323,8 @@ class LocalGitClient(GitClient):
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
           protocol_version: Optional Git protocol version
+          shallow_since: Deepen the history to include commits after this date
+          shallow_exclude: Deepen the history to exclude commits reachable from these refs
 
         Returns:
           FetchPackResult object
@@ -2314,6 +2352,8 @@ class LocalGitClient(GitClient):
         ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Retrieve a pack from a local on-disk repository.
 
@@ -2333,6 +2373,8 @@ class LocalGitClient(GitClient):
             Only used if the server supports the Git protocol-v2 'filter'
             feature, and ignored otherwise.
           protocol_version: Optional Git protocol version
+          shallow_since: Deepen the history to include commits after this date
+          shallow_exclude: Deepen the history to exclude commits reachable from these refs
 
         Returns:
           FetchPackResult object
@@ -2589,6 +2631,8 @@ class BundleClient(GitClient):
         ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Fetch into a target repository from a bundle file."""
         bundle = self._open_bundle(path)
@@ -2641,6 +2685,8 @@ class BundleClient(GitClient):
         ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Retrieve a pack from a bundle file."""
         bundle = self._open_bundle(path)
@@ -3641,6 +3687,8 @@ class AbstractHttpGitClient(GitClient):
         ref_prefix: Optional[Sequence[Ref]] = None,
         filter_spec: Optional[bytes] = None,
         protocol_version: Optional[int] = None,
+        shallow_since: Optional[str] = None,
+        shallow_exclude: Optional[list[str]] = None,
     ) -> FetchPackResult:
         """Retrieve a pack from a git smart server.
 
@@ -3659,6 +3707,8 @@ class AbstractHttpGitClient(GitClient):
             feature, and ignored otherwise.
           protocol_version: Desired Git protocol version. By default the highest
             mutually supported protocol version will be used.
+          shallow_since: Deepen the history to include commits after this date
+          shallow_exclude: Deepen the history to exclude commits reachable from these refs
 
         Returns:
           FetchPackResult object
@@ -3736,6 +3786,8 @@ class AbstractHttpGitClient(GitClient):
             can_read=None,
             depth=depth,
             protocol_version=self.protocol_version,
+            shallow_since=shallow_since,
+            shallow_exclude=shallow_exclude,
         )
         if self.protocol_version == 2:
             data = pkt_line(b"command=fetch\n") + b"0001"

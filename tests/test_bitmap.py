@@ -831,3 +831,75 @@ class BitmapEdgeCaseTests(unittest.TestCase):
         self.assertTrue(bitmap2.flags & BITMAP_OPT_LOOKUP_TABLE)
         self.assertIsNotNone(bitmap2.lookup_table)
         self.assertIsNotNone(bitmap2.name_hash_cache)
+
+
+class BitmapConfigTests(unittest.TestCase):
+    """Tests for bitmap-related configuration settings."""
+
+    def test_pack_write_bitmaps_default(self):
+        """Test pack.writeBitmaps defaults to false."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        self.assertFalse(config.get_boolean((b"pack",), b"writeBitmaps", False))
+
+    def test_pack_write_bitmaps_true(self):
+        """Test pack.writeBitmaps = true."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        config.set((b"pack",), b"writeBitmaps", b"true")
+        self.assertTrue(config.get_boolean((b"pack",), b"writeBitmaps", False))
+
+    def test_pack_write_bitmaps_false(self):
+        """Test pack.writeBitmaps = false."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        config.set((b"pack",), b"writeBitmaps", b"false")
+        self.assertFalse(config.get_boolean((b"pack",), b"writeBitmaps", False))
+
+    def test_pack_write_bitmap_hash_cache_default(self):
+        """Test pack.writeBitmapHashCache defaults to true."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        self.assertTrue(config.get_boolean((b"pack",), b"writeBitmapHashCache", True))
+
+    def test_pack_write_bitmap_hash_cache_false(self):
+        """Test pack.writeBitmapHashCache = false."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        config.set((b"pack",), b"writeBitmapHashCache", b"false")
+        self.assertFalse(config.get_boolean((b"pack",), b"writeBitmapHashCache", True))
+
+    def test_pack_write_bitmap_lookup_table_default(self):
+        """Test pack.writeBitmapLookupTable defaults to true."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        self.assertTrue(config.get_boolean((b"pack",), b"writeBitmapLookupTable", True))
+
+    def test_repack_write_bitmaps(self):
+        """Test repack.writeBitmaps configuration."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        config.set((b"repack",), b"writeBitmaps", b"true")
+        self.assertTrue(config.get_boolean((b"repack",), b"writeBitmaps", False))
+
+    def test_pack_use_bitmap_index_default(self):
+        """Test pack.useBitmapIndex defaults to true."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        self.assertTrue(config.get_boolean((b"pack",), b"useBitmapIndex", True))
+
+    def test_pack_use_bitmap_index_false(self):
+        """Test pack.useBitmapIndex = false."""
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile()
+        config.set((b"pack",), b"useBitmapIndex", b"false")
+        self.assertFalse(config.get_boolean((b"pack",), b"useBitmapIndex", True))

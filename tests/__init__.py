@@ -127,6 +127,7 @@ def self_test_suite() -> unittest.TestSuite:
         "archive",
         "attrs",
         "bisect",
+        "bitmap",
         "blackbox",
         "bundle",
         "cli",

@@ -7,9 +7,10 @@ and maintaining Git repositories.
 import logging
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .repo import BaseRepo, Repo
@@ -44,7 +45,7 @@ class MaintenanceTask(ABC):
         self,
         repo: "BaseRepo",
         auto: bool = False,
-        progress: Optional[Callable[[str], None]] = None,
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         """Initialize maintenance task.
 
@@ -312,7 +313,7 @@ MAINTENANCE_TASKS: dict[str, type[MaintenanceTask]] = {
 
 def get_enabled_tasks(
     repo: "BaseRepo",
-    task_filter: Optional[list[str]] = None,
+    task_filter: list[str] | None = None,
 ) -> list[str]:
     """Get list of enabled maintenance tasks.
 
@@ -341,9 +342,9 @@ def get_enabled_tasks(
 
 def run_maintenance(
     repo: "BaseRepo",
-    tasks: Optional[list[str]] = None,
+    tasks: list[str] | None = None,
     auto: bool = False,
-    progress: Optional[Callable[[str], None]] = None,
+    progress: Callable[[str], None] | None = None,
 ) -> MaintenanceResult:
     """Run maintenance tasks on a repository.
 

@@ -24,8 +24,8 @@
 import os
 import tempfile
 import warnings
-from collections.abc import Sequence
-from typing import Callable, Optional, TypedDict
+from collections.abc import Callable, Sequence
+from typing import TypedDict
 
 from .index import Index, build_index_from_tree
 from .object_store import BaseObjectStore
@@ -53,17 +53,17 @@ class CommitFilter:
         self,
         object_store: BaseObjectStore,
         *,
-        filter_fn: Optional[Callable[[Commit], Optional[CommitData]]] = None,
-        filter_author: Optional[Callable[[bytes], Optional[bytes]]] = None,
-        filter_committer: Optional[Callable[[bytes], Optional[bytes]]] = None,
-        filter_message: Optional[Callable[[bytes], Optional[bytes]]] = None,
-        tree_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
-        index_filter: Optional[Callable[[bytes, str], Optional[bytes]]] = None,
-        parent_filter: Optional[Callable[[Sequence[bytes]], list[bytes]]] = None,
-        commit_filter: Optional[Callable[[Commit, bytes], Optional[bytes]]] = None,
-        subdirectory_filter: Optional[bytes] = None,
+        filter_fn: Callable[[Commit], CommitData | None] | None = None,
+        filter_author: Callable[[bytes], bytes | None] | None = None,
+        filter_committer: Callable[[bytes], bytes | None] | None = None,
+        filter_message: Callable[[bytes], bytes | None] | None = None,
+        tree_filter: Callable[[bytes, str], bytes | None] | None = None,
+        index_filter: Callable[[bytes, str], bytes | None] | None = None,
+        parent_filter: Callable[[Sequence[bytes]], list[bytes]] | None = None,
+        commit_filter: Callable[[Commit, bytes], bytes | None] | None = None,
+        subdirectory_filter: bytes | None = None,
         prune_empty: bool = False,
-        tag_name_filter: Optional[Callable[[bytes], Optional[bytes]]] = None,
+        tag_name_filter: Callable[[bytes], bytes | None] | None = None,
     ):
         """Initialize a commit filter.
 
@@ -107,7 +107,7 @@ class CommitFilter:
 
     def _filter_tree_with_subdirectory(
         self, tree_sha: bytes, subdirectory: bytes
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """Extract a subdirectory from a tree as the new root.
 
         Args:
@@ -217,7 +217,7 @@ class CommitFilter:
         finally:
             os.unlink(tmp_index_path)
 
-    def process_commit(self, commit_sha: bytes) -> Optional[bytes]:
+    def process_commit(self, commit_sha: bytes) -> bytes | None:
         """Process a single commit, creating a filtered version.
 
         Args:
@@ -383,7 +383,7 @@ def filter_refs(
     *,
     keep_original: bool = True,
     force: bool = False,
-    tag_callback: Optional[Callable[[bytes, bytes], None]] = None,
+    tag_callback: Callable[[bytes, bytes], None] | None = None,
 ) -> dict[bytes, bytes]:
     """Filter commits reachable from the given refs.
 

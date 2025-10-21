@@ -1,3 +1,7 @@
+0.25.0	UNRELEASED
+
+ * Drop support for Python 3.9. (Jelmer Vernooĳ)
+
 0.24.8	2025-1029
 
  * Add Rust implementation of pack delta creation (create_delta). The

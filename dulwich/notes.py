@@ -333,7 +333,7 @@ class NotesTree:
 
         return new_tree
 
-    def _get_note_sha(self, object_sha: bytes) -> Optional[bytes]:
+    def _get_note_sha(self, object_sha: bytes) -> bytes | None:
         """Get the SHA of the note blob for an object.
 
         Args:
@@ -365,7 +365,7 @@ class NotesTree:
         except KeyError:
             return None
 
-    def get_note(self, object_sha: bytes) -> Optional[bytes]:
+    def get_note(self, object_sha: bytes) -> bytes | None:
         """Get the note content for an object.
 
         Args:
@@ -470,7 +470,7 @@ class NotesTree:
         self._fanout_level = self._detect_fanout_level()
         return new_tree
 
-    def remove_note(self, object_sha: bytes) -> Optional[Tree]:
+    def remove_note(self, object_sha: bytes) -> Tree | None:
         """Remove a note for an object.
 
         Args:
@@ -487,7 +487,7 @@ class NotesTree:
         components = path.split(b"/")
 
         # Build new tree structure without the note
-        def remove_from_tree(tree: Tree, components: Sequence[bytes]) -> Optional[Tree]:
+        def remove_from_tree(tree: Tree, components: Sequence[bytes]) -> Tree | None:
             """Remove note entry from tree.
 
             Args:
@@ -608,7 +608,7 @@ class Notes:
 
     def get_notes_ref(
         self,
-        notes_ref: Optional[bytes] = None,
+        notes_ref: bytes | None = None,
         config: Optional["StackedConfig"] = None,
     ) -> bytes:
         """Get the notes reference to use.
@@ -630,9 +630,9 @@ class Notes:
     def get_note(
         self,
         object_sha: bytes,
-        notes_ref: Optional[bytes] = None,
+        notes_ref: bytes | None = None,
         config: Optional["StackedConfig"] = None,
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """Get the note for an object.
 
         Args:
@@ -671,10 +671,10 @@ class Notes:
         self,
         object_sha: bytes,
         note_content: bytes,
-        notes_ref: Optional[bytes] = None,
-        author: Optional[bytes] = None,
-        committer: Optional[bytes] = None,
-        message: Optional[bytes] = None,
+        notes_ref: bytes | None = None,
+        author: bytes | None = None,
+        committer: bytes | None = None,
+        message: bytes | None = None,
         config: Optional["StackedConfig"] = None,
     ) -> bytes:
         """Set or update a note for an object.
@@ -755,12 +755,12 @@ class Notes:
     def remove_note(
         self,
         object_sha: bytes,
-        notes_ref: Optional[bytes] = None,
-        author: Optional[bytes] = None,
-        committer: Optional[bytes] = None,
-        message: Optional[bytes] = None,
+        notes_ref: bytes | None = None,
+        author: bytes | None = None,
+        committer: bytes | None = None,
+        message: bytes | None = None,
         config: Optional["StackedConfig"] = None,
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """Remove a note for an object.
 
         Args:
@@ -836,7 +836,7 @@ class Notes:
 
     def list_notes(
         self,
-        notes_ref: Optional[bytes] = None,
+        notes_ref: bytes | None = None,
         config: Optional["StackedConfig"] = None,
     ) -> list[tuple[bytes, bytes]]:
         """List all notes in a notes ref.

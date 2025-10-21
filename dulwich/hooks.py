@@ -23,8 +23,8 @@
 
 import os
 import subprocess
-from collections.abc import Sequence
-from typing import Any, Callable, Optional
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from .errors import HookError
 
@@ -58,9 +58,9 @@ class ShellHook(Hook):
         name: str,
         path: str,
         numparam: int,
-        pre_exec_callback: Optional[Callable[..., Any]] = None,
-        post_exec_callback: Optional[Callable[..., Any]] = None,
-        cwd: Optional[str] = None,
+        pre_exec_callback: Callable[..., Any] | None = None,
+        post_exec_callback: Callable[..., Any] | None = None,
+        cwd: str | None = None,
     ) -> None:
         """Setup shell hook definition.
 
@@ -162,7 +162,7 @@ class CommitMsgShellHook(ShellHook):
 
             return (path,)
 
-        def clean_msg(success: int, *args: str) -> Optional[bytes]:
+        def clean_msg(success: int, *args: str) -> bytes | None:
             if success:
                 with open(args[0], "rb") as f:
                     new_msg = f.read()
@@ -191,7 +191,7 @@ class PostReceiveShellHook(ShellHook):
 
     def execute(
         self, client_refs: Sequence[tuple[bytes, bytes, bytes]]
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """Execute the post-receive hook.
 
         Args:

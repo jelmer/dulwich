@@ -30,7 +30,8 @@ import tempfile
 import time
 import types
 import warnings
-from typing import Any, BinaryIO, Callable, Optional, TypeVar, Union
+from collections.abc import Callable
+from typing import Any, BinaryIO, TypeVar
 from unittest import SkipTest
 
 from dulwich.index import commit_tree
@@ -54,7 +55,7 @@ F = 0o100644  # Shorthand mode for Files.
 T = TypeVar("T", bound=ShaFile)
 
 
-def open_repo(name: str, temp_dir: Optional[str] = None) -> Repo:
+def open_repo(name: str, temp_dir: str | None = None) -> Repo:
     """Open a copy of a repo in a temporary directory.
 
     Use this function for accessing repos in dulwich/tests/data/repos to avoid
@@ -211,7 +212,7 @@ def ext_functest_builder(
 def build_pack(
     f: BinaryIO,
     objects_spec: list[tuple[int, Any]],
-    store: Optional[BaseObjectStore] = None,
+    store: BaseObjectStore | None = None,
 ) -> list[tuple[int, int, bytes, bytes, int]]:
     """Write test pack data from a concise spec.
 
@@ -293,10 +294,9 @@ def build_pack(
 def build_commit_graph(
     object_store: BaseObjectStore,
     commit_spec: list[list[int]],
-    trees: Optional[
-        dict[int, list[Union[tuple[bytes, ShaFile], tuple[bytes, ShaFile, int]]]]
-    ] = None,
-    attrs: Optional[dict[int, dict[str, Any]]] = None,
+    trees: dict[int, list[tuple[bytes, ShaFile] | tuple[bytes, ShaFile, int]]]
+    | None = None,
+    attrs: dict[int, dict[str, Any]] | None = None,
 ) -> list[Commit]:
     """Build a commit graph from a concise specification.
 

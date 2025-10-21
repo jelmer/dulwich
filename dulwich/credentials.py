@@ -28,7 +28,6 @@ https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
 
 import sys
 from collections.abc import Iterator
-from typing import Optional
 from urllib.parse import ParseResult, urlparse
 
 from .config import ConfigDict, SectionLike
@@ -77,7 +76,7 @@ def match_partial_url(valid_url: ParseResult, partial_url: str) -> bool:
 
 
 def urlmatch_credential_sections(
-    config: ConfigDict, url: Optional[str]
+    config: ConfigDict, url: str | None
 ) -> Iterator[SectionLike]:
     """Returns credential sections from the config which match the given URL."""
     encoding = config.encoding or sys.getdefaultencoding()

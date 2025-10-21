@@ -4,8 +4,9 @@ import collections
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Optional
 
 from dulwich.object_store import (
     BaseObjectStore,
@@ -39,7 +40,7 @@ def find_reachable_objects(
     object_store: BaseObjectStore,
     refs_container: RefsContainer,
     include_reflogs: bool = True,
-    progress: Optional[Callable[[str], None]] = None,
+    progress: Callable[[str], None] | None = None,
 ) -> set[bytes]:
     """Find all reachable objects in the repository.
 
@@ -113,7 +114,7 @@ def find_unreachable_objects(
     object_store: BaseObjectStore,
     refs_container: RefsContainer,
     include_reflogs: bool = True,
-    progress: Optional[Callable[[str], None]] = None,
+    progress: Callable[[str], None] | None = None,
 ) -> set[bytes]:
     """Find all unreachable objects in the repository.
 
@@ -141,9 +142,9 @@ def find_unreachable_objects(
 def prune_unreachable_objects(
     object_store: DiskObjectStore,
     refs_container: RefsContainer,
-    grace_period: Optional[int] = None,
+    grace_period: int | None = None,
     dry_run: bool = False,
-    progress: Optional[Callable[[str], None]] = None,
+    progress: Callable[[str], None] | None = None,
 ) -> tuple[set[bytes], int]:
     """Remove unreachable objects from the repository.
 
@@ -211,9 +212,9 @@ def garbage_collect(
     auto: bool = False,
     aggressive: bool = False,
     prune: bool = True,
-    grace_period: Optional[int] = 1209600,  # 2 weeks default
+    grace_period: int | None = 1209600,  # 2 weeks default
     dry_run: bool = False,
-    progress: Optional[Callable[[str], None]] = None,
+    progress: Callable[[str], None] | None = None,
 ) -> GCStats:
     """Run garbage collection on a repository.
 
@@ -372,7 +373,7 @@ def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
 def maybe_auto_gc(
     repo: "Repo",
     config: Optional["Config"] = None,
-    progress: Optional[Callable[[str], None]] = None,
+    progress: Callable[[str], None] | None = None,
 ) -> bool:
     """Run automatic garbage collection if needed.
 

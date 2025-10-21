@@ -21,12 +21,10 @@
 
 """Bundle format support."""
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from typing import (
     TYPE_CHECKING,
     BinaryIO,
-    Callable,
-    Optional,
     Protocol,
     cast,
     runtime_checkable,
@@ -56,12 +54,12 @@ if TYPE_CHECKING:
 class Bundle:
     """Git bundle object representation."""
 
-    version: Optional[int]
+    version: int | None
 
-    capabilities: dict[str, Optional[str]]
+    capabilities: dict[str, str | None]
     prerequisites: list[tuple[bytes, bytes]]
     references: dict[bytes, bytes]
-    pack_data: Optional[PackDataLike]
+    pack_data: PackDataLike | None
 
     def __repr__(self) -> str:
         """Return string representation of Bundle."""
@@ -91,7 +89,7 @@ class Bundle:
     def store_objects(
         self,
         object_store: "BaseObjectStore",
-        progress: Optional[Callable[[str], None]] = None,
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         """Store all objects from this bundle into an object store.
 
@@ -222,11 +220,11 @@ def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
 
 def create_bundle_from_repo(
     repo: "BaseRepo",
-    refs: Optional[Sequence[bytes]] = None,
-    prerequisites: Optional[Sequence[bytes]] = None,
-    version: Optional[int] = None,
-    capabilities: Optional[dict[str, Optional[str]]] = None,
-    progress: Optional[Callable[[str], None]] = None,
+    refs: Sequence[bytes] | None = None,
+    prerequisites: Sequence[bytes] | None = None,
+    version: int | None = None,
+    capabilities: dict[str, str | None] | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> Bundle:
     """Create a bundle from a repository.
 

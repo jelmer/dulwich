@@ -23,7 +23,7 @@
 
 import os
 import sys
-from typing import TYPE_CHECKING, Optional, TypedDict, Union
+from typing import TYPE_CHECKING, TypedDict
 
 from .diff_tree import tree_changes
 from .file import GitFile
@@ -163,11 +163,11 @@ class Stash:
         else:
 
             def symlink_fn(  # type: ignore[misc,unused-ignore]
-                src: Union[str, bytes],
-                dst: Union[str, bytes],
+                src: str | bytes,
+                dst: str | bytes,
                 target_is_directory: bool = False,
                 *,
-                dir_fd: Optional[int] = None,
+                dir_fd: int | None = None,
             ) -> None:
                 mode = "w" + ("b" if isinstance(src, bytes) else "")
                 with open(dst, mode) as f:
@@ -280,9 +280,9 @@ class Stash:
 
     def push(
         self,
-        committer: Optional[bytes] = None,
-        author: Optional[bytes] = None,
-        message: Optional[bytes] = None,
+        committer: bytes | None = None,
+        author: bytes | None = None,
+        message: bytes | None = None,
     ) -> ObjectID:
         """Create a new stash.
 

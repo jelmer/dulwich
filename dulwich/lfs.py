@@ -39,7 +39,7 @@ import os
 import tempfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, BinaryIO, Optional, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Optional
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
@@ -57,8 +57,8 @@ class LFSAction:
     """LFS action structure."""
 
     href: str
-    header: Optional[dict[str, str]] = None
-    expires_at: Optional[str] = None
+    header: dict[str, str] | None = None
+    expires_at: str | None = None
 
 
 @dataclass
@@ -75,9 +75,9 @@ class LFSBatchObject:
 
     oid: str
     size: int
-    authenticated: Optional[bool] = None
-    actions: Optional[dict[str, LFSAction]] = None
-    error: Optional[LFSErrorInfo] = None
+    authenticated: bool | None = None
+    actions: dict[str, LFSAction] | None = None
+    error: LFSErrorInfo | None = None
 
 
 @dataclass
@@ -86,7 +86,7 @@ class LFSBatchResponse:
 
     transfer: str
     objects: list[LFSBatchObject]
-    hash_algo: Optional[str] = None
+    hash_algo: str | None = None
 
 
 class LFSStore:
@@ -362,7 +362,7 @@ class LFSClient:
         """
         self._base_url = url.rstrip("/") + "/"  # Ensure trailing slash for urljoin
         self.config = config
-        self._pool_manager: Optional[urllib3.PoolManager] = None
+        self._pool_manager: urllib3.PoolManager | None = None
 
     @classmethod
     def from_config(cls, config: "Config") -> Optional["LFSClient"]:
@@ -422,8 +422,8 @@ class LFSClient:
         self,
         method: str,
         path: str,
-        data: Optional[bytes] = None,
-        headers: Optional[dict[str, str]] = None,
+        data: bytes | None = None,
+        headers: dict[str, str] | None = None,
     ) -> bytes:
         """Make an HTTP request to the LFS server."""
         url = urljoin(self._base_url, path)
@@ -447,8 +447,8 @@ class LFSClient:
     def batch(
         self,
         operation: str,
-        objects: list[dict[str, Union[str, int]]],
-        ref: Optional[str] = None,
+        objects: list[dict[str, str | int]],
+        ref: str | None = None,
     ) -> LFSBatchResponse:
         """Perform batch operation to get transfer URLs.
 
@@ -461,7 +461,7 @@ class LFSClient:
             Batch response from server
         """
         data: dict[
-            str, Union[str, list[str], list[dict[str, Union[str, int]]], dict[str, str]]
+            str, str | list[str] | list[dict[str, str | int]] | dict[str, str]
         ] = {
             "operation": operation,
             "transfers": ["basic"],
@@ -513,7 +513,7 @@ class LFSClient:
             hash_algo=data.get("hash_algo"),
         )
 
-    def download(self, oid: str, size: int, ref: Optional[str] = None) -> bytes:
+    def download(self, oid: str, size: int, ref: str | None = None) -> bytes:
         """Download an LFS object.
 
         Args:
@@ -561,7 +561,7 @@ class LFSClient:
         return content
 
     def upload(
-        self, oid: str, size: int, content: bytes, ref: Optional[str] = None
+        self, oid: str, size: int, content: bytes, ref: str | None = None
     ) -> None:
         """Upload an LFS object.
 

@@ -26,16 +26,16 @@ import sys
 import warnings
 from collections.abc import Iterable, Iterator
 from types import TracebackType
-from typing import IO, Any, ClassVar, Literal, Optional, Union, overload
+from typing import IO, Any, ClassVar, Literal, overload
 
 if sys.version_info >= (3, 12):
     from collections.abc import Buffer
 else:
-    Buffer = Union[bytes, bytearray, memoryview]
+    Buffer = bytes | bytearray | memoryview
 
 
 def ensure_dir_exists(
-    dirname: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+    dirname: str | bytes | os.PathLike[str] | os.PathLike[bytes],
 ) -> None:
     """Ensure a directory exists, creating if necessary."""
     try:
@@ -44,7 +44,7 @@ def ensure_dir_exists(
         pass
 
 
-def _fancy_rename(oldname: Union[str, bytes], newname: Union[str, bytes]) -> None:
+def _fancy_rename(oldname: str | bytes, newname: str | bytes) -> None:
     """Rename file with temporary backup file to rollback if rename fails."""
     if not os.path.exists(newname):
         os.rename(oldname, newname)
@@ -68,7 +68,7 @@ def _fancy_rename(oldname: Union[str, bytes], newname: Union[str, bytes]) -> Non
 
 @overload
 def GitFile(
-    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+    filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
     mode: Literal["wb"],
     bufsize: int = -1,
     mask: int = 0o644,
@@ -77,7 +77,7 @@ def GitFile(
 
 @overload
 def GitFile(
-    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+    filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
     mode: Literal["rb"] = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
@@ -86,19 +86,19 @@ def GitFile(
 
 @overload
 def GitFile(
-    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+    filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
     mode: str = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
-) -> Union[IO[bytes], "_GitFile"]: ...
+) -> "IO[bytes] | _GitFile": ...
 
 
 def GitFile(
-    filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+    filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
     mode: str = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
-) -> Union[IO[bytes], "_GitFile"]:
+) -> "IO[bytes] | _GitFile":
     """Create a file object that obeys the git file locking protocol.
 
     Returns: a builtin file object or a _GitFile object
@@ -131,8 +131,8 @@ class FileLocked(Exception):
 
     def __init__(
         self,
-        filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
-        lockfilename: Union[str, bytes],
+        filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        lockfilename: str | bytes,
     ) -> None:
         """Initialize FileLocked.
 
@@ -157,8 +157,8 @@ class _GitFile(IO[bytes]):
     """
 
     _file: IO[bytes]
-    _filename: Union[str, bytes]
-    _lockfilename: Union[str, bytes]
+    _filename: str | bytes
+    _lockfilename: str | bytes
     _closed: bool
 
     PROXY_PROPERTIES: ClassVar[set[str]] = {
@@ -190,15 +190,15 @@ class _GitFile(IO[bytes]):
 
     def __init__(
         self,
-        filename: Union[str, bytes, os.PathLike[str], os.PathLike[bytes]],
+        filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         mode: str,
         bufsize: int,
         mask: int,
     ) -> None:
         # Convert PathLike to str/bytes for our internal use
-        self._filename: Union[str, bytes] = os.fspath(filename)
+        self._filename: str | bytes = os.fspath(filename)
         if isinstance(self._filename, bytes):
-            self._lockfilename: Union[str, bytes] = self._filename + b".lock"
+            self._lockfilename: str | bytes = self._filename + b".lock"
         else:
             self._lockfilename = self._filename + ".lock"
         try:
@@ -272,16 +272,16 @@ class _GitFile(IO[bytes]):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         if exc_type is not None:
             self.abort()
         else:
             self.close()
 
-    def __fspath__(self) -> Union[str, bytes]:
+    def __fspath__(self) -> str | bytes:
         """Return the file path for os.fspath() compatibility."""
         return self._filename
 
@@ -301,7 +301,7 @@ class _GitFile(IO[bytes]):
         return self._file.read(size)
 
     # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
-    # Python 3.9/3.10 have issues with IO[bytes] overload signatures
+    # Python 3.10 has issues with IO[bytes] overload signatures
     def write(self, data: Buffer, /) -> int:  # type: ignore[override,unused-ignore]
         return self._file.write(data)
 
@@ -312,7 +312,7 @@ class _GitFile(IO[bytes]):
         return self._file.readlines(hint)
 
     # TODO: Remove type: ignore when Python 3.10 support is dropped (Oct 2026)
-    # Python 3.9/3.10 have issues with IO[bytes] overload signatures
+    # Python 3.10 has issues with IO[bytes] overload signatures
     def writelines(self, lines: Iterable[Buffer], /) -> None:  # type: ignore[override,unused-ignore]
         return self._file.writelines(lines)
 
@@ -325,7 +325,7 @@ class _GitFile(IO[bytes]):
     def flush(self) -> None:
         return self._file.flush()
 
-    def truncate(self, size: Optional[int] = None) -> int:
+    def truncate(self, size: int | None = None) -> int:
         return self._file.truncate(size)
 
     def fileno(self) -> int:

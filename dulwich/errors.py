@@ -28,7 +28,6 @@
 
 import binascii
 from collections.abc import Sequence
-from typing import Optional, Union
 
 
 class ChecksumMismatch(Exception):
@@ -36,9 +35,9 @@ class ChecksumMismatch(Exception):
 
     def __init__(
         self,
-        expected: Union[bytes, str],
-        got: Union[bytes, str],
-        extra: Optional[str] = None,
+        expected: bytes | str,
+        got: bytes | str,
+        extra: str | None = None,
     ) -> None:
         """Initialize a ChecksumMismatch exception.
 
@@ -198,7 +197,7 @@ class SendPackError(GitProtocolError):
 class HangupException(GitProtocolError):
     """Hangup exception."""
 
-    def __init__(self, stderr_lines: Optional[Sequence[bytes]] = None) -> None:
+    def __init__(self, stderr_lines: Sequence[bytes] | None = None) -> None:
         """Initialize a HangupException.
 
         Args:
@@ -232,7 +231,7 @@ class HangupException(GitProtocolError):
 class UnexpectedCommandError(GitProtocolError):
     """Unexpected command received in a proto line."""
 
-    def __init__(self, command: Optional[str]) -> None:
+    def __init__(self, command: str | None) -> None:
         """Initialize an UnexpectedCommandError.
 
         Args:

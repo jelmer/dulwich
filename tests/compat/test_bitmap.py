@@ -94,20 +94,20 @@ class BitmapCompatTests(TestCase):
         )
 
         # Try to load the bitmap using Dulwich
-        pack = Pack(pack_path)
-        bitmap = pack.bitmap
+        with Pack(pack_path) as pack:
+            bitmap = pack.bitmap
 
-        # Basic checks
-        self.assertIsNotNone(bitmap, f"Failed to load bitmap from {pack_path}")
-        self.assertIsNotNone(bitmap.pack_checksum, "Bitmap missing pack checksum")
+            # Basic checks
+            self.assertIsNotNone(bitmap, f"Failed to load bitmap from {pack_path}")
+            self.assertIsNotNone(bitmap.pack_checksum, "Bitmap missing pack checksum")
 
-        # Check that we have some type bitmaps
-        # At minimum, we should have some commits
-        self.assertGreater(
-            len(bitmap.commit_bitmap.bits),
-            0,
-            "Commit bitmap should not be empty",
-        )
+            # Check that we have some type bitmaps
+            # At minimum, we should have some commits
+            self.assertGreater(
+                len(bitmap.commit_bitmap.bits),
+                0,
+                "Commit bitmap should not be empty",
+            )
 
     def test_git_can_use_dulwich_repo_with_bitmap(self):
         """Test that git can work with a repo that has Dulwich-created objects."""
@@ -200,35 +200,35 @@ class BitmapCompatTests(TestCase):
         pack_basename = pack_files[0].replace(".pack", "")
         pack_path = os.path.join(pack_dir, pack_basename)
 
-        # Load the pack
-        pack = Pack(pack_path)
-        self.addCleanup(pack.close)
+        # Load the pack and create bitmap data, then close before writing
+        with Pack(pack_path) as pack:
+            # Create a simple bitmap for testing
+            # Git requires BITMAP_OPT_FULL_DAG flag
+            bitmap = PackBitmap(
+                flags=BITMAP_OPT_FULL_DAG
+                | BITMAP_OPT_HASH_CACHE
+                | BITMAP_OPT_LOOKUP_TABLE
+            )
+            bitmap.pack_checksum = pack.get_stored_checksum()
 
-        # Create a simple bitmap for testing
-        # Git requires BITMAP_OPT_FULL_DAG flag
-        bitmap = PackBitmap(
-            flags=BITMAP_OPT_FULL_DAG | BITMAP_OPT_HASH_CACHE | BITMAP_OPT_LOOKUP_TABLE
-        )
-        bitmap.pack_checksum = pack.get_stored_checksum()
+            # Add bitmap entries for the first few commits in the pack
+            for i, (sha, offset, crc) in enumerate(pack.index.iterentries()):
+                if i >= 3:  # Just add 3 entries
+                    break
 
-        # Add bitmap entries for the first few commits in the pack
-        for i, (sha, offset, crc) in enumerate(pack.index.iterentries()):
-            if i >= 3:  # Just add 3 entries
-                break
+                ewah = EWAHBitmap()
+                # Mark this object and a couple others as reachable
+                for j in range(i + 1):
+                    ewah.add(j)
 
-            ewah = EWAHBitmap()
-            # Mark this object and a couple others as reachable
-            for j in range(i + 1):
-                ewah.add(j)
+                entry = BitmapEntry(object_pos=i, xor_offset=0, flags=0, bitmap=ewah)
+                bitmap.entries[sha] = entry
+                bitmap.entries_list.append((sha, entry))
 
-            entry = BitmapEntry(object_pos=i, xor_offset=0, flags=0, bitmap=ewah)
-            bitmap.entries[sha] = entry
-            bitmap.entries_list.append((sha, entry))
+            # Add name hash cache
+            bitmap.name_hash_cache = [0x12345678, 0xABCDEF00, 0xFEDCBA98]
 
-        # Add name hash cache
-        bitmap.name_hash_cache = [0x12345678, 0xABCDEF00, 0xFEDCBA98]
-
-        # Write the bitmap
+        # Write the bitmap after pack is closed to avoid file locking on Windows
         bitmap_path = pack_path + ".bitmap"
         write_bitmap(bitmap_path, bitmap)
 
@@ -268,8 +268,8 @@ class BitmapCompatTests(TestCase):
         bitmap_name = bitmap_files[0]
         pack_basename = bitmap_name.replace(".bitmap", "")
         pack_path = os.path.join(pack_dir, pack_basename)
-        pack = Pack(pack_path)
-        bitmap = pack.bitmap
+        with Pack(pack_path) as pack:
+            bitmap = pack.bitmap
 
-        self.assertIsNotNone(bitmap)
-        self.assertEqual(bitmap.version, version)
+            self.assertIsNotNone(bitmap)
+            self.assertEqual(bitmap.version, version)

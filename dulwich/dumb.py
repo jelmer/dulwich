@@ -24,9 +24,9 @@
 import os
 import tempfile
 import zlib
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from io import BytesIO
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 from .errors import NotGitRepository, ObjectFormatException
@@ -65,9 +65,9 @@ class DumbHTTPObjectStore(BaseObjectStore):
         """
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
-        self._packs: Optional[list[tuple[str, Optional[PackIndex]]]] = None
+        self._packs: list[tuple[str, PackIndex | None]] | None = None
         self._cached_objects: dict[bytes, tuple[int, bytes]] = {}
-        self._temp_pack_dir: Optional[str] = None
+        self._temp_pack_dir: str | None = None
 
     def _ensure_temp_pack_dir(self) -> None:
         """Ensure we have a temporary directory for storing pack files."""
@@ -338,8 +338,8 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
     def add_objects(
         self,
-        objects: Sequence[tuple[ShaFile, Optional[str]]],
-        progress: Optional[Callable[[str], None]] = None,
+        objects: Sequence[tuple[ShaFile, str | None]],
+        progress: Callable[[str], None] | None = None,
     ) -> Optional["Pack"]:
         """Add a set of objects to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
@@ -370,8 +370,8 @@ class DumbRemoteHTTPRepo:
         """
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
-        self._refs: Optional[dict[Ref, ObjectID]] = None
-        self._peeled: Optional[dict[Ref, ObjectID]] = None
+        self._refs: dict[Ref, ObjectID] | None = None
+        self._peeled: dict[Ref, ObjectID] | None = None
         self.object_store = DumbHTTPObjectStore(base_url, http_request_func)
 
     def _fetch_url(self, path: str) -> bytes:
@@ -434,14 +434,12 @@ class DumbRemoteHTTPRepo:
 
     def fetch_pack_data(
         self,
-        determine_wants: Callable[
-            [Mapping[Ref, ObjectID], Optional[int]], list[ObjectID]
-        ],
+        determine_wants: Callable[[Mapping[Ref, ObjectID], int | None], list[ObjectID]],
         graph_walker: object,
-        progress: Optional[Callable[[bytes], None]] = None,
+        progress: Callable[[bytes], None] | None = None,
         *,
-        get_tagged: Optional[bool] = None,
-        depth: Optional[int] = None,
+        get_tagged: bool | None = None,
+        depth: int | None = None,
     ) -> Iterator[UnpackedObject]:
         """Fetch pack data from the remote.
 

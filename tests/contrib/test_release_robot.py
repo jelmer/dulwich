@@ -29,7 +29,7 @@ import sys
 import tempfile
 import time
 import unittest
-from typing import ClassVar, Optional
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 from dulwich.contrib import release_robot
@@ -89,7 +89,7 @@ class GetRecentTagsTest(unittest.TestCase):
     committer = b"Mark Mikofski <mark.mikofski@sunpowercorp.com>"
     test_tags: ClassVar[list[bytes]] = [b"v0.1a", b"v0.1"]
     tag_test_data: ClassVar[
-        dict[bytes, tuple[int, bytes, Optional[tuple[int, bytes]]]]
+        dict[bytes, tuple[int, bytes, tuple[int, bytes] | None]]
     ] = {
         test_tags[0]: (1484788003, b"3" * 40, None),
         test_tags[1]: (1484788314, b"1" * 40, (1484788401, b"2" * 40)),

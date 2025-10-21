@@ -20,9 +20,9 @@
 
 """Implementation of merge-base following the approach of git."""
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from heapq import heappop, heappush
-from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 if TYPE_CHECKING:
     from .repo import BaseRepo
@@ -52,7 +52,7 @@ class WorkList(Generic[T]):
         dt, cmt = item
         heappush(self.pq, (-dt, cmt))
 
-    def get(self) -> Optional[tuple[int, T]]:
+    def get(self) -> tuple[int, T] | None:
         """Get the highest priority item from the work list.
 
         Returns:
@@ -80,7 +80,7 @@ def _find_lcas(
     c2s: Sequence[ObjectID],
     lookup_stamp: Callable[[ObjectID], int],
     min_stamp: int = 0,
-    shallows: Optional[set[ObjectID]] = None,
+    shallows: set[ObjectID] | None = None,
 ) -> list[ObjectID]:
     """Find lowest common ancestors between commits.
 

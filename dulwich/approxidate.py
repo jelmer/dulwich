@@ -31,10 +31,9 @@ formats for specifying dates and times, including:
 
 import time
 from datetime import datetime
-from typing import Union
 
 
-def parse_approxidate(time_spec: Union[str, bytes]) -> int:
+def parse_approxidate(time_spec: str | bytes) -> int:
     """Parse a Git approxidate specification and return a Unix timestamp.
 
     Args:

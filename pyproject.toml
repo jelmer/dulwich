@@ -11,7 +11,6 @@ license = "Apache-2.0 OR GPL-2.0-or-later"
 keywords = ["vcs", "git"]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -23,7 +22,7 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Topic :: Software Development :: Version Control",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "urllib3>=2.2.2",
     'typing_extensions >=4.6.0 ; python_version < "3.12"',
@@ -140,7 +139,6 @@ ignore = [
     "ANN205",
     "ANN206",
     "E501",  # line too long
-    "UP007",  # Use X | Y for type annotations (Python 3.10+ syntax, but we support 3.9+)
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -168,7 +166,6 @@ before-build = "pip install -U setuptools-rust && yum -y install libatomic && cu
 archs = ["auto", "universal2", "x86_64", "arm64"]
 before-all = "rustup target add x86_64-apple-darwin aarch64-apple-darwin"
 skip = """\
-    cp39-macosx_x86_64 cp39-macosx_universal2 \
     cp310-macosx_x86_64 cp310-macosx_universal2 \
     cp311-macosx_x86_64 cp311-macosx_universal2 \
     cp312-macosx_x86_64 cp312-macosx_universal2 \

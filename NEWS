@@ -12,8 +12,9 @@
    vendor. Regression from 0.24.2.  (Jelmer Vernooĳ, #1945)
 
  * Fix LFS URL validation to prevent DNS resolution errors when ``lfs.url`` is
-   configured with an invalid value. Add support for ``file://`` URLs to match
-   git-lfs behavior. (Jelmer Vernooĳ, #1951)
+   configured with an invalid value. Implement full support for ``file://`` URLs
+   to access local LFS repositories, matching git-lfs behavior.
+   (Jelmer Vernooĳ, #1951)
 
 0.24.6	2025-10-19
 

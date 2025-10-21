@@ -1,3 +1,10 @@
+0.24.7	UNRELEASED
+
+ * Add sparse index support for improved performance with large repositories.
+   Implements reading and writing of sparse directory entries, index expansion/
+   collapse operations, and the 'sdir' extension.
+   (Jelmer Vernooĳ, #1797)
+
 0.24.6	2025-10-19
 
  * Fix import failure when ``sys.stdin`` is ``None``. The ``dulwich.server``

@@ -24,7 +24,7 @@
 
 import stat
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any, BinaryIO, Optional
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from fastimport import commands, parser, processor
 from fastimport import errors as fastimport_errors
@@ -117,7 +117,7 @@ class GitFastExporter:
         return marker
 
     def _iter_files(
-        self, base_tree: Optional[bytes], new_tree: Optional[bytes]
+        self, base_tree: bytes | None, new_tree: bytes | None
     ) -> Generator[Any, None, None]:
         for (
             (old_path, new_path),
@@ -146,7 +146,7 @@ class GitFastExporter:
                 )
 
     def _export_commit(
-        self, commit: Commit, ref: Ref, base_tree: Optional[ObjectID] = None
+        self, commit: Commit, ref: Ref, base_tree: ObjectID | None = None
     ) -> tuple[Any, bytes]:
         file_cmds = list(self._iter_files(base_tree, commit.tree))
         marker = self._allocate_marker()
@@ -176,7 +176,7 @@ class GitFastExporter:
         return (cmd, marker)
 
     def emit_commit(
-        self, commit: Commit, ref: Ref, base_tree: Optional[ObjectID] = None
+        self, commit: Commit, ref: Ref, base_tree: ObjectID | None = None
     ) -> bytes:
         """Emit a commit in fast-export format.
 
@@ -201,9 +201,9 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
     def __init__(
         self,
         repo: "BaseRepo",
-        params: Optional[Any] = None,  # noqa: ANN401
+        params: Any | None = None,  # noqa: ANN401
         verbose: bool = False,
-        outf: Optional[BinaryIO] = None,
+        outf: BinaryIO | None = None,
     ) -> None:
         """Initialize GitImportProcessor.
 

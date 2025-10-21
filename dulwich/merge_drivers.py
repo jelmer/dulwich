@@ -23,7 +23,8 @@
 import os
 import subprocess
 import tempfile
-from typing import Callable, Optional, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from .config import Config
 
@@ -36,7 +37,7 @@ class MergeDriver(Protocol):
         ancestor: bytes,
         ours: bytes,
         theirs: bytes,
-        path: Optional[str] = None,
+        path: str | None = None,
         marker_size: int = 7,
     ) -> tuple[bytes, bool]:
         """Perform a three-way merge.
@@ -73,7 +74,7 @@ class ProcessMergeDriver:
         ancestor: bytes,
         ours: bytes,
         theirs: bytes,
-        path: Optional[str] = None,
+        path: str | None = None,
         marker_size: int = 7,
     ) -> tuple[bytes, bool]:
         """Perform merge using external process.
@@ -136,7 +137,7 @@ class ProcessMergeDriver:
 class MergeDriverRegistry:
     """Registry for merge drivers."""
 
-    def __init__(self, config: Optional[Config] = None):
+    def __init__(self, config: Config | None = None):
         """Initialize merge driver registry.
 
         Args:
@@ -172,7 +173,7 @@ class MergeDriverRegistry:
         """
         self._factories[name] = factory
 
-    def get_driver(self, name: str) -> Optional[MergeDriver]:
+    def get_driver(self, name: str) -> MergeDriver | None:
         """Get a merge driver by name.
 
         Args:
@@ -200,7 +201,7 @@ class MergeDriverRegistry:
 
         return None
 
-    def _create_from_config(self, name: str) -> Optional[MergeDriver]:
+    def _create_from_config(self, name: str) -> MergeDriver | None:
         """Create a merge driver from git configuration.
 
         Args:
@@ -224,10 +225,10 @@ class MergeDriverRegistry:
 
 
 # Global registry instance
-_merge_driver_registry: Optional[MergeDriverRegistry] = None
+_merge_driver_registry: MergeDriverRegistry | None = None
 
 
-def get_merge_driver_registry(config: Optional[Config] = None) -> MergeDriverRegistry:
+def get_merge_driver_registry(config: Config | None = None) -> MergeDriverRegistry:
     """Get the global merge driver registry.
 
     Args:

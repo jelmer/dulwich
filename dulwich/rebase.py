@@ -24,10 +24,10 @@
 import os
 import shutil
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Optional, Protocol, TypedDict
+from typing import Optional, Protocol, TypedDict
 
 from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
@@ -119,9 +119,9 @@ class RebaseTodoEntry:
     """Represents a single entry in a rebase todo list."""
 
     command: RebaseTodoCommand
-    commit_sha: Optional[bytes] = None  # Store as hex string encoded as bytes
-    short_message: Optional[str] = None
-    arguments: Optional[str] = None
+    commit_sha: bytes | None = None  # Store as hex string encoded as bytes
+    short_message: str | None = None
+    arguments: str | None = None
 
     def to_string(self, abbreviate: bool = False) -> str:
         """Convert to git-rebase-todo format string.
@@ -226,7 +226,7 @@ class RebaseTodoEntry:
 class RebaseTodo:
     """Manages the git-rebase-todo file for interactive rebase."""
 
-    def __init__(self, entries: Optional[list[RebaseTodoEntry]] = None):
+    def __init__(self, entries: list[RebaseTodoEntry] | None = None):
         """Initialize RebaseTodo.
 
         Args:
@@ -239,7 +239,7 @@ class RebaseTodo:
         """Add an entry to the todo list."""
         self.entries.append(entry)
 
-    def get_current(self) -> Optional[RebaseTodoEntry]:
+    def get_current(self) -> RebaseTodoEntry | None:
         """Get the current todo entry."""
         if self.current_index < len(self.entries):
             return self.entries[self.current_index]
@@ -373,9 +373,9 @@ class RebaseStateManager(Protocol):
 
     def save(
         self,
-        original_head: Optional[bytes],
-        rebasing_branch: Optional[bytes],
-        onto: Optional[bytes],
+        original_head: bytes | None,
+        rebasing_branch: bytes | None,
+        onto: bytes | None,
         todo: list[Commit],
         done: list[Commit],
     ) -> None:
@@ -385,9 +385,9 @@ class RebaseStateManager(Protocol):
     def load(
         self,
     ) -> tuple[
-        Optional[bytes],  # original_head
-        Optional[bytes],  # rebasing_branch
-        Optional[bytes],  # onto
+        bytes | None,  # original_head
+        bytes | None,  # rebasing_branch
+        bytes | None,  # onto
         list[Commit],  # todo
         list[Commit],  # done
     ]:
@@ -406,7 +406,7 @@ class RebaseStateManager(Protocol):
         """Save interactive rebase todo list."""
         ...
 
-    def load_todo(self) -> Optional[RebaseTodo]:
+    def load_todo(self) -> RebaseTodo | None:
         """Load interactive rebase todo list."""
         ...
 
@@ -424,9 +424,9 @@ class DiskRebaseStateManager:
 
     def save(
         self,
-        original_head: Optional[bytes],
-        rebasing_branch: Optional[bytes],
-        onto: Optional[bytes],
+        original_head: bytes | None,
+        rebasing_branch: bytes | None,
+        onto: bytes | None,
         todo: list[Commit],
         done: list[Commit],
     ) -> None:
@@ -466,9 +466,9 @@ class DiskRebaseStateManager:
     def load(
         self,
     ) -> tuple[
-        Optional[bytes],
-        Optional[bytes],
-        Optional[bytes],
+        bytes | None,
+        bytes | None,
+        bytes | None,
         list[Commit],
         list[Commit],
     ]:
@@ -486,7 +486,7 @@ class DiskRebaseStateManager:
 
         return original_head, rebasing_branch, onto, todo, done
 
-    def _read_file(self, name: str) -> Optional[bytes]:
+    def _read_file(self, name: str) -> bytes | None:
         """Read content from a file in the rebase directory."""
         try:
             with open(os.path.join(self.path, name), "rb") as f:
@@ -515,7 +515,7 @@ class DiskRebaseStateManager:
         todo_content = todo.to_string()
         self._write_file("git-rebase-todo", todo_content.encode("utf-8"))
 
-    def load_todo(self) -> Optional[RebaseTodo]:
+    def load_todo(self) -> RebaseTodo | None:
         """Load the interactive rebase todo list.
 
         Returns:
@@ -531,9 +531,9 @@ class DiskRebaseStateManager:
 class RebaseState(TypedDict):
     """Type definition for rebase state."""
 
-    original_head: Optional[bytes]
-    rebasing_branch: Optional[bytes]
-    onto: Optional[bytes]
+    original_head: bytes | None
+    rebasing_branch: bytes | None
+    onto: bytes | None
     todo: list[Commit]
     done: list[Commit]
 
@@ -548,14 +548,14 @@ class MemoryRebaseStateManager:
           repo: Repository instance
         """
         self.repo = repo
-        self._state: Optional[RebaseState] = None
-        self._todo: Optional[RebaseTodo] = None
+        self._state: RebaseState | None = None
+        self._todo: RebaseTodo | None = None
 
     def save(
         self,
-        original_head: Optional[bytes],
-        rebasing_branch: Optional[bytes],
-        onto: Optional[bytes],
+        original_head: bytes | None,
+        rebasing_branch: bytes | None,
+        onto: bytes | None,
         todo: list[Commit],
         done: list[Commit],
     ) -> None:
@@ -571,9 +571,9 @@ class MemoryRebaseStateManager:
     def load(
         self,
     ) -> tuple[
-        Optional[bytes],
-        Optional[bytes],
-        Optional[bytes],
+        bytes | None,
+        bytes | None,
+        bytes | None,
         list[Commit],
         list[Commit],
     ]:
@@ -606,7 +606,7 @@ class MemoryRebaseStateManager:
         """
         self._todo = todo
 
-    def load_todo(self) -> Optional[RebaseTodo]:
+    def load_todo(self) -> RebaseTodo | None:
         """Load the interactive rebase todo list.
 
         Returns:
@@ -629,17 +629,17 @@ class Rebaser:
         self._state_manager = repo.get_rebase_state_manager()
 
         # Initialize state
-        self._original_head: Optional[bytes] = None
-        self._onto: Optional[bytes] = None
+        self._original_head: bytes | None = None
+        self._onto: bytes | None = None
         self._todo: list[Commit] = []
         self._done: list[Commit] = []
-        self._rebasing_branch: Optional[bytes] = None
+        self._rebasing_branch: bytes | None = None
 
         # Load any existing rebase state
         self._load_rebase_state()
 
     def _get_commits_to_rebase(
-        self, upstream: bytes, branch: Optional[bytes] = None
+        self, upstream: bytes, branch: bytes | None = None
     ) -> list[Commit]:
         """Get list of commits to rebase.
 
@@ -689,7 +689,7 @@ class Rebaser:
 
     def _cherry_pick(
         self, commit: Commit, onto: bytes
-    ) -> tuple[Optional[bytes], list[bytes]]:
+    ) -> tuple[bytes | None, list[bytes]]:
         """Cherry-pick a commit onto another commit.
 
         Args:
@@ -740,8 +740,8 @@ class Rebaser:
     def start(
         self,
         upstream: bytes,
-        onto: Optional[bytes] = None,
-        branch: Optional[bytes] = None,
+        onto: bytes | None = None,
+        branch: bytes | None = None,
     ) -> list[Commit]:
         """Start a rebase.
 
@@ -790,7 +790,7 @@ class Rebaser:
 
         return commits
 
-    def continue_(self) -> Optional[tuple[bytes, list[bytes]]]:
+    def continue_(self) -> tuple[bytes, list[bytes]] | None:
         """Continue an in-progress rebase.
 
         Returns:
@@ -914,8 +914,8 @@ class Rebaser:
 def rebase(
     repo: Repo,
     upstream: bytes,
-    onto: Optional[bytes] = None,
-    branch: Optional[bytes] = None,
+    onto: bytes | None = None,
+    branch: bytes | None = None,
 ) -> list[bytes]:
     """Perform a git rebase operation.
 
@@ -950,9 +950,9 @@ def rebase(
 def start_interactive(
     repo: Repo,
     upstream: bytes,
-    onto: Optional[bytes] = None,
-    branch: Optional[bytes] = None,
-    editor_callback: Optional[Callable[[bytes], bytes]] = None,
+    onto: bytes | None = None,
+    branch: bytes | None = None,
+    editor_callback: Callable[[bytes], bytes] | None = None,
 ) -> RebaseTodo:
     """Start an interactive rebase.
 
@@ -1052,9 +1052,9 @@ def edit_todo(repo: Repo, editor_callback: Callable[[bytes], bytes]) -> RebaseTo
 
 def process_interactive_rebase(
     repo: Repo,
-    todo: Optional[RebaseTodo] = None,
-    editor_callback: Optional[Callable[[bytes], bytes]] = None,
-) -> tuple[bool, Optional[str]]:
+    todo: RebaseTodo | None = None,
+    editor_callback: Callable[[bytes], bytes] | None = None,
+) -> tuple[bool, str | None]:
     """Process an interactive rebase.
 
     This function executes the commands in the todo list sequentially.
@@ -1201,8 +1201,8 @@ def _squash_commits(
     rebaser: Rebaser,
     entry: RebaseTodoEntry,
     keep_message: bool,
-    editor_callback: Optional[Callable[[bytes], bytes]] = None,
-) -> Optional[str]:
+    editor_callback: Callable[[bytes], bytes] | None = None,
+) -> str | None:
     """Helper to squash/fixup commits.
 
     Args:

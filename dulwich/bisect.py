@@ -22,7 +22,6 @@
 
 import os
 from collections.abc import Sequence, Set
-from typing import Optional
 
 from dulwich.object_store import peel_sha
 from dulwich.objects import Commit
@@ -48,9 +47,9 @@ class BisectState:
 
     def start(
         self,
-        bad: Optional[bytes] = None,
-        good: Optional[Sequence[bytes]] = None,
-        paths: Optional[Sequence[bytes]] = None,
+        bad: bytes | None = None,
+        good: Sequence[bytes] | None = None,
+        paths: Sequence[bytes] | None = None,
         no_checkout: bool = False,
         term_bad: str = "bad",
         term_good: str = "good",
@@ -125,7 +124,7 @@ class BisectState:
             for g in good:
                 self.mark_good(g)
 
-    def mark_bad(self, rev: Optional[bytes] = None) -> Optional[bytes]:
+    def mark_bad(self, rev: bytes | None = None) -> bytes | None:
         """Mark a commit as bad.
 
         Args:
@@ -155,7 +154,7 @@ class BisectState:
 
         return self._find_next_commit()
 
-    def mark_good(self, rev: Optional[bytes] = None) -> Optional[bytes]:
+    def mark_good(self, rev: bytes | None = None) -> bytes | None:
         """Mark a commit as good.
 
         Args:
@@ -187,7 +186,7 @@ class BisectState:
 
         return self._find_next_commit()
 
-    def skip(self, revs: Optional[Sequence[bytes]] = None) -> Optional[bytes]:
+    def skip(self, revs: Sequence[bytes] | None = None) -> bytes | None:
         """Skip one or more commits.
 
         Args:
@@ -214,7 +213,7 @@ class BisectState:
 
         return self._find_next_commit()
 
-    def reset(self, commit: Optional[bytes] = None) -> None:
+    def reset(self, commit: bytes | None = None) -> None:
         """Reset bisect state and return to original branch/commit.
 
         Args:
@@ -299,7 +298,7 @@ class BisectState:
                 revs = [arg.encode("ascii") for arg in args] if args else None
                 self.skip(revs)
 
-    def _find_next_commit(self) -> Optional[bytes]:
+    def _find_next_commit(self) -> bytes | None:
         """Find the next commit to test using binary search.
 
         Returns:

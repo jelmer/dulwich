@@ -50,18 +50,16 @@ import socketserver
 import sys
 import time
 import zlib
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from functools import partial
-from typing import IO, TYPE_CHECKING, Callable, Optional, Union
+from typing import IO, TYPE_CHECKING, Optional
 from typing import Protocol as TypingProtocol
 
 if sys.version_info >= (3, 12):
     from collections.abc import Buffer
 else:
-    from typing import Union
-
-    Buffer = Union[bytes, bytearray, memoryview]
+    Buffer = bytes | bytearray | memoryview
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
@@ -163,7 +161,7 @@ class BackendRepo(TypingProtocol):
         """
         raise NotImplementedError
 
-    def get_peeled(self, name: bytes) -> Optional[bytes]:
+    def get_peeled(self, name: bytes) -> bytes | None:
         """Return the cached peeled value of a ref, if available.
 
         Args:
@@ -177,12 +175,12 @@ class BackendRepo(TypingProtocol):
 
     def find_missing_objects(
         self,
-        determine_wants: Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]],
+        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]],
         graph_walker: "_ProtocolGraphWalker",
-        progress: Optional[Callable[[bytes], None]],
+        progress: Callable[[bytes], None] | None,
         *,
-        get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
-        depth: Optional[int] = None,
+        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
+        depth: int | None = None,
     ) -> Optional["MissingObjectFinder"]:
         """Yield the objects required for a list of commits.
 
@@ -201,7 +199,7 @@ class DictBackend(Backend):
     """Trivial backend that looks up Git repositories in a dictionary."""
 
     def __init__(
-        self, repos: Union[dict[bytes, "BackendRepo"], dict[str, "BackendRepo"]]
+        self, repos: dict[bytes, "BackendRepo"] | dict[str, "BackendRepo"]
     ) -> None:
         """Initialize a DictBackend.
 
@@ -315,7 +313,7 @@ class PackHandler(Handler):
           stateless_rpc: Whether this is a stateless RPC session
         """
         super().__init__(backend, proto, stateless_rpc)
-        self._client_capabilities: Optional[set[bytes]] = None
+        self._client_capabilities: set[bytes] | None = None
         # Flags needed for the no-done capability
         self._done_received = False
         self.advertise_refs = False
@@ -473,8 +471,8 @@ class UploadPackHandler(PackHandler):
 
     def get_tagged(
         self,
-        refs: Optional[Mapping[bytes, bytes]] = None,
-        repo: Optional[BackendRepo] = None,
+        refs: Mapping[bytes, bytes] | None = None,
+        repo: BackendRepo | None = None,
     ) -> dict[ObjectID, ObjectID]:
         """Get a dict of peeled values of tags to their original tag shas.
 
@@ -527,7 +525,7 @@ class UploadPackHandler(PackHandler):
         wants = []
 
         def wants_wrapper(
-            refs: Mapping[bytes, bytes], depth: Optional[int] = None
+            refs: Mapping[bytes, bytes], depth: int | None = None
         ) -> list[bytes]:
             wants.extend(graph_walker.determine_wants(refs, depth))
             return wants
@@ -572,8 +570,8 @@ class UploadPackHandler(PackHandler):
 
 
 def _split_proto_line(
-    line: Optional[bytes], allowed: Optional[Iterable[Optional[bytes]]]
-) -> tuple[Optional[bytes], Optional[Union[bytes, int]]]:
+    line: bytes | None, allowed: Iterable[bytes | None] | None
+) -> tuple[bytes | None, bytes | int | None]:
     """Split a line read from the wire.
 
     Args:
@@ -593,7 +591,7 @@ def _split_proto_line(
         allowed return values.
     """
     if not line:
-        fields: list[Optional[bytes]] = [None]
+        fields: list[bytes | None] = [None]
     else:
         fields = list(line.rstrip(b"\n").split(b" ", 1))
     command = fields[0]
@@ -719,7 +717,7 @@ class _ProtocolGraphWalker:
         self,
         handler: PackHandler,
         object_store: ObjectContainer,
-        get_peeled: Callable[[bytes], Optional[bytes]],
+        get_peeled: Callable[[bytes], bytes | None],
         get_symrefs: Callable[[], dict[bytes, bytes]],
     ) -> None:
         """Initialize a ProtocolGraphWalker.
@@ -744,10 +742,10 @@ class _ProtocolGraphWalker:
         self._cached = False
         self._cache: list[bytes] = []
         self._cache_index = 0
-        self._impl: Optional[AckGraphWalkerImpl] = None
+        self._impl: AckGraphWalkerImpl | None = None
 
     def determine_wants(
-        self, heads: Mapping[bytes, bytes], depth: Optional[int] = None
+        self, heads: Mapping[bytes, bytes], depth: int | None = None
     ) -> list[bytes]:
         """Determine the wants for a set of heads.
 
@@ -834,7 +832,7 @@ class _ProtocolGraphWalker:
 
         return want_revs
 
-    def unread_proto_line(self, command: bytes, value: Union[bytes, int]) -> None:
+    def unread_proto_line(self, command: bytes, value: bytes | int) -> None:
         """Push a command back to be read again.
 
         Args:
@@ -867,7 +865,7 @@ class _ProtocolGraphWalker:
         self._cached = True
         self._cache_index = 0
 
-    def next(self) -> Optional[bytes]:
+    def next(self) -> bytes | None:
         """Get the next SHA from the graph walker.
 
         Returns: Next SHA or None if done
@@ -885,8 +883,8 @@ class _ProtocolGraphWalker:
     __next__ = next
 
     def read_proto_line(
-        self, allowed: Optional[Iterable[Optional[bytes]]]
-    ) -> tuple[Optional[bytes], Optional[Union[bytes, int]]]:
+        self, allowed: Iterable[bytes | None] | None
+    ) -> tuple[bytes | None, bytes | int | None]:
         """Read a line from the wire.
 
         Args:
@@ -1027,7 +1025,7 @@ class SingleAckGraphWalkerImpl(AckGraphWalkerImpl):
             self.walker.send_ack(have_ref)
             self._common.append(have_ref)
 
-    def next(self) -> Optional[bytes]:
+    def next(self) -> bytes | None:
         """Get next SHA from graph walker.
 
         Returns:
@@ -1101,7 +1099,7 @@ class MultiAckGraphWalkerImpl(AckGraphWalkerImpl):
                 self._found_base = True
         # else we blind ack within next
 
-    def next(self) -> Optional[bytes]:
+    def next(self) -> bytes | None:
         """Get next SHA from graph walker.
 
         Returns:
@@ -1181,7 +1179,7 @@ class MultiAckDetailedGraphWalkerImpl(AckGraphWalkerImpl):
         self._common.append(have_ref)
         self.walker.send_ack(have_ref, b"common")
 
-    def next(self) -> Optional[bytes]:
+    def next(self) -> bytes | None:
         """Get next SHA from graph walker.
 
         Returns:
@@ -1592,7 +1590,7 @@ class TCPGitServer(socketserver.TCPServer):
         backend: Backend,
         listen_addr: str,
         port: int = TCP_GIT_PORT,
-        handlers: Optional[dict[bytes, type[Handler]]] = None,
+        handlers: dict[bytes, type[Handler]] | None = None,
     ) -> None:
         """Initialize TCP git server.
 
@@ -1611,8 +1609,8 @@ class TCPGitServer(socketserver.TCPServer):
 
     def verify_request(
         self,
-        request: Union[socket.socket, tuple[bytes, socket.socket]],
-        client_address: Union[tuple[str, int], socket.socket],
+        request: socket.socket | tuple[bytes, socket.socket],
+        client_address: tuple[str, int] | socket.socket,
     ) -> bool:
         """Verify incoming request.
 
@@ -1628,8 +1626,8 @@ class TCPGitServer(socketserver.TCPServer):
 
     def handle_error(
         self,
-        request: Union[socket.socket, tuple[bytes, socket.socket]],
-        client_address: Union[tuple[str, int], socket.socket],
+        request: socket.socket | tuple[bytes, socket.socket],
+        client_address: tuple[str, int] | socket.socket,
     ) -> None:
         """Handle request processing errors.
 
@@ -1679,9 +1677,9 @@ def main(argv: list[str] = sys.argv) -> None:
 def serve_command(
     handler_cls: type[Handler],
     argv: list[str] = sys.argv,
-    backend: Optional[Backend] = None,
-    inf: Optional[IO[bytes]] = None,
-    outf: Optional[IO[bytes]] = None,
+    backend: Backend | None = None,
+    inf: IO[bytes] | None = None,
+    outf: IO[bytes] | None = None,
 ) -> int:
     """Serve a single command.
 

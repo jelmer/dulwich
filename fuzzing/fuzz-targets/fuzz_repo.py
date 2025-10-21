@@ -3,7 +3,6 @@
 import os
 import sys
 import tempfile
-from typing import Optional
 
 import atheris
 
@@ -17,7 +16,7 @@ with atheris.instrument_imports():
     )
 
 
-def TestOneInput(data) -> Optional[int]:
+def TestOneInput(data) -> int | None:
     fdp = EnhancedFuzzedDataProvider(data)
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = Repo.init(temp_dir)

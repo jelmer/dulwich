@@ -28,7 +28,15 @@ import stat
 import struct
 import sys
 import types
-from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence, Set
+from collections.abc import (
+    Callable,
+    Generator,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    Set,
+)
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -36,7 +44,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
     Optional,
     Union,
 )
@@ -64,10 +71,7 @@ from .objects import (
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
 
 # Type alias for recursive tree structure used in commit_tree
-if sys.version_info >= (3, 10):
-    TreeDict = dict[bytes, Union["TreeDict", tuple[int, bytes]]]
-else:
-    TreeDict = dict[bytes, Any]
+TreeDict = dict[bytes, Union["TreeDict", tuple[int, bytes]]]
 
 # 2-bit stage (during merge)
 FLAG_STAGEMASK = 0x3000
@@ -284,8 +288,8 @@ class SerializedIndexEntry:
     """
 
     name: bytes
-    ctime: Union[int, float, tuple[int, int]]
-    mtime: Union[int, float, tuple[int, int]]
+    ctime: int | float | tuple[int, int]
+    mtime: int | float | tuple[int, int]
     dev: int
     ino: int
     mode: int
@@ -495,8 +499,8 @@ class IndexEntry:
     parsed data and convenience methods.
     """
 
-    ctime: Union[int, float, tuple[int, int]]
-    mtime: Union[int, float, tuple[int, int]]
+    ctime: int | float | tuple[int, int]
+    mtime: int | float | tuple[int, int]
     dev: int
     ino: int
     mode: int
@@ -615,15 +619,15 @@ class IndexEntry:
 class ConflictedIndexEntry:
     """Index entry that represents a conflict."""
 
-    ancestor: Optional[IndexEntry]
-    this: Optional[IndexEntry]
-    other: Optional[IndexEntry]
+    ancestor: IndexEntry | None
+    this: IndexEntry | None
+    other: IndexEntry | None
 
     def __init__(
         self,
-        ancestor: Optional[IndexEntry] = None,
-        this: Optional[IndexEntry] = None,
-        other: Optional[IndexEntry] = None,
+        ancestor: IndexEntry | None = None,
+        this: IndexEntry | None = None,
+        other: IndexEntry | None = None,
     ) -> None:
         """Initialize ConflictedIndexEntry.
 
@@ -674,7 +678,7 @@ def read_cache_time(f: BinaryIO) -> tuple[int, int]:
     return struct.unpack(">LL", f.read(8))
 
 
-def write_cache_time(f: IO[bytes], t: Union[int, float, tuple[int, int]]) -> None:
+def write_cache_time(f: IO[bytes], t: int | float | tuple[int, int]) -> None:
     """Write a cache time.
 
     Args:
@@ -856,9 +860,7 @@ def read_index(f: BinaryIO) -> Iterator[SerializedIndexEntry]:
 
 def read_index_dict_with_version(
     f: BinaryIO,
-) -> tuple[
-    dict[bytes, Union[IndexEntry, ConflictedIndexEntry]], int, list[IndexExtension]
-]:
+) -> tuple[dict[bytes, IndexEntry | ConflictedIndexEntry], int, list[IndexExtension]]:
     """Read an index file and return it as a dictionary along with the version.
 
     Returns:
@@ -866,7 +868,7 @@ def read_index_dict_with_version(
     """
     version, num_entries = read_index_header(f)
 
-    ret: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
+    ret: dict[bytes, IndexEntry | ConflictedIndexEntry] = {}
     previous_path = b""
     for i in range(num_entries):
         entry = read_cache_entry(f, version, previous_path)
@@ -927,7 +929,7 @@ def read_index_dict_with_version(
 
 def read_index_dict(
     f: BinaryIO,
-) -> dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]:
+) -> dict[bytes, IndexEntry | ConflictedIndexEntry]:
     """Read an index file and return it as a dictionary.
 
        Dict Key is tuple of path and stage number, as
@@ -935,7 +937,7 @@ def read_index_dict(
     Args:
       f: File object to read fromls.
     """
-    ret: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]] = {}
+    ret: dict[bytes, IndexEntry | ConflictedIndexEntry] = {}
     for entry in read_index(f):
         stage = entry.stage()
         if stage == Stage.NORMAL:
@@ -956,8 +958,8 @@ def read_index_dict(
 def write_index(
     f: IO[bytes],
     entries: Sequence[SerializedIndexEntry],
-    version: Optional[int] = None,
-    extensions: Optional[Sequence[IndexExtension]] = None,
+    version: int | None = None,
+    extensions: Sequence[IndexExtension] | None = None,
 ) -> None:
     """Write an index file.
 
@@ -996,9 +998,9 @@ def write_index(
 
 def write_index_dict(
     f: IO[bytes],
-    entries: Mapping[bytes, Union[IndexEntry, ConflictedIndexEntry]],
-    version: Optional[int] = None,
-    extensions: Optional[Sequence[IndexExtension]] = None,
+    entries: Mapping[bytes, IndexEntry | ConflictedIndexEntry],
+    version: int | None = None,
+    extensions: Sequence[IndexExtension] | None = None,
 ) -> None:
     """Write an index file based on the contents of a dictionary.
 
@@ -1052,14 +1054,14 @@ def cleanup_mode(mode: int) -> int:
 class Index:
     """A Git Index file."""
 
-    _byname: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
+    _byname: dict[bytes, IndexEntry | ConflictedIndexEntry]
 
     def __init__(
         self,
-        filename: Union[bytes, str, os.PathLike[str]],
+        filename: bytes | str | os.PathLike[str],
         read: bool = True,
         skip_hash: bool = False,
-        version: Optional[int] = None,
+        version: int | None = None,
     ) -> None:
         """Create an index object associated with the given filename.
 
@@ -1079,7 +1081,7 @@ class Index:
             self.read()
 
     @property
-    def path(self) -> Union[bytes, str]:
+    def path(self) -> bytes | str:
         """Get the path to the index file.
 
         Returns:
@@ -1147,7 +1149,7 @@ class Index:
         """Number of entries in this index file."""
         return len(self._byname)
 
-    def __getitem__(self, key: bytes) -> Union[IndexEntry, ConflictedIndexEntry]:
+    def __getitem__(self, key: bytes) -> IndexEntry | ConflictedIndexEntry:
         """Retrieve entry by relative path and stage.
 
         Returns: Either a IndexEntry or a ConflictedIndexEntry
@@ -1201,7 +1203,7 @@ class Index:
         self._byname = {}
 
     def __setitem__(
-        self, name: bytes, value: Union[IndexEntry, ConflictedIndexEntry]
+        self, name: bytes, value: IndexEntry | ConflictedIndexEntry
     ) -> None:
         """Set an entry in the index."""
         assert isinstance(name, bytes)
@@ -1213,7 +1215,7 @@ class Index:
 
     def iteritems(
         self,
-    ) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
+    ) -> Iterator[tuple[bytes, IndexEntry | ConflictedIndexEntry]]:
         """Iterate over (path, entry) pairs in the index.
 
         Returns:
@@ -1221,7 +1223,7 @@ class Index:
         """
         return iter(self._byname.items())
 
-    def items(self) -> Iterator[tuple[bytes, Union[IndexEntry, ConflictedIndexEntry]]]:
+    def items(self) -> Iterator[tuple[bytes, IndexEntry | ConflictedIndexEntry]]:
         """Get an iterator over (path, entry) pairs.
 
         Returns:
@@ -1229,9 +1231,7 @@ class Index:
         """
         return iter(self._byname.items())
 
-    def update(
-        self, entries: dict[bytes, Union[IndexEntry, ConflictedIndexEntry]]
-    ) -> None:
+    def update(self, entries: dict[bytes, IndexEntry | ConflictedIndexEntry]) -> None:
         """Update the index with multiple entries.
 
         Args:
@@ -1255,9 +1255,9 @@ class Index:
         want_unchanged: bool = False,
     ) -> Generator[
         tuple[
-            tuple[Optional[bytes], Optional[bytes]],
-            tuple[Optional[int], Optional[int]],
-            tuple[Optional[bytes], Optional[bytes]],
+            tuple[bytes | None, bytes | None],
+            tuple[int | None, int | None],
+            tuple[bytes | None, bytes | None],
         ],
         None,
         None,
@@ -1464,7 +1464,7 @@ class Index:
         tree: Tree,
         path: bytes,
         object_store: "BaseObjectStore",
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """Find the SHA of a subtree at a given path.
 
         Args:
@@ -1561,13 +1561,13 @@ def changes_from_tree(
     names: Iterable[bytes],
     lookup_entry: Callable[[bytes], tuple[bytes, int]],
     object_store: ObjectContainer,
-    tree: Optional[bytes],
+    tree: bytes | None,
     want_unchanged: bool = False,
 ) -> Iterable[
     tuple[
-        tuple[Optional[bytes], Optional[bytes]],
-        tuple[Optional[int], Optional[int]],
-        tuple[Optional[bytes], Optional[bytes]],
+        tuple[bytes | None, bytes | None],
+        tuple[int | None, int | None],
+        tuple[bytes | None, bytes | None],
     ]
 ]:
     """Find the differences between the contents of a tree and a working copy.
@@ -1610,7 +1610,7 @@ def changes_from_tree(
 def index_entry_from_stat(
     stat_val: os.stat_result,
     hex_sha: bytes,
-    mode: Optional[int] = None,
+    mode: int | None = None,
 ) -> IndexEntry:
     """Create a new index entry from a stat value.
 
@@ -1651,7 +1651,7 @@ if sys.platform == "win32":
         typically due to lack of developer mode or administrator privileges.
         """
 
-        def __init__(self, errno: int, msg: str, filename: Optional[str]) -> None:
+        def __init__(self, errno: int, msg: str, filename: str | None) -> None:
             """Initialize WindowsSymlinkPermissionError."""
             super(PermissionError, self).__init__(
                 errno,
@@ -1660,11 +1660,11 @@ if sys.platform == "win32":
             )
 
     def symlink(
-        src: Union[str, bytes],
-        dst: Union[str, bytes],
+        src: str | bytes,
+        dst: str | bytes,
         target_is_directory: bool = False,
         *,
-        dir_fd: Optional[int] = None,
+        dir_fd: int | None = None,
     ) -> None:
         """Create a symbolic link on Windows with better error handling.
 
@@ -1696,12 +1696,10 @@ def build_file_from_blob(
     *,
     honor_filemode: bool = True,
     tree_encoding: str = "utf-8",
-    symlink_fn: Optional[
-        Callable[
-            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
-            None,
-        ]
-    ] = None,
+    symlink_fn: Callable[
+        [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
+    ]
+    | None = None,
 ) -> os.stat_result:
     """Build a file or symlink on disk based on a Git object.
 
@@ -1880,18 +1878,16 @@ def validate_path(
 
 
 def build_index_from_tree(
-    root_path: Union[str, bytes],
-    index_path: Union[str, bytes],
+    root_path: str | bytes,
+    index_path: str | bytes,
     object_store: ObjectContainer,
     tree_id: bytes,
     honor_filemode: bool = True,
     validate_path_element: Callable[[bytes], bool] = validate_path_element_default,
-    symlink_fn: Optional[
-        Callable[
-            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
-            None,
-        ]
-    ] = None,
+    symlink_fn: Callable[
+        [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
+    ]
+    | None = None,
     blob_normalizer: Optional["FilterBlobNormalizer"] = None,
     tree_encoding: str = "utf-8",
 ) -> None:
@@ -2014,7 +2010,7 @@ def blob_from_path_and_stat(
     return blob_from_path_and_mode(fs_path, st.st_mode, tree_encoding)
 
 
-def read_submodule_head(path: Union[str, bytes]) -> Optional[bytes]:
+def read_submodule_head(path: str | bytes) -> bytes | None:
     """Read the head commit of a submodule.
 
     Args:
@@ -2164,7 +2160,7 @@ def _check_file_matches(
     current_stat: os.stat_result,
     honor_filemode: bool,
     blob_normalizer: Optional["FilterBlobNormalizer"] = None,
-    tree_path: Optional[bytes] = None,
+    tree_path: bytes | None = None,
 ) -> bool:
     """Check if a file on disk matches the expected git object.
 
@@ -2226,8 +2222,8 @@ def _transition_to_submodule(
     repo: "Repo",
     path: bytes,
     full_path: bytes,
-    current_stat: Optional[os.stat_result],
-    entry: Union[IndexEntry, TreeEntry],
+    current_stat: os.stat_result | None,
+    entry: IndexEntry | TreeEntry,
     index: Index,
 ) -> None:
     """Transition any type to submodule."""
@@ -2251,16 +2247,14 @@ def _transition_to_file(
     object_store: "BaseObjectStore",
     path: bytes,
     full_path: bytes,
-    current_stat: Optional[os.stat_result],
-    entry: Union[IndexEntry, TreeEntry],
+    current_stat: os.stat_result | None,
+    entry: IndexEntry | TreeEntry,
     index: Index,
     honor_filemode: bool,
-    symlink_fn: Optional[
-        Callable[
-            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
-            None,
-        ]
-    ],
+    symlink_fn: Callable[
+        [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
+    ]
+    | None,
     blob_normalizer: Optional["FilterBlobNormalizer"],
     tree_encoding: str = "utf-8",
 ) -> None:
@@ -2348,7 +2342,7 @@ def _transition_to_absent(
     repo: "Repo",
     path: bytes,
     full_path: bytes,
-    current_stat: Optional[os.stat_result],
+    current_stat: os.stat_result | None,
     index: Index,
 ) -> None:
     """Remove any type of entry."""
@@ -2511,17 +2505,15 @@ def detect_case_only_renames(
 
 def update_working_tree(
     repo: "Repo",
-    old_tree_id: Optional[bytes],
+    old_tree_id: bytes | None,
     new_tree_id: bytes,
     change_iterator: Iterator["TreeChange"],
     honor_filemode: bool = True,
-    validate_path_element: Optional[Callable[[bytes], bool]] = None,
-    symlink_fn: Optional[
-        Callable[
-            [Union[str, bytes, os.PathLike[str]], Union[str, bytes, os.PathLike[str]]],
-            None,
-        ]
-    ] = None,
+    validate_path_element: Callable[[bytes], bool] | None = None,
+    symlink_fn: Callable[
+        [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
+    ]
+    | None = None,
     force_remove_untracked: bool = False,
     blob_normalizer: Optional["FilterBlobNormalizer"] = None,
     tree_encoding: str = "utf-8",
@@ -2703,7 +2695,7 @@ def update_working_tree(
 
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
             try:
-                delete_stat: Optional[os.stat_result] = os.lstat(full_path)
+                delete_stat: os.stat_result | None = os.lstat(full_path)
             except FileNotFoundError:
                 delete_stat = None
             except OSError as e:
@@ -2734,7 +2726,7 @@ def update_working_tree(
 
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
             try:
-                modify_stat: Optional[os.stat_result] = os.lstat(full_path)
+                modify_stat: os.stat_result | None = os.lstat(full_path)
             except FileNotFoundError:
                 modify_stat = None
             except OSError as e:
@@ -2765,10 +2757,10 @@ def update_working_tree(
 
 def _check_entry_for_changes(
     tree_path: bytes,
-    entry: Union[IndexEntry, ConflictedIndexEntry],
+    entry: IndexEntry | ConflictedIndexEntry,
     root_path: bytes,
-    filter_blob_callback: Optional[Callable[[bytes, bytes], bytes]] = None,
-) -> Optional[bytes]:
+    filter_blob_callback: Callable[[bytes, bytes], bytes] | None = None,
+) -> bytes | None:
     """Check a single index entry for changes.
 
     Args:
@@ -2809,8 +2801,8 @@ def _check_entry_for_changes(
 
 def get_unstaged_changes(
     index: Index,
-    root_path: Union[str, bytes],
-    filter_blob_callback: Optional[Callable[..., Any]] = None,
+    root_path: str | bytes,
+    filter_blob_callback: Callable[..., Any] | None = None,
     preload_index: bool = False,
 ) -> Generator[bytes, None, None]:
     """Walk through an index and check for differences against working tree.
@@ -2902,7 +2894,7 @@ def _tree_to_fs_path(
     return os.path.join(root_path, sep_corrected_path)
 
 
-def _fs_to_tree_path(fs_path: Union[str, bytes], tree_encoding: str = "utf-8") -> bytes:
+def _fs_to_tree_path(fs_path: str | bytes, tree_encoding: str = "utf-8") -> bytes:
     """Convert a file system path to a git tree path.
 
     Args:
@@ -2933,7 +2925,7 @@ def _fs_to_tree_path(fs_path: Union[str, bytes], tree_encoding: str = "utf-8") -
     return tree_path
 
 
-def index_entry_from_directory(st: os.stat_result, path: bytes) -> Optional[IndexEntry]:
+def index_entry_from_directory(st: os.stat_result, path: bytes) -> IndexEntry | None:
     """Create an index entry for a directory.
 
     This is only used for submodules (directories containing .git).
@@ -2954,8 +2946,8 @@ def index_entry_from_directory(st: os.stat_result, path: bytes) -> Optional[Inde
 
 
 def index_entry_from_path(
-    path: bytes, object_store: Optional[ObjectContainer] = None
-) -> Optional[IndexEntry]:
+    path: bytes, object_store: ObjectContainer | None = None
+) -> IndexEntry | None:
     """Create an index from a filesystem path.
 
     This returns an index value for files, symlinks
@@ -2985,8 +2977,8 @@ def index_entry_from_path(
 def iter_fresh_entries(
     paths: Iterable[bytes],
     root_path: bytes,
-    object_store: Optional[ObjectContainer] = None,
-) -> Iterator[tuple[bytes, Optional[IndexEntry]]]:
+    object_store: ObjectContainer | None = None,
+) -> Iterator[tuple[bytes, IndexEntry | None]]:
     """Iterate over current versions of index entries on disk.
 
     Args:
@@ -3008,8 +3000,8 @@ def iter_fresh_objects(
     paths: Iterable[bytes],
     root_path: bytes,
     include_deleted: bool = False,
-    object_store: Optional[ObjectContainer] = None,
-) -> Iterator[tuple[bytes, Optional[bytes], Optional[int]]]:
+    object_store: ObjectContainer | None = None,
+) -> Iterator[tuple[bytes, bytes | None, int | None]]:
     """Iterate over versions of objects on disk referenced by index.
 
     Args:
@@ -3050,7 +3042,7 @@ class locked_index:
 
     _file: "_GitFile"
 
-    def __init__(self, path: Union[bytes, str]) -> None:
+    def __init__(self, path: bytes | str) -> None:
         """Initialize locked_index."""
         self._path = path
 
@@ -3063,9 +3055,9 @@ class locked_index:
 
     def __exit__(
         self,
-        exc_type: Optional[type],
-        exc_value: Optional[BaseException],
-        traceback: Optional[types.TracebackType],
+        exc_type: type | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
     ) -> None:
         """Exit context manager and unlock index."""
         if exc_type is not None:

@@ -35,7 +35,6 @@ from typing import (
     BinaryIO,
     Optional,
     TextIO,
-    Union,
 )
 
 if TYPE_CHECKING:
@@ -75,10 +74,10 @@ class DiffAlgorithmNotAvailable(Exception):
 def write_commit_patch(
     f: IO[bytes],
     commit: "Commit",
-    contents: Union[str, bytes],
+    contents: str | bytes,
     progress: tuple[int, int],
-    version: Optional[str] = None,
-    encoding: Optional[str] = None,
+    version: str | None = None,
+    encoding: str | None = None,
 ) -> None:
     """Write a individual file patch.
 
@@ -255,7 +254,7 @@ def unified_diff_with_algorithm(
     lineterm: str = "\n",
     tree_encoding: str = "utf-8",
     output_encoding: str = "utf-8",
-    algorithm: Optional[str] = None,
+    algorithm: str | None = None,
 ) -> Generator[bytes, None, None]:
     """Generate unified diff with specified algorithm.
 
@@ -327,7 +326,7 @@ def is_binary(content: bytes) -> bool:
     return b"\0" in content[:FIRST_FEW_BYTES]
 
 
-def shortid(hexsha: Optional[bytes]) -> bytes:
+def shortid(hexsha: bytes | None) -> bytes:
     """Get short object ID.
 
     Args:
@@ -342,7 +341,7 @@ def shortid(hexsha: Optional[bytes]) -> bytes:
         return hexsha[:7]
 
 
-def patch_filename(p: Optional[bytes], root: bytes) -> bytes:
+def patch_filename(p: bytes | None, root: bytes) -> bytes:
     """Generate patch filename.
 
     Args:
@@ -361,10 +360,10 @@ def patch_filename(p: Optional[bytes], root: bytes) -> bytes:
 def write_object_diff(
     f: IO[bytes],
     store: "BaseObjectStore",
-    old_file: tuple[Optional[bytes], Optional[int], Optional[bytes]],
-    new_file: tuple[Optional[bytes], Optional[int], Optional[bytes]],
+    old_file: tuple[bytes | None, int | None, bytes | None],
+    new_file: tuple[bytes | None, int | None, bytes | None],
     diff_binary: bool = False,
-    diff_algorithm: Optional[str] = None,
+    diff_algorithm: str | None = None,
 ) -> None:
     """Write the diff for an object.
 
@@ -384,7 +383,7 @@ def write_object_diff(
     patched_old_path = patch_filename(old_path, b"a")
     patched_new_path = patch_filename(new_path, b"b")
 
-    def content(mode: Optional[int], hexsha: Optional[bytes]) -> Blob:
+    def content(mode: int | None, hexsha: bytes | None) -> Blob:
         """Get blob content for a file.
 
         Args:
@@ -448,9 +447,9 @@ def write_object_diff(
 
 # TODO(jelmer): Support writing unicode, rather than bytes.
 def gen_diff_header(
-    paths: tuple[Optional[bytes], Optional[bytes]],
-    modes: tuple[Optional[int], Optional[int]],
-    shas: tuple[Optional[bytes], Optional[bytes]],
+    paths: tuple[bytes | None, bytes | None],
+    modes: tuple[int | None, int | None],
+    shas: tuple[bytes | None, bytes | None],
 ) -> Generator[bytes, None, None]:
     """Write a blob diff header.
 
@@ -486,9 +485,9 @@ def gen_diff_header(
 # TODO(jelmer): Support writing unicode, rather than bytes.
 def write_blob_diff(
     f: IO[bytes],
-    old_file: tuple[Optional[bytes], Optional[int], Optional["Blob"]],
-    new_file: tuple[Optional[bytes], Optional[int], Optional["Blob"]],
-    diff_algorithm: Optional[str] = None,
+    old_file: tuple[bytes | None, int | None, Optional["Blob"]],
+    new_file: tuple[bytes | None, int | None, Optional["Blob"]],
+    diff_algorithm: str | None = None,
 ) -> None:
     """Write blob diff.
 
@@ -542,10 +541,10 @@ def write_blob_diff(
 def write_tree_diff(
     f: IO[bytes],
     store: "BaseObjectStore",
-    old_tree: Optional[bytes],
-    new_tree: Optional[bytes],
+    old_tree: bytes | None,
+    new_tree: bytes | None,
     diff_binary: bool = False,
-    diff_algorithm: Optional[str] = None,
+    diff_algorithm: str | None = None,
 ) -> None:
     """Write tree diff.
 
@@ -571,8 +570,8 @@ def write_tree_diff(
 
 
 def git_am_patch_split(
-    f: Union[TextIO, BinaryIO], encoding: Optional[str] = None
-) -> tuple["Commit", bytes, Optional[bytes]]:
+    f: TextIO | BinaryIO, encoding: str | None = None
+) -> tuple["Commit", bytes, bytes | None]:
     """Parse a git-am-style patch and split it up into bits.
 
     Args:
@@ -593,8 +592,8 @@ def git_am_patch_split(
 
 
 def parse_patch_message(
-    msg: "email.message.Message", encoding: Optional[str] = None
-) -> tuple["Commit", bytes, Optional[bytes]]:
+    msg: "email.message.Message", encoding: str | None = None
+) -> tuple["Commit", bytes, bytes | None]:
     """Extract a Commit object and patch from an e-mail message.
 
     Args:

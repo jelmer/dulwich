@@ -21,7 +21,7 @@
 import os
 import tempfile
 import unittest
-from typing import Any, Optional
+from typing import Any
 from unittest import TestCase
 
 from dulwich.annotate import annotate_lines, update_lines
@@ -134,7 +134,7 @@ class AnnotateLinesTestCase(TestCase):
         shutil.rmtree(self.temp_dir)
 
     def _make_commit(
-        self, blob_content: bytes, message: str, parent: Optional[bytes] = None
+        self, blob_content: bytes, message: str, parent: bytes | None = None
     ) -> bytes:
         """Helper to create a commit with a single file."""
         # Create blob
@@ -231,7 +231,7 @@ class PorcelainAnnotateTestCase(TestCase):
         filename: str,
         content: bytes,
         message: str,
-        parent: Optional[bytes] = None,
+        parent: bytes | None = None,
     ) -> bytes:
         """Helper to create a commit with a file."""
         # Create blob
@@ -330,7 +330,7 @@ class IntegrationTestCase(TestCase):
         filename: str,
         content: bytes,
         message: str,
-        parent: Optional[bytes] = None,
+        parent: bytes | None = None,
     ) -> bytes:
         """Helper to create a commit with file content."""
         # Write file to working directory

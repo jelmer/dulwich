@@ -1116,3 +1116,35 @@ class LFSClientTests(TestCase):
             self.client.upload("wrong_oid", 5, b"hello")
         # Server should reject due to OID mismatch
         self.assertIn("OID mismatch", str(cm.exception))
+
+    def test_from_config_validates_lfs_url(self) -> None:
+        """Test that from_config validates lfs.url and raises error for invalid URLs."""
+        from dulwich.config import ConfigFile
+        from dulwich.lfs import LFSClient
+
+        # Test with invalid lfs.url - no scheme/host
+        config = ConfigFile()
+        config.set((b"lfs",), b"url", b"objects")
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_config(config)
+        self.assertIn("Invalid lfs.url", str(cm.exception))
+        self.assertIn("objects", str(cm.exception))
+
+        # Test with another malformed URL - no scheme
+        config.set((b"lfs",), b"url", b"//example.com/path")
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_config(config)
+        self.assertIn("Invalid lfs.url", str(cm.exception))
+
+        # Test with valid URL - should succeed
+        config.set((b"lfs",), b"url", b"https://example.com/repo.git/info/lfs")
+        client = LFSClient.from_config(config)
+        self.assertIsNotNone(client)
+        self.assertEqual(client.url, "https://example.com/repo.git/info/lfs")
+
+        # Test with no lfs.url but valid remote - should derive URL
+        config2 = ConfigFile()
+        config2.set((b"remote", b"origin"), b"url", b"https://example.com/user/repo.git")
+        client2 = LFSClient.from_config(config2)
+        self.assertIsNotNone(client2)
+        self.assertEqual(client2.url, "https://example.com/user/repo.git/info/lfs")

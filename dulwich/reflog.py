@@ -205,7 +205,9 @@ def expire_reflog(
     f: BinaryIO,
     expire_time: Optional[int] = None,
     expire_unreachable_time: Optional[int] = None,
-    reachable_checker: Optional[Callable[[bytes], bool]] = None,
+    # String annotation to work around typing module bug in Python 3.9.0/3.9.1
+    # See: https://github.com/jelmer/dulwich/issues/1948
+    reachable_checker: "Optional[Callable[[bytes], bool]]" = None,
 ) -> int:
     """Expire reflog entries based on age and reachability.
 

@@ -26,6 +26,7 @@ import unittest
 
 def test_suite() -> unittest.TestSuite:
     names = [
+        "bitmap",
         "bundle",
         "check_ignore",
         "client",

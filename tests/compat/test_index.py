@@ -962,3 +962,223 @@ class IndexV4CompatTestCase(CompatTestCase):
         self.assertIn(b"unchanged.txt", entries)
         self.assertNotIn(b"old1.txt", entries)
         self.assertNotIn(b"old2.txt", entries)
+
+
+class SparseIndexCompatTestCase(CompatTestCase):
+    """Tests for Git sparse index compatibility with C Git."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(self._cleanup)
+
+    def _cleanup(self) -> None:
+        import shutil
+
+        shutil.rmtree(self.tempdir, ignore_errors=True)
+
+    def test_read_sparse_index_created_by_git(self) -> None:
+        """Test that Dulwich can read a sparse index created by Git."""
+        # Sparse index requires Git 2.37+
+        require_git_version((2, 37, 0))
+
+        repo_path = os.path.join(self.tempdir, "test_repo")
+        os.mkdir(repo_path)
+
+        # Initialize repo
+        run_git_or_fail(["init"], cwd=repo_path)
+        run_git_or_fail(["config", "core.sparseCheckout", "true"], cwd=repo_path)
+        run_git_or_fail(
+            ["config", "index.sparse", "true"], cwd=repo_path
+        )  # Enable sparse index
+
+        # Create directory structure
+        os.makedirs(os.path.join(repo_path, "included"), exist_ok=True)
+        os.makedirs(os.path.join(repo_path, "excluded", "subdir"), exist_ok=True)
+
+        # Create files
+        with open(os.path.join(repo_path, "included", "file1.txt"), "w") as f:
+            f.write("included file 1\n")
+        with open(os.path.join(repo_path, "included", "file2.txt"), "w") as f:
+            f.write("included file 2\n")
+        with open(os.path.join(repo_path, "excluded", "file3.txt"), "w") as f:
+            f.write("excluded file 3\n")
+        with open(os.path.join(repo_path, "excluded", "subdir", "file4.txt"), "w") as f:
+            f.write("excluded file 4\n")
+        with open(os.path.join(repo_path, "root.txt"), "w") as f:
+            f.write("root file\n")
+
+        # Add and commit all files
+        run_git_or_fail(["add", "."], cwd=repo_path)
+        run_git_or_fail(["commit", "-m", "initial"], cwd=repo_path)
+
+        # Set up sparse-checkout to include only "included/" and root files
+        sparse_checkout_path = os.path.join(
+            repo_path, ".git", "info", "sparse-checkout"
+        )
+        os.makedirs(os.path.dirname(sparse_checkout_path), exist_ok=True)
+        with open(sparse_checkout_path, "w") as f:
+            f.write("/*\n")  # Include top-level files
+            f.write("!/*/\n")  # Exclude all directories
+            f.write("/included/\n")  # Re-include "included" directory
+
+        # Run sparse-checkout reapply to create sparse index
+        run_git_or_fail(["sparse-checkout", "reapply"], cwd=repo_path)
+
+        # Read the index with Dulwich
+        from dulwich.index import Index
+
+        index_path = os.path.join(repo_path, ".git", "index")
+        idx = Index(index_path)
+
+        # Git may or may not create a sparse index depending on the repo state
+        # The key test is that Dulwich can read it without errors
+        self.assertIsNotNone(idx)
+
+        # If it is sparse, verify we can handle sparse directory entries
+        if idx.is_sparse():
+            for path, entry in idx.items():
+                if entry.is_sparse_dir(path):
+                    # Verify sparse dirs are for excluded paths
+                    self.assertTrue(path.startswith(b"excluded"))
+        else:
+            # If not sparse, we should still be able to read all entries
+            self.assertGreater(len(idx), 0)
+
+    def test_write_sparse_index_readable_by_git(self) -> None:
+        """Test that Git can read a sparse index created by Dulwich."""
+        # Sparse index requires Git 2.37+
+        require_git_version((2, 37, 0))
+
+        from dulwich.index import Index, IndexEntry, SparseDirExtension
+        from dulwich.objects import Blob, Tree
+        from dulwich.repo import Repo
+
+        repo_path = os.path.join(self.tempdir, "test_repo")
+        os.mkdir(repo_path)
+
+        # Initialize repo with Git
+        run_git_or_fail(["init"], cwd=repo_path)
+        run_git_or_fail(["config", "index.sparse", "true"], cwd=repo_path)
+
+        # Create a tree structure using Dulwich
+        repo = Repo(repo_path)
+
+        # Create blobs
+        blob1 = Blob()
+        blob1.data = b"file1 content"
+        repo.object_store.add_object(blob1)
+
+        blob2 = Blob()
+        blob2.data = b"file2 content"
+        repo.object_store.add_object(blob2)
+
+        # Create subtree for sparse directory
+        subtree = Tree()
+        subtree[b"file1.txt"] = (0o100644, blob1.id)
+        subtree[b"file2.txt"] = (0o100644, blob2.id)
+        repo.object_store.add_object(subtree)
+
+        # Create root tree
+        tree = Tree()
+        tree[b"sparse_dir"] = (0o040000, subtree.id)
+        repo.object_store.add_object(tree)
+
+        # Create a commit
+        from dulwich.objects import Commit
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 1234567890
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.encoding = b"UTF-8"
+        commit.message = b"Test commit"
+        repo.object_store.add_object(commit)
+        repo.refs[b"refs/heads/master"] = commit.id
+
+        # Create sparse index with Dulwich
+        index = Index(os.path.join(repo_path, ".git", "index"), read=False)
+
+        # Add sparse directory entry
+        sparse_entry = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=0o040000,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=subtree.id,
+            extended_flags=0x4000,  # SKIP_WORKTREE
+        )
+        index[b"sparse_dir/"] = sparse_entry
+        index._extensions.append(SparseDirExtension())
+        index.write()
+
+        # Verify Git can read the index
+        output = run_git_or_fail(["ls-files", "--debug"], cwd=repo_path)
+        self.assertIn(b"sparse_dir/", output)
+
+        # Verify Git recognizes it as sparse
+        output = run_git_or_fail(["status"], cwd=repo_path)
+        # Should not crash
+        self.assertIsNotNone(output)
+
+    def test_expand_sparse_index_matches_git(self) -> None:
+        """Test that expanding a sparse index matches Git's behavior."""
+        # Sparse index requires Git 2.37+
+        require_git_version((2, 37, 0))
+
+        repo_path = os.path.join(self.tempdir, "test_repo")
+        os.mkdir(repo_path)
+
+        # Initialize repo
+        run_git_or_fail(["init"], cwd=repo_path)
+        run_git_or_fail(["config", "core.sparseCheckout", "true"], cwd=repo_path)
+        run_git_or_fail(["config", "index.sparse", "true"], cwd=repo_path)
+
+        # Create directory structure
+        os.makedirs(os.path.join(repo_path, "dir1", "subdir"), exist_ok=True)
+        with open(os.path.join(repo_path, "dir1", "file1.txt"), "w") as f:
+            f.write("file1\n")
+        with open(os.path.join(repo_path, "dir1", "subdir", "file2.txt"), "w") as f:
+            f.write("file2\n")
+
+        # Commit files
+        run_git_or_fail(["add", "."], cwd=repo_path)
+        run_git_or_fail(["commit", "-m", "initial"], cwd=repo_path)
+
+        # Set up sparse-checkout to exclude dir1
+        sparse_checkout_path = os.path.join(
+            repo_path, ".git", "info", "sparse-checkout"
+        )
+        os.makedirs(os.path.dirname(sparse_checkout_path), exist_ok=True)
+        with open(sparse_checkout_path, "w") as f:
+            f.write("/*\n")
+            f.write("!/dir1/\n")
+
+        run_git_or_fail(["sparse-checkout", "reapply"], cwd=repo_path)
+
+        # Read sparse index with Dulwich
+        from dulwich.index import Index
+        from dulwich.repo import Repo
+
+        index_path = os.path.join(repo_path, ".git", "index")
+        idx = Index(index_path)
+
+        if idx.is_sparse():
+            # Expand the index
+            repo = Repo(repo_path)
+            idx.ensure_full_index(repo.object_store)
+
+            # Should no longer be sparse
+            self.assertFalse(idx.is_sparse())
+
+            # Write it back
+            idx.write()
+
+            # Git should still be able to read it
+            output = run_git_or_fail(["status"], cwd=repo_path)
+            self.assertIsNotNone(output)

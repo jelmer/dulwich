@@ -28,7 +28,7 @@ import stat
 import struct
 import sys
 import types
-from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence, Set
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -94,6 +94,7 @@ REUC_EXTENSION = b"REUC"
 UNTR_EXTENSION = b"UNTR"
 EOIE_EXTENSION = b"EOIE"
 IEOT_EXTENSION = b"IEOT"
+SDIR_EXTENSION = b"sdir"  # Sparse directory extension
 
 
 def _encode_varint(value: int) -> bytes:
@@ -303,6 +304,25 @@ class SerializedIndexEntry:
         """
         return Stage((self.flags & FLAG_STAGEMASK) >> FLAG_STAGESHIFT)
 
+    def is_sparse_dir(self) -> bool:
+        """Check if this entry represents a sparse directory.
+
+        A sparse directory entry is a collapsed representation of an entire
+        directory tree in a sparse index. It has:
+        - Directory mode (0o040000)
+        - SKIP_WORKTREE flag set
+        - Path ending with '/'
+        - SHA pointing to a tree object
+
+        Returns:
+          True if entry is a sparse directory entry
+        """
+        return (
+            stat.S_ISDIR(self.mode)
+            and bool(self.extended_flags & EXTENDED_FLAG_SKIP_WORKTREE)
+            and self.name.endswith(b"/")
+        )
+
 
 @dataclass
 class IndexExtension:
@@ -327,6 +347,8 @@ class IndexExtension:
             return ResolveUndoExtension.from_bytes(data)
         elif signature == UNTR_EXTENSION:
             return UntrackedExtension.from_bytes(data)
+        elif signature == SDIR_EXTENSION:
+            return SparseDirExtension.from_bytes(data)
         else:
             # Unknown extension - just store raw data
             return cls(signature, data)
@@ -430,6 +452,41 @@ class UntrackedExtension(IndexExtension):
         return cls(data)
 
 
+class SparseDirExtension(IndexExtension):
+    """Sparse directory extension.
+
+    This extension indicates that the index contains sparse directory entries.
+    Tools that don't understand sparse index should avoid interacting with
+    the index when this extension is present.
+
+    The extension data is empty - its presence is the signal.
+    """
+
+    def __init__(self) -> None:
+        """Initialize SparseDirExtension."""
+        super().__init__(SDIR_EXTENSION, b"")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "SparseDirExtension":
+        """Parse SparseDirExtension from bytes.
+
+        Args:
+          data: Raw bytes to parse (should be empty)
+
+        Returns:
+          SparseDirExtension instance
+        """
+        return cls()
+
+    def to_bytes(self) -> bytes:
+        """Serialize SparseDirExtension to bytes.
+
+        Returns:
+          Empty bytes (extension presence is the signal)
+        """
+        return b""
+
+
 @dataclass
 class IndexEntry:
     """Represents an entry in the Git index.
@@ -531,6 +588,28 @@ class IndexEntry:
             # Optionally unset the main extended bit if no extended flags remain
             if self.extended_flags == 0:
                 self.flags &= ~FLAG_EXTENDED
+
+    def is_sparse_dir(self, name: bytes) -> bool:
+        """Check if this entry represents a sparse directory.
+
+        A sparse directory entry is a collapsed representation of an entire
+        directory tree in a sparse index. It has:
+        - Directory mode (0o040000)
+        - SKIP_WORKTREE flag set
+        - Path ending with '/'
+        - SHA pointing to a tree object
+
+        Args:
+          name: The path name for this entry (IndexEntry doesn't store name)
+
+        Returns:
+          True if entry is a sparse directory entry
+        """
+        return (
+            stat.S_ISDIR(self.mode)
+            and bool(self.extended_flags & EXTENDED_FLAG_SKIP_WORKTREE)
+            and name.endswith(b"/")
+        )
 
 
 class ConflictedIndexEntry:
@@ -1218,6 +1297,208 @@ class Index:
           Root tree SHA
         """
         return commit_tree(object_store, self.iterobjects())
+
+    def is_sparse(self) -> bool:
+        """Check if this index contains sparse directory entries.
+
+        Returns:
+          True if any sparse directory extension is present
+        """
+        return any(isinstance(ext, SparseDirExtension) for ext in self._extensions)
+
+    def ensure_full_index(self, object_store: "BaseObjectStore") -> None:
+        """Expand all sparse directory entries into full file entries.
+
+        This converts a sparse index into a full index by recursively
+        expanding any sparse directory entries into their constituent files.
+
+        Args:
+          object_store: Object store to read tree objects from
+
+        Raises:
+          KeyError: If a tree object referenced by a sparse dir entry doesn't exist
+        """
+        if not self.is_sparse():
+            return
+
+        # Find all sparse directory entries
+        sparse_dirs = []
+        for path, entry in list(self._byname.items()):
+            if isinstance(entry, IndexEntry) and entry.is_sparse_dir(path):
+                sparse_dirs.append((path, entry))
+
+        # Expand each sparse directory
+        for path, entry in sparse_dirs:
+            # Remove the sparse directory entry
+            del self._byname[path]
+
+            # Get the tree object
+            tree = object_store[entry.sha]
+            if not isinstance(tree, Tree):
+                raise ValueError(f"Sparse directory {path!r} points to non-tree object")
+
+            # Recursively add all entries from the tree
+            self._expand_tree(path.rstrip(b"/"), tree, object_store, entry)
+
+        # Remove the sparse directory extension
+        self._extensions = [
+            ext for ext in self._extensions if not isinstance(ext, SparseDirExtension)
+        ]
+
+    def _expand_tree(
+        self,
+        prefix: bytes,
+        tree: Tree,
+        object_store: "BaseObjectStore",
+        template_entry: IndexEntry,
+    ) -> None:
+        """Recursively expand a tree into index entries.
+
+        Args:
+          prefix: Path prefix for entries (without trailing slash)
+          tree: Tree object to expand
+          object_store: Object store to read nested trees from
+          template_entry: Template entry to copy metadata from
+        """
+        for name, mode, sha in tree.items():
+            if prefix:
+                full_path = prefix + b"/" + name
+            else:
+                full_path = name
+
+            if stat.S_ISDIR(mode):
+                # Recursively expand subdirectories
+                subtree = object_store[sha]
+                if not isinstance(subtree, Tree):
+                    raise ValueError(
+                        f"Directory entry {full_path!r} points to non-tree object"
+                    )
+                self._expand_tree(full_path, subtree, object_store, template_entry)
+            else:
+                # Create an index entry for this file
+                # Use the template entry for metadata but with the file's sha and mode
+                new_entry = IndexEntry(
+                    ctime=template_entry.ctime,
+                    mtime=template_entry.mtime,
+                    dev=template_entry.dev,
+                    ino=template_entry.ino,
+                    mode=mode,
+                    uid=template_entry.uid,
+                    gid=template_entry.gid,
+                    size=0,  # Size is unknown from tree
+                    sha=sha,
+                    flags=0,
+                    extended_flags=0,  # Don't copy skip-worktree flag
+                )
+                self._byname[full_path] = new_entry
+
+    def convert_to_sparse(
+        self,
+        object_store: "BaseObjectStore",
+        tree_sha: bytes,
+        sparse_dirs: Set[bytes],
+    ) -> None:
+        """Convert full index entries to sparse directory entries.
+
+        This collapses directories that are entirely outside the sparse
+        checkout cone into single sparse directory entries.
+
+        Args:
+          object_store: Object store to read tree objects
+          tree_sha: SHA of the tree (usually HEAD) to base sparse dirs on
+          sparse_dirs: Set of directory paths (with trailing /) to collapse
+
+        Raises:
+          KeyError: If tree_sha or a subdirectory doesn't exist
+        """
+        if not sparse_dirs:
+            return
+
+        # Get the base tree
+        tree = object_store[tree_sha]
+        if not isinstance(tree, Tree):
+            raise ValueError(f"tree_sha {tree_sha!r} is not a tree object")
+
+        # For each sparse directory, find its tree SHA and create sparse entry
+        for dir_path in sparse_dirs:
+            dir_path_stripped = dir_path.rstrip(b"/")
+
+            # Find the tree SHA for this directory
+            subtree_sha = self._find_subtree_sha(tree, dir_path_stripped, object_store)
+            if subtree_sha is None:
+                # Directory doesn't exist in tree, skip it
+                continue
+
+            # Remove all entries under this directory
+            entries_to_remove = [
+                path
+                for path in self._byname
+                if path.startswith(dir_path) or path == dir_path_stripped
+            ]
+            for path in entries_to_remove:
+                del self._byname[path]
+
+            # Create a sparse directory entry
+            # Use minimal metadata since it's not a real file
+            sparse_entry = IndexEntry(
+                ctime=0,
+                mtime=0,
+                dev=0,
+                ino=0,
+                mode=stat.S_IFDIR,
+                uid=0,
+                gid=0,
+                size=0,
+                sha=subtree_sha,
+                flags=0,
+                extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
+            )
+            self._byname[dir_path] = sparse_entry
+
+        # Add sparse directory extension if not present
+        if not self.is_sparse():
+            self._extensions.append(SparseDirExtension())
+
+    def _find_subtree_sha(
+        self,
+        tree: Tree,
+        path: bytes,
+        object_store: "BaseObjectStore",
+    ) -> Optional[bytes]:
+        """Find the SHA of a subtree at a given path.
+
+        Args:
+          tree: Root tree object to search in
+          path: Path to the subdirectory (no trailing slash)
+          object_store: Object store to read nested trees from
+
+        Returns:
+          SHA of the subtree, or None if path doesn't exist
+        """
+        if not path:
+            return tree.id
+
+        parts = path.split(b"/")
+        current_tree = tree
+
+        for part in parts:
+            # Look for this part in the current tree
+            try:
+                mode, sha = current_tree[part]
+            except KeyError:
+                return None
+
+            if not stat.S_ISDIR(mode):
+                # Path component is a file, not a directory
+                return None
+
+            # Load the next tree
+            obj = object_store[sha]
+            if not isinstance(obj, Tree):
+                return None
+            current_tree = obj
+
+        return current_tree.id
 
 
 def commit_tree(

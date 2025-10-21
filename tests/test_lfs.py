@@ -25,6 +25,7 @@ import json
 import os
 import shutil
 import tempfile
+from pathlib import Path
 
 from dulwich import porcelain
 from dulwich.lfs import LFSFilterDriver, LFSPointer, LFSStore
@@ -991,7 +992,7 @@ class LFSClientTests(TestCase):
         super().setUp()
         import threading
 
-        from dulwich.lfs import LFSClient
+        from dulwich.lfs import HTTPLFSClient
         from dulwich.lfs_server import run_lfs_server
 
         # Create temporary directory for LFS storage
@@ -1011,8 +1012,8 @@ class LFSClientTests(TestCase):
 
         self.addCleanup(cleanup_server)
 
-        # Create LFS client pointing to our test server
-        self.client = LFSClient(self.server_url)
+        # Create HTTP LFS client pointing to our test server
+        self.client = HTTPLFSClient(self.server_url)
 
     def test_client_url_normalization(self) -> None:
         """Test that client URL is normalized correctly."""
@@ -1196,3 +1197,113 @@ class LFSClientTests(TestCase):
         self.assertIsNotNone(client2)
         assert client2 is not None  # for mypy
         self.assertEqual(client2.url, "https://example.com/user/repo.git/info/lfs")
+
+
+class FileLFSClientTests(TestCase):
+    """Tests for FileLFSClient with file:// URLs."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Create temporary directory for LFS storage
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+
+        # Create LFS store and populate with test data
+        from dulwich.lfs import FileLFSClient, LFSStore
+
+        self.lfs_store = LFSStore.create(self.test_dir)
+        self.test_content = b"Test file content for FileLFSClient"
+        self.test_oid = self.lfs_store.write_object([self.test_content])
+
+        # Create FileLFSClient pointing to the test directory
+        # Use Path.as_uri() to create proper file:// URLs on all platforms
+        file_url = Path(self.test_dir).as_uri()
+        self.client = FileLFSClient(file_url)
+
+    def test_download_existing_object(self) -> None:
+        """Test downloading an existing object from file:// URL."""
+        content = self.client.download(self.test_oid, len(self.test_content))
+        self.assertEqual(content, self.test_content)
+
+    def test_download_missing_object(self) -> None:
+        """Test downloading a non-existent object raises LFSError."""
+        from dulwich.lfs import LFSError
+
+        fake_oid = "0" * 64
+        with self.assertRaises(LFSError) as cm:
+            self.client.download(fake_oid, 100)
+        self.assertIn("Object not found", str(cm.exception))
+
+    def test_download_size_mismatch(self) -> None:
+        """Test download with wrong size raises LFSError."""
+        from dulwich.lfs import LFSError
+
+        with self.assertRaises(LFSError) as cm:
+            self.client.download(self.test_oid, 999)  # Wrong size
+        self.assertIn("Size mismatch", str(cm.exception))
+
+    def test_upload_new_object(self) -> None:
+        """Test uploading a new object to file:// URL."""
+        import hashlib
+
+        new_content = b"New content to upload"
+        new_oid = hashlib.sha256(new_content).hexdigest()
+
+        # Upload
+        self.client.upload(new_oid, len(new_content), new_content)
+
+        # Verify it was stored
+        with self.lfs_store.open_object(new_oid) as f:
+            stored_content = f.read()
+        self.assertEqual(stored_content, new_content)
+
+    def test_upload_size_mismatch(self) -> None:
+        """Test upload with mismatched size raises LFSError."""
+        from dulwich.lfs import LFSError
+
+        content = b"test"
+        oid = "0" * 64
+
+        with self.assertRaises(LFSError) as cm:
+            self.client.upload(oid, 999, content)  # Wrong size
+        self.assertIn("Size mismatch", str(cm.exception))
+
+    def test_upload_oid_mismatch(self) -> None:
+        """Test upload with mismatched OID raises LFSError."""
+        from dulwich.lfs import LFSError
+
+        content = b"test"
+        wrong_oid = "0" * 64  # Won't match actual SHA256
+
+        with self.assertRaises(LFSError) as cm:
+            self.client.upload(wrong_oid, len(content), content)
+        self.assertIn("OID mismatch", str(cm.exception))
+
+    def test_from_config_creates_file_client(self) -> None:
+        """Test that from_config creates FileLFSClient for file:// URLs."""
+        from dulwich.config import ConfigFile
+        from dulwich.lfs import FileLFSClient, LFSClient
+
+        config = ConfigFile()
+        file_url = Path(self.test_dir).as_uri()
+        config.set((b"lfs",), b"url", file_url.encode())
+
+        client = LFSClient.from_config(config)
+        self.assertIsInstance(client, FileLFSClient)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, file_url)
+
+    def test_round_trip(self) -> None:
+        """Test uploading and then downloading an object."""
+        import hashlib
+
+        content = b"Round trip test content"
+        oid = hashlib.sha256(content).hexdigest()
+
+        # Upload
+        self.client.upload(oid, len(content), content)
+
+        # Download
+        downloaded = self.client.download(oid, len(content))
+
+        self.assertEqual(downloaded, content)

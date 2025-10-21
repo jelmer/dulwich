@@ -350,6 +350,19 @@ def _get_lfs_user_agent(config: Optional["Config"]) -> str:
     return f"git-lfs/dulwich/{version_str}"
 
 
+def _is_valid_lfs_url(url: str) -> bool:
+    """Check if a URL is valid for LFS (has scheme and netloc).
+
+    Args:
+        url: URL to validate
+
+    Returns:
+        True if URL has both scheme and netloc, False otherwise
+    """
+    parsed = urlparse(url)
+    return bool(parsed.scheme and parsed.netloc)
+
+
 class LFSClient:
     """LFS client for network operations."""
 
@@ -373,6 +386,12 @@ class LFSClient:
         except KeyError:
             pass
         else:
+            # Validate explicitly configured URL - raise error if invalid
+            if not _is_valid_lfs_url(url):
+                raise ValueError(
+                    f"Invalid lfs.url in config: {url!r}. "
+                    "URL must include scheme (http/https) and hostname."
+                )
             return cls(url, config)
 
         # Fall back to deriving from remote URL (same as git-lfs)
@@ -397,8 +416,8 @@ class LFSClient:
             # Standard LFS endpoint is remote_url + "/info/lfs"
             lfs_url = f"{remote_url}/info/lfs"
 
-            parsed = urlparse(lfs_url)
-            if not parsed.scheme or not parsed.netloc:
+            # Return None if derived URL is invalid (LFS is optional)
+            if not _is_valid_lfs_url(lfs_url):
                 return None
 
             return LFSClient(lfs_url, config)

@@ -22,8 +22,8 @@
 
 """A simple least-recently-used (LRU) cache."""
 
-from collections.abc import Iterable, Iterator
-from typing import Callable, Generic, Optional, TypeVar, Union, cast
+from collections.abc import Callable, Iterable, Iterator
+from typing import Generic, Optional, TypeVar, cast
 
 _null_key = object()
 
@@ -38,11 +38,11 @@ class _LRUNode(Generic[K, V]):
     __slots__ = ("cleanup", "key", "next_key", "prev", "size", "value")
 
     prev: Optional["_LRUNode[K, V]"]
-    next_key: Union[K, object]
-    size: Optional[int]
+    next_key: K | object
+    size: int | None
 
     def __init__(
-        self, key: K, value: V, cleanup: Optional[Callable[[K, V], None]] = None
+        self, key: K, value: V, cleanup: Callable[[K, V], None] | None = None
     ) -> None:
         self.prev = None
         self.next_key = _null_key
@@ -72,11 +72,11 @@ class _LRUNode(Generic[K, V]):
 class LRUCache(Generic[K, V]):
     """A class which manages a cache of entries, removing unused ones."""
 
-    _least_recently_used: Optional[_LRUNode[K, V]]
-    _most_recently_used: Optional[_LRUNode[K, V]]
+    _least_recently_used: _LRUNode[K, V] | None
+    _most_recently_used: _LRUNode[K, V] | None
 
     def __init__(
-        self, max_cache: int = 100, after_cleanup_count: Optional[int] = None
+        self, max_cache: int = 100, after_cleanup_count: int | None = None
     ) -> None:
         """Initialize LRUCache.
 
@@ -171,7 +171,7 @@ class LRUCache(Generic[K, V]):
             node = node_next
 
     def add(
-        self, key: K, value: V, cleanup: Optional[Callable[[K, V], None]] = None
+        self, key: K, value: V, cleanup: Callable[[K, V], None] | None = None
     ) -> None:
         """Add a new value to the cache.
 
@@ -204,7 +204,7 @@ class LRUCache(Generic[K, V]):
         """Get the number of entries we will cache."""
         return self._max_cache
 
-    def get(self, key: K, default: Optional[V] = None) -> Optional[V]:
+    def get(self, key: K, default: V | None = None) -> V | None:
         """Get value from cache with default if not found.
 
         Args:
@@ -308,12 +308,12 @@ class LRUCache(Generic[K, V]):
         while self._cache:
             self._remove_lru()
 
-    def resize(self, max_cache: int, after_cleanup_count: Optional[int] = None) -> None:
+    def resize(self, max_cache: int, after_cleanup_count: int | None = None) -> None:
         """Change the number of entries that will be cached."""
         self._update_max_cache(max_cache, after_cleanup_count=after_cleanup_count)
 
     def _update_max_cache(
-        self, max_cache: int, after_cleanup_count: Optional[int] = None
+        self, max_cache: int, after_cleanup_count: int | None = None
     ) -> None:
         self._max_cache = max_cache
         if after_cleanup_count is None:
@@ -338,8 +338,8 @@ class LRUSizeCache(LRUCache[K, V]):
     def __init__(
         self,
         max_size: int = 1024 * 1024,
-        after_cleanup_size: Optional[int] = None,
-        compute_size: Optional[Callable[[V], int]] = None,
+        after_cleanup_size: int | None = None,
+        compute_size: Callable[[V], int] | None = None,
     ) -> None:
         """Create a new LRUSizeCache.
 
@@ -364,7 +364,7 @@ class LRUSizeCache(LRUCache[K, V]):
         LRUCache.__init__(self, max_cache=max(int(max_size / 512), 1))
 
     def add(
-        self, key: K, value: V, cleanup: Optional[Callable[[K, V], None]] = None
+        self, key: K, value: V, cleanup: Callable[[K, V], None] | None = None
     ) -> None:
         """Add a new value to the cache.
 
@@ -419,14 +419,14 @@ class LRUSizeCache(LRUCache[K, V]):
         self._value_size -= node.size
         LRUCache._remove_node(self, node)
 
-    def resize(self, max_size: int, after_cleanup_size: Optional[int] = None) -> None:
+    def resize(self, max_size: int, after_cleanup_size: int | None = None) -> None:
         """Change the number of bytes that will be cached."""
         self._update_max_size(max_size, after_cleanup_size=after_cleanup_size)
         max_cache = max(int(max_size / 512), 1)
         self._update_max_cache(max_cache)
 
     def _update_max_size(
-        self, max_size: int, after_cleanup_size: Optional[int] = None
+        self, max_size: int, after_cleanup_size: int | None = None
     ) -> None:
         self._max_size = max_size
         if after_cleanup_size is None:

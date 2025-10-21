@@ -32,7 +32,7 @@ import os
 import struct
 from collections.abc import Iterator
 from io import BytesIO
-from typing import IO, TYPE_CHECKING, Optional, Union
+from typing import IO, TYPE_CHECKING, Optional
 
 from .file import GitFile
 
@@ -122,7 +122,7 @@ class EWAHBitmap:
     - Bits 33-63: literal_words (31 bits) - count of literal words following this RLW
     """
 
-    def __init__(self, data: Optional[bytes] = None) -> None:
+    def __init__(self, data: bytes | None = None) -> None:
         """Initialize EWAH bitmap.
 
         Args:
@@ -357,7 +357,7 @@ class PackBitmap:
         """
         self.version = version
         self.flags = flags
-        self.pack_checksum: Optional[bytes] = None
+        self.pack_checksum: bytes | None = None
 
         # Type bitmaps for commits, trees, blobs, tags
         self.commit_bitmap = EWAHBitmap()
@@ -372,12 +372,12 @@ class PackBitmap:
         self.entries_list: list[tuple[bytes, BitmapEntry]] = []
 
         # Optional lookup table for random access
-        self.lookup_table: Optional[list[tuple[int, int, int]]] = None
+        self.lookup_table: list[tuple[int, int, int]] | None = None
 
         # Optional name-hash cache
-        self.name_hash_cache: Optional[list[int]] = None
+        self.name_hash_cache: list[int] | None = None
 
-    def get_bitmap(self, commit_sha: bytes) -> Optional[EWAHBitmap]:
+    def get_bitmap(self, commit_sha: bytes) -> EWAHBitmap | None:
         """Get the bitmap for a commit.
 
         Args:
@@ -439,7 +439,7 @@ class PackBitmap:
 
 
 def read_bitmap(
-    filename: Union[str, os.PathLike[str]],
+    filename: str | os.PathLike[str],
     pack_index: Optional["PackIndex"] = None,
 ) -> PackBitmap:
     """Read a bitmap index file.
@@ -665,7 +665,7 @@ def read_bitmap_file(
 
 
 def write_bitmap(
-    filename: Union[str, os.PathLike[str]],
+    filename: str | os.PathLike[str],
     bitmap: PackBitmap,
 ) -> None:
     """Write a bitmap index file.

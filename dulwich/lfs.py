@@ -351,16 +351,35 @@ def _get_lfs_user_agent(config: Optional["Config"]) -> str:
 
 
 def _is_valid_lfs_url(url: str) -> bool:
-    """Check if a URL is valid for LFS (has scheme and netloc).
+    """Check if a URL is valid for LFS.
+
+    Git LFS supports http://, https://, and file:// URLs.
 
     Args:
         url: URL to validate
 
     Returns:
-        True if URL has both scheme and netloc, False otherwise
+        True if URL is a valid LFS URL, False otherwise
     """
     parsed = urlparse(url)
-    return bool(parsed.scheme and parsed.netloc)
+
+    # Must have a scheme
+    if not parsed.scheme:
+        return False
+
+    # Only support http, https, and file schemes
+    if parsed.scheme not in ("http", "https", "file"):
+        return False
+
+    # http/https require a hostname
+    if parsed.scheme in ("http", "https"):
+        return bool(parsed.netloc)
+
+    # file:// URLs must have a path (netloc is typically empty)
+    if parsed.scheme == "file":
+        return bool(parsed.path)
+
+    return False
 
 
 class LFSClient:
@@ -390,7 +409,7 @@ class LFSClient:
             if not _is_valid_lfs_url(url):
                 raise ValueError(
                     f"Invalid lfs.url in config: {url!r}. "
-                    "URL must include scheme (http/https) and hostname."
+                    "URL must be an absolute URL with scheme http://, https://, or file://."
                 )
             return cls(url, config)
 

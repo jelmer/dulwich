@@ -1136,15 +1136,63 @@ class LFSClientTests(TestCase):
             LFSClient.from_config(config)
         self.assertIn("Invalid lfs.url", str(cm.exception))
 
-        # Test with valid URL - should succeed
+        # Test with relative path - should be rejected (not supported by git-lfs)
+        config.set((b"lfs",), b"url", b"../lfs")
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_config(config)
+        self.assertIn("Invalid lfs.url", str(cm.exception))
+
+        # Test with relative path starting with ./
+        config.set((b"lfs",), b"url", b"./lfs")
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_config(config)
+        self.assertIn("Invalid lfs.url", str(cm.exception))
+
+        # Test with unsupported scheme - git://
+        config.set((b"lfs",), b"url", b"git://example.com/repo.git")
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_config(config)
+        self.assertIn("Invalid lfs.url", str(cm.exception))
+
+        # Test with unsupported scheme - ssh://
+        config.set((b"lfs",), b"url", b"ssh://git@example.com/repo.git")
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_config(config)
+        self.assertIn("Invalid lfs.url", str(cm.exception))
+
+        # Test with http:// but no hostname
+        config.set((b"lfs",), b"url", b"http://")
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_config(config)
+        self.assertIn("Invalid lfs.url", str(cm.exception))
+
+        # Test with valid https URL - should succeed
         config.set((b"lfs",), b"url", b"https://example.com/repo.git/info/lfs")
         client = LFSClient.from_config(config)
         self.assertIsNotNone(client)
+        assert client is not None  # for mypy
         self.assertEqual(client.url, "https://example.com/repo.git/info/lfs")
+
+        # Test with valid http URL - should succeed
+        config.set((b"lfs",), b"url", b"http://localhost:8080/lfs")
+        client = LFSClient.from_config(config)
+        self.assertIsNotNone(client)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, "http://localhost:8080/lfs")
+
+        # Test with valid file:// URL - should succeed
+        config.set((b"lfs",), b"url", b"file:///path/to/lfs")
+        client = LFSClient.from_config(config)
+        self.assertIsNotNone(client)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, "file:///path/to/lfs")
 
         # Test with no lfs.url but valid remote - should derive URL
         config2 = ConfigFile()
-        config2.set((b"remote", b"origin"), b"url", b"https://example.com/user/repo.git")
+        config2.set(
+            (b"remote", b"origin"), b"url", b"https://example.com/user/repo.git"
+        )
         client2 = LFSClient.from_config(config2)
         self.assertIsNotNone(client2)
+        assert client2 is not None  # for mypy
         self.assertEqual(client2.url, "https://example.com/user/repo.git/info/lfs")

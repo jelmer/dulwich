@@ -23,10 +23,9 @@
 """Generic functions for talking the git smart server protocol."""
 
 import types
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from io import BytesIO
 from os import SEEK_END
-from typing import Callable, Optional
 
 import dulwich
 
@@ -173,7 +172,7 @@ def extract_capability_names(capabilities: Iterable[bytes]) -> set[bytes]:
     return {parse_capability(c)[0] for c in capabilities}
 
 
-def parse_capability(capability: bytes) -> tuple[bytes, Optional[bytes]]:
+def parse_capability(capability: bytes) -> tuple[bytes, bytes | None]:
     """Parse a capability string into name and value.
 
     Args:
@@ -238,7 +237,7 @@ def parse_cmd_pkt(line: bytes) -> tuple[bytes, list[bytes]]:
     return cmd, args[:-1].split(b"\0")
 
 
-def pkt_line(data: Optional[bytes]) -> bytes:
+def pkt_line(data: bytes | None) -> bytes:
     """Wrap data in a pkt-line.
 
     Args:
@@ -251,7 +250,7 @@ def pkt_line(data: Optional[bytes]) -> bytes:
     return ("%04x" % (len(data) + 4)).encode("ascii") + data
 
 
-def pkt_seq(*seq: Optional[bytes]) -> bytes:
+def pkt_seq(*seq: bytes | None) -> bytes:
     """Wrap a sequence of data in pkt-lines.
 
     Args:
@@ -275,9 +274,9 @@ class Protocol:
     def __init__(
         self,
         read: Callable[[int], bytes],
-        write: Callable[[bytes], Optional[int]],
-        close: Optional[Callable[[], None]] = None,
-        report_activity: Optional[Callable[[int, str], None]] = None,
+        write: Callable[[bytes], int | None],
+        close: Callable[[], None] | None = None,
+        report_activity: Callable[[int, str], None] | None = None,
     ) -> None:
         """Initialize Protocol.
 
@@ -291,7 +290,7 @@ class Protocol:
         self.write = write
         self._close = close
         self.report_activity = report_activity
-        self._readahead: Optional[BytesIO] = None
+        self._readahead: BytesIO | None = None
 
     def close(self) -> None:
         """Close the underlying transport if a close function was provided."""
@@ -304,14 +303,14 @@ class Protocol:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[types.TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         """Exit context manager and close transport."""
         self.close()
 
-    def read_pkt_line(self) -> Optional[bytes]:
+    def read_pkt_line(self) -> bytes | None:
         """Reads a pkt-line from the remote git process.
 
         This method may read from the readahead buffer; see unread_pkt_line.
@@ -363,7 +362,7 @@ class Protocol:
         self.unread_pkt_line(next_line)
         return False
 
-    def unread_pkt_line(self, data: Optional[bytes]) -> None:
+    def unread_pkt_line(self, data: bytes | None) -> None:
         """Unread a single line of data into the readahead buffer.
 
         This method can be used to unread a single pkt-line into a fixed
@@ -390,7 +389,7 @@ class Protocol:
             yield pkt
             pkt = self.read_pkt_line()
 
-    def write_pkt_line(self, line: Optional[bytes]) -> None:
+    def write_pkt_line(self, line: bytes | None) -> None:
         """Sends a pkt-line to the remote git process.
 
         Args:
@@ -461,9 +460,9 @@ class ReceivableProtocol(Protocol):
     def __init__(
         self,
         recv: Callable[[int], bytes],
-        write: Callable[[bytes], Optional[int]],
-        close: Optional[Callable[[], None]] = None,
-        report_activity: Optional[Callable[[int, str], None]] = None,
+        write: Callable[[bytes], int | None],
+        close: Callable[[], None] | None = None,
+        report_activity: Callable[[int, str], None] | None = None,
         rbufsize: int = _RBUFSIZE,
     ) -> None:
         """Initialize ReceivableProtocol.
@@ -630,7 +629,7 @@ class BufferedPktLineWriter:
     """
 
     def __init__(
-        self, write: Callable[[bytes], Optional[int]], bufsize: int = 65515
+        self, write: Callable[[bytes], int | None], bufsize: int = 65515
     ) -> None:
         """Initialize the BufferedPktLineWriter.
 
@@ -670,7 +669,7 @@ class BufferedPktLineWriter:
 class PktLineParser:
     """Packet line parser that hands completed packets off to a callback."""
 
-    def __init__(self, handle_pkt: Callable[[Optional[bytes]], None]) -> None:
+    def __init__(self, handle_pkt: Callable[[bytes | None], None]) -> None:
         """Initialize PktLineParser.
 
         Args:
@@ -716,7 +715,7 @@ def format_capability_line(capabilities: Iterable[bytes]) -> bytes:
 
 
 def format_ref_line(
-    ref: bytes, sha: bytes, capabilities: Optional[Sequence[bytes]] = None
+    ref: bytes, sha: bytes, capabilities: Sequence[bytes] | None = None
 ) -> bytes:
     """Format a ref advertisement line.
 

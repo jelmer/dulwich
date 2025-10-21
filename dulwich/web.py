@@ -51,16 +51,14 @@ import os
 import re
 import sys
 import time
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from io import BytesIO
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
     ClassVar,
-    Optional,
     Union,
     cast,
 )
@@ -92,9 +90,7 @@ else:
                     self,
                     status: str,
                     response_headers: list[tuple[str, str]],
-                    exc_info: Optional[
-                        tuple[type, BaseException, TracebackType]
-                    ] = None,
+                    exc_info: tuple[type, BaseException, TracebackType] | None = None,
                 ) -> Callable[[bytes], None]:
                     """Start the response with status and headers."""
                     ...
@@ -171,7 +167,7 @@ NO_CACHE_HEADERS = [
 ]
 
 
-def cache_forever_headers(now: Optional[float] = None) -> list[tuple[str, str]]:
+def cache_forever_headers(now: float | None = None) -> list[tuple[str, str]]:
     """Generate headers for caching forever.
 
     Args:
@@ -189,7 +185,7 @@ def cache_forever_headers(now: Optional[float] = None) -> list[tuple[str, str]]:
     ]
 
 
-def date_time_string(timestamp: Optional[float] = None) -> str:
+def date_time_string(timestamp: float | None = None) -> str:
     """Convert a timestamp to an HTTP date string.
 
     Args:
@@ -252,7 +248,7 @@ def get_repo(backend: "Backend", mat: re.Match[str]) -> BaseRepo:
 
 
 def send_file(
-    req: "HTTPGitRequest", f: Optional[BinaryIO], content_type: str
+    req: "HTTPGitRequest", f: BinaryIO | None, content_type: str
 ) -> Iterator[bytes]:
     """Send a file-like object to the request output.
 
@@ -407,7 +403,7 @@ def get_info_refs(
         req.nocache()
         write = req.respond(HTTP_OK, f"application/x-{service}-advertisement")
 
-        def write_fn(data: bytes) -> Optional[int]:
+        def write_fn(data: bytes) -> int | None:
             result = write(data)
             return len(data) if result is not None else None
 
@@ -556,7 +552,7 @@ def handle_service_request(
     req.nocache()
     write = req.respond(HTTP_OK, f"application/x-{service}-result")
 
-    def write_fn(data: bytes) -> Optional[int]:
+    def write_fn(data: bytes) -> int | None:
         result = write(data)
         return len(data) if result is not None else None
 
@@ -586,9 +582,8 @@ class HTTPGitRequest:
         environ: WSGIEnvironment,
         start_response: StartResponse,
         dumb: bool = False,
-        handlers: Optional[
-            dict[bytes, Union["HandlerConstructor", Callable[..., Any]]]
-        ] = None,
+        handlers: dict[bytes, Union["HandlerConstructor", Callable[..., Any]]]
+        | None = None,
     ) -> None:
         """Initialize HTTPGitRequest.
 
@@ -612,8 +607,8 @@ class HTTPGitRequest:
     def respond(
         self,
         status: str = HTTP_OK,
-        content_type: Optional[str] = None,
-        headers: Optional[Sequence[tuple[str, str]]] = None,
+        content_type: str | None = None,
+        headers: Sequence[tuple[str, str]] | None = None,
     ) -> Callable[[bytes], object]:
         """Begin a response with the given status and other headers."""
         if headers:
@@ -692,10 +687,9 @@ class HTTPGitApplication:
         self,
         backend: Backend,
         dumb: bool = False,
-        handlers: Optional[
-            dict[bytes, Union["HandlerConstructor", Callable[..., Any]]]
-        ] = None,
-        fallback_app: Optional[WSGIApplication] = None,
+        handlers: dict[bytes, Union["HandlerConstructor", Callable[..., Any]]]
+        | None = None,
+        fallback_app: WSGIApplication | None = None,
     ) -> None:
         """Initialize HTTPGitApplication.
 
@@ -707,8 +701,8 @@ class HTTPGitApplication:
         """
         self.backend = backend
         self.dumb = dumb
-        self.handlers: dict[bytes, Union[HandlerConstructor, Callable[..., Any]]] = (
-            dict(DEFAULT_HANDLERS)
+        self.handlers: dict[bytes, HandlerConstructor | Callable[..., Any]] = dict(
+            DEFAULT_HANDLERS
         )
         self.fallback_app = fallback_app
         if handlers is not None:
@@ -798,8 +792,8 @@ class LimitedInputFilter:
 def make_wsgi_chain(
     backend: Backend,
     dumb: bool = False,
-    handlers: Optional[dict[bytes, Callable[..., Any]]] = None,
-    fallback_app: Optional[WSGIApplication] = None,
+    handlers: dict[bytes, Callable[..., Any]] | None = None,
+    fallback_app: WSGIApplication | None = None,
 ) -> WSGIApplication:
     """Factory function to create an instance of HTTPGitApplication.
 
@@ -817,11 +811,9 @@ class ServerHandlerLogger(ServerHandler):
 
     def log_exception(
         self,
-        exc_info: Union[
-            tuple[type[BaseException], BaseException, TracebackType],
-            tuple[None, None, None],
-            None,
-        ],
+        exc_info: tuple[type[BaseException], BaseException, TracebackType]
+        | tuple[None, None, None]
+        | None,
     ) -> None:
         """Log exception using dulwich logger."""
         logger.exception(
@@ -843,11 +835,9 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
 
     def log_exception(
         self,
-        exc_info: Union[
-            tuple[type[BaseException], BaseException, TracebackType],
-            tuple[None, None, None],
-            None,
-        ],
+        exc_info: tuple[type[BaseException], BaseException, TracebackType]
+        | tuple[None, None, None]
+        | None,
     ) -> None:
         """Log exception using dulwich logger."""
         logger.exception(

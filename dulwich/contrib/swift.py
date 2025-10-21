@@ -36,10 +36,10 @@ import sys
 import tempfile
 import urllib.parse as urlparse
 import zlib
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from configparser import ConfigParser
 from io import BytesIO
-from typing import Any, BinaryIO, Callable, Optional, Union, cast
+from typing import Any, BinaryIO, Optional, cast
 
 from geventhttpclient import HTTPClient
 
@@ -101,7 +101,7 @@ cache_length = 20
 class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
     """Find missing objects required for pack generation."""
 
-    def next(self) -> Optional[tuple[bytes, int, Union[bytes, None]]]:
+    def next(self) -> tuple[bytes, int, bytes | None] | None:
         """Get the next missing object.
 
         Returns:
@@ -149,7 +149,7 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
         )
 
 
-def load_conf(path: Optional[str] = None, file: Optional[str] = None) -> ConfigParser:
+def load_conf(path: str | None = None, file: str | None = None) -> ConfigParser:
     """Load configuration in global var CONF.
 
     Args:
@@ -232,8 +232,8 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
 def load_pack_info(
     filename: str,
     scon: Optional["SwiftConnector"] = None,
-    file: Optional[BinaryIO] = None,
-) -> Optional[dict[str, Any]]:
+    file: BinaryIO | None = None,
+) -> dict[str, Any] | None:
     """Load pack info from Swift or file.
 
     Args:
@@ -389,7 +389,7 @@ class SwiftConnector:
         )
         return endpoint[self.endpoint_type], token
 
-    def test_root_exists(self) -> Optional[bool]:
+    def test_root_exists(self) -> bool | None:
         """Check that Swift container exist.
 
         Returns: True if exist or None it not
@@ -416,7 +416,7 @@ class SwiftConnector:
                     f"PUT request failed with error code {ret.status_code}"
                 )
 
-    def get_container_objects(self) -> Optional[list[dict[str, Any]]]:
+    def get_container_objects(self) -> list[dict[str, Any]] | None:
         """Retrieve objects list in a container.
 
         Returns: A list of dict that describe objects
@@ -434,7 +434,7 @@ class SwiftConnector:
         content = ret.read()
         return cast(list[dict[str, Any]], json.loads(content))
 
-    def get_object_stat(self, name: str) -> Optional[dict[str, Any]]:
+    def get_object_stat(self, name: str) -> dict[str, Any] | None:
         """Retrieve object stat.
 
         Args:
@@ -485,9 +485,7 @@ class SwiftConnector:
                 f"PUT request failed with error code {ret.status_code}"  # type: ignore
             )
 
-    def get_object(
-        self, name: str, range: Optional[str] = None
-    ) -> Optional[Union[bytes, BytesIO]]:
+    def get_object(self, name: str, range: str | None = None) -> bytes | BytesIO | None:
         """Retrieve an object.
 
         Args:
@@ -637,9 +635,7 @@ class SwiftPackData(PackData):
     using the Range header feature of Swift.
     """
 
-    def __init__(
-        self, scon: SwiftConnector, filename: Union[str, os.PathLike[str]]
-    ) -> None:
+    def __init__(self, scon: SwiftConnector, filename: str | os.PathLike[str]) -> None:
         """Initialize a SwiftPackReader.
 
         Args:
@@ -663,7 +659,7 @@ class SwiftPackData(PackData):
 
     def get_object_at(
         self, offset: int
-    ) -> tuple[int, Union[tuple[Union[bytes, int], list[bytes]], list[bytes]]]:
+    ) -> tuple[int, tuple[bytes | int, list[bytes]] | list[bytes]]:
         """Get the object at a specific offset in the pack.
 
         Args:
@@ -713,15 +709,15 @@ class SwiftPack(Pack):
         del kwargs["scon"]
         super().__init__(*args, **kwargs)  # type: ignore
         self._pack_info_path = self._basename + ".info"
-        self._pack_info: Optional[dict[str, Any]] = None
-        self._pack_info_load: Callable[[], Optional[dict[str, Any]]] = (
+        self._pack_info: dict[str, Any] | None = None
+        self._pack_info_load: Callable[[], dict[str, Any] | None] = (
             lambda: load_pack_info(self._pack_info_path, self.scon)
         )
         self._idx_load = lambda: swift_load_pack_index(self.scon, self._idx_path)
         self._data_load = lambda: SwiftPackData(self.scon, self._data_path)
 
     @property
-    def pack_info(self) -> Optional[dict[str, Any]]:
+    def pack_info(self) -> dict[str, Any] | None:
         """The pack data object being used."""
         if self._pack_info is None:
             self._pack_info = self._pack_info_load()
@@ -767,7 +763,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         """Loose objects are not supported by this repository."""
         return iter([])
 
-    def pack_info_get(self, sha: bytes) -> Optional[tuple[Any, ...]]:
+    def pack_info_get(self, sha: bytes) -> tuple[Any, ...] | None:
         """Get pack info for a specific SHA.
 
         Args:
@@ -781,11 +777,11 @@ class SwiftObjectStore(PackBasedObjectStore):
                 if hasattr(pack, "pack_info"):
                     pack_info = pack.pack_info
                     if pack_info is not None:
-                        return cast(Optional[tuple[Any, ...]], pack_info.get(sha))
+                        return cast(tuple[Any, ...] | None, pack_info.get(sha))
         return None
 
     def _collect_ancestors(
-        self, heads: list[Any], common: Optional[set[Any]] = None
+        self, heads: list[Any], common: set[Any] | None = None
     ) -> tuple[set[Any], set[Any]]:
         if common is None:
             common = set()
@@ -987,8 +983,8 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         super().__init__(f)
 
     def _load_check_ref(
-        self, name: bytes, old_ref: Optional[bytes]
-    ) -> Union[dict[bytes, bytes], bool]:
+        self, name: bytes, old_ref: bytes | None
+    ) -> dict[bytes, bytes] | bool:
         self._check_refname(name)
         obj = self.scon.get_object(self.filename)
         if not obj:
@@ -1012,12 +1008,12 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
     def set_if_equals(
         self,
         name: bytes,
-        old_ref: Optional[bytes],
+        old_ref: bytes | None,
         new_ref: bytes,
-        committer: Optional[bytes] = None,
-        timestamp: Optional[float] = None,
-        timezone: Optional[int] = None,
-        message: Optional[bytes] = None,
+        committer: bytes | None = None,
+        timestamp: float | None = None,
+        timezone: int | None = None,
+        message: bytes | None = None,
     ) -> bool:
         """Set a refname to new_ref only if it currently equals old_ref."""
         if name == b"HEAD":
@@ -1033,7 +1029,7 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
     def remove_if_equals(
         self,
         name: bytes,
-        old_ref: Optional[bytes],
+        old_ref: bytes | None,
         committer: object = None,
         timestamp: object = None,
         timezone: object = None,

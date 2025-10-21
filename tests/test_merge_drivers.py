@@ -23,7 +23,6 @@
 import importlib.util
 import sys
 import unittest
-from typing import Optional
 
 from dulwich.attrs import GitAttributes, Pattern
 from dulwich.config import ConfigDict
@@ -51,7 +50,7 @@ class _TestMergeDriver:
         ancestor: bytes,
         ours: bytes,
         theirs: bytes,
-        path: Optional[str] = None,
+        path: str | None = None,
         marker_size: int = 7,
     ) -> tuple[bytes, bool]:
         """Test merge implementation."""

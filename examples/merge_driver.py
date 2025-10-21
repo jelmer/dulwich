@@ -12,7 +12,6 @@ This example:
 
 import json
 import os
-from typing import Optional
 
 from dulwich import porcelain
 from dulwich.merge_drivers import get_merge_driver_registry
@@ -27,7 +26,7 @@ class JSONMergeDriver:
         ancestor: bytes,
         ours: bytes,
         theirs: bytes,
-        path: Optional[str] = None,
+        path: str | None = None,
         marker_size: int = 7,
     ) -> tuple[bytes, bool]:
         """Merge JSON files by combining objects."""

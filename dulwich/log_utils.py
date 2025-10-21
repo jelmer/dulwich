@@ -39,7 +39,6 @@ directly.
 import logging
 import os
 import sys
-from typing import Optional, Union
 
 getLogger = logging.getLogger
 
@@ -67,7 +66,7 @@ def _should_trace() -> bool:
     return True
 
 
-def _get_trace_target() -> Optional[Union[str, int]]:
+def _get_trace_target() -> str | int | None:
     """Get the trace target from GIT_TRACE environment variable.
 
     Returns:

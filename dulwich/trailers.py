@@ -31,8 +31,6 @@ They are similar to RFC 822 email headers and appear at the end of commit
 messages after free-form content.
 """
 
-from typing import Optional
-
 
 class Trailer:
     """Represents a single Git trailer.
@@ -260,7 +258,7 @@ def _parse_trailer_lines(lines: list[str], separators: str) -> list[Trailer]:
         List of parsed Trailer objects
     """
     trailers: list[Trailer] = []
-    current_trailer: Optional[Trailer] = None
+    current_trailer: Trailer | None = None
 
     for line in lines:
         stripped = line.rstrip()

@@ -2,7 +2,6 @@
 
 import sys
 from io import BytesIO
-from typing import Optional
 
 import atheris
 from test_utils import is_expected_exception
@@ -11,7 +10,7 @@ with atheris.instrument_imports():
     from dulwich.config import ConfigFile
 
 
-def TestOneInput(data) -> Optional[int]:
+def TestOneInput(data) -> int | None:
     try:
         ConfigFile.from_file(BytesIO(data))
     except ValueError as e:

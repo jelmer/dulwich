@@ -34,17 +34,15 @@ import stat
 import sys
 import time
 import warnings
-from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from io import BytesIO
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
     Optional,
     TypeVar,
-    Union,
 )
 
 if TYPE_CHECKING:
@@ -200,7 +198,7 @@ def _get_default_identity() -> tuple[str, str]:
     return (fullname, email)
 
 
-def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> bytes:
+def get_user_identity(config: "StackedConfig", kind: str | None = None) -> bytes:
     """Determine the identity to use for new commits.
 
     If kind is set, this first checks
@@ -222,8 +220,8 @@ def get_user_identity(config: "StackedConfig", kind: Optional[str] = None) -> by
     Returns:
       A user identity
     """
-    user: Optional[bytes] = None
-    email: Optional[bytes] = None
+    user: bytes | None = None
+    email: bytes | None = None
     if kind:
         user_uc = os.environ.get("GIT_" + kind + "_NAME")
         if user_uc is not None:
@@ -370,7 +368,7 @@ class ParentsProvider:
         self.commit_graph = store.get_commit_graph()
 
     def get_parents(
-        self, commit_id: bytes, commit: Optional[Commit] = None
+        self, commit_id: bytes, commit: Commit | None = None
     ) -> list[bytes]:
         """Get parents for a commit using the parents provider."""
         try:
@@ -443,7 +441,7 @@ class BaseRepo:
         return sys.platform != "win32"
 
     def _init_files(
-        self, bare: bool, symlinks: Optional[bool] = None, format: Optional[int] = None
+        self, bare: bool, symlinks: bool | None = None, format: int | None = None
     ) -> None:
         """Initialize a default set of named files."""
         from .config import ConfigFile
@@ -473,7 +471,7 @@ class BaseRepo:
         self._put_named_file("config", f.getvalue())
         self._put_named_file(os.path.join("info", "exclude"), b"")
 
-    def get_named_file(self, path: str) -> Optional[BinaryIO]:
+    def get_named_file(self, path: str) -> BinaryIO | None:
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -511,11 +509,10 @@ class BaseRepo:
     def fetch(
         self,
         target: "BaseRepo",
-        determine_wants: Optional[
-            Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]]
-        ] = None,
-        progress: Optional[Callable[..., None]] = None,
-        depth: Optional[int] = None,
+        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]]
+        | None = None,
+        progress: Callable[..., None] | None = None,
+        depth: int | None = None,
     ) -> dict[bytes, bytes]:
         """Fetch objects into another repository.
 
@@ -540,12 +537,12 @@ class BaseRepo:
 
     def fetch_pack_data(
         self,
-        determine_wants: Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]],
+        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]],
         graph_walker: "GraphWalker",
-        progress: Optional[Callable[[bytes], None]],
+        progress: Callable[[bytes], None] | None,
         *,
-        get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
-        depth: Optional[int] = None,
+        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
+        depth: int | None = None,
     ) -> tuple[int, Iterator["UnpackedObject"]]:
         """Fetch the pack data required for a set of revisions.
 
@@ -575,13 +572,13 @@ class BaseRepo:
 
     def find_missing_objects(
         self,
-        determine_wants: Callable[[Mapping[bytes, bytes], Optional[int]], list[bytes]],
+        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]],
         graph_walker: "GraphWalker",
-        progress: Optional[Callable[[bytes], None]],
+        progress: Callable[[bytes], None] | None,
         *,
-        get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
-        depth: Optional[int] = None,
-    ) -> Optional[MissingObjectFinder]:
+        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
+        depth: int | None = None,
+    ) -> MissingObjectFinder | None:
         """Fetch the missing objects required for a set of revisions.
 
         Args:
@@ -674,9 +671,9 @@ class BaseRepo:
         have: set[ObjectID],
         want: set[ObjectID],
         *,
-        shallow: Optional[set[ObjectID]] = None,
-        progress: Optional[Callable[[str], None]] = None,
-        ofs_delta: Optional[bool] = None,
+        shallow: set[ObjectID] | None = None,
+        progress: Callable[[str], None] | None = None,
+        ofs_delta: bool | None = None,
     ) -> tuple[int, Iterator["UnpackedObject"]]:
         """Generate pack data objects for a set of wants/haves.
 
@@ -698,7 +695,7 @@ class BaseRepo:
         )
 
     def get_graph_walker(
-        self, heads: Optional[list[ObjectID]] = None
+        self, heads: list[ObjectID] | None = None
     ) -> ObjectStoreGraphWalker:
         """Retrieve a graph walker.
 
@@ -774,7 +771,7 @@ class BaseRepo:
             shallows=self.get_shallow(),
         )
 
-    def get_parents(self, sha: bytes, commit: Optional[Commit] = None) -> list[bytes]:
+    def get_parents(self, sha: bytes, commit: Commit | None = None) -> list[bytes]:
         """Retrieve the parents of a specific commit.
 
         If the specific commit is a graftpoint, the graft parents
@@ -798,7 +795,7 @@ class BaseRepo:
         """Retrieve the worktree config object."""
         raise NotImplementedError(self.get_worktree_config)
 
-    def get_description(self) -> Optional[bytes]:
+    def get_description(self) -> bytes | None:
         """Retrieve the description for this repository.
 
         Returns: Bytes with the description of the repository
@@ -828,7 +825,7 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_blob_normalizer)
 
-    def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
+    def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":
         """Read gitattributes for the repository.
 
         Args:
@@ -870,7 +867,7 @@ class BaseRepo:
             return {line.strip() for line in f}
 
     def update_shallow(
-        self, new_shallow: Optional[set[bytes]], new_unshallow: Optional[set[bytes]]
+        self, new_shallow: set[bytes] | None, new_unshallow: set[bytes] | None
     ) -> None:
         """Update the list of shallow objects.
 
@@ -915,17 +912,17 @@ class BaseRepo:
 
     def get_walker(
         self,
-        include: Optional[Sequence[bytes]] = None,
-        exclude: Optional[Sequence[bytes]] = None,
+        include: Sequence[bytes] | None = None,
+        exclude: Sequence[bytes] | None = None,
         order: str = "date",
         reverse: bool = False,
-        max_entries: Optional[int] = None,
-        paths: Optional[Sequence[bytes]] = None,
+        max_entries: int | None = None,
+        paths: Sequence[bytes] | None = None,
         rename_detector: Optional["RenameDetector"] = None,
         follow: bool = False,
-        since: Optional[int] = None,
-        until: Optional[int] = None,
-        queue_cls: Optional[type] = None,
+        since: int | None = None,
+        until: int | None = None,
+        queue_cls: type | None = None,
     ) -> "Walker":
         """Obtain a walker for this repository.
 
@@ -974,7 +971,7 @@ class BaseRepo:
             queue_cls=queue_cls if queue_cls is not None else _CommitTimeQueue,
         )
 
-    def __getitem__(self, name: Union[ObjectID, Ref]) -> "ShaFile":
+    def __getitem__(self, name: ObjectID | Ref) -> "ShaFile":
         """Retrieve a Git object by SHA1 or ref.
 
         Args:
@@ -1006,7 +1003,7 @@ class BaseRepo:
         else:
             return name in self.refs
 
-    def __setitem__(self, name: bytes, value: Union[ShaFile, bytes]) -> None:
+    def __setitem__(self, name: bytes, value: ShaFile | bytes) -> None:
         """Set a ref.
 
         Args:
@@ -1035,7 +1032,7 @@ class BaseRepo:
             raise ValueError(name)
 
     def _get_user_identity(
-        self, config: "StackedConfig", kind: Optional[str] = None
+        self, config: "StackedConfig", kind: str | None = None
     ) -> bytes:
         """Determine the identity to use for new commits."""
         warnings.warn(
@@ -1089,17 +1086,17 @@ class BaseRepo:
     @replace_me(remove_in="0.26.0")
     def do_commit(
         self,
-        message: Optional[bytes] = None,
-        committer: Optional[bytes] = None,
-        author: Optional[bytes] = None,
-        commit_timestamp: Optional[float] = None,
-        commit_timezone: Optional[int] = None,
-        author_timestamp: Optional[float] = None,
-        author_timezone: Optional[int] = None,
-        tree: Optional[ObjectID] = None,
-        encoding: Optional[bytes] = None,
-        ref: Optional[Ref] = b"HEAD",
-        merge_heads: Optional[list[ObjectID]] = None,
+        message: bytes | None = None,
+        committer: bytes | None = None,
+        author: bytes | None = None,
+        commit_timestamp: float | None = None,
+        commit_timezone: int | None = None,
+        author_timestamp: float | None = None,
+        author_timezone: int | None = None,
+        tree: ObjectID | None = None,
+        encoding: bytes | None = None,
+        ref: Ref | None = b"HEAD",
+        merge_heads: list[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool = False,
     ) -> bytes:
@@ -1215,9 +1212,9 @@ class Repo(BaseRepo):
 
     def __init__(
         self,
-        root: Union[str, bytes, os.PathLike[str]],
-        object_store: Optional[PackBasedObjectStore] = None,
-        bare: Optional[bool] = None,
+        root: str | bytes | os.PathLike[str],
+        object_store: PackBasedObjectStore | None = None,
+        bare: bool | None = None,
     ) -> None:
         """Open a repository on disk.
 
@@ -1350,9 +1347,9 @@ class Repo(BaseRepo):
         ref: bytes,
         old_sha: bytes,
         new_sha: bytes,
-        committer: Optional[bytes],
-        timestamp: Optional[int],
-        timezone: Optional[int],
+        committer: bytes | None,
+        timestamp: int | None,
+        timezone: int | None,
         message: bytes,
     ) -> None:
         from .reflog import format_reflog_line
@@ -1404,7 +1401,7 @@ class Repo(BaseRepo):
             return
 
     @classmethod
-    def discover(cls, start: Union[str, bytes, os.PathLike[str]] = ".") -> "Repo":
+    def discover(cls, start: str | bytes | os.PathLike[str] = ".") -> "Repo":
         """Iterate parent directories to discover a repository.
 
         Return a Repo object for the first parent directory that looks like a
@@ -1491,9 +1488,9 @@ class Repo(BaseRepo):
 
     def get_named_file(
         self,
-        path: Union[str, bytes],
-        basedir: Optional[str] = None,
-    ) -> Optional[BinaryIO]:
+        path: str | bytes,
+        basedir: str | None = None,
+    ) -> BinaryIO | None:
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -1568,9 +1565,10 @@ class Repo(BaseRepo):
     @replace_me(remove_in="0.26.0")
     def stage(
         self,
-        fs_paths: Union[
-            str, bytes, os.PathLike[str], Iterable[Union[str, bytes, os.PathLike[str]]]
-        ],
+        fs_paths: str
+        | bytes
+        | os.PathLike[str]
+        | Iterable[str | bytes | os.PathLike[str]],
     ) -> None:
         """Stage a set of paths.
 
@@ -1591,16 +1589,16 @@ class Repo(BaseRepo):
 
     def clone(
         self,
-        target_path: Union[str, bytes, os.PathLike[str]],
+        target_path: str | bytes | os.PathLike[str],
         *,
         mkdir: bool = True,
         bare: bool = False,
         origin: bytes = b"origin",
-        checkout: Optional[bool] = None,
-        branch: Optional[bytes] = None,
-        progress: Optional[Callable[[str], None]] = None,
-        depth: Optional[int] = None,
-        symlinks: Optional[bool] = None,
+        checkout: bool | None = None,
+        branch: bytes | None = None,
+        progress: Callable[[str], None] | None = None,
+        depth: int | None = None,
+        symlinks: bool | None = None,
     ) -> "Repo":
         """Clone this repository.
 
@@ -1685,7 +1683,7 @@ class Repo(BaseRepo):
         return target
 
     @replace_me(remove_in="0.26.0")
-    def reset_index(self, tree: Optional[bytes] = None) -> None:
+    def reset_index(self, tree: bytes | None = None) -> None:
         """Reset the index back to a specific tree.
 
         Args:
@@ -1828,7 +1826,7 @@ class Repo(BaseRepo):
         path = os.path.join(self.controldir(), "rebase-merge")
         return DiskRebaseStateManager(path)
 
-    def get_description(self) -> Optional[bytes]:
+    def get_description(self) -> bytes | None:
         """Retrieve the description of this repository.
 
         Returns: Description as bytes or None.
@@ -1855,14 +1853,14 @@ class Repo(BaseRepo):
     @classmethod
     def _init_maybe_bare(
         cls,
-        path: Union[str, bytes, os.PathLike[str]],
-        controldir: Union[str, bytes, os.PathLike[str]],
+        path: str | bytes | os.PathLike[str],
+        controldir: str | bytes | os.PathLike[str],
         bare: bool,
-        object_store: Optional[PackBasedObjectStore] = None,
+        object_store: PackBasedObjectStore | None = None,
         config: Optional["StackedConfig"] = None,
-        default_branch: Optional[bytes] = None,
-        symlinks: Optional[bool] = None,
-        format: Optional[int] = None,
+        default_branch: bytes | None = None,
+        symlinks: bool | None = None,
+        format: int | None = None,
     ) -> "Repo":
         path = os.fspath(path)
         if isinstance(path, bytes):
@@ -1891,13 +1889,13 @@ class Repo(BaseRepo):
     @classmethod
     def init(
         cls,
-        path: Union[str, bytes, os.PathLike[str]],
+        path: str | bytes | os.PathLike[str],
         *,
         mkdir: bool = False,
         config: Optional["StackedConfig"] = None,
-        default_branch: Optional[bytes] = None,
-        symlinks: Optional[bool] = None,
-        format: Optional[int] = None,
+        default_branch: bytes | None = None,
+        symlinks: bool | None = None,
+        format: int | None = None,
     ) -> "Repo":
         """Create a new repository.
 
@@ -1931,9 +1929,9 @@ class Repo(BaseRepo):
     @classmethod
     def _init_new_working_directory(
         cls,
-        path: Union[str, bytes, os.PathLike[str]],
+        path: str | bytes | os.PathLike[str],
         main_repo: "Repo",
-        identifier: Optional[str] = None,
+        identifier: str | None = None,
         mkdir: bool = False,
     ) -> "Repo":
         """Create a new working directory linked to a repository.
@@ -1980,13 +1978,13 @@ class Repo(BaseRepo):
     @classmethod
     def init_bare(
         cls,
-        path: Union[str, bytes, os.PathLike[str]],
+        path: str | bytes | os.PathLike[str],
         *,
         mkdir: bool = False,
-        object_store: Optional[PackBasedObjectStore] = None,
+        object_store: PackBasedObjectStore | None = None,
         config: Optional["StackedConfig"] = None,
-        default_branch: Optional[bytes] = None,
-        format: Optional[int] = None,
+        default_branch: bytes | None = None,
+        format: int | None = None,
     ) -> "Repo":
         """Create a new bare repository.
 
@@ -2032,9 +2030,9 @@ class Repo(BaseRepo):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         """Exit context manager and close repository."""
         self.close()
@@ -2099,7 +2097,7 @@ class Repo(BaseRepo):
             config_stack, git_attributes, filter_context=self.filter_context
         )
 
-    def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
+    def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":
         """Read gitattributes for the repository.
 
         Args:
@@ -2202,7 +2200,7 @@ class Repo(BaseRepo):
         return self.get_worktree().set_sparse_checkout_patterns(patterns)
 
     @replace_me(remove_in="0.26.0")
-    def set_cone_mode_patterns(self, dirs: Union[Sequence[str], None] = None) -> None:
+    def set_cone_mode_patterns(self, dirs: Sequence[str] | None = None) -> None:
         """Write the given cone-mode directory patterns into info/sparse-checkout.
 
         For each directory to include, add an inclusion line that "undoes" the prior
@@ -2231,18 +2229,18 @@ class MemoryRepo(BaseRepo):
         self._named_files: dict[str, bytes] = {}
         self.bare = True
         self._config = ConfigFile()
-        self._description: Optional[bytes] = None
+        self._description: bytes | None = None
         self.filter_context = None
 
     def _append_reflog(
         self,
         ref: bytes,
-        old_sha: Optional[bytes],
-        new_sha: Optional[bytes],
-        committer: Optional[bytes],
-        timestamp: Optional[int],
-        timezone: Optional[int],
-        message: Optional[bytes],
+        old_sha: bytes | None,
+        new_sha: bytes | None,
+        committer: bytes | None,
+        timestamp: int | None,
+        timezone: int | None,
+        message: bytes | None,
     ) -> None:
         self._reflog.append(
             (ref, old_sha, new_sha, committer, timestamp, timezone, message)
@@ -2256,7 +2254,7 @@ class MemoryRepo(BaseRepo):
         """
         self._description = description
 
-    def get_description(self) -> Optional[bytes]:
+    def get_description(self) -> bytes | None:
         """Get the description of this repository.
 
         Returns:
@@ -2295,9 +2293,9 @@ class MemoryRepo(BaseRepo):
 
     def get_named_file(
         self,
-        path: Union[str, bytes],
-        basedir: Optional[str] = None,
-    ) -> Optional[BytesIO]:
+        path: str | bytes,
+        basedir: str | None = None,
+    ) -> BytesIO | None:
         """Get a file from the control dir with a specific name.
 
         Although the filename should be interpreted as a filename relative to
@@ -2360,7 +2358,7 @@ class MemoryRepo(BaseRepo):
             config_stack, git_attributes, filter_context=self.filter_context
         )
 
-    def get_gitattributes(self, tree: Optional[bytes] = None) -> "GitAttributes":
+    def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":
         """Read gitattributes for the repository."""
         from .attrs import GitAttributes
 
@@ -2377,17 +2375,17 @@ class MemoryRepo(BaseRepo):
 
     def do_commit(
         self,
-        message: Optional[bytes] = None,
-        committer: Optional[bytes] = None,
-        author: Optional[bytes] = None,
-        commit_timestamp: Optional[float] = None,
-        commit_timezone: Optional[int] = None,
-        author_timestamp: Optional[float] = None,
-        author_timezone: Optional[int] = None,
-        tree: Optional[ObjectID] = None,
-        encoding: Optional[bytes] = None,
-        ref: Optional[Ref] = b"HEAD",
-        merge_heads: Optional[list[ObjectID]] = None,
+        message: bytes | None = None,
+        committer: bytes | None = None,
+        author: bytes | None = None,
+        commit_timestamp: float | None = None,
+        commit_timezone: int | None = None,
+        author_timestamp: float | None = None,
+        author_timezone: int | None = None,
+        tree: ObjectID | None = None,
+        encoding: bytes | None = None,
+        ref: Ref | None = b"HEAD",
+        merge_heads: list[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool = False,
     ) -> bytes:
@@ -2510,7 +2508,7 @@ class MemoryRepo(BaseRepo):
         cls,
         objects: Iterable[ShaFile],
         refs: Mapping[bytes, bytes],
-        format: Optional[int] = None,
+        format: int | None = None,
     ) -> "MemoryRepo":
         """Create a new bare repository in memory.
 

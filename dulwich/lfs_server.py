@@ -27,7 +27,6 @@ import tempfile
 import typing
 from collections.abc import Mapping
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Optional
 
 from .lfs import LFSStore
 
@@ -265,7 +264,7 @@ class LFSServer(HTTPServer):
 def run_lfs_server(
     host: str = "localhost",
     port: int = 0,
-    lfs_dir: Optional[str] = None,
+    lfs_dir: str | None = None,
     log_requests: bool = False,
 ) -> tuple[LFSServer, str]:
     """Run an LFS server.

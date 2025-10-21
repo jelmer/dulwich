@@ -30,6 +30,7 @@ import os
 import re
 import sys
 from collections.abc import (
+    Callable,
     ItemsView,
     Iterable,
     Iterator,
@@ -42,9 +43,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import (
     IO,
-    Callable,
     Generic,
-    Optional,
     TypeVar,
     Union,
     overload,
@@ -52,13 +51,13 @@ from typing import (
 
 from .file import GitFile, _GitFile
 
-ConfigKey = Union[str, bytes, tuple[Union[str, bytes], ...]]
-ConfigValue = Union[str, bytes, bool, int]
+ConfigKey = str | bytes | tuple[str | bytes, ...]
+ConfigValue = str | bytes | bool | int
 
 logger = logging.getLogger(__name__)
 
 # Type for file opener callback
-FileOpener = Callable[[Union[str, os.PathLike[str]]], IO[bytes]]
+FileOpener = Callable[[str | os.PathLike[str]], IO[bytes]]
 
 # Type for includeIf condition matcher
 # Takes the condition value (e.g., "main" for onbranch:main) and returns bool
@@ -185,7 +184,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
     for the same key. Keys are compared case-insensitively.
     """
 
-    def __init__(self, default_factory: Optional[Callable[[], V]] = None) -> None:
+    def __init__(self, default_factory: Callable[[], V] | None = None) -> None:
         """Initialize a CaseInsensitiveOrderedMultiDict.
 
         Args:
@@ -198,10 +197,9 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
     @classmethod
     def make(
         cls,
-        dict_in: Optional[
-            Union[MutableMapping[K, V], "CaseInsensitiveOrderedMultiDict[K, V]"]
-        ] = None,
-        default_factory: Optional[Callable[[], V]] = None,
+        dict_in: Union[MutableMapping[K, V], "CaseInsensitiveOrderedMultiDict[K, V]"]
+        | None = None,
+        default_factory: Callable[[], V] | None = None,
     ) -> "CaseInsensitiveOrderedMultiDict[K, V]":
         """Create a CaseInsensitiveOrderedMultiDict from an existing mapping.
 
@@ -339,7 +337,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
         """
         return self._keyed[lower_key(item)]
 
-    def get(self, key: K, /, default: Union[V, _T, None] = None) -> Union[V, _T, None]:  # type: ignore[override]
+    def get(self, key: K, /, default: V | _T | None = None) -> V | _T | None:  # type: ignore[override]
         """Get the last value for a key, or a default if not found.
 
         Args:
@@ -373,7 +371,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
             if lower_key(actual) == lowered_key:
                 yield value
 
-    def setdefault(self, key: K, default: Optional[V] = None) -> V:
+    def setdefault(self, key: K, default: V | None = None) -> V:
         """Get value for key, setting it to default if not present.
 
         Args:
@@ -401,11 +399,11 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
 
 
 Name = bytes
-NameLike = Union[bytes, str]
+NameLike = bytes | str
 Section = tuple[bytes, ...]
-SectionLike = Union[bytes, str, tuple[Union[bytes, str], ...]]
+SectionLike = bytes | str | tuple[bytes | str, ...]
 Value = bytes
-ValueLike = Union[bytes, str]
+ValueLike = bytes | str
 
 
 class Config:
@@ -443,11 +441,11 @@ class Config:
     ) -> bool: ...
 
     @overload
-    def get_boolean(self, section: SectionLike, name: NameLike) -> Optional[bool]: ...
+    def get_boolean(self, section: SectionLike, name: NameLike) -> bool | None: ...
 
     def get_boolean(
-        self, section: SectionLike, name: NameLike, default: Optional[bool] = None
-    ) -> Optional[bool]:
+        self, section: SectionLike, name: NameLike, default: bool | None = None
+    ) -> bool | None:
         """Retrieve a configuration setting as boolean.
 
         Args:
@@ -470,7 +468,7 @@ class Config:
         raise ValueError(f"not a valid boolean string: {value!r}")
 
     def set(
-        self, section: SectionLike, name: NameLike, value: Union[ValueLike, bool]
+        self, section: SectionLike, name: NameLike, value: ValueLike | bool
     ) -> None:
         """Set a configuration value.
 
@@ -515,10 +513,9 @@ class ConfigDict(Config):
 
     def __init__(
         self,
-        values: Union[
-            MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]], None
-        ] = None,
-        encoding: Union[str, None] = None,
+        values: MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]]
+        | None = None,
+        encoding: str | None = None,
     ) -> None:
         """Create a new ConfigDict."""
         if encoding is None:
@@ -573,7 +570,7 @@ class ConfigDict(Config):
         return self._values.keys()
 
     @classmethod
-    def _parse_setting(cls, name: str) -> tuple[str, Optional[str], str]:
+    def _parse_setting(cls, name: str) -> tuple[str, str | None, str]:
         parts = name.split(".")
         if len(parts) == 3:
             return (parts[0], parts[1], parts[2])
@@ -651,7 +648,7 @@ class ConfigDict(Config):
         self,
         section: SectionLike,
         name: NameLike,
-        value: Union[ValueLike, bool],
+        value: ValueLike | bool,
     ) -> None:
         """Set a configuration value.
 
@@ -678,7 +675,7 @@ class ConfigDict(Config):
         self,
         section: SectionLike,
         name: NameLike,
-        value: Union[ValueLike, bool],
+        value: ValueLike | bool,
     ) -> None:
         """Add a value to a configuration setting, creating a multivar if needed."""
         section, name = self._check_section_and_name(section, name)
@@ -908,10 +905,9 @@ class ConfigFile(ConfigDict):
 
     def __init__(
         self,
-        values: Union[
-            MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]], None
-        ] = None,
-        encoding: Union[str, None] = None,
+        values: MutableMapping[Section, CaseInsensitiveOrderedMultiDict[Name, Value]]
+        | None = None,
+        encoding: str | None = None,
     ) -> None:
         """Initialize a ConfigFile.
 
@@ -920,7 +916,7 @@ class ConfigFile(ConfigDict):
           encoding: Optional encoding for the file (defaults to system encoding)
         """
         super().__init__(values=values, encoding=encoding)
-        self.path: Optional[str] = None
+        self.path: str | None = None
         self._included_paths: set[str] = set()  # Track included files to prevent cycles
 
     @classmethod
@@ -928,12 +924,12 @@ class ConfigFile(ConfigDict):
         cls,
         f: IO[bytes],
         *,
-        config_dir: Optional[str] = None,
-        included_paths: Optional[set[str]] = None,
+        config_dir: str | None = None,
+        included_paths: set[str] | None = None,
         include_depth: int = 0,
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
-        file_opener: Optional[FileOpener] = None,
-        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
+        file_opener: FileOpener | None = None,
+        condition_matchers: Mapping[str, ConditionMatcher] | None = None,
     ) -> "ConfigFile":
         """Read configuration from a file-like object.
 
@@ -954,7 +950,7 @@ class ConfigFile(ConfigDict):
         if included_paths is not None:
             ret._included_paths = included_paths.copy()
 
-        section: Optional[Section] = None
+        section: Section | None = None
         setting = None
         continuation = None
         for lineno, line in enumerate(f.readlines()):
@@ -1031,15 +1027,15 @@ class ConfigFile(ConfigDict):
 
     def _handle_include_directive(
         self,
-        section: Optional[Section],
+        section: Section | None,
         setting: bytes,
         value: bytes,
         *,
-        config_dir: Optional[str],
+        config_dir: str | None,
         include_depth: int,
         max_include_depth: int,
-        file_opener: Optional[FileOpener],
-        condition_matchers: Optional[Mapping[str, ConditionMatcher]],
+        file_opener: FileOpener | None,
+        condition_matchers: Mapping[str, ConditionMatcher] | None,
     ) -> None:
         """Handle include/includeIf directives during config parsing."""
         if (
@@ -1065,11 +1061,11 @@ class ConfigFile(ConfigDict):
         section: Section,
         path_value: bytes,
         *,
-        config_dir: Optional[str],
+        config_dir: str | None,
         include_depth: int,
         max_include_depth: int,
-        file_opener: Optional[FileOpener],
-        condition_matchers: Optional[Mapping[str, ConditionMatcher]],
+        file_opener: FileOpener | None,
+        condition_matchers: Mapping[str, ConditionMatcher] | None,
     ) -> None:
         """Process an include or includeIf directive."""
         path_str = path_value.decode(self.encoding, errors="replace")
@@ -1103,7 +1099,7 @@ class ConfigFile(ConfigDict):
             opener: FileOpener
             if file_opener is None:
 
-                def opener(path: Union[str, os.PathLike[str]]) -> IO[bytes]:
+                def opener(path: str | os.PathLike[str]) -> IO[bytes]:
                     return GitFile(path, "rb")
             else:
                 opener = file_opener
@@ -1140,9 +1136,7 @@ class ConfigFile(ConfigDict):
             for key, value in values.items():
                 self._values[section][key] = value
 
-    def _resolve_include_path(
-        self, path: str, config_dir: Optional[str]
-    ) -> Optional[str]:
+    def _resolve_include_path(self, path: str, config_dir: str | None) -> str | None:
         """Resolve an include path to an absolute path."""
         # Expand ~ to home directory
         path = os.path.expanduser(path)
@@ -1156,8 +1150,8 @@ class ConfigFile(ConfigDict):
     def _evaluate_includeif_condition(
         self,
         condition: str,
-        config_dir: Optional[str] = None,
-        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
+        config_dir: str | None = None,
+        condition_matchers: Mapping[str, ConditionMatcher] | None = None,
     ) -> bool:
         """Evaluate an includeIf condition."""
         # Try custom matchers first if provided
@@ -1243,11 +1237,11 @@ class ConfigFile(ConfigDict):
     @classmethod
     def from_path(
         cls,
-        path: Union[str, os.PathLike[str]],
+        path: str | os.PathLike[str],
         *,
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
-        file_opener: Optional[FileOpener] = None,
-        condition_matchers: Optional[Mapping[str, ConditionMatcher]] = None,
+        file_opener: FileOpener | None = None,
+        condition_matchers: Mapping[str, ConditionMatcher] | None = None,
     ) -> "ConfigFile":
         """Read configuration from a file on disk.
 
@@ -1264,7 +1258,7 @@ class ConfigFile(ConfigDict):
         opener: FileOpener
         if file_opener is None:
 
-            def opener(p: Union[str, os.PathLike[str]]) -> IO[bytes]:
+            def opener(p: str | os.PathLike[str]) -> IO[bytes]:
                 return GitFile(p, "rb")
         else:
             opener = file_opener
@@ -1280,20 +1274,18 @@ class ConfigFile(ConfigDict):
             ret.path = abs_path
             return ret
 
-    def write_to_path(
-        self, path: Optional[Union[str, os.PathLike[str]]] = None
-    ) -> None:
+    def write_to_path(self, path: str | os.PathLike[str] | None = None) -> None:
         """Write configuration to a file on disk."""
         if path is None:
             if self.path is None:
                 raise ValueError("No path specified and no default path available")
-            path_to_use: Union[str, os.PathLike[str]] = self.path
+            path_to_use: str | os.PathLike[str] = self.path
         else:
             path_to_use = path
         with GitFile(path_to_use, "wb") as f:
             self.write_to_file(f)
 
-    def write_to_file(self, f: Union[IO[bytes], _GitFile]) -> None:
+    def write_to_file(self, f: IO[bytes] | _GitFile) -> None:
         """Write configuration to a file-like object."""
         for section, values in self._values.items():
             try:
@@ -1404,7 +1396,7 @@ class StackedConfig(Config):
     """Configuration which reads from multiple config files.."""
 
     def __init__(
-        self, backends: list[ConfigFile], writable: Optional[ConfigFile] = None
+        self, backends: list[ConfigFile], writable: ConfigFile | None = None
     ) -> None:
         """Initialize a StackedConfig.
 
@@ -1487,7 +1479,7 @@ class StackedConfig(Config):
                 pass
 
     def set(
-        self, section: SectionLike, name: NameLike, value: Union[ValueLike, bool]
+        self, section: SectionLike, name: NameLike, value: ValueLike | bool
     ) -> None:
         """Set value in configuration."""
         if self.writable is None:
@@ -1505,7 +1497,7 @@ class StackedConfig(Config):
 
 
 def read_submodules(
-    path: Union[str, os.PathLike[str]],
+    path: str | os.PathLike[str],
 ) -> Iterator[tuple[bytes, bytes, bytes]]:
     """Read a .gitmodules file."""
     cfg = ConfigFile.from_path(path)

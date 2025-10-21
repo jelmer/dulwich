@@ -3128,6 +3128,7 @@ class SSHGitClient(TraditionalGitClient):
             port=self.port,
             username=self.username,
             protocol_version=protocol_version,
+            **kwargs,
         )
         return (
             Protocol(

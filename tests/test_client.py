@@ -1025,6 +1025,23 @@ class SSHGitClientTests(TestCase):
         test_client = SSHGitClient("git.samba.org", config=config)
         self.assertEqual(test_client.ssh_command, "/usr/bin/ssh -v")
 
+    def test_ssh_kwargs_passed_to_vendor(self) -> None:
+        # Test that ssh_command and other kwargs are actually passed to the SSH vendor
+        server = self.server
+        client = self.client
+
+        # Set custom ssh_command
+        client.ssh_command = "custom-ssh-wrapper.sh -o Option=Value"
+        client.password = "test-password"
+        client.key_filename = "/path/to/key"
+
+        # Connect and verify all kwargs are passed through
+        client._connect(b"upload-pack", b"/path/to/repo")
+
+        self.assertEqual(server.ssh_command, "custom-ssh-wrapper.sh -o Option=Value")
+        self.assertEqual(server.password, "test-password")
+        self.assertEqual(server.key_filename, "/path/to/key")
+
 
 class ReportStatusParserTests(TestCase):
     def test_invalid_pack(self) -> None:

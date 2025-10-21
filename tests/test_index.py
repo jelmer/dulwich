@@ -3008,3 +3008,276 @@ class TestUpdateWorkingTree(TestCase):
                     parent = os.path.dirname(path)
                     # We're not creating these directories, just testing the logic doesn't fail
                     self.assertIsInstance(parent, bytes)
+
+
+class TestSparseIndex(TestCase):
+    """Tests for sparse index support."""
+
+    def test_serialized_index_entry_is_sparse_dir(self):
+        """Test SerializedIndexEntry.is_sparse_dir() method."""
+        from dulwich.index import EXTENDED_FLAG_SKIP_WORKTREE
+
+        # Regular file entry - not sparse
+        regular_entry = SerializedIndexEntry(
+            name=b"file.txt",
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=0o100644,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"\x00" * 20,
+            flags=0,
+            extended_flags=0,
+        )
+        self.assertFalse(regular_entry.is_sparse_dir())
+
+        # Directory mode but no skip-worktree flag - not sparse
+        dir_entry = SerializedIndexEntry(
+            name=b"dir/",
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=stat.S_IFDIR,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"\x00" * 20,
+            flags=0,
+            extended_flags=0,
+        )
+        self.assertFalse(dir_entry.is_sparse_dir())
+
+        # Skip-worktree flag but not directory - not sparse
+        skip_file = SerializedIndexEntry(
+            name=b"file.txt",
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=0o100644,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"\x00" * 20,
+            flags=0,
+            extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
+        )
+        self.assertFalse(skip_file.is_sparse_dir())
+
+        # Directory mode + skip-worktree + trailing slash - sparse!
+        sparse_dir = SerializedIndexEntry(
+            name=b"sparse_dir/",
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=stat.S_IFDIR,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"\x00" * 20,
+            flags=0,
+            extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
+        )
+        self.assertTrue(sparse_dir.is_sparse_dir())
+
+    def test_index_entry_is_sparse_dir(self):
+        """Test IndexEntry.is_sparse_dir() method."""
+        from dulwich.index import EXTENDED_FLAG_SKIP_WORKTREE
+
+        # Regular file - not sparse
+        regular = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=0o100644,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"\x00" * 20,
+            extended_flags=0,
+        )
+        self.assertFalse(regular.is_sparse_dir(b"file.txt"))
+
+        # Sparse directory entry
+        sparse = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=stat.S_IFDIR,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"\x00" * 20,
+            extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
+        )
+        self.assertTrue(sparse.is_sparse_dir(b"dir/"))
+        self.assertFalse(sparse.is_sparse_dir(b"dir"))  # No trailing slash
+
+    def test_sparse_dir_extension(self):
+        """Test SparseDirExtension serialization."""
+        from dulwich.index import SDIR_EXTENSION, SparseDirExtension
+
+        ext = SparseDirExtension()
+        self.assertEqual(ext.signature, SDIR_EXTENSION)
+        self.assertEqual(ext.to_bytes(), b"")
+
+        # Test round-trip
+        ext2 = SparseDirExtension.from_bytes(b"")
+        self.assertEqual(ext2.signature, SDIR_EXTENSION)
+        self.assertEqual(ext2.to_bytes(), b"")
+
+    def test_index_is_sparse(self):
+        """Test Index.is_sparse() method."""
+        from dulwich.index import SparseDirExtension
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            index_path = os.path.join(tmpdir, "index")
+            idx = Index(index_path, read=False)
+
+            # Initially not sparse
+            self.assertFalse(idx.is_sparse())
+
+            # Add sparse directory extension
+            idx._extensions.append(SparseDirExtension())
+            self.assertTrue(idx.is_sparse())
+
+    def test_index_expansion(self):
+        """Test Index.ensure_full_index() expands sparse directories."""
+        from dulwich.index import EXTENDED_FLAG_SKIP_WORKTREE, SparseDirExtension
+        from dulwich.object_store import MemoryObjectStore
+        from dulwich.objects import Blob, Tree
+
+        # Create a tree structure
+        store = MemoryObjectStore()
+
+        blob1 = Blob()
+        blob1.data = b"file1"
+        store.add_object(blob1)
+
+        blob2 = Blob()
+        blob2.data = b"file2"
+        store.add_object(blob2)
+
+        subtree = Tree()
+        subtree[b"file1.txt"] = (0o100644, blob1.id)
+        subtree[b"file2.txt"] = (0o100644, blob2.id)
+        store.add_object(subtree)
+
+        # Create an index with a sparse directory entry
+        with tempfile.TemporaryDirectory() as tmpdir:
+            index_path = os.path.join(tmpdir, "index")
+            idx = Index(index_path, read=False)
+
+            # Add sparse directory entry
+            sparse_entry = IndexEntry(
+                ctime=0,
+                mtime=0,
+                dev=0,
+                ino=0,
+                mode=stat.S_IFDIR,
+                uid=0,
+                gid=0,
+                size=0,
+                sha=subtree.id,
+                extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
+            )
+            idx[b"subdir/"] = sparse_entry
+            idx._extensions.append(SparseDirExtension())
+
+            self.assertTrue(idx.is_sparse())
+            self.assertEqual(len(idx), 1)
+
+            # Expand the index
+            idx.ensure_full_index(store)
+
+            # Should no longer be sparse
+            self.assertFalse(idx.is_sparse())
+
+            # Should have 2 entries now (the files)
+            self.assertEqual(len(idx), 2)
+            self.assertIn(b"subdir/file1.txt", idx)
+            self.assertIn(b"subdir/file2.txt", idx)
+
+            # Entries should point to the correct blobs
+            self.assertEqual(idx[b"subdir/file1.txt"].sha, blob1.id)
+            self.assertEqual(idx[b"subdir/file2.txt"].sha, blob2.id)
+
+    def test_index_collapse(self):
+        """Test Index.convert_to_sparse() collapses directories."""
+        from dulwich.object_store import MemoryObjectStore
+        from dulwich.objects import Blob, Tree
+
+        # Create a tree structure
+        store = MemoryObjectStore()
+
+        blob1 = Blob()
+        blob1.data = b"file1"
+        store.add_object(blob1)
+
+        blob2 = Blob()
+        blob2.data = b"file2"
+        store.add_object(blob2)
+
+        subtree = Tree()
+        subtree[b"file1.txt"] = (0o100644, blob1.id)
+        subtree[b"file2.txt"] = (0o100644, blob2.id)
+        store.add_object(subtree)
+
+        tree = Tree()
+        tree[b"subdir"] = (stat.S_IFDIR, subtree.id)
+        store.add_object(tree)
+
+        # Create an index with full entries
+        with tempfile.TemporaryDirectory() as tmpdir:
+            index_path = os.path.join(tmpdir, "index")
+            idx = Index(index_path, read=False)
+
+            idx[b"subdir/file1.txt"] = IndexEntry(
+                ctime=0,
+                mtime=0,
+                dev=0,
+                ino=0,
+                mode=0o100644,
+                uid=0,
+                gid=0,
+                size=5,
+                sha=blob1.id,
+                extended_flags=0,
+            )
+            idx[b"subdir/file2.txt"] = IndexEntry(
+                ctime=0,
+                mtime=0,
+                dev=0,
+                ino=0,
+                mode=0o100644,
+                uid=0,
+                gid=0,
+                size=5,
+                sha=blob2.id,
+                extended_flags=0,
+            )
+
+            self.assertEqual(len(idx), 2)
+            self.assertFalse(idx.is_sparse())
+
+            # Collapse subdir to sparse
+            idx.convert_to_sparse(store, tree.id, {b"subdir/"})
+
+            # Should now be sparse
+            self.assertTrue(idx.is_sparse())
+
+            # Should have 1 entry (the sparse dir)
+            self.assertEqual(len(idx), 1)
+            self.assertIn(b"subdir/", idx)
+
+            # Entry should be a sparse directory
+            entry = idx[b"subdir/"]
+            self.assertTrue(entry.is_sparse_dir(b"subdir/"))
+            self.assertEqual(entry.sha, subtree.id)

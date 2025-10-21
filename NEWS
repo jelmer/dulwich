@@ -5,6 +5,9 @@
    collapse operations, and the 'sdir' extension.
    (Jelmer Vernooĳ, #1797)
 
+ * Work around typing module bug in Python 3.9.0 and 3.9.1 by using string
+   annotation for Callable type in reflog.py. (Jelmer Vernooĳ, #1948)
+
  * Fix passing ssh_command, password, and key_filename parameters to the SSH
    vendor. Regression from 0.24.2.  (Jelmer Vernooĳ, #1945)
 

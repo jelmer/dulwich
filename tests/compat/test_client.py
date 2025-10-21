@@ -580,6 +580,7 @@ class TestSSHVendor:
         port=None,
         password=None,
         key_filename=None,
+        ssh_command=None,
         protocol_version=None,
     ):
         # Handle both bytes and string commands

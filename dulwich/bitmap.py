@@ -735,31 +735,3 @@ def write_bitmap_file(f: IO[bytes], bitmap: PackBitmap) -> None:
     if bitmap.flags & BITMAP_OPT_HASH_CACHE and bitmap.name_hash_cache:
         for hash_value in bitmap.name_hash_cache:
             f.write(struct.pack(">I", hash_value))
-
-
-def load_pack_bitmap(
-    pack_path: Union[str, os.PathLike[str]],
-    pack_index: Optional["PackIndex"] = None,
-) -> Optional[PackBitmap]:
-    """Load the bitmap file for a pack.
-
-    Args:
-        pack_path: Path to the .pack file
-        pack_index: Optional PackIndex to resolve object positions to SHAs
-
-    Returns:
-        Loaded PackBitmap or None if no bitmap exists
-    """
-    # Convert .pack to .bitmap
-    pack_str = str(pack_path)
-    if pack_str.endswith(".pack"):
-        bitmap_path = pack_str[:-5] + ".bitmap"
-    elif pack_str.endswith(".idx"):
-        bitmap_path = pack_str[:-4] + ".bitmap"
-    else:
-        bitmap_path = pack_str + ".bitmap"
-
-    if not os.path.exists(bitmap_path):
-        return None
-
-    return read_bitmap(bitmap_path, pack_index=pack_index)

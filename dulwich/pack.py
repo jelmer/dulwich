@@ -3536,10 +3536,9 @@ class Pack:
             ValueError: If bitmap file is invalid or corrupt
         """
         if self._bitmap is None:
-            from .bitmap import load_pack_bitmap
+            from .bitmap import read_bitmap
 
-            # load_pack_bitmap expects the pack basename (not the .bitmap path)
-            self._bitmap = load_pack_bitmap(self._basename, pack_index=self.index)
+            self._bitmap = read_bitmap(self._bitmap_path, pack_index=self.index)
         return self._bitmap
 
     def close(self) -> None:

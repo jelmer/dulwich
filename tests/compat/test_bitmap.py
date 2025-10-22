@@ -22,14 +22,22 @@
 """Compatibility tests for git pack bitmaps."""
 
 import os
-import shutil
 import tempfile
 
+from dulwich.bitmap import (
+    BITMAP_OPT_FULL_DAG,
+    BITMAP_OPT_HASH_CACHE,
+    BITMAP_OPT_LOOKUP_TABLE,
+    BitmapEntry,
+    EWAHBitmap,
+    PackBitmap,
+    write_bitmap,
+)
 from dulwich.pack import Pack
 from dulwich.repo import Repo
 
-from .. import SkipTest, TestCase
-from .utils import require_git_version, run_git_or_fail
+from .. import TestCase
+from .utils import remove_ro, require_git_version, rmtree_ro, run_git_or_fail
 
 
 class BitmapCompatTests(TestCase):
@@ -40,7 +48,7 @@ class BitmapCompatTests(TestCase):
         # Git bitmap support was added in 2.0.0
         require_git_version((2, 0, 0))
         self._tempdir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self._tempdir)
+        self.addCleanup(rmtree_ro, self._tempdir)
 
     def _init_repo_with_bitmap(self):
         """Create a repo and generate a bitmap using git."""
@@ -78,9 +86,6 @@ class BitmapCompatTests(TestCase):
         # Find the pack file with bitmap
         pack_dir = os.path.join(repo_path, ".git", "objects", "pack")
         bitmap_files = [f for f in os.listdir(pack_dir) if f.endswith(".bitmap")]
-
-        if not bitmap_files:
-            raise SkipTest("Git did not generate a bitmap file")
 
         # Get the pack file (basename without extension)
         bitmap_name = bitmap_files[0]
@@ -183,16 +188,6 @@ class BitmapCompatTests(TestCase):
         run_git_or_fail(["repack", "-a", "-d"], cwd=None, env={"GIT_DIR": repo_path})
 
         # Now use Dulwich to write a bitmap for the pack
-        from dulwich.bitmap import (
-            BITMAP_OPT_FULL_DAG,
-            BITMAP_OPT_HASH_CACHE,
-            BITMAP_OPT_LOOKUP_TABLE,
-            BitmapEntry,
-            EWAHBitmap,
-            PackBitmap,
-            write_bitmap,
-        )
-
         pack_dir = os.path.join(repo_path, "objects", "pack")
         pack_files = [f for f in os.listdir(pack_dir) if f.endswith(".pack")]
         self.assertGreater(len(pack_files), 0, "Should have at least one pack file")
@@ -230,6 +225,7 @@ class BitmapCompatTests(TestCase):
 
         # Write the bitmap after pack is closed to avoid file locking on Windows
         bitmap_path = pack_path + ".bitmap"
+        remove_ro(bitmap_path)
         write_bitmap(bitmap_path, bitmap)
 
         # Verify git can use the repository with our bitmap
@@ -250,9 +246,6 @@ class BitmapCompatTests(TestCase):
         # Find bitmap
         pack_dir = os.path.join(repo_path, ".git", "objects", "pack")
         bitmap_files = [f for f in os.listdir(pack_dir) if f.endswith(".bitmap")]
-
-        if not bitmap_files:
-            raise SkipTest("Git did not generate a bitmap file")
 
         bitmap_path = os.path.join(pack_dir, bitmap_files[0])
 

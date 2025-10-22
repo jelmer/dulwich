@@ -766,6 +766,88 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         depth_disabled = get_depth(self.store, c4.id)
         self.assertEqual(3, depth_disabled)
 
+    def test_fsync_object_files_disabled_by_default(self) -> None:
+        """Test that fsync is disabled by default for object files."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        store = DiskObjectStore.from_config(self.store_dir, config)
+        self.addCleanup(store.close)
+
+        # Should be disabled by default
+        self.assertFalse(store.fsync_object_files)
+
+    def test_fsync_object_files_enabled_by_config(self) -> None:
+        """Test that fsync can be enabled via core.fsyncObjectFiles config."""
+        from unittest.mock import patch
+
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config[(b"core",)] = {b"fsyncObjectFiles": b"true"}
+        store = DiskObjectStore.from_config(self.store_dir, config)
+        self.addCleanup(store.close)
+
+        # Should be enabled
+        self.assertTrue(store.fsync_object_files)
+
+        # Test that fsync is actually called when adding objects
+        blob = make_object(Blob, data=b"test fsync data")
+        with patch("os.fsync") as mock_fsync:
+            store.add_object(blob)
+            # fsync should have been called
+            mock_fsync.assert_called_once()
+
+    def test_fsync_object_files_disabled_by_config(self) -> None:
+        """Test that fsync can be explicitly disabled via config."""
+        from unittest.mock import patch
+
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        config[(b"core",)] = {b"fsyncObjectFiles": b"false"}
+        store = DiskObjectStore.from_config(self.store_dir, config)
+        self.addCleanup(store.close)
+
+        # Should be disabled
+        self.assertFalse(store.fsync_object_files)
+
+        # Test that fsync is NOT called when adding objects
+        blob = make_object(Blob, data=b"test no fsync data")
+        with patch("os.fsync") as mock_fsync:
+            store.add_object(blob)
+            # fsync should NOT have been called
+            mock_fsync.assert_not_called()
+
+    def test_fsync_object_files_for_pack_files(self) -> None:
+        """Test that fsync config applies to pack files."""
+        from unittest.mock import patch
+
+        from dulwich.config import ConfigDict
+        from dulwich.pack import write_pack_objects
+
+        # Test with fsync enabled
+        config = ConfigDict()
+        config[(b"core",)] = {b"fsyncObjectFiles": b"true"}
+        store = DiskObjectStore.from_config(self.store_dir, config)
+        self.addCleanup(store.close)
+
+        self.assertTrue(store.fsync_object_files)
+
+        # Add some objects via pack
+        blob = make_object(Blob, data=b"pack test data")
+        with patch("os.fsync") as mock_fsync:
+            f, commit, abort = store.add_pack()
+            try:
+                write_pack_objects(f.write, [(blob, None)])
+            except BaseException:
+                abort()
+                raise
+            else:
+                commit()
+            # fsync should have been called at least once (for pack file and index)
+            self.assertGreater(mock_fsync.call_count, 0)
+
 
 class TreeLookupPathTests(TestCase):
     def setUp(self) -> None:

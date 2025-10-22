@@ -72,6 +72,7 @@ def GitFile(
     mode: Literal["wb"],
     bufsize: int = -1,
     mask: int = 0o644,
+    fsync: bool = True,
 ) -> "_GitFile": ...
 
 
@@ -81,6 +82,7 @@ def GitFile(
     mode: Literal["rb"] = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
+    fsync: bool = True,
 ) -> IO[bytes]: ...
 
 
@@ -90,6 +92,7 @@ def GitFile(
     mode: str = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
+    fsync: bool = True,
 ) -> Union[IO[bytes], "_GitFile"]: ...
 
 
@@ -98,6 +101,7 @@ def GitFile(
     mode: str = "rb",
     bufsize: int = -1,
     mask: int = 0o644,
+    fsync: bool = True,
 ) -> Union[IO[bytes], "_GitFile"]:
     """Create a file object that obeys the git file locking protocol.
 
@@ -113,6 +117,13 @@ def GitFile(
     The default file mask makes any created files user-writable and
     world-readable.
 
+    Args:
+      filename: Path to the file
+      mode: File mode (only 'rb' and 'wb' are supported)
+      bufsize: Buffer size for file operations
+      mask: File mask for created files
+      fsync: Whether to call fsync() before closing (default: True)
+
     """
     if "a" in mode:
         raise OSError("append mode not supported for Git files")
@@ -121,7 +132,7 @@ def GitFile(
     if "b" not in mode:
         raise OSError("text mode not supported for Git files")
     if "w" in mode:
-        return _GitFile(filename, mode, bufsize, mask)
+        return _GitFile(filename, mode, bufsize, mask, fsync)
     else:
         return open(filename, mode, bufsize)
 
@@ -194,9 +205,11 @@ class _GitFile(IO[bytes]):
         mode: str,
         bufsize: int,
         mask: int,
+        fsync: bool = True,
     ) -> None:
         # Convert PathLike to str/bytes for our internal use
         self._filename: Union[str, bytes] = os.fspath(filename)
+        self._fsync = fsync
         if isinstance(self._filename, bytes):
             self._lockfilename: Union[str, bytes] = self._filename + b".lock"
         else:
@@ -247,7 +260,8 @@ class _GitFile(IO[bytes]):
         if self._closed:
             return
         self._file.flush()
-        os.fsync(self._file.fileno())
+        if self._fsync:
+            os.fsync(self._file.fileno())
         self._file.close()
         try:
             if getattr(os, "replace", None) is not None:

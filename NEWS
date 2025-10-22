@@ -5,6 +5,9 @@
    collapse operations, and the 'sdir' extension.
    (Jelmer Vernooĳ, #1797)
 
+ * Add support for core.fsyncObjectFiles configuration option.
+   (Jelmer Vernooĳ, #1817)
+
  * Work around typing module bug in Python 3.9.0 and 3.9.1 by using string
    annotation for Callable type in reflog.py. (Jelmer Vernooĳ, #1948)
 

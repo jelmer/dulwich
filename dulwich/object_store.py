@@ -1202,6 +1202,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_depth: Optional[int] = None,
         pack_threads: Optional[int] = None,
         pack_big_file_threshold: Optional[int] = None,
+        fsync_object_files: bool = False,
     ) -> None:
         """Open an object store.
 
@@ -1216,6 +1217,7 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_depth: maximum delta chain depth
           pack_threads: number of threads for pack operations
           pack_big_file_threshold: threshold for treating files as big
+          fsync_object_files: whether to fsync object files for durability
         """
         super().__init__(
             pack_compression_level=pack_compression_level,
@@ -1233,6 +1235,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self.loose_compression_level = loose_compression_level
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
+        self.fsync_object_files = fsync_object_files
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -1317,6 +1320,9 @@ class DiskObjectStore(PackBasedObjectStore):
         # Read core.commitGraph setting
         use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
 
+        # Read core.fsyncObjectFiles setting
+        fsync_object_files = config.get_boolean((b"core",), b"fsyncObjectFiles", False)
+
         instance = cls(
             path,
             loose_compression_level,
@@ -1328,6 +1334,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth,
             pack_threads,
             pack_big_file_threshold,
+            fsync_object_files,
         )
         instance._use_commit_graph = use_commit_graph
         return instance
@@ -1566,12 +1573,13 @@ class DiskObjectStore(PackBasedObjectStore):
             progress=progress,
         )
         f.flush()
-        try:
-            fileno = f.fileno()
-        except AttributeError:
-            pass
-        else:
-            os.fsync(fileno)
+        if self.fsync_object_files:
+            try:
+                fileno = f.fileno()
+            except AttributeError as e:
+                raise OSError("fsync requested but file has no fileno()") from e
+            else:
+                os.fsync(fileno)
         f.close()
 
         entries.extend(extra_entries)
@@ -1594,7 +1602,9 @@ class DiskObjectStore(PackBasedObjectStore):
         os.rename(path, target_pack_path)
 
         # Write the index.
-        with GitFile(target_index_path, "wb", mask=PACK_MODE) as index_file:
+        with GitFile(
+            target_index_path, "wb", mask=PACK_MODE, fsync=self.fsync_object_files
+        ) as index_file:
             write_pack_index(
                 index_file, entries, pack_sha, version=self.pack_index_version
             )
@@ -1694,7 +1704,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pass
         if os.path.exists(path):
             return  # Already there, no need to write again
-        with GitFile(path, "wb", mask=PACK_MODE) as f:
+        with GitFile(path, "wb", mask=PACK_MODE, fsync=self.fsync_object_files) as f:
             f.write(
                 obj.as_legacy_object(compression_level=self.loose_compression_level)
             )

@@ -82,6 +82,7 @@ else:
 if TYPE_CHECKING:
     from _hashlib import HASH as HashObject
 
+    from .bitmap import PackBitmap
     from .commit_graph import CommitGraph
 
 # For some reason the above try, except fails to set has_mmap = False for plan9
@@ -3428,6 +3429,7 @@ class Pack:
 
     _data: Optional[PackData]
     _idx: Optional[PackIndex]
+    _bitmap: Optional["PackBitmap"]
 
     def __init__(
         self,
@@ -3456,8 +3458,10 @@ class Pack:
         self._basename = basename
         self._data = None
         self._idx = None
+        self._bitmap = None
         self._idx_path = self._basename + ".idx"
         self._data_path = self._basename + ".pack"
+        self._bitmap_path = self._basename + ".bitmap"
         self.delta_window_size = delta_window_size
         self.window_memory = window_memory
         self.delta_cache_size = delta_cache_size
@@ -3520,6 +3524,22 @@ class Pack:
             assert self._idx_load
             self._idx = self._idx_load()
         return self._idx
+
+    @property
+    def bitmap(self) -> Optional["PackBitmap"]:
+        """The bitmap being used, if available.
+
+        Returns:
+            PackBitmap instance or None if no bitmap exists
+
+        Raises:
+            ValueError: If bitmap file is invalid or corrupt
+        """
+        if self._bitmap is None:
+            from .bitmap import read_bitmap
+
+            self._bitmap = read_bitmap(self._bitmap_path, pack_index=self.index)
+        return self._bitmap
 
     def close(self) -> None:
         """Close the pack file and index."""

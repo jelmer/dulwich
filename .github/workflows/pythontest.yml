@@ -65,6 +65,11 @@ jobs:
           python setup.py build_ext -i
         env:
           RUSTFLAGS: "-D warnings"
+      - name: Run Rust tests
+        run: |
+          cargo test
+        env:
+          RUSTFLAGS: "-D warnings"
       - name: codespell
         run: |
           codespell --config .codespellrc .

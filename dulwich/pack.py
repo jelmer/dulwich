@@ -2774,11 +2774,11 @@ def pack_objects_to_data(
       progress: Optional progress reporting callback
     Returns: Tuples with (type_num, hexdigest, delta base, object chunks)
     """
-    # TODO(jelmer): support deltaifying
     count = len(objects)
     if deltify is None:
-        # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too
-        # slow at the moment.
+        # PERFORMANCE/TODO(jelmer): This should be enabled but the python
+        # implementation is *much* too slow at the moment.
+        # Maybe consider enabling it just if the rust extension is available?
         deltify = False
     if deltify:
         return (
@@ -3145,7 +3145,7 @@ def _encode_copy_operation(start: int, length: int) -> bytes:
     return bytes(scratch)
 
 
-def create_delta(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
+def _create_delta_py(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
     """Use python difflib to work out how to transform base_buf to target_buf.
 
     Args:
@@ -3189,6 +3189,10 @@ def create_delta(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
                 o += 127
             yield bytes([s])
             yield bytes(memoryview(target_buf)[o : o + s])
+
+
+# Default to pure Python implementation
+create_delta = _create_delta_py
 
 
 def apply_delta(
@@ -3913,3 +3917,16 @@ try:
     )
 except ImportError:
     pass
+
+# Try to import the Rust version of create_delta
+try:
+    from dulwich._pack import create_delta as _create_delta_rs
+except ImportError:
+    pass
+else:
+    # Wrap the Rust version to match the Python API (returns bytes instead of Iterator)
+    def _create_delta_rs_wrapper(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
+        """Wrapper for Rust create_delta to match Python API."""
+        yield _create_delta_rs(base_buf, target_buf)
+
+    create_delta = _create_delta_rs_wrapper

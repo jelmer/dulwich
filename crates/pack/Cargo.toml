@@ -9,3 +9,4 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { workspace = true, features = ["extension-module"]}
 memchr = "2"
+similar = "2"

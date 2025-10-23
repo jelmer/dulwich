@@ -1,5 +1,9 @@
 0.24.8	UNRELEASED
 
+ * Add Rust implementation of pack delta creation (create_delta). The
+   implementation uses the similar crate for efficient diff computation.
+   (Jelmer Vernooĳ)
+
 0.24.7	2025-10-23
 
  * Add sparse index support for improved performance with large repositories.

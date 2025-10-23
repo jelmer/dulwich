@@ -31,7 +31,7 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import ParamSpec
 
-__version__ = (0, 24, 7)
+__version__ = (0, 24, 8)
 
 __all__ = ["__version__", "replace_me"]
 

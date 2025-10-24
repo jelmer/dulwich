@@ -1872,6 +1872,173 @@ class locked_ref:
         self._deleted = True
 
 
+class NamespacedRefsContainer(RefsContainer):
+    """Wrapper that adds namespace prefix to all ref operations.
+
+    This implements Git's GIT_NAMESPACE feature, which stores refs under
+    refs/namespaces/<namespace>/ and filters operations to only show refs
+    within that namespace.
+
+    Example:
+        With namespace "foo", a ref "refs/heads/master" is stored as
+        "refs/namespaces/foo/refs/heads/master" in the underlying container.
+    """
+
+    def __init__(self, refs: RefsContainer, namespace: bytes) -> None:
+        """Initialize NamespacedRefsContainer.
+
+        Args:
+          refs: The underlying refs container to wrap
+          namespace: The namespace prefix (e.g., b"foo" or b"foo/bar")
+        """
+        super().__init__(logger=refs._logger)
+        self._refs = refs
+        # Build namespace prefix: refs/namespaces/<namespace>/
+        # Support nested namespaces: foo/bar -> refs/namespaces/foo/refs/namespaces/bar/
+        namespace_parts = namespace.split(b"/")
+        self._namespace_prefix = b""
+        for part in namespace_parts:
+            self._namespace_prefix += b"refs/namespaces/" + part + b"/"
+
+    def _apply_namespace(self, name: bytes) -> bytes:
+        """Apply namespace prefix to a ref name."""
+        # HEAD and other special refs are not namespaced
+        if name == HEADREF or not name.startswith(b"refs/"):
+            return name
+        return self._namespace_prefix + name
+
+    def _strip_namespace(self, name: bytes) -> Optional[bytes]:
+        """Remove namespace prefix from a ref name.
+
+        Returns None if the ref is not in our namespace.
+        """
+        # HEAD and other special refs are not namespaced
+        if name == HEADREF or not name.startswith(b"refs/"):
+            return name
+        if name.startswith(self._namespace_prefix):
+            return name[len(self._namespace_prefix) :]
+        return None
+
+    def allkeys(self) -> set[bytes]:
+        """Return all reference keys in this namespace."""
+        keys = set()
+        for key in self._refs.allkeys():
+            stripped = self._strip_namespace(key)
+            if stripped is not None:
+                keys.add(stripped)
+        return keys
+
+    def read_loose_ref(self, name: bytes) -> Optional[bytes]:
+        """Read a loose reference."""
+        return self._refs.read_loose_ref(self._apply_namespace(name))
+
+    def get_packed_refs(self) -> dict[Ref, ObjectID]:
+        """Get packed refs within this namespace."""
+        packed = {}
+        for name, value in self._refs.get_packed_refs().items():
+            stripped = self._strip_namespace(name)
+            if stripped is not None:
+                packed[stripped] = value
+        return packed
+
+    def add_packed_refs(self, new_refs: Mapping[Ref, Optional[ObjectID]]) -> None:
+        """Add packed refs with namespace prefix."""
+        namespaced_refs = {
+            self._apply_namespace(name): value for name, value in new_refs.items()
+        }
+        self._refs.add_packed_refs(namespaced_refs)
+
+    def get_peeled(self, name: bytes) -> Optional[ObjectID]:
+        """Return the cached peeled value of a ref."""
+        return self._refs.get_peeled(self._apply_namespace(name))
+
+    def set_symbolic_ref(
+        self,
+        name: bytes,
+        other: bytes,
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
+    ) -> None:
+        """Make a ref point at another ref."""
+        self._refs.set_symbolic_ref(
+            self._apply_namespace(name),
+            self._apply_namespace(other),
+            committer=committer,
+            timestamp=timestamp,
+            timezone=timezone,
+            message=message,
+        )
+
+    def set_if_equals(
+        self,
+        name: bytes,
+        old_ref: Optional[bytes],
+        new_ref: bytes,
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
+    ) -> bool:
+        """Set a refname to new_ref only if it currently equals old_ref."""
+        return self._refs.set_if_equals(
+            self._apply_namespace(name),
+            old_ref,
+            new_ref,
+            committer=committer,
+            timestamp=timestamp,
+            timezone=timezone,
+            message=message,
+        )
+
+    def add_if_new(
+        self,
+        name: bytes,
+        ref: bytes,
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
+    ) -> bool:
+        """Add a new reference only if it does not already exist."""
+        return self._refs.add_if_new(
+            self._apply_namespace(name),
+            ref,
+            committer=committer,
+            timestamp=timestamp,
+            timezone=timezone,
+            message=message,
+        )
+
+    def remove_if_equals(
+        self,
+        name: bytes,
+        old_ref: Optional[bytes],
+        committer: Optional[bytes] = None,
+        timestamp: Optional[int] = None,
+        timezone: Optional[int] = None,
+        message: Optional[bytes] = None,
+    ) -> bool:
+        """Remove a refname only if it currently equals old_ref."""
+        return self._refs.remove_if_equals(
+            self._apply_namespace(name),
+            old_ref,
+            committer=committer,
+            timestamp=timestamp,
+            timezone=timezone,
+            message=message,
+        )
+
+    def pack_refs(self, all: bool = False) -> None:
+        """Pack loose refs into packed-refs file.
+
+        Note: This packs all refs in the underlying container, not just
+        those in the namespace.
+        """
+        self._refs.pack_refs(all=all)
+
+
 def filter_ref_prefix(refs: T, prefixes: Iterable[bytes]) -> T:
     """Filter refs to only include those with a given prefix.
 

@@ -28,6 +28,10 @@ no means intended to be a full-blown Git command-line interface but just
 a way to test Dulwich.
 """
 
+# TODO: Add support for GIT_NAMESPACE environment variable by wrapping
+# repository refs with NamespacedRefsContainer when the environment
+# variable is set. See issue #1809 and dulwich.refs.NamespacedRefsContainer.
+
 import argparse
 import io
 import logging

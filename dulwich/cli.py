@@ -95,6 +95,196 @@ def to_display_str(value: Union[bytes, str]) -> str:
     return value
 
 
+def _should_auto_flush(
+    stream: Union[TextIO, BinaryIO], env: Optional[Mapping[str, str]] = None
+) -> bool:
+    """Determine if output should be auto-flushed based on GIT_FLUSH environment variable.
+
+    Args:
+        stream: The output stream to check
+        env: Environment variables dict (defaults to os.environ)
+
+    Returns:
+        True if output should be flushed after each write, False otherwise
+    """
+    if env is None:
+        env = os.environ
+    git_flush = env.get("GIT_FLUSH", "").strip()
+    if git_flush == "1":
+        return True
+    elif git_flush == "0":
+        return False
+    else:
+        # Auto-detect: don't flush if redirected to a file
+        return hasattr(stream, "isatty") and not stream.isatty()
+
+
+class AutoFlushTextIOWrapper:
+    """Wrapper that automatically flushes a TextIO stream based on configuration.
+
+    This wrapper can be configured to flush after each write operation,
+    which is useful for real-time output monitoring in CI/CD systems.
+    """
+
+    def __init__(self, stream: TextIO) -> None:
+        """Initialize the wrapper.
+
+        Args:
+            stream: The stream to wrap
+        """
+        self._stream = stream
+
+    @classmethod
+    def env(
+        cls, stream: TextIO, env: Optional[Mapping[str, str]] = None
+    ) -> "AutoFlushTextIOWrapper | TextIO":
+        """Create wrapper respecting the GIT_FLUSH environment variable.
+
+        Respects the GIT_FLUSH environment variable:
+        - GIT_FLUSH=1: Always flush after each write
+        - GIT_FLUSH=0: Never auto-flush (use buffered I/O)
+        - Not set: Auto-detect based on whether output is redirected
+
+        Args:
+            stream: The stream to wrap
+            env: Environment variables dict (defaults to os.environ)
+
+        Returns:
+            AutoFlushTextIOWrapper instance configured based on GIT_FLUSH
+        """
+        if _should_auto_flush(stream, env):
+            return cls(stream)
+        else:
+            return stream
+
+    def write(self, data: str) -> int:
+        """Write data to the stream and optionally flush.
+
+        Args:
+            data: Data to write
+
+        Returns:
+            Number of characters written
+        """
+        result = self._stream.write(data)
+        self._stream.flush()
+        return result
+
+    def writelines(self, lines: Iterable[str]) -> None:
+        """Write multiple lines to the stream and optionally flush.
+
+        Args:
+            lines: Lines to write
+        """
+        self._stream.writelines(lines)
+        self._stream.flush()
+
+    def flush(self) -> None:
+        """Flush the underlying stream."""
+        self._stream.flush()
+
+    def __getattr__(self, name: str) -> object:
+        """Delegate all other attributes to the underlying stream."""
+        return getattr(self._stream, name)
+
+    def __enter__(self) -> "AutoFlushTextIOWrapper":
+        """Support context manager protocol."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        """Support context manager protocol."""
+        if hasattr(self._stream, "__exit__"):
+            self._stream.__exit__(exc_type, exc_val, exc_tb)
+
+
+class AutoFlushBinaryIOWrapper:
+    """Wrapper that automatically flushes a BinaryIO stream based on configuration.
+
+    This wrapper can be configured to flush after each write operation,
+    which is useful for real-time output monitoring in CI/CD systems.
+    """
+
+    def __init__(self, stream: BinaryIO) -> None:
+        """Initialize the wrapper.
+
+        Args:
+            stream: The stream to wrap
+        """
+        self._stream = stream
+
+    @classmethod
+    def env(
+        cls, stream: BinaryIO, env: Optional[Mapping[str, str]] = None
+    ) -> "AutoFlushBinaryIOWrapper | BinaryIO":
+        """Create wrapper respecting the GIT_FLUSH environment variable.
+
+        Respects the GIT_FLUSH environment variable:
+        - GIT_FLUSH=1: Always flush after each write
+        - GIT_FLUSH=0: Never auto-flush (use buffered I/O)
+        - Not set: Auto-detect based on whether output is redirected
+
+        Args:
+            stream: The stream to wrap
+            env: Environment variables dict (defaults to os.environ)
+
+        Returns:
+            AutoFlushBinaryIOWrapper instance configured based on GIT_FLUSH
+        """
+        if _should_auto_flush(stream, env):
+            return cls(stream)
+        else:
+            return stream
+
+    def write(self, data: Buffer) -> int:
+        """Write data to the stream and optionally flush.
+
+        Args:
+            data: Data to write
+
+        Returns:
+            Number of bytes written
+        """
+        result = self._stream.write(data)
+        self._stream.flush()
+        return result
+
+    def writelines(self, lines: Iterable[Buffer]) -> None:
+        """Write multiple lines to the stream and optionally flush.
+
+        Args:
+            lines: Lines to write
+        """
+        self._stream.writelines(lines)
+        self._stream.flush()
+
+    def flush(self) -> None:
+        """Flush the underlying stream."""
+        self._stream.flush()
+
+    def __getattr__(self, name: str) -> object:
+        """Delegate all other attributes to the underlying stream."""
+        return getattr(self._stream, name)
+
+    def __enter__(self) -> "AutoFlushBinaryIOWrapper":
+        """Support context manager protocol."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        """Support context manager protocol."""
+        if hasattr(self._stream, "__exit__"):
+            self._stream.__exit__(exc_type, exc_val, exc_tb)
+
+
 class CommitMessageError(Exception):
     """Raised when there's an issue with the commit message."""
 
@@ -5640,6 +5830,10 @@ def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
     Returns:
         Exit code or None
     """
+    # Wrap stdout and stderr to respect GIT_FLUSH environment variable
+    sys.stdout = AutoFlushTextIOWrapper.env(sys.stdout)
+    sys.stderr = AutoFlushTextIOWrapper.env(sys.stderr)
+
     if argv is None:
         argv = sys.argv[1:]
 

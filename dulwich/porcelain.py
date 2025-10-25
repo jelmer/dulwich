@@ -120,6 +120,7 @@ else:
 if TYPE_CHECKING:
     from .filter_branch import CommitData
     from .gc import GCStats
+    from .maintenance import MaintenanceResult
 
 from . import replace_me
 from .archive import tar_stream
@@ -6384,6 +6385,30 @@ def prune(
             progress("Pruning temporary files")
         if not dry_run:
             r.object_store.prune(grace_period=grace_period)
+
+
+def maintenance_run(
+    repo: RepoPath,
+    tasks: Optional[list[str]] = None,
+    auto: bool = False,
+    progress: Optional[Callable[[str], None]] = None,
+) -> "MaintenanceResult":
+    """Run maintenance tasks on a repository.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      tasks: Optional list of specific task names to run
+             (e.g., ['gc', 'commit-graph', 'pack-refs'])
+      auto: If True, only run tasks if needed
+      progress: Optional progress callback
+
+    Returns:
+      MaintenanceResult object with task execution results
+    """
+    from .maintenance import run_maintenance
+
+    with open_repo_closing(repo) as r:
+        return run_maintenance(r, tasks=tasks, auto=auto, progress=progress)
 
 
 def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsResult:

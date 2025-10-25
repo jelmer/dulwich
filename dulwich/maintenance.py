@@ -5,13 +5,14 @@ and maintaining Git repositories.
 """
 
 import logging
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
-    from .repo import BaseRepo
+    from .repo import BaseRepo, Repo
 
 logger = logging.getLogger(__name__)
 
@@ -382,3 +383,129 @@ def run_maintenance(
             logger.error(f"Task {task_name} failed: {e}")
 
     return result
+
+
+def register_repository(repo: "Repo") -> None:
+    """Register a repository for background maintenance.
+
+    This adds the repository to the global maintenance.repo config and sets
+    up recommended configuration for scheduled maintenance.
+
+    Args:
+        repo: Repository to register
+    """
+    from .config import ConfigFile
+
+    repo_path = os.path.abspath(repo.path)
+
+    # Get global config path
+    global_config_path = os.path.expanduser("~/.gitconfig")
+    try:
+        global_config = ConfigFile.from_path(global_config_path)
+    except FileNotFoundError:
+        # Create new config file if it doesn't exist
+        global_config = ConfigFile()
+        global_config.path = global_config_path
+
+    # Add repository to maintenance.repo list
+    # Check if already registered
+    repo_path_bytes = repo_path.encode()
+    try:
+        existing_repos = list(global_config.get_multivar((b"maintenance",), b"repo"))
+    except KeyError:
+        existing_repos = []
+
+    if repo_path_bytes in existing_repos:
+        # Already registered
+        return
+
+    # Add to global config
+    global_config.set((b"maintenance",), b"repo", repo_path_bytes)
+
+    # Set up incremental strategy in global config if not already set
+    try:
+        global_config.get((b"maintenance",), b"strategy")
+    except KeyError:
+        global_config.set((b"maintenance",), b"strategy", b"incremental")
+
+    # Configure task schedules for incremental strategy
+    schedule_config = {
+        b"commit-graph": b"hourly",
+        b"prefetch": b"hourly",
+        b"loose-objects": b"daily",
+        b"incremental-repack": b"daily",
+    }
+
+    for task, schedule in schedule_config.items():
+        try:
+            global_config.get((b"maintenance", task), b"schedule")
+        except KeyError:
+            global_config.set((b"maintenance", task), b"schedule", schedule)
+
+    global_config.write_to_path()
+
+    # Disable foreground auto maintenance in the repository
+    repo_config = repo.get_config()
+    repo_config.set((b"maintenance",), b"auto", False)
+    repo_config.write_to_path()
+
+
+def unregister_repository(repo: "Repo", force: bool = False) -> None:
+    """Unregister a repository from background maintenance.
+
+    This removes the repository from the global maintenance.repo config.
+
+    Args:
+        repo: Repository to unregister
+        force: If True, don't error if repository is not registered
+
+    Raises:
+        ValueError: If repository is not registered and force is False
+    """
+    from .config import ConfigFile
+
+    repo_path = os.path.abspath(repo.path)
+
+    # Get global config
+    global_config_path = os.path.expanduser("~/.gitconfig")
+    try:
+        global_config = ConfigFile.from_path(global_config_path)
+    except FileNotFoundError:
+        if not force:
+            raise ValueError(
+                f"Repository {repo_path} is not registered for maintenance"
+            )
+        return
+
+    # Check if repository is registered
+    repo_path_bytes = repo_path.encode()
+    try:
+        existing_repos = list(global_config.get_multivar((b"maintenance",), b"repo"))
+    except KeyError:
+        if not force:
+            raise ValueError(
+                f"Repository {repo_path} is not registered for maintenance"
+            )
+        return
+
+    if repo_path_bytes not in existing_repos:
+        if not force:
+            raise ValueError(
+                f"Repository {repo_path} is not registered for maintenance"
+            )
+        return
+
+    # Remove from list
+    existing_repos.remove(repo_path_bytes)
+
+    # Delete the maintenance section and recreate it with remaining repos
+    try:
+        del global_config[(b"maintenance",)]
+    except KeyError:
+        pass
+
+    # Re-add remaining repos
+    for remaining_repo in existing_repos:
+        global_config.set((b"maintenance",), b"repo", remaining_repo)
+
+    global_config.write_to_path()

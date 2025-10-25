@@ -34,14 +34,14 @@ from unittest.mock import MagicMock, patch
 
 from dulwich import cli
 from dulwich.cli import (
+    AutoFlushBinaryIOWrapper,
+    AutoFlushTextIOWrapper,
+    _should_auto_flush,
     detect_terminal_width,
     format_bytes,
     launch_editor,
     parse_relative_time,
     write_columns,
-    _should_auto_flush,
-    AutoFlushTextIOWrapper,
-    AutoFlushBinaryIOWrapper,
 )
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
@@ -3778,6 +3778,13 @@ class GitFlushTest(TestCase):
 class MaintenanceCommandTest(DulwichCliTestCase):
     """Tests for maintenance command."""
 
+    def setUp(self):
+        super().setUp()
+        # Set up a temporary HOME for testing global config
+        self.temp_home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_home)
+        self.overrideEnv("HOME", self.temp_home)
+
     def test_maintenance_run_default(self):
         """Test maintenance run with default tasks."""
         result, _stdout, _stderr = self._run_cli("maintenance", "run")
@@ -3812,9 +3819,33 @@ class MaintenanceCommandTest(DulwichCliTestCase):
         result, _stdout, _stderr = self._run_cli("maintenance")
         self.assertEqual(result, 1)
 
+    def test_maintenance_register(self):
+        """Test maintenance register subcommand."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "register")
+        self.assertIsNone(result)
+
+    def test_maintenance_unregister(self):
+        """Test maintenance unregister subcommand."""
+        # First register
+        _result, _stdout, _stderr = self._run_cli("maintenance", "register")
+
+        # Then unregister
+        result, _stdout, _stderr = self._run_cli("maintenance", "unregister")
+        self.assertIsNone(result)
+
+    def test_maintenance_unregister_not_registered(self):
+        """Test unregistering a repository that is not registered."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "unregister")
+        self.assertEqual(result, 1)
+
+    def test_maintenance_unregister_force(self):
+        """Test unregistering with --force flag."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "unregister", "--force")
+        self.assertIsNone(result)
+
     def test_maintenance_unimplemented_subcommand(self):
         """Test unimplemented maintenance subcommands."""
-        for subcommand in ["start", "stop", "register", "unregister"]:
+        for subcommand in ["start", "stop"]:
             result, _stdout, _stderr = self._run_cli("maintenance", subcommand)
             self.assertEqual(result, 1)
 

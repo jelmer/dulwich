@@ -4363,12 +4363,17 @@ class cmd_maintenance(Command):
         # maintenance stop subcommand (placeholder)
         subparsers.add_parser("stop", help="Stop background maintenance")
 
-        # maintenance register subcommand (placeholder)
+        # maintenance register subcommand
         subparsers.add_parser("register", help="Register repository for maintenance")
 
-        # maintenance unregister subcommand (placeholder)
-        subparsers.add_parser(
+        # maintenance unregister subcommand
+        unregister_parser = subparsers.add_parser(
             "unregister", help="Unregister repository from maintenance"
+        )
+        unregister_parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Don't error if repository is not registered",
         )
 
         parsed_args = parser.parse_args(args)
@@ -4408,7 +4413,18 @@ class cmd_maintenance(Command):
             except porcelain.Error as e:
                 logger.error("%s", e)
                 return 1
-        elif parsed_args.subcommand in ("start", "stop", "register", "unregister"):
+        elif parsed_args.subcommand == "register":
+            porcelain.maintenance_register(".")
+            logger.info("Repository registered for background maintenance")
+        elif parsed_args.subcommand == "unregister":
+            try:
+                force = getattr(parsed_args, "force", False)
+                porcelain.maintenance_unregister(".", force=force)
+            except ValueError as e:
+                logger.error(str(e))
+                return 1
+            logger.info("Repository unregistered from background maintenance")
+        elif parsed_args.subcommand in ("start", "stop"):
             # TODO: Implement background maintenance scheduling
             logger.error(
                 f"The '{parsed_args.subcommand}' subcommand is not yet implemented"

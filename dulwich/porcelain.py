@@ -987,7 +987,7 @@ def clone(
     if recurse_submodules and not bare:
         try:
             submodule_init(repo)
-            submodule_update(repo, init=True)
+            submodule_update(repo, init=True, recursive=True)
         except FileNotFoundError as e:
             # .gitmodules file doesn't exist - no submodules to process
             logging.debug("No .gitmodules file found: %s", e)
@@ -1962,6 +1962,7 @@ def submodule_update(
     paths: Optional[Sequence[Union[str, bytes, os.PathLike[str]]]] = None,
     init: bool = False,
     force: bool = False,
+    recursive: bool = False,
     errstream: Optional[BinaryIO] = None,
 ) -> None:
     """Update submodules.
@@ -1971,6 +1972,7 @@ def submodule_update(
       paths: Optional list of specific submodule paths to update. If None, updates all.
       init: If True, initialize submodules first
       force: Force update even if local changes exist
+      recursive: If True, recursively update nested submodules
       errstream: Error stream for error messages
     """
     from .submodule import iter_cached_submodules
@@ -2028,7 +2030,7 @@ def submodule_update(
 
             # Get or create the submodule repository paths
             submodule_path = os.path.join(r.path, path_str)
-            submodule_git_dir = os.path.join(r.path, ".git", "modules", path_str)
+            submodule_git_dir = os.path.join(r.controldir(), "modules", path_str)
 
             # Clone or fetch the submodule
             if not os.path.exists(submodule_git_dir):
@@ -2044,8 +2046,7 @@ def submodule_update(
                     os.makedirs(submodule_path)
 
                 # Create .git file in the submodule directory
-                depth = path_str.count("/") + 1
-                relative_git_dir = "../" * depth + ".git/modules/" + path_str
+                relative_git_dir = os.path.relpath(submodule_git_dir, submodule_path)
                 git_file_path = os.path.join(submodule_path, ".git")
                 with open(git_file_path, "w") as f:
                     f.write(f"gitdir: {relative_git_dir}\n")
@@ -2088,6 +2089,19 @@ def submodule_update(
 
                     # Reset the working directory
                     reset(sub_repo, "hard", target_sha)
+
+            # Recursively update nested submodules if requested
+            if recursive:
+                submodule_gitmodules = os.path.join(submodule_path, ".gitmodules")
+                if os.path.exists(submodule_gitmodules):
+                    submodule_update(
+                        submodule_path,
+                        paths=None,
+                        init=True,  # Always initialize nested submodules
+                        force=force,
+                        recursive=True,
+                        errstream=errstream,
+                    )
 
 
 def tag_create(

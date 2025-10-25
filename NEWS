@@ -8,6 +8,11 @@
    in CLI commands. When GIT_FLUSH=1, output is flushed after each write for
    real-time visibility. (Jelmer Vernooĳ, #1810)
 
+ * Add support for recursive submodule updates via ``--recursive`` flag in
+   ``dulwich submodule update`` command and ``recursive`` parameter in
+   ``porcelain.submodule_update()``.
+   (Jelmer Vernooĳ, #1813)
+
 0.24.7	2025-10-23
 
  * Add sparse index support for improved performance with large repositories.

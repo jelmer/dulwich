@@ -233,3 +233,82 @@ class PorcelainMaintenanceTest(MaintenanceTaskTestCase):
         result = porcelain.maintenance_run(self.test_dir, tasks=["pack-refs"])
         self.assertEqual(result.tasks_run, ["pack-refs"])
         self.assertEqual(result.tasks_succeeded, ["pack-refs"])
+
+
+class MaintenanceRegisterTest(MaintenanceTaskTestCase):
+    """Tests for maintenance register/unregister."""
+
+    def setUp(self):
+        super().setUp()
+        # Set up a temporary HOME for testing global config
+        self.temp_home = tempfile.mkdtemp()
+        self.addCleanup(self._cleanup_temp_home)
+        self.overrideEnv("HOME", self.temp_home)
+
+    def _cleanup_temp_home(self):
+        import shutil
+
+        shutil.rmtree(self.temp_home)
+
+    def test_register_repository(self):
+        """Test registering a repository for maintenance."""
+        porcelain.maintenance_register(self.test_dir)
+
+        # Verify repository was added to global config
+        import os
+
+        from dulwich.config import ConfigFile
+
+        global_config_path = os.path.expanduser("~/.gitconfig")
+        global_config = ConfigFile.from_path(global_config_path)
+
+        repos = list(global_config.get_multivar((b"maintenance",), b"repo"))
+        self.assertIn(self.test_dir.encode(), repos)
+
+        # Verify strategy was set
+        strategy = global_config.get((b"maintenance",), b"strategy")
+        self.assertEqual(strategy, b"incremental")
+
+        # Verify auto maintenance was disabled in repo
+        repo_config = self.repo.get_config()
+        auto = repo_config.get_boolean((b"maintenance",), b"auto")
+        self.assertFalse(auto)
+
+    def test_register_already_registered(self):
+        """Test registering an already registered repository."""
+        porcelain.maintenance_register(self.test_dir)
+        # Should not error when registering again
+        porcelain.maintenance_register(self.test_dir)
+
+    def test_unregister_repository(self):
+        """Test unregistering a repository."""
+        # First register
+        porcelain.maintenance_register(self.test_dir)
+
+        # Then unregister
+        porcelain.maintenance_unregister(self.test_dir)
+
+        # Verify repository was removed from global config
+        import os
+
+        from dulwich.config import ConfigFile
+
+        global_config_path = os.path.expanduser("~/.gitconfig")
+        global_config = ConfigFile.from_path(global_config_path)
+
+        try:
+            repos = list(global_config.get_multivar((b"maintenance",), b"repo"))
+            self.assertNotIn(self.test_dir.encode(), repos)
+        except KeyError:
+            # No repos registered, which is fine
+            pass
+
+    def test_unregister_not_registered(self):
+        """Test unregistering a repository that is not registered."""
+        with self.assertRaises(ValueError):
+            porcelain.maintenance_unregister(self.test_dir)
+
+    def test_unregister_not_registered_force(self):
+        """Test unregistering with force flag."""
+        # Should not error with force=True
+        porcelain.maintenance_unregister(self.test_dir, force=True)

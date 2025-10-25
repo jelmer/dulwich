@@ -3672,5 +3672,124 @@ class ConfigCommandTest(DulwichCliTestCase):
         self.assertEqual(stdout, "value1\nvalue2\nvalue3\n")
 
 
+class GitFlushTest(TestCase):
+    """Tests for GIT_FLUSH environment variable support."""
+
+    def test_should_auto_flush_with_git_flush_1(self):
+        """Test that GIT_FLUSH=1 enables auto-flushing."""
+        from dulwich.cli import _should_auto_flush
+
+        mock_stream = MagicMock()
+        mock_stream.isatty.return_value = True
+
+        self.assertTrue(_should_auto_flush(mock_stream, env={"GIT_FLUSH": "1"}))
+
+    def test_should_auto_flush_with_git_flush_0(self):
+        """Test that GIT_FLUSH=0 disables auto-flushing."""
+        from dulwich.cli import _should_auto_flush
+
+        mock_stream = MagicMock()
+        mock_stream.isatty.return_value = True
+
+        self.assertFalse(_should_auto_flush(mock_stream, env={"GIT_FLUSH": "0"}))
+
+    def test_should_auto_flush_auto_detect_tty(self):
+        """Test that auto-detect returns False for TTY (no flush needed)."""
+        from dulwich.cli import _should_auto_flush
+
+        mock_stream = MagicMock()
+        mock_stream.isatty.return_value = True
+
+        self.assertFalse(_should_auto_flush(mock_stream, env={}))
+
+    def test_should_auto_flush_auto_detect_pipe(self):
+        """Test that auto-detect returns True for pipes (flush needed)."""
+        from dulwich.cli import _should_auto_flush
+
+        mock_stream = MagicMock()
+        mock_stream.isatty.return_value = False
+
+        self.assertTrue(_should_auto_flush(mock_stream, env={}))
+
+    def test_text_wrapper_flushes_on_write(self):
+        """Test that AutoFlushTextIOWrapper flushes after write."""
+        from dulwich.cli import AutoFlushTextIOWrapper
+
+        mock_stream = MagicMock()
+        wrapper = AutoFlushTextIOWrapper(mock_stream)
+
+        wrapper.write("test")
+        mock_stream.write.assert_called_once_with("test")
+        mock_stream.flush.assert_called_once()
+
+    def test_text_wrapper_flushes_on_writelines(self):
+        """Test that AutoFlushTextIOWrapper flushes after writelines."""
+        from dulwich.cli import AutoFlushTextIOWrapper
+
+        mock_stream = MagicMock()
+        wrapper = AutoFlushTextIOWrapper(mock_stream)
+
+        wrapper.writelines(["line1\n", "line2\n"])
+        mock_stream.writelines.assert_called_once()
+        mock_stream.flush.assert_called_once()
+
+    def test_binary_wrapper_flushes_on_write(self):
+        """Test that AutoFlushBinaryIOWrapper flushes after write."""
+        from dulwich.cli import AutoFlushBinaryIOWrapper
+
+        mock_stream = MagicMock()
+        wrapper = AutoFlushBinaryIOWrapper(mock_stream)
+
+        wrapper.write(b"test")
+        mock_stream.write.assert_called_once_with(b"test")
+        mock_stream.flush.assert_called_once()
+
+    def test_text_wrapper_env_classmethod(self):
+        """Test that AutoFlushTextIOWrapper.env() respects GIT_FLUSH."""
+        from dulwich.cli import AutoFlushTextIOWrapper
+
+        mock_stream = MagicMock()
+        mock_stream.isatty.return_value = False
+
+        wrapper = AutoFlushTextIOWrapper.env(mock_stream, env={"GIT_FLUSH": "1"})
+        self.assertIsInstance(wrapper, AutoFlushTextIOWrapper)
+
+        wrapper = AutoFlushTextIOWrapper.env(mock_stream, env={"GIT_FLUSH": "0"})
+        self.assertIs(mock_stream, wrapper)
+
+    def test_binary_wrapper_env_classmethod(self):
+        """Test that AutoFlushBinaryIOWrapper.env() respects GIT_FLUSH."""
+        from dulwich.cli import AutoFlushBinaryIOWrapper
+
+        mock_stream = MagicMock()
+        mock_stream.isatty.return_value = False
+
+        wrapper = AutoFlushBinaryIOWrapper.env(mock_stream, env={"GIT_FLUSH": "1"})
+        self.assertIsInstance(wrapper, AutoFlushBinaryIOWrapper)
+
+        wrapper = AutoFlushBinaryIOWrapper.env(mock_stream, env={"GIT_FLUSH": "0"})
+        self.assertIs(wrapper, mock_stream)
+
+    def test_wrapper_delegates_attributes(self):
+        """Test that wrapper delegates unknown attributes to stream."""
+        from dulwich.cli import AutoFlushTextIOWrapper
+
+        mock_stream = MagicMock()
+        mock_stream.encoding = "utf-8"
+        wrapper = AutoFlushTextIOWrapper(mock_stream)
+
+        self.assertEqual(wrapper.encoding, "utf-8")
+
+    def test_wrapper_context_manager(self):
+        """Test that wrapper supports context manager protocol."""
+        from dulwich.cli import AutoFlushTextIOWrapper
+
+        mock_stream = MagicMock()
+        wrapper = AutoFlushTextIOWrapper(mock_stream)
+
+        with wrapper as w:
+            self.assertIs(w, wrapper)
+
+
 if __name__ == "__main__":
     unittest.main()

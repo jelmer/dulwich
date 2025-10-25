@@ -4,6 +4,10 @@
    Implements Git's namespace feature for isolating refs within a single
    repository using the ``refs/namespaces/`` prefix. (Jelmer Vernooĳ, #1809)
 
+ * Add support for GIT_FLUSH environment variable to control output buffering
+   in CLI commands. When GIT_FLUSH=1, output is flushed after each write for
+   real-time visibility. (Jelmer Vernooĳ, #1810)
+
 0.24.7	2025-10-23
 
  * Add sparse index support for improved performance with large repositories.

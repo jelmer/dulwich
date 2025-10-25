@@ -4321,6 +4321,106 @@ class cmd_gc(Command):
         return None
 
 
+class cmd_maintenance(Command):
+    """Run tasks to optimize Git repository data."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the maintenance command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser(
+            description="Run tasks to optimize Git repository data"
+        )
+        subparsers = parser.add_subparsers(
+            dest="subcommand", help="Maintenance subcommand"
+        )
+
+        # maintenance run subcommand
+        run_parser = subparsers.add_parser("run", help="Run maintenance tasks")
+        run_parser.add_argument(
+            "--task",
+            action="append",
+            dest="tasks",
+            help="Run a specific task (can be specified multiple times)",
+        )
+        run_parser.add_argument(
+            "--auto",
+            action="store_true",
+            help="Only run tasks if needed",
+        )
+        run_parser.add_argument(
+            "--quiet",
+            "-q",
+            action="store_true",
+            help="Only report errors",
+        )
+
+        # maintenance start subcommand (placeholder)
+        subparsers.add_parser("start", help="Start background maintenance")
+
+        # maintenance stop subcommand (placeholder)
+        subparsers.add_parser("stop", help="Stop background maintenance")
+
+        # maintenance register subcommand (placeholder)
+        subparsers.add_parser("register", help="Register repository for maintenance")
+
+        # maintenance unregister subcommand (placeholder)
+        subparsers.add_parser(
+            "unregister", help="Unregister repository from maintenance"
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        if not parsed_args.subcommand:
+            parser.print_help()
+            return 1
+
+        if parsed_args.subcommand == "run":
+            # Progress callback
+            def progress(msg: str) -> None:
+                if not parsed_args.quiet:
+                    logger.info(msg)
+
+            try:
+                result = porcelain.maintenance_run(
+                    ".",
+                    tasks=parsed_args.tasks,
+                    auto=parsed_args.auto,
+                    progress=progress if not parsed_args.quiet else None,
+                )
+
+                # Report results
+                if not parsed_args.quiet:
+                    if result.tasks_succeeded:
+                        logger.info("\nSuccessfully completed tasks:")
+                        for task in result.tasks_succeeded:
+                            logger.info(f"  - {task}")
+
+                    if result.tasks_failed:
+                        logger.error("\nFailed tasks:")
+                        for task in result.tasks_failed:
+                            error_msg = result.errors.get(task, "Unknown error")
+                            logger.error(f"  - {task}: {error_msg}")
+                        return 1
+
+            except porcelain.Error as e:
+                logger.error("%s", e)
+                return 1
+        elif parsed_args.subcommand in ("start", "stop", "register", "unregister"):
+            # TODO: Implement background maintenance scheduling
+            logger.error(
+                f"The '{parsed_args.subcommand}' subcommand is not yet implemented"
+            )
+            return 1
+        else:
+            parser.print_help()
+            return 1
+
+        return None
+
+
 class cmd_grep(Command):
     """Search for patterns in tracked files."""
 
@@ -5787,6 +5887,7 @@ commands = {
     "ls-files": cmd_ls_files,
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
+    "maintenance": cmd_maintenance,
     "mailsplit": cmd_mailsplit,
     "merge": cmd_merge,
     "merge-base": cmd_merge_base,

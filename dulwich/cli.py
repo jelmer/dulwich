@@ -3307,11 +3307,18 @@ class cmd_submodule_update(Command):
             help="Force update even if local changes exist",
         )
         parser.add_argument(
+            "--recursive",
+            action="store_true",
+            help="Recursively update nested submodules",
+        )
+        parser.add_argument(
             "paths", nargs="*", help="Specific submodule paths to update"
         )
         args = parser.parse_args(argv)
         paths = args.paths if args.paths else None
-        porcelain.submodule_update(".", paths=paths, init=args.init, force=args.force)
+        porcelain.submodule_update(
+            ".", paths=paths, init=args.init, force=args.force, recursive=args.recursive
+        )
 
 
 class cmd_submodule(SuperCommand):

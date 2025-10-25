@@ -4859,6 +4859,118 @@ class SubmoduleTests(PorcelainTestCase):
         with open(submodule_file) as f:
             self.assertEqual(f.read(), "submodule content")
 
+    def test_update_recursive(self) -> None:
+        # Create a nested (innermost) submodule repository
+        nested_repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, nested_repo_path)
+        nested_repo = Repo.init(nested_repo_path)
+        self.addCleanup(nested_repo.close)
+
+        # Add a file to the nested repo
+        nested_file = os.path.join(nested_repo_path, "nested.txt")
+        with open(nested_file, "w") as f:
+            f.write("nested submodule content")
+
+        porcelain.add(nested_repo, paths=[nested_file])
+        nested_commit = porcelain.commit(
+            nested_repo,
+            message=b"Initial nested commit",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Create a middle submodule repository
+        middle_repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, middle_repo_path)
+        middle_repo = Repo.init(middle_repo_path)
+        self.addCleanup(middle_repo.close)
+
+        # Add a file to the middle repo
+        middle_file = os.path.join(middle_repo_path, "middle.txt")
+        with open(middle_file, "w") as f:
+            f.write("middle submodule content")
+
+        porcelain.add(middle_repo, paths=[middle_file])
+
+        # Add the nested submodule to the middle repository
+        porcelain.submodule_add(middle_repo, nested_repo_path, "nested")
+
+        # Manually add the nested submodule to the index
+        from dulwich.index import IndexEntry
+        from dulwich.objects import S_IFGITLINK
+
+        middle_index = middle_repo.open_index()
+        middle_index[b"nested"] = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=S_IFGITLINK,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=nested_commit,
+            flags=0,
+        )
+        middle_index.write()
+
+        porcelain.add(middle_repo, paths=[".gitmodules"])
+        middle_commit = porcelain.commit(
+            middle_repo,
+            message=b"Add nested submodule",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Add the middle submodule to the main repository
+        porcelain.submodule_add(self.repo, middle_repo_path, "middle")
+
+        # Manually add the middle submodule to the index
+        main_index = self.repo.open_index()
+        main_index[b"middle"] = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=S_IFGITLINK,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=middle_commit,
+            flags=0,
+        )
+        main_index.write()
+
+        porcelain.add(self.repo, paths=[".gitmodules"])
+        porcelain.commit(
+            self.repo,
+            message=b"Add middle submodule",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Initialize and recursively update the submodules
+        porcelain.submodule_init(self.repo)
+        porcelain.submodule_update(self.repo, recursive=True)
+
+        # Check that the middle submodule directory and file exist
+        middle_submodule_path = os.path.join(self.repo.path, "middle")
+        self.assertTrue(os.path.exists(middle_submodule_path))
+
+        middle_submodule_file = os.path.join(middle_submodule_path, "middle.txt")
+        self.assertTrue(os.path.exists(middle_submodule_file))
+        with open(middle_submodule_file) as f:
+            self.assertEqual(f.read(), "middle submodule content")
+
+        # Check that the nested submodule directory and file exist
+        nested_submodule_path = os.path.join(self.repo.path, "middle", "nested")
+        self.assertTrue(os.path.exists(nested_submodule_path))
+
+        nested_submodule_file = os.path.join(nested_submodule_path, "nested.txt")
+        self.assertTrue(os.path.exists(nested_submodule_file))
+        with open(nested_submodule_file) as f:
+            self.assertEqual(f.read(), "nested submodule content")
+
 
 class PushTests(PorcelainTestCase):
     def test_simple(self) -> None:

@@ -34,6 +34,9 @@ from unittest.mock import MagicMock, patch
 
 from dulwich import cli
 from dulwich.cli import (
+    AutoFlushBinaryIOWrapper,
+    AutoFlushTextIOWrapper,
+    _should_auto_flush,
     detect_terminal_width,
     format_bytes,
     launch_editor,
@@ -3677,7 +3680,6 @@ class GitFlushTest(TestCase):
 
     def test_should_auto_flush_with_git_flush_1(self):
         """Test that GIT_FLUSH=1 enables auto-flushing."""
-        from dulwich.cli import _should_auto_flush
 
         mock_stream = MagicMock()
         mock_stream.isatty.return_value = True
@@ -3686,8 +3688,6 @@ class GitFlushTest(TestCase):
 
     def test_should_auto_flush_with_git_flush_0(self):
         """Test that GIT_FLUSH=0 disables auto-flushing."""
-        from dulwich.cli import _should_auto_flush
-
         mock_stream = MagicMock()
         mock_stream.isatty.return_value = True
 
@@ -3695,8 +3695,6 @@ class GitFlushTest(TestCase):
 
     def test_should_auto_flush_auto_detect_tty(self):
         """Test that auto-detect returns False for TTY (no flush needed)."""
-        from dulwich.cli import _should_auto_flush
-
         mock_stream = MagicMock()
         mock_stream.isatty.return_value = True
 
@@ -3704,8 +3702,6 @@ class GitFlushTest(TestCase):
 
     def test_should_auto_flush_auto_detect_pipe(self):
         """Test that auto-detect returns True for pipes (flush needed)."""
-        from dulwich.cli import _should_auto_flush
-
         mock_stream = MagicMock()
         mock_stream.isatty.return_value = False
 
@@ -3713,8 +3709,6 @@ class GitFlushTest(TestCase):
 
     def test_text_wrapper_flushes_on_write(self):
         """Test that AutoFlushTextIOWrapper flushes after write."""
-        from dulwich.cli import AutoFlushTextIOWrapper
-
         mock_stream = MagicMock()
         wrapper = AutoFlushTextIOWrapper(mock_stream)
 
@@ -3735,8 +3729,6 @@ class GitFlushTest(TestCase):
 
     def test_binary_wrapper_flushes_on_write(self):
         """Test that AutoFlushBinaryIOWrapper flushes after write."""
-        from dulwich.cli import AutoFlushBinaryIOWrapper
-
         mock_stream = MagicMock()
         wrapper = AutoFlushBinaryIOWrapper(mock_stream)
 
@@ -3746,8 +3738,6 @@ class GitFlushTest(TestCase):
 
     def test_text_wrapper_env_classmethod(self):
         """Test that AutoFlushTextIOWrapper.env() respects GIT_FLUSH."""
-        from dulwich.cli import AutoFlushTextIOWrapper
-
         mock_stream = MagicMock()
         mock_stream.isatty.return_value = False
 
@@ -3759,8 +3749,6 @@ class GitFlushTest(TestCase):
 
     def test_binary_wrapper_env_classmethod(self):
         """Test that AutoFlushBinaryIOWrapper.env() respects GIT_FLUSH."""
-        from dulwich.cli import AutoFlushBinaryIOWrapper
-
         mock_stream = MagicMock()
         mock_stream.isatty.return_value = False
 
@@ -3772,8 +3760,6 @@ class GitFlushTest(TestCase):
 
     def test_wrapper_delegates_attributes(self):
         """Test that wrapper delegates unknown attributes to stream."""
-        from dulwich.cli import AutoFlushTextIOWrapper
-
         mock_stream = MagicMock()
         mock_stream.encoding = "utf-8"
         wrapper = AutoFlushTextIOWrapper(mock_stream)
@@ -3782,13 +3768,86 @@ class GitFlushTest(TestCase):
 
     def test_wrapper_context_manager(self):
         """Test that wrapper supports context manager protocol."""
-        from dulwich.cli import AutoFlushTextIOWrapper
-
         mock_stream = MagicMock()
         wrapper = AutoFlushTextIOWrapper(mock_stream)
 
         with wrapper as w:
             self.assertIs(w, wrapper)
+
+
+class MaintenanceCommandTest(DulwichCliTestCase):
+    """Tests for maintenance command."""
+
+    def setUp(self):
+        super().setUp()
+        # Set up a temporary HOME for testing global config
+        self.temp_home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_home)
+        self.overrideEnv("HOME", self.temp_home)
+
+    def test_maintenance_run_default(self):
+        """Test maintenance run with default tasks."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "run")
+        self.assertIsNone(result)
+
+    def test_maintenance_run_specific_task(self):
+        """Test maintenance run with a specific task."""
+        result, _stdout, _stderr = self._run_cli(
+            "maintenance", "run", "--task", "pack-refs"
+        )
+        self.assertIsNone(result)
+
+    def test_maintenance_run_multiple_tasks(self):
+        """Test maintenance run with multiple specific tasks."""
+        result, _stdout, _stderr = self._run_cli(
+            "maintenance", "run", "--task", "pack-refs", "--task", "gc"
+        )
+        self.assertIsNone(result)
+
+    def test_maintenance_run_quiet(self):
+        """Test maintenance run with quiet flag."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "run", "--quiet")
+        self.assertIsNone(result)
+
+    def test_maintenance_run_auto(self):
+        """Test maintenance run with auto flag."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "run", "--auto")
+        self.assertIsNone(result)
+
+    def test_maintenance_no_subcommand(self):
+        """Test maintenance command without subcommand shows help."""
+        result, _stdout, _stderr = self._run_cli("maintenance")
+        self.assertEqual(result, 1)
+
+    def test_maintenance_register(self):
+        """Test maintenance register subcommand."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "register")
+        self.assertIsNone(result)
+
+    def test_maintenance_unregister(self):
+        """Test maintenance unregister subcommand."""
+        # First register
+        _result, _stdout, _stderr = self._run_cli("maintenance", "register")
+
+        # Then unregister
+        result, _stdout, _stderr = self._run_cli("maintenance", "unregister")
+        self.assertIsNone(result)
+
+    def test_maintenance_unregister_not_registered(self):
+        """Test unregistering a repository that is not registered."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "unregister")
+        self.assertEqual(result, 1)
+
+    def test_maintenance_unregister_force(self):
+        """Test unregistering with --force flag."""
+        result, _stdout, _stderr = self._run_cli("maintenance", "unregister", "--force")
+        self.assertIsNone(result)
+
+    def test_maintenance_unimplemented_subcommand(self):
+        """Test unimplemented maintenance subcommands."""
+        for subcommand in ["start", "stop"]:
+            result, _stdout, _stderr = self._run_cli("maintenance", subcommand)
+            self.assertEqual(result, 1)
 
 
 if __name__ == "__main__":

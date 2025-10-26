@@ -283,3 +283,50 @@ class CompatBundleTestCase(CompatTestCase):
         # Verify the cloned repository exists and has content
         self.assertTrue(os.path.exists(clone_path))
         self.assertTrue(os.path.exists(os.path.join(clone_path, "test.txt")))
+
+    def test_unbundle_git_bundle(self) -> None:
+        """Test unbundling a bundle created by git using dulwich CLI."""
+        # Create a repository with commits using git
+        run_git_or_fail(["config", "user.name", "Test User"], cwd=self.repo_path)
+        run_git_or_fail(
+            ["config", "user.email", "test@example.com"], cwd=self.repo_path
+        )
+
+        # Create commits
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("content 1\n")
+        run_git_or_fail(["add", "test.txt"], cwd=self.repo_path)
+        run_git_or_fail(["commit", "-m", "Commit 1"], cwd=self.repo_path)
+
+        with open(test_file, "a") as f:
+            f.write("content 2\n")
+        run_git_or_fail(["add", "test.txt"], cwd=self.repo_path)
+        run_git_or_fail(["commit", "-m", "Commit 2"], cwd=self.repo_path)
+
+        # Get commit SHA for verification
+        head_sha = run_git_or_fail(["rev-parse", "HEAD"], cwd=self.repo_path).strip()
+
+        # Create bundle using git
+        bundle_path = os.path.join(self.test_dir, "unbundle_test.bundle")
+        run_git_or_fail(["bundle", "create", bundle_path, "master"], cwd=self.repo_path)
+
+        # Create a new empty repository to unbundle into
+        unbundle_repo_path = os.path.join(self.test_dir, "unbundle_repo")
+        unbundle_repo = Repo.init(unbundle_repo_path, mkdir=True)
+        self.addCleanup(unbundle_repo.close)
+
+        # Read the bundle and store objects using dulwich
+        with open(bundle_path, "rb") as f:
+            bundle = read_bundle(f)
+
+        # Use the bundle's store_objects method to unbundle
+        bundle.store_objects(unbundle_repo.object_store)
+
+        # Verify objects are now in the repository
+        # Check that the HEAD commit exists
+        self.assertIn(head_sha, unbundle_repo.object_store)
+
+        # Verify we can retrieve the commit
+        commit = unbundle_repo.object_store[head_sha]
+        self.assertEqual(b"Commit 2\n", commit.message)

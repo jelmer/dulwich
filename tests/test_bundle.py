@@ -449,3 +449,66 @@ class BundleTests(TestCase):
         # Verify capabilities are included
         self.assertEqual(bundle.capabilities, capabilities)
         self.assertEqual(bundle.version, 3)
+
+    def test_create_bundle_with_hex_bytestring_prerequisite(self) -> None:
+        """Test creating a bundle with prerequisite as 40-byte hex bytestring."""
+        repo = MemoryRepo()
+
+        # Create minimal objects
+        blob = Blob.from_string(b"Hello world")
+        repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"hello.txt", 0o100644, blob.id)
+        repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.message = b"Initial commit"
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        repo.object_store.add_object(commit)
+
+        repo.refs[b"refs/heads/master"] = commit.id
+
+        # Create another blob to use as prerequisite
+        prereq_blob = Blob.from_string(b"prerequisite")
+
+        # Use blob.id directly (40-byte hex bytestring)
+        bundle = create_bundle_from_repo(repo, prerequisites=[prereq_blob.id])
+
+        # Verify the prerequisite was added correctly
+        self.assertEqual(len(bundle.prerequisites), 1)
+        self.assertEqual(bundle.prerequisites[0][0], prereq_blob.id)
+
+    def test_create_bundle_with_hex_bytestring_prerequisite_simple(self) -> None:
+        """Test creating a bundle with prerequisite as 40-byte hex bytestring."""
+        repo = MemoryRepo()
+
+        # Create minimal objects
+        blob = Blob.from_string(b"Hello world")
+        repo.object_store.add_object(blob)
+
+        tree = Tree()
+        tree.add(b"hello.txt", 0o100644, blob.id)
+        repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.message = b"Initial commit"
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        repo.object_store.add_object(commit)
+
+        repo.refs[b"refs/heads/master"] = commit.id
+
+        # Use a 40-byte hex bytestring as prerequisite
+        prereq_hex = b"aa" * 20
+
+        bundle = create_bundle_from_repo(repo, prerequisites=[prereq_hex])
+
+        # Verify the prerequisite was added correctly
+        self.assertEqual(len(bundle.prerequisites), 1)
+        self.assertEqual(bundle.prerequisites[0][0], prereq_hex)

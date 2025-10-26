@@ -55,6 +55,7 @@ Currently implemented:
  * rm
  * remote{_add}
  * receive_pack
+ * replace{_create,_delete,_list}
  * reset
  * revert
  * sparse_checkout
@@ -192,12 +193,14 @@ from .refs import (
     LOCAL_BRANCH_PREFIX,
     LOCAL_NOTES_PREFIX,
     LOCAL_REMOTE_PREFIX,
+    LOCAL_REPLACE_PREFIX,
     LOCAL_TAG_PREFIX,
     Ref,
     SymrefLoop,
     _import_remote_refs,
     filter_ref_prefix,
     local_branch_name,
+    local_replace_name,
     local_tag_name,
     shorten_ref_name,
 )
@@ -2532,6 +2535,77 @@ def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[bytes, byt
         return r.notes.list_notes(notes_ref, config=config)
 
 
+def replace_list(repo: RepoPath) -> list[tuple[bytes, bytes]]:
+    """List all replacement refs.
+
+    Args:
+      repo: Path to repository
+
+    Returns:
+      List of tuples of (object_sha, replacement_sha) where object_sha is the
+      object being replaced and replacement_sha is what it's replaced with
+    """
+    with open_repo_closing(repo) as r:
+        replacements = []
+        for ref in r.refs.keys():
+            if ref.startswith(LOCAL_REPLACE_PREFIX):
+                object_sha = ref[len(LOCAL_REPLACE_PREFIX) :]
+                replacement_sha = r.refs[ref]
+                replacements.append((object_sha, replacement_sha))
+        return replacements
+
+
+def replace_delete(repo: RepoPath, object_sha: Union[str, bytes]) -> None:
+    """Delete a replacement ref.
+
+    Args:
+      repo: Path to repository
+      object_sha: SHA of the object whose replacement should be removed
+    """
+    with open_repo_closing(repo) as r:
+        # Convert to bytes if string
+        if isinstance(object_sha, str):
+            object_sha_hex = object_sha.encode("ascii")
+        else:
+            object_sha_hex = object_sha
+
+        replace_ref = _make_replace_ref(object_sha_hex)
+        if replace_ref not in r.refs:
+            raise KeyError(
+                f"No replacement ref found for {object_sha_hex.decode('ascii')}"
+            )
+        del r.refs[replace_ref]
+
+
+def replace_create(
+    repo: RepoPath,
+    object_sha: Union[str, bytes],
+    replacement_sha: Union[str, bytes],
+) -> None:
+    """Create a replacement ref to replace one object with another.
+
+    Args:
+      repo: Path to repository
+      object_sha: SHA of the object to replace
+      replacement_sha: SHA of the replacement object
+    """
+    with open_repo_closing(repo) as r:
+        # Convert to bytes if string
+        if isinstance(object_sha, str):
+            object_sha_hex = object_sha.encode("ascii")
+        else:
+            object_sha_hex = object_sha
+
+        if isinstance(replacement_sha, str):
+            replacement_sha_hex = replacement_sha.encode("ascii")
+        else:
+            replacement_sha_hex = replacement_sha
+
+        # Create the replacement ref
+        replace_ref = _make_replace_ref(object_sha_hex)
+        r.refs[replace_ref] = replacement_sha_hex
+
+
 def reset(
     repo: Union[str, os.PathLike[str], Repo],
     mode: str,
@@ -3609,6 +3683,12 @@ def _make_tag_ref(name: Union[str, bytes]) -> Ref:
     if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return local_tag_name(name)
+
+
+def _make_replace_ref(name: Union[str, bytes]) -> Ref:
+    if isinstance(name, str):
+        name = name.encode(DEFAULT_ENCODING)
+    return local_replace_name(name)
 
 
 def branch_delete(

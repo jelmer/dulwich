@@ -54,6 +54,7 @@ LOCAL_BRANCH_PREFIX = b"refs/heads/"
 LOCAL_TAG_PREFIX = b"refs/tags/"
 LOCAL_REMOTE_PREFIX = b"refs/remotes/"
 LOCAL_NOTES_PREFIX = b"refs/notes/"
+LOCAL_REPLACE_PREFIX = b"refs/replace/"
 BAD_REF_CHARS = set(b"\177 ~^:?*[")
 PEELED_TAG_SUFFIX = b"^{}"
 
@@ -1506,6 +1507,26 @@ def local_tag_name(name: bytes) -> bytes:
     if name.startswith(LOCAL_TAG_PREFIX):
         return name
     return LOCAL_TAG_PREFIX + name
+
+
+def local_replace_name(name: bytes) -> bytes:
+    """Build a full replace ref from a short name.
+
+    Args:
+      name: Short replace name (object SHA) or full ref
+
+    Returns:
+      Full replace ref name (e.g., b"refs/replace/<sha>")
+
+    Examples:
+      >>> local_replace_name(b"abc123")
+      b'refs/replace/abc123'
+      >>> local_replace_name(b"refs/replace/abc123")
+      b'refs/replace/abc123'
+    """
+    if name.startswith(LOCAL_REPLACE_PREFIX):
+        return name
+    return LOCAL_REPLACE_PREFIX + name
 
 
 def extract_branch_name(ref: bytes) -> bytes:

@@ -4112,6 +4112,89 @@ class cmd_notes(SuperCommand):
     default_command = cmd_notes_list
 
 
+class cmd_replace_list(Command):
+    """List all replacement refs."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the replace-list command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.parse_args(args)
+
+        replacements = porcelain.replace_list(".")
+        for object_sha, replacement_sha in replacements:
+            sys.stdout.write(
+                f"{object_sha.decode('ascii')} -> {replacement_sha.decode('ascii')}\n"
+            )
+
+
+class cmd_replace_delete(Command):
+    """Delete a replacement ref."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the replace-delete command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("object", help="Object whose replacement should be removed")
+        parsed_args = parser.parse_args(args)
+
+        try:
+            porcelain.replace_delete(".", parsed_args.object)
+            logger.info("Deleted replacement for %s", parsed_args.object)
+            return None
+        except KeyError as e:
+            logger.error(str(e))
+            return 1
+
+
+class cmd_replace(SuperCommand):
+    """Create, list, and delete replacement refs."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "list": cmd_replace_list,
+        "delete": cmd_replace_delete,
+    }
+
+    default_command = cmd_replace_list
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the replace command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        # Special case: if we have exactly 2 args and no subcommand, treat as create
+        if len(args) == 2 and args[0] not in self.subcommands:
+            # This is the create form: git replace <object> <replacement>
+            parser = argparse.ArgumentParser()
+            parser.add_argument("object", help="Object to replace")
+            parser.add_argument("replacement", help="Replacement object")
+            parsed_args = parser.parse_args(args)
+
+            porcelain.replace_create(".", parsed_args.object, parsed_args.replacement)
+            logger.info(
+                "Created replacement: %s -> %s",
+                parsed_args.object,
+                parsed_args.replacement,
+            )
+            return None
+
+        # Otherwise, delegate to supercommand handling
+        return super().run(args)
+
+
 class cmd_cherry(Command):
     """Find commits not merged upstream."""
 
@@ -6030,6 +6113,7 @@ commands = {
     "reflog": cmd_reflog,
     "remote": cmd_remote,
     "repack": cmd_repack,
+    "replace": cmd_replace,
     "reset": cmd_reset,
     "revert": cmd_revert,
     "rev-list": cmd_rev_list,

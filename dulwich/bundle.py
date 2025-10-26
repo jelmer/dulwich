@@ -272,32 +272,22 @@ def create_bundle_from_repo(
     bundle_prerequisites = []
     have_objects = set()
     for prereq in prerequisites:
-        if isinstance(prereq, str):
-            prereq = prereq.encode("utf-8")
-        if isinstance(prereq, bytes):
-            if len(prereq) == 40:  # SHA1 hex string
-                try:
-                    # Validate it's actually hex
-                    bytes.fromhex(prereq.decode("utf-8"))
-                    # Store hex in bundle and for pack generation
-                    bundle_prerequisites.append((prereq, b""))
-                    have_objects.add(prereq)
-                except ValueError:
-                    # Not a valid hex string, invalid prerequisite
-                    raise ValueError(f"Invalid prerequisite format: {prereq!r}")
-            elif len(prereq) == 20:
-                # Binary SHA, convert to hex for both bundle and pack generation
-                hex_prereq = prereq.hex().encode("ascii")
-                bundle_prerequisites.append((hex_prereq, b""))
-                have_objects.add(hex_prereq)
-            else:
-                # Invalid length
-                raise ValueError(f"Invalid prerequisite SHA length: {len(prereq)}")
-        else:
-            # Assume it's already a binary SHA
-            hex_prereq = prereq.hex().encode("ascii")
-            bundle_prerequisites.append((hex_prereq, b""))
-            have_objects.append(hex_prereq)
+        if not isinstance(prereq, bytes):
+            raise TypeError(
+                f"Invalid prerequisite type: {type(prereq)}, expected bytes"
+            )
+        if len(prereq) != 40:
+            raise ValueError(
+                f"Invalid prerequisite SHA length: {len(prereq)}, expected 40 hex characters"
+            )
+        try:
+            # Validate it's actually hex
+            bytes.fromhex(prereq.decode("utf-8"))
+        except ValueError:
+            raise ValueError(f"Invalid prerequisite format: {prereq!r}")
+        # Store hex in bundle and for pack generation
+        bundle_prerequisites.append((prereq, b""))
+        have_objects.add(prereq)
 
     # Generate pack data containing all objects needed for the refs
     pack_count, pack_objects = repo.generate_pack_data(

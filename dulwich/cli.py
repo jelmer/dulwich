@@ -1514,6 +1514,116 @@ class cmd_dump_index(Command):
             logger.info("%s %s", o, idx[o])
 
 
+class cmd_interpret_trailers(Command):
+    """Add or parse structured information in commit messages."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the interpret-trailers command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "file",
+            nargs="?",
+            help="File to read message from. If not specified, reads from stdin.",
+        )
+        parser.add_argument(
+            "--trailer",
+            action="append",
+            dest="trailers",
+            metavar="<token>[(=|:)<value>]",
+            help="Trailer to add. Can be specified multiple times.",
+        )
+        parser.add_argument(
+            "--trim-empty",
+            action="store_true",
+            help="Remove trailers with empty values",
+        )
+        parser.add_argument(
+            "--only-trailers",
+            action="store_true",
+            help="Output only the trailers, not the message body",
+        )
+        parser.add_argument(
+            "--only-input",
+            action="store_true",
+            help="Don't add new trailers, only parse existing ones",
+        )
+        parser.add_argument(
+            "--unfold", action="store_true", help="Join multiline values into one line"
+        )
+        parser.add_argument(
+            "--parse",
+            action="store_true",
+            help="Shorthand for --only-trailers --only-input --unfold",
+        )
+        parser.add_argument(
+            "--where",
+            choices=["end", "start", "after", "before"],
+            default="end",
+            help="Where to place new trailers",
+        )
+        parser.add_argument(
+            "--if-exists",
+            choices=[
+                "add",
+                "replace",
+                "addIfDifferent",
+                "addIfDifferentNeighbor",
+                "doNothing",
+            ],
+            default="addIfDifferentNeighbor",
+            help="Action if trailer already exists",
+        )
+        parser.add_argument(
+            "--if-missing",
+            choices=["add", "doNothing"],
+            default="add",
+            help="Action if trailer is missing",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Read message from file or stdin
+        if parsed_args.file:
+            with open(parsed_args.file, "rb") as f:
+                message = f.read()
+        else:
+            message = sys.stdin.buffer.read()
+
+        # Parse trailer arguments
+        trailer_list = []
+        if parsed_args.trailers:
+            for trailer_spec in parsed_args.trailers:
+                # Parse "key:value" or "key=value" or just "key"
+                if ":" in trailer_spec:
+                    key, value = trailer_spec.split(":", 1)
+                elif "=" in trailer_spec:
+                    key, value = trailer_spec.split("=", 1)
+                else:
+                    key = trailer_spec
+                    value = ""
+                trailer_list.append((key.strip(), value.strip()))
+
+        # Call interpret_trailers
+        result = porcelain.interpret_trailers(
+            message,
+            trailers=trailer_list if trailer_list else None,
+            trim_empty=parsed_args.trim_empty,
+            only_trailers=parsed_args.only_trailers,
+            only_input=parsed_args.only_input,
+            unfold=parsed_args.unfold,
+            parse=parsed_args.parse,
+            where=parsed_args.where,
+            if_exists=parsed_args.if_exists,
+            if_missing=parsed_args.if_missing,
+        )
+
+        # Output result
+        sys.stdout.buffer.write(result)
+
+
 class cmd_init(Command):
     """Create an empty Git repository or reinitialize an existing one."""
 
@@ -5898,6 +6008,7 @@ commands = {
     "grep": cmd_grep,
     "help": cmd_help,
     "init": cmd_init,
+    "interpret-trailers": cmd_interpret_trailers,
     "lfs": cmd_lfs,
     "log": cmd_log,
     "ls-files": cmd_ls_files,

@@ -41,6 +41,7 @@ Currently implemented:
  * for_each_ref
  * grep
  * init
+ * interpret_trailers
  * ls_files
  * ls_remote
  * ls_tree
@@ -213,6 +214,7 @@ from .sparse_patterns import (
     apply_included_paths,
     determine_included_paths,
 )
+from .trailers import add_trailer_to_message, format_trailers, parse_trailers
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -817,6 +819,7 @@ def commit(
                 encoding=encoding,
                 no_verify=no_verify,
                 sign=sign,
+                signoff=signoff,
                 merge_heads=merge_heads,
                 ref=None,
             )
@@ -833,6 +836,7 @@ def commit(
                 encoding=encoding,
                 no_verify=no_verify,
                 sign=sign,
+                signoff=signoff,
                 merge_heads=merge_heads,
             )
 
@@ -859,6 +863,108 @@ def commit_tree(
         return r.get_worktree().commit(
             message=message, tree=tree, committer=committer, author=author
         )
+
+
+def interpret_trailers(
+    message: Union[str, bytes],
+    *,
+    trailers: Optional[list[tuple[str, str]]] = None,
+    trim_empty: bool = False,
+    only_trailers: bool = False,
+    only_input: bool = False,
+    unfold: bool = False,
+    parse: bool = False,
+    where: str = "end",
+    if_exists: str = "addIfDifferentNeighbor",
+    if_missing: str = "add",
+    separators: str = ":",
+) -> bytes:
+    r"""Parse and manipulate trailers in a commit message.
+
+    This function implements the functionality of `git interpret-trailers`,
+    allowing parsing and manipulation of structured metadata (trailers) in
+    commit messages.
+
+    Trailers are key-value pairs at the end of commit messages, formatted like:
+        Signed-off-by: Alice <alice@example.com>
+        Reviewed-by: Bob <bob@example.com>
+
+    Args:
+        message: The commit message (string or bytes)
+        trailers: List of (key, value) tuples to add as new trailers
+        trim_empty: Remove trailers with empty values
+        only_trailers: Output only the trailers, not the message body
+        only_input: Don't add new trailers, only parse existing ones
+        unfold: Join multiline trailer values into a single line
+        parse: Shorthand for --only-trailers --only-input --unfold
+        where: Where to add new trailers ('end', 'start', 'after', 'before')
+        if_exists: How to handle duplicate keys
+            - 'add': Always add
+            - 'replace': Replace all existing
+            - 'addIfDifferent': Add only if value differs from all existing
+            - 'addIfDifferentNeighbor': Add only if value differs from neighbors
+            - 'doNothing': Don't add if key exists
+        if_missing: What to do if key doesn't exist ('add' or 'doNothing')
+        separators: Valid separator characters (default ':')
+
+    Returns:
+        The processed message as bytes
+
+    Examples:
+        >>> msg = b"Subject\\n\\nBody text\\n"
+        >>> interpret_trailers(msg, trailers=[("Signed-off-by", "Alice <alice@example.com>")])
+        b'Subject\\n\\nBody text\\n\\nSigned-off-by: Alice <alice@example.com>\\n'
+
+        >>> msg = b"Subject\\n\\nSigned-off-by: Alice\\n"
+        >>> interpret_trailers(msg, only_trailers=True)
+        b'Signed-off-by: Alice\\n'
+    """
+    # Handle --parse shorthand
+    if parse:
+        only_trailers = True
+        only_input = True
+        unfold = True
+
+    # Convert message to bytes
+    if isinstance(message, str):
+        message_bytes = message.encode("utf-8")
+    else:
+        message_bytes = message
+
+    # Parse existing trailers
+    _message_body, parsed_trailers = parse_trailers(message_bytes, separators)
+
+    # Apply unfold if requested
+    if unfold:
+        for trailer in parsed_trailers:
+            # Replace newlines and multiple spaces with single space
+            trailer.value = " ".join(trailer.value.split())
+
+    # Apply trim_empty if requested
+    if trim_empty:
+        parsed_trailers = [t for t in parsed_trailers if t.value.strip()]
+
+    # Add new trailers if requested and not only_input
+    if not only_input and trailers:
+        for key, value in trailers:
+            message_bytes = add_trailer_to_message(
+                message_bytes,
+                key,
+                value,
+                separators[0],  # Use first separator as default
+                where=where,
+                if_exists=if_exists,
+                if_missing=if_missing,
+            )
+        # Re-parse to get updated trailers for output
+        if only_trailers:
+            _message_body, parsed_trailers = parse_trailers(message_bytes, separators)
+
+    # Return based on only_trailers flag
+    if only_trailers:
+        return format_trailers(parsed_trailers)
+    else:
+        return message_bytes
 
 
 def init(

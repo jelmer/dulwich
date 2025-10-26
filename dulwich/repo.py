@@ -1158,7 +1158,7 @@ def read_gitfile(f: BinaryIO) -> str:
     cs = f.read()
     if not cs.startswith(b"gitdir: "):
         raise ValueError("Expected file to start with 'gitdir: '")
-    return cs[len(b"gitdir: ") :].rstrip(b"\n").decode("utf-8")
+    return cs[len(b"gitdir: ") :].rstrip(b"\r\n").decode("utf-8")
 
 
 class UnsupportedVersion(Exception):

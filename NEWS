@@ -8,6 +8,12 @@
    in CLI commands. When GIT_FLUSH=1, output is flushed after each write for
    real-time visibility. (Jelmer Vernooĳ, #1810)
 
+ * Implement ``dulwich interpret-trailers`` functionality to parse and manipulate
+   structured metadata (trailers) in commit messages. Adds ``porcelain.interpret_trailers()``
+   with support for parsing, adding, replacing, and formatting trailers. Also fixes
+   the ``signoff`` parameter in ``porcelain.commit()`` to add ``Signed-off-by`` trailers.
+   (Jelmer Vernooĳ, #1826)
+
  * Add support for recursive submodule updates via ``--recursive`` flag in
    ``dulwich submodule update`` command and ``recursive`` parameter in
    ``porcelain.submodule_update()``.

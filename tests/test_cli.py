@@ -3850,5 +3850,113 @@ class MaintenanceCommandTest(DulwichCliTestCase):
             self.assertEqual(result, 1)
 
 
+class InterpretTrailersCommandTest(DulwichCliTestCase):
+    """Tests for interpret-trailers command."""
+
+    def test_parse_trailers_from_file(self):
+        """Test parsing trailers from a file."""
+        # Create a message file with trailers
+        msg_file = os.path.join(self.test_dir, "message.txt")
+        with open(msg_file, "wb") as f:
+            f.write(b"Subject\n\nBody\n\nSigned-off-by: Alice <alice@example.com>\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "interpret-trailers", "--only-trailers", msg_file
+        )
+        self.assertIsNone(result)
+        self.assertIn("Signed-off-by: Alice <alice@example.com>", stdout)
+
+    def test_add_trailer_to_message(self):
+        """Test adding a trailer to a message."""
+        msg_file = os.path.join(self.test_dir, "message.txt")
+        with open(msg_file, "wb") as f:
+            f.write(b"Subject\n\nBody text\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "interpret-trailers",
+            "--trailer",
+            "Signed-off-by:Alice <alice@example.com>",
+            msg_file,
+        )
+        self.assertIsNone(result)
+        self.assertIn("Signed-off-by: Alice <alice@example.com>", stdout)
+        self.assertIn("Subject", stdout)
+        self.assertIn("Body text", stdout)
+
+    def test_add_multiple_trailers(self):
+        """Test adding multiple trailers."""
+        msg_file = os.path.join(self.test_dir, "message.txt")
+        with open(msg_file, "wb") as f:
+            f.write(b"Subject\n\nBody\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "interpret-trailers",
+            "--trailer",
+            "Signed-off-by:Alice",
+            "--trailer",
+            "Reviewed-by:Bob",
+            msg_file,
+        )
+        self.assertIsNone(result)
+        self.assertIn("Signed-off-by: Alice", stdout)
+        self.assertIn("Reviewed-by: Bob", stdout)
+
+    def test_parse_shorthand(self):
+        """Test --parse shorthand option."""
+        msg_file = os.path.join(self.test_dir, "message.txt")
+        with open(msg_file, "wb") as f:
+            f.write(b"Subject\n\nBody\n\nSigned-off-by: Alice\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "interpret-trailers", "--parse", msg_file
+        )
+        self.assertIsNone(result)
+        # --parse is shorthand for --only-trailers --only-input --unfold
+        self.assertEqual(stdout, "Signed-off-by: Alice\n")
+
+    def test_trim_empty(self):
+        """Test --trim-empty option."""
+        msg_file = os.path.join(self.test_dir, "message.txt")
+        with open(msg_file, "wb") as f:
+            f.write(b"Subject\n\nBody\n\nSigned-off-by: Alice\nReviewed-by: \n")
+
+        result, stdout, _stderr = self._run_cli(
+            "interpret-trailers", "--trim-empty", "--only-trailers", msg_file
+        )
+        self.assertIsNone(result)
+        self.assertIn("Signed-off-by: Alice", stdout)
+        self.assertNotIn("Reviewed-by:", stdout)
+
+    def test_if_exists_replace(self):
+        """Test --if-exists replace option."""
+        msg_file = os.path.join(self.test_dir, "message.txt")
+        with open(msg_file, "wb") as f:
+            f.write(b"Subject\n\nBody\n\nSigned-off-by: Alice\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "interpret-trailers",
+            "--if-exists",
+            "replace",
+            "--trailer",
+            "Signed-off-by:Bob",
+            msg_file,
+        )
+        self.assertIsNone(result)
+        self.assertIn("Signed-off-by: Bob", stdout)
+        self.assertNotIn("Alice", stdout)
+
+    def test_trailer_with_equals(self):
+        """Test trailer with equals separator."""
+        msg_file = os.path.join(self.test_dir, "message.txt")
+        with open(msg_file, "wb") as f:
+            f.write(b"Subject\n\nBody\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "interpret-trailers", "--trailer", "Bug=12345", msg_file
+        )
+        self.assertIsNone(result)
+        self.assertIn("Bug: 12345", stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

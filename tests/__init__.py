@@ -184,6 +184,7 @@ def self_test_suite() -> unittest.TestSuite:
         "sparse_patterns",
         "stash",
         "submodule",
+        "trailers",
         "utils",
         "walk",
         "web",

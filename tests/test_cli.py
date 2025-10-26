@@ -3958,5 +3958,94 @@ class InterpretTrailersCommandTest(DulwichCliTestCase):
         self.assertIn("Bug: 12345", stdout)
 
 
+class ReplaceCommandTest(DulwichCliTestCase):
+    """Tests for replace command."""
+
+    def test_replace_create(self):
+        """Test creating a replacement ref."""
+        # Create two commits
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create replacement using the create form (decode to string for CLI)
+        c1_str = c1.id.decode("ascii")
+        c2_str = c2.id.decode("ascii")
+        _result, _stdout, _stderr = self._run_cli("replace", c1_str, c2_str)
+
+        # Verify the replacement ref was created
+        replace_ref = b"refs/replace/" + c1.id
+        self.assertIn(replace_ref, self.repo.refs.keys())
+        self.assertEqual(c2.id, self.repo.refs[replace_ref])
+
+    def test_replace_list_empty(self):
+        """Test listing replacements when there are none."""
+        _result, stdout, _stderr = self._run_cli("replace", "list")
+        self.assertEqual("", stdout)
+
+    def test_replace_list(self):
+        """Test listing replacement refs."""
+        # Create two commits
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create replacement
+        c1_str = c1.id.decode("ascii")
+        c2_str = c2.id.decode("ascii")
+        self._run_cli("replace", c1_str, c2_str)
+
+        # List replacements
+        _result, stdout, _stderr = self._run_cli("replace", "list")
+        self.assertIn(c1_str, stdout)
+        self.assertIn(c2_str, stdout)
+
+    def test_replace_default_list(self):
+        """Test that replace without subcommand defaults to list."""
+        # Create two commits
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create replacement
+        c1_str = c1.id.decode("ascii")
+        c2_str = c2.id.decode("ascii")
+        self._run_cli("replace", c1_str, c2_str)
+
+        # Call replace without subcommand (should list)
+        _result, stdout, _stderr = self._run_cli("replace")
+        self.assertIn(c1_str, stdout)
+        self.assertIn(c2_str, stdout)
+
+    def test_replace_delete(self):
+        """Test deleting a replacement ref."""
+        # Create two commits
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create replacement
+        c1_str = c1.id.decode("ascii")
+        c2_str = c2.id.decode("ascii")
+        self._run_cli("replace", c1_str, c2_str)
+
+        # Verify it exists
+        replace_ref = b"refs/replace/" + c1.id
+        self.assertIn(replace_ref, self.repo.refs.keys())
+
+        # Delete the replacement
+        _result, _stdout, _stderr = self._run_cli("replace", "delete", c1_str)
+
+        # Verify it's gone
+        self.assertNotIn(replace_ref, self.repo.refs.keys())
+
+    def test_replace_delete_nonexistent(self):
+        """Test deleting a nonexistent replacement ref fails."""
+        # Create a commit
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Try to delete a non-existent replacement
+        c1_str = c1.id.decode("ascii")
+        result, _stdout, _stderr = self._run_cli("replace", "delete", c1_str)
+        self.assertEqual(result, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

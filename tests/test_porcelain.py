@@ -10706,3 +10706,96 @@ class GrepTests(PorcelainTestCase):
         outstream = StringIO()
         with self.assertRaises(ValueError):
             porcelain.grep(empty_repo, "pattern", outstream=outstream)
+
+
+class ReplaceListTests(PorcelainTestCase):
+    def test_empty(self) -> None:
+        """Test listing replacements when there are none."""
+        replacements = porcelain.replace_list(self.repo)
+        self.assertEqual([], replacements)
+
+    def test_list_replacements(self) -> None:
+        """Test listing replacement refs."""
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create a replacement
+        porcelain.replace_create(self.repo, c1.id, c2.id)
+
+        # List replacements
+        replacements = porcelain.replace_list(self.repo)
+        self.assertEqual(1, len(replacements))
+        self.assertEqual((c1.id, c2.id), replacements[0])
+
+
+class ReplaceCreateTests(PorcelainTestCase):
+    def test_create_replacement(self) -> None:
+        """Test creating a replacement ref."""
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create a replacement
+        porcelain.replace_create(self.repo, c1.id, c2.id)
+
+        # Verify the replacement ref was created (c1.id is already 40-char hex bytes)
+        replace_ref = b"refs/replace/" + c1.id
+        self.assertIn(replace_ref, self.repo.refs)
+        self.assertEqual(c2.id, self.repo.refs[replace_ref])
+
+    def test_create_replacement_with_bytes(self) -> None:
+        """Test creating a replacement ref with bytes arguments."""
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create a replacement using bytes arguments
+        porcelain.replace_create(self.repo, c1.id, c2.id)
+
+        # Verify the replacement ref was created
+        replace_ref = b"refs/replace/" + c1.id
+        self.assertIn(replace_ref, self.repo.refs)
+        self.assertEqual(c2.id, self.repo.refs[replace_ref])
+
+
+class ReplaceDeleteTests(PorcelainTestCase):
+    def test_delete_replacement(self) -> None:
+        """Test deleting a replacement ref."""
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create a replacement
+        porcelain.replace_create(self.repo, c1.id, c2.id)
+
+        # Verify it exists
+        replacements = porcelain.replace_list(self.repo)
+        self.assertEqual(1, len(replacements))
+
+        # Delete the replacement
+        porcelain.replace_delete(self.repo, c1.id)
+
+        # Verify it's gone
+        replacements = porcelain.replace_list(self.repo)
+        self.assertEqual(0, len(replacements))
+
+    def test_delete_replacement_with_bytes(self) -> None:
+        """Test deleting a replacement ref with bytes argument."""
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Create a replacement
+        porcelain.replace_create(self.repo, c1.id, c2.id)
+
+        # Delete using bytes argument
+        porcelain.replace_delete(self.repo, c1.id)
+
+        # Verify it's gone
+        replacements = porcelain.replace_list(self.repo)
+        self.assertEqual(0, len(replacements))
+
+    def test_delete_nonexistent_replacement(self) -> None:
+        """Test deleting a replacement ref that doesn't exist raises KeyError."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo[b"HEAD"] = c1.id
+
+        # Try to delete a non-existent replacement
+        with self.assertRaises(KeyError):
+            porcelain.replace_delete(self.repo, c1.id)

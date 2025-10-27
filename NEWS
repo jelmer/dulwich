@@ -27,6 +27,11 @@
  * Add support for ``dulwich replace`` command to create refs that replace objects.
    (Jelmer Vernooĳ, #1834)
 
+ * Implement advanced Git object specification support: index path lookup (``:``, ``:0:``,
+   ``:1:``, ``:2:``, ``:3:``) for accessing files from the index and merge stages, and
+   reflog time specifications (``@{time}``) using Git's approxidate format (e.g.,
+   ``HEAD@{yesterday}`, ``master@{2.weeks.ago}``). (Jelmer Vernooĳ, #1783)
+
 0.24.7	2025-10-23
 
  * Add sparse index support for improved performance with large repositories.

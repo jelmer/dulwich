@@ -311,59 +311,6 @@ def signal_quit(signal: int, frame: Optional[types.FrameType]) -> None:
     pdb.set_trace()
 
 
-def parse_relative_time(time_str: str) -> int:
-    """Parse a relative time string like '2 weeks ago' into seconds.
-
-    Args:
-        time_str: String like '2 weeks ago' or 'now'
-
-    Returns:
-        Number of seconds
-
-    Raises:
-        ValueError: If the time string cannot be parsed
-    """
-    if time_str == "now":
-        return 0
-
-    if not time_str.endswith(" ago"):
-        raise ValueError(f"Invalid relative time format: {time_str}")
-
-    parts = time_str[:-4].split()
-    if len(parts) != 2:
-        raise ValueError(f"Invalid relative time format: {time_str}")
-
-    try:
-        num = int(parts[0])
-        unit = parts[1]
-
-        multipliers = {
-            "second": 1,
-            "seconds": 1,
-            "minute": 60,
-            "minutes": 60,
-            "hour": 3600,
-            "hours": 3600,
-            "day": 86400,
-            "days": 86400,
-            "week": 604800,
-            "weeks": 604800,
-            "month": 2592000,  # 30 days
-            "months": 2592000,
-            "year": 31536000,  # 365 days
-            "years": 31536000,
-        }
-
-        if unit in multipliers:
-            return num * multipliers[unit]
-        else:
-            raise ValueError(f"Unknown time unit: {unit}")
-    except ValueError as e:
-        if "invalid literal" in str(e):
-            raise ValueError(f"Invalid number in relative time: {parts[0]}")
-        raise
-
-
 def parse_time_to_timestamp(time_spec: str) -> int:
     """Parse a time specification and return a Unix timestamp.
 
@@ -383,7 +330,9 @@ def parse_time_to_timestamp(time_spec: str) -> int:
     """
     import time
 
-    # Handle special cases
+    from .approxidate import parse_approxidate
+
+    # Handle special cases specific to CLI
     if time_spec == "all":
         # Expire all entries - set to future time so everything is "older"
         return int(time.time()) + (100 * 365 * 24 * 60 * 60)  # 100 years in future
@@ -391,15 +340,8 @@ def parse_time_to_timestamp(time_spec: str) -> int:
         # Never expire - set to epoch start so nothing is older
         return 0
 
-    # Try parsing as direct Unix timestamp
-    try:
-        return int(time_spec)
-    except ValueError:
-        pass
-
-    # Parse relative time and convert to timestamp
-    seconds_ago = parse_relative_time(time_spec)
-    return int(time.time()) - seconds_ago
+    # Use approxidate parser for everything else
+    return parse_approxidate(time_spec)
 
 
 def format_bytes(bytes: float) -> str:
@@ -3221,6 +3163,8 @@ class cmd_prune(Command):
         # Parse expire grace period
         grace_period = DEFAULT_TEMPFILE_GRACE_PERIOD
         if parsed_args.expire:
+            from .approxidate import parse_relative_time
+
             try:
                 grace_period = parse_relative_time(parsed_args.expire)
             except ValueError:
@@ -4455,6 +4399,8 @@ class cmd_gc(Command):
         # Parse prune grace period
         grace_period = None
         if parsed_args.prune:
+            from .approxidate import parse_relative_time
+
             try:
                 grace_period = parse_relative_time(parsed_args.prune)
             except ValueError:

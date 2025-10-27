@@ -87,31 +87,106 @@ def parse_object(repo: "Repo", objectish: Union[bytes, str]) -> "ShaFile":
     """
     objectish = to_bytes(objectish)
 
-    # Handle :<path> - lookup path in tree
+    # Handle :<path> - lookup path in tree or index
     if b":" in objectish:
         rev, path = objectish.split(b":", 1)
         if not rev:
-            raise NotImplementedError("Index path lookup (:path) not yet supported")
+            # Index path lookup: :path or :N:path where N is stage 0-3
+            stage = 0
+            if path and path[0:1].isdigit() and len(path) > 2 and path[1:2] == b":":
+                stage = int(path[0:1])
+                if stage > 3:
+                    raise ValueError(f"Invalid stage number: {stage}. Must be 0-3.")
+                path = path[2:]
+
+            # Open the index and look up the path
+
+            try:
+                index = repo.open_index()
+            except AttributeError:
+                raise NotImplementedError(
+                    "Index path lookup requires a non-bare repository"
+                )
+
+            if path not in index:
+                raise KeyError(f"Path {path!r} not found in index")
+
+            entry = index[path]
+            # Handle ConflictedIndexEntry (merge stages)
+            from .index import ConflictedIndexEntry
+
+            if isinstance(entry, ConflictedIndexEntry):
+                if stage == 0:
+                    raise ValueError(
+                        f"Path {path!r} has unresolved conflicts. "
+                        "Use :1:path, :2:path, or :3:path to access specific stages."
+                    )
+                elif stage == 1:
+                    if entry.ancestor is None:
+                        raise KeyError(f"Path {path!r} has no ancestor (stage 1)")
+                    return repo[entry.ancestor.sha]
+                elif stage == 2:
+                    if entry.this is None:
+                        raise KeyError(f"Path {path!r} has no 'this' version (stage 2)")
+                    return repo[entry.this.sha]
+                elif stage == 3:
+                    if entry.other is None:
+                        raise KeyError(
+                            f"Path {path!r} has no 'other' version (stage 3)"
+                        )
+                    return repo[entry.other.sha]
+            else:
+                # Regular IndexEntry - only stage 0 is valid
+                if stage != 0:
+                    raise ValueError(
+                        f"Path {path!r} has no conflicts. Only :0:{path!r} or :{path!r} is valid."
+                    )
+                return repo[entry.sha]
+
+        # Regular tree lookup: rev:path
         tree = parse_tree(repo, rev)
         _mode, sha = tree.lookup_path(repo.object_store.__getitem__, path)
         return repo[sha]
 
-    # Handle @{N} - reflog lookup
+    # Handle @{N} or @{time} - reflog lookup
     if b"@{" in objectish:
         base, rest = objectish.split(b"@{", 1)
         if not rest.endswith(b"}"):
             raise ValueError("Invalid @{} syntax")
         spec = rest[:-1]
-        if not spec.isdigit():
-            raise NotImplementedError(f"Only @{{N}} supported, not @{{{spec!r}}}")
 
         ref = base if base else b"HEAD"
         entries = list(repo.read_reflog(ref))
         entries.reverse()  # Git uses reverse chronological order
-        index = int(spec)
-        if index >= len(entries):
-            raise ValueError(f"Reflog for {ref!r} has only {len(entries)} entries")
-        return repo[entries[index].new_sha]
+
+        if spec.isdigit():
+            # Check if it's a small index or a timestamp
+            # Git treats values < number of entries as indices, larger values as timestamps
+            num = int(spec)
+            if num < len(entries):
+                # Treat as numeric index: @{N}
+                return repo[entries[num].new_sha]
+            # Otherwise fall through to treat as timestamp
+
+        # Time specification: @{time} (includes large numeric values)
+        from .approxidate import parse_approxidate
+
+        target_time = parse_approxidate(spec)
+
+        # Find the most recent entry at or before the target time
+        for reflog_entry in entries:
+            if reflog_entry.timestamp <= target_time:
+                return repo[reflog_entry.new_sha]
+
+        # If no entry is old enough, raise an error
+        if entries:
+            oldest_time = entries[-1].timestamp
+            raise ValueError(
+                f"Reflog for {ref!r} has no entries at or before {spec!r}. "
+                f"Oldest entry is at timestamp {oldest_time}"
+            )
+        else:
+            raise ValueError(f"Reflog for {ref!r} is empty")
 
     # Handle ^{} - tag dereferencing
     if objectish.endswith(b"^{}"):

@@ -1566,6 +1566,59 @@ class cmd_interpret_trailers(Command):
         sys.stdout.buffer.write(result)
 
 
+class cmd_stripspace(Command):
+    """Remove unnecessary whitespace from text."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the stripspace command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "file",
+            nargs="?",
+            help="File to read text from. If not specified, reads from stdin.",
+        )
+        parser.add_argument(
+            "-s",
+            "--strip-comments",
+            action="store_true",
+            help="Strip lines that begin with comment character",
+        )
+        parser.add_argument(
+            "-c",
+            "--comment-lines",
+            action="store_true",
+            help="Prepend comment character to each line",
+        )
+        parser.add_argument(
+            "--comment-char",
+            default="#",
+            help="Comment character to use (default: #)",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Read text from file or stdin
+        if parsed_args.file:
+            with open(parsed_args.file, "rb") as f:
+                text = f.read()
+        else:
+            text = sys.stdin.buffer.read()
+
+        # Call stripspace
+        result = porcelain.stripspace(
+            text,
+            strip_comments=parsed_args.strip_comments,
+            comment_char=parsed_args.comment_char,
+            comment_lines=parsed_args.comment_lines,
+        )
+
+        # Output result
+        sys.stdout.buffer.write(result)
+
+
 class cmd_init(Command):
     """Create an empty Git repository or reinitialize an existing one."""
 
@@ -6070,6 +6123,7 @@ commands = {
     "show-ref": cmd_show_ref,
     "stash": cmd_stash,
     "status": cmd_status,
+    "stripspace": cmd_stripspace,
     "shortlog": cmd_shortlog,
     "symbolic-ref": cmd_symbolic_ref,
     "submodule": cmd_submodule,

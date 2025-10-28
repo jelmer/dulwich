@@ -95,7 +95,7 @@ mailing list.
 Contributing
 ------------
 
-For a full list of contributors, see the git logs or `AUTHORS <AUTHORS>`_.
+For a full list of contributors, see the git logs.
 
 If you'd like to contribute to Dulwich, see the `CONTRIBUTING <CONTRIBUTING.rst>`_
 file and `list of open issues <https://github.com/dulwich/dulwich/issues>`_.

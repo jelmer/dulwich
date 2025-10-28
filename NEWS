@@ -4,6 +4,12 @@
    implementation uses the similar crate for efficient diff computation.
    (Jelmer Vernooĳ)
 
+ * Extend ``http.extraHeader`` configuration to support per-URL settings.
+   Allows configuring different HTTP headers for specific URLs using
+   ``http.<url>.extraHeader`` syntax, enabling authentication in CI/CD
+   environments like GitHub Actions. More specific URL configurations
+   override less specific ones.  (Jelmer Vernooĳ, #882)
+
  * Add support for namespace isolation via ``NamespacedRefsContainer``.
    Implements Git's namespace feature for isolating refs within a single
    repository using the ``refs/namespaces/`` prefix. (Jelmer Vernooĳ, #1809)

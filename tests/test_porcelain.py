@@ -1492,6 +1492,34 @@ class CloneTests(PorcelainTestCase):
         with open(cloned_sub_file) as f:
             self.assertEqual(f.read(), "submodule content")
 
+    def test_clone_with_refspec_kwarg(self) -> None:
+        """Test that clone accepts refspec as a kwarg without TypeError.
+
+        This reproduces a bug where passing refspec as a kwarg to clone()
+        would cause a TypeError because it was being passed to
+        get_transport_and_path() which doesn't accept that parameter.
+        """
+        f1_1 = make_object(Blob, data=b"f1")
+        commit_spec = [[1]]
+        trees = {1: [(b"f1", f1_1)]}
+
+        (c1,) = build_commit_graph(self.repo.object_store, commit_spec, trees)
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        target_path = tempfile.mkdtemp()
+        errstream = BytesIO()
+        self.addCleanup(shutil.rmtree, target_path)
+
+        # This should not raise TypeError
+        r = porcelain.clone(
+            self.repo.path,
+            target_path,
+            checkout=False,
+            errstream=errstream,
+            refspec="refs/heads/master",
+        )
+        self.addCleanup(r.close)
+        self.assertEqual(r.path, target_path)
+
 
 class InitTests(TestCase):
     def test_non_bare(self) -> None:

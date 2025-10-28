@@ -1,5 +1,4 @@
 include NEWS
-include AUTHORS
 include README.rst
 include Makefile
 include COPYING

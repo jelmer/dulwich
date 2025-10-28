@@ -1797,6 +1797,126 @@ class HttpGitClientTests(TestCase):
         self.assertIn("Authorization", c.pool_manager.headers)
         self.assertEqual(c.pool_manager.headers["Authorization"], "Bearer token123")
 
+    def test_http_extra_headers_per_url_config(self) -> None:
+        """Test that per-URL http.extraHeader config values are applied (issue #882)."""
+        from dulwich.config import ConfigDict
+
+        url = "https://github.com/jelmer/dulwich"
+        config = ConfigDict()
+        # Set URL-specific extra header
+        config.set(
+            (b"http", b"https://github.com/"),
+            b"extraHeader",
+            b"Authorization: basic token123",
+        )
+
+        c = HttpGitClient(url, config=config)
+        # Check that the header was added to the pool manager
+        self.assertIn("Authorization", c.pool_manager.headers)
+        self.assertEqual(c.pool_manager.headers["Authorization"], "basic token123")
+
+    def test_http_extra_headers_url_specificity(self) -> None:
+        """Test that more specific URL configs override less specific ones."""
+        from dulwich.config import ConfigDict
+
+        url = "https://github.com/jelmer/dulwich"
+        config = ConfigDict()
+        # Set global header
+        config.set((b"http",), b"extraHeader", b"X-Global: global-value")
+        # Set host-specific header (overrides global)
+        config.set(
+            (b"http", b"https://github.com/"), b"extraHeader", b"X-Global: github-value"
+        )
+        config.add(
+            (b"http", b"https://github.com/"),
+            b"extraHeader",
+            b"Authorization: Bearer token123",
+        )
+
+        c = HttpGitClient(url, config=config)
+        # More specific setting should win
+        self.assertEqual(c.pool_manager.headers["X-Global"], "github-value")
+        self.assertEqual(c.pool_manager.headers["Authorization"], "Bearer token123")
+
+    def test_http_extra_headers_multiple_url_configs(self) -> None:
+        """Test that different URLs can have different extra headers."""
+        from dulwich.config import ConfigDict
+
+        config = ConfigDict()
+        # Set different headers for different URLs
+        config.set(
+            (b"http", b"https://github.com/"),
+            b"extraHeader",
+            b"Authorization: Bearer github-token",
+        )
+        config.set(
+            (b"http", b"https://gitlab.com/"),
+            b"extraHeader",
+            b"Authorization: Bearer gitlab-token",
+        )
+
+        # Test GitHub URL
+        c1 = HttpGitClient("https://github.com/user/repo", config=config)
+        self.assertEqual(
+            c1.pool_manager.headers["Authorization"], "Bearer github-token"
+        )
+
+        # Test GitLab URL
+        c2 = HttpGitClient("https://gitlab.com/user/repo", config=config)
+        self.assertEqual(
+            c2.pool_manager.headers["Authorization"], "Bearer gitlab-token"
+        )
+
+    def test_http_extra_headers_no_match(self) -> None:
+        """Test that non-matching URL configs don't apply."""
+        from dulwich.config import ConfigDict
+
+        url = "https://example.com/repo"
+        config = ConfigDict()
+        # Set header only for GitHub
+        config.set(
+            (b"http", b"https://github.com/"),
+            b"extraHeader",
+            b"Authorization: Bearer token123",
+        )
+
+        c = HttpGitClient(url, config=config)
+        # Authorization header should not be present for example.com
+        self.assertNotIn("Authorization", c.pool_manager.headers)
+
+    def test_http_extra_headers_invalid_format(self) -> None:
+        """Test that invalid extra headers trigger warnings."""
+        import logging
+
+        from dulwich.config import ConfigDict
+
+        url = "https://github.com/jelmer/dulwich"
+        config = ConfigDict()
+        # Set valid header
+        config.set((b"http",), b"extraHeader", b"X-Valid: valid-value")
+        # Set invalid headers (no colon-space separator)
+        config.add((b"http",), b"extraHeader", b"X-Invalid-No-Separator")
+        # Set empty header
+        config.add((b"http",), b"extraHeader", b"")
+        # Set another valid header to verify we continue processing
+        config.add((b"http",), b"extraHeader", b"X-Another-Valid: another-value")
+
+        with self.assertLogs("dulwich.client", level=logging.WARNING) as cm:
+            c = HttpGitClient(url, config=config)
+
+        # Check that warnings were logged
+        self.assertEqual(len(cm.output), 2)
+        self.assertIn("missing ': ' separator", cm.output[0])
+        self.assertIn("empty http.extraHeader", cm.output[1])
+
+        # Valid headers should still be applied
+        self.assertIn("X-Valid", c.pool_manager.headers)
+        self.assertEqual(c.pool_manager.headers["X-Valid"], "valid-value")
+        self.assertIn("X-Another-Valid", c.pool_manager.headers)
+        self.assertEqual(c.pool_manager.headers["X-Another-Valid"], "another-value")
+        # Invalid header should not be present
+        self.assertNotIn("X-Invalid-No-Separator", c.pool_manager.headers)
+
     def test_get_url_preserves_credentials_from_url(self) -> None:
         """Test that credentials from URL are preserved in get_url() (issue #1925)."""
         # When credentials come from the URL (not passed explicitly),

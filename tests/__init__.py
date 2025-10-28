@@ -184,6 +184,7 @@ def self_test_suite() -> unittest.TestSuite:
         "server",
         "sparse_patterns",
         "stash",
+        "stripspace",
         "submodule",
         "trailers",
         "utils",

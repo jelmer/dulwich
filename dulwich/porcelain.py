@@ -970,6 +970,67 @@ def interpret_trailers(
         return message_bytes
 
 
+def stripspace(
+    text: Union[str, bytes],
+    *,
+    strip_comments: bool = False,
+    comment_char: str = "#",
+    comment_lines: bool = False,
+) -> bytes:
+    r"""Strip unnecessary whitespace from text.
+
+    This function implements the functionality of `git stripspace`, commonly
+    used to clean up commit messages and other text content.
+
+    Args:
+        text: The text to process (string or bytes)
+        strip_comments: If True, remove lines that begin with comment_char
+        comment_char: The comment character to use (default: "#")
+        comment_lines: If True, prepend comment_char to each line
+
+    Returns:
+        The processed text as bytes
+
+    The function performs the following operations:
+        1. If comment_lines is True, prepend comment_char + space to each line
+        2. Strip trailing whitespace from each line
+        3. If strip_comments is True, remove lines starting with comment_char
+        4. Collapse multiple consecutive blank lines into a single blank line
+        5. Remove leading blank lines
+        6. Remove trailing blank lines
+        7. Ensure the text ends with a newline (unless empty)
+
+    Examples:
+        >>> stripspace(b"  hello  \\n\\n\\nworld  \\n\\n")
+        b'hello\\n\\nworld\\n'
+
+        >>> stripspace(b"# comment\\ntext\\n", strip_comments=True)
+        b'text\\n'
+
+        >>> stripspace(b"line\\n", comment_lines=True)
+        b'# line\\n'
+    """
+    from dulwich.stripspace import stripspace as _stripspace
+
+    # Convert text to bytes
+    if isinstance(text, str):
+        text_bytes = text.encode("utf-8")
+    else:
+        text_bytes = text
+
+    # Convert comment_char to bytes
+    comment_char_bytes = (
+        comment_char.encode("utf-8") if isinstance(comment_char, str) else comment_char
+    )
+
+    return _stripspace(
+        text_bytes,
+        strip_comments=strip_comments,
+        comment_char=comment_char_bytes,
+        comment_lines=comment_lines,
+    )
+
+
 def init(
     path: Union[str, os.PathLike[str]] = ".",
     *,

@@ -124,6 +124,7 @@ class BlackboxTestCase(TestCase):
 def self_test_suite() -> unittest.TestSuite:
     names = [
         "annotate",
+        "approxidate",
         "archive",
         "attrs",
         "bisect",
@@ -184,6 +185,7 @@ def self_test_suite() -> unittest.TestSuite:
         "sparse_patterns",
         "stash",
         "submodule",
+        "trailers",
         "utils",
         "walk",
         "web",

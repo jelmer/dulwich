@@ -46,6 +46,7 @@ from .repo import (
     check_user_identity,
     get_user_identity,
 )
+from .trailers import add_trailer_to_message
 
 
 class WorkTreeInfo:
@@ -428,6 +429,7 @@ class WorkTree:
         merge_heads: Sequence[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool | None = None,
+        signoff: bool | None = None,
     ) -> ObjectID:
         """Create a new commit.
 
@@ -456,6 +458,8 @@ class WorkTree:
           sign: GPG Sign the commit (bool, defaults to False,
             pass True to use default GPG key,
             pass a str containing Key ID to use a specific GPG key)
+          signoff: Add Signed-off-by line (DCO) to commit message.
+            If None, uses format.signoff config.
 
         Returns:
           New commit SHA1
@@ -556,6 +560,39 @@ class WorkTree:
         if message is None:
             # FIXME: Try to read commit message from .git/MERGE_MSG
             raise ValueError("No commit message specified")
+
+        # Handle signoff
+        should_signoff = signoff
+        if should_signoff is None:
+            # Check format.signOff configuration
+            try:
+                should_signoff = config.get_boolean(
+                    (b"format",), b"signoff", default=False
+                )
+            except KeyError:
+                should_signoff = False
+
+        if should_signoff:
+            # Add Signed-off-by trailer
+            # Get the committer identity for the signoff
+            signoff_identity = committer
+            if isinstance(message, bytes):
+                message_bytes = message
+            else:
+                message_bytes = message.encode("utf-8")
+
+            message_bytes = add_trailer_to_message(
+                message_bytes,
+                "Signed-off-by",
+                signoff_identity.decode("utf-8")
+                if isinstance(signoff_identity, bytes)
+                else signoff_identity,
+                separator=":",
+                where="end",
+                if_exists="addIfDifferentNeighbor",
+                if_missing="add",
+            )
+            message = message_bytes
 
         try:
             if no_verify:

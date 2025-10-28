@@ -4,6 +4,38 @@
    implementation uses the similar crate for efficient diff computation.
    (Jelmer Vernooĳ)
 
+ * Add support for namespace isolation via ``NamespacedRefsContainer``.
+   Implements Git's namespace feature for isolating refs within a single
+   repository using the ``refs/namespaces/`` prefix. (Jelmer Vernooĳ, #1809)
+
+ * Add support for GIT_FLUSH environment variable to control output buffering
+   in CLI commands. When GIT_FLUSH=1, output is flushed after each write for
+   real-time visibility. (Jelmer Vernooĳ, #1810)
+
+ * Implement ``dulwich interpret-trailers`` functionality to parse and manipulate
+   structured metadata (trailers) in commit messages. Adds ``porcelain.interpret_trailers()``
+   with support for parsing, adding, replacing, and formatting trailers. Also fixes
+   the ``signoff`` parameter in ``porcelain.commit()`` to add ``Signed-off-by`` trailers.
+   (Jelmer Vernooĳ, #1826)
+
+ * Add support for recursive submodule updates via ``--recursive`` flag in
+   ``dulwich submodule update`` command and ``recursive`` parameter in
+   ``porcelain.submodule_update()``.
+   (Jelmer Vernooĳ, #1813)
+
+ * Add support for ``git maintenance`` command to optimize Git repository data.
+   Implements gc, commit-graph, loose-objects, incremental-repack, pack-refs, and
+   prefetch tasks. Supports automatic maintenance with ``--auto`` flag and task-specific
+   configuration. (Jelmer Vernooĳ)
+
+ * Add support for ``dulwich replace`` command to create refs that replace objects.
+   (Jelmer Vernooĳ, #1834)
+
+ * Implement advanced Git object specification support: index path lookup (``:``, ``:0:``,
+   ``:1:``, ``:2:``, ``:3:``) for accessing files from the index and merge stages, and
+   reflog time specifications (``@{time}``) using Git's approxidate format (e.g.,
+   ``HEAD@{yesterday}`, ``master@{2.weeks.ago}``). (Jelmer Vernooĳ, #1783)
+
 0.24.7	2025-10-23
 
  * Add sparse index support for improved performance with large repositories.

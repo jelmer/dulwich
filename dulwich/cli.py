@@ -28,6 +28,10 @@ no means intended to be a full-blown Git command-line interface but just
 a way to test Dulwich.
 """
 
+# TODO: Add support for GIT_NAMESPACE environment variable by wrapping
+# repository refs with NamespacedRefsContainer when the environment
+# variable is set. See issue #1809 and dulwich.refs.NamespacedRefsContainer.
+
 import argparse
 import io
 import logging
@@ -91,6 +95,196 @@ def to_display_str(value: Union[bytes, str]) -> str:
     return value
 
 
+def _should_auto_flush(
+    stream: Union[TextIO, BinaryIO], env: Optional[Mapping[str, str]] = None
+) -> bool:
+    """Determine if output should be auto-flushed based on GIT_FLUSH environment variable.
+
+    Args:
+        stream: The output stream to check
+        env: Environment variables dict (defaults to os.environ)
+
+    Returns:
+        True if output should be flushed after each write, False otherwise
+    """
+    if env is None:
+        env = os.environ
+    git_flush = env.get("GIT_FLUSH", "").strip()
+    if git_flush == "1":
+        return True
+    elif git_flush == "0":
+        return False
+    else:
+        # Auto-detect: don't flush if redirected to a file
+        return hasattr(stream, "isatty") and not stream.isatty()
+
+
+class AutoFlushTextIOWrapper:
+    """Wrapper that automatically flushes a TextIO stream based on configuration.
+
+    This wrapper can be configured to flush after each write operation,
+    which is useful for real-time output monitoring in CI/CD systems.
+    """
+
+    def __init__(self, stream: TextIO) -> None:
+        """Initialize the wrapper.
+
+        Args:
+            stream: The stream to wrap
+        """
+        self._stream = stream
+
+    @classmethod
+    def env(
+        cls, stream: TextIO, env: Optional[Mapping[str, str]] = None
+    ) -> "AutoFlushTextIOWrapper | TextIO":
+        """Create wrapper respecting the GIT_FLUSH environment variable.
+
+        Respects the GIT_FLUSH environment variable:
+        - GIT_FLUSH=1: Always flush after each write
+        - GIT_FLUSH=0: Never auto-flush (use buffered I/O)
+        - Not set: Auto-detect based on whether output is redirected
+
+        Args:
+            stream: The stream to wrap
+            env: Environment variables dict (defaults to os.environ)
+
+        Returns:
+            AutoFlushTextIOWrapper instance configured based on GIT_FLUSH
+        """
+        if _should_auto_flush(stream, env):
+            return cls(stream)
+        else:
+            return stream
+
+    def write(self, data: str) -> int:
+        """Write data to the stream and optionally flush.
+
+        Args:
+            data: Data to write
+
+        Returns:
+            Number of characters written
+        """
+        result = self._stream.write(data)
+        self._stream.flush()
+        return result
+
+    def writelines(self, lines: Iterable[str]) -> None:
+        """Write multiple lines to the stream and optionally flush.
+
+        Args:
+            lines: Lines to write
+        """
+        self._stream.writelines(lines)
+        self._stream.flush()
+
+    def flush(self) -> None:
+        """Flush the underlying stream."""
+        self._stream.flush()
+
+    def __getattr__(self, name: str) -> object:
+        """Delegate all other attributes to the underlying stream."""
+        return getattr(self._stream, name)
+
+    def __enter__(self) -> "AutoFlushTextIOWrapper":
+        """Support context manager protocol."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        """Support context manager protocol."""
+        if hasattr(self._stream, "__exit__"):
+            self._stream.__exit__(exc_type, exc_val, exc_tb)
+
+
+class AutoFlushBinaryIOWrapper:
+    """Wrapper that automatically flushes a BinaryIO stream based on configuration.
+
+    This wrapper can be configured to flush after each write operation,
+    which is useful for real-time output monitoring in CI/CD systems.
+    """
+
+    def __init__(self, stream: BinaryIO) -> None:
+        """Initialize the wrapper.
+
+        Args:
+            stream: The stream to wrap
+        """
+        self._stream = stream
+
+    @classmethod
+    def env(
+        cls, stream: BinaryIO, env: Optional[Mapping[str, str]] = None
+    ) -> "AutoFlushBinaryIOWrapper | BinaryIO":
+        """Create wrapper respecting the GIT_FLUSH environment variable.
+
+        Respects the GIT_FLUSH environment variable:
+        - GIT_FLUSH=1: Always flush after each write
+        - GIT_FLUSH=0: Never auto-flush (use buffered I/O)
+        - Not set: Auto-detect based on whether output is redirected
+
+        Args:
+            stream: The stream to wrap
+            env: Environment variables dict (defaults to os.environ)
+
+        Returns:
+            AutoFlushBinaryIOWrapper instance configured based on GIT_FLUSH
+        """
+        if _should_auto_flush(stream, env):
+            return cls(stream)
+        else:
+            return stream
+
+    def write(self, data: Buffer) -> int:
+        """Write data to the stream and optionally flush.
+
+        Args:
+            data: Data to write
+
+        Returns:
+            Number of bytes written
+        """
+        result = self._stream.write(data)
+        self._stream.flush()
+        return result
+
+    def writelines(self, lines: Iterable[Buffer]) -> None:
+        """Write multiple lines to the stream and optionally flush.
+
+        Args:
+            lines: Lines to write
+        """
+        self._stream.writelines(lines)
+        self._stream.flush()
+
+    def flush(self) -> None:
+        """Flush the underlying stream."""
+        self._stream.flush()
+
+    def __getattr__(self, name: str) -> object:
+        """Delegate all other attributes to the underlying stream."""
+        return getattr(self._stream, name)
+
+    def __enter__(self) -> "AutoFlushBinaryIOWrapper":
+        """Support context manager protocol."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        """Support context manager protocol."""
+        if hasattr(self._stream, "__exit__"):
+            self._stream.__exit__(exc_type, exc_val, exc_tb)
+
+
 class CommitMessageError(Exception):
     """Raised when there's an issue with the commit message."""
 
@@ -117,59 +311,6 @@ def signal_quit(signal: int, frame: Optional[types.FrameType]) -> None:
     pdb.set_trace()
 
 
-def parse_relative_time(time_str: str) -> int:
-    """Parse a relative time string like '2 weeks ago' into seconds.
-
-    Args:
-        time_str: String like '2 weeks ago' or 'now'
-
-    Returns:
-        Number of seconds
-
-    Raises:
-        ValueError: If the time string cannot be parsed
-    """
-    if time_str == "now":
-        return 0
-
-    if not time_str.endswith(" ago"):
-        raise ValueError(f"Invalid relative time format: {time_str}")
-
-    parts = time_str[:-4].split()
-    if len(parts) != 2:
-        raise ValueError(f"Invalid relative time format: {time_str}")
-
-    try:
-        num = int(parts[0])
-        unit = parts[1]
-
-        multipliers = {
-            "second": 1,
-            "seconds": 1,
-            "minute": 60,
-            "minutes": 60,
-            "hour": 3600,
-            "hours": 3600,
-            "day": 86400,
-            "days": 86400,
-            "week": 604800,
-            "weeks": 604800,
-            "month": 2592000,  # 30 days
-            "months": 2592000,
-            "year": 31536000,  # 365 days
-            "years": 31536000,
-        }
-
-        if unit in multipliers:
-            return num * multipliers[unit]
-        else:
-            raise ValueError(f"Unknown time unit: {unit}")
-    except ValueError as e:
-        if "invalid literal" in str(e):
-            raise ValueError(f"Invalid number in relative time: {parts[0]}")
-        raise
-
-
 def parse_time_to_timestamp(time_spec: str) -> int:
     """Parse a time specification and return a Unix timestamp.
 
@@ -189,7 +330,9 @@ def parse_time_to_timestamp(time_spec: str) -> int:
     """
     import time
 
-    # Handle special cases
+    from .approxidate import parse_approxidate
+
+    # Handle special cases specific to CLI
     if time_spec == "all":
         # Expire all entries - set to future time so everything is "older"
         return int(time.time()) + (100 * 365 * 24 * 60 * 60)  # 100 years in future
@@ -197,15 +340,8 @@ def parse_time_to_timestamp(time_spec: str) -> int:
         # Never expire - set to epoch start so nothing is older
         return 0
 
-    # Try parsing as direct Unix timestamp
-    try:
-        return int(time_spec)
-    except ValueError:
-        pass
-
-    # Parse relative time and convert to timestamp
-    seconds_ago = parse_relative_time(time_spec)
-    return int(time.time()) - seconds_ago
+    # Use approxidate parser for everything else
+    return parse_approxidate(time_spec)
 
 
 def format_bytes(bytes: float) -> str:
@@ -1318,6 +1454,116 @@ class cmd_dump_index(Command):
 
         for o in idx:
             logger.info("%s %s", o, idx[o])
+
+
+class cmd_interpret_trailers(Command):
+    """Add or parse structured information in commit messages."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the interpret-trailers command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "file",
+            nargs="?",
+            help="File to read message from. If not specified, reads from stdin.",
+        )
+        parser.add_argument(
+            "--trailer",
+            action="append",
+            dest="trailers",
+            metavar="<token>[(=|:)<value>]",
+            help="Trailer to add. Can be specified multiple times.",
+        )
+        parser.add_argument(
+            "--trim-empty",
+            action="store_true",
+            help="Remove trailers with empty values",
+        )
+        parser.add_argument(
+            "--only-trailers",
+            action="store_true",
+            help="Output only the trailers, not the message body",
+        )
+        parser.add_argument(
+            "--only-input",
+            action="store_true",
+            help="Don't add new trailers, only parse existing ones",
+        )
+        parser.add_argument(
+            "--unfold", action="store_true", help="Join multiline values into one line"
+        )
+        parser.add_argument(
+            "--parse",
+            action="store_true",
+            help="Shorthand for --only-trailers --only-input --unfold",
+        )
+        parser.add_argument(
+            "--where",
+            choices=["end", "start", "after", "before"],
+            default="end",
+            help="Where to place new trailers",
+        )
+        parser.add_argument(
+            "--if-exists",
+            choices=[
+                "add",
+                "replace",
+                "addIfDifferent",
+                "addIfDifferentNeighbor",
+                "doNothing",
+            ],
+            default="addIfDifferentNeighbor",
+            help="Action if trailer already exists",
+        )
+        parser.add_argument(
+            "--if-missing",
+            choices=["add", "doNothing"],
+            default="add",
+            help="Action if trailer is missing",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Read message from file or stdin
+        if parsed_args.file:
+            with open(parsed_args.file, "rb") as f:
+                message = f.read()
+        else:
+            message = sys.stdin.buffer.read()
+
+        # Parse trailer arguments
+        trailer_list = []
+        if parsed_args.trailers:
+            for trailer_spec in parsed_args.trailers:
+                # Parse "key:value" or "key=value" or just "key"
+                if ":" in trailer_spec:
+                    key, value = trailer_spec.split(":", 1)
+                elif "=" in trailer_spec:
+                    key, value = trailer_spec.split("=", 1)
+                else:
+                    key = trailer_spec
+                    value = ""
+                trailer_list.append((key.strip(), value.strip()))
+
+        # Call interpret_trailers
+        result = porcelain.interpret_trailers(
+            message,
+            trailers=trailer_list if trailer_list else None,
+            trim_empty=parsed_args.trim_empty,
+            only_trailers=parsed_args.only_trailers,
+            only_input=parsed_args.only_input,
+            unfold=parsed_args.unfold,
+            parse=parsed_args.parse,
+            where=parsed_args.where,
+            if_exists=parsed_args.if_exists,
+            if_missing=parsed_args.if_missing,
+        )
+
+        # Output result
+        sys.stdout.buffer.write(result)
 
 
 class cmd_init(Command):
@@ -2917,6 +3163,8 @@ class cmd_prune(Command):
         # Parse expire grace period
         grace_period = DEFAULT_TEMPFILE_GRACE_PERIOD
         if parsed_args.expire:
+            from .approxidate import parse_relative_time
+
             try:
                 grace_period = parse_relative_time(parsed_args.expire)
             except ValueError:
@@ -3113,11 +3361,18 @@ class cmd_submodule_update(Command):
             help="Force update even if local changes exist",
         )
         parser.add_argument(
+            "--recursive",
+            action="store_true",
+            help="Recursively update nested submodules",
+        )
+        parser.add_argument(
             "paths", nargs="*", help="Specific submodule paths to update"
         )
         args = parser.parse_args(argv)
         paths = args.paths if args.paths else None
-        porcelain.submodule_update(".", paths=paths, init=args.init, force=args.force)
+        porcelain.submodule_update(
+            ".", paths=paths, init=args.init, force=args.force, recursive=args.recursive
+        )
 
 
 class cmd_submodule(SuperCommand):
@@ -3801,6 +4056,89 @@ class cmd_notes(SuperCommand):
     default_command = cmd_notes_list
 
 
+class cmd_replace_list(Command):
+    """List all replacement refs."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the replace-list command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.parse_args(args)
+
+        replacements = porcelain.replace_list(".")
+        for object_sha, replacement_sha in replacements:
+            sys.stdout.write(
+                f"{object_sha.decode('ascii')} -> {replacement_sha.decode('ascii')}\n"
+            )
+
+
+class cmd_replace_delete(Command):
+    """Delete a replacement ref."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the replace-delete command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("object", help="Object whose replacement should be removed")
+        parsed_args = parser.parse_args(args)
+
+        try:
+            porcelain.replace_delete(".", parsed_args.object)
+            logger.info("Deleted replacement for %s", parsed_args.object)
+            return None
+        except KeyError as e:
+            logger.error(str(e))
+            return 1
+
+
+class cmd_replace(SuperCommand):
+    """Create, list, and delete replacement refs."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "list": cmd_replace_list,
+        "delete": cmd_replace_delete,
+    }
+
+    default_command = cmd_replace_list
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the replace command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        # Special case: if we have exactly 2 args and no subcommand, treat as create
+        if len(args) == 2 and args[0] not in self.subcommands:
+            # This is the create form: git replace <object> <replacement>
+            parser = argparse.ArgumentParser()
+            parser.add_argument("object", help="Object to replace")
+            parser.add_argument("replacement", help="Replacement object")
+            parsed_args = parser.parse_args(args)
+
+            porcelain.replace_create(".", parsed_args.object, parsed_args.replacement)
+            logger.info(
+                "Created replacement: %s -> %s",
+                parsed_args.object,
+                parsed_args.replacement,
+            )
+            return None
+
+        # Otherwise, delegate to supercommand handling
+        return super().run(args)
+
+
 class cmd_cherry(Command):
     """Find commits not merged upstream."""
 
@@ -4061,6 +4399,8 @@ class cmd_gc(Command):
         # Parse prune grace period
         grace_period = None
         if parsed_args.prune:
+            from .approxidate import parse_relative_time
+
             try:
                 grace_period = parse_relative_time(parsed_args.prune)
             except ValueError:
@@ -4117,6 +4457,122 @@ class cmd_gc(Command):
         except porcelain.Error as e:
             logger.error("%s", e)
             return 1
+        return None
+
+
+class cmd_maintenance(Command):
+    """Run tasks to optimize Git repository data."""
+
+    def run(self, args: Sequence[str]) -> Optional[int]:
+        """Execute the maintenance command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser(
+            description="Run tasks to optimize Git repository data"
+        )
+        subparsers = parser.add_subparsers(
+            dest="subcommand", help="Maintenance subcommand"
+        )
+
+        # maintenance run subcommand
+        run_parser = subparsers.add_parser("run", help="Run maintenance tasks")
+        run_parser.add_argument(
+            "--task",
+            action="append",
+            dest="tasks",
+            help="Run a specific task (can be specified multiple times)",
+        )
+        run_parser.add_argument(
+            "--auto",
+            action="store_true",
+            help="Only run tasks if needed",
+        )
+        run_parser.add_argument(
+            "--quiet",
+            "-q",
+            action="store_true",
+            help="Only report errors",
+        )
+
+        # maintenance start subcommand (placeholder)
+        subparsers.add_parser("start", help="Start background maintenance")
+
+        # maintenance stop subcommand (placeholder)
+        subparsers.add_parser("stop", help="Stop background maintenance")
+
+        # maintenance register subcommand
+        subparsers.add_parser("register", help="Register repository for maintenance")
+
+        # maintenance unregister subcommand
+        unregister_parser = subparsers.add_parser(
+            "unregister", help="Unregister repository from maintenance"
+        )
+        unregister_parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Don't error if repository is not registered",
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        if not parsed_args.subcommand:
+            parser.print_help()
+            return 1
+
+        if parsed_args.subcommand == "run":
+            # Progress callback
+            def progress(msg: str) -> None:
+                if not parsed_args.quiet:
+                    logger.info(msg)
+
+            try:
+                result = porcelain.maintenance_run(
+                    ".",
+                    tasks=parsed_args.tasks,
+                    auto=parsed_args.auto,
+                    progress=progress if not parsed_args.quiet else None,
+                )
+
+                # Report results
+                if not parsed_args.quiet:
+                    if result.tasks_succeeded:
+                        logger.info("\nSuccessfully completed tasks:")
+                        for task in result.tasks_succeeded:
+                            logger.info(f"  - {task}")
+
+                    if result.tasks_failed:
+                        logger.error("\nFailed tasks:")
+                        for task in result.tasks_failed:
+                            error_msg = result.errors.get(task, "Unknown error")
+                            logger.error(f"  - {task}: {error_msg}")
+                        return 1
+
+            except porcelain.Error as e:
+                logger.error("%s", e)
+                return 1
+        elif parsed_args.subcommand == "register":
+            porcelain.maintenance_register(".")
+            logger.info("Repository registered for background maintenance")
+        elif parsed_args.subcommand == "unregister":
+            try:
+                force = getattr(parsed_args, "force", False)
+                porcelain.maintenance_unregister(".", force=force)
+            except ValueError as e:
+                logger.error(str(e))
+                return 1
+            logger.info("Repository unregistered from background maintenance")
+        elif parsed_args.subcommand in ("start", "stop"):
+            # TODO: Implement background maintenance scheduling
+            logger.error(
+                f"The '{parsed_args.subcommand}' subcommand is not yet implemented"
+            )
+            return 1
+        else:
+            parser.print_help()
+            return 1
+
         return None
 
 
@@ -5581,11 +6037,13 @@ commands = {
     "grep": cmd_grep,
     "help": cmd_help,
     "init": cmd_init,
+    "interpret-trailers": cmd_interpret_trailers,
     "lfs": cmd_lfs,
     "log": cmd_log,
     "ls-files": cmd_ls_files,
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
+    "maintenance": cmd_maintenance,
     "mailsplit": cmd_mailsplit,
     "merge": cmd_merge,
     "merge-base": cmd_merge_base,
@@ -5601,6 +6059,7 @@ commands = {
     "reflog": cmd_reflog,
     "remote": cmd_remote,
     "repack": cmd_repack,
+    "replace": cmd_replace,
     "reset": cmd_reset,
     "revert": cmd_revert,
     "rev-list": cmd_rev_list,
@@ -5636,6 +6095,10 @@ def main(argv: Optional[Sequence[str]] = None) -> Optional[int]:
     Returns:
         Exit code or None
     """
+    # Wrap stdout and stderr to respect GIT_FLUSH environment variable
+    sys.stdout = AutoFlushTextIOWrapper.env(sys.stdout)
+    sys.stderr = AutoFlushTextIOWrapper.env(sys.stderr)
+
     if argv is None:
         argv = sys.argv[1:]
 

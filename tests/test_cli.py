@@ -3936,5 +3936,96 @@ class ReplaceCommandTest(DulwichCliTestCase):
         self.assertEqual(result, 1)
 
 
+class StripspaceCommandTest(DulwichCliTestCase):
+    """Tests for stripspace command."""
+
+    def test_stripspace_from_file(self):
+        """Test stripspace from a file."""
+        # Create a text file with whitespace issues
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"  hello  \n\n\n\n  world  \n\n")
+
+        result, stdout, _stderr = self._run_cli("stripspace", text_file)
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "hello\n\nworld\n")
+
+    def test_stripspace_simple(self):
+        """Test basic stripspace functionality."""
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"hello\nworld\n")
+
+        result, stdout, _stderr = self._run_cli("stripspace", text_file)
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "hello\nworld\n")
+
+    def test_stripspace_trailing_whitespace(self):
+        """Test that trailing whitespace is removed."""
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"hello  \nworld\t\n")
+
+        result, stdout, _stderr = self._run_cli("stripspace", text_file)
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "hello\nworld\n")
+
+    def test_stripspace_strip_comments(self):
+        """Test stripping comments."""
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"# comment\nhello\n# another comment\nworld\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "stripspace", "--strip-comments", text_file
+        )
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "hello\nworld\n")
+
+    def test_stripspace_comment_lines(self):
+        """Test prepending comment character."""
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"hello\nworld\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "stripspace", "--comment-lines", text_file
+        )
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "# hello\n# world\n")
+
+    def test_stripspace_custom_comment_char(self):
+        """Test using custom comment character."""
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"; comment\nhello\n; another comment\nworld\n")
+
+        result, stdout, _stderr = self._run_cli(
+            "stripspace", "--strip-comments", "--comment-char", ";", text_file
+        )
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "hello\nworld\n")
+
+    def test_stripspace_leading_trailing_blanks(self):
+        """Test removing leading and trailing blank lines."""
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"\n\nhello\nworld\n\n\n")
+
+        result, stdout, _stderr = self._run_cli("stripspace", text_file)
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "hello\nworld\n")
+
+    def test_stripspace_collapse_blank_lines(self):
+        """Test collapsing multiple blank lines."""
+        text_file = os.path.join(self.test_dir, "message.txt")
+        with open(text_file, "wb") as f:
+            f.write(b"hello\n\n\n\nworld\n")
+
+        result, stdout, _stderr = self._run_cli("stripspace", text_file)
+        self.assertIsNone(result)
+        self.assertEqual(stdout, "hello\n\nworld\n")
+
+
 if __name__ == "__main__":
     unittest.main()

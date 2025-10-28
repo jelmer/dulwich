@@ -246,6 +246,177 @@ class ParseObjectTests(TestCase):
             # HEAD@{2} is the third/oldest (c1)
             self.assertEqual(c1, parse_object(r, b"HEAD@{2}"))
 
+    def test_reflog_time_lookup(self) -> None:
+        # Use a real repo for reflog testing with time specifications
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            r = Repo.init_bare(tmpdir)
+            c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
+
+            # Write reflog entries with specific timestamps
+            # 1234567890 = 2009-02-13 23:31:30 UTC
+            r._write_reflog(
+                b"HEAD",
+                None,
+                c1.id,
+                b"Test User <test@example.com>",
+                1234567890,
+                0,
+                b"commit: Initial commit",
+            )
+            # 1234657890 = 2009-02-14 23:31:30 UTC (1 day + 1 second later)
+            r._write_reflog(
+                b"HEAD",
+                c1.id,
+                c2.id,
+                b"Test User <test@example.com>",
+                1234657890,
+                0,
+                b"commit: Second commit",
+            )
+            # 1235000000 = 2009-02-18 19:33:20 UTC
+            r._write_reflog(
+                b"HEAD",
+                c2.id,
+                c3.id,
+                b"Test User <test@example.com>",
+                1235000000,
+                0,
+                b"commit: Third commit",
+            )
+
+            # Lookup by timestamp - should get the most recent entry at or before time
+            self.assertEqual(c1, parse_object(r, b"HEAD@{1234567890}"))
+            self.assertEqual(c2, parse_object(r, b"HEAD@{1234657890}"))
+            self.assertEqual(c3, parse_object(r, b"HEAD@{1235000000}"))
+            # Future timestamp should get latest entry
+            self.assertEqual(c3, parse_object(r, b"HEAD@{9999999999}"))
+
+    def test_index_path_lookup_stage0(self) -> None:
+        # Test index path lookup for stage 0 (normal files)
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            r = Repo.init(tmpdir)
+
+            # Create a blob and add it to the index
+            b = Blob.from_string(b"Test content")
+            r.object_store.add_object(b)
+
+            # Add to index
+            index = r.open_index()
+            from dulwich.index import IndexEntry
+
+            index[b"test.txt"] = IndexEntry(
+                ctime=(0, 0),
+                mtime=(0, 0),
+                dev=0,
+                ino=0,
+                mode=0o100644,
+                uid=0,
+                gid=0,
+                size=len(b.data),
+                sha=b.id,
+            )
+            index.write()
+
+            # Test :path syntax (defaults to stage 0)
+            result = parse_object(r, b":test.txt")
+            self.assertEqual(b"Test content", result.data)
+
+            # Test :0:path syntax (explicit stage 0)
+            result = parse_object(r, b":0:test.txt")
+            self.assertEqual(b"Test content", result.data)
+
+    def test_index_path_lookup_conflicts(self) -> None:
+        # Test index path lookup with merge conflicts (stages 1-3)
+        import tempfile
+
+        from dulwich.index import ConflictedIndexEntry, IndexEntry
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            r = Repo.init(tmpdir)
+
+            # Create three different versions of a file
+            b_ancestor = Blob.from_string(b"Ancestor content")
+            b_this = Blob.from_string(b"This content")
+            b_other = Blob.from_string(b"Other content")
+            r.object_store.add_object(b_ancestor)
+            r.object_store.add_object(b_this)
+            r.object_store.add_object(b_other)
+
+            # Add conflicted entry to index
+            index = r.open_index()
+            index[b"conflict.txt"] = ConflictedIndexEntry(
+                ancestor=IndexEntry(
+                    ctime=(0, 0),
+                    mtime=(0, 0),
+                    dev=0,
+                    ino=0,
+                    mode=0o100644,
+                    uid=0,
+                    gid=0,
+                    size=len(b_ancestor.data),
+                    sha=b_ancestor.id,
+                ),
+                this=IndexEntry(
+                    ctime=(0, 0),
+                    mtime=(0, 0),
+                    dev=0,
+                    ino=0,
+                    mode=0o100644,
+                    uid=0,
+                    gid=0,
+                    size=len(b_this.data),
+                    sha=b_this.id,
+                ),
+                other=IndexEntry(
+                    ctime=(0, 0),
+                    mtime=(0, 0),
+                    dev=0,
+                    ino=0,
+                    mode=0o100644,
+                    uid=0,
+                    gid=0,
+                    size=len(b_other.data),
+                    sha=b_other.id,
+                ),
+            )
+            index.write()
+
+            # Test stage 1 (ancestor)
+            result = parse_object(r, b":1:conflict.txt")
+            self.assertEqual(b"Ancestor content", result.data)
+
+            # Test stage 2 (this)
+            result = parse_object(r, b":2:conflict.txt")
+            self.assertEqual(b"This content", result.data)
+
+            # Test stage 3 (other)
+            result = parse_object(r, b":3:conflict.txt")
+            self.assertEqual(b"Other content", result.data)
+
+            # Test that :conflict.txt raises an error for conflicted files
+            self.assertRaises(ValueError, parse_object, r, b":conflict.txt")
+
+    def test_index_path_not_found(self) -> None:
+        # Test error when path not in index
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            r = Repo.init(tmpdir)
+
+            # Try to lookup non-existent path
+            self.assertRaises(KeyError, parse_object, r, b":nonexistent.txt")
+
 
 class ParseCommitRangeTests(TestCase):
     """Test parse_commit_range."""

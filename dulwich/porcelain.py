@@ -107,6 +107,7 @@ from typing import (
     Callable,
     Optional,
     TextIO,
+    TypedDict,
     TypeVar,
     Union,
     cast,
@@ -120,6 +121,8 @@ else:
     from typing_extensions import Buffer, override
 
 if TYPE_CHECKING:
+    import urllib3
+
     from .filter_branch import CommitData
     from .gc import GCStats
     from .maintenance import MaintenanceResult
@@ -227,6 +230,21 @@ T = TypeVar("T", bound="BaseRepo")
 
 # Type alias for common repository parameter pattern
 RepoPath = Union[str, os.PathLike[str], Repo]
+
+
+class TransportKwargs(TypedDict, total=False):
+    """Keyword arguments accepted by get_transport_and_path."""
+
+    operation: Optional[str]
+    thin_packs: bool
+    report_activity: Optional[Callable[[int, str], None]]
+    quiet: bool
+    include_tags: bool
+    username: Optional[str]
+    password: Optional[str]
+    key_filename: Optional[str]
+    ssh_command: Optional[str]
+    pool_manager: Optional["urllib3.PoolManager"]
 
 
 @dataclass
@@ -1054,6 +1072,30 @@ def init(
         return Repo.init(path, symlinks=symlinks)
 
 
+def _filter_transport_kwargs(**kwargs: object) -> TransportKwargs:
+    """Filter kwargs to only include parameters accepted by get_transport_and_path.
+
+    Args:
+      **kwargs: Arbitrary keyword arguments
+
+    Returns:
+      Dictionary containing only the kwargs that get_transport_and_path accepts
+    """
+    valid_params = {
+        "operation",
+        "thin_packs",
+        "report_activity",
+        "quiet",
+        "include_tags",
+        "username",
+        "password",
+        "key_filename",
+        "ssh_command",
+        "pool_manager",
+    }
+    return cast(TransportKwargs, {k: v for k, v in kwargs.items() if k in valid_params})
+
+
 def clone(
     source: Union[str, bytes, Repo],
     target: Optional[Union[str, os.PathLike[str]]] = None,
@@ -1134,7 +1176,10 @@ def clone(
         path = source.path
     else:
         source_str = source.decode() if isinstance(source, bytes) else source
-        (client, path) = get_transport_and_path(source_str, config=config, **kwargs)  # type: ignore[arg-type]
+        transport_kwargs = _filter_transport_kwargs(**kwargs)
+        (client, path) = get_transport_and_path(
+            source_str, config=config, **transport_kwargs
+        )
 
     filter_spec_bytes: Optional[bytes] = None
     if filter_spec:
@@ -2890,10 +2935,11 @@ def push(
                     refspecs_bytes.append(spec)
 
         # Get the client and path
+        transport_kwargs = _filter_transport_kwargs(**kwargs)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
-            **kwargs,  # type: ignore[arg-type]
+            **transport_kwargs,
         )
 
         selected_refs = []
@@ -3058,10 +3104,11 @@ def pull(
                 and remote_refs[lh] not in r.object_store
             ]
 
+        transport_kwargs = _filter_transport_kwargs(**kwargs)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
-            **kwargs,  # type: ignore[arg-type]
+            **transport_kwargs,
         )
         if filter_spec:
             filter_spec_bytes: Optional[bytes] = filter_spec.encode("ascii")

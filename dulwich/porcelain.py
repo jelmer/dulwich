@@ -41,6 +41,7 @@ Currently implemented:
  * for_each_ref
  * grep
  * init
+ * interpret_trailers
  * ls_files
  * ls_remote
  * ls_tree
@@ -54,6 +55,7 @@ Currently implemented:
  * rm
  * remote{_add}
  * receive_pack
+ * replace{_create,_delete,_list}
  * reset
  * revert
  * sparse_checkout
@@ -120,6 +122,7 @@ else:
 if TYPE_CHECKING:
     from .filter_branch import CommitData
     from .gc import GCStats
+    from .maintenance import MaintenanceResult
 
 from . import replace_me
 from .archive import tar_stream
@@ -190,12 +193,14 @@ from .refs import (
     LOCAL_BRANCH_PREFIX,
     LOCAL_NOTES_PREFIX,
     LOCAL_REMOTE_PREFIX,
+    LOCAL_REPLACE_PREFIX,
     LOCAL_TAG_PREFIX,
     Ref,
     SymrefLoop,
     _import_remote_refs,
     filter_ref_prefix,
     local_branch_name,
+    local_replace_name,
     local_tag_name,
     shorten_ref_name,
 )
@@ -212,6 +217,7 @@ from .sparse_patterns import (
     apply_included_paths,
     determine_included_paths,
 )
+from .trailers import add_trailer_to_message, format_trailers, parse_trailers
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -816,6 +822,7 @@ def commit(
                 encoding=encoding,
                 no_verify=no_verify,
                 sign=sign,
+                signoff=signoff,
                 merge_heads=merge_heads,
                 ref=None,
             )
@@ -832,6 +839,7 @@ def commit(
                 encoding=encoding,
                 no_verify=no_verify,
                 sign=sign,
+                signoff=signoff,
                 merge_heads=merge_heads,
             )
 
@@ -858,6 +866,108 @@ def commit_tree(
         return r.get_worktree().commit(
             message=message, tree=tree, committer=committer, author=author
         )
+
+
+def interpret_trailers(
+    message: Union[str, bytes],
+    *,
+    trailers: Optional[list[tuple[str, str]]] = None,
+    trim_empty: bool = False,
+    only_trailers: bool = False,
+    only_input: bool = False,
+    unfold: bool = False,
+    parse: bool = False,
+    where: str = "end",
+    if_exists: str = "addIfDifferentNeighbor",
+    if_missing: str = "add",
+    separators: str = ":",
+) -> bytes:
+    r"""Parse and manipulate trailers in a commit message.
+
+    This function implements the functionality of `git interpret-trailers`,
+    allowing parsing and manipulation of structured metadata (trailers) in
+    commit messages.
+
+    Trailers are key-value pairs at the end of commit messages, formatted like:
+        Signed-off-by: Alice <alice@example.com>
+        Reviewed-by: Bob <bob@example.com>
+
+    Args:
+        message: The commit message (string or bytes)
+        trailers: List of (key, value) tuples to add as new trailers
+        trim_empty: Remove trailers with empty values
+        only_trailers: Output only the trailers, not the message body
+        only_input: Don't add new trailers, only parse existing ones
+        unfold: Join multiline trailer values into a single line
+        parse: Shorthand for --only-trailers --only-input --unfold
+        where: Where to add new trailers ('end', 'start', 'after', 'before')
+        if_exists: How to handle duplicate keys
+            - 'add': Always add
+            - 'replace': Replace all existing
+            - 'addIfDifferent': Add only if value differs from all existing
+            - 'addIfDifferentNeighbor': Add only if value differs from neighbors
+            - 'doNothing': Don't add if key exists
+        if_missing: What to do if key doesn't exist ('add' or 'doNothing')
+        separators: Valid separator characters (default ':')
+
+    Returns:
+        The processed message as bytes
+
+    Examples:
+        >>> msg = b"Subject\\n\\nBody text\\n"
+        >>> interpret_trailers(msg, trailers=[("Signed-off-by", "Alice <alice@example.com>")])
+        b'Subject\\n\\nBody text\\n\\nSigned-off-by: Alice <alice@example.com>\\n'
+
+        >>> msg = b"Subject\\n\\nSigned-off-by: Alice\\n"
+        >>> interpret_trailers(msg, only_trailers=True)
+        b'Signed-off-by: Alice\\n'
+    """
+    # Handle --parse shorthand
+    if parse:
+        only_trailers = True
+        only_input = True
+        unfold = True
+
+    # Convert message to bytes
+    if isinstance(message, str):
+        message_bytes = message.encode("utf-8")
+    else:
+        message_bytes = message
+
+    # Parse existing trailers
+    _message_body, parsed_trailers = parse_trailers(message_bytes, separators)
+
+    # Apply unfold if requested
+    if unfold:
+        for trailer in parsed_trailers:
+            # Replace newlines and multiple spaces with single space
+            trailer.value = " ".join(trailer.value.split())
+
+    # Apply trim_empty if requested
+    if trim_empty:
+        parsed_trailers = [t for t in parsed_trailers if t.value.strip()]
+
+    # Add new trailers if requested and not only_input
+    if not only_input and trailers:
+        for key, value in trailers:
+            message_bytes = add_trailer_to_message(
+                message_bytes,
+                key,
+                value,
+                separators[0],  # Use first separator as default
+                where=where,
+                if_exists=if_exists,
+                if_missing=if_missing,
+            )
+        # Re-parse to get updated trailers for output
+        if only_trailers:
+            _message_body, parsed_trailers = parse_trailers(message_bytes, separators)
+
+    # Return based on only_trailers flag
+    if only_trailers:
+        return format_trailers(parsed_trailers)
+    else:
+        return message_bytes
 
 
 def init(
@@ -987,7 +1097,7 @@ def clone(
     if recurse_submodules and not bare:
         try:
             submodule_init(repo)
-            submodule_update(repo, init=True)
+            submodule_update(repo, init=True, recursive=True)
         except FileNotFoundError as e:
             # .gitmodules file doesn't exist - no submodules to process
             logging.debug("No .gitmodules file found: %s", e)
@@ -1962,6 +2072,7 @@ def submodule_update(
     paths: Optional[Sequence[Union[str, bytes, os.PathLike[str]]]] = None,
     init: bool = False,
     force: bool = False,
+    recursive: bool = False,
     errstream: Optional[BinaryIO] = None,
 ) -> None:
     """Update submodules.
@@ -1971,6 +2082,7 @@ def submodule_update(
       paths: Optional list of specific submodule paths to update. If None, updates all.
       init: If True, initialize submodules first
       force: Force update even if local changes exist
+      recursive: If True, recursively update nested submodules
       errstream: Error stream for error messages
     """
     from .submodule import iter_cached_submodules
@@ -2028,7 +2140,7 @@ def submodule_update(
 
             # Get or create the submodule repository paths
             submodule_path = os.path.join(r.path, path_str)
-            submodule_git_dir = os.path.join(r.path, ".git", "modules", path_str)
+            submodule_git_dir = os.path.join(r.controldir(), "modules", path_str)
 
             # Clone or fetch the submodule
             if not os.path.exists(submodule_git_dir):
@@ -2044,8 +2156,7 @@ def submodule_update(
                     os.makedirs(submodule_path)
 
                 # Create .git file in the submodule directory
-                depth = path_str.count("/") + 1
-                relative_git_dir = "../" * depth + ".git/modules/" + path_str
+                relative_git_dir = os.path.relpath(submodule_git_dir, submodule_path)
                 git_file_path = os.path.join(submodule_path, ".git")
                 with open(git_file_path, "w") as f:
                     f.write(f"gitdir: {relative_git_dir}\n")
@@ -2088,6 +2199,19 @@ def submodule_update(
 
                     # Reset the working directory
                     reset(sub_repo, "hard", target_sha)
+
+            # Recursively update nested submodules if requested
+            if recursive:
+                submodule_gitmodules = os.path.join(submodule_path, ".gitmodules")
+                if os.path.exists(submodule_gitmodules):
+                    submodule_update(
+                        submodule_path,
+                        paths=None,
+                        init=True,  # Always initialize nested submodules
+                        force=force,
+                        recursive=True,
+                        errstream=errstream,
+                    )
 
 
 def tag_create(
@@ -2409,6 +2533,77 @@ def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[bytes, byt
         config = r.get_config_stack()
 
         return r.notes.list_notes(notes_ref, config=config)
+
+
+def replace_list(repo: RepoPath) -> list[tuple[bytes, bytes]]:
+    """List all replacement refs.
+
+    Args:
+      repo: Path to repository
+
+    Returns:
+      List of tuples of (object_sha, replacement_sha) where object_sha is the
+      object being replaced and replacement_sha is what it's replaced with
+    """
+    with open_repo_closing(repo) as r:
+        replacements = []
+        for ref in r.refs.keys():
+            if ref.startswith(LOCAL_REPLACE_PREFIX):
+                object_sha = ref[len(LOCAL_REPLACE_PREFIX) :]
+                replacement_sha = r.refs[ref]
+                replacements.append((object_sha, replacement_sha))
+        return replacements
+
+
+def replace_delete(repo: RepoPath, object_sha: Union[str, bytes]) -> None:
+    """Delete a replacement ref.
+
+    Args:
+      repo: Path to repository
+      object_sha: SHA of the object whose replacement should be removed
+    """
+    with open_repo_closing(repo) as r:
+        # Convert to bytes if string
+        if isinstance(object_sha, str):
+            object_sha_hex = object_sha.encode("ascii")
+        else:
+            object_sha_hex = object_sha
+
+        replace_ref = _make_replace_ref(object_sha_hex)
+        if replace_ref not in r.refs:
+            raise KeyError(
+                f"No replacement ref found for {object_sha_hex.decode('ascii')}"
+            )
+        del r.refs[replace_ref]
+
+
+def replace_create(
+    repo: RepoPath,
+    object_sha: Union[str, bytes],
+    replacement_sha: Union[str, bytes],
+) -> None:
+    """Create a replacement ref to replace one object with another.
+
+    Args:
+      repo: Path to repository
+      object_sha: SHA of the object to replace
+      replacement_sha: SHA of the replacement object
+    """
+    with open_repo_closing(repo) as r:
+        # Convert to bytes if string
+        if isinstance(object_sha, str):
+            object_sha_hex = object_sha.encode("ascii")
+        else:
+            object_sha_hex = object_sha
+
+        if isinstance(replacement_sha, str):
+            replacement_sha_hex = replacement_sha.encode("ascii")
+        else:
+            replacement_sha_hex = replacement_sha
+
+        # Create the replacement ref
+        replace_ref = _make_replace_ref(object_sha_hex)
+        r.refs[replace_ref] = replacement_sha_hex
 
 
 def reset(
@@ -3488,6 +3683,12 @@ def _make_tag_ref(name: Union[str, bytes]) -> Ref:
     if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return local_tag_name(name)
+
+
+def _make_replace_ref(name: Union[str, bytes]) -> Ref:
+    if isinstance(name, str):
+        name = name.encode(DEFAULT_ENCODING)
+    return local_replace_name(name)
 
 
 def branch_delete(
@@ -6370,6 +6571,60 @@ def prune(
             progress("Pruning temporary files")
         if not dry_run:
             r.object_store.prune(grace_period=grace_period)
+
+
+def maintenance_run(
+    repo: RepoPath,
+    tasks: Optional[list[str]] = None,
+    auto: bool = False,
+    progress: Optional[Callable[[str], None]] = None,
+) -> "MaintenanceResult":
+    """Run maintenance tasks on a repository.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      tasks: Optional list of specific task names to run
+             (e.g., ['gc', 'commit-graph', 'pack-refs'])
+      auto: If True, only run tasks if needed
+      progress: Optional progress callback
+
+    Returns:
+      MaintenanceResult object with task execution results
+    """
+    from .maintenance import run_maintenance
+
+    with open_repo_closing(repo) as r:
+        return run_maintenance(r, tasks=tasks, auto=auto, progress=progress)
+
+
+def maintenance_register(repo: RepoPath) -> None:
+    """Register a repository for background maintenance.
+
+    This adds the repository to the global maintenance.repo config and sets
+    up recommended configuration for scheduled maintenance.
+
+    Args:
+      repo: Path to the repository or repository object
+    """
+    from .maintenance import register_repository
+
+    with open_repo_closing(repo) as r:
+        register_repository(r)
+
+
+def maintenance_unregister(repo: RepoPath, force: bool = False) -> None:
+    """Unregister a repository from background maintenance.
+
+    This removes the repository from the global maintenance.repo config.
+
+    Args:
+      repo: Path to the repository or repository object
+      force: If True, don't error if repository is not registered
+    """
+    from .maintenance import unregister_repository
+
+    with open_repo_closing(repo) as r:
+        unregister_repository(r, force=force)
 
 
 def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsResult:

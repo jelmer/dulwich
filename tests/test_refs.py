@@ -33,6 +33,7 @@ from dulwich.objects import ZERO_SHA
 from dulwich.refs import (
     DictRefsContainer,
     InfoRefsContainer,
+    NamespacedRefsContainer,
     SymrefLoop,
     _split_ref_line,
     check_ref_format,
@@ -1301,3 +1302,151 @@ class RefUtilityFunctionsTests(TestCase):
 
         with self.assertRaises(ValueError):
             extract_tag_name(b"v1.0")
+
+
+class NamespacedRefsContainerTests(TestCase):
+    """Tests for NamespacedRefsContainer."""
+
+    def setUp(self) -> None:
+        TestCase.setUp(self)
+        # Create an underlying refs container
+        self._underlying_refs = DictRefsContainer(dict(_TEST_REFS))
+        # Create a namespaced view
+        self._refs = NamespacedRefsContainer(self._underlying_refs, b"foo")
+
+    def test_namespace_prefix_simple(self) -> None:
+        """Test simple namespace prefix."""
+        refs = NamespacedRefsContainer(self._underlying_refs, b"foo")
+        self.assertEqual(b"refs/namespaces/foo/", refs._namespace_prefix)
+
+    def test_namespace_prefix_nested(self) -> None:
+        """Test nested namespace prefix."""
+        refs = NamespacedRefsContainer(self._underlying_refs, b"foo/bar")
+        self.assertEqual(
+            b"refs/namespaces/foo/refs/namespaces/bar/", refs._namespace_prefix
+        )
+
+    def test_allkeys_empty_namespace(self) -> None:
+        """Test that newly created namespace has no refs except HEAD."""
+        # HEAD is shared across namespaces, so it appears even in empty namespace
+        self.assertEqual({b"HEAD"}, self._refs.allkeys())
+
+    def test_setitem_and_getitem(self) -> None:
+        """Test setting and getting refs in namespace."""
+        sha = b"9" * 40
+        self._refs[b"refs/heads/master"] = sha
+        self.assertEqual(sha, self._refs[b"refs/heads/master"])
+
+        # Verify it's stored with the namespace prefix in underlying container
+        self.assertIn(
+            b"refs/namespaces/foo/refs/heads/master", self._underlying_refs.allkeys()
+        )
+        self.assertEqual(
+            sha, self._underlying_refs[b"refs/namespaces/foo/refs/heads/master"]
+        )
+
+    def test_head_not_namespaced(self) -> None:
+        """Test that HEAD is not namespaced."""
+        sha = b"a" * 40
+        self._refs[b"HEAD"] = sha
+        self.assertEqual(sha, self._refs[b"HEAD"])
+
+        # HEAD should be directly in the underlying container, not namespaced
+        self.assertIn(b"HEAD", self._underlying_refs.allkeys())
+        self.assertNotIn(b"refs/namespaces/foo/HEAD", self._underlying_refs.allkeys())
+
+    def test_isolation_between_namespaces(self) -> None:
+        """Test that different namespaces are isolated."""
+        sha1 = b"a" * 40
+        sha2 = b"b" * 40
+
+        # Create two different namespaces
+        refs_foo = NamespacedRefsContainer(self._underlying_refs, b"foo")
+        refs_bar = NamespacedRefsContainer(self._underlying_refs, b"bar")
+
+        # Set ref in foo namespace
+        refs_foo[b"refs/heads/master"] = sha1
+
+        # Set ref in bar namespace
+        refs_bar[b"refs/heads/master"] = sha2
+
+        # Each namespace should only see its own refs (plus shared HEAD)
+        self.assertEqual(sha1, refs_foo[b"refs/heads/master"])
+        self.assertEqual(sha2, refs_bar[b"refs/heads/master"])
+        self.assertEqual({b"HEAD", b"refs/heads/master"}, refs_foo.allkeys())
+        self.assertEqual({b"HEAD", b"refs/heads/master"}, refs_bar.allkeys())
+
+    def test_allkeys_filters_namespace(self) -> None:
+        """Test that allkeys only returns refs in the namespace."""
+        # Add refs in multiple namespaces
+        self._underlying_refs[b"refs/namespaces/foo/refs/heads/master"] = b"a" * 40
+        self._underlying_refs[b"refs/namespaces/foo/refs/heads/develop"] = b"b" * 40
+        self._underlying_refs[b"refs/namespaces/bar/refs/heads/feature"] = b"c" * 40
+        self._underlying_refs[b"refs/heads/global"] = b"d" * 40
+
+        # Only refs in 'foo' namespace should be visible (plus HEAD which is shared)
+        foo_refs = NamespacedRefsContainer(self._underlying_refs, b"foo")
+        self.assertEqual(
+            {b"HEAD", b"refs/heads/master", b"refs/heads/develop"}, foo_refs.allkeys()
+        )
+
+    def test_set_symbolic_ref(self) -> None:
+        """Test symbolic ref creation in namespace."""
+        sha = b"e" * 40
+        self._refs[b"refs/heads/develop"] = sha
+        self._refs.set_symbolic_ref(b"refs/heads/main", b"refs/heads/develop")
+
+        # Both target and link should be namespaced
+        self.assertIn(
+            b"refs/namespaces/foo/refs/heads/main", self._underlying_refs.allkeys()
+        )
+        self.assertEqual(
+            b"ref: refs/namespaces/foo/refs/heads/develop",
+            self._underlying_refs.read_loose_ref(
+                b"refs/namespaces/foo/refs/heads/main"
+            ),
+        )
+
+    def test_remove_if_equals(self) -> None:
+        """Test removing refs from namespace."""
+        sha = b"f" * 40
+        self._refs[b"refs/heads/temp"] = sha
+
+        # Remove the ref
+        self.assertTrue(self._refs.remove_if_equals(b"refs/heads/temp", sha))
+        self.assertNotIn(b"refs/heads/temp", self._refs.allkeys())
+        self.assertNotIn(
+            b"refs/namespaces/foo/refs/heads/temp", self._underlying_refs.allkeys()
+        )
+
+    def test_get_packed_refs(self) -> None:
+        """Test get_packed_refs returns empty dict for DictRefsContainer."""
+        # DictRefsContainer doesn't support packed refs, so just verify
+        # the wrapper returns an empty dict
+        packed = self._refs.get_packed_refs()
+        self.assertEqual({}, packed)
+
+    def test_add_if_new(self) -> None:
+        """Test add_if_new in namespace."""
+        sha = b"1" * 40
+        # Should succeed - ref doesn't exist
+        self.assertTrue(self._refs.add_if_new(b"refs/heads/new", sha))
+        self.assertEqual(sha, self._refs[b"refs/heads/new"])
+
+        # Should fail - ref already exists
+        self.assertFalse(self._refs.add_if_new(b"refs/heads/new", b"2" * 40))
+        self.assertEqual(sha, self._refs[b"refs/heads/new"])
+
+    def test_set_if_equals(self) -> None:
+        """Test set_if_equals in namespace."""
+        sha1 = b"a" * 40
+        sha2 = b"b" * 40
+        self._refs[b"refs/heads/test"] = sha1
+
+        # Should fail with wrong old value
+        self.assertFalse(self._refs.set_if_equals(b"refs/heads/test", b"c" * 40, sha2))
+        self.assertEqual(sha1, self._refs[b"refs/heads/test"])
+
+        # Should succeed with correct old value
+        self.assertTrue(self._refs.set_if_equals(b"refs/heads/test", sha1, sha2))
+        self.assertEqual(sha2, self._refs[b"refs/heads/test"])

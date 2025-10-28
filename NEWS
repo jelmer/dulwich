@@ -1,5 +1,9 @@
 0.24.8	UNRELEASED
 
+ * Add Rust implementation of pack delta creation (create_delta). The
+   implementation uses the similar crate for efficient diff computation.
+   (Jelmer Vernooĳ)
+
  * Add support for namespace isolation via ``NamespacedRefsContainer``.
    Implements Git's namespace feature for isolating refs within a single
    repository using the ``refs/namespaces/`` prefix. (Jelmer Vernooĳ, #1809)

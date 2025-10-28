@@ -46,6 +46,7 @@ from dulwich.pack import (
     PackStreamReader,
     UnpackedObject,
     UnresolvedDeltas,
+    _create_delta_py,
     _delta_encode_size,
     _encode_copy_operation,
     apply_delta,
@@ -62,7 +63,17 @@ from dulwich.pack import (
     write_pack_index_v3,
     write_pack_object,
 )
-from dulwich.tests.utils import build_pack, make_object
+from dulwich.tests.utils import (
+    build_pack,
+    ext_functest_builder,
+    functest_builder,
+    make_object,
+)
+
+try:
+    from dulwich._pack import create_delta as _create_delta_rs
+except ImportError:
+    _create_delta_rs = None
 
 from . import TestCase
 
@@ -289,6 +300,165 @@ class TestPackDeltas(TestCase):
             b"write_eof(), can_write_eof(), get_extra_info(), drain().\n",
         ]
         self.assertEqual(b"".join(expected), b"".join(res))
+
+    def _do_test_create_delta_various_cases(self, create_delta_func):
+        """Test create_delta with various input cases for both Python and Rust versions."""
+        import types
+
+        # Helper to normalize delta output (Rust returns bytes, Python returns Iterator[bytes])
+        def get_delta(base, target):
+            result = create_delta_func(base, target)
+            # Check if it's a Rust extension (returns bytes directly)
+            if isinstance(create_delta_func, types.BuiltinFunctionType):
+                return result
+            # Python version returns iterator
+            return b"".join(result)
+
+        # Test case 1: Identical content
+        base = b"hello world"
+        target = b"hello world"
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 2: Complete rewrite
+        base = b"aaaaaaaaaa"
+        target = b"bbbbbbbbbb"
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 3: Partial replacement
+        base = b"The quick brown fox jumps over the lazy dog"
+        target = b"The quick brown cat jumps over the lazy dog"
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 4: Insertion at end
+        base = b"hello"
+        target = b"hello world"
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 5: Deletion from end
+        base = b"hello world"
+        target = b"hello"
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 6: Empty base
+        base = b""
+        target = b"new content"
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 7: Empty target
+        base = b"old content"
+        target = b""
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 8: Large content
+        base = b"x" * 10000
+        target = b"x" * 9000 + b"y" * 1000
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+        # Test case 9: Multiple changes
+        base = b"line1\nline2\nline3\nline4\n"
+        target = b"line1\nmodified2\nline3\nmodified4\n"
+        delta = get_delta(base, target)
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+    # Test both Python and Rust versions
+    test_create_delta_py = functest_builder(
+        _do_test_create_delta_various_cases, _create_delta_py
+    )
+    test_create_delta_extension = ext_functest_builder(
+        _do_test_create_delta_various_cases, _create_delta_rs
+    )
+
+    def _do_test_create_delta_output_consistency(self, create_delta_func):
+        """Test that create_delta produces consistent and valid output."""
+        import types
+
+        # Helper to normalize delta output
+        def get_delta(base, target):
+            result = create_delta_func(base, target)
+            if isinstance(create_delta_func, types.BuiltinFunctionType):
+                return result
+            return b"".join(result)
+
+        test_cases = [
+            (b"", b""),
+            (b"a", b"a"),
+            (b"abc", b"abc"),
+            (b"abc", b"def"),
+            (b"hello world", b"hello rust"),
+            (b"x" * 100, b"y" * 100),
+            (b"same prefix but different suffix", b"same prefix with new suffix"),
+        ]
+
+        for base, target in test_cases:
+            delta = get_delta(base, target)
+
+            # Verify delta can be applied
+            result = b"".join(apply_delta(base, delta))
+            self.assertEqual(
+                target,
+                result,
+                f"Delta failed for base={base[:20]}... target={target[:20]}...",
+            )
+
+            # Verify delta is not empty (should have at least header)
+            self.assertGreater(len(delta), 0)
+
+    test_create_delta_output_consistency_py = functest_builder(
+        _do_test_create_delta_output_consistency, _create_delta_py
+    )
+    test_create_delta_output_consistency_extension = ext_functest_builder(
+        _do_test_create_delta_output_consistency, _create_delta_rs
+    )
+
+    def _do_test_create_delta_produces_valid_deltas(self, create_delta_func):
+        """Test that deltas produced are valid Git delta format."""
+        import types
+
+        # Helper to normalize delta output
+        def get_delta(base, target):
+            result = create_delta_func(base, target)
+            if isinstance(create_delta_func, types.BuiltinFunctionType):
+                return result
+            return b"".join(result)
+
+        base = b"The quick brown fox"
+        target = b"The slow brown fox"
+
+        delta = get_delta(base, target)
+
+        # A valid delta should have:
+        # 1. Base size header
+        # 2. Target size header
+        # 3. Delta operations
+        self.assertGreater(len(delta), 2)  # At minimum 2 header bytes
+
+        # Apply delta to verify it's valid
+        result = b"".join(apply_delta(base, delta))
+        self.assertEqual(target, result)
+
+    test_create_delta_valid_format_py = functest_builder(
+        _do_test_create_delta_produces_valid_deltas, _create_delta_py
+    )
+    test_create_delta_valid_format_extension = ext_functest_builder(
+        _do_test_create_delta_produces_valid_deltas, _create_delta_rs
+    )
 
 
 class TestPackData(PackTests):

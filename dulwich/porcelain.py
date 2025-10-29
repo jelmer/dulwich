@@ -422,6 +422,31 @@ def _noop_context_manager(obj: T) -> Iterator[T]:
     yield obj
 
 
+def _get_reflog_message(
+    default_message: bytes, explicit_message: Optional[bytes] = None
+) -> bytes:
+    """Get reflog message, checking GIT_REFLOG_ACTION environment variable.
+
+    Args:
+      default_message: Default message to use if no explicit message or env var
+      explicit_message: Explicit message passed as argument (takes precedence)
+
+    Returns:
+      The reflog message to use, with priority:
+        1. explicit_message if provided
+        2. GIT_REFLOG_ACTION environment variable if set
+        3. default_message otherwise
+    """
+    if explicit_message is not None:
+        return explicit_message
+
+    env_action = os.environ.get("GIT_REFLOG_ACTION")
+    if env_action is not None:
+        return env_action.encode("utf-8")
+
+    return default_message
+
+
 @overload
 def open_repo_closing(path_or_repo: T) -> AbstractContextManager[T]: ...
 
@@ -844,8 +869,23 @@ def commit(
                 merge_heads=merge_heads,
                 ref=None,
             )
-            # Update HEAD to point to the new commit
-            r.refs[b"HEAD"] = commit_sha
+            # Update HEAD to point to the new commit with reflog message
+            try:
+                old_head = r.refs[b"HEAD"]
+            except KeyError:
+                old_head = None
+
+            # Get the actual commit message from the created commit
+            commit_obj = r[commit_sha]
+            assert isinstance(commit_obj, Commit)
+            commit_message = commit_obj.message
+            default_message = b"commit (amend): " + commit_message
+            # Truncate message if too long for reflog
+            if len(default_message) > 100:
+                default_message = default_message[:97] + b"..."
+            reflog_message = _get_reflog_message(default_message)
+
+            r.refs.set_if_equals(b"HEAD", old_head, commit_sha, message=reflog_message)
             return commit_sha
         else:
             return r.get_worktree().commit(
@@ -2736,7 +2776,27 @@ def reset(
 
         # Update HEAD to point to the target commit
         if target_commit is not None:
-            r.refs[b"HEAD"] = target_commit.id
+            # Get the current HEAD value for set_if_equals
+            try:
+                old_head = r.refs[b"HEAD"]
+            except KeyError:
+                old_head = None
+
+            # Create reflog message
+            treeish_str = (
+                treeish.decode("utf-8")
+                if isinstance(treeish, bytes)
+                else str(treeish)
+                if not isinstance(treeish, (Commit, Tree, Tag))
+                else target_commit.id.hex()
+            )
+            default_message = f"reset: moving to {treeish_str}".encode()
+            reflog_message = _get_reflog_message(default_message)
+
+            # Update HEAD with reflog message
+            r.refs.set_if_equals(
+                b"HEAD", old_head, target_commit.id, message=reflog_message
+            )
 
         if mode == "soft":
             # Soft reset: only update HEAD, leave index and working tree unchanged
@@ -3850,11 +3910,12 @@ def branch_create(
 
         object = parse_object(r, objectish)
         refname = _make_branch_ref(name)
-        ref_message = (
+        default_message = (
             b"branch: Created from " + original_objectish.encode(DEFAULT_ENCODING)
             if isinstance(original_objectish, str)
             else b"branch: Created from " + original_objectish
         )
+        ref_message = _get_reflog_message(default_message)
         if force:
             r.refs.set_if_equals(refname, None, object.id, message=ref_message)
         else:
@@ -4249,8 +4310,8 @@ def fetch(
     """
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
-        if message is None:
-            message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
+        default_message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
+        message = _get_reflog_message(default_message, message)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),

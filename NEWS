@@ -10,6 +10,9 @@
    environments like GitHub Actions. More specific URL configurations
    override less specific ones.  (Jelmer Vernooĳ, #882)
 
+ * Add support for ``GIT_REFLOG_ACTION`` environment variable in porcelain
+   functions. (Jelmer Vernooĳ, #1811)
+
  * Add support for namespace isolation via ``NamespacedRefsContainer``.
    Implements Git's namespace feature for isolating refs within a single
    repository using the ``refs/namespaces/`` prefix. (Jelmer Vernooĳ, #1809)

@@ -358,7 +358,7 @@ class GitClientTests(TestCase):
                 b"refs/foo/bar": commit.id,
             }
 
-        def generate_pack_data(have, want, ofs_delta=False, progress=None):
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
@@ -385,7 +385,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"}
 
-        def generate_pack_data(have, want, ofs_delta=False, progress=None):
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -405,7 +405,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False, progress=None):
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -429,7 +429,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False, progress=None):
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
 
         self.client.send_pack(b"/", update_refs, generate_pack_data)
@@ -456,7 +456,7 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False, progress=None):
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
 
         f = BytesIO()
@@ -496,7 +496,7 @@ class GitClientTests(TestCase):
                 b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
             }
 
-        def generate_pack_data(have, want, ofs_delta=False, progress=None):
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return pack_objects_to_data(
                 [
                     (commit, None),
@@ -533,7 +533,7 @@ class GitClientTests(TestCase):
         def update_refs(refs):
             return {b"refs/heads/master": b"0" * 40}
 
-        def generate_pack_data(have, want, ofs_delta=False, progress=None):
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
 
         result = self.client.send_pack(b"/", update_refs, generate_pack_data)

@@ -673,6 +673,8 @@ class BaseRepo:
         self,
         have: set[ObjectID],
         want: set[ObjectID],
+        *,
+        shallow: Optional[set[ObjectID]] = None,
         progress: Optional[Callable[[str], None]] = None,
         ofs_delta: Optional[bool] = None,
     ) -> tuple[int, Iterator["UnpackedObject"]]:
@@ -681,13 +683,16 @@ class BaseRepo:
         Args:
           have: List of SHA1s of objects that should not be sent
           want: List of SHA1s of objects that should be sent
+          shallow: Set of shallow commit SHA1s to skip (defaults to repo's shallow commits)
           ofs_delta: Whether OFS deltas can be included
           progress: Optional progress reporting method
         """
+        if shallow is None:
+            shallow = self.get_shallow()
         return self.object_store.generate_pack_data(
             have,
             want,
-            shallow=self.get_shallow(),
+            shallow=shallow,
             progress=progress,
             ofs_delta=ofs_delta if ofs_delta is not None else DEFAULT_OFS_DELTA,
         )

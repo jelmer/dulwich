@@ -10827,3 +10827,81 @@ class ReplaceDeleteTests(PorcelainTestCase):
         # Try to delete a non-existent replacement
         with self.assertRaises(KeyError):
             porcelain.replace_delete(self.repo, c1.id)
+
+
+class GitReflogActionTests(PorcelainTestCase):
+    """Tests for GIT_REFLOG_ACTION environment variable support."""
+
+    def test_reset_with_git_reflog_action(self) -> None:
+        """Test that reset respects GIT_REFLOG_ACTION environment variable."""
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo.refs[b"HEAD"] = c2.id
+
+        # Set GIT_REFLOG_ACTION environment variable
+        self.overrideEnv("GIT_REFLOG_ACTION", "custom reset action")
+
+        # Reset to c1
+        porcelain.reset(self.repo, "hard", c1.id.decode())
+
+        # Check reflog message - HEAD is a symref to refs/heads/master
+        entries = list(porcelain.reflog(self.repo_path, b"refs/heads/master"))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(b"custom reset action", entries[0].message)
+
+    def test_commit_amend_with_git_reflog_action(self) -> None:
+        """Test that commit --amend respects GIT_REFLOG_ACTION environment variable."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"HEAD"] = c1.id
+
+        # Set GIT_REFLOG_ACTION environment variable
+        self.overrideEnv("GIT_REFLOG_ACTION", "custom amend action")
+
+        # Amend the commit
+        porcelain.commit(self.repo, b"amended message", amend=True)
+
+        # Check reflog message - HEAD is a symref to refs/heads/master
+        entries = list(porcelain.reflog(self.repo_path, b"refs/heads/master"))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(b"custom amend action", entries[0].message)
+
+    def test_branch_create_with_git_reflog_action(self) -> None:
+        """Test that branch_create respects GIT_REFLOG_ACTION environment variable."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"HEAD"] = c1.id
+
+        # Set GIT_REFLOG_ACTION environment variable
+        self.overrideEnv("GIT_REFLOG_ACTION", "custom branch action")
+
+        # Create a new branch
+        porcelain.branch_create(self.repo, b"test-branch")
+
+        # Check reflog message
+        entries = list(porcelain.reflog(self.repo_path, b"refs/heads/test-branch"))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(b"custom branch action", entries[0].message)
+
+    def test_reset_without_git_reflog_action(self) -> None:
+        """Test that reset uses default message when GIT_REFLOG_ACTION is not set."""
+        [c1, c2] = build_commit_graph(self.repo.object_store, [[1], [2]])
+        self.repo.refs[b"HEAD"] = c2.id
+
+        # Reset to c1 without GIT_REFLOG_ACTION
+        porcelain.reset(self.repo, "hard", c1.id.decode())
+
+        # Check reflog message contains default format - HEAD is a symref to refs/heads/master
+        entries = list(porcelain.reflog(self.repo_path, b"refs/heads/master"))
+        self.assertEqual(1, len(entries))
+        self.assertTrue(entries[0].message.startswith(b"reset: moving to"))
+
+    def test_branch_create_without_git_reflog_action(self) -> None:
+        """Test that branch_create uses default message when GIT_REFLOG_ACTION is not set."""
+        [c1] = build_commit_graph(self.repo.object_store, [[1]])
+        self.repo.refs[b"HEAD"] = c1.id
+
+        # Create a new branch without GIT_REFLOG_ACTION
+        porcelain.branch_create(self.repo, b"test-branch")
+
+        # Check reflog message contains default format
+        entries = list(porcelain.reflog(self.repo_path, b"refs/heads/test-branch"))
+        self.assertEqual(1, len(entries))
+        self.assertTrue(entries[0].message.startswith(b"branch: Created from"))

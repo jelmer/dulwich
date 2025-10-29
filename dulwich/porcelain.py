@@ -3048,12 +3048,14 @@ def push(
             def generate_pack_data_wrapper(
                 have: AbstractSet[bytes],
                 want: AbstractSet[bytes],
+                *,
                 ofs_delta: bool = False,
+                progress: Optional[Callable[..., None]] = None,
             ) -> tuple[int, Iterator[UnpackedObject]]:
                 # Wrap to match the expected signature
                 # Convert AbstractSet to set since generate_pack_data expects set
                 return r.generate_pack_data(
-                    set(have), set(want), progress=None, ofs_delta=ofs_delta
+                    set(have), set(want), progress=progress, ofs_delta=ofs_delta
                 )
 
             result = client.send_pack(

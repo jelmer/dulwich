@@ -5267,7 +5267,7 @@ class PushTests(PorcelainTestCase):
         )
 
         self.assertEqual(b"", outstream.getvalue())
-        self.assertTrue(re.match(b"Push to .* successful.\n", errstream.getvalue()))
+        self.assertTrue(re.search(b"Push to .* successful.\n", errstream.getvalue()))
 
     def test_push_returns_sendpackresult(self) -> None:
         """Test that push returns a SendPackResult with per-ref information."""

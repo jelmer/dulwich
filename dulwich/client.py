@@ -89,7 +89,9 @@ if TYPE_CHECKING:
             self,
             have: Set[bytes],
             want: Set[bytes],
+            *,
             ofs_delta: bool = False,
+            progress: Optional[Callable[[bytes], None]] = None,
         ) -> tuple[int, Iterator[UnpackedObject]]:
             """Generate pack data for the given have and want sets."""
             ...
@@ -1531,7 +1533,8 @@ class TraditionalGitClient(GitClient):
             pack_data_count, pack_data = generate_pack_data(
                 header_handler.have,
                 header_handler.want,
-                (CAPABILITY_OFS_DELTA in negotiated_capabilities),
+                ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
+                progress=progress,
             )
 
             if self._should_send_pack(new_refs):
@@ -2276,7 +2279,11 @@ class LocalGitClient(GitClient):
             if not want and set(new_refs.items()).issubset(set(old_refs.items())):
                 return SendPackResult(_to_optional_dict(new_refs), ref_status={})
 
-            target.object_store.add_pack_data(*generate_pack_data(set(have), set(want)))
+            target.object_store.add_pack_data(
+                *generate_pack_data(
+                    set(have), set(want), ofs_delta=True, progress=progress
+                )
+            )
 
             ref_status: dict[bytes, Optional[str]] = {}
 
@@ -3741,6 +3748,7 @@ class AbstractHttpGitClient(GitClient):
                 header_handler.have,
                 header_handler.want,
                 ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
+                progress=progress,
             )
             if self._should_send_pack(new_refs):
                 yield from PackChunkGenerator(pack_data_count, pack_data)

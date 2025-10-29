@@ -92,10 +92,14 @@ class DulwichClientTestBase:
 
             # Wrap generate_pack_data to match expected signature
             def generate_pack_data_wrapper(
-                have: set[bytes], want: set[bytes], ofs_delta: bool = False
+                have: set[bytes],
+                want: set[bytes],
+                *,
+                ofs_delta: bool = False,
+                progress=None,
             ) -> tuple[int, Iterator]:
                 return src.generate_pack_data(
-                    have, want, progress=None, ofs_delta=ofs_delta
+                    have, want, progress=progress, ofs_delta=ofs_delta
                 )
 
             c.send_pack(
@@ -150,10 +154,14 @@ class DulwichClientTestBase:
 
             # Wrap generate_pack_data to match expected signature
             def generate_pack_data_wrapper(
-                have: set[bytes], want: set[bytes], ofs_delta: bool = False
+                have: set[bytes],
+                want: set[bytes],
+                *,
+                ofs_delta: bool = False,
+                progress=None,
             ) -> tuple[int, Iterator]:
                 return local.generate_pack_data(
-                    have, want, progress=None, ofs_delta=ofs_delta
+                    have, want, progress=progress, ofs_delta=ofs_delta
                 )
 
             c.send_pack(remote_path, lambda _: sendrefs, generate_pack_data_wrapper)
@@ -170,10 +178,14 @@ class DulwichClientTestBase:
 
             # Wrap generate_pack_data to match expected signature
             def generate_pack_data_wrapper(
-                have: set[bytes], want: set[bytes], ofs_delta: bool = False
+                have: set[bytes],
+                want: set[bytes],
+                *,
+                ofs_delta: bool = False,
+                progress=None,
             ) -> tuple[int, Iterator]:
                 return src.generate_pack_data(
-                    have, want, progress=None, ofs_delta=ofs_delta
+                    have, want, progress=progress, ofs_delta=ofs_delta
                 )
 
             c.send_pack(
@@ -211,10 +223,14 @@ class DulwichClientTestBase:
 
         # Wrap generate_pack_data to match expected signature
         def generate_pack_data_wrapper(
-            have: set[bytes], want: set[bytes], ofs_delta: bool = False
+            have: set[bytes],
+            want: set[bytes],
+            *,
+            ofs_delta: bool = False,
+            progress=None,
         ) -> tuple[int, Iterator]:
             return src.generate_pack_data(
-                have, want, progress=None, ofs_delta=ofs_delta
+                have, want, progress=progress, ofs_delta=ofs_delta
             )
 
         return sendrefs, generate_pack_data_wrapper

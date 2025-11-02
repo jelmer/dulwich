@@ -1,7 +1,7 @@
 """Git merge implementation."""
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import merge3
@@ -24,7 +24,7 @@ def make_merge3(
     a: Sequence[bytes],
     b: Sequence[bytes],
     is_cherrypick: bool = False,
-    sequence_matcher: Optional[type["SequenceMatcherProtocol[bytes]"]] = None,
+    sequence_matcher: type["SequenceMatcherProtocol[bytes]"] | None = None,
 ) -> "merge3.Merge3[bytes]":
     """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
     if merge3 is None:
@@ -118,12 +118,12 @@ def _merge_lines(
 
 
 def merge_blobs(
-    base_blob: Optional[Blob],
-    ours_blob: Optional[Blob],
-    theirs_blob: Optional[Blob],
-    path: Optional[bytes] = None,
-    gitattributes: Optional[GitAttributes] = None,
-    config: Optional[Config] = None,
+    base_blob: Blob | None,
+    ours_blob: Blob | None,
+    theirs_blob: Blob | None,
+    path: bytes | None = None,
+    gitattributes: GitAttributes | None = None,
+    config: Config | None = None,
 ) -> tuple[bytes, bool]:
     """Perform three-way merge on blob contents.
 
@@ -253,8 +253,8 @@ class Merger:
     def __init__(
         self,
         object_store: BaseObjectStore,
-        gitattributes: Optional[GitAttributes] = None,
-        config: Optional[Config] = None,
+        gitattributes: GitAttributes | None = None,
+        config: Config | None = None,
     ) -> None:
         """Initialize merger.
 
@@ -269,10 +269,10 @@ class Merger:
 
     def merge_blobs(
         self,
-        base_blob: Optional[Blob],
-        ours_blob: Optional[Blob],
-        theirs_blob: Optional[Blob],
-        path: Optional[bytes] = None,
+        base_blob: Blob | None,
+        ours_blob: Blob | None,
+        theirs_blob: Blob | None,
+        path: bytes | None = None,
     ) -> tuple[bytes, bool]:
         """Perform three-way merge on blob contents.
 
@@ -290,7 +290,7 @@ class Merger:
         )
 
     def merge_trees(
-        self, base_tree: Optional[Tree], ours_tree: Tree, theirs_tree: Tree
+        self, base_tree: Tree | None, ours_tree: Tree, theirs_tree: Tree
     ) -> tuple[Tree, list[bytes]]:
         """Perform three-way merge on trees.
 
@@ -303,7 +303,7 @@ class Merger:
             tuple of (merged_tree, list_of_conflicted_paths)
         """
         conflicts: list[bytes] = []
-        merged_entries: dict[bytes, tuple[Optional[int], Optional[bytes]]] = {}
+        merged_entries: dict[bytes, tuple[int | None, bytes | None]] = {}
 
         # Get all paths from all trees
         all_paths = set()
@@ -522,8 +522,8 @@ def recursive_merge(
     merge_bases: list[bytes],
     ours_commit: Commit,
     theirs_commit: Commit,
-    gitattributes: Optional[GitAttributes] = None,
-    config: Optional[Config] = None,
+    gitattributes: GitAttributes | None = None,
+    config: Config | None = None,
 ) -> tuple[Tree, list[bytes]]:
     """Perform a recursive merge with multiple merge bases.
 
@@ -622,11 +622,11 @@ def recursive_merge(
 
 def three_way_merge(
     object_store: BaseObjectStore,
-    base_commit: Optional[Commit],
+    base_commit: Commit | None,
     ours_commit: Commit,
     theirs_commit: Commit,
-    gitattributes: Optional[GitAttributes] = None,
-    config: Optional[Config] = None,
+    gitattributes: GitAttributes | None = None,
+    config: Config | None = None,
 ) -> tuple[Tree, list[bytes]]:
     """Perform a three-way merge between commits.
 
@@ -674,8 +674,8 @@ def octopus_merge(
     merge_bases: list[bytes],
     head_commit: Commit,
     other_commits: list[Commit],
-    gitattributes: Optional[GitAttributes] = None,
-    config: Optional[Config] = None,
+    gitattributes: GitAttributes | None = None,
+    config: Config | None = None,
 ) -> tuple[Tree, list[bytes]]:
     """Perform an octopus merge of multiple commits.
 

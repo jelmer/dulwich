@@ -31,10 +31,10 @@ import sys
 import tempfile
 import time
 import warnings
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Union
+from typing import Any
 
 from .errors import CommitError, HookError
 from .objects import Blob, Commit, ObjectID, Tag, Tree
@@ -416,7 +416,7 @@ class WorkTree:
 
     def commit(
         self,
-        message: Union[str, bytes, Callable[[Any, Commit], bytes], None] = None,
+        message: str | bytes | Callable[[Any, Commit], bytes] | None = None,
         committer: bytes | None = None,
         author: bytes | None = None,
         commit_timestamp: float | None = None,
@@ -706,8 +706,8 @@ class WorkTree:
         else:
 
             def symlink_fn(  # type: ignore[misc,unused-ignore]
-                src: Union[str, bytes],
-                dst: Union[str, bytes],
+                src: str | bytes,
+                dst: str | bytes,
                 target_is_directory: bool = False,
                 *,
                 dir_fd: int | None = None,

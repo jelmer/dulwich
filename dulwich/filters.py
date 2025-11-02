@@ -24,7 +24,8 @@
 import logging
 import subprocess
 import threading
-from typing import TYPE_CHECKING, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Optional
 from typing import Protocol as TypingProtocol
 
 from .attrs import GitAttributes
@@ -114,11 +115,11 @@ class ProcessFilterDriver:
 
     def __init__(
         self,
-        clean_cmd: Optional[str] = None,
-        smudge_cmd: Optional[str] = None,
+        clean_cmd: str | None = None,
+        smudge_cmd: str | None = None,
         required: bool = False,
-        cwd: Optional[str] = None,
-        process_cmd: Optional[str] = None,
+        cwd: str | None = None,
+        process_cmd: str | None = None,
     ) -> None:
         """Initialize ProcessFilterDriver.
 
@@ -134,8 +135,8 @@ class ProcessFilterDriver:
         self.required = required
         self.cwd = cwd
         self.process_cmd = process_cmd
-        self._process: Optional[subprocess.Popen[bytes]] = None
-        self._protocol: Optional[Protocol] = None
+        self._process: subprocess.Popen[bytes] | None = None
+        self._protocol: Protocol | None = None
         self._capabilities: set[bytes] = set()
         self._process_lock = threading.Lock()
 
@@ -508,7 +509,7 @@ class FilterContext:
         self.filter_registry = filter_registry
         self._active_drivers: dict[str, FilterDriver] = {}
 
-    def get_driver(self, name: str) -> Optional[FilterDriver]:
+    def get_driver(self, name: str) -> FilterDriver | None:
         """Get a filter driver by name, managing stateful instances.
 
         This method handles driver instantiation and caching. Only drivers
@@ -520,7 +521,7 @@ class FilterContext:
         Returns:
             FilterDriver instance or None
         """
-        driver: Optional[FilterDriver] = None
+        driver: FilterDriver | None = None
         # Check if we have a cached instance that should be reused
         if name in self._active_drivers:
             driver = self._active_drivers[name]
@@ -616,7 +617,7 @@ class FilterRegistry:
         """Register a filter driver instance."""
         self._drivers[name] = driver
 
-    def get_driver(self, name: str) -> Optional[FilterDriver]:
+    def get_driver(self, name: str) -> FilterDriver | None:
         """Get a filter driver by name."""
         # Check if we already have an instance
         if name in self._drivers:
@@ -651,14 +652,14 @@ class FilterRegistry:
             # Don't raise exceptions in __del__
             pass
 
-    def _create_from_config(self, name: str) -> Optional[FilterDriver]:
+    def _create_from_config(self, name: str) -> FilterDriver | None:
         """Create a filter driver from config."""
         if self.config is None:
             return None
 
-        clean_cmd: Optional[str] = None
-        smudge_cmd: Optional[str] = None
-        process_cmd: Optional[str] = None
+        clean_cmd: str | None = None
+        smudge_cmd: str | None = None
+        process_cmd: str | None = None
 
         # Get process command (preferred over clean/smudge for performance)
         try:
@@ -764,9 +765,9 @@ class FilterRegistry:
 def get_filter_for_path(
     path: bytes,
     gitattributes: "GitAttributes",
-    filter_registry: Optional[FilterRegistry] = None,
-    filter_context: Optional[FilterContext] = None,
-) -> Optional[FilterDriver]:
+    filter_registry: FilterRegistry | None = None,
+    filter_context: FilterContext | None = None,
+) -> FilterDriver | None:
     """Get the appropriate filter driver for a given path.
 
     Args:
@@ -864,9 +865,9 @@ class FilterBlobNormalizer:
         self,
         config_stack: Optional["StackedConfig"],
         gitattributes: GitAttributes,
-        filter_registry: Optional[FilterRegistry] = None,
+        filter_registry: FilterRegistry | None = None,
         repo: Optional["BaseRepo"] = None,
-        filter_context: Optional[FilterContext] = None,
+        filter_context: FilterContext | None = None,
     ) -> None:
         """Initialize FilterBlobNormalizer.
 

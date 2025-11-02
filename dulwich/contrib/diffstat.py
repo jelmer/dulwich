@@ -46,7 +46,6 @@ statistics about changes, including:
 import re
 import sys
 from collections.abc import Sequence
-from typing import Optional
 
 # only needs to detect git style diffs as this is for
 # use with dulwich
@@ -80,7 +79,7 @@ def _parse_patch(
     nametypes = []
     counts = []
     in_patch_chunk = in_git_header = binaryfile = False
-    currentfile: Optional[bytes] = None
+    currentfile: bytes | None = None
     added = deleted = 0
     for line in lines:
         if line.startswith(_GIT_HEADER_START):

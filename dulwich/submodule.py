@@ -23,7 +23,7 @@
 
 import os
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK
@@ -55,7 +55,7 @@ def iter_cached_submodules(
 
 def ensure_submodule_placeholder(
     repo: "Repo",
-    submodule_path: Union[str, bytes],
+    submodule_path: str | bytes,
 ) -> None:
     """Create a submodule placeholder directory with .git file.
 

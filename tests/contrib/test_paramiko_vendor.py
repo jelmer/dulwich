@@ -26,7 +26,6 @@ import tempfile
 import threading
 import time
 from io import StringIO
-from typing import Optional
 from unittest import skipIf
 from unittest.mock import patch
 
@@ -134,7 +133,7 @@ else:
                     conn_thread.start()
                     self.connection_threads.append(conn_thread)
 
-                except socket.timeout:
+                except TimeoutError:
                     # Normal timeout, continue to check if we should keep running
                     continue
                 except OSError as e:
@@ -192,7 +191,7 @@ else:
                             break
                         # Echo the data back immediately
                         channel.send(data)
-                    except socket.timeout:
+                    except TimeoutError:
                         # No more data available, break
                         break
 
@@ -284,7 +283,7 @@ class ParamikoSSHVendorTests(TestCase):
     def tearDown(self) -> None:
         self.thread.join()
 
-    def _run(self) -> Optional[bool]:
+    def _run(self) -> bool | None:
         try:
             conn, _addr = self.socket.accept()
         except OSError:

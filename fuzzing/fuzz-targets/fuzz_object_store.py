@@ -3,7 +3,6 @@
 import stat
 import sys
 from io import BytesIO
-from typing import Optional
 
 import atheris
 
@@ -20,7 +19,7 @@ with atheris.instrument_imports():
     )
 
 
-def TestOneInput(data) -> Optional[int]:
+def TestOneInput(data) -> int | None:
     fdp = EnhancedFuzzedDataProvider(data)
     repo = MemoryRepo()
     blob = Blob.from_string(fdp.ConsumeRandomBytes())

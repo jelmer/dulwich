@@ -24,7 +24,6 @@
 import struct
 import tarfile
 from io import BytesIO
-from typing import Optional
 from unittest.mock import patch
 
 from dulwich.archive import tar_stream
@@ -88,7 +87,7 @@ class ArchiveTests(TestCase):
         self.assertEqual(stream.getvalue()[4:8], expected_mtime)
 
     def test_same_file(self) -> None:
-        contents: list[Optional[bytes]] = [None, None]
+        contents: list[bytes | None] = [None, None]
         for format in ["", "gz", "bz2"]:
             for i in [0, 1]:
                 with patch("time.time", return_value=i):

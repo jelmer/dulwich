@@ -23,7 +23,7 @@
 
 import collections
 from collections.abc import Callable, Generator
-from typing import IO, BinaryIO, Optional, Union
+from typing import IO, BinaryIO
 
 from .file import _GitFile
 from .objects import ZERO_SHA, format_timezone, parse_timezone
@@ -34,7 +34,7 @@ Entry = collections.namedtuple(
 )
 
 
-def parse_reflog_spec(refspec: Union[str, bytes]) -> tuple[bytes, int]:
+def parse_reflog_spec(refspec: str | bytes) -> tuple[bytes, int]:
     """Parse a reflog specification like 'HEAD@{1}' or 'refs/heads/master@{2}'.
 
     Args:
@@ -74,10 +74,10 @@ def parse_reflog_spec(refspec: Union[str, bytes]) -> tuple[bytes, int]:
 
 
 def format_reflog_line(
-    old_sha: Optional[bytes],
+    old_sha: bytes | None,
     new_sha: bytes,
     committer: bytes,
-    timestamp: Union[int, float],
+    timestamp: int | float,
     timezone: int,
     message: bytes,
 ) -> bytes:
@@ -130,7 +130,7 @@ def parse_reflog_line(line: bytes) -> Entry:
 
 
 def read_reflog(
-    f: Union[BinaryIO, IO[bytes], _GitFile],
+    f: BinaryIO | IO[bytes] | _GitFile,
 ) -> Generator[Entry, None, None]:
     """Read reflog.
 
@@ -203,11 +203,9 @@ def drop_reflog_entry(f: BinaryIO, index: int, rewrite: bool = False) -> None:
 
 def expire_reflog(
     f: BinaryIO,
-    expire_time: Optional[int] = None,
-    expire_unreachable_time: Optional[int] = None,
-    # String annotation to work around typing module bug in Python 3.9.0/3.9.1
-    # See: https://github.com/jelmer/dulwich/issues/1948
-    reachable_checker: "Optional[Callable[[bytes], bool]]" = None,
+    expire_time: int | None = None,
+    expire_unreachable_time: int | None = None,
+    reachable_checker: Callable[[bytes], bool] | None = None,
 ) -> int:
     """Expire reflog entries based on age and reachability.
 

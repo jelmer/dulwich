@@ -19,7 +19,7 @@ https://git-scm.com/docs/gitformat-commit-graph
 import os
 import struct
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, BinaryIO, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from .file import _GitFile
 
@@ -269,7 +269,7 @@ class CommitGraph:
 
         return parents
 
-    def get_entry_by_oid(self, oid: ObjectID) -> Optional[CommitGraphEntry]:
+    def get_entry_by_oid(self, oid: ObjectID) -> CommitGraphEntry | None:
         """Get commit graph entry by commit OID."""
         # Convert hex ObjectID to binary if needed for lookup
         if isinstance(oid, bytes) and len(oid) == 40:
@@ -283,17 +283,17 @@ class CommitGraph:
             return self.entries[index]
         return None
 
-    def get_generation_number(self, oid: ObjectID) -> Optional[int]:
+    def get_generation_number(self, oid: ObjectID) -> int | None:
         """Get generation number for a commit."""
         entry = self.get_entry_by_oid(oid)
         return entry.generation if entry else None
 
-    def get_parents(self, oid: ObjectID) -> Optional[list[bytes]]:
+    def get_parents(self, oid: ObjectID) -> list[bytes] | None:
         """Get parent commit IDs for a commit."""
         entry = self.get_entry_by_oid(oid)
         return entry.parents if entry else None
 
-    def write_to_file(self, f: Union[BinaryIO, _GitFile]) -> None:
+    def write_to_file(self, f: BinaryIO | _GitFile) -> None:
         """Write commit graph to file."""
         if not self.entries:
             raise ValueError("Cannot write empty commit graph")
@@ -391,7 +391,7 @@ class CommitGraph:
         return iter(self.entries)
 
 
-def read_commit_graph(path: Union[str, bytes]) -> Optional[CommitGraph]:
+def read_commit_graph(path: str | bytes) -> CommitGraph | None:
     """Read commit graph from file path."""
     if isinstance(path, str):
         path = path.encode()
@@ -403,7 +403,7 @@ def read_commit_graph(path: Union[str, bytes]) -> Optional[CommitGraph]:
         return CommitGraph.from_file(f)
 
 
-def find_commit_graph_file(git_dir: Union[str, bytes]) -> Optional[bytes]:
+def find_commit_graph_file(git_dir: str | bytes) -> bytes | None:
     """Find commit graph file in a Git repository."""
     if isinstance(git_dir, str):
         git_dir = git_dir.encode()
@@ -538,7 +538,7 @@ def generate_commit_graph(
 
 
 def write_commit_graph(
-    git_dir: Union[str, bytes],
+    git_dir: str | bytes,
     object_store: "BaseObjectStore",
     commit_ids: Sequence[ObjectID],
 ) -> None:

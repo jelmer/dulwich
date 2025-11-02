@@ -2,7 +2,6 @@
 
 import sys
 from io import BytesIO
-from typing import Optional
 
 import atheris
 
@@ -14,7 +13,7 @@ with atheris.instrument_imports():
     from dulwich.pack import PackData, write_pack_objects
 
 
-def TestOneInput(data) -> Optional[int]:
+def TestOneInput(data) -> int | None:
     fdp = EnhancedFuzzedDataProvider(data)
     bundle = Bundle()
     bundle.version = fdp.PickValueInList([2, 3, None])

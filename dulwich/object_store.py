@@ -29,17 +29,15 @@ import stat
 import sys
 import time
 import warnings
-from collections.abc import Iterable, Iterator, Mapping, Sequence, Set
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Set
 from contextlib import suppress
 from io import BytesIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     BinaryIO,
-    Callable,
     Optional,
     Protocol,
-    Union,
 )
 
 from .errors import NotTreeError
@@ -93,7 +91,7 @@ if TYPE_CHECKING:
 class GraphWalker(Protocol):
     """Protocol for graph walker objects."""
 
-    def __next__(self) -> Optional[bytes]:
+    def __next__(self) -> bytes | None:
         """Return the next object SHA to visit."""
         ...
 
@@ -181,7 +179,7 @@ def get_depth(
     store: ObjectContainer,
     head: bytes,
     get_parents: Callable[..., list[bytes]] = lambda commit: commit.parents,
-    max_depth: Optional[int] = None,
+    max_depth: int | None = None,
 ) -> int:
     """Return the current available depth for the given head.
 
@@ -232,7 +230,7 @@ class BaseObjectStore:
     """Object store interface."""
 
     def determine_wants_all(
-        self, refs: Mapping[Ref, ObjectID], depth: Optional[int] = None
+        self, refs: Mapping[Ref, ObjectID], depth: int | None = None
     ) -> list[ObjectID]:
         """Determine which objects are wanted based on refs."""
 
@@ -295,8 +293,8 @@ class BaseObjectStore:
 
     def add_objects(
         self,
-        objects: Sequence[tuple[ShaFile, Optional[str]]],
-        progress: Optional[Callable[..., None]] = None,
+        objects: Sequence[tuple[ShaFile, str | None]],
+        progress: Callable[..., None] | None = None,
     ) -> Optional["Pack"]:
         """Add a set of objects to this object store.
 
@@ -308,18 +306,18 @@ class BaseObjectStore:
 
     def tree_changes(
         self,
-        source: Optional[bytes],
-        target: Optional[bytes],
+        source: bytes | None,
+        target: bytes | None,
         want_unchanged: bool = False,
         include_trees: bool = False,
         change_type_same: bool = False,
         rename_detector: Optional["RenameDetector"] = None,
-        paths: Optional[Sequence[bytes]] = None,
+        paths: Sequence[bytes] | None = None,
     ) -> Iterator[
         tuple[
-            tuple[Optional[bytes], Optional[bytes]],
-            tuple[Optional[int], Optional[int]],
-            tuple[Optional[bytes], Optional[bytes]],
+            tuple[bytes | None, bytes | None],
+            tuple[int | None, int | None],
+            tuple[bytes | None, bytes | None],
         ]
     ]:
         """Find the differences between the contents of two trees.
@@ -444,11 +442,11 @@ class BaseObjectStore:
         self,
         haves: Iterable[bytes],
         wants: Iterable[bytes],
-        shallow: Optional[Set[bytes]] = None,
-        progress: Optional[Callable[..., None]] = None,
-        get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
+        shallow: Set[bytes] | None = None,
+        progress: Callable[..., None] | None = None,
+        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
         get_parents: Callable[..., list[bytes]] = lambda commit: commit.parents,
-    ) -> Iterator[tuple[bytes, Optional[PackHint]]]:
+    ) -> Iterator[tuple[bytes, PackHint | None]]:
         """Find the missing objects required for a set of revisions.
 
         Args:
@@ -496,8 +494,8 @@ class BaseObjectStore:
         have: Iterable[bytes],
         want: Iterable[bytes],
         *,
-        shallow: Optional[Set[bytes]] = None,
-        progress: Optional[Callable[..., None]] = None,
+        shallow: Set[bytes] | None = None,
+        progress: Callable[..., None] | None = None,
         ofs_delta: bool = True,
     ) -> tuple[int, Iterator[UnpackedObject]]:
         """Generate pack data objects for a set of wants/haves.
@@ -541,7 +539,7 @@ class BaseObjectStore:
         self,
         head: bytes,
         get_parents: Callable[..., list[bytes]] = lambda commit: commit.parents,
-        max_depth: Optional[int] = None,
+        max_depth: int | None = None,
     ) -> int:
         """Return the current available depth for the given head.
 
@@ -559,7 +557,7 @@ class BaseObjectStore:
         """Close any files opened by this object store."""
         # Default implementation is a NO-OP
 
-    def prune(self, grace_period: Optional[int] = None) -> None:
+    def prune(self, grace_period: int | None = None) -> None:
         """Prune/clean up this object store.
 
         This includes removing orphaned temporary files and other
@@ -591,7 +589,7 @@ class BaseObjectStore:
         return None
 
     def write_commit_graph(
-        self, refs: Optional[Sequence[bytes]] = None, reachable: bool = True
+        self, refs: Sequence[bytes] | None = None, reachable: bool = True
     ) -> None:
         """Write a commit graph file for this object store.
 
@@ -641,7 +639,7 @@ class PackCapableObjectStore(BaseObjectStore, PackedObjectContainer):
         self,
         count: int,
         unpacked_objects: Iterator["UnpackedObject"],
-        progress: Optional[Callable[..., None]] = None,
+        progress: Callable[..., None] | None = None,
     ) -> Optional["Pack"]:
         """Add pack data to this object store.
 
@@ -700,13 +698,13 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
     def __init__(
         self,
         pack_compression_level: int = -1,
-        pack_index_version: Optional[int] = None,
-        pack_delta_window_size: Optional[int] = None,
-        pack_window_memory: Optional[int] = None,
-        pack_delta_cache_size: Optional[int] = None,
-        pack_depth: Optional[int] = None,
-        pack_threads: Optional[int] = None,
-        pack_big_file_threshold: Optional[int] = None,
+        pack_index_version: int | None = None,
+        pack_delta_window_size: int | None = None,
+        pack_window_memory: int | None = None,
+        pack_delta_cache_size: int | None = None,
+        pack_depth: int | None = None,
+        pack_threads: int | None = None,
+        pack_big_file_threshold: int | None = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -738,7 +736,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         self,
         count: int,
         unpacked_objects: Iterator[UnpackedObject],
-        progress: Optional[Callable[..., None]] = None,
+        progress: Callable[..., None] | None = None,
     ) -> Optional["Pack"]:
         """Add pack data to this object store.
 
@@ -808,8 +806,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         have: Iterable[bytes],
         want: Iterable[bytes],
         *,
-        shallow: Optional[Set[bytes]] = None,
-        progress: Optional[Callable[..., None]] = None,
+        shallow: Set[bytes] | None = None,
+        progress: Callable[..., None] | None = None,
         ofs_delta: bool = True,
     ) -> tuple[int, Iterator[UnpackedObject]]:
         """Generate pack data objects for a set of wants/haves.
@@ -882,7 +880,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """Iterate over the SHAs of all loose objects."""
         raise NotImplementedError(self._iter_loose_objects)
 
-    def _get_loose_object(self, sha: bytes) -> Optional[ShaFile]:
+    def _get_loose_object(self, sha: bytes) -> ShaFile | None:
         raise NotImplementedError(self._get_loose_object)
 
     def delete_loose_object(self, sha: bytes) -> None:
@@ -896,9 +894,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
     def _remove_pack(self, pack: "Pack") -> None:
         raise NotImplementedError(self._remove_pack)
 
-    def pack_loose_objects(
-        self, progress: Optional[Callable[[str], None]] = None
-    ) -> int:
+    def pack_loose_objects(self, progress: Callable[[str], None] | None = None) -> int:
         """Pack loose objects.
 
         Args:
@@ -918,8 +914,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     def repack(
         self,
-        exclude: Optional[Set[bytes]] = None,
-        progress: Optional[Callable[[str], None]] = None,
+        exclude: Set[bytes] | None = None,
+        progress: Callable[[str], None] | None = None,
     ) -> int:
         """Repack the packs in this repository.
 
@@ -1119,7 +1115,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 yield o
                 todo.remove(o.id)
         for oid in todo:
-            loose_obj: Optional[ShaFile] = self._get_loose_object(oid)
+            loose_obj: ShaFile | None = self._get_loose_object(oid)
             if loose_obj is not None:
                 yield loose_obj
             elif not allow_missing:
@@ -1168,8 +1164,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     def add_objects(
         self,
-        objects: Sequence[tuple[ShaFile, Optional[str]]],
-        progress: Optional[Callable[[str], None]] = None,
+        objects: Sequence[tuple[ShaFile, str | None]],
+        progress: Callable[[str], None] | None = None,
     ) -> Optional["Pack"]:
         """Add a set of objects to this object store.
 
@@ -1187,23 +1183,23 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 class DiskObjectStore(PackBasedObjectStore):
     """Git-style object store that exists on disk."""
 
-    path: Union[str, os.PathLike[str]]
-    pack_dir: Union[str, os.PathLike[str]]
-    _alternates: Optional[list["BaseObjectStore"]]
+    path: str | os.PathLike[str]
+    pack_dir: str | os.PathLike[str]
+    _alternates: list["BaseObjectStore"] | None
     _commit_graph: Optional["CommitGraph"]
 
     def __init__(
         self,
-        path: Union[str, os.PathLike[str]],
+        path: str | os.PathLike[str],
         loose_compression_level: int = -1,
         pack_compression_level: int = -1,
-        pack_index_version: Optional[int] = None,
-        pack_delta_window_size: Optional[int] = None,
-        pack_window_memory: Optional[int] = None,
-        pack_delta_cache_size: Optional[int] = None,
-        pack_depth: Optional[int] = None,
-        pack_threads: Optional[int] = None,
-        pack_big_file_threshold: Optional[int] = None,
+        pack_index_version: int | None = None,
+        pack_delta_window_size: int | None = None,
+        pack_window_memory: int | None = None,
+        pack_delta_cache_size: int | None = None,
+        pack_depth: int | None = None,
+        pack_threads: int | None = None,
+        pack_big_file_threshold: int | None = None,
         fsync_object_files: bool = False,
     ) -> None:
         """Open an object store.
@@ -1253,7 +1249,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
     @classmethod
     def from_config(
-        cls, path: Union[str, os.PathLike[str]], config: "Config"
+        cls, path: str | os.PathLike[str], config: "Config"
     ) -> "DiskObjectStore":
         """Create a DiskObjectStore from a configuration object.
 
@@ -1372,7 +1368,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 else:
                     yield os.fsdecode(os.path.join(os.fsencode(self.path), line))
 
-    def add_alternate_path(self, path: Union[str, os.PathLike[str]]) -> None:
+    def add_alternate_path(self, path: str | os.PathLike[str]) -> None:
         """Add an alternate path to this object store."""
         try:
             os.mkdir(os.path.join(self.path, INFODIR))
@@ -1470,7 +1466,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         return count
 
-    def _get_loose_object(self, sha: bytes) -> Optional[ShaFile]:
+    def _get_loose_object(self, sha: bytes) -> ShaFile | None:
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_path(path)
@@ -1534,7 +1530,7 @@ class DiskObjectStore(PackBasedObjectStore):
             os.remove(pack.index.path)
 
     def _get_pack_basepath(
-        self, entries: Iterable[tuple[bytes, int, Union[int, None]]]
+        self, entries: Iterable[tuple[bytes, int, int | None]]
     ) -> str:
         suffix_bytes = iter_sha1(entry[0] for entry in entries)
         # TODO: Handle self.pack_dir being bytes
@@ -1547,7 +1543,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path: str,
         num_objects: int,
         indexer: PackIndexer,
-        progress: Optional[Callable[..., None]] = None,
+        progress: Callable[..., None] | None = None,
     ) -> Pack:
         """Move a specific file containing a pack into the pack directory.
 
@@ -1628,8 +1624,8 @@ class DiskObjectStore(PackBasedObjectStore):
     def add_thin_pack(
         self,
         read_all: Callable[[int], bytes],
-        read_some: Optional[Callable[[int], bytes]],
-        progress: Optional[Callable[..., None]] = None,
+        read_some: Callable[[int], bytes] | None,
+        progress: Callable[..., None] | None = None,
     ) -> "Pack":
         """Add a new thin pack to this object store.
 
@@ -1712,7 +1708,7 @@ class DiskObjectStore(PackBasedObjectStore):
             )
 
     @classmethod
-    def init(cls, path: Union[str, os.PathLike[str]]) -> "DiskObjectStore":
+    def init(cls, path: str | os.PathLike[str]) -> "DiskObjectStore":
         """Initialize a new disk object store.
 
         Creates the necessary directory structure for a Git object store.
@@ -1792,7 +1788,7 @@ class DiskObjectStore(PackBasedObjectStore):
         return self._commit_graph
 
     def write_commit_graph(
-        self, refs: Optional[Iterable[bytes]] = None, reachable: bool = True
+        self, refs: Iterable[bytes] | None = None, reachable: bool = True
     ) -> None:
         """Write a commit graph file for this object store.
 
@@ -1863,7 +1859,7 @@ class DiskObjectStore(PackBasedObjectStore):
             # Clear cached commit graph so it gets reloaded
             self._commit_graph = None
 
-    def prune(self, grace_period: Optional[int] = None) -> None:
+    def prune(self, grace_period: int | None = None) -> None:
         """Prune/clean up this object store.
 
         This removes temporary files that were left behind by interrupted
@@ -1985,8 +1981,8 @@ class MemoryObjectStore(PackCapableObjectStore):
 
     def add_objects(
         self,
-        objects: Iterable[tuple[ShaFile, Optional[str]]],
-        progress: Optional[Callable[[str], None]] = None,
+        objects: Iterable[tuple[ShaFile, str | None]],
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         """Add a set of objects to this object store.
 
@@ -2032,7 +2028,7 @@ class MemoryObjectStore(PackCapableObjectStore):
         self,
         count: int,
         unpacked_objects: Iterator[UnpackedObject],
-        progress: Optional[Callable[[str], None]] = None,
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         """Add pack data to this object store.
 
@@ -2065,7 +2061,7 @@ class MemoryObjectStore(PackCapableObjectStore):
         self,
         read_all: Callable[[], bytes],
         read_some: Callable[[int], bytes],
-        progress: Optional[Callable[[str], None]] = None,
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         """Add a new thin pack to this object store.
 
@@ -2204,9 +2200,9 @@ class MissingObjectFinder:
         haves: Iterable[bytes],
         wants: Iterable[bytes],
         *,
-        shallow: Optional[Set[bytes]] = None,
-        progress: Optional[Callable[[bytes], None]] = None,
-        get_tagged: Optional[Callable[[], dict[bytes, bytes]]] = None,
+        shallow: Set[bytes] | None = None,
+        progress: Callable[[bytes], None] | None = None,
+        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
         get_parents: Callable[[Commit], list[bytes]] = lambda commit: commit.parents,
     ) -> None:
         """Initialize a MissingObjectFinder.
@@ -2270,9 +2266,9 @@ class MissingObjectFinder:
 
         # in fact, what we 'want' is commits, tags, and others
         # we've found missing
-        self.objects_to_send: set[
-            tuple[ObjectID, Optional[bytes], Optional[int], bool]
-        ] = {(w, None, Commit.type_num, False) for w in missing_commits}
+        self.objects_to_send: set[tuple[ObjectID, bytes | None, int | None, bool]] = {
+            (w, None, Commit.type_num, False) for w in missing_commits
+        }
         missing_tags = want_tags.difference(have_tags)
         self.objects_to_send.update(
             {(w, None, Tag.type_num, False) for w in missing_tags}
@@ -2295,7 +2291,7 @@ class MissingObjectFinder:
         return self.remote_has
 
     def add_todo(
-        self, entries: Iterable[tuple[ObjectID, Optional[bytes], Optional[int], bool]]
+        self, entries: Iterable[tuple[ObjectID, bytes | None, int | None, bool]]
     ) -> None:
         """Add objects to the todo list.
 
@@ -2304,7 +2300,7 @@ class MissingObjectFinder:
         """
         self.objects_to_send.update([e for e in entries if e[0] not in self.sha_done])
 
-    def __next__(self) -> tuple[bytes, Optional[PackHint]]:
+    def __next__(self) -> tuple[bytes, PackHint | None]:
         """Get the next object to send.
 
         Returns:
@@ -2355,7 +2351,7 @@ class MissingObjectFinder:
             pack_hint = (type_num, name)
         return (sha, pack_hint)
 
-    def __iter__(self) -> Iterator[tuple[bytes, Optional[PackHint]]]:
+    def __iter__(self) -> Iterator[tuple[bytes, PackHint | None]]:
         """Return iterator over objects to send.
 
         Returns:
@@ -2379,10 +2375,9 @@ class ObjectStoreGraphWalker:
         self,
         local_heads: Iterable[ObjectID],
         get_parents: Callable[[ObjectID], list[ObjectID]],
-        shallow: Optional[set[ObjectID]] = None,
-        update_shallow: Optional[
-            Callable[[Optional[set[ObjectID]], Optional[set[ObjectID]]], None]
-        ] = None,
+        shallow: set[ObjectID] | None = None,
+        update_shallow: Callable[[set[ObjectID] | None, set[ObjectID] | None], None]
+        | None = None,
     ) -> None:
         """Create a new instance.
 
@@ -2394,7 +2389,7 @@ class ObjectStoreGraphWalker:
         """
         self.heads = set(local_heads)
         self.get_parents = get_parents
-        self.parents: dict[ObjectID, Optional[list[ObjectID]]] = {}
+        self.parents: dict[ObjectID, list[ObjectID] | None] = {}
         if shallow is None:
             shallow = set()
         self.shallow = shallow
@@ -2429,7 +2424,7 @@ class ObjectStoreGraphWalker:
 
             ancestors = new_ancestors
 
-    def next(self) -> Optional[ObjectID]:
+    def next(self) -> ObjectID | None:
         """Iterate over ancestors of heads in the target."""
         if self.heads:
             ret = self.heads.pop()
@@ -2447,8 +2442,8 @@ class ObjectStoreGraphWalker:
 
 def commit_tree_changes(
     object_store: BaseObjectStore,
-    tree: Union[ObjectID, Tree],
-    changes: Sequence[tuple[bytes, Optional[int], Optional[bytes]]],
+    tree: ObjectID | Tree,
+    changes: Sequence[tuple[bytes, int | None, bytes | None]],
 ) -> ObjectID:
     """Commit a specified set of changes to a tree structure.
 
@@ -2479,7 +2474,7 @@ def commit_tree_changes(
         sha_obj = object_store[tree]
         assert isinstance(sha_obj, Tree)
         tree_obj = sha_obj
-    nested_changes: dict[bytes, list[tuple[bytes, Optional[int], Optional[bytes]]]] = {}
+    nested_changes: dict[bytes, list[tuple[bytes, int | None, bytes | None]]] = {}
     for path, new_mode, new_sha in changes:
         try:
             (dirname, subpath) = path.split(b"/", 1)
@@ -2493,7 +2488,7 @@ def commit_tree_changes(
             nested_changes.setdefault(dirname, []).append((subpath, new_mode, new_sha))
     for name, subchanges in nested_changes.items():
         try:
-            orig_subtree_id: Union[bytes, Tree] = tree_obj[name][1]
+            orig_subtree_id: bytes | Tree = tree_obj[name][1]
         except KeyError:
             # For new directories, pass an empty Tree object
             orig_subtree_id = Tree()
@@ -2514,7 +2509,7 @@ class OverlayObjectStore(BaseObjectStore):
     def __init__(
         self,
         bases: list[BaseObjectStore],
-        add_store: Optional[BaseObjectStore] = None,
+        add_store: BaseObjectStore | None = None,
     ) -> None:
         """Initialize an OverlayObjectStore.
 
@@ -2540,9 +2535,9 @@ class OverlayObjectStore(BaseObjectStore):
 
     def add_objects(
         self,
-        objects: Sequence[tuple[ShaFile, Optional[str]]],
-        progress: Optional[Callable[[str], None]] = None,
-    ) -> Optional[Pack]:
+        objects: Sequence[tuple[ShaFile, str | None]],
+        progress: Callable[[str], None] | None = None,
+    ) -> Pack | None:
         """Add multiple objects to the store.
 
         Args:
@@ -2725,9 +2720,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
         """
         # Doesn't exist..
 
-    def pack_loose_objects(
-        self, progress: Optional[Callable[[str], None]] = None
-    ) -> int:
+    def pack_loose_objects(self, progress: Callable[[str], None] | None = None) -> int:
         """Pack loose objects. Returns number of objects packed.
 
         BucketBasedObjectStore doesn't support loose objects, so this is a no-op.
@@ -2780,7 +2773,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
             max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix="incoming-"
         )
 
-        def commit() -> Optional[Pack]:
+        def commit() -> Pack | None:
             if pf.tell() == 0:
                 pf.close()
                 return None
@@ -2870,7 +2863,7 @@ def _collect_ancestors(
 
 
 def iter_tree_contents(
-    store: ObjectContainer, tree_id: Optional[ObjectID], *, include_trees: bool = False
+    store: ObjectContainer, tree_id: ObjectID | None, *, include_trees: bool = False
 ) -> Iterator[TreeEntry]:
     """Iterate the contents of a tree and all subtrees.
 
@@ -2906,9 +2899,9 @@ def iter_tree_contents(
 
 def iter_commit_contents(
     store: ObjectContainer,
-    commit: Union[Commit, bytes],
+    commit: Commit | bytes,
     *,
-    include: Optional[Sequence[Union[str, bytes, Path]]] = None,
+    include: Sequence[str | bytes | Path] | None = None,
 ) -> Iterator[TreeEntry]:
     """Iterate the contents of the repository at the specified commit.
 

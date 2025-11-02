@@ -23,9 +23,9 @@
 
 import collections
 import heapq
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
@@ -62,12 +62,12 @@ class WalkEntry:
         self.commit = commit
         self._store = walker.store
         self._get_parents = walker.get_parents
-        self._changes: dict[Optional[bytes], list[TreeChange]] = {}
+        self._changes: dict[bytes | None, list[TreeChange]] = {}
         self._rename_detector = walker.rename_detector
 
     def changes(
-        self, path_prefix: Optional[bytes] = None
-    ) -> Union[list[TreeChange], list[list[TreeChange]]]:
+        self, path_prefix: bytes | None = None
+    ) -> list[TreeChange] | list[list[TreeChange]]:
         """Get the tree changes for this entry.
 
         Args:
@@ -169,7 +169,7 @@ class _CommitTimeQueue:
         self._seen: set[ObjectID] = set()
         self._done: set[ObjectID] = set()
         self._min_time = walker.since
-        self._last: Optional[Commit] = None
+        self._last: Commit | None = None
         self._extra_commits_left = _MAX_EXTRA_COMMITS
         self._is_finished = False
 
@@ -210,7 +210,7 @@ class _CommitTimeQueue:
                     todo.append(parent_commit)
                 excluded.add(parent)
 
-    def next(self) -> Optional[WalkEntry]:
+    def next(self) -> WalkEntry | None:
         if self._is_finished:
             return None
         while self._pq:
@@ -275,15 +275,15 @@ class Walker:
         self,
         store: "BaseObjectStore",
         include: Sequence[bytes],
-        exclude: Optional[Sequence[bytes]] = None,
+        exclude: Sequence[bytes] | None = None,
         order: str = "date",
         reverse: bool = False,
-        max_entries: Optional[int] = None,
-        paths: Optional[Sequence[bytes]] = None,
-        rename_detector: Optional[RenameDetector] = None,
+        max_entries: int | None = None,
+        paths: Sequence[bytes] | None = None,
+        rename_detector: RenameDetector | None = None,
         follow: bool = False,
-        since: Optional[int] = None,
-        until: Optional[int] = None,
+        since: int | None = None,
+        until: int | None = None,
         get_parents: Callable[[Commit], list[bytes]] = lambda commit: commit.parents,
         queue_cls: type = _CommitTimeQueue,
     ) -> None:
@@ -340,7 +340,7 @@ class Walker:
         self._queue = queue_cls(self)
         self._out_queue: collections.deque[WalkEntry] = collections.deque()
 
-    def _path_matches(self, changed_path: Optional[bytes]) -> bool:
+    def _path_matches(self, changed_path: bytes | None) -> bool:
         if changed_path is None:
             return False
         if self.paths is None:
@@ -373,7 +373,7 @@ class Walker:
             return True
         return False
 
-    def _should_return(self, entry: WalkEntry) -> Optional[bool]:
+    def _should_return(self, entry: WalkEntry) -> bool | None:
         """Determine if a walk entry should be returned..
 
         Args:
@@ -429,7 +429,7 @@ class Walker:
                         return True
         return None
 
-    def _next(self) -> Optional[WalkEntry]:
+    def _next(self) -> WalkEntry | None:
         max_entries = self.max_entries
         while max_entries is None or self._num_entries < max_entries:
             entry = next(self._queue)
@@ -446,7 +446,7 @@ class Walker:
 
     def _reorder(
         self, results: Iterator[WalkEntry]
-    ) -> Union[Iterator[WalkEntry], list[WalkEntry]]:
+    ) -> Iterator[WalkEntry] | list[WalkEntry]:
         """Possibly reorder a results iterator.
 
         Args:

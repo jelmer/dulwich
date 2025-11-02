@@ -21,8 +21,8 @@
 
 """Tests for the object store interface."""
 
-from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 from unittest import TestCase
 from unittest.mock import patch
 

@@ -50,7 +50,7 @@ import logging
 import re
 import sys
 import time
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from ..repo import Repo
 
@@ -118,8 +118,8 @@ def get_recent_tags(projdir: str = PROJDIR) -> list[tuple[str, list[Any]]]:
 def get_current_version(
     projdir: str = PROJDIR,
     pattern: str = PATTERN,
-    logger: Optional[logging.Logger] = None,
-) -> Optional[str]:
+    logger: logging.Logger | None = None,
+) -> str | None:
     """Return the most recent tag, using an options regular expression pattern.
 
     The default pattern will strip any characters preceding the first semantic

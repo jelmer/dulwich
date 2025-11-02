@@ -25,7 +25,6 @@ whitespace error detection capabilities.
 """
 
 from collections.abc import Sequence, Set
-from typing import Optional
 
 # Default whitespace errors Git checks for
 DEFAULT_WHITESPACE_ERRORS = {
@@ -47,7 +46,7 @@ WHITESPACE_ERROR_TYPES = {
 }
 
 
-def parse_whitespace_config(value: Optional[str]) -> tuple[set[str], int]:
+def parse_whitespace_config(value: str | None) -> tuple[set[str], int]:
     """Parse core.whitespace configuration value.
 
     Args:
@@ -220,7 +219,7 @@ class WhitespaceChecker:
 def fix_whitespace_errors(
     content: bytes,
     errors: Sequence[tuple[str, int]],
-    fix_types: Optional[Set[str]] = None,
+    fix_types: Set[str] | None = None,
 ) -> bytes:
     """Fix whitespace errors in content.
 

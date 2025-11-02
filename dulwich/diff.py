@@ -50,12 +50,12 @@ import os
 import stat
 import sys
 from collections.abc import Iterable, Sequence
-from typing import BinaryIO, Optional, Union
+from typing import BinaryIO
 
 if sys.version_info >= (3, 12):
     from collections.abc import Buffer
 else:
-    Buffer = Union[bytes, bytearray, memoryview]
+    Buffer = bytes | bytearray | memoryview
 
 from .index import ConflictedIndexEntry, commit_index
 from .object_store import iter_tree_contents
@@ -66,7 +66,7 @@ from .repo import Repo
 logger = logging.getLogger(__name__)
 
 
-def should_include_path(path: bytes, paths: Optional[Sequence[bytes]]) -> bool:
+def should_include_path(path: bytes, paths: Sequence[bytes] | None) -> bool:
     """Check if a path should be included based on path filters.
 
     Args:
@@ -84,9 +84,9 @@ def should_include_path(path: bytes, paths: Optional[Sequence[bytes]]) -> bool:
 def diff_index_to_tree(
     repo: Repo,
     outstream: BinaryIO,
-    commit_sha: Optional[bytes] = None,
-    paths: Optional[Sequence[bytes]] = None,
-    diff_algorithm: Optional[str] = None,
+    commit_sha: bytes | None = None,
+    paths: Sequence[bytes] | None = None,
+    diff_algorithm: str | None = None,
 ) -> None:
     """Show staged changes (index vs commit).
 
@@ -130,8 +130,8 @@ def diff_working_tree_to_tree(
     repo: Repo,
     outstream: BinaryIO,
     commit_sha: bytes,
-    paths: Optional[Sequence[bytes]] = None,
-    diff_algorithm: Optional[str] = None,
+    paths: Sequence[bytes] | None = None,
+    diff_algorithm: str | None = None,
 ) -> None:
     """Compare working tree to a specific commit.
 
@@ -375,8 +375,8 @@ def diff_working_tree_to_tree(
 def diff_working_tree_to_index(
     repo: Repo,
     outstream: BinaryIO,
-    paths: Optional[Sequence[bytes]] = None,
-    diff_algorithm: Optional[str] = None,
+    paths: Sequence[bytes] | None = None,
+    diff_algorithm: str | None = None,
 ) -> None:
     """Compare working tree to index.
 
@@ -572,7 +572,7 @@ class ColorizedDiffStream(BinaryIO):
         self.console = Console(file=self.text_wrapper, force_terminal=True)
         self.buffer = b""
 
-    def write(self, data: Union[bytes, Buffer]) -> int:  # type: ignore[override,unused-ignore]
+    def write(self, data: bytes | Buffer) -> int:  # type: ignore[override,unused-ignore]
         """Write data to the stream, applying colorization.
 
         Args:
@@ -593,7 +593,7 @@ class ColorizedDiffStream(BinaryIO):
 
         return len(data)
 
-    def writelines(self, lines: Iterable[Union[bytes, Buffer]]) -> None:  # type: ignore[override,unused-ignore]
+    def writelines(self, lines: Iterable[bytes | Buffer]) -> None:  # type: ignore[override,unused-ignore]
         """Write a list of lines to the stream.
 
         Args:
@@ -686,7 +686,7 @@ class ColorizedDiffStream(BinaryIO):
         """Tell is not supported on this stream."""
         raise io.UnsupportedOperation("not seekable")
 
-    def truncate(self, size: Optional[int] = None) -> int:
+    def truncate(self, size: int | None = None) -> int:
         """Truncate is not supported on this stream."""
         raise io.UnsupportedOperation("not truncatable")
 
@@ -700,9 +700,9 @@ class ColorizedDiffStream(BinaryIO):
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[object],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
     ) -> None:
         """Context manager exit."""
         self.flush()

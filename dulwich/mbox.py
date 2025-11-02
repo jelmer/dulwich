@@ -29,12 +29,12 @@ import mailbox
 import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import BinaryIO, Union
+from typing import BinaryIO
 
 
 def split_mbox(
-    input_file: Union[str, bytes, BinaryIO],
-    output_dir: Union[str, bytes, Path],
+    input_file: str | bytes | BinaryIO,
+    output_dir: str | bytes | Path,
     start_number: int = 1,
     precision: int = 4,
     keep_cr: bool = False,
@@ -111,8 +111,8 @@ def split_mbox(
 
 
 def split_maildir(
-    maildir_path: Union[str, bytes, Path],
-    output_dir: Union[str, bytes, Path],
+    maildir_path: str | bytes | Path,
+    output_dir: str | bytes | Path,
     start_number: int = 1,
     precision: int = 4,
     keep_cr: bool = False,

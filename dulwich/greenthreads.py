@@ -23,8 +23,7 @@
 
 """Utility module for querying an ObjectStore with gevent."""
 
-from collections.abc import Sequence
-from typing import Callable, Optional
+from collections.abc import Callable, Sequence
 
 import gevent
 from gevent import pool
@@ -85,10 +84,10 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
         object_store: BaseObjectStore,
         haves: Sequence[ObjectID],
         wants: Sequence[ObjectID],
-        progress: Optional[Callable[[bytes], None]] = None,
-        get_tagged: Optional[Callable[[], dict[ObjectID, ObjectID]]] = None,
+        progress: Callable[[bytes], None] | None = None,
+        get_tagged: Callable[[], dict[ObjectID, ObjectID]] | None = None,
         concurrency: int = 1,
-        get_parents: Optional[Callable[[ObjectID], list[ObjectID]]] = None,
+        get_parents: Callable[[ObjectID], list[ObjectID]] | None = None,
     ) -> None:
         """Initialize GreenThreadsMissingObjectFinder.
 
@@ -131,9 +130,9 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
             self.sha_done.add(t)
         missing_tags = want_tags.difference(have_tags)
         all_wants = missing_commits.union(missing_tags)
-        self.objects_to_send: set[
-            tuple[ObjectID, Optional[bytes], Optional[int], bool]
-        ] = {(w, None, 0, False) for w in all_wants}
+        self.objects_to_send: set[tuple[ObjectID, bytes | None, int | None, bool]] = {
+            (w, None, 0, False) for w in all_wants
+        }
         if progress is None:
             self.progress: Callable[[bytes], None] = lambda x: None
         else:

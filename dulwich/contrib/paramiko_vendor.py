@@ -33,7 +33,7 @@ This implementation has comprehensive tests in tests/contrib/test_paramiko_vendo
 
 import os
 import warnings
-from typing import Any, BinaryIO, Optional, cast
+from typing import Any, BinaryIO, cast
 
 import paramiko
 import paramiko.client
@@ -81,7 +81,7 @@ class _ParamikoWrapper:
         """
         return self.channel.sendall(data)
 
-    def read(self, n: Optional[int] = None) -> bytes:
+    def read(self, n: int | None = None) -> bytes:
         """Read data from the channel.
 
         Args:
@@ -141,12 +141,12 @@ class ParamikoSSHVendor:
         self,
         host: str,
         command: str,
-        username: Optional[str] = None,
-        port: Optional[int] = None,
-        password: Optional[str] = None,
-        pkey: Optional[paramiko.PKey] = None,
-        key_filename: Optional[str] = None,
-        protocol_version: Optional[int] = None,
+        username: str | None = None,
+        port: int | None = None,
+        password: str | None = None,
+        pkey: paramiko.PKey | None = None,
+        key_filename: str | None = None,
+        protocol_version: int | None = None,
         **kwargs: object,
     ) -> _ParamikoWrapper:
         """Run a command on a remote host via SSH.

@@ -31,9 +31,9 @@ the dulwich.client.HttpGitClient attribute:
 This implementation is experimental and does not have any tests.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from ..config import ConfigFile
@@ -55,12 +55,12 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
     def __init__(
         self,
         base_url: str,
-        dumb: Optional[bool] = None,
+        dumb: bool | None = None,
         config: Optional["ConfigFile"] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        username: str | None = None,
+        password: str | None = None,
         thin_packs: bool = True,
-        report_activity: Optional[Callable[[int, str], None]] = None,
+        report_activity: Callable[[int, str], None] | None = None,
         quiet: bool = False,
         include_tags: bool = False,
     ) -> None:
@@ -97,8 +97,8 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
     def _http_request(
         self,
         url: str,
-        headers: Optional[dict[str, str]] = None,
-        data: Optional[Union[bytes, Iterator[bytes]]] = None,
+        headers: dict[str, str] | None = None,
+        data: bytes | Iterator[bytes] | None = None,
         raise_for_status: bool = True,
     ) -> tuple[Any, Callable[[int], bytes]]:
         req_headers = self.session.headers.copy()  # type: ignore[attr-defined]
@@ -145,10 +145,10 @@ def get_session(config: Optional["ConfigFile"]) -> Session:
     session = Session()
     session.headers.update({"Pragma": "no-cache"})
 
-    proxy_server: Optional[str] = None
-    user_agent: Optional[str] = None
-    ca_certs: Optional[str] = None
-    ssl_verify: Optional[bool] = None
+    proxy_server: str | None = None
+    user_agent: str | None = None
+    ca_certs: str | None = None
+    ssl_verify: bool | None = None
 
     if config is not None:
         try:

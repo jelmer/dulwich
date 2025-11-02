@@ -28,7 +28,7 @@ Python's difflib.
 
 import difflib
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from dulwich.objects import Blob
 from dulwich.walk import (
@@ -77,7 +77,7 @@ def annotate_lines(
     commit_id: bytes,
     path: bytes,
     order: str = ORDER_DATE,
-    lines: Optional[Sequence[tuple[tuple["Commit", "TreeEntry"], bytes]]] = None,
+    lines: Sequence[tuple[tuple["Commit", "TreeEntry"], bytes]] | None = None,
     follow: bool = True,
 ) -> list[tuple[tuple["Commit", "TreeEntry"], bytes]]:
     """Annotate the lines of a blob.

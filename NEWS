@@ -1,4 +1,6 @@
-0.24.8	2025-1029
+0.24.9	UNRELEASED
+
+0.24.8	2025-10-29
 
  * Add Rust implementation of pack delta creation (create_delta). The
    implementation uses the similar crate for efficient diff computation.

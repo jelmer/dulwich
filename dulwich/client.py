@@ -3063,6 +3063,8 @@ class SSHGitClient(TraditionalGitClient):
         config: Config | None = None,
         path_encoding: str = TraditionalGitClient.DEFAULT_ENCODING,
         vendor: SSHVendor | None = None,
+        key_filename: str | None = None,
+        ssh_command: str | None = None,
     ) -> "SSHGitClient":
         """Create an SSHGitClient from a parsed URL.
 
@@ -3078,6 +3080,8 @@ class SSHGitClient(TraditionalGitClient):
           config: Configuration object
           path_encoding: Encoding for paths
           vendor: SSH implementation to use
+          key_filename: Optional SSH key file
+          ssh_command: Optional custom SSH command
 
         Returns:
           An SSHGitClient instance
@@ -3096,6 +3100,8 @@ class SSHGitClient(TraditionalGitClient):
             vendor=vendor,
             config=config,
             password=password,
+            key_filename=key_filename,
+            ssh_command=ssh_command,
         )
 
     def _get_cmd_path(self, cmd: bytes) -> bytes:
@@ -4300,6 +4306,8 @@ def _get_transport_and_path_from_url(
             report_activity=report_activity,
             quiet=quiet,
             include_tags=include_tags,
+            key_filename=key_filename,
+            ssh_command=ssh_command,
         ), parsed.path
     elif parsed.scheme in ("http", "https"):
         return (

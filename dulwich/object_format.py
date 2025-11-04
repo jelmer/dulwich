@@ -1,4 +1,4 @@
-# hash.py -- Hash algorithm abstraction layer for Git
+# hash.py -- Object format abstraction layer for Git
 # Copyright (C) 2024 The Dulwich contributors
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
@@ -19,26 +19,34 @@
 # License, Version 2.0.
 #
 
-"""Hash algorithm abstraction for Git objects.
+"""Object format abstraction for Git objects.
 
-This module provides an abstraction layer for different hash algorithms
+This module provides an abstraction layer for different object formats
 used in Git repositories (SHA-1 and SHA-256).
 """
 
+from collections.abc import Callable
 from hashlib import sha1, sha256
-from typing import Callable, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from _hashlib import HASH
 
 
-class HashAlgorithm:
-    """Base class for hash algorithms used in Git."""
+class ObjectFormat:
+    """Object format (hash algorithm) used in Git."""
 
     def __init__(
-        self, name: str, oid_length: int, hex_length: int, hash_func: Callable
+        self,
+        name: str,
+        oid_length: int,
+        hex_length: int,
+        hash_func: Callable[[], "HASH"],
     ) -> None:
-        """Initialize a hash algorithm.
+        """Initialize an object format.
 
         Args:
-            name: Name of the algorithm (e.g., "sha1", "sha256")
+            name: Name of the format (e.g., "sha1", "sha256")
             oid_length: Length of the binary object ID in bytes
             hex_length: Length of the hexadecimal object ID in characters
             hash_func: Hash function from hashlib
@@ -51,12 +59,14 @@ class HashAlgorithm:
         self.zero_oid_bin = b"\x00" * oid_length
 
     def __str__(self) -> str:
+        """Return string representation."""
         return self.name
 
     def __repr__(self) -> str:
-        return f"HashAlgorithm({self.name!r})"
+        """Return repr."""
+        return f"ObjectFormat({self.name!r})"
 
-    def new_hash(self):
+    def new_hash(self) -> "HASH":
         """Create a new hash object."""
         return self.hash_func()
 
@@ -87,35 +97,58 @@ class HashAlgorithm:
         return h.hexdigest().encode("ascii")
 
 
-# Define the supported hash algorithms
-SHA1 = HashAlgorithm("sha1", 20, 40, sha1)
-SHA256 = HashAlgorithm("sha256", 32, 64, sha256)
+# Define the supported object formats
+SHA1 = ObjectFormat("sha1", 20, 40, sha1)
+SHA256 = ObjectFormat("sha256", 32, 64, sha256)
 
-# Map of algorithm names to HashAlgorithm instances
-HASH_ALGORITHMS = {
+# Map of format names to ObjectFormat instances
+OBJECT_FORMATS = {
     "sha1": SHA1,
     "sha256": SHA256,
 }
 
-# Default algorithm for backward compatibility
-DEFAULT_HASH_ALGORITHM = SHA1
+# Default format for backward compatibility
+DEFAULT_OBJECT_FORMAT = SHA1
 
 
-def get_hash_algorithm(name: Optional[str] = None) -> HashAlgorithm:
-    """Get a hash algorithm by name.
+def get_object_format(name: str | None = None) -> ObjectFormat:
+    """Get an object format by name.
 
     Args:
-        name: Algorithm name ("sha1" or "sha256"). If None, returns default.
+        name: Format name ("sha1" or "sha256"). If None, returns default.
 
     Returns:
-        HashAlgorithm instance
+        ObjectFormat instance
 
     Raises:
-        ValueError: If the algorithm name is not supported
+        ValueError: If the format name is not supported
     """
     if name is None:
-        return DEFAULT_HASH_ALGORITHM
+        return DEFAULT_OBJECT_FORMAT
     try:
-        return HASH_ALGORITHMS[name.lower()]
+        return OBJECT_FORMATS[name.lower()]
     except KeyError:
-        raise ValueError(f"Unsupported hash algorithm: {name}")
+        raise ValueError(f"Unsupported object format: {name}")
+
+
+def verify_same_object_format(*formats: ObjectFormat) -> ObjectFormat:
+    """Verify that all provided object formats are the same.
+
+    Args:
+        *formats: Object format instances to verify
+
+    Returns:
+        The common object format
+
+    Raises:
+        ValueError: If formats don't match or no formats provided
+    """
+    if not formats:
+        raise ValueError("At least one object format must be provided")
+
+    first = formats[0]
+    for fmt in formats[1:]:
+        if fmt != first:
+            raise ValueError(f"Object format mismatch: {first.name} != {fmt.name}")
+
+    return first

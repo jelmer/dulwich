@@ -24,7 +24,7 @@
 import os
 import tempfile
 
-from dulwich.hash import SHA256
+from dulwich.object_format import SHA256
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.pack import load_pack_index_file
 from dulwich.repo import Repo

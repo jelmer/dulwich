@@ -530,16 +530,16 @@ def iter_sha1(iter: Iterable[bytes]) -> bytes:
     return sha.hexdigest().encode("ascii")
 
 
-def load_pack_index(path: str | os.PathLike[str], hash_algorithm: int | None = None) -> "PackIndex":
+def load_pack_index(path: str | os.PathLike[str], object_format: ObjectFormat| None = None) -> "PackIndex":
     """Load an index file by path.
 
     Args:
       path: Path to the index file
-      hash_algorithm: Hash algorithm used by the repository
+      object_format: Hash algorithm used by the repository
     Returns: A PackIndex loaded from the given path
     """
     with GitFile(path, "rb") as f:
-        return load_pack_index_file(path, f, hash_algorithm=hash_algorithm)
+        return load_pack_index_file(path, f, object_format=object_format)
 
 
 def _load_file_contents(
@@ -575,14 +575,14 @@ def _load_file_contents(
 
 def load_pack_index_file(
     path: str | os.PathLike[str], f: IO[bytes] | _GitFile
-    hash_algorithm: int | None = None,
+    object_format: ObjectFormat | = None,
 ) -> "PackIndex":
     """Load an index file from a file-like object.
 
     Args:
       path: Path for the index file
       f: File-like object
-      hash_algorithm: Hash algorithm used by the repository
+      object_format: Hash algorithm used by the repository
     Returns: A PackIndex loaded from the given file
     """
     contents, size = _load_file_contents(f)
@@ -594,7 +594,7 @@ def load_pack_index_file(
                 file=f,
                 contents=contents,
                 size=size,
-                hash_algorithm=hash_algorithm,
+                object_format=object_format,
             )
         elif version == 3:
             return PackIndex3(path, file=f, contents=contents, size=size)
@@ -602,7 +602,7 @@ def load_pack_index_file(
             raise KeyError(f"Unknown pack index format {version}")
     else:
         return PackIndex1(
-            path, file=f, contents=contents, size=size, hash_algorithm=hash_algorithm
+            path, file=f, contents=contents, size=size, object_format=object_format
         )
 
 
@@ -642,7 +642,7 @@ class PackIndex:
     """
 
     # Default to SHA-1 for backward compatibility
-    hash_algorithm = 1
+    object_format = 1
     hash_size = 20
 
     def __eq__(self, other: object) -> bool:
@@ -1032,7 +1032,7 @@ class PackIndex1(FilePackIndex):
         file: IO[bytes] | _GitFile | None = None,
         contents: bytes | None = None,
         size: int | None = None,
-        hash_algorithm: int | None = None,
+        object_format: ObjectFormat | None = None,
     ) -> None:
         """Initialize a version 1 pack index.
 
@@ -1047,8 +1047,8 @@ class PackIndex1(FilePackIndex):
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
         # Use provided hash algorithm if available, otherwise default to SHA1
-        if hash_algorithm:
-            self.hash_size = hash_algorithm.oid_length
+        if object_format:
+            self.hash_size = object_format.oid_length
         else:
             self.hash_size = 20  # Default to SHA1
 
@@ -1085,7 +1085,7 @@ class PackIndex2(FilePackIndex):
         file: IO[bytes] | _GitFile | None = None,
         contents: bytes | None = None,
         size: int | None = None,
-        hash_algorithm: int | None = None,
+        object_format: ObjectFormat | None = None,
     ) -> None:
         """Initialize a version 2 pack index.
 
@@ -1105,8 +1105,8 @@ class PackIndex2(FilePackIndex):
         self._fan_out_table = self._read_fan_out_table(8)
 
         # Use provided hash algorithm if available, otherwise default to SHA1
-        if hash_algorithm:
-            self.hash_size = hash_algorithm.oid_length
+        if object_format:
+            self.hash_size = object_format.oid_length
         else:
             self.hash_size = 20  # Default to SHA1
 
@@ -1177,13 +1177,13 @@ class PackIndex3(FilePackIndex):
             raise AssertionError(f"Version was {self.version}")
 
         # Read hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
-        (self.hash_algorithm,) = unpack_from(b">L", self._contents, 8)
-        if self.hash_algorithm == 1:
+        (self.object_format,) = unpack_from(b">L", self._contents, 8)
+        if self.object_format == 1:
             self.hash_size = 20  # SHA-1
-        elif self.hash_algorithm == 2:
+        elif self.object_format == 2:
             self.hash_size = 32  # SHA-256
         else:
-            raise AssertionError(f"Unknown hash algorithm {self.hash_algorithm}")
+            raise AssertionError(f"Unknown hash algorithm {self.object_format}")
 
         # Read length of shortened object names
         (self.shortened_oid_len,) = unpack_from(b">L", self._contents, 12)
@@ -1857,7 +1857,7 @@ class PackData:
         filename: str,
         progress: Callable[..., None] | None = None,
         resolve_ext_ref: ResolveExtRefFn | None = None,
-        hash_algorithm: int = 1,
+        hash_format: int | None = None,
     ) -> bytes:
         """Create a version 3 index file for this data file.
 
@@ -1865,7 +1865,7 @@ class PackData:
           filename: Index filename.
           progress: Progress report function
           resolve_ext_ref: Function to resolve external references
-          hash_algorithm: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
+          hash_format: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
         Returns: Checksum of index file
         """
         entries = self.sorted_entries(
@@ -1873,7 +1873,7 @@ class PackData:
         )
         with GitFile(filename, "wb") as f:
             return write_pack_index_v3(
-                f, entries, self.calculate_checksum(), hash_algorithm
+                f, entries, self.calculate_checksum(), hash_format
             )
 
     def create_index(
@@ -1882,7 +1882,7 @@ class PackData:
         progress: Callable[..., None] | None = None,
         version: int = 2,
         resolve_ext_ref: ResolveExtRefFn | None = None,
-        hash_algorithm: int = 1,
+        hash_format: int | None = None,
     ) -> bytes:
         """Create an  index file for this data file.
 
@@ -1891,7 +1891,7 @@ class PackData:
           progress: Progress report function
           version: Index version (1, 2, or 3)
           resolve_ext_ref: Function to resolve external references
-          hash_algorithm: Hash algorithm identifier for v3 (1 = SHA-1, 2 = SHA-256)
+          hash_format: Hash algorithm identifier for v3 (1 = SHA-1, 2 = SHA-256)
         Returns: Checksum of index file
         """
         if version == 1:
@@ -1907,7 +1907,7 @@ class PackData:
                 filename,
                 progress,
                 resolve_ext_ref=resolve_ext_ref,
-                hash_algorithm=hash_algorithm,
+                hash_format=hash_format,
             )
         else:
             raise ValueError(f"unknown index format {version}")
@@ -3428,7 +3428,7 @@ def write_pack_index_v3(
     f: IO[bytes],
     entries: Iterable[tuple[bytes, int, int | None]],
     pack_checksum: bytes,
-    hash_algorithm: int = 1,
+    hash_format: int = 1,
 ) -> bytes:
     """Write a new pack index file in v3 format.
 
@@ -3437,18 +3437,18 @@ def write_pack_index_v3(
       entries: List of tuples with object name (sha), offset_in_pack, and
         crc32_checksum.
       pack_checksum: Checksum of the pack file.
-      hash_algorithm: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
+      hash_format: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
     Returns: The SHA of the index file written
     """
-    if hash_algorithm == 1:
+    if hash_format == 1:
         hash_size = 20  # SHA-1
         writer_cls = SHA1Writer
-    elif hash_algorithm == 2:
+    elif hash_format == 2:
         hash_size = 32  # SHA-256
         # TODO: Add SHA256Writer when SHA-256 support is implemented
         raise NotImplementedError("SHA-256 support not yet implemented")
     else:
-        raise ValueError(f"Unknown hash algorithm {hash_algorithm}")
+        raise ValueError(f"Unknown hash algorithm {hash_format}")
 
     # Convert entries to list to allow multiple iterations
     entries_list = list(entries)
@@ -3460,7 +3460,7 @@ def write_pack_index_v3(
     f = writer_cls(f)
     f.write(b"\377tOc")  # Magic!
     f.write(struct.pack(">L", 3))  # Version 3
-    f.write(struct.pack(">L", hash_algorithm))  # Hash algorithm
+    f.write(struct.pack(">L", hash_format))  # Hash algorithm
     f.write(struct.pack(">L", shortened_oid_len))  # Shortened OID length
 
     fan_out_table: dict[int, int] = defaultdict(lambda: 0)
@@ -3522,6 +3522,9 @@ def write_pack_index(
 
     Returns:
       SHA of the written index file
+
+    Raises:
+      ValueError: If an unsupported version is specified
     """
     if version is None:
         version = DEFAULT_PACK_INDEX_VERSION
@@ -3557,7 +3560,7 @@ class Pack:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
-        hash_algorithm: int | None = None,
+        object_format: ObjectFormat | None = None,
     ) -> None:
         """Initialize a Pack object.
 
@@ -3570,7 +3573,7 @@ class Pack:
           depth: Maximum depth for delta chains
           threads: Number of threads to use for operations
           big_file_threshold: Size threshold for big file handling
-          hash_algorithm: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
+          object_format: Hash algorithm to use (defaults to SHA1)
         """
         self._basename = basename
         self._data = None
@@ -3594,27 +3597,32 @@ class Pack:
             threads=threads,
             big_file_threshold=big_file_threshold,
         )
-        self._idx_load = lambda: load_pack_index(self._idx_path)
+        self._idx_load = lambda: load_pack_index(
+            self._idx_path, object_format=object_format
+        )
         self.resolve_ext_ref = resolve_ext_ref
-        self.hash_algorithm = (
-            hash_algorithm if hash_algorithm is not None else DEFAULT_HASH_ALGORITHM
+        # Always set object_format, defaulting to SHA1
+        from .object_format import get_object_format
+
+        self.object_format = (
+            object_format if object_format else get_object_format("sha1")
         )
 
     @classmethod
     def from_lazy_objects(
         cls, data_fn: Callable[[], PackData], idx_fn: Callable[[], PackIndex],
-        hash_algorithm: int | None = None
+        object_format: ObjectFormat | None = None
     ) -> "Pack":
         """Create a new pack object from callables to load pack data and index objects."""
-        ret = cls("", hash_algorithm=hash_algorithm)
+        ret = cls("", object_format=object_format)
         ret._data_load = data_fn
         ret._idx_load = idx_fn
         return ret
 
     @classmethod
-    def from_objects(cls, data: PackData, idx: PackIndex, hash_algorithm: int | None = None) -> "Pack":
+    def from_objects(cls, data: PackData, idx: PackIndex, object_format | ObjectFormat | None = None) -> "Pack":
         """Create a new pack object from pack data and index objects."""
-        ret = cls("", hash_algorithm=hash_algorithm)
+        ret = cls("", object_format=object_format)
         ret._data = data
         ret._data_load = None
         ret._idx = idx
@@ -3981,7 +3989,7 @@ class Pack:
         return base_type, chunks
 
     def entries(
-        self, progress: Callable[[int, int], None] | None = None
+        self, progress: ProgressFn | None = None
     ) -> Iterator[PackIndexEntry]:
         """Yield entries summarizing the contents of this pack.
 

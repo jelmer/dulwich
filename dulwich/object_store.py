@@ -319,6 +319,16 @@ class PackContainer(Protocol):
 class BaseObjectStore:
     """Object store interface."""
 
+    def __init__(self, *, object_format=None) -> None:
+        """Initialize object store.
+
+        Args:
+            object_format: Hash algorithm to use (defaults to SHA1)
+        """
+        from .object_format import get_object_format
+
+        self.object_format = object_format if object_format else get_object_format()
+
     def determine_wants_all(
         self, refs: Mapping[Ref, ObjectID], depth: int | None = None
     ) -> list[ObjectID]:
@@ -371,7 +381,9 @@ class BaseObjectStore:
     def __getitem__(self, sha1: ObjectID | RawObjectID) -> ShaFile:
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha1)
-        return ShaFile.from_raw_string(type_num, uncomp, sha=sha1)
+        return ShaFile.from_raw_string(
+            type_num, uncomp, sha=sha1, object_format=self.object_format
+        )
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""
@@ -816,6 +828,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         pack_depth: int | None = None,
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
+        *,
+        object_format=None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -828,7 +842,9 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           pack_depth: Maximum depth for pack deltas
           pack_threads: Number of threads to use for packing
           pack_big_file_threshold: Threshold for treating files as "big"
+          object_format: Hash algorithm to use
         """
+        super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
@@ -1382,7 +1398,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_write_bitmap_lookup_table: bool = True,
         file_mode: int | None = None,
         dir_mode: int | None = None,
-        hash_algorithm=None,
+        object_format=None,
     ) -> None:
         """Open an object store.
 
@@ -1403,8 +1419,12 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_write_bitmap_lookup_table: whether to include lookup table in bitmaps
           file_mode: File permission mask for shared repository
           dir_mode: Directory permission mask for shared repository
-          hash_algorithm: Hash algorithm to use (SHA1 or SHA256)
+          object_format: Hash algorithm to use (SHA1 or SHA256)
+          object_format: Hash algorithm to use (SHA1 or SHA256)
         """
+        # Import here to avoid circular dependency
+        from .object_format import get_object_format
+
         super().__init__(
             pack_compression_level=pack_compression_level,
             pack_index_version=pack_index_version,
@@ -1414,6 +1434,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth=pack_depth,
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
+            object_format=object_format if object_format else get_object_format(),
         )
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
@@ -1427,11 +1448,6 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_write_bitmap_lookup_table = pack_write_bitmap_lookup_table
         self.file_mode = file_mode
         self.dir_mode = dir_mode
-
-        # Import here to avoid circular dependency
-        from .hash import get_hash_algorithm
-
-        self.hash_algorithm = hash_algorithm if hash_algorithm else get_hash_algorithm()
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -1548,9 +1564,9 @@ class DiskObjectStore(PackBasedObjectStore):
             )
 
         # Get hash algorithm from config
-        from .hash import get_hash_algorithm
+        from .object_format import get_object_format
 
-        hash_algorithm = None
+        object_format = None
         try:
             try:
                 version = int(config.get((b"core",), b"repositoryformatversion"))
@@ -1561,7 +1577,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     object_format = config.get((b"extensions",), b"objectformat")
                 except KeyError:
                     object_format = b"sha1"
-                hash_algorithm = get_hash_algorithm(object_format.decode("ascii"))
+                object_format = get_object_format(object_format.decode("ascii"))
         except (KeyError, ValueError):
             pass
 
@@ -1582,7 +1598,18 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_write_bitmap_lookup_table=pack_write_bitmap_lookup_table,
             file_mode=file_mode,
             dir_mode=dir_mode,
-            hash_algorithm=hash_algorithm,
+            object_format=hash_algorithm,
+            loose_compression_level,
+            pack_compression_level,
+            pack_index_version,
+            pack_delta_window_size,
+            pack_window_memory,
+            pack_delta_cache_size,
+            pack_depth,
+            pack_threads,
+            pack_big_file_threshold,
+            fsync_object_files,
+            object_format,
         )
         instance._use_commit_graph = use_commit_graph
         instance._use_midx = use_midx
@@ -1673,7 +1700,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     depth=self.pack_depth,
                     threads=self.pack_threads,
                     big_file_threshold=self.pack_big_file_threshold,
-                    hash_algorithm=self.hash_algorithm,
+                    object_format=self.object_format,
                 )
                 new_packs.append(pack)
                 self._pack_cache[f] = pack
@@ -1725,9 +1752,8 @@ class DiskObjectStore(PackBasedObjectStore):
     def _get_loose_object(self, sha: ObjectID | RawObjectID) -> ShaFile | None:
         path = self._get_shafile_path(sha)
         try:
-            # Load the object from path with SHA for hash algorithm detection
-            # sha parameter here is already hex, so pass it directly
-            return ShaFile.from_path(path, sha)
+            # Load the object from path with SHA and hash algorithm from object store
+            return ShaFile.from_path(path, sha, object_format=self.object_format)
         except FileNotFoundError:
             return None
 
@@ -1914,7 +1940,7 @@ class DiskObjectStore(PackBasedObjectStore):
             depth=self.pack_depth,
             threads=self.pack_threads,
             big_file_threshold=self.pack_big_file_threshold,
-            hash_algorithm=self.hash_algorithm,
+            object_format=self.object_format,
         )
         final_pack.check_length_and_checksum()
         self._add_cached_pack(pack_base_name, final_pack)
@@ -1995,7 +2021,7 @@ class DiskObjectStore(PackBasedObjectStore):
           obj: Object to add
         """
         # Use the correct hash algorithm for the object ID
-        obj_id = obj.get_id(self.hash_algorithm)
+        obj_id = obj.get_id(self.object_format)
         path = self._get_shafile_path(obj_id)
         dir = os.path.dirname(path)
         try:
@@ -2019,7 +2045,8 @@ class DiskObjectStore(PackBasedObjectStore):
         *,
         file_mode: int | None = None,
         dir_mode: int | None = None,
-        hash_algorithm=None,
+        object_format=None,
+        cls, path: str | os.PathLike[str], object_format=None
     ) -> "DiskObjectStore":
         """Initialize a new disk object store.
 
@@ -2029,7 +2056,8 @@ class DiskObjectStore(PackBasedObjectStore):
           path: Path where the object store should be created
           file_mode: Optional file permission mask for shared repository
           dir_mode: Optional directory permission mask for shared repository
-          hash_algorithm: Hash algorithm to use (SHA1 or SHA256)
+          object_format: Hash algorithm to use (SHA1 or SHA256)
+          object_format: Hash algorithm to use (SHA1 or SHA256)
 
         Returns:
           New DiskObjectStore instance
@@ -2047,7 +2075,10 @@ class DiskObjectStore(PackBasedObjectStore):
         if dir_mode is not None:
             os.chmod(info_path, dir_mode)
             os.chmod(pack_path, dir_mode)
-        return cls(path, file_mode=file_mode, dir_mode=dir_mode, hash_algorithm=hash_algorithm)
+        return cls(path, file_mode=file_mode, dir_mode=dir_mode, object_format=object_format)
+        os.mkdir(os.path.join(path, "info"))
+        os.mkdir(os.path.join(path, PACKDIR))
+        return cls(path, object_format=object_format)
 
     def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
         """Iterate over all object SHAs with the given prefix.
@@ -2401,13 +2432,18 @@ class DiskObjectStore(PackBasedObjectStore):
 class MemoryObjectStore(PackCapableObjectStore):
     """Object store that keeps all objects in memory."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, object_format=None) -> None:
         """Initialize a MemoryObjectStore.
 
         Creates an empty in-memory object store.
+
+        Args:
+            object_format: Hash algorithm to use (defaults to SHA1)
         """
         super().__init__()
         self._data: dict[ObjectID, ShaFile] = {}
+        super().__init__(object_format=object_format)
+        self._data: dict[bytes, ShaFile] = {}
         self.pack_compression_level = -1
 
     def _to_hexsha(self, sha: ObjectID | RawObjectID) -> ObjectID:
@@ -3020,7 +3056,20 @@ class OverlayObjectStore(BaseObjectStore):
         Args:
           bases: List of base object stores to overlay
           add_store: Optional store to write new objects to
+
+        Raises:
+          ValueError: If stores have different hash algorithms
         """
+        from .object_format import verify_same_object_format
+
+        # Verify all stores use the same hash algorithm
+        store_algorithms = [store.object_format for store in bases]
+        if add_store:
+            store_algorithms.append(add_store.object_format)
+
+        object_format = verify_same_object_format(*store_algorithms)
+
+        super().__init__(object_format=object_format)
         self.bases = bases
         self.add_store = add_store
 

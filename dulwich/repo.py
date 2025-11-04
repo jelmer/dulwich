@@ -499,7 +499,10 @@ class BaseRepo:
     """
 
     def __init__(
-        self, object_store: "PackCapableObjectStore", refs: RefsContainer
+        self,
+        object_store: "PackCapableObjectStore",
+        refs: RefsContainer,
+        object_format=None,
     ) -> None:
         """Open a repository.
 
@@ -509,13 +512,14 @@ class BaseRepo:
         Args:
           object_store: Object store to use
           refs: Refs container to use
+          object_format: Hash algorithm to use (if None, will be determined from config)
         """
         self.object_store = object_store
         self.refs = refs
 
         self._graftpoints: dict[ObjectID, list[ObjectID]] = {}
         self.hooks: dict[str, Hook] = {}
-        self._hash_algorithm = None  # Cached hash algorithm
+        self.object_format = object_format  # Hash algorithm (SHA1 or SHA256)
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
@@ -569,6 +573,11 @@ class BaseRepo:
         # Set object format extension if using SHA256
         if object_format == "sha256":
             cf.set("extensions", "objectformat", "sha256")
+
+        # Set hash algorithm based on object format
+        from .object_format import get_object_format
+
+        self.object_format = get_object_format(object_format)
 
         if self._determine_file_mode():
             cf.set("core", "filemode", True)
@@ -946,42 +955,6 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_config)
 
-    def get_hash_algorithm(self):
-        """Get the hash algorithm used by this repository.
-
-        Returns: HashAlgorithm instance (SHA1 or SHA256)
-        """
-        if self._hash_algorithm is None:
-            from .hash import get_hash_algorithm
-
-            # Check if repository uses SHA256
-            try:
-                config = self.get_config()
-                try:
-                    version = int(config.get(("core",), "repositoryformatversion"))
-                except KeyError:
-                    version = 0  # Default version is 0
-
-                if version == 1:
-                    # Check for SHA256 extension
-                    try:
-                        object_format = config.get(("extensions",), "objectformat")
-                        if object_format == b"sha256":
-                            self._hash_algorithm = get_hash_algorithm("sha256")
-                        else:
-                            self._hash_algorithm = get_hash_algorithm("sha1")
-                    except KeyError:
-                        # No objectformat extension, default to SHA1
-                        self._hash_algorithm = get_hash_algorithm("sha1")
-                else:
-                    # Version 0 always uses SHA1
-                    self._hash_algorithm = get_hash_algorithm("sha1")
-            except (KeyError, ValueError):
-                # If we can't read config, default to SHA1
-                self._hash_algorithm = get_hash_algorithm("sha1")
-
-        return self._hash_algorithm
-
     def get_worktree_config(self) -> "ConfigFile":
         """Retrieve the worktree config object."""
         raise NotImplementedError(self.get_worktree_config)
@@ -1190,12 +1163,17 @@ class BaseRepo:
         """Check if a specific Git object or ref is present.
 
         Args:
-          name: Git object SHA1 or ref name
+          name: Git object SHA1/SHA256 or ref name
         """
         if len(name) == 20:
             return RawObjectID(name) in self.object_store or Ref(name) in self.refs
         elif len(name) == 40 and valid_hexsha(name):
             return ObjectID(name) in self.object_store or Ref(name) in self.refs
+        # Check if it's a binary or hex SHA
+        if len(name) == self.object_format.oid_length or (
+            len(name) == self.object_format.hex_length and valid_hexsha(name)
+        ):
+            return name in self.object_store or name in self.refs
         else:
             return Ref(name) in self.refs
 
@@ -1520,6 +1498,21 @@ class Repo(BaseRepo):
             # Update worktrees container after refs change
             self.worktrees = WorkTreeContainer(self)
         BaseRepo.__init__(self, object_store, self.refs)
+
+        # Determine hash algorithm from config if not already set
+        if self.object_format is None:
+            from .object_format import get_object_format
+
+            if format_version == 1:
+                try:
+                    object_format = config.get((b"extensions",), b"objectformat")
+                    self.object_format = get_object_format(
+                        object_format.decode("ascii")
+                    )
+                except KeyError:
+                    self.object_format = get_object_format("sha1")
+            else:
+                self.object_format = get_object_format("sha1")
 
         self._graftpoints = {}
         graft_file = self.get_named_file(
@@ -2120,6 +2113,7 @@ class Repo(BaseRepo):
         controldir: str | bytes | os.PathLike[str],
         bare: bool,
         object_store: PackBasedObjectStore | None = None,
+        object_store: "PackBasedObjectStore | None" = None,
         config: "StackedConfig | None" = None,
         default_branch: bytes | None = None,
         symlinks: bool | None = None,
@@ -2150,15 +2144,20 @@ class Repo(BaseRepo):
         if object_store is None:
             # Get hash algorithm for object store
             from .hash import get_hash_algorithm
+            os.mkdir(os.path.join(controldir, *d))
 
-            hash_alg = get_hash_algorithm(
-                "sha256" if object_format == "sha256" else "sha1"
-            )
+        # Determine hash algorithm
+        from .object_format import get_object_format
+
+        hash_alg = get_object_format(object_format)
+
+        if object_store is None:
             object_store = DiskObjectStore.init(
                 os.path.join(controldir, OBJECTDIR),
                 file_mode=file_mode,
                 dir_mode=dir_mode,
-                hash_algorithm=hash_alg,
+                object_format=hash_alg,
+                os.path.join(controldir, OBJECTDIR), object_format=hash_alg
             )
         ret = cls(path, bare=bare, object_store=object_store)
         if default_branch is None:
@@ -2537,6 +2536,7 @@ class MemoryRepo(BaseRepo):
     def __init__(self) -> None:
         """Create a new repository in memory."""
         from .config import ConfigFile
+        from .object_format import get_object_format
 
         self._reflog: list[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
@@ -2546,6 +2546,8 @@ class MemoryRepo(BaseRepo):
         self._config = ConfigFile()
         self._description: bytes | None = None
         self.filter_context = None
+        # MemoryRepo defaults to SHA1
+        self.object_format = get_object_format("sha1")
 
     def _append_reflog(
         self,
@@ -2740,8 +2742,10 @@ class MemoryRepo(BaseRepo):
             raise ValueError("tree must be specified for MemoryRepo")
 
         c = Commit()
-        if len(tree) != 40:
-            raise ValueError("tree must be a 40-byte hex sha string")
+        if len(tree) != self.object_format.hex_length:
+            raise ValueError(
+                f"tree must be a {self.object_format.hex_length}-character hex sha string"
+            )
         c.tree = tree
 
         config = self.get_config_stack()

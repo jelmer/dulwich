@@ -26,7 +26,7 @@ import tempfile
 import unittest
 from io import BytesIO
 
-from dulwich.hash import SHA256
+from dulwich.object_format import SHA256
 from dulwich.pack import (
     load_pack_index_file,
     write_pack_index_v2,

@@ -50,6 +50,7 @@ from dulwich.client import (
     SubprocessSSHVendor,
     TCPGitClient,
     TraditionalGitClient,
+    Urllib3HttpGitClient,
     _extract_symrefs_and_agent,
     _remote_error_from_stderr,
     _win32_url_to_path,
@@ -764,6 +765,18 @@ class TestGetTransportAndPath(TestCase):
         self.assertEqual("/jelmer/dulwich", path)
         self.assertIs(None, c._username)
         self.assertIs(None, c._password)
+
+    def test_ssh_with_key_filename_and_ssh_command(self) -> None:
+        # Test that key_filename and ssh_command are passed through to SSHGitClient
+        c, path = get_transport_and_path(
+            "ssh://git@github.com/user/repo.git",
+            key_filename="/path/to/id_rsa",
+            ssh_command="custom-ssh -o StrictHostKeyChecking=no",
+        )
+        self.assertIsInstance(c, SSHGitClient)
+        self.assertEqual("/user/repo.git", path)
+        self.assertEqual("/path/to/id_rsa", c.key_filename)
+        self.assertEqual("custom-ssh -o StrictHostKeyChecking=no", c.ssh_command)
 
 
 class TestGetTransportAndPathFromUrl(TestCase):
@@ -2016,6 +2029,37 @@ class HttpGitClientTests(TestCase):
         # Verify the client is an HTTP client and has our custom pool manager
         self.assertIsInstance(client2, HttpGitClient)
         self.assertIs(client2.pool_manager, custom_pool_manager)
+
+    def test_urllib3_subclass_support(self) -> None:
+        """Test that subclasses of Urllib3HttpGitClient are properly supported.
+
+        This test verifies that the bug fix for commit d1f41c5c works correctly.
+        Previously, the code used `cls is Urllib3HttpGitClient` which failed for
+        subclasses. Now it uses `issubclass(cls, Urllib3HttpGitClient)` which
+        correctly handles subclasses.
+        """
+
+        # Create a custom subclass of Urllib3HttpGitClient
+        class CustomUrllib3HttpGitClient(Urllib3HttpGitClient):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.custom_attribute = "custom_value"
+
+        # Test with AbstractHttpGitClient.from_parsedurl directly
+        # This is how subclasses use the client
+        from urllib.parse import urlparse
+
+        parsed = urlparse("https://github.com/jelmer/dulwich")
+        config = ConfigDict()
+
+        client = CustomUrllib3HttpGitClient.from_parsedurl(parsed, config=config)
+
+        # Verify the client is our custom subclass
+        self.assertIsInstance(client, CustomUrllib3HttpGitClient)
+        self.assertIsInstance(client, Urllib3HttpGitClient)
+        self.assertEqual("custom_value", client.custom_attribute)
+        # Verify the config was passed through (this was the bug - it wasn't passed to subclasses before)
+        self.assertIsNotNone(client.config)
 
 
 class TCPGitClientTests(TestCase):

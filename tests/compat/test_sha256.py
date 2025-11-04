@@ -24,7 +24,7 @@
 import os
 import tempfile
 
-from dulwich.hash import SHA256
+from dulwich.object_format import SHA256
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 
@@ -90,8 +90,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         repo = Repo(repo_path)
 
         # Verify dulwich detects SHA256
-        hash_alg = repo.get_hash_algorithm()
-        self.assertEqual(hash_alg, SHA256)
+        self.assertEqual(repo.object_format, SHA256)
 
         # Verify dulwich can read objects
         # Try both main and master branches (git default changed over time)

@@ -4027,8 +4027,8 @@ class AbstractHttpGitClient(GitClient):
             base_parsed = base_parsed._replace(netloc=f"{hostname}:{parsedurl.port}")
 
         # Pass credentials to constructor if it's a subclass that supports them
-        if cls is Urllib3HttpGitClient:
-            client = cls(  # type: ignore[call-arg]
+        if issubclass(cls, Urllib3HttpGitClient):
+            client: AbstractHttpGitClient = cls(
                 urlunparse(base_parsed),
                 dumb=dumb,
                 thin_packs=thin_packs,

@@ -26,7 +26,7 @@ import shutil
 import tempfile
 import unittest
 
-from dulwich.hash import SHA1, SHA256, get_hash_algorithm
+from dulwich.object_format import SHA1, SHA256, get_object_format
 from dulwich.objects import Blob, Tree, valid_hexsha, zero_sha_for
 from dulwich.repo import MemoryRepo, Repo
 
@@ -54,12 +54,12 @@ class HashAlgorithmTests(unittest.TestCase):
 
     def test_get_hash_algorithm(self):
         """Test getting hash algorithms by name."""
-        self.assertEqual(get_hash_algorithm("sha1"), SHA1)
-        self.assertEqual(get_hash_algorithm("sha256"), SHA256)
-        self.assertEqual(get_hash_algorithm(None), SHA1)  # Default
+        self.assertEqual(get_object_format("sha1"), SHA1)
+        self.assertEqual(get_object_format("sha256"), SHA256)
+        self.assertEqual(get_object_format(None), SHA1)  # Default
 
         with self.assertRaises(ValueError):
-            get_hash_algorithm("invalid")
+            get_object_format("invalid")
 
 
 class ObjectHashingTests(unittest.TestCase):
@@ -167,8 +167,7 @@ class RepositorySHA256Tests(unittest.TestCase):
         self.assertEqual(config.get(("extensions",), "objectformat"), b"sha256")
 
         # Check hash algorithm detection
-        hash_alg = repo.get_hash_algorithm()
-        self.assertEqual(hash_alg, SHA256)
+        self.assertEqual(repo.object_format, SHA256)
 
         repo.close()
 
@@ -186,8 +185,7 @@ class RepositorySHA256Tests(unittest.TestCase):
             config.get(("extensions",), "objectformat")
 
         # Check hash algorithm detection
-        hash_alg = repo.get_hash_algorithm()
-        self.assertEqual(hash_alg, SHA1)
+        self.assertEqual(repo.object_format, SHA1)
 
         repo.close()
 
@@ -205,8 +203,7 @@ class RepositorySHA256Tests(unittest.TestCase):
         repo = MemoryRepo.init_bare([], {}, object_format="sha256")
 
         # Check hash algorithm
-        hash_alg = repo.get_hash_algorithm()
-        self.assertEqual(hash_alg, SHA256)
+        self.assertEqual(repo.object_format, SHA256)
 
 
 if __name__ == "__main__":

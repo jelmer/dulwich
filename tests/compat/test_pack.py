@@ -232,16 +232,16 @@ class TestPackIndexCompat(PackTests):
 
         v3_path = os.path.join(self._tempdir, "v3_test.idx")
         with GitFile(v3_path, "wb") as f:
-            write_pack_index_v3(f, entries, b"x" * 20, hash_algorithm=1)
+            write_pack_index_v3(f, entries, b"x" * 20, object_format=1)
 
         # Load and verify structure
         idx = load_pack_index(v3_path)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
-        self.assertEqual(idx.hash_algorithm, 1)  # SHA-1
+        self.assertEqual(idx.object_format, 1)  # SHA-1
         self.assertEqual(idx.hash_size, 20)
 
         # Verify SHA-256 would raise NotImplementedError
         with self.assertRaises(NotImplementedError):
             with GitFile(v3_path + ".sha256", "wb") as f:
-                write_pack_index_v3(f, entries, b"x" * 32, hash_algorithm=2)
+                write_pack_index_v3(f, entries, b"x" * 32, object_format=2)

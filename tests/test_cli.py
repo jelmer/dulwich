@@ -4027,5 +4027,170 @@ class StripspaceCommandTest(DulwichCliTestCase):
         self.assertEqual(stdout, "hello\n\nworld\n")
 
 
+class MailinfoCommandTests(DulwichCliTestCase):
+    """Tests for the mailinfo command."""
+
+    def test_mailinfo_basic(self):
+        """Test basic mailinfo command."""
+        email_content = b"""From: Test User <test@example.com>
+Subject: [PATCH] Add feature
+Date: Mon, 1 Jan 2024 12:00:00 +0000
+
+This is the commit message.
+
+---
+diff --git a/file.txt b/file.txt
+"""
+        email_file = os.path.join(self.test_dir, "email.txt")
+        with open(email_file, "wb") as f:
+            f.write(email_content)
+
+        msg_file = os.path.join(self.test_dir, "msg")
+        patch_file = os.path.join(self.test_dir, "patch")
+
+        result, stdout, _stderr = self._run_cli(
+            "mailinfo", msg_file, patch_file, email_file
+        )
+        self.assertIsNone(result)
+
+        # Check stdout contains author info
+        self.assertIn("Author: Test User", stdout)
+        self.assertIn("Email: test@example.com", stdout)
+        self.assertIn("Subject: Add feature", stdout)
+
+        # Check files were written
+        self.assertTrue(os.path.exists(msg_file))
+        self.assertTrue(os.path.exists(patch_file))
+
+        # Check file contents
+        with open(msg_file) as f:
+            msg_content = f.read()
+            self.assertIn("This is the commit message.", msg_content)
+
+        with open(patch_file) as f:
+            patch_content = f.read()
+            self.assertIn("diff --git", patch_content)
+
+    def test_mailinfo_keep_subject(self):
+        """Test mailinfo with -k flag."""
+        email_content = b"""From: Test <test@example.com>
+Subject: [PATCH 1/2] Feature
+
+Body
+"""
+        email_file = os.path.join(self.test_dir, "email.txt")
+        with open(email_file, "wb") as f:
+            f.write(email_content)
+
+        msg_file = os.path.join(self.test_dir, "msg")
+        patch_file = os.path.join(self.test_dir, "patch")
+
+        result, stdout, _stderr = self._run_cli(
+            "mailinfo", "-k", msg_file, patch_file, email_file
+        )
+        self.assertIsNone(result)
+        self.assertIn("Subject: [PATCH 1/2] Feature", stdout)
+
+    def test_mailinfo_keep_non_patch(self):
+        """Test mailinfo with -b flag."""
+        email_content = b"""From: Test <test@example.com>
+Subject: [RFC][PATCH] Feature
+
+Body
+"""
+        email_file = os.path.join(self.test_dir, "email.txt")
+        with open(email_file, "wb") as f:
+            f.write(email_content)
+
+        msg_file = os.path.join(self.test_dir, "msg")
+        patch_file = os.path.join(self.test_dir, "patch")
+
+        result, stdout, _stderr = self._run_cli(
+            "mailinfo", "-b", msg_file, patch_file, email_file
+        )
+        self.assertIsNone(result)
+        self.assertIn("Subject: [RFC] Feature", stdout)
+
+    def test_mailinfo_scissors(self):
+        """Test mailinfo with --scissors flag."""
+        email_content = b"""From: Test <test@example.com>
+Subject: Test
+
+Ignore this part
+
+-- >8 --
+
+Keep this part
+"""
+        email_file = os.path.join(self.test_dir, "email.txt")
+        with open(email_file, "wb") as f:
+            f.write(email_content)
+
+        msg_file = os.path.join(self.test_dir, "msg")
+        patch_file = os.path.join(self.test_dir, "patch")
+
+        result, _stdout, _stderr = self._run_cli(
+            "mailinfo", "--scissors", msg_file, patch_file, email_file
+        )
+        self.assertIsNone(result)
+
+        # Check message file
+        with open(msg_file) as f:
+            msg_content = f.read()
+            self.assertIn("Keep this part", msg_content)
+            self.assertNotIn("Ignore this part", msg_content)
+
+    def test_mailinfo_message_id(self):
+        """Test mailinfo with -m flag."""
+        email_content = b"""From: Test <test@example.com>
+Subject: Test
+Message-ID: <test123@example.com>
+
+Body
+"""
+        email_file = os.path.join(self.test_dir, "email.txt")
+        with open(email_file, "wb") as f:
+            f.write(email_content)
+
+        msg_file = os.path.join(self.test_dir, "msg")
+        patch_file = os.path.join(self.test_dir, "patch")
+
+        result, _stdout, _stderr = self._run_cli(
+            "mailinfo", "-m", msg_file, patch_file, email_file
+        )
+        self.assertIsNone(result)
+
+        # Check message file contains Message-ID
+        with open(msg_file) as f:
+            msg_content = f.read()
+            self.assertIn("Message-ID:", msg_content)
+
+    def test_mailinfo_encoding(self):
+        """Test mailinfo with --encoding flag."""
+        email_content = (
+            b"From: Test <test@example.com>\n"
+            b"Subject: Test\n"
+            b"Content-Type: text/plain; charset=utf-8\n"
+            b"\n"
+            b"Body with UTF-8: " + "naïve".encode() + b"\n"
+        )
+        email_file = os.path.join(self.test_dir, "email.txt")
+        with open(email_file, "wb") as f:
+            f.write(email_content)
+
+        msg_file = os.path.join(self.test_dir, "msg")
+        patch_file = os.path.join(self.test_dir, "patch")
+
+        result, _stdout, _stderr = self._run_cli(
+            "mailinfo", "--encoding", "utf-8", msg_file, patch_file, email_file
+        )
+        self.assertIsNone(result)
+
+        # Just verify the command runs successfully
+        with open(msg_file) as f:
+            msg_content = f.read()
+            self.assertIn("Body", msg_content)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -92,18 +92,18 @@ fn parse_tree_with_length(
 }
 
 #[pyfunction]
-#[pyo3(signature = (text, strict=None, hash_algorithm=None))]
+#[pyo3(signature = (text, strict=None, object_format=None))]
 fn parse_tree(
     py: Python,
     text: &[u8],
     strict: Option<bool>,
-    hash_algorithm: Option<PyObject>,
+    object_format: Option<PyObject>,
 ) -> PyResult<Vec<(PyObject, u32, PyObject)>> {
     let strict = strict.unwrap_or(false);
 
-    // Determine hash length from hash_algorithm if provided
-    if let Some(algo) = hash_algorithm {
-        // Get oid_length attribute from hash algorithm object
+    // Determine hash length from object_format if provided
+    if let Some(algo) = object_format {
+        // Get oid_length attribute from object format object
         let oid_length: usize = algo.getattr(py, "oid_length")?.extract(py)?;
         parse_tree_with_length(py, text, strict, oid_length)
     } else {

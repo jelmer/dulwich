@@ -1461,7 +1461,7 @@ class Repo(BaseRepo):
 
         # Determine hash algorithm from config if not already set
         if self.object_format is None:
-            from .object_format import get_object_format
+            from .object_format import DEFAULT_OBJECT_FORMAT, get_object_format
 
             if format_version == 1:
                 try:
@@ -1470,9 +1470,9 @@ class Repo(BaseRepo):
                         object_format.decode("ascii")
                     )
                 except KeyError:
-                    self.object_format = get_object_format("sha1")
+                    self.object_format = DEFAULT_OBJECT_FORMAT
             else:
-                self.object_format = get_object_format("sha1")
+                self.object_format = DEFAULT_OBJECT_FORMAT
 
         self._graftpoints = {}
         graft_file = self.get_named_file(
@@ -2496,7 +2496,7 @@ class MemoryRepo(BaseRepo):
     def __init__(self) -> None:
         """Create a new repository in memory."""
         from .config import ConfigFile
-        from .object_format import get_object_format
+        from .object_format import DEFAULT_OBJECT_FORMAT
 
         self._reflog: list[Any] = []
         refs_container = DictRefsContainer({}, logger=self._append_reflog)
@@ -2506,8 +2506,8 @@ class MemoryRepo(BaseRepo):
         self._config = ConfigFile()
         self._description: bytes | None = None
         self.filter_context = None
-        # MemoryRepo defaults to SHA1
-        self.object_format = get_object_format("sha1")
+        # MemoryRepo defaults to default object format
+        self.object_format = DEFAULT_OBJECT_FORMAT
 
     def _append_reflog(
         self,

@@ -476,6 +476,148 @@ def write_columns(
             out.write("".join(lines).rstrip() + "\n")
 
 
+def format_columns(
+    items: list[str],
+    width: int | None = None,
+    mode: str = "column",
+    padding: int = 1,
+    indent: str = "",
+    nl: str = "\n",
+) -> str:
+    r"""Format items into columns with various layout modes.
+
+    Args:
+        items: List of strings to format
+        width: Terminal width (auto-detected if None)
+        mode: Layout mode - "column" (fill columns first), "row" (fill rows first),
+              "plain" (one column), or add ",dense" for unequal column widths
+        padding: Number of spaces between columns
+        indent: String to prepend to each line
+        nl: String to append to each line (including newline)
+
+    Returns:
+        Formatted string with items in columns
+
+    Examples:
+        >>> format_columns(["a", "b", "c"], width=20, mode="column")
+        "a  b\\nc\\n"
+        >>> format_columns(["a", "b", "c"], width=20, mode="row")
+        "a  b  c\\n"
+    """
+    if not items:
+        return ""
+
+    if width is None:
+        width = detect_terminal_width()
+
+    # Parse mode
+    mode_parts = mode.split(",")
+    layout_mode = "column"
+    dense = False
+
+    for part in mode_parts:
+        part = part.strip()
+        if part in ("column", "row", "plain"):
+            layout_mode = part
+        elif part == "dense":
+            dense = True
+        elif part == "nodense":
+            dense = False
+
+    # Plain mode - one item per line
+    if layout_mode == "plain":
+        return "".join(indent + item + nl for item in items)
+
+    # Calculate available width for content (excluding indent)
+    available_width = width - len(indent)
+    if available_width <= 0:
+        available_width = width
+
+    # Find optimal number of columns
+    max_item_len = max(len(item) for item in items)
+
+    # Start with maximum possible columns and work down
+    best_num_cols = 1
+    best_col_widths: list[int] = []
+
+    for num_cols in range(min(len(items), 20), 0, -1):
+        if layout_mode == "column":
+            # Column mode: fill columns first (items go down, then across)
+            num_rows = (len(items) + num_cols - 1) // num_cols
+        else:  # row mode
+            # Row mode: fill rows first (items go across, then down)
+            num_rows = (len(items) + num_cols - 1) // num_cols
+
+        col_widths: list[int] = []
+
+        if dense:
+            # Calculate width for each column based on its contents
+            for col in range(num_cols):
+                max_width = 0
+                for row in range(num_rows):
+                    if layout_mode == "column":
+                        idx = row + col * num_rows
+                    else:  # row mode
+                        idx = row * num_cols + col
+
+                    if idx < len(items):
+                        max_width = max(max_width, len(items[idx]))
+
+                if max_width > 0:
+                    col_widths.append(max_width)
+        else:
+            # All columns same width (nodense)
+            max_width = 0
+            for col in range(num_cols):
+                for row in range(num_rows):
+                    if layout_mode == "column":
+                        idx = row + col * num_rows
+                    else:  # row mode
+                        idx = row * num_cols + col
+
+                    if idx < len(items):
+                        max_width = max(max_width, len(items[idx]))
+
+            col_widths = [max_width] * num_cols
+
+        # Calculate total width including padding (but not after last column)
+        total_width = sum(col_widths) + padding * (len(col_widths) - 1)
+
+        if total_width <= available_width:
+            best_num_cols = num_cols
+            best_col_widths = col_widths
+            break
+
+    # If no fit found, use single column
+    if not best_col_widths:
+        best_num_cols = 1
+        best_col_widths = [max_item_len]
+
+    # Format output
+    num_rows = (len(items) + best_num_cols - 1) // best_num_cols
+    lines = []
+
+    for row in range(num_rows):
+        line_parts = []
+        for col in range(best_num_cols):
+            if layout_mode == "column":
+                idx = row + col * num_rows
+            else:  # row mode
+                idx = row * best_num_cols + col
+
+            if idx < len(items):
+                item = items[idx]
+                # Pad item to column width, except for last column in row
+                if col < best_num_cols - 1 and col < len(best_col_widths) - 1:
+                    item = item.ljust(best_col_widths[col] + padding)
+                line_parts.append(item)
+
+        if line_parts:
+            lines.append(indent + "".join(line_parts).rstrip() + nl)
+
+    return "".join(lines)
+
+
 class PagerBuffer(BinaryIO):
     """Binary buffer wrapper for Pager to mimic sys.stdout.buffer."""
 
@@ -1614,6 +1756,69 @@ class cmd_stripspace(Command):
 
         # Output result
         sys.stdout.buffer.write(result)
+
+
+class cmd_column(Command):
+    """Display data in columns."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the column command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser(
+            description="Format input data into columns for better readability"
+        )
+        parser.add_argument(
+            "--mode",
+            default="column",
+            help=(
+                "Layout mode: 'column' (fill columns first), 'row' (fill rows first), "
+                "'plain' (one column). Add ',dense' for unequal column widths, "
+                "',nodense' for equal widths (default: column)"
+            ),
+        )
+        parser.add_argument(
+            "--width",
+            type=int,
+            help="Terminal width (default: auto-detect)",
+        )
+        parser.add_argument(
+            "--indent",
+            default="",
+            help="String to prepend to each line (default: empty)",
+        )
+        parser.add_argument(
+            "--nl",
+            default="\n",
+            help="String to append to each line, including newline (default: \\n)",
+        )
+        parser.add_argument(
+            "--padding",
+            type=int,
+            default=1,
+            help="Number of spaces between columns (default: 1)",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Read lines from stdin
+        lines = []
+        for line in sys.stdin:
+            # Strip the newline but keep the content
+            lines.append(line.rstrip("\n\r"))
+
+        # Format and output
+        result = format_columns(
+            lines,
+            width=parsed_args.width,
+            mode=parsed_args.mode,
+            padding=parsed_args.padding,
+            indent=parsed_args.indent,
+            nl=parsed_args.nl,
+        )
+
+        sys.stdout.write(result)
 
 
 class cmd_init(Command):
@@ -3023,6 +3228,11 @@ class cmd_status(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
+        parser.add_argument(
+            "--column",
+            action="store_true",
+            help="Display untracked files in columns",
+        )
         parsed_args = parser.parse_args(args)
         status = porcelain.status(parsed_args.gitdir)
         if any(names for (kind, names) in status.staged.items()):
@@ -3040,8 +3250,14 @@ class cmd_status(Command):
             sys.stdout.write("\n")
         if status.untracked:
             sys.stdout.write("Untracked files:\n\n")
-            for name in status.untracked:
-                sys.stdout.write(f"\t{name}\n")
+            if parsed_args.column:
+                # Format untracked files in columns
+                untracked_names = [name for name in status.untracked]
+                output = format_columns(untracked_names, mode="column", indent="\t")
+                sys.stdout.write(output)
+            else:
+                for name in status.untracked:
+                    sys.stdout.write(f"\t{name}\n")
             sys.stdout.write("\n")
 
 
@@ -3525,7 +3741,9 @@ class cmd_branch(Command):
             branches: Iterator[bytes] | Sequence[bytes], use_columns: bool = False
         ) -> None:
             if use_columns:
-                write_columns(branches, sys.stdout)
+                branch_names = [branch.decode() for branch in branches]
+                output = format_columns(branch_names, mode="column")
+                sys.stdout.write(output)
             else:
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")
@@ -6137,6 +6355,7 @@ commands = {
     "cherry": cmd_cherry,
     "cherry-pick": cmd_cherry_pick,
     "clone": cmd_clone,
+    "column": cmd_column,
     "commit": cmd_commit,
     "commit-tree": cmd_commit_tree,
     "config": cmd_config,

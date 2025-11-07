@@ -2,6 +2,12 @@
 
  * Drop support for Python 3.9. (Jelmer Vernooĳ)
 
+ * Add support for ``git mailinfo`` command to extract patch information from
+   email messages. Implements ``dulwich mailinfo`` CLI command,
+   ``porcelain.mailinfo()``, and ``patch.mailinfo()`` with support for subject
+   munging, -k/-b flags, --scissors, --encoding, and --message-id options.
+   (Jelmer Vernooĳ, #1839)
+
 0.24.8	2025-10-29
 
  * Add Rust implementation of pack delta creation (create_delta). The

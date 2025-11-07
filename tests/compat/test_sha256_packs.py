@@ -62,7 +62,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
 
         # Open with dulwich
         repo = Repo(repo_path)
-        self.assertEqual(repo.get_hash_algorithm(), SHA256)
+        self.assertEqual(repo.object_format, SHA256)
 
         # Find pack files
         pack_dir = os.path.join(repo_path, ".git", "objects", "pack")
@@ -77,7 +77,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
             # Load pack index with SHA256 algorithm
             with open(idx_path, "rb") as f:
                 pack_idx = load_pack_index_file(
-                    idx_path, f, hash_algorithm=repo.get_hash_algorithm()
+                    idx_path, f, hash_algorithm=repo.object_format
                 )
 
             # Verify it's detected as SHA256
@@ -195,7 +195,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
             idx_path = os.path.join(pack_dir, idx_file)
             with open(idx_path, "rb") as f:
                 pack_idx = load_pack_index_file(
-                    idx_path, f, hash_algorithm=repo.get_hash_algorithm()
+                    idx_path, f, hash_algorithm=repo.object_format
                 )
 
             # Verify it's v1 with SHA256

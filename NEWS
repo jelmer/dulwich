@@ -8,6 +8,8 @@
    munging, -k/-b flags, --scissors, --encoding, and --message-id options.
    (Jelmer Vernooĳ, #1839)
 
+ * Add support for column formatting. (Jelmer Vernooĳ, #1837)
+
 0.24.8	2025-10-29
 
  * Add Rust implementation of pack delta creation (create_delta). The

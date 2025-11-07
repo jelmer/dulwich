@@ -1105,7 +1105,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         idx = load_pack_index(filename)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
-        self.assertEqual(idx.hash_algorithm, 1)  # SHA-1
+        self.assertEqual(idx.object_format, 1)  # SHA-1
         self.assertEqual(idx.hash_size, 20)
         self.assertEqual(idx.shortened_oid_len, 20)
 
@@ -1115,9 +1115,9 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         filename = os.path.join(self.tempdir, "test_hash.idx")
         # Write v3 index with SHA-1 (algorithm=1)
         with GitFile(filename, "wb") as f:
-            write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=1)
+            write_pack_index_v3(f, entries, b"1" * 20, object_format=1)
         idx = load_pack_index(filename)
-        self.assertEqual(idx.hash_algorithm, 1)
+        self.assertEqual(idx.object_format, 1)
         self.assertEqual(idx.hash_size, 20)
 
     def test_v3_sha256_length(self) -> None:
@@ -1128,7 +1128,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         # SHA-256 should raise NotImplementedError
         with self.assertRaises(NotImplementedError) as cm:
             with GitFile(filename, "wb") as f:
-                write_pack_index_v3(f, entries, b"1" * 32, hash_algorithm=2)
+                write_pack_index_v3(f, entries, b"1" * 32, object_format=2)
         self.assertIn("SHA-256", str(cm.exception))
 
     def test_v3_invalid_hash_algorithm(self) -> None:
@@ -1138,7 +1138,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         # Invalid hash algorithm should raise ValueError
         with self.assertRaises(ValueError) as cm:
             with GitFile(filename, "wb") as f:
-                write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=99)
+                write_pack_index_v3(f, entries, b"1" * 20, object_format=99)
         self.assertIn("Unknown hash algorithm", str(cm.exception))
 
     def test_v3_wrong_hash_length(self) -> None:
@@ -1148,7 +1148,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         filename = os.path.join(self.tempdir, "test_wrong_len.idx")
         with self.assertRaises(ValueError) as cm:
             with GitFile(filename, "wb") as f:
-                write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=1)
+                write_pack_index_v3(f, entries, b"1" * 20, object_format=1)
         self.assertIn("wrong length", str(cm.exception))
 
 
@@ -1779,7 +1779,7 @@ class DeltaChainIteratorTests(TestCase):
             # Attempting to open this REF_DELTA object would loop forever
             pack[b1.id]
         except UnresolvedDeltas as e:
-            self.assertEqual([hex_to_sha(b1.id)], e.shas)
+            self.assertEqual(b1.id, e.shas)
 
 
 class DeltaEncodeSizeTests(TestCase):

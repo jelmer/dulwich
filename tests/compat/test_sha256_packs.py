@@ -77,7 +77,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
             # Load pack index with SHA256 algorithm
             with open(idx_path, "rb") as f:
                 pack_idx = load_pack_index_file(
-                    idx_path, f, hash_algorithm=repo.object_format
+                    idx_path, f, object_format=repo.object_format
                 )
 
             # Verify it's detected as SHA256
@@ -195,7 +195,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
             idx_path = os.path.join(pack_dir, idx_file)
             with open(idx_path, "rb") as f:
                 pack_idx = load_pack_index_file(
-                    idx_path, f, hash_algorithm=repo.object_format
+                    idx_path, f, object_format=repo.object_format
                 )
 
             # Verify it's v1 with SHA256

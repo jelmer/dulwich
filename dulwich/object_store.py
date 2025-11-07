@@ -323,11 +323,11 @@ class BaseObjectStore:
         """Initialize object store.
 
         Args:
-            object_format: Hash algorithm to use (defaults to SHA1)
+            object_format: Object format to use (defaults to DEFAULT_OBJECT_FORMAT)
         """
-        from .object_format import get_object_format
+        from .object_format import DEFAULT_OBJECT_FORMAT
 
-        self.object_format = object_format if object_format else get_object_format()
+        self.object_format = object_format if object_format else DEFAULT_OBJECT_FORMAT
 
     def determine_wants_all(
         self, refs: Mapping[Ref, ObjectID], depth: int | None = None
@@ -1423,7 +1423,7 @@ class DiskObjectStore(PackBasedObjectStore):
           object_format: Hash algorithm to use (SHA1 or SHA256)
         """
         # Import here to avoid circular dependency
-        from .object_format import get_object_format
+        from .object_format import DEFAULT_OBJECT_FORMAT
 
         super().__init__(
             pack_compression_level=pack_compression_level,
@@ -1434,7 +1434,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth=pack_depth,
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
-            object_format=object_format if object_format else get_object_format(),
+            object_format=object_format if object_format else DEFAULT_OBJECT_FORMAT,
         )
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)

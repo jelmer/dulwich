@@ -1146,12 +1146,12 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           sha1: sha for the object.
           include_comp: Whether to include compression metadata.
         """
-        if sha1 == ZERO_SHA:
+        if sha1 == self.object_format.zero_oid:
             raise KeyError(sha1)
-        if len(sha1) == 40:
+        if len(sha1) == self.object_format.hex_length:
             sha = hex_to_sha(sha1)
             hexsha = sha1
-        elif len(sha1) == 20:
+        elif len(sha1) == self.object_format.oid_length:
             sha = sha1
             hexsha = None
         else:
@@ -1873,10 +1873,10 @@ class DiskObjectStore(PackBasedObjectStore):
             # Just use the direct ref targets - ensure they're hex ObjectIDs
             commit_ids = []
             for ref in all_refs:
-                if isinstance(ref, bytes) and len(ref) == 40:
+                if isinstance(ref, bytes) and len(ref) == self.object_format.hex_length:
                     # Already hex ObjectID
                     commit_ids.append(ref)
-                elif isinstance(ref, bytes) and len(ref) == 20:
+                elif isinstance(ref, bytes) and len(ref) == self.object_format.oid_length:
                     # Binary SHA, convert to hex ObjectID
                     from .objects import sha_to_hex
 
@@ -1975,9 +1975,9 @@ class MemoryObjectStore(PackCapableObjectStore):
         self.pack_compression_level = -1
 
     def _to_hexsha(self, sha: bytes) -> bytes:
-        if len(sha) == 40:
+        if len(sha) == self.object_format.hex_length:
             return sha
-        elif len(sha) == 20:
+        elif len(sha) == self.object_format.oid_length:
             return sha_to_hex(sha)
         else:
             raise ValueError(f"Invalid sha {sha!r}")

@@ -779,7 +779,10 @@ class BaseRepo:
         return self.refs[b"HEAD"]
 
     def _get_object(self, sha: bytes, cls: type[T]) -> T:
-        assert len(sha) in (20, 40)
+        assert len(sha) in (
+            self.object_format.oid_length,
+            self.object_format.hex_length,
+        )
         ret = self.get_object(sha)
         if not isinstance(ret, cls):
             if cls is Commit:

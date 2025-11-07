@@ -3601,12 +3601,10 @@ class Pack:
             self._idx_path, object_format=object_format
         )
         self.resolve_ext_ref = resolve_ext_ref
-        # Always set object_format, defaulting to SHA1
-        from .object_format import get_object_format
+        # Always set object_format, defaulting to default
+        from .object_format import DEFAULT_OBJECT_FORMAT
 
-        self.object_format = (
-            object_format if object_format else get_object_format("sha1")
-        )
+        self.object_format = object_format if object_format else DEFAULT_OBJECT_FORMAT
 
     @classmethod
     def from_lazy_objects(

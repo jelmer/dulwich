@@ -3730,7 +3730,9 @@ class cmd_branch(Command):
             branches: Iterator[bytes] | Sequence[bytes], use_columns: bool = False
         ) -> None:
             if use_columns:
-                write_columns(branches, sys.stdout)
+                branch_names = [branch.decode() for branch in branches]
+                output = format_columns(branch_names, mode="column")
+                sys.stdout.write(output)
             else:
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")

@@ -902,3 +902,216 @@ index 3b0f961..a116b51 644
         pid = commit_patch_id(store, commit.id)
         self.assertEqual(40, len(pid))
         self.assertTrue(all(c in b"0123456789abcdef" for c in pid))
+
+
+class MailinfoTests(TestCase):
+    """Tests for mailinfo functionality."""
+
+    def test_basic_parsing(self):
+        """Test basic email parsing."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email_content = b"""From: John Doe <john@example.com>
+Date: Mon, 1 Jan 2024 12:00:00 +0000
+Subject: [PATCH] Add new feature
+Message-ID: <test@example.com>
+
+This is the commit message.
+
+More details here.
+
+---
+ file.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/file.txt b/file.txt
+--- a/file.txt
++++ b/file.txt
+@@ -1 +1,2 @@
+ line1
++line2
+--
+2.39.0
+"""
+        result = mailinfo(BytesIO(email_content))
+
+        self.assertEqual("John Doe", result.author_name)
+        self.assertEqual("john@example.com", result.author_email)
+        self.assertEqual("Add new feature", result.subject)
+        self.assertIn("This is the commit message.", result.message)
+        self.assertIn("More details here.", result.message)
+        self.assertIn("diff --git a/file.txt b/file.txt", result.patch)
+
+    def test_subject_munging(self):
+        """Test subject line munging."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        # Test with [PATCH] tag
+        email = b"""From: Test <test@example.com>
+Subject: [PATCH 1/2] Fix bug
+
+Body
+"""
+        result = mailinfo(BytesIO(email))
+        self.assertEqual("Fix bug", result.subject)
+
+        # Test with Re: prefix
+        email = b"""From: Test <test@example.com>
+Subject: Re: [PATCH] Fix bug
+
+Body
+"""
+        result = mailinfo(BytesIO(email))
+        self.assertEqual("Fix bug", result.subject)
+
+        # Test with multiple brackets
+        email = b"""From: Test <test@example.com>
+Subject: [RFC][PATCH] New feature
+
+Body
+"""
+        result = mailinfo(BytesIO(email))
+        self.assertEqual("New feature", result.subject)
+
+    def test_keep_subject(self):
+        """Test -k flag (keep subject intact)."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email = b"""From: Test <test@example.com>
+Subject: [PATCH 1/2] Fix bug
+
+Body
+"""
+        result = mailinfo(BytesIO(email), keep_subject=True)
+        self.assertEqual("[PATCH 1/2] Fix bug", result.subject)
+
+    def test_keep_non_patch(self):
+        """Test -b flag (only strip [PATCH])."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email = b"""From: Test <test@example.com>
+Subject: [RFC][PATCH] New feature
+
+Body
+"""
+        result = mailinfo(BytesIO(email), keep_non_patch=True)
+        self.assertEqual("[RFC] New feature", result.subject)
+
+    def test_scissors(self):
+        """Test scissors line handling."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email = b"""From: Test <test@example.com>
+Subject: Test
+
+Ignore this part
+
+-- >8 --
+
+Keep this part
+
+---
+diff --git a/file.txt b/file.txt
+"""
+        result = mailinfo(BytesIO(email), scissors=True)
+        self.assertIn("Keep this part", result.message)
+        self.assertNotIn("Ignore this part", result.message)
+
+    def test_message_id(self):
+        """Test -m flag (include Message-ID)."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email = b"""From: Test <test@example.com>
+Subject: Test
+Message-ID: <12345@example.com>
+
+Body text
+"""
+        result = mailinfo(BytesIO(email), message_id=True)
+        self.assertIn("Message-ID: <12345@example.com>", result.message)
+        self.assertEqual("<12345@example.com>", result.message_id)
+
+    def test_encoding(self):
+        """Test encoding handling."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        # Use explicit UTF-8 bytes with MIME encoded subject
+        email = (
+            b"From: Test <test@example.com>\n"
+            b"Subject: =?utf-8?q?Test_with_UTF-8=3A_caf=C3=A9?=\n"
+            b"Content-Type: text/plain; charset=utf-8\n"
+            b"Content-Transfer-Encoding: 8bit\n"
+            b"\n"
+            b"Body with UTF-8: " + "naïve".encode() + b"\n"
+        )
+
+        result = mailinfo(BytesIO(email), encoding="utf-8")
+        # The subject should be decoded from MIME encoding
+        self.assertIn("caf", result.subject)
+        self.assertIn("na", result.message)
+
+    def test_patch_separation(self):
+        """Test separation of message from patch."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email = b"""From: Test <test@example.com>
+Subject: Test
+
+Commit message line 1
+Commit message line 2
+
+---
+ file.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/file.txt b/file.txt
+"""
+        result = mailinfo(BytesIO(email))
+        self.assertIn("Commit message line 1", result.message)
+        self.assertIn("Commit message line 2", result.message)
+        self.assertIn("---", result.patch)
+        self.assertIn("diff --git", result.patch)
+        self.assertNotIn("---", result.message)
+
+    def test_no_subject(self):
+        """Test handling of missing subject."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email = b"""From: Test <test@example.com>
+
+Body text
+"""
+        result = mailinfo(BytesIO(email))
+        self.assertEqual("(no subject)", result.subject)
+
+    def test_missing_from_header(self):
+        """Test error on missing From header."""
+        from io import BytesIO
+
+        from dulwich.patch import mailinfo
+
+        email = b"""Subject: Test
+
+Body text
+"""
+        with self.assertRaises(ValueError) as cm:
+            mailinfo(BytesIO(email))
+        self.assertIn("From", str(cm.exception))

@@ -22,14 +22,18 @@
 """Classes for dealing with mbox files and Maildir.
 
 This module provides functionality to split mbox files and Maildir
-into individual message files, similar to git mailsplit.
+into individual message files, similar to git mailsplit, and to extract
+patch information from email messages, similar to git mailinfo.
 """
 
 import mailbox
 import os
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO, TextIO
+
+if TYPE_CHECKING:
+    from .patch import MailinfoResult
 
 
 def split_mbox(
@@ -233,3 +237,57 @@ def _reverse_mboxrd_escaping(message_bytes: bytes) -> bytes:
             result_lines.append(line)
 
     return b"\n".join(result_lines)
+
+
+def mailinfo(
+    input_file: str | bytes | BinaryIO | TextIO,
+    keep_subject: bool = False,
+    keep_non_patch: bool = False,
+    encoding: str | None = None,
+    scissors: bool = False,
+    message_id: bool = False,
+) -> "MailinfoResult":
+    """Extract patch information from an email message.
+
+    High-level wrapper around patch.mailinfo() that handles file I/O.
+
+    Args:
+        input_file: Path to email file or file-like object (binary or text)
+        keep_subject: If True, keep subject intact without munging (-k)
+        keep_non_patch: If True, only strip [PATCH] from brackets (-b)
+        encoding: Character encoding to use (default: detect from message)
+        scissors: If True, remove everything before scissors line
+        message_id: If True, include Message-ID in commit message (-m)
+
+    Returns:
+        MailinfoResult with parsed information (from patch.mailinfo)
+
+    Raises:
+        ValueError: If message is malformed or missing required fields
+        OSError: If there are issues reading the file
+    """
+    from .patch import mailinfo as patch_mailinfo
+
+    # Handle file path input
+    if isinstance(input_file, (str, bytes)):
+        if isinstance(input_file, bytes):
+            input_file = input_file.decode("utf-8")
+        with open(input_file, "rb") as f:
+            return patch_mailinfo(
+                f,
+                keep_subject=keep_subject,
+                keep_non_patch=keep_non_patch,
+                encoding=encoding,
+                scissors=scissors,
+                message_id=message_id,
+            )
+
+    # Handle file-like objects
+    return patch_mailinfo(
+        input_file,
+        keep_subject=keep_subject,
+        keep_non_patch=keep_non_patch,
+        encoding=encoding,
+        scissors=scissors,
+        message_id=message_id,
+    )

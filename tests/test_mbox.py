@@ -446,3 +446,70 @@ From quoted text
                 )
 
             self.assertIn("required", str(cm.exception).lower())
+
+
+class MailinfoTests(TestCase):
+    """Tests for mbox.mailinfo function."""
+
+    def test_mailinfo_from_file_path(self) -> None:
+        """Test mailinfo with file path."""
+        from dulwich.mbox import mailinfo
+
+        email_content = b"""From: Test User <test@example.com>
+Subject: [PATCH] Test patch
+Date: Mon, 1 Jan 2024 12:00:00 +0000
+
+This is the commit message.
+
+---
+diff --git a/test.txt b/test.txt
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            email_path = os.path.join(tmpdir, "email.txt")
+            with open(email_path, "wb") as f:
+                f.write(email_content)
+
+            # Test with file path
+            result = mailinfo(email_path)
+            self.assertEqual("Test User", result.author_name)
+            self.assertEqual("test@example.com", result.author_email)
+            self.assertEqual("Test patch", result.subject)
+            self.assertIn("This is the commit message.", result.message)
+            self.assertIn("diff --git", result.patch)
+
+    def test_mailinfo_from_file_object(self) -> None:
+        """Test mailinfo with file-like object."""
+        from dulwich.mbox import mailinfo
+
+        email_content = b"""From: Test User <test@example.com>
+Subject: Test subject
+
+Body text
+"""
+        result = mailinfo(BytesIO(email_content))
+        self.assertEqual("Test User", result.author_name)
+        self.assertEqual("test@example.com", result.author_email)
+        self.assertEqual("Test subject", result.subject)
+
+    def test_mailinfo_with_options(self) -> None:
+        """Test mailinfo with various options."""
+        from dulwich.mbox import mailinfo
+
+        email_content = b"""From: Test <test@example.com>
+Subject: [PATCH] Feature
+Message-ID: <test123@example.com>
+
+Ignore this
+
+-- >8 --
+
+Keep this
+"""
+        # Test with scissors and message_id
+        result = mailinfo(
+            BytesIO(email_content), scissors=True, message_id=True, keep_subject=False
+        )
+        self.assertEqual("Feature", result.subject)
+        self.assertIn("Keep this", result.message)
+        self.assertNotIn("Ignore this", result.message)
+        self.assertIn("Message-ID:", result.message)

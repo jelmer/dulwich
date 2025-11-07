@@ -184,6 +184,7 @@ from .objectspec import (
 )
 from .pack import UnpackedObject, write_pack_from_container, write_pack_index
 from .patch import (
+    MailinfoResult,
     get_summary,
     write_commit_patch,
     write_object_diff,
@@ -8743,3 +8744,84 @@ def mailsplit(
             keep_cr=keep_cr,
             mboxrd=mboxrd,
         )
+
+
+def mailinfo(
+    input_path: str | os.PathLike[str] | IO[bytes] | IO[str] | None = None,
+    msg_file: str | os.PathLike[str] | None = None,
+    patch_file: str | os.PathLike[str] | None = None,
+    keep_subject: bool = False,
+    keep_non_patch: bool = False,
+    encoding: str | None = None,
+    scissors: bool = False,
+    message_id: bool = False,
+) -> MailinfoResult:
+    """Extract patch information from an email message.
+
+    This is similar to git mailinfo.
+
+    Args:
+        input_path: Path to email file or file-like object. If None, reads from stdin.
+        msg_file: Path to write commit message. If None, message not written to file.
+        patch_file: Path to write patch content. If None, patch not written to file.
+        keep_subject: If True, keep subject intact without munging (-k)
+        keep_non_patch: If True, only strip [PATCH] from brackets (-b)
+        encoding: Character encoding to use (default: detect from message)
+        scissors: If True, remove everything before scissors line
+        message_id: If True, include Message-ID in commit message (-m)
+
+    Returns:
+        MailinfoResult with parsed information
+
+    Raises:
+        ValueError: If message is malformed or missing required fields
+        OSError: If there are issues reading/writing files
+
+    Example:
+        >>> result = mailinfo("patch.eml", "msg", "patch")
+        >>> print(f"Author: {result.author_name} <{result.author_email}>")
+        >>> print(f"Subject: {result.subject}")
+    """
+    from typing import BinaryIO, TextIO, cast
+
+    from .mbox import mailinfo as mbox_mailinfo
+
+    if input_path is None:
+        # Read from stdin
+        input_file: str | bytes | BinaryIO | TextIO = sys.stdin.buffer
+    else:
+        # Convert PathLike to str if needed
+        if isinstance(input_path, os.PathLike):
+            input_file = os.fspath(input_path)
+        else:
+            # input_path is either str or IO[bytes] or IO[str] here
+            input_file = cast(str | BinaryIO | TextIO, input_path)
+
+    result = mbox_mailinfo(
+        input_file,
+        keep_subject=keep_subject,
+        keep_non_patch=keep_non_patch,
+        encoding=encoding,
+        scissors=scissors,
+        message_id=message_id,
+    )
+
+    # Write message to file if requested
+    if msg_file is not None:
+        msg_path = (
+            os.fspath(msg_file) if isinstance(msg_file, os.PathLike) else msg_file
+        )
+        with open(msg_path, "w", encoding=encoding or "utf-8") as f:
+            f.write(result.message)
+            if not result.message.endswith("\n"):
+                f.write("\n")
+
+    # Write patch to file if requested
+    if patch_file is not None:
+        patch_path = (
+            os.fspath(patch_file) if isinstance(patch_file, os.PathLike) else patch_file
+        )
+        with open(patch_path, "w", encoding=encoding or "utf-8") as f:
+            f.write(result.patch)
+
+    return result

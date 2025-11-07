@@ -10905,3 +10905,106 @@ class GitReflogActionTests(PorcelainTestCase):
         entries = list(porcelain.reflog(self.repo_path, b"refs/heads/test-branch"))
         self.assertEqual(1, len(entries))
         self.assertTrue(entries[0].message.startswith(b"branch: Created from"))
+
+
+class PorcelainMailinfoTests(TestCase):
+    """Tests for porcelain.mailinfo function."""
+
+    def test_mailinfo_basic(self) -> None:
+        """Test basic mailinfo functionality."""
+        from io import BytesIO
+
+        email_content = b"""From: Test User <test@example.com>
+Subject: [PATCH] Add feature
+Date: Mon, 1 Jan 2024 12:00:00 +0000
+
+Commit message here.
+
+---
+diff --git a/file.txt b/file.txt
+"""
+        result = porcelain.mailinfo(BytesIO(email_content))
+        self.assertEqual("Test User", result.author_name)
+        self.assertEqual("test@example.com", result.author_email)
+        self.assertEqual("Add feature", result.subject)
+        self.assertIn("Commit message here.", result.message)
+        self.assertIn("diff --git", result.patch)
+
+    def test_mailinfo_write_to_files(self) -> None:
+        """Test mailinfo writing message and patch to files."""
+        from io import BytesIO
+
+        email_content = b"""From: Test <test@example.com>
+Subject: Test
+
+Message content
+
+---
+Patch content
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            msg_file = os.path.join(tmpdir, "msg")
+            patch_file = os.path.join(tmpdir, "patch")
+
+            result = porcelain.mailinfo(
+                BytesIO(email_content), msg_file=msg_file, patch_file=patch_file
+            )
+
+            # Check that files were written
+            self.assertTrue(os.path.exists(msg_file))
+            self.assertTrue(os.path.exists(patch_file))
+
+            # Check file contents
+            with open(msg_file) as f:
+                msg_content = f.read()
+                self.assertIn("Message content", msg_content)
+
+            with open(patch_file) as f:
+                patch_content = f.read()
+                self.assertIn("Patch content", patch_content)
+
+            # Check return value
+            self.assertEqual("Test", result.subject)
+
+    def test_mailinfo_with_options(self) -> None:
+        """Test mailinfo with various options."""
+        from io import BytesIO
+
+        email_content = b"""From: Test <test@example.com>
+Subject: [RFC][PATCH] Feature
+Message-ID: <id@example.com>
+
+Text before scissors
+
+-- >8 --
+
+Text after scissors
+"""
+        # Test with keep_non_patch, scissors, and message_id
+        result = porcelain.mailinfo(
+            BytesIO(email_content),
+            keep_non_patch=True,
+            scissors=True,
+            message_id=True,
+        )
+
+        self.assertEqual("[RFC] Feature", result.subject)
+        self.assertIn("Text after scissors", result.message)
+        self.assertNotIn("Text before scissors", result.message)
+        self.assertIn("Message-ID:", result.message)
+
+    def test_mailinfo_from_file_path(self) -> None:
+        """Test mailinfo reading from file path."""
+        email_content = b"""From: Test <test@example.com>
+Subject: Test
+
+Body
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            email_path = os.path.join(tmpdir, "email.txt")
+            with open(email_path, "wb") as f:
+                f.write(email_content)
+
+            result = porcelain.mailinfo(input_path=email_path)
+            self.assertEqual("Test", result.subject)
+            self.assertEqual("test@example.com", result.author_email)

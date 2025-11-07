@@ -5493,6 +5493,80 @@ class cmd_mailsplit(Command):
         )
 
 
+class cmd_mailinfo(Command):
+    """Extract patch information from an email message."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the mailinfo command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "msg",
+            help="File to write commit message",
+        )
+        parser.add_argument(
+            "patch",
+            help="File to write patch content",
+        )
+        parser.add_argument(
+            "mail",
+            nargs="?",
+            help="Path to email file. If not specified, reads from stdin.",
+        )
+        parser.add_argument(
+            "-k",
+            action="store_true",
+            dest="keep_subject",
+            help="Pass -k flag to git mailinfo (keeps [PATCH] and other subject tags)",
+        )
+        parser.add_argument(
+            "-b",
+            action="store_true",
+            dest="keep_non_patch",
+            help="Pass -b flag to git mailinfo (only strip [PATCH] tags)",
+        )
+        parser.add_argument(
+            "--encoding",
+            dest="encoding",
+            help="Character encoding to use (default: detect from message)",
+        )
+        parser.add_argument(
+            "--scissors",
+            action="store_true",
+            help="Remove everything before scissors line",
+        )
+        parser.add_argument(
+            "-m",
+            "--message-id",
+            action="store_true",
+            dest="message_id",
+            help="Copy Message-ID to the end of the commit message",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Call porcelain function
+        result = porcelain.mailinfo(
+            input_path=parsed_args.mail,
+            msg_file=parsed_args.msg,
+            patch_file=parsed_args.patch,
+            keep_subject=parsed_args.keep_subject,
+            keep_non_patch=parsed_args.keep_non_patch,
+            encoding=parsed_args.encoding,
+            scissors=parsed_args.scissors,
+            message_id=parsed_args.message_id,
+        )
+
+        # Print author info to stdout (as git mailinfo does)
+        print(f"Author: {result.author_name}")
+        print(f"Email: {result.author_email}")
+        print(f"Subject: {result.subject}")
+        if result.author_date:
+            print(f"Date: {result.author_date}")
+
+
 class cmd_bundle(Command):
     """Create, unpack, and manipulate bundle files."""
 
@@ -6090,6 +6164,7 @@ commands = {
     "ls-remote": cmd_ls_remote,
     "ls-tree": cmd_ls_tree,
     "maintenance": cmd_maintenance,
+    "mailinfo": cmd_mailinfo,
     "mailsplit": cmd_mailsplit,
     "merge": cmd_merge,
     "merge-base": cmd_merge_base,

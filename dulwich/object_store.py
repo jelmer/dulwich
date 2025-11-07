@@ -1321,12 +1321,12 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           sha1: sha for the object.
           include_comp: Whether to include compression metadata.
         """
-        if sha1 == ZERO_SHA:
+        if sha1 == self.object_format.zero_oid:
             raise KeyError(sha1)
-        if len(sha1) == 40:
+        if len(sha1) == self.object_format.hex_length:
             sha = hex_to_sha(cast(ObjectID, sha1))
             hexsha = cast(ObjectID, sha1)
-        elif len(sha1) == 20:
+        elif len(sha1) == self.object_format.oid_length:
             sha = cast(RawObjectID, sha1)
             hexsha = None
         else:
@@ -2330,8 +2330,20 @@ class DiskObjectStore(PackBasedObjectStore):
             # Get all reachable commits
             commit_ids = get_reachable_commits(self, all_refs)
         else:
-            # Just use the direct ref targets (already ObjectIDs)
-            commit_ids = all_refs
+            # Just use the direct ref targets - ensure they're hex ObjectIDs
+            commit_ids = []
+            for ref in all_refs:
+                if isinstance(ref, bytes) and len(ref) == self.object_format.hex_length:
+                    # Already hex ObjectID
+                    commit_ids.append(ref)
+                elif isinstance(ref, bytes) and len(ref) == self.object_format.oid_length:
+                    # Binary SHA, convert to hex ObjectID
+                    from .objects import sha_to_hex
+
+                    commit_ids.append(sha_to_hex(ref))
+                else:
+                    # Assume it's already correct format
+                    commit_ids.append(ref)
 
         if commit_ids:
             # Write commit graph directly to our object store path
@@ -2447,9 +2459,9 @@ class MemoryObjectStore(PackCapableObjectStore):
         self.pack_compression_level = -1
 
     def _to_hexsha(self, sha: ObjectID | RawObjectID) -> ObjectID:
-        if len(sha) == 40:
+        if len(sha) == self.object_format.hex_length:
             return cast(ObjectID, sha)
-        elif len(sha) == 20:
+        elif len(sha) == self.object_format.oid_length:
             return sha_to_hex(cast(RawObjectID, sha))
         else:
             raise ValueError(f"Invalid sha {sha!r}")

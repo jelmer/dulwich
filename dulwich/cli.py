@@ -3228,6 +3228,11 @@ class cmd_status(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
+        parser.add_argument(
+            "--column",
+            action="store_true",
+            help="Display untracked files in columns",
+        )
         parsed_args = parser.parse_args(args)
         status = porcelain.status(parsed_args.gitdir)
         if any(names for (kind, names) in status.staged.items()):
@@ -3245,8 +3250,14 @@ class cmd_status(Command):
             sys.stdout.write("\n")
         if status.untracked:
             sys.stdout.write("Untracked files:\n\n")
-            for name in status.untracked:
-                sys.stdout.write(f"\t{name}\n")
+            if parsed_args.column:
+                # Format untracked files in columns
+                untracked_names = [name for name in status.untracked]
+                output = format_columns(untracked_names, mode="column", indent="\t")
+                sys.stdout.write(output)
+            else:
+                for name in status.untracked:
+                    sys.stdout.write(f"\t{name}\n")
             sys.stdout.write("\n")
 
 

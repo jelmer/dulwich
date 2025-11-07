@@ -893,10 +893,12 @@ class BaseRepo:
         # TODO: move this method to WorkTree
         return self.refs[HEADREF]
 
-    def _get_object(self, sha: bytes, cls: type[T]) -> T:
-        assert len(sha) in (20, 40)
-        obj_id = ObjectID(sha) if len(sha) == 40 else RawObjectID(sha)
-        ret = self.get_object(obj_id)
+    def _get_object(self, sha: ObjectID | RawObjectID, cls: type[T]) -> T:
+        assert len(sha) in (
+            self.object_format.oid_length,
+            self.object_format.hex_length,
+        )
+        ret = self.get_object(sha)
         if not isinstance(ret, cls):
             if cls is Commit:
                 raise NotCommitError(ret.id)

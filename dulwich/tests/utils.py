@@ -37,7 +37,7 @@ from unittest import SkipTest
 from dulwich.index import commit_tree
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import BaseObjectStore
-from dulwich.objects import Commit, FixedSha, ShaFile, Tag, object_class
+from dulwich.objects import ZERO_SHA, Commit, FixedSha, ShaFile, Tag, object_class
 from dulwich.pack import (
     DELTA_TYPES,
     OFS_DELTA,
@@ -138,7 +138,7 @@ def make_commit(**attrs: Any) -> Commit:
         "commit_timezone": 0,
         "message": b"Test message.",
         "parents": [],
-        "tree": b"0" * 40,
+        "tree": ZERO_SHA,
     }
     all_attrs.update(attrs)
     return make_object(Commit, **all_attrs)

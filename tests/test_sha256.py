@@ -27,7 +27,7 @@ import tempfile
 import unittest
 
 from dulwich.object_format import SHA1, SHA256, get_object_format
-from dulwich.objects import Blob, Tree, valid_hexsha, zero_sha_for
+from dulwich.objects import Blob, Tree, valid_hexsha
 from dulwich.repo import MemoryRepo, Repo
 
 
@@ -129,18 +129,6 @@ class ObjectHashingTests(unittest.TestCase):
 
         # Invalid characters
         self.assertFalse(valid_hexsha(b"123456789gabcdef1234567890abcdef12345678"))
-
-    def test_zero_sha_for(self):
-        """Test getting zero SHA for different algorithms."""
-        # Default (SHA1)
-        self.assertEqual(zero_sha_for(), b"0" * 40)
-        self.assertEqual(zero_sha_for(None), b"0" * 40)
-
-        # SHA1 explicit
-        self.assertEqual(zero_sha_for(SHA1), b"0" * 40)
-
-        # SHA256
-        self.assertEqual(zero_sha_for(SHA256), b"0" * 64)
 
 
 class RepositorySHA256Tests(unittest.TestCase):

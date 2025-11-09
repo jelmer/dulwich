@@ -1882,11 +1882,21 @@ class cmd_init(Command):
             "--bare", action="store_true", help="Create a bare repository"
         )
         parser.add_argument(
+            "--objectformat",
+            type=str,
+            choices=["sha1", "sha256"],
+            help="Object format to use (sha1 or sha256)",
+        )
+        parser.add_argument(
             "path", nargs="?", default=os.getcwd(), help="Repository path"
         )
         parsed_args = parser.parse_args(args)
 
-        porcelain.init(parsed_args.path, bare=parsed_args.bare)
+        porcelain.init(
+            parsed_args.path,
+            bare=parsed_args.bare,
+            object_format=parsed_args.objectformat,
+        )
 
 
 class cmd_clone(Command):

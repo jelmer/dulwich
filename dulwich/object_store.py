@@ -70,6 +70,9 @@ from typing import (
     cast,
 )
 
+if TYPE_CHECKING:
+    from .object_format import ObjectFormat
+
 from .errors import NotTreeError
 from .file import GitFile, _GitFile
 from .midx import MultiPackIndex, load_midx
@@ -319,7 +322,7 @@ class PackContainer(Protocol):
 class BaseObjectStore:
     """Object store interface."""
 
-    def __init__(self, *, object_format=None) -> None:
+    def __init__(self, *, object_format: "ObjectFormat | None" = None) -> None:
         """Initialize object store.
 
         Args:
@@ -829,7 +832,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         *,
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -1399,7 +1402,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_write_bitmap_lookup_table: bool = True,
         file_mode: int | None = None,
         dir_mode: int | None = None,
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Open an object store.
 
@@ -1575,10 +1578,10 @@ class DiskObjectStore(PackBasedObjectStore):
                 version = 0
             if version == 1:
                 try:
-                    object_format = config.get((b"extensions",), b"objectformat")
+                    object_format_name = config.get((b"extensions",), b"objectformat")
                 except KeyError:
-                    object_format = b"sha1"
-                object_format = get_object_format(object_format.decode("ascii"))
+                    object_format_name = b"sha1"
+                object_format = get_object_format(object_format_name.decode("ascii"))
         except (KeyError, ValueError):
             pass
 
@@ -1599,18 +1602,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_write_bitmap_lookup_table=pack_write_bitmap_lookup_table,
             file_mode=file_mode,
             dir_mode=dir_mode,
-            object_format=hash_algorithm,
-            loose_compression_level,
-            pack_compression_level,
-            pack_index_version,
-            pack_delta_window_size,
-            pack_window_memory,
-            pack_delta_cache_size,
-            pack_depth,
-            pack_threads,
-            pack_big_file_threshold,
-            fsync_object_files,
-            object_format,
+            object_format=object_format,
         )
         instance._use_commit_graph = use_commit_graph
         instance._use_midx = use_midx
@@ -2046,8 +2038,7 @@ class DiskObjectStore(PackBasedObjectStore):
         *,
         file_mode: int | None = None,
         dir_mode: int | None = None,
-        object_format=None,
-        cls, path: str | os.PathLike[str], object_format=None
+        object_format: "ObjectFormat | None" = None,
     ) -> "DiskObjectStore":
         """Initialize a new disk object store.
 
@@ -2057,7 +2048,6 @@ class DiskObjectStore(PackBasedObjectStore):
           path: Path where the object store should be created
           file_mode: Optional file permission mask for shared repository
           dir_mode: Optional directory permission mask for shared repository
-          object_format: Hash algorithm to use (SHA1 or SHA256)
           object_format: Hash algorithm to use (SHA1 or SHA256)
 
         Returns:
@@ -2076,10 +2066,9 @@ class DiskObjectStore(PackBasedObjectStore):
         if dir_mode is not None:
             os.chmod(info_path, dir_mode)
             os.chmod(pack_path, dir_mode)
-        return cls(path, file_mode=file_mode, dir_mode=dir_mode, object_format=object_format)
-        os.mkdir(os.path.join(path, "info"))
-        os.mkdir(os.path.join(path, PACKDIR))
-        return cls(path, object_format=object_format)
+        return cls(
+            path, file_mode=file_mode, dir_mode=dir_mode, object_format=object_format
+        )
 
     def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
         """Iterate over all object SHAs with the given prefix.
@@ -2240,11 +2229,13 @@ class DiskObjectStore(PackBasedObjectStore):
             raise KeyError(name)
 
         sha: RawObjectID
-        if len(name) == 40:
+        if len(name) in (40, 64):
             # name is ObjectID (hex), convert to RawObjectID
+            # Support both SHA1 (40) and SHA256 (64)
             sha = hex_to_sha(cast(ObjectID, name))
-        elif len(name) == 20:
+        elif len(name) in (20, 32):
             # name is already RawObjectID (binary)
+            # Support both SHA1 (20) and SHA256 (32)
             sha = RawObjectID(name)
         else:
             raise AssertionError(f"Invalid object name {name!r}")
@@ -2447,7 +2438,7 @@ class DiskObjectStore(PackBasedObjectStore):
 class MemoryObjectStore(PackCapableObjectStore):
     """Object store that keeps all objects in memory."""
 
-    def __init__(self, *, object_format=None) -> None:
+    def __init__(self, *, object_format: "ObjectFormat | None" = None) -> None:
         """Initialize a MemoryObjectStore.
 
         Creates an empty in-memory object store.

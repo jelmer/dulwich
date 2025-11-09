@@ -31,8 +31,11 @@ import tempfile
 import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from io import BytesIO
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
+
+if TYPE_CHECKING:
+    from .object_format import ObjectFormat
 
 from .errors import NotGitRepository, ObjectFormatException
 from .object_store import BaseObjectStore
@@ -62,7 +65,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         http_request_func: Callable[
             [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
         ],
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize a DumbHTTPObjectStore.
 

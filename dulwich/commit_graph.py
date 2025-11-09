@@ -65,6 +65,7 @@ from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, BinaryIO
 
 from .file import _GitFile
+from .object_format import ObjectFormat
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
@@ -156,7 +157,7 @@ class CommitGraphChunk:
 class CommitGraph:
     """Git commit graph file reader/writer."""
 
-    def __init__(self, *, object_format=None) -> None:
+    def __init__(self, *, object_format: ObjectFormat | None = None) -> None:
         """Initialize CommitGraph.
 
         Args:
@@ -257,7 +258,7 @@ class CommitGraph:
             end = start + self.object_format.oid_length
             oid = oid_lookup_data[start:end]
             oids.append(oid)
-            self._oid_to_index[sha_to_hex(oid)] = i
+            self._oid_to_index[oid] = i
 
         # Parse commit data chunk
         commit_data = self.chunks[CHUNK_COMMIT_DATA].data

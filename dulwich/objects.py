@@ -106,6 +106,7 @@ from .errors import (
     ObjectFormatException,
 )
 from .file import GitFile
+from .object_format import DEFAULT_OBJECT_FORMAT, ObjectFormat
 
 if TYPE_CHECKING:
     from _hashlib import HASH
@@ -116,21 +117,7 @@ if TYPE_CHECKING:
 ZERO_SHA = b"0" * 40  # SHA1 - kept for backward compatibility
 
 
-def zero_sha_for(object_format=None) -> bytes:
-    """Get the zero SHA for a given hash algorithm.
-
-    Args:
-        object_format: HashAlgorithm instance. If None, returns SHA1 zero.
-
-    Returns:
-        Zero SHA as hex bytes (40 chars for SHA1, 64 for SHA256)
-    """
-    if object_format is None:
-        return ZERO_SHA
-    return object_format.zero_oid
-
-
-
+>>>>>>> 063bbc0c (Update more hardcoded sha length)
 # Header fields for commits
 _TREE_HEADER = b"tree"
 _PARENT_HEADER = b"parent"
@@ -472,14 +459,18 @@ class ShaFile:
     type_name: bytes
     type_num: int
     _chunked_text: list[bytes] | None
+<<<<<<< HEAD
     _sha: "FixedSha | None | HASH"
+=======
+    _sha: Union[FixedSha, None, "HASH"]
+    object_format: ObjectFormat
 
     def __init__(self) -> None:
         """Initialize a ShaFile."""
         self._sha = None
         self._chunked_text = None
         self._needs_serialization = True
-        self.object_format = None
+        self.object_format = DEFAULT_OBJECT_FORMAT
 
     @staticmethod
     def _parse_legacy_object_header(
@@ -1346,36 +1337,19 @@ class TreeEntry(NamedTuple):
 
 
 def parse_tree(
-    text: bytes, strict: bool = False, object_format=None
-) -> Iterator[tuple[bytes, int, ObjectID]]:
+    text: bytes, sha_len: int | None = None, *, strict: bool = False
+) -> Iterator[tuple[bytes, int, bytes]]:
     """Parse a tree text.
 
     Args:
       text: Serialized text to parse
+      sha_len: Length of the object IDs in bytes
       strict: Whether to be strict about format
-      object_format: Hash algorithm object (SHA1 or SHA256) - if None, auto-detect
     Returns: iterator of tuples of (name, mode, sha)
 
     Raises:
       ObjectFormatException: if the object was malformed in some way
     """
-    if object_format is not None:
-        sha_len = object_format.oid_length
-        return _parse_tree_with_sha_len(text, strict, sha_len)
-
-    # Try both hash lengths and use the one that works
-    try:
-        # Try SHA1 first (more common)
-        return _parse_tree_with_sha_len(text, strict, 20)
-    except ObjectFormatException:
-        # If SHA1 fails, try SHA256
-        return _parse_tree_with_sha_len(text, strict, 32)
-
-
-def _parse_tree_with_sha_len(
-    text: bytes, strict: bool, sha_len: int
-) -> Iterator[tuple[bytes, int, bytes]]:
-    """Helper function to parse tree with a specific hash length."""
     count = 0
     length = len(text)
 
@@ -1598,7 +1572,8 @@ class Tree(ShaFile):
         """Grab the entries in the tree."""
         try:
             parsed_entries = parse_tree(
-                b"".join(chunks), object_format=self.object_format
+                b"".join(chunks),
+                sha_len=self.object_format.oid_length,
             )
         except ValueError as exc:
             raise ObjectFormatException(exc) from exc
@@ -1628,7 +1603,7 @@ class Tree(ShaFile):
         for name, mode, sha in parse_tree(
             b"".join(self._chunked_text),
             strict=True,
-            object_format=self.object_format,
+            sha_len=self.object_format.oid_length,
         ):
             check_hexsha(sha, f"invalid sha {sha!r}")
             if b"/" in name or name in (b"", b".", b"..", b".git"):

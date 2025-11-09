@@ -154,6 +154,7 @@ from .bundle import Bundle
 from .config import Config, apply_instead_of, get_xdg_config_home_path
 from .credentials import match_partial_url, match_urls
 from .errors import GitProtocolError, HangupException, NotGitRepository, SendPackError
+from .object_format import DEFAULT_OBJECT_FORMAT
 from .object_store import GraphWalker
 from .objects import ObjectID
 from .pack import (
@@ -1586,7 +1587,9 @@ class TraditionalGitClient(GitClient):
             )
 
             if self._should_send_pack(new_refs):
-                for chunk in PackChunkGenerator(pack_data_count, pack_data):
+                for chunk in PackChunkGenerator(
+                    pack_data_count, pack_data, object_format=DEFAULT_OBJECT_FORMAT
+                ):
                     proto.write(chunk)
 
             ref_status = self._handle_receive_pack_tail(
@@ -2457,6 +2460,7 @@ class LocalGitClient(GitClient):
                 r.object_store,
                 object_ids,
                 other_haves=other_haves,
+                object_format=r.object_format,
             )
             # Convert refs to Optional type for FetchPackResult
             return FetchPackResult(_to_optional_dict(r.get_refs()), symrefs, agent)
@@ -2716,7 +2720,7 @@ class BundleClient(GitClient):
         from io import BytesIO
 
         pack_io = BytesIO(pack_bytes)
-        pack_data = PackData.from_file(pack_io)
+        pack_data = PackData.from_file(pack_io, object_format=DEFAULT_OBJECT_FORMAT)
         target.object_store.add_pack_data(len(pack_data), pack_data.iter_unpacked())
 
         # Apply ref filtering if specified
@@ -3809,7 +3813,9 @@ class AbstractHttpGitClient(GitClient):
                 progress=progress,
             )
             if self._should_send_pack(new_refs):
-                yield from PackChunkGenerator(pack_data_count, pack_data)
+                yield from PackChunkGenerator(
+                    pack_data_count, pack_data, object_format=DEFAULT_OBJECT_FORMAT
+                )
 
         resp, read = self._smart_request("git-receive-pack", url, data=body_generator())
         try:
@@ -3921,6 +3927,7 @@ class AbstractHttpGitClient(GitClient):
                     iter(pack_data_list),
                     num_records=len(pack_data_list),
                     progress=progress,
+                    object_format=DEFAULT_OBJECT_FORMAT,
                 )
 
             return FetchPackResult(refs, symrefs, agent)

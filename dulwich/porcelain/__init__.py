@@ -4542,6 +4542,7 @@ def pack_objects(
             deltify=deltify,
             delta_window_size=delta_window_size,
             reuse_deltas=reuse_deltas,
+            object_format=r.object_format,
         )
     if idxf is not None:
         index_entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])

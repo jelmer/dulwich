@@ -160,8 +160,10 @@ def _read_bundle(f: BinaryIO, version: int) -> Bundle:
 
     from io import BytesIO
 
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
     pack_file = BytesIO(pack_bytes)
-    pack_data = PackData.from_file(pack_file)
+    pack_data = PackData.from_file(pack_file, object_format=DEFAULT_OBJECT_FORMAT)
     ret = Bundle()
     ret.references = references
     ret.capabilities = capabilities
@@ -225,6 +227,7 @@ def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
         cast(Callable[[bytes], None], f.write),
         num_records=len(bundle.pack_data),
         records=bundle.pack_data.iter_unpacked(),
+        object_format=bundle.pack_data.object_format,
     )
 
 
@@ -307,9 +310,12 @@ def create_bundle_from_repo(
     # Store the pack objects directly, we'll write them when saving the bundle
     # For now, create a simple wrapper to hold the data
     class _BundlePackData:
-        def __init__(self, count: int, objects: Iterator[UnpackedObject]) -> None:
+        def __init__(
+            self, count: int, objects: Iterator[UnpackedObject], object_format
+        ) -> None:
             self._count = count
             self._objects = list(objects)  # Materialize the iterator
+            self.object_format = object_format
 
         def __len__(self) -> int:
             return self._count
@@ -317,7 +323,7 @@ def create_bundle_from_repo(
         def iter_unpacked(self) -> Iterator[UnpackedObject]:
             return iter(self._objects)
 
-    pack_data = _BundlePackData(pack_count, pack_objects)
+    pack_data = _BundlePackData(pack_count, pack_objects, repo.object_format)
 
     # Create bundle object
     bundle = Bundle()

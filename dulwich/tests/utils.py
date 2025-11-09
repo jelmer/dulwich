@@ -35,6 +35,7 @@ from typing import Any, BinaryIO, TypeVar
 from unittest import SkipTest
 
 from dulwich.index import commit_tree
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import BaseObjectStore
 from dulwich.objects import Commit, FixedSha, ShaFile, Tag, object_class
 from dulwich.pack import (
@@ -276,7 +277,9 @@ def build_pack(
                 base = obj_sha(base_type_num, base_data)
             obj = (base, list(create_delta(base_data, data)))
 
-        crc32 = write_pack_object(sf.write, type_num, obj)
+        crc32 = write_pack_object(
+            sf.write, type_num, obj, object_format=DEFAULT_OBJECT_FORMAT
+        )
         offsets[i] = offset
         crc32s[i] = crc32
 

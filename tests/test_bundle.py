@@ -26,6 +26,7 @@ import tempfile
 from io import BytesIO
 
 from dulwich.bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.pack import PackData, write_pack_objects
 from dulwich.repo import MemoryRepo
@@ -49,9 +50,9 @@ class BundleTests(TestCase):
 
         # Create a simple pack data
         b = BytesIO()
-        write_pack_objects(b.write, [])
+        write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b.seek(0)
-        bundle.pack_data = PackData.from_file(b)
+        bundle.pack_data = PackData.from_file(b, object_format=DEFAULT_OBJECT_FORMAT)
 
         # Check the repr output
         rep = repr(bundle)
@@ -70,9 +71,9 @@ class BundleTests(TestCase):
         bundle1.references = {b"refs/heads/master": b"ab" * 20}
 
         b1 = BytesIO()
-        write_pack_objects(b1.write, [])
+        write_pack_objects(b1.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b1.seek(0)
-        bundle1.pack_data = PackData.from_file(b1)
+        bundle1.pack_data = PackData.from_file(b1, object_format=DEFAULT_OBJECT_FORMAT)
 
         bundle2 = Bundle()
         bundle2.version = 3
@@ -81,9 +82,9 @@ class BundleTests(TestCase):
         bundle2.references = {b"refs/heads/master": b"ab" * 20}
 
         b2 = BytesIO()
-        write_pack_objects(b2.write, [])
+        write_pack_objects(b2.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b2.seek(0)
-        bundle2.pack_data = PackData.from_file(b2)
+        bundle2.pack_data = PackData.from_file(b2, object_format=DEFAULT_OBJECT_FORMAT)
 
         # Test equality
         self.assertEqual(bundle1, bundle2)
@@ -95,9 +96,9 @@ class BundleTests(TestCase):
         bundle3.prerequisites = [(b"cc" * 20, "comment")]
         bundle3.references = {b"refs/heads/master": b"ab" * 20}
         b3 = BytesIO()
-        write_pack_objects(b3.write, [])
+        write_pack_objects(b3.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b3.seek(0)
-        bundle3.pack_data = PackData.from_file(b3)
+        bundle3.pack_data = PackData.from_file(b3, object_format=DEFAULT_OBJECT_FORMAT)
         self.assertNotEqual(bundle1, bundle3)
 
         bundle4 = Bundle()
@@ -106,9 +107,9 @@ class BundleTests(TestCase):
         bundle4.prerequisites = [(b"cc" * 20, "comment")]
         bundle4.references = {b"refs/heads/master": b"ab" * 20}
         b4 = BytesIO()
-        write_pack_objects(b4.write, [])
+        write_pack_objects(b4.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b4.seek(0)
-        bundle4.pack_data = PackData.from_file(b4)
+        bundle4.pack_data = PackData.from_file(b4, object_format=DEFAULT_OBJECT_FORMAT)
         self.assertNotEqual(bundle1, bundle4)
 
         bundle5 = Bundle()
@@ -117,9 +118,9 @@ class BundleTests(TestCase):
         bundle5.prerequisites = [(b"dd" * 20, "different")]  # Different prerequisites
         bundle5.references = {b"refs/heads/master": b"ab" * 20}
         b5 = BytesIO()
-        write_pack_objects(b5.write, [])
+        write_pack_objects(b5.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b5.seek(0)
-        bundle5.pack_data = PackData.from_file(b5)
+        bundle5.pack_data = PackData.from_file(b5, object_format=DEFAULT_OBJECT_FORMAT)
         self.assertNotEqual(bundle1, bundle5)
 
         bundle6 = Bundle()
@@ -130,9 +131,9 @@ class BundleTests(TestCase):
             b"refs/heads/different": b"ab" * 20
         }  # Different references
         b6 = BytesIO()
-        write_pack_objects(b6.write, [])
+        write_pack_objects(b6.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b6.seek(0)
-        bundle6.pack_data = PackData.from_file(b6)
+        bundle6.pack_data = PackData.from_file(b6, object_format=DEFAULT_OBJECT_FORMAT)
         self.assertNotEqual(bundle1, bundle6)
 
         # Test inequality with different type
@@ -147,7 +148,7 @@ class BundleTests(TestCase):
         f.write(b"\n")
         # Add pack data
         b = BytesIO()
-        write_pack_objects(b.write, [])
+        write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         f.write(b.getvalue())
         f.seek(0)
 
@@ -168,7 +169,7 @@ class BundleTests(TestCase):
         f.write(b"\n")
         # Add pack data
         b = BytesIO()
-        write_pack_objects(b.write, [])
+        write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         f.write(b.getvalue())
         f.seek(0)
 
@@ -199,9 +200,9 @@ class BundleTests(TestCase):
 
         # Create a simple pack data
         b = BytesIO()
-        write_pack_objects(b.write, [])
+        write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b.seek(0)
-        bundle.pack_data = PackData.from_file(b)
+        bundle.pack_data = PackData.from_file(b, object_format=DEFAULT_OBJECT_FORMAT)
 
         # Write the bundle
         f = BytesIO()
@@ -225,9 +226,9 @@ class BundleTests(TestCase):
 
         # Create a simple pack data
         b = BytesIO()
-        write_pack_objects(b.write, [])
+        write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b.seek(0)
-        bundle.pack_data = PackData.from_file(b)
+        bundle.pack_data = PackData.from_file(b, object_format=DEFAULT_OBJECT_FORMAT)
 
         # Write the bundle
         f = BytesIO()
@@ -253,9 +254,9 @@ class BundleTests(TestCase):
         bundle1.references = {b"refs/heads/master": b"ab" * 20}
 
         b1 = BytesIO()
-        write_pack_objects(b1.write, [])
+        write_pack_objects(b1.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b1.seek(0)
-        bundle1.pack_data = PackData.from_file(b1)
+        bundle1.pack_data = PackData.from_file(b1, object_format=DEFAULT_OBJECT_FORMAT)
 
         f1 = BytesIO()
         write_bundle(f1, bundle1)
@@ -271,9 +272,9 @@ class BundleTests(TestCase):
         bundle2.references = {b"refs/heads/master": b"ab" * 20}
 
         b2 = BytesIO()
-        write_pack_objects(b2.write, [])
+        write_pack_objects(b2.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b2.seek(0)
-        bundle2.pack_data = PackData.from_file(b2)
+        bundle2.pack_data = PackData.from_file(b2, object_format=DEFAULT_OBJECT_FORMAT)
 
         f2 = BytesIO()
         write_bundle(f2, bundle2)
@@ -290,9 +291,9 @@ class BundleTests(TestCase):
         bundle.references = {}
 
         b = BytesIO()
-        write_pack_objects(b.write, [])
+        write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b.seek(0)
-        bundle.pack_data = PackData.from_file(b)
+        bundle.pack_data = PackData.from_file(b, object_format=DEFAULT_OBJECT_FORMAT)
 
         f = BytesIO()
         with self.assertRaises(AssertionError):
@@ -305,9 +306,11 @@ class BundleTests(TestCase):
         origbundle.references = {b"refs/heads/master": b"ab" * 20}
         origbundle.prerequisites = [(b"cc" * 20, b"comment")]
         b = BytesIO()
-        write_pack_objects(b.write, [])
+        write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b.seek(0)
-        origbundle.pack_data = PackData.from_file(b)
+        origbundle.pack_data = PackData.from_file(
+            b, object_format=DEFAULT_OBJECT_FORMAT
+        )
         with tempfile.TemporaryDirectory() as td:
             with open(os.path.join(td, "foo"), "wb") as f:
                 write_bundle(f, origbundle)

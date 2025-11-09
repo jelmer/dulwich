@@ -5,7 +5,6 @@ include COPYING
 include CONTRIBUTING.rst
 include TODO
 include dulwich/contrib/README.swift.rst
-include dulwich/stdint.h
 include dulwich/py.typed
 recursive-include docs conf.py *.txt Makefile make.bat
 recursive-include examples *.py

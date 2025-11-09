@@ -877,8 +877,8 @@ class GetUnstagedChangesTests(TestCase):
                     f.write(b"origstuff" + str(i).encode())
                 files.append(filename)
 
-            repo.stage(files)
-            repo.do_commit(
+            repo.get_worktree().stage(files)
+            repo.get_worktree().commit(
                 b"test status",
                 author=b"author <email>",
                 committer=b"committer <email>",

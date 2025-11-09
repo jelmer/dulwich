@@ -565,7 +565,9 @@ class ApplyIncludedPathsTests(TestCase):
 
         # Add and commit .gitattributes
         self.repo.get_worktree().stage([b".gitattributes"])
-        self.repo.do_commit(b"Add gitattributes", committer=b"Test <test@example.com>")
+        self.repo.get_worktree().commit(
+            b"Add gitattributes", committer=b"Test <test@example.com>"
+        )
 
         # Initialize the filter context and register the filter
         _ = self.repo.get_blob_normalizer()

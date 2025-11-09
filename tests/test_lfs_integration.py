@@ -61,8 +61,11 @@ class LFSFilterIntegrationTests(TestCase):
         ]
         self.gitattributes = GitAttributes(patterns)
 
+        from dulwich.filters import FilterContext
+
+        filter_context = FilterContext(self.registry)
         self.normalizer = FilterBlobNormalizer(
-            self.config, self.gitattributes, self.registry
+            self.config, self.gitattributes, filter_context=filter_context
         )
 
     def tearDown(self) -> None:

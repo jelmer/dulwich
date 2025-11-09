@@ -234,7 +234,7 @@ def build_pack(
     """
     sf = SHA1Writer(f)
     num_objects = len(objects_spec)
-    write_pack_header(sf, num_objects)
+    write_pack_header(sf.write, num_objects)
 
     full_objects: dict[int, tuple[int, bytes, bytes]] = {}
     offsets: dict[int, int] = {}

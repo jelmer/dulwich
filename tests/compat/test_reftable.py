@@ -706,6 +706,8 @@ class ReftableCompatTestCase(CompatTestCase):
             repo.refs.set_if_equals(b"refs/heads/develop", None, commits[1])
             repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
 
+        repo.refs._update_tables_list()
+
         # Second batch: Update some refs and add new ones
         with repo.refs.batch_update():
             repo.refs.set_if_equals(
@@ -715,6 +717,8 @@ class ReftableCompatTestCase(CompatTestCase):
                 b"refs/heads/feature", None, commits[3]
             )  # Add feature
             repo.refs.set_if_equals(b"refs/tags/v1.0", None, commits[0])  # Add tag
+
+        repo.refs._update_tables_list()
 
         # Third batch: More complex operations
         with repo.refs.batch_update():
@@ -727,6 +731,8 @@ class ReftableCompatTestCase(CompatTestCase):
             repo.refs.set_symbolic_ref(
                 b"HEAD", b"refs/heads/develop"
             )  # Change HEAD target
+
+        repo.refs._update_tables_list()
 
         repo.close()
 

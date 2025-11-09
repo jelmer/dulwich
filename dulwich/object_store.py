@@ -772,6 +772,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 num_records=count,
                 progress=progress,
                 compression_level=self.pack_compression_level,
+                object_format=self.object_format,
             )
         except BaseException:
             abort()
@@ -1612,6 +1613,7 @@ class DiskObjectStore(PackBasedObjectStore):
             get_raw=self.get_raw,
             compression_level=self.pack_compression_level,
             progress=progress,
+            object_format=self.object_format,
         )
         f.flush()
         if self.fsync_object_files:
@@ -1715,7 +1717,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if f.tell() > 0:
                 f.seek(0)
 
-                with PackData(path, f) as pd:
+                with PackData(path, f, object_format=self.object_format) as pd:
                     indexer = PackIndexer.for_pack_data(
                         pd,
                         resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
@@ -1876,7 +1878,9 @@ class DiskObjectStore(PackBasedObjectStore):
                 if isinstance(ref, bytes) and len(ref) == self.object_format.hex_length:
                     # Already hex ObjectID
                     commit_ids.append(ref)
-                elif isinstance(ref, bytes) and len(ref) == self.object_format.oid_length:
+                elif (
+                    isinstance(ref, bytes) and len(ref) == self.object_format.oid_length
+                ):
                     # Binary SHA, convert to hex ObjectID
                     from .objects import sha_to_hex
 
@@ -2063,7 +2067,7 @@ class MemoryObjectStore(PackCapableObjectStore):
             if size > 0:
                 f.seek(0)
 
-                p = PackData.from_file(f, size)
+                p = PackData.from_file(f, size, object_format=self.object_format)
                 for obj in PackInflater.for_pack_data(p, self.get_raw):  # type: ignore[arg-type]
                     self.add_object(obj)
                 p.close()
@@ -2102,6 +2106,7 @@ class MemoryObjectStore(PackCapableObjectStore):
                 unpacked_objects,
                 num_records=count,
                 progress=progress,
+                object_format=self.object_format,
             )
         except BaseException:
             abort()

@@ -754,7 +754,7 @@ class MemoryPackIndex(PackIndex):
     def for_pack(cls, pack_data: "PackData") -> "MemoryPackIndex":
         """Create a MemoryPackIndex from a PackData object."""
         return MemoryPackIndex(
-            list(pack_data.sorted_entries()), pack_data.get_stored_checksum()
+            list(pack_data.sorted_entries()), pack_checksum=pack_data.get_stored_checksum(), object_format=pack.object_format,
         )
 
     @classmethod
@@ -1575,6 +1575,7 @@ class PackData:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
+        object_format=None,
     ) -> None:
         """Create a PackData object representing the pack in the given filename.
 
@@ -1584,6 +1585,16 @@ class PackData:
         Currently there is a restriction on the size of the pack as the python
         mmap implementation is flawed.
         """
+        from .object_format import DEFAULT_OBJECT_FORMAT
+
+        if object_format is None:
+            warnings.warn(
+                "PackData() should be called with object_format parameter",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            object_format = DEFAULT_OBJECT_FORMAT
+        self.object_format = object_format
         self._filename = filename
         self._size = size
         self._header_size = 12
@@ -1626,29 +1637,31 @@ class PackData:
         return self._filename
 
     @classmethod
-    def from_file(cls, file: IO[bytes], size: int | None = None) -> "PackData":
+    def from_file(cls, file: IO[bytes], size: int | None = None, object_format: ObjectFormat | None = None) -> "PackData":
         """Create a PackData object from an open file.
 
         Args:
           file: Open file object
           size: Optional file size
+          object_format: Object format used by the repository
 
         Returns:
           PackData instance
         """
-        return cls(str(file), file=file, size=size)
+        return cls(str(file), file=file, size=size, object_format=object_format)
 
     @classmethod
-    def from_path(cls, path: str | os.PathLike[str]) -> "PackData":
+    def from_path(cls, path: str | os.PathLike[str], object_format: ObjectFormat | None = None) -> "PackData":
         """Create a PackData object from a file path.
 
         Args:
           path: Path to the pack file
+          object_format: Object format used by the repository
 
         Returns:
           PackData instance
         """
-        return cls(filename=path)
+        return cls(filename=path, object_format=object_format)
 
     def close(self) -> None:
         """Close the underlying pack file."""
@@ -2501,6 +2514,7 @@ def pack_object_header(
     Returns: A header for a packed object.
     """
     from .object_format import DEFAULT_OBJECT_FORMAT
+
     if object_format is None:
         warnings.warn(
             "pack_object_header() should be called with object_format parameter",
@@ -2536,6 +2550,7 @@ def pack_object_chunks(
     type: int,
     object: list[bytes] | tuple[bytes | int, list[bytes]],
     compression_level: int = -1,
+    object_format: "ObjectFormat" | None = None,
 ) -> Iterator[bytes]:
     """Generate chunks for a pack object.
 
@@ -2543,8 +2558,18 @@ def pack_object_chunks(
       type: Numeric type of the object
       object: Object to write
       compression_level: the zlib compression level
+      object_format: Object format (hash algorithm) to use
     Returns: Chunks
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "pack_object_chunks() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
     if type in DELTA_TYPES:
         if isinstance(object, tuple):
             delta_base, object = object
@@ -2564,7 +2589,7 @@ def pack_object_chunks(
         # Shouldn't reach here with proper typing
         raise TypeError(f"Unexpected object type: {object.__class__.__name__}")
 
-    yield bytes(pack_object_header(type, delta_base, sum(map(len, chunks))))
+    yield bytes(pack_object_header(type, delta_base, sum(map(len, chunks)), object_format=object_format))
     compressor = zlib.compressobj(level=compression_level)
     for data in chunks:
         yield compressor.compress(data)
@@ -2577,6 +2602,7 @@ def write_pack_object(
     object: list[bytes] | tuple[bytes | int, list[bytes]],
     sha: Optional["HashObject"] = None,
     compression_level: int = -1,
+    object_format: "ObjectFormat" | None = None,
 ) -> int:
     """Write pack object to a file.
 
@@ -2586,10 +2612,22 @@ def write_pack_object(
       object: Object to write
       sha: Optional SHA-1 hasher to update
       compression_level: the zlib compression level
+      object_format: Object format (hash algorithm) to use
     Returns: CRC32 checksum of the written object
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "write_pack_object() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
     crc32 = 0
-    for chunk in pack_object_chunks(type, object, compression_level=compression_level):
+    for chunk in pack_object_chunks(
+        type, object, compression_level=compression_level, object_format=object_format
+    ):
         write(chunk)
         if sha is not None:
             sha.update(chunk)
@@ -2604,6 +2642,7 @@ def write_pack(
     deltify: bool | None = None,
     delta_window_size: int | None = None,
     compression_level: int = -1,
+    object_format: "ObjectFormat" | None = None
 ) -> tuple[bytes, bytes]:
     """Write a new pack data file.
 
@@ -2613,8 +2652,18 @@ def write_pack(
       delta_window_size: Delta window size
       deltify: Whether to deltify pack objects
       compression_level: the zlib compression level
+      object_format: Object format
     Returns: Tuple with checksum of pack file and index file
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "write_pack() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
     with GitFile(filename + ".pack", "wb") as f:
         entries, data_sum = write_pack_objects(
             f,
@@ -2622,6 +2671,7 @@ def write_pack(
             delta_window_size=delta_window_size,
             deltify=deltify,
             compression_level=compression_level,
+            object_format=object_format,
         )
     entries_list = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + ".idx", "wb") as f:
@@ -2922,6 +2972,7 @@ def write_pack_from_container(
     reuse_deltas: bool = True,
     compression_level: int = -1,
     other_haves: set[bytes] | None = None,
+    object_format: "ObjectFormat" | None = None,
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
@@ -2935,6 +2986,7 @@ def write_pack_from_container(
       reuse_deltas: Whether to reuse existing deltas
       compression_level: the zlib compression level to use
       other_haves: Set of additional object IDs the receiver has
+      object_format: Object format (hash algorithm) to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     pack_contents_count = len(object_ids)
@@ -2952,6 +3004,7 @@ def write_pack_from_container(
         pack_contents,
         num_records=pack_contents_count,
         compression_level=compression_level,
+        object_format=object_format,
     )
 
 
@@ -2962,6 +3015,7 @@ def write_pack_objects(
     delta_window_size: int | None = None,
     deltify: bool | None = None,
     compression_level: int = -1,
+    object_format: "ObjectFormat" | None = None
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
@@ -2972,6 +3026,7 @@ def write_pack_objects(
                          Set to None for default window size.
       deltify: Whether to deltify objects
       compression_level: the zlib compression level to use
+      object_format: Object format (hash algorithm) to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     pack_contents_count, pack_contents = pack_objects_to_data(objects, deltify=deltify)
@@ -2981,6 +3036,7 @@ def write_pack_objects(
         pack_contents,
         num_records=pack_contents_count,
         compression_level=compression_level,
+        object_format=object_format,
     )
 
 
@@ -2994,6 +3050,7 @@ class PackChunkGenerator:
         progress: Callable[..., None] | None = None,
         compression_level: int = -1,
         reuse_compressed: bool = True,
+        object_format: "ObjectFormat" | None = None,
     ) -> None:
         """Initialize PackChunkGenerator.
 
@@ -3003,7 +3060,18 @@ class PackChunkGenerator:
             progress: Optional progress callback
             compression_level: Compression level (-1 for default)
             reuse_compressed: Whether to reuse compressed chunks
+            object_format: Object format (hash algorithm) to use
         """
+        from .object_format import DEFAULT_OBJECT_FORMAT
+
+        if object_format is None:
+            warnings.warn(
+                "PackChunkGenerator() should be called with object_format parameter",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            object_format = DEFAULT_OBJECT_FORMAT
+        self.object_format = object_format
         self.cs = sha1(b"")
         self.entries: dict[bytes, tuple[int, int]] = {}
         if records is None:
@@ -3077,7 +3145,10 @@ class PackChunkGenerator:
                 chunks = unpacked.comp_chunks
             else:
                 chunks = pack_object_chunks(
-                    type_num, raw, compression_level=compression_level
+                    type_num,
+                    raw,
+                    compression_level=compression_level,
+                    object_format=self.object_format,
                 )
             crc32 = 0
             object_size = 0
@@ -3106,6 +3177,7 @@ def write_pack_data(
     num_records: int | None = None,
     progress: Callable[..., None] | None = None,
     compression_level: int = -1,
+    object_format: "ObjectFormat" | None = None,
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
@@ -3115,6 +3187,7 @@ def write_pack_data(
       records: Iterator over type_num, object_id, delta_base, raw
       progress: Function to report progress to
       compression_level: the zlib compression level
+      object_format: Object format (hash algorithm) to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     chunk_generator = PackChunkGenerator(
@@ -3122,6 +3195,7 @@ def write_pack_data(
         records=records,
         progress=progress,
         compression_level=compression_level,
+        object_format=object_format,
     )
     for chunk in chunk_generator:
         if callable(write):
@@ -3543,6 +3617,7 @@ class Pack:
             depth=depth,
             threads=threads,
             big_file_threshold=big_file_threshold,
+            object_format=self.object_format,
         )
         self._idx_load = lambda: load_pack_index(
             self._idx_path, object_format=object_format
@@ -3845,7 +3920,10 @@ class Pack:
                 assert isinstance(base_type, int)
             elif base_type == REF_DELTA:
                 (basename, delta) = base_obj
-                assert isinstance(basename, bytes) and len(basename) == self.object_format.oid_length
+                assert (
+                    isinstance(basename, bytes)
+                    and len(basename) == self.object_format.oid_length
+                )
                 base_offset, base_type, base_obj = get_ref(basename)
                 assert isinstance(base_type, int)
                 if base_offset == prev_offset:  # object is based on itself
@@ -3940,6 +4018,7 @@ def extend_pack(
     that are already in the pack
     """
     from .object_format import DEFAULT_OBJECT_FORMAT
+
     if object_format is None:
         warnings.warn(
             "extend_pack() should be called with object_format parameter",
@@ -3981,6 +4060,7 @@ def extend_pack(
             [data],  # Convert bytes to list[bytes]
             sha=new_sha,
             compression_level=compression_level,
+            object_format=object_format,
         )
         extra_entries.append((object_id, offset, crc32))
     pack_sha = new_sha.digest()

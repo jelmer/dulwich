@@ -54,7 +54,7 @@ fn parse_tree_with_length(
     mut text: &[u8],
     strict: bool,
     hash_len: usize,
-) -> PyResult<Vec<(PyObject, u32, PyObject)>> {
+) -> PyResult<Vec<(Py<PyAny>, u32, Py<PyAny>)>> {
     let mut entries = Vec::new();
     while !text.is_empty() {
         let mode_end = memchr(b' ', text)
@@ -97,8 +97,8 @@ fn parse_tree(
     py: Python,
     text: &[u8],
     strict: Option<bool>,
-    object_format: Option<PyObject>,
-) -> PyResult<Vec<(PyObject, u32, PyObject)>> {
+    object_format: Option<Py<PyAny>>,
+) -> PyResult<Vec<(Py<PyAny>, u32, Py<PyAny>)>> {
     let strict = strict.unwrap_or(false);
 
     // Determine hash length from object_format if provided

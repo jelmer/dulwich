@@ -163,6 +163,7 @@ class CommitGraph:
           object_format: Object format to use (defaults to SHA1)
         """
         import warnings
+
         from .object_format import DEFAULT_OBJECT_FORMAT, SHA256
 
         if object_format is None:
@@ -173,7 +174,9 @@ class CommitGraph:
             )
             object_format = DEFAULT_OBJECT_FORMAT
         self.object_format = object_format
-        self.hash_version = HASH_VERSION_SHA256 if object_format == SHA256 else HASH_VERSION_SHA1
+        self.hash_version = (
+            HASH_VERSION_SHA256 if object_format == SHA256 else HASH_VERSION_SHA1
+        )
         self.chunks: dict[bytes, CommitGraphChunk] = {}
         self.entries: list[CommitGraphEntry] = []
         self._oid_to_index: dict[ObjectID, int] = {}
@@ -181,11 +184,10 @@ class CommitGraph:
     @classmethod
     def from_file(cls, f: BinaryIO) -> "CommitGraph":
         """Read commit graph from file."""
-        graph = cls()
-        graph._read_from_file(f)
-        return graph
+        return cls._read_from_file(f)
 
-    def _read_from_file(self, f: BinaryIO) -> None:
+    @classmethod
+    def _read_from_file(cls, f: BinaryIO) -> "CommitGraph":
         """Read commit graph data from file."""
         # Read header
         signature = f.read(4)
@@ -196,16 +198,21 @@ class CommitGraph:
         if version != COMMIT_GRAPH_VERSION:
             raise ValueError(f"Unsupported commit graph version: {version}")
 
-        self.hash_version = struct.unpack(">B", f.read(1))[0]
+        hash_version = struct.unpack(">B", f.read(1))[0]
 
         # Set object_format based on hash_version from file
         from .object_format import SHA1, SHA256
-        if self.hash_version == HASH_VERSION_SHA1:
-            self.object_format = SHA1
-        elif self.hash_version == HASH_VERSION_SHA256:
-            self.object_format = SHA256
+
+        if hash_version == HASH_VERSION_SHA1:
+            object_format = SHA1
+        elif hash_version == HASH_VERSION_SHA256:
+            object_format = SHA256
         else:
-            raise ValueError(f"Unsupported hash version: {self.hash_version}")
+            raise ValueError(f"Unsupported hash version: {hash_version}")
+
+        # Create instance with correct object_format
+        graph = cls(object_format=object_format)
+        graph.hash_version = hash_version
 
         num_chunks = struct.unpack(">B", f.read(1))[0]
         struct.unpack(">B", f.read(1))[0]
@@ -226,10 +233,12 @@ class CommitGraph:
 
             f.seek(offset)
             chunk_data = f.read(chunk_size)
-            self.chunks[chunk_id] = CommitGraphChunk(chunk_id, chunk_data)
+            graph.chunks[chunk_id] = CommitGraphChunk(chunk_id, chunk_data)
 
         # Parse chunks
-        self._parse_chunks()
+        graph._parse_chunks()
+
+        return graph
 
     def _parse_chunks(self) -> None:
         """Parse chunk data into entries."""

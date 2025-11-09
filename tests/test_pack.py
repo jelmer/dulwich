@@ -33,6 +33,7 @@ from typing import NoReturn
 
 from dulwich.errors import ApplyDeltaError, ChecksumMismatch
 from dulwich.file import GitFile
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Commit, Tree, hex_to_sha, sha_to_hex
 from dulwich.pack import (
@@ -106,7 +107,8 @@ class PackTests(TestCase):
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha."""
         return PackData(
-            os.path.join(self.datadir, "pack-{}.pack".format(sha.decode("ascii")))
+            os.path.join(self.datadir, "pack-{}.pack".format(sha.decode("ascii"))),
+            object_format=DEFAULT_OBJECT_FORMAT,
         )
 
     def get_pack(self, sha):
@@ -472,7 +474,9 @@ class TestPackData(PackTests):
             self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii"))
         )
         with open(path, "rb") as f:
-            PackData.from_file(f, os.path.getsize(path))
+            PackData.from_file(
+                f, os.path.getsize(path), object_format=DEFAULT_OBJECT_FORMAT
+            )
 
     def test_pack_len(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
@@ -684,7 +688,9 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, "Elch")
-            write_pack(basename, origpack.pack_tuples())
+            write_pack(
+                basename, origpack.pack_tuples(), object_format=DEFAULT_OBJECT_FORMAT
+            )
 
             with Pack(basename) as newpack:
                 self.assertEqual(origpack, newpack)
@@ -711,7 +717,9 @@ class TestPack(PackTests):
 
     def _copy_pack(self, origpack):
         basename = os.path.join(self.tempdir, "somepack")
-        write_pack(basename, origpack.pack_tuples())
+        write_pack(
+            basename, origpack.pack_tuples(), object_format=DEFAULT_OBJECT_FORMAT
+        )
         return Pack(basename)
 
     def test_keep_no_message(self) -> None:
@@ -758,7 +766,7 @@ class TestPack(PackTests):
             write_pack_header(bad_file.write, 9999)
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
-            bad_data = PackData("", file=bad_file)
+            bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(AssertionError, lambda: bad_pack.data)
             self.assertRaises(AssertionError, bad_pack.check_length_and_checksum)
@@ -770,7 +778,7 @@ class TestPack(PackTests):
 
             data._file.seek(0)
             bad_file = BytesIO(data._file.read()[:-20] + (b"\xff" * 20))
-            bad_data = PackData("", file=bad_file)
+            bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
             self.assertRaises(ChecksumMismatch, bad_pack.check_length_and_checksum)
@@ -846,7 +854,7 @@ class TestThinPack(PackTests):
 
         # Index the new pack.
         with self.make_pack(True) as pack:
-            with PackData(pack._data_path) as data:
+            with PackData(pack._data_path, object_format=DEFAULT_OBJECT_FORMAT) as data:
                 data.create_index(
                     self.pack_prefix + ".idx", resolve_ext_ref=pack.resolve_ext_ref
                 )
@@ -919,7 +927,9 @@ class WritePackTests(TestCase):
         try:
             f.write(b"header")
             offset = f.tell()
-            crc32 = write_pack_object(f.write, Blob.type_num, b"blob")
+            crc32 = write_pack_object(
+                f.write, Blob.type_num, b"blob", object_format=DEFAULT_OBJECT_FORMAT
+            )
             self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xFFFFFFFF)
 
             f.write(b"x")  # unpack_object needs extra trailing data.
@@ -939,7 +949,13 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a)
+        write_pack_object(
+            f.write,
+            Blob.type_num,
+            b"blob",
+            sha=sha_a,
+            object_format=DEFAULT_OBJECT_FORMAT,
+        )
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -951,7 +967,12 @@ class WritePackTests(TestCase):
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
         write_pack_object(
-            f.write, Blob.type_num, b"blob", sha=sha_a, compression_level=6
+            f.write,
+            Blob.type_num,
+            b"blob",
+            sha=sha_a,
+            compression_level=6,
+            object_format=DEFAULT_OBJECT_FORMAT,
         )
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
@@ -1050,7 +1071,11 @@ class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
         self._supports_large = True
 
     def index(self, filename, entries, pack_checksum):
-        return MemoryPackIndex(entries, pack_checksum)
+        from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+
+        return MemoryPackIndex(
+            entries, pack_checksum, object_format=DEFAULT_OBJECT_FORMAT
+        )
 
     def tearDown(self) -> None:
         TestCase.tearDown(self)
@@ -1490,14 +1515,14 @@ class DeltaChainIteratorTests(TestCase):
         if thin is None:
             thin = bool(list(self.store))
         resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
-        data = PackData("test.pack", file=f)
+        data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
         return TestPackIterator.for_pack_data(data, resolve_ext_ref=resolve_ext_ref)
 
     def make_pack_iter_subset(self, f, subset, thin=None):
         if thin is None:
             thin = bool(list(self.store))
         resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
-        data = PackData("test.pack", file=f)
+        data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
         assert data
         index = MemoryPackIndex.for_pack(data)
         pack = Pack.from_objects(data, index)
@@ -1764,7 +1789,7 @@ class DeltaChainIteratorTests(TestCase):
         )
         fsize = f.tell()
         f.seek(0)
-        packdata = PackData.from_file(f, fsize)
+        packdata = PackData.from_file(f, fsize, object_format=DEFAULT_OBJECT_FORMAT)
         td = tempfile.mkdtemp()
         idx_path = os.path.join(td, "test.idx")
         self.addCleanup(shutil.rmtree, td)

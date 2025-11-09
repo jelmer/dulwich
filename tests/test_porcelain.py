@@ -10505,7 +10505,7 @@ class CherryTests(PorcelainTestCase):
     def test_cherry_no_changes(self):
         """Test cherry when head and upstream are the same."""
         # Create a simple commit
-        commit_sha = self.repo.do_commit(
+        commit_sha = self.repo.get_worktree().commit(
             b"Initial commit", committer=b"Test <test@example.com>"
         )
 
@@ -10520,16 +10520,16 @@ class CherryTests(PorcelainTestCase):
         # Create initial commit
         with open(os.path.join(self.repo_path, "file1.txt"), "w") as f:
             f.write("base content\n")
-        self.repo.stage(["file1.txt"])
-        base_commit = self.repo.do_commit(
+        self.repo.get_worktree().stage(["file1.txt"])
+        base_commit = self.repo.get_worktree().commit(
             b"Base commit", committer=b"Test <test@example.com>"
         )
 
         # Create a new commit on head
         with open(os.path.join(self.repo_path, "file2.txt"), "w") as f:
             f.write("new content\n")
-        self.repo.stage(["file2.txt"])
-        head_commit = self.repo.do_commit(
+        self.repo.get_worktree().stage(["file2.txt"])
+        head_commit = self.repo.get_worktree().commit(
             b"New commit", committer=b"Test <test@example.com>"
         )
 
@@ -10548,16 +10548,16 @@ class CherryTests(PorcelainTestCase):
         # Create initial commit
         with open(os.path.join(self.repo_path, "file1.txt"), "w") as f:
             f.write("base content\n")
-        self.repo.stage(["file1.txt"])
-        base_commit = self.repo.do_commit(
+        self.repo.get_worktree().stage(["file1.txt"])
+        base_commit = self.repo.get_worktree().commit(
             b"Base commit", committer=b"Test <test@example.com>"
         )
 
         # Create a new commit on head
         with open(os.path.join(self.repo_path, "file2.txt"), "w") as f:
             f.write("new content\n")
-        self.repo.stage(["file2.txt"])
-        head_commit = self.repo.do_commit(
+        self.repo.get_worktree().stage(["file2.txt"])
+        head_commit = self.repo.get_worktree().commit(
             b"New commit on head", committer=b"Test <test@example.com>"
         )
 
@@ -10579,26 +10579,26 @@ class CherryTests(PorcelainTestCase):
         # Create base commit
         with open(os.path.join(self.repo_path, "file.txt"), "w") as f:
             f.write("line1\n")
-        self.repo.stage(["file.txt"])
-        base_commit = self.repo.do_commit(
+        self.repo.get_worktree().stage(["file.txt"])
+        base_commit = self.repo.get_worktree().commit(
             b"Base commit", committer=b"Test <test@example.com>"
         )
 
         # Create upstream branch with a change
         with open(os.path.join(self.repo_path, "file.txt"), "w") as f:
             f.write("line1\nline2\n")
-        self.repo.stage(["file.txt"])
-        upstream_commit = self.repo.do_commit(
+        self.repo.get_worktree().stage(["file.txt"])
+        upstream_commit = self.repo.get_worktree().commit(
             b"Add line2", committer=b"Test <test@example.com>"
         )
 
         # Reset to base and create same change on head branch
         self.repo.refs[b"HEAD"] = base_commit
-        self.repo.reset_index()
+        self.repo.get_worktree().reset_index()
         with open(os.path.join(self.repo_path, "file.txt"), "w") as f:
             f.write("line1\nline2\n")
-        self.repo.stage(["file.txt"])
-        head_commit = self.repo.do_commit(
+        self.repo.get_worktree().stage(["file.txt"])
+        head_commit = self.repo.get_worktree().commit(
             b"Add line2 (different metadata)",
             committer=b"Different <different@example.com>",
         )

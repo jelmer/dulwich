@@ -63,7 +63,7 @@ from dulwich.client import (
 )
 from dulwich.config import ConfigDict
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
-from dulwich.objects import Blob, Commit, Tree
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
 from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
@@ -405,7 +405,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
@@ -429,7 +429,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
@@ -537,7 +537,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []

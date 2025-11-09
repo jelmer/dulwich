@@ -2466,7 +2466,7 @@ class cmd_show_ref(Command):
             "-s",
             "--hash",
             nargs="?",
-            const=40,
+            const=40,  # TODO: Support SHA256
             type=int,
             metavar="n",
             help="Only show the OID, not the reference name",
@@ -2543,6 +2543,7 @@ class cmd_show_ref(Command):
 
         # Output results
         if not parsed_args.quiet:
+            # TODO: Add support for SHA256
             abbrev_len = parsed_args.abbrev if parsed_args.abbrev else 40
             hash_only = parsed_args.hash is not None
             if hash_only and parsed_args.hash:

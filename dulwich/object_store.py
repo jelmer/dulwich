@@ -1011,10 +1011,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         if name == ZERO_SHA:
             raise KeyError(name)
-        if len(name) in (40, 64):  # Support both SHA1 (40) and SHA256 (64) hex
+        if len(name) == self.object_format.hex_length:
             sha = hex_to_sha(name)
             hexsha = name
-        elif len(name) in (20, 32):  # Support both SHA1 (20) and SHA256 (32) binary
+        elif len(name) == self.object_format.oid_length:
             sha = name
             hexsha = None
         else:
@@ -1489,6 +1489,9 @@ class DiskObjectStore(PackBasedObjectStore):
         Returns:
             Number of loose objects
         """
+        # Calculate expected filename length for loose
+        # objects (excluding directory)
+        fn_length = self.object_format.hex_length - 2
         count = 0
         if not os.path.exists(self.path):
             return 0
@@ -1497,11 +1500,7 @@ class DiskObjectStore(PackBasedObjectStore):
             subdir = os.path.join(self.path, f"{i:02x}")
             try:
                 count += len(
-                    [
-                        name
-                        for name in os.listdir(subdir)
-                        if len(name) == 38  # 40 - 2 for the prefix
-                    ]
+                    [name for name in os.listdir(subdir) if len(name) == fn_length]
                 )
             except FileNotFoundError:
                 # Directory may have been removed or is inaccessible
@@ -2458,6 +2457,7 @@ class ObjectStoreGraphWalker:
     def ack(self, sha: ObjectID) -> None:
         """Ack that a revision and its ancestors are present in the source."""
         if len(sha) != 40:
+            # TODO: support SHA256
             raise ValueError(f"unexpected sha {sha!r} received")
         ancestors = {sha}
 

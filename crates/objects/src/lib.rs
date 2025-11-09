@@ -49,12 +49,16 @@ fn sha_to_pyhex(py: Python, sha: &[u8]) -> PyResult<Py<PyAny>> {
     Ok(PyBytes::new(py, hexsha.as_slice()).into())
 }
 
-fn parse_tree_with_length(
+#[pyfunction]
+#[pyo3(signature = (text, sha_len, strict=None))]
+fn parse_tree(
     py: Python,
     mut text: &[u8],
-    strict: bool,
-    hash_len: usize,
+    sha_len: usize,
+    strict: Option<bool>,
 ) -> PyResult<Vec<(Py<PyAny>, u32, Py<PyAny>)>> {
+    let strict = strict.unwrap_or(false);
+
     let mut entries = Vec::new();
     while !text.is_empty() {
         let mode_end = memchr(b' ', text)
@@ -76,47 +80,19 @@ fn parse_tree_with_length(
         text = &text[namelen + 1..];
 
         // Check if we have enough bytes for the hash
-        if text.len() < hash_len {
+        if text.len() < sha_len {
             return Err(ObjectFormatException::new_err(("SHA truncated",)));
         }
 
-        let sha = &text[..hash_len];
+        let sha = &text[..sha_len];
         entries.push((
             PyBytes::new(py, name).into_pyobject(py)?.unbind().into(),
             mode,
             sha_to_pyhex(py, sha)?,
         ));
-        text = &text[hash_len..];
+        text = &text[sha_len..];
     }
     Ok(entries)
-}
-
-#[pyfunction]
-#[pyo3(signature = (text, strict=None, object_format=None))]
-fn parse_tree(
-    py: Python,
-    text: &[u8],
-    strict: Option<bool>,
-    object_format: Option<Py<PyAny>>,
-) -> PyResult<Vec<(Py<PyAny>, u32, Py<PyAny>)>> {
-    let strict = strict.unwrap_or(false);
-
-    // Determine hash length from object_format if provided
-    if let Some(algo) = object_format {
-        // Get oid_length attribute from object format object
-        let oid_length: usize = algo.getattr(py, "oid_length")?.extract(py)?;
-        parse_tree_with_length(py, text, strict, oid_length)
-    } else {
-        // Try to auto-detect by attempting to parse with both lengths
-        // We'll attempt to parse with SHA1 first (20 bytes), then SHA256 (32 bytes)
-        match parse_tree_with_length(py, text, strict, 20) {
-            Ok(entries) => Ok(entries),
-            Err(_) => {
-                // SHA1 failed, try SHA256
-                parse_tree_with_length(py, text, strict, 32)
-            }
-        }
-    }
 }
 
 fn cmp_with_suffix(a: (u32, &[u8]), b: (u32, &[u8])) -> std::cmp::Ordering {
@@ -182,8 +158,7 @@ fn sorted_tree_items(
                         .unbind()
                         .into_any(),
                 ))?
-                .unbind()
-                .into())
+                .unbind())
         })
         .collect::<PyResult<Vec<Py<PyAny>>>>()
 }

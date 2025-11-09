@@ -127,7 +127,6 @@ from typing import (
     Optional,
     Protocol,
     TypeVar,
-    cast,
 )
 
 try:
@@ -143,6 +142,8 @@ if TYPE_CHECKING:
     from .bitmap import PackBitmap
     from .commit_graph import CommitGraph
     from .object_format import ObjectFormat
+    from .object_store import BaseObjectStore
+    from .ref import Ref
 
 # For some reason the above try, except fails to set has_mmap = False for plan9
 if sys.platform == "Plan9":
@@ -1085,7 +1086,7 @@ class PackIndex1(FilePackIndex):
 
     def _unpack_offset(self, i: int) -> int:
         offset = (0x100 * 4) + (i * self._entry_size)
-        return unpack_from(">L", self._contents, offset)[0]
+        return int(unpack_from(">L", self._contents, offset)[0])
 
     def _unpack_crc32_checksum(self, i: int) -> None:
         # Not stored in v1 index files
@@ -1146,14 +1147,18 @@ class PackIndex2(FilePackIndex):
 
     def _unpack_offset(self, i: int) -> int:
         offset = self._pack_offset_table_offset + i * 4
-        offset = unpack_from(">L", self._contents, offset)[0]
-        if offset & (2**31):
-            offset = self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
-            offset = unpack_from(">Q", self._contents, offset)[0]
-        return offset
+        offset_val = int(unpack_from(">L", self._contents, offset)[0])
+        if offset_val & (2**31):
+            offset = (
+                self._pack_offset_largetable_offset + (offset_val & (2**31 - 1)) * 8
+            )
+            offset_val = int(unpack_from(">Q", self._contents, offset)[0])
+        return offset_val
 
     def _unpack_crc32_checksum(self, i: int) -> int:
-        return unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+        return int(
+            unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+        )
 
     def get_pack_checksum(self) -> bytes:
         """Return the checksum stored for the corresponding packfile.
@@ -1652,7 +1657,7 @@ class PackData:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Create a PackData object representing the pack in the given filename.
 
@@ -3408,11 +3413,11 @@ def _create_delta_py(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
             o = j1
             while s > 127:
                 yield bytes([127])
-                yield memoryview(target_buf)[o : o + 127]
+                yield bytes(memoryview(target_buf)[o : o + 127])
                 s -= 127
                 o += 127
             yield bytes([s])
-            yield memoryview(target_buf)[o : o + s]
+            yield bytes(memoryview(target_buf)[o : o + s])
 
 
 # Default to pure Python implementation
@@ -4088,8 +4093,10 @@ class Pack:
                     isinstance(basename, bytes)
                     and len(basename) == self.object_format.oid_length
                 )
-                base_offset, base_type, base_obj = get_ref(basename)
+                base_offset_temp, base_type, base_obj = get_ref(basename)
                 assert isinstance(base_type, int)
+                # base_offset_temp can be None for thin packs (external references)
+                base_offset = base_offset_temp
                 if base_offset == prev_offset:  # object is based on itself
                     raise UnresolvedDeltas([basename])
             delta_stack.append((prev_offset, base_type, delta))

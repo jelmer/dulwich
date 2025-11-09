@@ -309,7 +309,7 @@ class ProcessFilterDriver:
             except FilterError as e:
                 if self.required:
                     raise
-                logging.warning(f"Process filter failed, falling back: {e}")
+                logging.warning("Process filter failed, falling back: %s", e)
 
         # Fall back to clean command
         if not self.clean_cmd:
@@ -331,7 +331,7 @@ class ProcessFilterDriver:
             if self.required:
                 raise FilterError(f"Required clean filter failed: {e}")
             # If not required, log warning and return original data on failure
-            logging.warning(f"Optional clean filter failed: {e}")
+            logging.warning("Optional clean filter failed: %s", e)
             return data
 
     def smudge(self, data: bytes, path: bytes = b"") -> bytes:
@@ -345,7 +345,7 @@ class ProcessFilterDriver:
             except FilterError as e:
                 if self.required:
                     raise
-                logging.warning(f"Process filter failed, falling back: {e}")
+                logging.warning("Process filter failed, falling back: %s", e)
 
         # Fall back to smudge command
         if not self.smudge_cmd:
@@ -370,7 +370,7 @@ class ProcessFilterDriver:
             if self.required:
                 raise FilterError(f"Required smudge filter failed: {e}")
             # If not required, log warning and return original data on failure
-            logging.warning(f"Optional smudge filter failed: {e}")
+            logging.warning("Optional smudge filter failed: %s", e)
             return data
 
     def cleanup(self) -> None:
@@ -427,6 +427,22 @@ class ProcessFilterDriver:
                 except ProcessLookupError:
                     # Process already dead
                     pass
+
+            # Close stdout and stderr to prevent resource leaks
+            if self._process.stdout and not self._process.stdout.closed:
+                try:
+                    self._process.stdout.close()
+                except (OSError, ValueError):
+                    # OSError: I/O operation on closed file
+                    # ValueError: I/O operation on closed file (some platforms)
+                    pass
+
+            if self._process.stderr and not self._process.stderr.closed:
+                try:
+                    self._process.stderr.close()
+                except (OSError, ValueError):
+                    pass
+
         self._process = None
         self._protocol = None
 

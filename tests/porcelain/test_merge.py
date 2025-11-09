@@ -27,6 +27,7 @@ import tempfile
 import unittest
 
 from dulwich import porcelain
+from dulwich.objects import ZERO_SHA
 from dulwich.repo import Repo
 
 from .. import DependencyMissing, TestCase
@@ -682,7 +683,7 @@ class PorcelainMergeTreeTests(TestCase):
                 tmpdir,
                 None,
                 commit_id,
-                "0" * 40,  # Invalid SHA
+                ZERO_SHA,
             )
 
 

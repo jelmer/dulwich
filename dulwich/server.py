@@ -585,6 +585,7 @@ class UploadPackHandler(PackHandler):
             self.write_pack_data,
             self.repo.object_store,
             object_ids,
+            object_format=self.repo.object_format,
         )
         # we are done
         self.proto.write_pkt_line(None)

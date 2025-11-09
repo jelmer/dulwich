@@ -62,6 +62,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         http_request_func: Callable[
             [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
         ],
+        object_format=None,
     ) -> None:
         """Initialize a DumbHTTPObjectStore.
 
@@ -69,7 +70,9 @@ class DumbHTTPObjectStore(BaseObjectStore):
           base_url: Base URL of the remote repository (e.g. "https://example.com/repo.git/")
           http_request_func: Function to make HTTP requests, should accept (url, headers)
                            and return (response, read_func).
+          object_format: Object format to use (defaults to DEFAULT_OBJECT_FORMAT)
         """
+        super().__init__(object_format=object_format)
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
         self._packs: list[tuple[str, PackIndex | None]] | None = None
@@ -252,7 +255,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
                     f.write(data)
 
             # Open the pack and get the object
-            pack_data = PackData(pack_path)
+            pack_data = PackData(pack_path, object_format=self.object_format)
             pack = Pack.from_objects(pack_data, pack_idx)
             try:
                 return pack.get_raw(binsha)

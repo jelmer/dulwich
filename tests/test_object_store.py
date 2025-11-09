@@ -31,6 +31,7 @@ from io import BytesIO
 
 from dulwich.errors import NotTreeError
 from dulwich.index import commit_tree
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import (
     DiskObjectStore,
     MemoryObjectStore,
@@ -75,7 +76,9 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         f, commit, abort = o.add_pack()
         try:
             b = make_object(Blob, data=b"more yummy data")
-            write_pack_objects(f.write, [(b, None)])
+            write_pack_objects(
+                f.write, [(b, None)], object_format=DEFAULT_OBJECT_FORMAT
+            )
         except BaseException:
             abort()
             raise
@@ -299,7 +302,9 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         f, commit, abort = o.add_pack()
         try:
             b = make_object(Blob, data=b"more yummy data")
-            write_pack_objects(f.write, [(b, None)])
+            write_pack_objects(
+                f.write, [(b, None)], object_format=DEFAULT_OBJECT_FORMAT
+            )
         except BaseException:
             abort()
             raise
@@ -839,7 +844,9 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         with patch("os.fsync") as mock_fsync:
             f, commit, abort = store.add_pack()
             try:
-                write_pack_objects(f.write, [(blob, None)])
+                write_pack_objects(
+                    f.write, [(blob, None)], object_format=DEFAULT_OBJECT_FORMAT
+                )
             except BaseException:
                 abort()
                 raise

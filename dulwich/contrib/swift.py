@@ -939,7 +939,7 @@ class SwiftObjectStore(PackBasedObjectStore):
 
         # Complete the pack.
         for ext_sha in indexer.ext_refs():  # type: ignore
-            assert len(ext_sha) == 20
+            assert len(ext_sha) in (20, 32)  # SHA-1 or SHA-256
             type_num, data = self.get_raw(ext_sha)
             offset = f.tell()
             crc32 = write_pack_object(f, type_num, data, sha=new_sha)  # type: ignore

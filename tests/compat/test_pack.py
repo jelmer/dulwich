@@ -29,6 +29,7 @@ import tempfile
 from typing import NoReturn
 
 from dulwich.file import GitFile
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import Blob
 from dulwich.pack import (
     PackData,
@@ -70,7 +71,9 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             pack_path = os.path.join(self._tempdir, "Elch")
-            write_pack(pack_path, origpack.pack_tuples())
+            write_pack(
+                pack_path, origpack.pack_tuples(), object_format=DEFAULT_OBJECT_FORMAT
+            )
             output = run_git_or_fail(["verify-pack", "-v", pack_path])
             orig_shas = {o.id for o in origpack.iterobjects()}
             self.assertEqual(orig_shas, _git_verify_pack_object_list(output))
@@ -84,7 +87,9 @@ class TestPack(PackTests):
                 (new_blob, None)
             ]
         pack_path = os.path.join(self._tempdir, "pack_with_deltas")
-        write_pack(pack_path, all_to_pack, deltify=True)
+        write_pack(
+            pack_path, all_to_pack, deltify=True, object_format=DEFAULT_OBJECT_FORMAT
+        )
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
             {x[0].id for x in all_to_pack},
@@ -115,7 +120,12 @@ class TestPack(PackTests):
                 (new_blob_2, None),
             ]
             pack_path = os.path.join(self._tempdir, "pack_with_deltas")
-            write_pack(pack_path, all_to_pack, deltify=True)
+            write_pack(
+                pack_path,
+                all_to_pack,
+                deltify=True,
+                object_format=DEFAULT_OBJECT_FORMAT,
+            )
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
             {x[0].id for x in all_to_pack},
@@ -155,7 +165,12 @@ class TestPack(PackTests):
                 (new_blob_2, None),
             ]
             pack_path = os.path.join(self._tempdir, "pack_with_deltas")
-            write_pack(pack_path, all_to_pack, deltify=True)
+            write_pack(
+                pack_path,
+                all_to_pack,
+                deltify=True,
+                object_format=DEFAULT_OBJECT_FORMAT,
+            )
         output = run_git_or_fail(["verify-pack", "-v", pack_path])
         self.assertEqual(
             {x[0].id for x in all_to_pack},
@@ -189,10 +204,10 @@ class TestPackIndexCompat(PackTests):
 
         pack_path = os.path.join(self._tempdir, "test_pack")
         entries = [(blob, None)]
-        write_pack(pack_path, entries)
+        write_pack(pack_path, entries, object_format=DEFAULT_OBJECT_FORMAT)
 
         # Load the pack and create v2 index (most compatible)
-        pack_data = PackData(pack_path + ".pack")
+        pack_data = PackData(pack_path + ".pack", object_format=DEFAULT_OBJECT_FORMAT)
         try:
             pack_data.create_index(pack_path + ".idx", version=2)
         finally:
@@ -210,7 +225,7 @@ class TestPackIndexCompat(PackTests):
 
         pack_path = os.path.join(self._tempdir, "git_pack")
         entries = [(blob, None)]
-        write_pack(pack_path, entries)
+        write_pack(pack_path, entries, object_format=DEFAULT_OBJECT_FORMAT)
 
         # Create index with git
         run_git_or_fail(["index-pack", pack_path + ".pack"])

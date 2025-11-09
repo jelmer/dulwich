@@ -84,7 +84,7 @@ class ObjectStoreTests:
         self.assertEqual(
             [],
             self.store.determine_wants_all(
-                {Ref(b"refs/heads/foo"): ObjectID(b"0" * 40)}
+                {b"refs/heads/foo": self.store.object_format.zero_oid}
             ),
         )
 

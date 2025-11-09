@@ -147,7 +147,7 @@ if TYPE_CHECKING:
 
 from . import replace_me
 from .attrs import GitAttributes, Pattern
-from .filters import FilterBlobNormalizer, FilterDriver, FilterRegistry
+from .filters import FilterBlobNormalizer, FilterContext, FilterDriver, FilterRegistry
 from .object_store import iter_tree_contents
 from .objects import Blob, ObjectID
 from .patch import is_binary
@@ -517,9 +517,12 @@ class BlobNormalizer(FilterBlobNormalizer):
 
         git_attributes = GitAttributes(git_attrs_patterns)
 
+        # Create FilterContext for parent class
+        filter_context = FilterContext(filter_registry)
+
         # Initialize parent class with gitattributes
         # The filter infrastructure will handle gitattributes processing
-        super().__init__(config_stack, git_attributes, filter_registry)
+        super().__init__(config_stack, git_attributes, filter_context=filter_context)
 
         # Store original filters for backward compatibility
         self.fallback_read_filter = smudge_filter

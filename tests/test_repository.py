@@ -839,7 +839,7 @@ exit 0
 
         self.assertRaises(
             errors.CommitError,
-            r.do_commit,
+            r.get_worktree().commit,
             b"failed commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
@@ -889,7 +889,7 @@ exit 0
 
         self.assertRaises(
             errors.CommitError,
-            r.do_commit,
+            r.get_worktree().commit,
             b"failed commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
@@ -927,7 +927,7 @@ with open('foo', 'w') as f:
     f.write('newfile')
 
 r = Repo('.')
-r.stage(['foo'])
+r.get_worktree().stage(['foo'])
 """.format(
             executable=sys.executable,
             path=[os.path.join(os.path.dirname(__file__), "..", ".."), *sys.path],
@@ -1415,10 +1415,13 @@ class BuildRepoRootTests(TestCase):
         r.object_store.add_object(tree)
 
         # Use do_commit for MemoryRepo since it doesn't support worktree
-        commit_sha = r.do_commit(
-            message=b"message",
-            tree=tree.id,
-        )
+        # Suppress deprecation warning since we're intentionally testing the deprecated method
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            commit_sha = r.do_commit(
+                message=b"message",
+                tree=tree.id,
+            )
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].author)
         self.assertEqual(b"Jelmer <jelmer@apache.org>", r[commit_sha].committer)
 
@@ -1453,7 +1456,7 @@ class BuildRepoRootTests(TestCase):
         old_shas = set(r.object_store)
         self.assertRaises(
             errors.CommitError,
-            r.do_commit,
+            r.get_worktree().commit,
             b"failed commit",
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
@@ -1504,7 +1507,7 @@ class BuildRepoRootTests(TestCase):
 
         self.assertRaises(
             ValueError,
-            r.do_commit,
+            r.get_worktree().commit,
             message_callback,
             committer=b"Test Committer <test@nodomain.com>",
             author=b"Test Author <test@nodomain.com>",
@@ -1658,7 +1661,10 @@ class BuildRepoRootTests(TestCase):
     def test_stage_absolute(self) -> None:
         r = self._repo
         os.remove(os.path.join(r.path, "a"))
-        self.assertRaises(ValueError, r.stage, [os.path.join(r.path, "a")])
+        # Suppress deprecation warning since we're intentionally testing the deprecated method
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            self.assertRaises(ValueError, r.stage, [os.path.join(r.path, "a")])
 
     def test_stage_deleted(self) -> None:
         r = self._repo

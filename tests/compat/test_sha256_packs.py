@@ -262,7 +262,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
         # Read all blobs
         for i in range(10):
             name = f"large{i}.txt".encode()
-            mode, sha = tree[name]
+            _mode, sha = tree[name]
             blob = repo[sha]
             expected = large_content + f" variation {i}".encode()
             self.assertEqual(blob.data, expected)

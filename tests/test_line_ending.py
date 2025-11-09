@@ -486,9 +486,12 @@ class LineEndingIntegrationTests(TestCase):
         gitattributes = GitAttributes(patterns)
 
         # Create normalizer
-        from dulwich.filters import FilterBlobNormalizer
+        from dulwich.filters import FilterBlobNormalizer, FilterContext
 
-        normalizer = FilterBlobNormalizer(self.config, gitattributes, self.registry)
+        filter_context = FilterContext(self.registry)
+        normalizer = FilterBlobNormalizer(
+            self.config, gitattributes, filter_context=filter_context
+        )
 
         # Test round trip
         blob = Blob()
@@ -537,9 +540,12 @@ class LineEndingIntegrationTests(TestCase):
         ]
         gitattributes = GitAttributes(patterns)
 
-        from dulwich.filters import FilterBlobNormalizer
+        from dulwich.filters import FilterBlobNormalizer, FilterContext
 
-        normalizer = FilterBlobNormalizer(self.config, gitattributes, self.registry)
+        filter_context = FilterContext(self.registry)
+        normalizer = FilterBlobNormalizer(
+            self.config, gitattributes, filter_context=filter_context
+        )
 
         # Text file gets line ending conversion
         text_blob = Blob()

@@ -83,6 +83,7 @@ if TYPE_CHECKING:
     from .filters import FilterBlobNormalizer, FilterContext
     from .index import Index
     from .notes import Notes
+    from .object_format import ObjectFormat
     from .object_store import BaseObjectStore, GraphWalker
     from .pack import UnpackedObject
     from .rebase import RebaseStateManager
@@ -502,7 +503,7 @@ class BaseRepo:
         self,
         object_store: "PackCapableObjectStore",
         refs: RefsContainer,
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Open a repository.
 
@@ -512,14 +513,17 @@ class BaseRepo:
         Args:
           object_store: Object store to use
           refs: Refs container to use
-          object_format: Hash algorithm to use (if None, will be determined from config)
+          object_format: Hash algorithm to use (if None, will use object_store's format)
         """
         self.object_store = object_store
         self.refs = refs
 
         self._graftpoints: dict[ObjectID, list[ObjectID]] = {}
         self.hooks: dict[str, Hook] = {}
-        self.object_format = object_format  # Hash algorithm (SHA1 or SHA256)
+        if object_format is None:
+            self.object_format: ObjectFormat = object_store.object_format
+        else:
+            self.object_format = object_format
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.
@@ -2115,7 +2119,6 @@ class Repo(BaseRepo):
         controldir: str | bytes | os.PathLike[str],
         bare: bool,
         object_store: PackBasedObjectStore | None = None,
-        object_store: "PackBasedObjectStore | None" = None,
         config: "StackedConfig | None" = None,
         default_branch: bytes | None = None,
         symlinks: bool | None = None,
@@ -2143,11 +2146,6 @@ class Repo(BaseRepo):
             if dir_mode is not None:
                 os.chmod(dir_path, dir_mode)
 
-        if object_store is None:
-            # Get hash algorithm for object store
-            from .hash import get_hash_algorithm
-            os.mkdir(os.path.join(controldir, *d))
-
         # Determine hash algorithm
         from .object_format import get_object_format
 
@@ -2159,7 +2157,6 @@ class Repo(BaseRepo):
                 file_mode=file_mode,
                 dir_mode=dir_mode,
                 object_format=hash_alg,
-                os.path.join(controldir, OBJECTDIR), object_format=hash_alg
             )
         ret = cls(path, bare=bare, object_store=object_store)
         if default_branch is None:

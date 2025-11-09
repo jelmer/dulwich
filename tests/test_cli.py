@@ -126,6 +126,50 @@ class InitCommandTest(DulwichCliTestCase):
         self.assertTrue(os.path.exists(os.path.join(bare_repo_path, "HEAD")))
         self.assertFalse(os.path.exists(os.path.join(bare_repo_path, ".git")))
 
+    def test_init_objectformat_sha256(self) -> None:
+        # Create a new directory for init with SHA-256
+        new_repo_path = os.path.join(self.test_dir, "sha256_repo")
+        _result, _stdout, _stderr = self._run_cli(
+            "init", "--objectformat=sha256", new_repo_path
+        )
+        self.assertTrue(os.path.exists(os.path.join(new_repo_path, ".git")))
+        # Verify the object format
+        repo = Repo(new_repo_path)
+        self.addCleanup(repo.close)
+        config = repo.get_config()
+        self.assertEqual(b"sha256", config.get((b"extensions",), b"objectformat"))
+
+    def test_init_objectformat_sha1(self) -> None:
+        # Create a new directory for init with SHA-1
+        new_repo_path = os.path.join(self.test_dir, "sha1_repo")
+        _result, _stdout, _stderr = self._run_cli(
+            "init", "--objectformat=sha1", new_repo_path
+        )
+        self.assertTrue(os.path.exists(os.path.join(new_repo_path, ".git")))
+        # SHA-1 is the default, so objectformat should not be set
+        repo = Repo(new_repo_path)
+        self.addCleanup(repo.close)
+        config = repo.get_config()
+        # The extensions section may not exist at all for SHA-1
+        if config.has_section((b"extensions",)):
+            object_format = config.get((b"extensions",), b"objectformat")
+            self.assertNotEqual(b"sha256", object_format)
+        # If the section doesn't exist, that's also fine (SHA-1 is default)
+
+    def test_init_bare_objectformat_sha256(self) -> None:
+        # Create a bare repo with SHA-256
+        bare_repo_path = os.path.join(self.test_dir, "bare_sha256_repo")
+        _result, _stdout, _stderr = self._run_cli(
+            "init", "--bare", "--objectformat=sha256", bare_repo_path
+        )
+        self.assertTrue(os.path.exists(os.path.join(bare_repo_path, "HEAD")))
+        self.assertFalse(os.path.exists(os.path.join(bare_repo_path, ".git")))
+        # Verify the object format
+        repo = Repo(bare_repo_path)
+        self.addCleanup(repo.close)
+        config = repo.get_config()
+        self.assertEqual(b"sha256", config.get((b"extensions",), b"objectformat"))
+
 
 class HelperFunctionsTest(TestCase):
     """Tests for CLI helper functions."""

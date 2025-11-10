@@ -8843,10 +8843,10 @@ def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
         - List of tuples (path, conflict_id) for recorded conflicts
         - List of paths where resolutions were automatically applied
     """
-    from dulwich.rerere import rerere_auto
+    from dulwich.rerere import _has_conflict_markers, rerere_auto
 
     with open_repo_closing(repo) as r:
-        # Get conflicts from the index
+        # Get conflicts from the index (if available)
         index = r.open_index()
         conflicts = []
 
@@ -8855,6 +8855,20 @@ def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
         for path, entry in index.items():
             if isinstance(entry, ConflictedIndexEntry):
                 conflicts.append(path)
+
+        # Also scan working tree for files with conflict markers
+        # This is needed because merge() doesn't always create ConflictedIndexEntry
+        if not conflicts:
+            working_tree = r.path
+            for path in index:
+                file_path = os.path.join(working_tree, os.fsdecode(path))
+                try:
+                    with open(file_path, "rb") as f:
+                        content = f.read()
+                    if _has_conflict_markers(content):
+                        conflicts.append(path)
+                except (FileNotFoundError, IsADirectoryError, PermissionError):
+                    pass
 
         # Record conflicts and apply known resolutions
         working_tree = r.path

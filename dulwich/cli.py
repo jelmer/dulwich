@@ -4082,6 +4082,72 @@ class cmd_describe(Command):
         logger.info(porcelain.describe("."))
 
 
+class cmd_diagnose(Command):
+    """Display diagnostic information about the Python environment."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the diagnose command.
+
+        Args:
+            args: Command line arguments
+        """
+        # TODO: Support creating zip files with diagnostic information
+        parser = argparse.ArgumentParser()
+        parser.parse_args(args)
+
+        # Python version and executable
+        logger.info("Python version: %s", sys.version)
+        logger.info("Python executable: %s", sys.executable)
+
+        # PYTHONPATH
+        pythonpath = os.environ.get("PYTHONPATH", "")
+        if pythonpath:
+            logger.info("PYTHONPATH: %s", pythonpath)
+        else:
+            logger.info("PYTHONPATH: (not set)")
+
+        # sys.path
+        logger.info("sys.path:")
+        for path_entry in sys.path:
+            logger.info("  %s", path_entry)
+
+        # Dulwich version
+        try:
+            import dulwich
+
+            logger.info("Dulwich version: %s", dulwich.__version__)
+        except AttributeError:
+            logger.info("Dulwich version: (unknown)")
+
+        # List installed dependencies and their versions
+        logger.info("Installed dependencies:")
+
+        # Core dependencies
+        dependencies = [
+            ("urllib3", "core"),
+            ("typing_extensions", "core (Python < 3.12)"),
+        ]
+
+        # Optional dependencies
+        optional_dependencies = [
+            ("fastimport", "fastimport"),
+            ("gpg", "pgp"),
+            ("paramiko", "paramiko"),
+            ("rich", "colordiff"),
+            ("merge3", "merge"),
+            ("patiencediff", "patiencediff"),
+            ("atheris", "fuzzing"),
+        ]
+
+        for dep, dep_type in dependencies + optional_dependencies:
+            try:
+                module = __import__(dep)
+                version = getattr(module, "__version__", "(unknown)")
+                logger.info("  %s: %s [%s]", dep, version, dep_type)
+            except ImportError:
+                logger.info("  %s: (not installed) [%s]", dep, dep_type)
+
+
 class cmd_merge(Command):
     """Join two or more development histories together."""
 
@@ -6361,6 +6427,7 @@ commands = {
     "config": cmd_config,
     "count-objects": cmd_count_objects,
     "describe": cmd_describe,
+    "diagnose": cmd_diagnose,
     "daemon": cmd_daemon,
     "diff": cmd_diff,
     "diff-tree": cmd_diff_tree,

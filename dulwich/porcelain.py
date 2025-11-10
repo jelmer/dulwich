@@ -8828,6 +8828,36 @@ def mailinfo(
     return result
 
 
+def rerere(repo: RepoPath = ".") -> list[tuple[bytes, str]]:
+    """Record current conflict resolutions.
+
+    This reads conflicted files from the working tree and records them
+    in the rerere cache.
+
+    Args:
+        repo: Path to the repository
+
+    Returns:
+        List of tuples (path, conflict_id) for recorded conflicts
+    """
+    from dulwich.rerere import rerere_auto
+
+    with open_repo_closing(repo) as r:
+        # Get conflicts from the index
+        index = r.open_index()
+        conflicts = []
+
+        from dulwich.index import ConflictedIndexEntry
+
+        for path, entry in index.items():
+            if isinstance(entry, ConflictedIndexEntry):
+                conflicts.append(path)
+
+        # Record conflicts
+        working_tree = r.path
+        return rerere_auto(r, working_tree, conflicts)
+
+
 def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
     """Get the status of all conflicts in the rerere cache.
 
@@ -8844,7 +8874,9 @@ def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
         return cache.status()
 
 
-def rerere_diff(repo: RepoPath = ".", conflict_id: str | None = None) -> list[tuple[str, bytes, bytes | None]]:
+def rerere_diff(
+    repo: RepoPath = ".", conflict_id: str | None = None
+) -> list[tuple[str, bytes, bytes | None]]:
     """Show differences for recorded rerere conflicts.
 
     Args:

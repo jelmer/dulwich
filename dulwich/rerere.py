@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dulwich.config import StackedConfig
-    from dulwich.index import Index
     from dulwich.repo import Repo
 
 
@@ -464,9 +463,9 @@ def is_rerere_autoupdate(config: "StackedConfig") -> bool:
 
 
 def rerere_auto(
-    repo_dir: bytes | str,
-    index: "Index",
-    config: "StackedConfig",
+    repo: "Repo",
+    working_tree_path: bytes | str,
+    conflicts: list[bytes],
 ) -> list[tuple[bytes, str]]:
     """Automatically record conflicts and apply known resolutions.
 
@@ -474,27 +473,38 @@ def rerere_auto(
     It should be called after a merge that resulted in conflicts.
 
     Args:
-        repo_dir: Path to the repository (.git directory)
-        index: Git index with conflicts
-        config: Git configuration
+        repo: Repository object
+        working_tree_path: Path to the working tree
+        conflicts: List of conflicted file paths
 
     Returns:
         List of tuples (path, conflict_id) for recorded conflicts
     """
+    config = repo.get_config_stack()
     if not is_rerere_enabled(config):
         return []
 
-    if isinstance(repo_dir, bytes):
-        repo_dir = os.fsdecode(repo_dir)
+    cache = RerereCache.from_repo(repo)
+    recorded = []
 
-    # rr_cache_dir = os.path.join(repo_dir, "rr-cache")
-    # cache = RerereCache(rr_cache_dir)
+    if isinstance(working_tree_path, bytes):
+        working_tree_path = os.fsdecode(working_tree_path)
 
-    # TODO: Implement automatic conflict recording and resolution
-    # This requires:
-    # 1. Reading conflicted files from the working tree
-    # 2. Recording conflicts in the cache
-    # 3. Applying known resolutions if rerere.autoupdate is enabled
-    # 4. Updating the index with resolved content
+    # Record conflicts from the working tree
+    for path in conflicts:
+        # Read the file from the working tree
+        file_path = os.path.join(working_tree_path, os.fsdecode(path))
 
-    return []
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+        except FileNotFoundError:
+            # File was deleted in conflict
+            continue
+
+        # Record the conflict
+        conflict_id = cache.record_conflict(path, content)
+        if conflict_id:
+            recorded.append((path, conflict_id))
+
+    return recorded

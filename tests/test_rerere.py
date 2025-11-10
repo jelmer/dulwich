@@ -1,5 +1,6 @@
 """Tests for rerere functionality."""
 
+import os
 import tempfile
 import unittest
 
@@ -291,3 +292,95 @@ class ConfigTests(unittest.TestCase):
         config = ConfigDict()
         config.set((b"rerere",), b"autoupdate", b"true")
         self.assertTrue(is_rerere_autoupdate(config))
+
+
+class RerereAutoTests(unittest.TestCase):
+    """Tests for rerere_auto functionality."""
+
+    def setUp(self) -> None:
+        """Set up test fixtures."""
+
+        from dulwich.repo import Repo
+
+        self.tempdir = tempfile.mkdtemp()
+        self.repo = Repo.init(self.tempdir)
+
+        # Enable rerere
+        config = self.repo.get_config()
+        config.set((b"rerere",), b"enabled", b"true")
+        config.write_to_path()
+
+    def tearDown(self) -> None:
+        """Clean up test fixtures."""
+        import shutil
+
+        shutil.rmtree(self.tempdir, ignore_errors=True)
+
+    def test_rerere_auto_disabled(self) -> None:
+        """Test that rerere_auto does nothing when disabled."""
+        from dulwich.rerere import rerere_auto
+
+        # Disable rerere
+        config = self.repo.get_config()
+        config.set((b"rerere",), b"enabled", b"false")
+        config.write_to_path()
+
+        # Create a fake conflicted file
+        conflict_file = os.path.join(self.tempdir, "test.txt")
+        with open(conflict_file, "wb") as f:
+            f.write(
+                b"""<<<<<<< ours
+our change
+=======
+their change
+>>>>>>> theirs
+"""
+            )
+
+        result = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual([], result)
+
+    def test_rerere_auto_records_conflicts(self) -> None:
+        """Test that rerere_auto records conflicts from working tree."""
+        from dulwich.rerere import rerere_auto
+
+        # Create a conflicted file in the working tree
+        conflict_file = os.path.join(self.tempdir, "test.txt")
+        with open(conflict_file, "wb") as f:
+            f.write(
+                b"""line 1
+<<<<<<< ours
+our change
+=======
+their change
+>>>>>>> theirs
+line 2
+"""
+            )
+
+        result = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual(1, len(result))
+
+        path, conflict_id = result[0]
+        self.assertEqual(b"test.txt", path)
+        self.assertEqual(40, len(conflict_id))  # SHA-1 hash length
+
+    def test_rerere_auto_skips_non_conflicted_files(self) -> None:
+        """Test that rerere_auto skips files without conflict markers."""
+        from dulwich.rerere import rerere_auto
+
+        # Create a non-conflicted file
+        file_path = os.path.join(self.tempdir, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\n")
+
+        result = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual([], result)
+
+    def test_rerere_auto_handles_missing_files(self) -> None:
+        """Test that rerere_auto handles deleted files gracefully."""
+        from dulwich.rerere import rerere_auto
+
+        # Don't create the file
+        result = rerere_auto(self.repo, self.tempdir, [b"missing.txt"])
+        self.assertEqual([], result)

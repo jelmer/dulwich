@@ -6421,9 +6421,9 @@ class cmd_rerere(Command):
         parser.add_argument(
             "subcommand",
             nargs="?",
-            default="status",
+            default=None,
             choices=["status", "diff", "forget", "clear", "gc"],
-            help="Subcommand to execute",
+            help="Subcommand to execute (default: record conflicts)",
         )
         parser.add_argument(
             "pathspec", nargs="?", help="Path specification (for forget subcommand)"
@@ -6436,7 +6436,18 @@ class cmd_rerere(Command):
         )
         parsed_args = parser.parse_args(args)
 
-        if parsed_args.subcommand == "status":
+        if parsed_args.subcommand is None:
+            # Record current conflicts
+            recorded = porcelain.rerere(parsed_args.gitdir)
+            if not recorded:
+                sys.stdout.write("No conflicts to record.\n")
+            else:
+                for path, conflict_id in recorded:
+                    sys.stdout.write(
+                        f"Recorded resolution for {path.decode('utf-8')}: {conflict_id}\n"
+                    )
+
+        elif parsed_args.subcommand == "status":
             status_list = porcelain.rerere_status(parsed_args.gitdir)
             if not status_list:
                 sys.stdout.write("No recorded resolutions.\n")
@@ -6472,7 +6483,9 @@ class cmd_rerere(Command):
 
         elif parsed_args.subcommand == "gc":
             porcelain.rerere_gc(parsed_args.gitdir, parsed_args.max_age_days)
-            sys.stdout.write(f"Cleaned up resolutions older than {parsed_args.max_age_days} days\n")
+            sys.stdout.write(
+                f"Cleaned up resolutions older than {parsed_args.max_age_days} days\n"
+            )
 
 
 commands = {

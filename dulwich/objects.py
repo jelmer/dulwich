@@ -504,7 +504,11 @@ class ShaFile:
         self.set_raw_chunks([text], sha)
 
     def set_raw_chunks(
-        self, chunks: list[bytes], sha: ObjectID | None = None, *, object_format=None
+        self,
+        chunks: list[bytes],
+        sha: ObjectID | None = None,
+        *,
+        object_format: ObjectFormat | None = None,
     ) -> None:
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
@@ -551,7 +555,10 @@ class ShaFile:
 
     @classmethod
     def _parse_file(
-        cls, f: Union[BufferedIOBase, IO[bytes], "_GitFile"], *, object_format=None
+        cls,
+        f: Union[BufferedIOBase, IO[bytes], "_GitFile"],
+        *,
+        object_format: ObjectFormat | None = None,
     ) -> "ShaFile":
         map = f.read()
         if not map:
@@ -577,7 +584,11 @@ class ShaFile:
 
     @classmethod
     def from_path(
-        cls, path: str | bytes, sha: ObjectID | None = None, *, object_format=None
+        cls,
+        path: str | bytes,
+        sha: ObjectID | None = None,
+        *,
+        object_format: ObjectFormat | None = None,
     ) -> "ShaFile":
         """Open a SHA file from disk."""
         with GitFile(path, "rb") as f:
@@ -589,7 +600,7 @@ class ShaFile:
         f: Union[BufferedIOBase, IO[bytes], "_GitFile"],
         sha: ObjectID | None = None,
         *,
-        object_format=None,
+        object_format: ObjectFormat | None = None,
     ) -> "ShaFile":
         """Get the contents of a SHA file on disk."""
         try:
@@ -617,7 +628,7 @@ class ShaFile:
         string: bytes,
         sha: ObjectID | None = None,
         *,
-        object_format=None,
+        object_format: ObjectFormat | None = None,
     ) -> "ShaFile":
         """Creates an object of the indicated type from the raw string given.
 
@@ -703,7 +714,7 @@ class ShaFile:
         """Returns the length of the raw string of this object."""
         return sum(map(len, self.as_raw_chunks()))
 
-    def sha(self, object_format=None) -> Union[FixedSha, "HASH"]:
+    def sha(self, object_format: ObjectFormat | None = None) -> Union[FixedSha, "HASH"]:
         """The SHA object that is the name of this object.
 
         Args:
@@ -743,7 +754,7 @@ class ShaFile:
         """
         return self.sha().hexdigest().encode("ascii")
 
-    def get_id(self, object_format=None) -> bytes:
+    def get_id(self, object_format: ObjectFormat | None = None) -> bytes:
         """Get the hex SHA of this object using the specified hash algorithm.
 
         Args:
@@ -832,12 +843,19 @@ class Blob(ShaFile):
     )
 
     @classmethod
-    def from_path(cls, path: str | bytes, sha: ObjectID | None = None) -> "Blob":
+    def from_path(
+        cls,
+        path: str | bytes,
+        sha: ObjectID | None = None,
+        *,
+        object_format: ObjectFormat | None = None,
+    ) -> "Blob":
         """Read a blob from a file on disk.
 
         Args:
           path: Path to the blob file
           sha: Optional known SHA for the object
+          object_format: Optional object format to use
 
         Returns:
           A Blob object
@@ -845,7 +863,7 @@ class Blob(ShaFile):
         Raises:
           NotBlobError: If the file is not a blob
         """
-        blob = ShaFile.from_path(path, sha)
+        blob = ShaFile.from_path(path, sha, object_format=object_format)
         if not isinstance(blob, cls):
             raise NotBlobError(_path_to_bytes(path))
         return blob
@@ -994,12 +1012,19 @@ class Tag(ShaFile):
         self._signature: bytes | None = None
 
     @classmethod
-    def from_path(cls, filename: str | bytes, sha: ObjectID | None = None) -> "Tag":
+    def from_path(
+        cls,
+        filename: str | bytes,
+        sha: ObjectID | None = None,
+        *,
+        object_format: ObjectFormat | None = None,
+    ) -> "Tag":
         """Read a tag from a file on disk.
 
         Args:
           filename: Path to the tag file
           sha: Optional known SHA for the object
+          object_format: Optional object format to use
 
         Returns:
           A Tag object
@@ -1007,7 +1032,7 @@ class Tag(ShaFile):
         Raises:
           NotTagError: If the file is not a tag
         """
-        tag = ShaFile.from_path(filename, sha)
+        tag = ShaFile.from_path(filename, sha, object_format=object_format)
         if not isinstance(tag, cls):
             raise NotTagError(_path_to_bytes(filename))
         return tag
@@ -1303,6 +1328,8 @@ def parse_tree(
         name_end = text.index(b"\0", mode_end)
         name = text[mode_end + 1 : name_end]
 
+        if sha_len is None:
+            raise ObjectFormatException("sha_len must be specified")
         count = name_end + 1 + sha_len
         if count > length:
             raise ObjectFormatException(
@@ -1425,12 +1452,19 @@ class Tree(ShaFile):
         self._entries: dict[bytes, tuple[int, bytes]] = {}
 
     @classmethod
-    def from_path(cls, filename: str | bytes, sha: ObjectID | None = None) -> "Tree":
+    def from_path(
+        cls,
+        filename: str | bytes,
+        sha: ObjectID | None = None,
+        *,
+        object_format: ObjectFormat | None = None,
+    ) -> "Tree":
         """Read a tree from a file on disk.
 
         Args:
           filename: Path to the tree file
           sha: Optional known SHA for the object
+          object_format: Optional object format to use
 
         Returns:
           A Tree object
@@ -1438,7 +1472,7 @@ class Tree(ShaFile):
         Raises:
           NotTreeError: If the file is not a tree
         """
-        tree = ShaFile.from_path(filename, sha)
+        tree = ShaFile.from_path(filename, sha, object_format=object_format)
         if not isinstance(tree, cls):
             raise NotTreeError(_path_to_bytes(filename))
         return tree
@@ -1814,12 +1848,19 @@ class Commit(ShaFile):
         self._commit_timezone_neg_utc: bool | None = False
 
     @classmethod
-    def from_path(cls, path: str | bytes, sha: ObjectID | None = None) -> "Commit":
+    def from_path(
+        cls,
+        path: str | bytes,
+        sha: ObjectID | None = None,
+        *,
+        object_format: ObjectFormat | None = None,
+    ) -> "Commit":
         """Read a commit from a file on disk.
 
         Args:
           path: Path to the commit file
           sha: Optional known SHA for the object
+          object_format: Optional object format to use
 
         Returns:
           A Commit object
@@ -1827,7 +1868,7 @@ class Commit(ShaFile):
         Raises:
           NotCommitError: If the file is not a commit
         """
-        commit = ShaFile.from_path(path, sha)
+        commit = ShaFile.from_path(path, sha, object_format=object_format)
         if not isinstance(commit, cls):
             raise NotCommitError(_path_to_bytes(path))
         return commit

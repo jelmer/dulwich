@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from .filters import FilterBlobNormalizer, FilterContext
     from .index import Index
     from .notes import Notes
+    from .object_format import ObjectFormat
     from .object_store import BaseObjectStore, GraphWalker
     from .pack import UnpackedObject
     from .rebase import RebaseStateManager
@@ -411,7 +412,7 @@ class BaseRepo:
         self,
         object_store: "PackCapableObjectStore",
         refs: RefsContainer,
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Open a repository.
 
@@ -421,14 +422,17 @@ class BaseRepo:
         Args:
           object_store: Object store to use
           refs: Refs container to use
-          object_format: Hash algorithm to use (if None, will be determined from config)
+          object_format: Hash algorithm to use (if None, will use object_store's format)
         """
         self.object_store = object_store
         self.refs = refs
 
         self._graftpoints: dict[bytes, list[bytes]] = {}
         self.hooks: dict[str, Hook] = {}
-        self.object_format = object_format  # Hash algorithm (SHA1 or SHA256)
+        if object_format is None:
+            self.object_format: ObjectFormat = object_store.object_format
+        else:
+            self.object_format = object_format
 
     def _determine_file_mode(self) -> bool:
         """Probe the file-system to determine whether permissions can be trusted.

@@ -40,6 +40,9 @@ from typing import (
     Protocol,
 )
 
+if TYPE_CHECKING:
+    from .object_format import ObjectFormat
+
 from .errors import NotTreeError
 from .file import GitFile, _GitFile
 from .objects import (
@@ -229,7 +232,7 @@ class PackContainer(Protocol):
 class BaseObjectStore:
     """Object store interface."""
 
-    def __init__(self, *, object_format=None) -> None:
+    def __init__(self, *, object_format: "ObjectFormat | None" = None) -> None:
         """Initialize object store.
 
         Args:
@@ -718,7 +721,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         *,
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -1218,7 +1221,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         fsync_object_files: bool = False,
-        object_format=None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Open an object store.
 
@@ -1355,10 +1358,10 @@ class DiskObjectStore(PackBasedObjectStore):
                 version = 0
             if version == 1:
                 try:
-                    object_format = config.get((b"extensions",), b"objectformat")
+                    object_format_name = config.get((b"extensions",), b"objectformat")
                 except KeyError:
-                    object_format = b"sha1"
-                object_format = get_object_format(object_format.decode("ascii"))
+                    object_format_name = b"sha1"
+                object_format = get_object_format(object_format_name.decode("ascii"))
         except (KeyError, ValueError):
             pass
 
@@ -1756,7 +1759,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
     @classmethod
     def init(
-        cls, path: str | os.PathLike[str], object_format=None
+        cls, path: str | os.PathLike[str], object_format: "ObjectFormat | None" = None
     ) -> "DiskObjectStore":
         """Initialize a new disk object store.
 
@@ -1965,7 +1968,7 @@ class DiskObjectStore(PackBasedObjectStore):
 class MemoryObjectStore(PackCapableObjectStore):
     """Object store that keeps all objects in memory."""
 
-    def __init__(self, *, object_format=None) -> None:
+    def __init__(self, *, object_format: "ObjectFormat | None" = None) -> None:
         """Initialize a MemoryObjectStore.
 
         Creates an empty in-memory object store.

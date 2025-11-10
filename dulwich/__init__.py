@@ -26,7 +26,7 @@
 from collections.abc import Callable
 from typing import Any, ParamSpec, TypeVar
 
-__version__ = (0, 24, 8)
+__version__ = (0, 24, 9)
 
 __all__ = ["__version__", "replace_me"]
 

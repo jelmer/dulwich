@@ -479,3 +479,242 @@ line 2
         with open(conflict_file, "rb") as f:
             actual = f.read()
         self.assertEqual(conflict_content, actual)
+
+
+class RerereEndToEndTests(unittest.TestCase):
+    """End-to-end tests for rerere with real merge operations."""
+
+    def setUp(self) -> None:
+        """Set up test fixtures."""
+
+        from dulwich.objects import Blob, Commit, Tree
+        from dulwich.repo import Repo
+
+        self.tempdir = tempfile.mkdtemp()
+        self.repo = Repo.init(self.tempdir)
+
+        # Enable rerere
+        config = self.repo.get_config()
+        config.set((b"rerere",), b"enabled", b"true")
+        config.write_to_path()
+
+        # Create initial commit on master
+        blob1 = Blob.from_string(b"line 1\noriginal line\nline 3\n")
+        self.repo.object_store.add_object(blob1)
+
+        tree1 = Tree()
+        tree1.add(b"file.txt", 0o100644, blob1.id)
+        self.repo.object_store.add_object(tree1)
+
+        commit1 = Commit()
+        commit1.tree = tree1.id
+        commit1.author = commit1.committer = b"Test User <test@example.com>"
+        commit1.author_time = commit1.commit_time = 1234567890
+        commit1.author_timezone = commit1.commit_timezone = 0
+        commit1.encoding = b"UTF-8"
+        commit1.message = b"Initial commit"
+        self.repo.object_store.add_object(commit1)
+
+        self.repo.refs[b"refs/heads/master"] = commit1.id
+        self.repo.refs[b"HEAD"] = commit1.id
+
+        # Write file to working tree
+        with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
+            f.write(b"line 1\noriginal line\nline 3\n")
+
+        self.initial_commit = commit1.id
+
+    def tearDown(self) -> None:
+        """Clean up test fixtures."""
+        import shutil
+
+        shutil.rmtree(self.tempdir, ignore_errors=True)
+
+    def test_rerere_full_workflow(self) -> None:
+        """Test complete rerere workflow with real merge conflicts."""
+        from dulwich.objects import Blob, Commit, Tree
+        from dulwich.porcelain import merge, rerere
+
+        # Create branch1: change "original line" to "branch1 change"
+        blob_branch1 = Blob.from_string(b"line 1\nbranch1 change\nline 3\n")
+        self.repo.object_store.add_object(blob_branch1)
+
+        tree_branch1 = Tree()
+        tree_branch1.add(b"file.txt", 0o100644, blob_branch1.id)
+        self.repo.object_store.add_object(tree_branch1)
+
+        commit_branch1 = Commit()
+        commit_branch1.tree = tree_branch1.id
+        commit_branch1.parents = [self.initial_commit]
+        commit_branch1.author = commit_branch1.committer = (
+            b"Test User <test@example.com>"
+        )
+        commit_branch1.author_time = commit_branch1.commit_time = 1234567891
+        commit_branch1.author_timezone = commit_branch1.commit_timezone = 0
+        commit_branch1.encoding = b"UTF-8"
+        commit_branch1.message = b"Branch1 changes"
+        self.repo.object_store.add_object(commit_branch1)
+        self.repo.refs[b"refs/heads/branch1"] = commit_branch1.id
+
+        # Create branch2: change "original line" to "branch2 change"
+        blob_branch2 = Blob.from_string(b"line 1\nbranch2 change\nline 3\n")
+        self.repo.object_store.add_object(blob_branch2)
+
+        tree_branch2 = Tree()
+        tree_branch2.add(b"file.txt", 0o100644, blob_branch2.id)
+        self.repo.object_store.add_object(tree_branch2)
+
+        commit_branch2 = Commit()
+        commit_branch2.tree = tree_branch2.id
+        commit_branch2.parents = [self.initial_commit]
+        commit_branch2.author = commit_branch2.committer = (
+            b"Test User <test@example.com>"
+        )
+        commit_branch2.author_time = commit_branch2.commit_time = 1234567892
+        commit_branch2.author_timezone = commit_branch2.commit_timezone = 0
+        commit_branch2.encoding = b"UTF-8"
+        commit_branch2.message = b"Branch2 changes"
+        self.repo.object_store.add_object(commit_branch2)
+        self.repo.refs[b"refs/heads/branch2"] = commit_branch2.id
+
+        # Checkout branch1
+        self.repo.refs[b"HEAD"] = commit_branch1.id
+        with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
+            f.write(b"line 1\nbranch1 change\nline 3\n")
+
+        # Merge branch2 into branch1 - should create conflict
+        merge_result, conflicts = merge(self.repo, b"branch2", no_commit=True)
+
+        # Should have conflicts
+        self.assertIsNone(merge_result)  # No commit created due to conflicts
+        self.assertEqual([b"file.txt"], conflicts)
+
+        # File should have conflict markers
+        with open(os.path.join(self.tempdir, "file.txt"), "rb") as f:
+            content = f.read()
+        self.assertIn(b"<<<<<<<", content)
+        self.assertIn(b"branch1 change", content)
+        self.assertIn(b"branch2 change", content)
+
+        # Record the conflict with rerere
+        recorded, resolved = rerere(self.repo)
+        self.assertEqual(1, len(recorded))
+        self.assertEqual(0, len(resolved))  # No resolution yet
+
+        conflict_id = recorded[0][1]
+
+        # User manually resolves the conflict
+        resolved_content = b"line 1\nmerged change\nline 3\n"
+        with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
+            f.write(resolved_content)
+
+        # Record the resolution
+        from dulwich.rerere import RerereCache
+
+        cache = RerereCache.from_repo(self.repo)
+        cache.record_resolution(conflict_id, resolved_content)
+
+        # Reset to initial state and try the merge again
+        self.repo.refs[b"HEAD"] = commit_branch1.id
+        with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
+            f.write(b"line 1\nbranch1 change\nline 3\n")
+
+        # Merge again - should create same conflict
+        _merge_result2, conflicts2 = merge(self.repo, b"branch2", no_commit=True)
+        self.assertEqual([b"file.txt"], conflicts2)
+
+        # Now rerere should recognize the conflict
+        recorded2, resolved2 = rerere(self.repo)
+        self.assertEqual(1, len(recorded2))
+
+        # With autoupdate disabled, it shouldn't auto-apply
+        self.assertEqual(0, len(resolved2))
+
+    def test_rerere_with_autoupdate(self) -> None:
+        """Test rerere with autoupdate enabled."""
+        from dulwich.objects import Blob, Commit, Tree
+        from dulwich.porcelain import merge, rerere
+        from dulwich.rerere import RerereCache
+
+        # Enable autoupdate
+        config = self.repo.get_config()
+        config.set((b"rerere",), b"autoupdate", b"true")
+        config.write_to_path()
+
+        # Create branch1
+        blob_branch1 = Blob.from_string(b"line 1\nbranch1 change\nline 3\n")
+        self.repo.object_store.add_object(blob_branch1)
+
+        tree_branch1 = Tree()
+        tree_branch1.add(b"file.txt", 0o100644, blob_branch1.id)
+        self.repo.object_store.add_object(tree_branch1)
+
+        commit_branch1 = Commit()
+        commit_branch1.tree = tree_branch1.id
+        commit_branch1.parents = [self.initial_commit]
+        commit_branch1.author = commit_branch1.committer = (
+            b"Test User <test@example.com>"
+        )
+        commit_branch1.author_time = commit_branch1.commit_time = 1234567891
+        commit_branch1.author_timezone = commit_branch1.commit_timezone = 0
+        commit_branch1.encoding = b"UTF-8"
+        commit_branch1.message = b"Branch1 changes"
+        self.repo.object_store.add_object(commit_branch1)
+        self.repo.refs[b"refs/heads/branch1"] = commit_branch1.id
+
+        # Create branch2
+        blob_branch2 = Blob.from_string(b"line 1\nbranch2 change\nline 3\n")
+        self.repo.object_store.add_object(blob_branch2)
+
+        tree_branch2 = Tree()
+        tree_branch2.add(b"file.txt", 0o100644, blob_branch2.id)
+        self.repo.object_store.add_object(tree_branch2)
+
+        commit_branch2 = Commit()
+        commit_branch2.tree = tree_branch2.id
+        commit_branch2.parents = [self.initial_commit]
+        commit_branch2.author = commit_branch2.committer = (
+            b"Test User <test@example.com>"
+        )
+        commit_branch2.author_time = commit_branch2.commit_time = 1234567892
+        commit_branch2.author_timezone = commit_branch2.commit_timezone = 0
+        commit_branch2.encoding = b"UTF-8"
+        commit_branch2.message = b"Branch2 changes"
+        self.repo.object_store.add_object(commit_branch2)
+        self.repo.refs[b"refs/heads/branch2"] = commit_branch2.id
+
+        # Checkout branch1 and merge branch2
+        self.repo.refs[b"HEAD"] = commit_branch1.id
+        with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
+            f.write(b"line 1\nbranch1 change\nline 3\n")
+
+        merge(self.repo, b"branch2", no_commit=True)
+
+        # Record conflict and resolution
+        recorded, _ = rerere(self.repo)
+        conflict_id = recorded[0][1]
+
+        resolved_content = b"line 1\nmerged change\nline 3\n"
+        with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
+            f.write(resolved_content)
+
+        cache = RerereCache.from_repo(self.repo)
+        cache.record_resolution(conflict_id, resolved_content)
+
+        # Reset and merge again
+        self.repo.refs[b"HEAD"] = commit_branch1.id
+        with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
+            f.write(b"line 1\nbranch1 change\nline 3\n")
+
+        merge(self.repo, b"branch2", no_commit=True)
+
+        # With autoupdate, rerere should auto-apply the resolution
+        recorded2, resolved2 = rerere(self.repo)
+        self.assertEqual(1, len(recorded2))
+        self.assertEqual(1, len(resolved2))
+        self.assertEqual(b"file.txt", resolved2[0])
+
+        # Verify the file was auto-resolved
+        with open(os.path.join(self.tempdir, "file.txt"), "rb") as f:
+            actual = f.read()
+        self.assertEqual(resolved_content, actual)

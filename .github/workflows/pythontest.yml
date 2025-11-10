@@ -2,7 +2,7 @@ name: Python tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, "0.24" ]
   pull_request:
   schedule:
     - cron: "0 6 * * *" # Daily 6AM UTC build

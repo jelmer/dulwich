@@ -4316,5 +4316,27 @@ Body
             self.assertIn("Body", msg_content)
 
 
+class DiagnoseCommandTest(DulwichCliTestCase):
+    """Tests for diagnose command."""
+
+    def test_diagnose(self):
+        """Test the diagnose command."""
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("diagnose")
+            self.assertIsNone(result)
+
+            # Check that key information is present in log output
+            log_output = "\n".join(cm.output)
+            self.assertIn("Python version:", log_output)
+            self.assertIn("Python executable:", log_output)
+            self.assertIn("PYTHONPATH:", log_output)
+            self.assertIn("sys.path:", log_output)
+            self.assertIn("Dulwich version:", log_output)
+            self.assertIn("Installed dependencies:", log_output)
+
+            # Check that at least core dependencies are listed
+            self.assertIn("urllib3:", log_output)
+
+
 if __name__ == "__main__":
     unittest.main()

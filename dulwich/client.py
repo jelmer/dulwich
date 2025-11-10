@@ -3065,7 +3065,7 @@ class SSHGitClient(TraditionalGitClient):
         path_encoding: str = TraditionalGitClient.DEFAULT_ENCODING,
         vendor: Optional[SSHVendor] = None,
         key_filename: Optional[str] = None,
-        ssh_command: str | None = None,
+        ssh_command: Optional[str] = None,
     ) -> "SSHGitClient":
         """Create an SSHGitClient from a parsed URL.
 

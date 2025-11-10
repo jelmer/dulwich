@@ -15,6 +15,20 @@
    Dulwich version, and installed dependencies with their versions.
    (Jelmer Vernooĳ, #1835)
 
+0.24.9	2025-11-10
+
+ * Fix passing key_filename and ssh_command parameters to SSHGitClient.
+   (Saugat Pachhai)
+
+ * Relax check to support subclasses of Urllib3HttpGitClient. Fixes
+   regression from 0.24.2 where subclasses of Urllib3HttpGitClient would
+   not receive the config object. (Saugat Pachhai)
+
+ * Fix test_concurrent_ref_operations_compatibility test flakiness.
+   (Jelmer Vernooĳ)
+
+ * Fix warnings in test suite. (Jelmer Vernooĳ)
+
 0.24.8	2025-10-29
 
  * Add Rust implementation of pack delta creation (create_delta). The

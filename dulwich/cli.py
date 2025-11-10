@@ -6407,6 +6407,74 @@ class cmd_worktree(SuperCommand):
     default_command = cmd_worktree_list
 
 
+class cmd_rerere(Command):
+    """Record and reuse recorded conflict resolutions."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the rerere command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("gitdir", nargs="?", default=".", help="Git directory")
+        parser.add_argument(
+            "subcommand",
+            nargs="?",
+            default="status",
+            choices=["status", "diff", "forget", "clear", "gc"],
+            help="Subcommand to execute",
+        )
+        parser.add_argument(
+            "pathspec", nargs="?", help="Path specification (for forget subcommand)"
+        )
+        parser.add_argument(
+            "--max-age-days",
+            type=int,
+            default=60,
+            help="Maximum age in days for gc (default: 60)",
+        )
+        parsed_args = parser.parse_args(args)
+
+        if parsed_args.subcommand == "status":
+            status_list = porcelain.rerere_status(parsed_args.gitdir)
+            if not status_list:
+                sys.stdout.write("No recorded resolutions.\n")
+            else:
+                for conflict_id, has_resolution in status_list:
+                    status = "resolved" if has_resolution else "unresolved"
+                    sys.stdout.write(f"{conflict_id}\t{status}\n")
+
+        elif parsed_args.subcommand == "diff":
+            diff_list = porcelain.rerere_diff(parsed_args.gitdir)
+            if not diff_list:
+                sys.stdout.write("No recorded conflicts.\n")
+            else:
+                for conflict_id, preimage, postimage in diff_list:
+                    sys.stdout.write(f"--- {conflict_id} (preimage)\n")
+                    sys.stdout.buffer.write(preimage)
+                    sys.stdout.write("\n")
+                    if postimage:
+                        sys.stdout.write(f"+++ {conflict_id} (postimage)\n")
+                        sys.stdout.buffer.write(postimage)
+                        sys.stdout.write("\n")
+
+        elif parsed_args.subcommand == "forget":
+            porcelain.rerere_forget(parsed_args.gitdir, parsed_args.pathspec)
+            if parsed_args.pathspec:
+                sys.stdout.write(f"Forgot resolution for {parsed_args.pathspec}\n")
+            else:
+                sys.stdout.write("Forgot all resolutions\n")
+
+        elif parsed_args.subcommand == "clear":
+            porcelain.rerere_clear(parsed_args.gitdir)
+            sys.stdout.write("Cleared all rerere resolutions\n")
+
+        elif parsed_args.subcommand == "gc":
+            porcelain.rerere_gc(parsed_args.gitdir, parsed_args.max_age_days)
+            sys.stdout.write(f"Cleaned up resolutions older than {parsed_args.max_age_days} days\n")
+
+
 commands = {
     "add": cmd_add,
     "annotate": cmd_annotate,
@@ -6464,6 +6532,7 @@ commands = {
     "rebase": cmd_rebase,
     "receive-pack": cmd_receive_pack,
     "reflog": cmd_reflog,
+    "rerere": cmd_rerere,
     "remote": cmd_remote,
     "repack": cmd_repack,
     "replace": cmd_replace,

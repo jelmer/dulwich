@@ -184,7 +184,9 @@ class WorkTreeContainer:
             exist_ok=exist_ok,
         )
 
-    def remove(self, path: Union[str, bytes, os.PathLike[str]], force: bool = False) -> None:
+    def remove(
+        self, path: Union[str, bytes, os.PathLike[str]], force: bool = False
+    ) -> None:
         """Remove a worktree.
 
         Args:

@@ -30,6 +30,9 @@ from typing import (
     runtime_checkable,
 )
 
+if TYPE_CHECKING:
+    from .object_format import ObjectFormat
+
 from .objects import ObjectID
 from .pack import PackData, UnpackedObject, write_pack_data
 from .refs import Ref
@@ -38,6 +41,8 @@ from .refs import Ref
 @runtime_checkable
 class PackDataLike(Protocol):
     """Protocol for objects that behave like PackData."""
+
+    object_format: "ObjectFormat"
 
     def __len__(self) -> int:
         """Return the number of objects in the pack."""
@@ -303,7 +308,10 @@ def create_bundle_from_repo(
     # For now, create a simple wrapper to hold the data
     class _BundlePackData:
         def __init__(
-            self, count: int, objects: Iterator[UnpackedObject], object_format
+            self,
+            count: int,
+            objects: Iterator[UnpackedObject],
+            object_format: "ObjectFormat",
         ) -> None:
             self._count = count
             self._objects = list(objects)  # Materialize the iterator

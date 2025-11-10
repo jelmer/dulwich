@@ -8828,17 +8828,20 @@ def mailinfo(
     return result
 
 
-def rerere(repo: RepoPath = ".") -> list[tuple[bytes, str]]:
-    """Record current conflict resolutions.
+def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
+    """Record current conflict resolutions and apply known resolutions.
 
     This reads conflicted files from the working tree and records them
-    in the rerere cache.
+    in the rerere cache. If rerere.autoupdate is enabled and a known
+    resolution exists, it will be automatically applied.
 
     Args:
         repo: Path to the repository
 
     Returns:
-        List of tuples (path, conflict_id) for recorded conflicts
+        Tuple of:
+        - List of tuples (path, conflict_id) for recorded conflicts
+        - List of paths where resolutions were automatically applied
     """
     from dulwich.rerere import rerere_auto
 
@@ -8853,7 +8856,7 @@ def rerere(repo: RepoPath = ".") -> list[tuple[bytes, str]]:
             if isinstance(entry, ConflictedIndexEntry):
                 conflicts.append(path)
 
-        # Record conflicts
+        # Record conflicts and apply known resolutions
         working_tree = r.path
         return rerere_auto(r, working_tree, conflicts)
 

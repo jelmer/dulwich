@@ -6438,7 +6438,7 @@ class cmd_rerere(Command):
 
         if parsed_args.subcommand is None:
             # Record current conflicts
-            recorded = porcelain.rerere(parsed_args.gitdir)
+            recorded, resolved = porcelain.rerere(parsed_args.gitdir)
             if not recorded:
                 sys.stdout.write("No conflicts to record.\n")
             else:
@@ -6446,6 +6446,10 @@ class cmd_rerere(Command):
                     sys.stdout.write(
                         f"Recorded resolution for {path.decode('utf-8')}: {conflict_id}\n"
                     )
+                if resolved:
+                    sys.stdout.write("\nAutomatically resolved:\n")
+                    for path in resolved:
+                        sys.stdout.write(f"  {path.decode('utf-8')}\n")
 
         elif parsed_args.subcommand == "status":
             status_list = porcelain.rerere_status(parsed_args.gitdir)

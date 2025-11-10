@@ -337,8 +337,9 @@ their change
 """
             )
 
-        result = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
-        self.assertEqual([], result)
+        recorded, resolved = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual([], recorded)
+        self.assertEqual([], resolved)
 
     def test_rerere_auto_records_conflicts(self) -> None:
         """Test that rerere_auto records conflicts from working tree."""
@@ -358,10 +359,11 @@ line 2
 """
             )
 
-        result = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
-        self.assertEqual(1, len(result))
+        recorded, resolved = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual(1, len(recorded))
+        self.assertEqual(0, len(resolved))
 
-        path, conflict_id = result[0]
+        path, conflict_id = recorded[0]
         self.assertEqual(b"test.txt", path)
         self.assertEqual(40, len(conflict_id))  # SHA-1 hash length
 
@@ -374,13 +376,106 @@ line 2
         with open(file_path, "wb") as f:
             f.write(b"line 1\nline 2\n")
 
-        result = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
-        self.assertEqual([], result)
+        recorded, resolved = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual([], recorded)
+        self.assertEqual([], resolved)
 
     def test_rerere_auto_handles_missing_files(self) -> None:
         """Test that rerere_auto handles deleted files gracefully."""
         from dulwich.rerere import rerere_auto
 
         # Don't create the file
-        result = rerere_auto(self.repo, self.tempdir, [b"missing.txt"])
-        self.assertEqual([], result)
+        recorded, resolved = rerere_auto(self.repo, self.tempdir, [b"missing.txt"])
+        self.assertEqual([], recorded)
+        self.assertEqual([], resolved)
+
+    def test_rerere_auto_applies_known_resolution(self) -> None:
+        """Test that rerere_auto applies known resolutions when autoupdate is enabled."""
+        from dulwich.rerere import RerereCache, rerere_auto
+
+        # Enable autoupdate
+        config = self.repo.get_config()
+        config.set((b"rerere",), b"autoupdate", b"true")
+        config.write_to_path()
+
+        # Create a conflicted file
+        conflict_file = os.path.join(self.tempdir, "test.txt")
+        conflict_content = b"""line 1
+<<<<<<< ours
+our change
+=======
+their change
+>>>>>>> theirs
+line 2
+"""
+        with open(conflict_file, "wb") as f:
+            f.write(conflict_content)
+
+        # Record the conflict first time
+        recorded, resolved = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual(1, len(recorded))
+        self.assertEqual(0, len(resolved))  # No resolution yet
+
+        conflict_id = recorded[0][1]
+
+        # Manually record a resolution
+        cache = RerereCache.from_repo(self.repo)
+        resolution = b"line 1\nresolved change\nline 2\n"
+        cache.record_resolution(conflict_id, resolution)
+
+        # Create the same conflict again
+        with open(conflict_file, "wb") as f:
+            f.write(conflict_content)
+
+        # rerere_auto should now apply the resolution
+        recorded2, resolved2 = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual(1, len(recorded2))
+        self.assertEqual(1, len(resolved2))
+        self.assertEqual(b"test.txt", resolved2[0])
+
+        # Verify the file was resolved
+        with open(conflict_file, "rb") as f:
+            actual = f.read()
+        self.assertEqual(resolution, actual)
+
+    def test_rerere_auto_no_apply_without_autoupdate(self) -> None:
+        """Test that rerere_auto doesn't apply resolutions when autoupdate is disabled."""
+        from dulwich.rerere import RerereCache, rerere_auto
+
+        # autoupdate is disabled by default
+
+        # Create a conflicted file
+        conflict_file = os.path.join(self.tempdir, "test.txt")
+        conflict_content = b"""line 1
+<<<<<<< ours
+our change
+=======
+their change
+>>>>>>> theirs
+line 2
+"""
+        with open(conflict_file, "wb") as f:
+            f.write(conflict_content)
+
+        # Record the conflict first time
+        recorded, _resolved = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        conflict_id = recorded[0][1]
+
+        # Manually record a resolution
+        cache = RerereCache.from_repo(self.repo)
+        resolution = b"line 1\nresolved change\nline 2\n"
+        cache.record_resolution(conflict_id, resolution)
+
+        # Create the same conflict again
+        with open(conflict_file, "wb") as f:
+            f.write(conflict_content)
+
+        # rerere_auto should NOT apply the resolution (autoupdate disabled)
+        recorded2, resolved2 = rerere_auto(self.repo, self.tempdir, [b"test.txt"])
+        self.assertEqual(1, len(recorded2))
+        self.assertEqual(0, len(resolved2))  # Should not auto-apply
+
+        # Verify the file still has conflicts
+        with open(conflict_file, "rb") as f:
+            actual = f.read()
+        self.assertEqual(conflict_content, actual)

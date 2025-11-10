@@ -181,6 +181,7 @@ def self_test_suite() -> unittest.TestSuite:
         "refs",
         "reftable",
         "repository",
+        "rerere",
         "server",
         "sparse_patterns",
         "stash",

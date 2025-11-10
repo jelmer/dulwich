@@ -56,6 +56,7 @@ Currently implemented:
  * remote{_add}
  * receive_pack
  * replace{_create,_delete,_list}
+ * rerere{_status,_diff,_forget,_clear,_gc}
  * reset
  * revert
  * sparse_checkout
@@ -8825,3 +8826,146 @@ def mailinfo(
             f.write(result.patch)
 
     return result
+
+
+def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
+    """Record current conflict resolutions and apply known resolutions.
+
+    This reads conflicted files from the working tree and records them
+    in the rerere cache. If rerere.autoupdate is enabled and a known
+    resolution exists, it will be automatically applied.
+
+    Args:
+        repo: Path to the repository
+
+    Returns:
+        Tuple of:
+        - List of tuples (path, conflict_id) for recorded conflicts
+        - List of paths where resolutions were automatically applied
+    """
+    from dulwich.rerere import _has_conflict_markers, rerere_auto
+
+    with open_repo_closing(repo) as r:
+        # Get conflicts from the index (if available)
+        index = r.open_index()
+        conflicts = []
+
+        from dulwich.index import ConflictedIndexEntry
+
+        for path, entry in index.items():
+            if isinstance(entry, ConflictedIndexEntry):
+                conflicts.append(path)
+
+        # Also scan working tree for files with conflict markers
+        # This is needed because merge() doesn't always create ConflictedIndexEntry
+        if not conflicts:
+            working_tree = r.path
+            for path in index:
+                file_path = os.path.join(working_tree, os.fsdecode(path))
+                try:
+                    with open(file_path, "rb") as f:
+                        content = f.read()
+                    if _has_conflict_markers(content):
+                        conflicts.append(path)
+                except (FileNotFoundError, IsADirectoryError, PermissionError):
+                    pass
+
+        # Record conflicts and apply known resolutions
+        working_tree = r.path
+        return rerere_auto(r, working_tree, conflicts)
+
+
+def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
+    """Get the status of all conflicts in the rerere cache.
+
+    Args:
+        repo: Path to the repository
+
+    Returns:
+        List of tuples (conflict_id, has_resolution)
+    """
+    from dulwich.rerere import RerereCache
+
+    with open_repo_closing(repo) as r:
+        cache = RerereCache.from_repo(r)
+        return cache.status()
+
+
+def rerere_diff(
+    repo: RepoPath = ".", conflict_id: str | None = None
+) -> list[tuple[str, bytes, bytes | None]]:
+    """Show differences for recorded rerere conflicts.
+
+    Args:
+        repo: Path to the repository
+        conflict_id: Optional specific conflict ID to show
+
+    Returns:
+        List of tuples (conflict_id, preimage, postimage)
+    """
+    from dulwich.rerere import RerereCache
+
+    with open_repo_closing(repo) as r:
+        cache = RerereCache.from_repo(r)
+
+        if conflict_id:
+            preimage, postimage = cache.diff(conflict_id)
+            if preimage is not None:
+                return [(conflict_id, preimage, postimage)]
+            return []
+
+        # Show all conflicts
+        results = []
+        for cid, _has_res in cache.status():
+            preimage, postimage = cache.diff(cid)
+            if preimage is not None:
+                results.append((cid, preimage, postimage))
+        return results
+
+
+def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> None:
+    """Forget recorded rerere resolutions for a pathspec.
+
+    Args:
+        repo: Path to the repository
+        pathspec: Path to forget (currently not implemented, forgets all)
+    """
+    from dulwich.rerere import RerereCache
+
+    with open_repo_closing(repo) as r:
+        cache = RerereCache.from_repo(r)
+
+        if pathspec:
+            # TODO: Implement pathspec matching
+            # For now, we need to track which conflict IDs correspond to which paths
+            raise NotImplementedError("Pathspec matching not yet implemented")
+
+        # Forget all conflicts (this is when called with no pathspec after resolving)
+        cache.clear()
+
+
+def rerere_clear(repo: RepoPath = ".") -> None:
+    """Clear all recorded rerere resolutions.
+
+    Args:
+        repo: Path to the repository
+    """
+    from dulwich.rerere import RerereCache
+
+    with open_repo_closing(repo) as r:
+        cache = RerereCache.from_repo(r)
+        cache.clear()
+
+
+def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
+    """Garbage collect old rerere resolutions.
+
+    Args:
+        repo: Path to the repository
+        max_age_days: Maximum age in days for keeping resolutions
+    """
+    from dulwich.rerere import RerereCache
+
+    with open_repo_closing(repo) as r:
+        cache = RerereCache.from_repo(r)
+        cache.gc(max_age_days)

@@ -2,6 +2,10 @@
 
  * Drop support for Python 3.9. (Jelmer Vernooĳ)
 
+ * Add support for ``git rerere`` (reuse recorded resolution) with CLI
+   subcommands and porcelain functions. Supports ``rerere.enabled`` and
+   ``rerere.autoupdate`` configuration. (Jelmer Vernooĳ, #1786)
+
  * Add support for ``git mailinfo`` command to extract patch information from
    email messages. Implements ``dulwich mailinfo`` CLI command,
    ``porcelain.mailinfo()``, and ``patch.mailinfo()`` with support for subject

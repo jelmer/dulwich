@@ -1,4 +1,4 @@
-0.24.9	UNRELEASED
+0.24.9	2025-11-10
 
  * Fix passing key_filename and ssh_command parameters to SSHGitClient.
    (Saugat Pachhai)

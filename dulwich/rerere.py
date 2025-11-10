@@ -248,23 +248,22 @@ class RerereCache:
 
         return conflict_id
 
-    def record_resolution(self, path: bytes, content: bytes) -> str | None:
+    def record_resolution(self, conflict_id: str, content: bytes) -> None:
         """Record a resolution for a previously recorded conflict.
 
         Args:
-            path: Path to the resolved file
+            conflict_id: The conflict ID to record resolution for
             content: Resolved file content (without conflict markers)
-
-        Returns:
-            The conflict ID if resolution was recorded, None otherwise
         """
-        # Find the conflict ID by checking existing preimages
-        # In practice, we need to track which conflicts are active
-        # For now, we'll compute the ID from the original conflict
+        # Write postimage
+        postimage_path = self._get_postimage_path(conflict_id)
 
-        # This is a simplified version - in real git, we'd track active conflicts
-        # and match them to resolutions
-        return None
+        # Ensure directory exists
+        conflict_dir = self._get_conflict_dir(conflict_id)
+        os.makedirs(conflict_dir, exist_ok=True)
+
+        with open(postimage_path, "wb") as f:
+            f.write(content)
 
     def has_resolution(self, conflict_id: str) -> bool:
         """Check if a resolution exists for a conflict.
@@ -466,7 +465,7 @@ def rerere_auto(
     repo: "Repo",
     working_tree_path: bytes | str,
     conflicts: list[bytes],
-) -> list[tuple[bytes, str]]:
+) -> tuple[list[tuple[bytes, str]], list[bytes]]:
     """Automatically record conflicts and apply known resolutions.
 
     This is the main entry point for rerere integration with merge operations.
@@ -478,19 +477,24 @@ def rerere_auto(
         conflicts: List of conflicted file paths
 
     Returns:
-        List of tuples (path, conflict_id) for recorded conflicts
+        Tuple of:
+        - List of tuples (path, conflict_id) for recorded conflicts
+        - List of paths where resolutions were automatically applied
     """
     config = repo.get_config_stack()
     if not is_rerere_enabled(config):
-        return []
+        return [], []
 
     cache = RerereCache.from_repo(repo)
     recorded = []
+    resolved = []
 
     if isinstance(working_tree_path, bytes):
         working_tree_path = os.fsdecode(working_tree_path)
 
-    # Record conflicts from the working tree
+    autoupdate = is_rerere_autoupdate(config)
+
+    # Record conflicts from the working tree and apply known resolutions
     for path in conflicts:
         # Read the file from the working tree
         file_path = os.path.join(working_tree_path, os.fsdecode(path))
@@ -504,7 +508,18 @@ def rerere_auto(
 
         # Record the conflict
         conflict_id = cache.record_conflict(path, content)
-        if conflict_id:
-            recorded.append((path, conflict_id))
+        if not conflict_id:
+            continue
 
-    return recorded
+        recorded.append((path, conflict_id))
+
+        # Check if we have a resolution for this conflict
+        if autoupdate and cache.has_resolution(conflict_id):
+            resolution = cache.get_resolution(conflict_id)
+            if resolution is not None:
+                # Apply the resolution to the working tree
+                with open(file_path, "wb") as f:
+                    f.write(resolution)
+                resolved.append(path)
+
+    return recorded, resolved

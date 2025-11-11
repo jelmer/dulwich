@@ -19,6 +19,10 @@
    Dulwich version, and installed dependencies with their versions.
    (Jelmer Vernooĳ, #1835)
 
+024.10	2025-11-10
+
+ * Fix compatibility with python 3.9. (Jelmer Vernooĳ, #1991)
+
 0.24.9	2025-11-10
 
  * Fix passing key_filename and ssh_command parameters to SSHGitClient.

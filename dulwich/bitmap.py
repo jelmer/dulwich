@@ -1145,7 +1145,7 @@ def generate_bitmap(
 
 def find_commit_bitmaps(
     commit_shas: set[bytes], packs: Iterable[Pack]
-) -> dict[bytes, tuple]:
+) -> dict[bytes, tuple["Pack", "PackBitmap", dict[bytes, int]]]:
     """Find which packs have bitmaps for the given commits.
 
     Args:

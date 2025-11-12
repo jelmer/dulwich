@@ -360,12 +360,16 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.add_objects)
 
-    def get_reachability_provider(self) -> ObjectReachabilityProvider:
+    def get_reachability_provider(self, prefer_bitmap: bool = True) -> ObjectReachabilityProvider:
         """Get a reachability provider for this object store.
 
         Returns an ObjectReachabilityProvider that can efficiently compute
         object reachability queries. Subclasses can override this to provide
         optimized implementations (e.g., using bitmap indexes).
+
+        Args:
+            prefer_bitmap: Whether to prefer bitmap-based reachability if
+                available.
 
         Returns:
           ObjectReachabilityProvider instance
@@ -798,6 +802,39 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         self.pack_depth = pack_depth
         self.pack_threads = pack_threads
         self.pack_big_file_threshold = pack_big_file_threshold
+
+    def get_reachability_provider(
+        self,
+        prefer_bitmaps: bool = True,
+    ) -> ObjectReachabilityProvider:
+        """Get the best reachability provider for the object store.
+
+        Args:
+          object_store: The object store to query
+          prefer_bitmaps: Whether to use bitmaps if available
+
+        Returns:
+          ObjectReachabilityProvider implementation (either bitmap-accelerated
+          or graph traversal)
+        """
+        if prefer_bitmaps:
+            # Check if any packs have bitmaps
+            has_bitmap = False
+            for pack in self.packs:
+                try:
+                    # Try to access bitmap property
+                    if pack.bitmap is not None:
+                        has_bitmap = True
+                        break
+                except (FileNotFoundError, ValueError, AttributeError):
+                    # No bitmap file, corrupt bitmap, or no bitmap support
+                    continue
+
+            if has_bitmap:
+                return BitmapReachability(self)
+
+        # Fall back to graph traversal
+        return GraphTraversalReachability(self)
 
     def add_pack(self) -> tuple[BinaryIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack to this object store."""
@@ -3099,9 +3136,6 @@ def peel_sha(store: ObjectContainer, sha: bytes) -> tuple[ShaFile, ShaFile]:
     return unpeeled, obj
 
 
-# ObjectReachabilityProvider implementation
-
-
 class GraphTraversalReachability:
     """Naive graph traversal implementation of ObjectReachabilityProvider.
 
@@ -3138,7 +3172,6 @@ class GraphTraversalReachability:
         """
         exclude_set = frozenset(exclude) if exclude else frozenset()
         shallow_set = frozenset(shallow) if shallow else frozenset()
-
         commits, _bases = _collect_ancestors(
             self.store, heads, exclude_set, shallow_set
         )
@@ -3200,3 +3233,76 @@ class GraphTraversalReachability:
             result -= exclude_objects
 
         return result
+
+
+
+class BitmapReachability:
+    """Bitmap-accelerated implementation of ObjectReachabilityProvider.
+
+    This implementation uses packfile bitmap indexes where available to
+    accelerate reachability queries. Falls back to graph traversal when
+    bitmaps don't cover the requested commits.
+    """
+
+    def __init__(self, object_store: "PackBasedObjectStore") -> None:
+        """Initialize the bitmap provider.
+
+        Args:
+          object_store: Pack-based object store with bitmap support
+        """
+        self.store = object_store
+        # Fallback to graph traversal for operations not yet optimized
+        self._fallback = GraphTraversalReachability(object_store)
+
+    def get_reachable_commits(
+        self,
+        heads: Iterable[bytes],
+        exclude: Iterable[bytes] | None = None,
+        shallow: Set[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all commits reachable from heads using bitmaps where possible.
+
+        Args:
+          heads: Starting commit SHAs
+          exclude: Commit SHAs to exclude (and their ancestors)
+          shallow: Set of shallow commit boundaries
+
+        Returns:
+          Set of commit SHAs reachable from heads but not from exclude
+        """
+        # TODO: Implement bitmap-accelerated version
+        # For now, fall back to graph traversal
+        return self._fallback.get_reachable_commits(heads, exclude, shallow)
+
+    def get_tree_objects(
+        self,
+        tree_shas: Iterable[bytes],
+    ) -> set[bytes]:
+        """Get all trees and blobs reachable from the given trees.
+
+        Args:
+          tree_shas: Starting tree SHAs
+
+        Returns:
+          Set of tree and blob SHAs
+        """
+        # Tree traversal doesn't benefit much from bitmaps, use fallback
+        return self._fallback.get_tree_objects(tree_shas)
+
+    def get_reachable_objects(
+        self,
+        commits: Iterable[bytes],
+        exclude_commits: Iterable[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all objects reachable from commits using bitmaps.
+
+        Args:
+          commits: Starting commit SHAs
+          exclude_commits: Commits whose objects should be excluded
+
+        Returns:
+          Set of all object SHAs (commits, trees, blobs)
+        """
+        # TODO: Implement bitmap-accelerated version
+        # For now, fall back to graph traversal
+        return self._fallback.get_reachable_objects(commits, exclude_commits)

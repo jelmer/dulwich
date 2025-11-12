@@ -2834,8 +2834,13 @@ class cmd_repack(Command):
             args: Command line arguments
         """
         parser = argparse.ArgumentParser()
-        parser.parse_args(args)
-        porcelain.repack(".")
+        parser.add_argument(
+            "--write-bitmap-index",
+            action="store_true",
+            help="write a bitmap index for packs",
+        )
+        parsed_args = parser.parse_args(args)
+        porcelain.repack(".", write_bitmaps=parsed_args.write_bitmap_index)
 
 
 class cmd_reflog(Command):

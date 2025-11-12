@@ -54,6 +54,9 @@ BITMAP_OPT_HASH_CACHE = 0x4  # Name-hash cache
 BITMAP_OPT_LOOKUP_TABLE = 0x10  # Lookup table for random access
 BITMAP_OPT_PSEUDO_MERGES = 0x20  # Pseudo-merge bitmaps
 
+# EWAH compression constants
+MAX_LITERAL_WORDS = 0x7FFFFFFF  # Maximum literal words in EWAH format (31 bits)
+MAX_XOR_OFFSET = 160  # Maximum distance to search for XOR compression base
 DEFAULT_COMMIT_INTERVAL = 100  # Default interval for commit selection
 
 
@@ -84,7 +87,7 @@ def _encode_ewah_words(words: list[int]) -> list[int]:
             while i < len(words) and words[i] != 0 and words[i] != 0xFFFFFFFFFFFFFFFF:
                 literals.append(words[i])
                 i += 1
-                if len(literals) >= 0x7FFFFFFF:  # Max literal count in RLW
+                if len(literals) >= MAX_LITERAL_WORDS:
                     break
 
             # Create RLW with correct bit layout:
@@ -99,7 +102,7 @@ def _encode_ewah_words(words: list[int]) -> list[int]:
             while i < len(words) and words[i] != 0 and words[i] != 0xFFFFFFFFFFFFFFFF:
                 literals.append(words[i])
                 i += 1
-                if len(literals) >= 0x7FFFFFFF:  # Max literal count
+                if len(literals) >= MAX_LITERAL_WORDS:
                     break
 
             # RLW with no run, just literals
@@ -350,7 +353,7 @@ class BitmapEntry:
 
         Args:
             object_pos: Position of object in pack index
-            xor_offset: XOR offset for compression (0-160)
+            xor_offset: XOR offset for compression
             flags: Entry flags
             bitmap: The EWAH bitmap data
         """
@@ -428,7 +431,7 @@ class PackBitmap:
                 # Entry not found in list, return as-is
                 return entry.bitmap
 
-            # XOR offset is how many positions back to look (max 160)
+            # XOR offset is how many positions back to look
             if current_idx >= entry.xor_offset:
                 base_sha, _base_entry = self.entries_list[
                     current_idx - entry.xor_offset
@@ -902,7 +905,7 @@ def build_reachability_bitmap(
 
 def apply_xor_compression(
     bitmaps: list[tuple[bytes, EWAHBitmap]],
-    max_xor_offset: int = 160,
+    max_xor_offset: int = MAX_XOR_OFFSET,
 ) -> list[tuple[bytes, EWAHBitmap, int]]:
     """Apply XOR compression to bitmaps.
 
@@ -911,7 +914,7 @@ def apply_xor_compression(
 
     Args:
         bitmaps: List of (commit_sha, bitmap) tuples
-        max_xor_offset: Maximum offset to search for XOR base (default: 160)
+        max_xor_offset: Maximum offset to search for XOR base
 
     Returns:
         List of (commit_sha, bitmap, xor_offset) tuples

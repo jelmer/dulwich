@@ -482,9 +482,12 @@ class BaseObjectStore:
 
         Args:
           shas: Iterable of object SHAs to retrieve
-          include_comp: Whether to include compressed data (ignored in base implementation)
-          allow_missing: If True, skip missing objects; if False, raise KeyError
-          convert_ofs_delta: Whether to convert OFS_DELTA objects (ignored in base implementation)
+          include_comp: Whether to include compressed data (ignored in base
+            implementation)
+          allow_missing: If True, skip missing objects; if False, raise
+            KeyError
+          convert_ofs_delta: Whether to convert OFS_DELTA objects (ignored in
+            base implementation)
 
         Returns:
           Iterator of UnpackedObject instances
@@ -1269,6 +1272,9 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         fsync_object_files: bool = False,
+        pack_write_bitmaps: bool = False,
+        pack_write_bitmap_hash_cache: bool = True,
+        pack_write_bitmap_lookup_table: bool = True,
     ) -> None:
         """Open an object store.
 
@@ -1284,6 +1290,9 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_threads: number of threads for pack operations
           pack_big_file_threshold: threshold for treating files as big
           fsync_object_files: whether to fsync object files for durability
+          pack_write_bitmaps: whether to write bitmap indexes for packs
+          pack_write_bitmap_hash_cache: whether to include name-hash cache in bitmaps
+          pack_write_bitmap_lookup_table: whether to include lookup table in bitmaps
         """
         super().__init__(
             pack_compression_level=pack_compression_level,
@@ -1302,6 +1311,9 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.fsync_object_files = fsync_object_files
+        self.pack_write_bitmaps = pack_write_bitmaps
+        self.pack_write_bitmap_hash_cache = pack_write_bitmap_hash_cache
+        self.pack_write_bitmap_lookup_table = pack_write_bitmap_lookup_table
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -1389,6 +1401,20 @@ class DiskObjectStore(PackBasedObjectStore):
         # Read core.fsyncObjectFiles setting
         fsync_object_files = config.get_boolean((b"core",), b"fsyncObjectFiles", False)
 
+        # Read bitmap settings
+        pack_write_bitmaps = config.get_boolean((b"pack",), b"writeBitmaps", False)
+        pack_write_bitmap_hash_cache = config.get_boolean(
+            (b"pack",), b"writeBitmapHashCache", True
+        )
+        pack_write_bitmap_lookup_table = config.get_boolean(
+            (b"pack",), b"writeBitmapLookupTable", True
+        )
+        # Also check repack.writeBitmaps for backwards compatibility
+        if not pack_write_bitmaps:
+            pack_write_bitmaps = config.get_boolean(
+                (b"repack",), b"writeBitmaps", False
+            )
+
         instance = cls(
             path,
             loose_compression_level,
@@ -1401,6 +1427,9 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_threads,
             pack_big_file_threshold,
             fsync_object_files,
+            pack_write_bitmaps,
+            pack_write_bitmap_hash_cache,
+            pack_write_bitmap_lookup_table,
         )
         instance._use_commit_graph = use_commit_graph
         return instance
@@ -1612,6 +1641,7 @@ class DiskObjectStore(PackBasedObjectStore):
         num_objects: int,
         indexer: PackIndexer,
         progress: Callable[..., None] | None = None,
+        refs: dict[bytes, bytes] | None = None,
     ) -> Pack:
         """Move a specific file containing a pack into the pack directory.
 
@@ -1624,6 +1654,7 @@ class DiskObjectStore(PackBasedObjectStore):
           num_objects: Number of objects in the pack.
           indexer: A PackIndexer for indexing the pack.
           progress: Optional progress reporting function.
+          refs: Optional dictionary of refs for bitmap generation.
         """
         entries = []
         for i, entry in enumerate(indexer):
@@ -1674,6 +1705,40 @@ class DiskObjectStore(PackBasedObjectStore):
             write_pack_index(
                 index_file, entries, pack_sha, version=self.pack_index_version
             )
+
+        # Generate bitmap if configured and refs are available
+        if self.pack_write_bitmaps and refs:
+            from .bitmap import generate_bitmap, write_bitmap
+            from .pack import load_pack_index_file
+
+            if progress:
+                progress("Generating bitmap index\r".encode("ascii"))
+
+            # Load the index we just wrote
+            with open(target_index_path, "rb") as idx_file:
+                pack_index = load_pack_index_file(
+                    os.path.basename(target_index_path), idx_file
+                )
+
+            # Generate the bitmap
+            bitmap = generate_bitmap(
+                pack_index=pack_index,
+                object_store=self,
+                refs=refs,
+                pack_checksum=pack_sha,
+                include_hash_cache=self.pack_write_bitmap_hash_cache,
+                include_lookup_table=self.pack_write_bitmap_lookup_table,
+                progress=lambda msg: progress(msg.encode("ascii"))
+                if progress and isinstance(msg, str)
+                else None,
+            )
+
+            # Write the bitmap
+            target_bitmap_path = pack_base_name + ".bitmap"
+            write_bitmap(target_bitmap_path, bitmap)
+
+            if progress:
+                progress("Bitmap index written\r".encode("ascii"))
 
         # Add the pack to the store and return it.
         final_pack = Pack(

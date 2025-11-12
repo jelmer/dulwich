@@ -104,6 +104,62 @@ class GraphWalker(Protocol):
         ...
 
 
+class ObjectReachabilityProvider(Protocol):
+    """Protocol for computing object reachability queries.
+
+    This abstraction allows reachability computations to be backed by either
+    naive graph traversal or optimized bitmap indexes, with a consistent interface.
+    """
+
+    def get_reachable_commits(
+        self,
+        heads: Iterable[bytes],
+        exclude: Iterable[bytes] | None = None,
+        shallow: Set[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all commits reachable from heads, excluding those in exclude.
+
+        Args:
+          heads: Starting commit SHAs
+          exclude: Commit SHAs to exclude (and their ancestors)
+          shallow: Set of shallow commit boundaries (traversal stops here)
+
+        Returns:
+          Set of commit SHAs reachable from heads but not from exclude
+        """
+        ...
+
+    def get_reachable_objects(
+        self,
+        commits: Iterable[bytes],
+        exclude_commits: Iterable[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all objects (commits + trees + blobs) reachable from commits.
+
+        Args:
+          commits: Starting commit SHAs
+          exclude_commits: Commits whose objects should be excluded
+
+        Returns:
+          Set of all object SHAs (commits, trees, blobs, tags)
+        """
+        ...
+
+    def get_tree_objects(
+        self,
+        tree_shas: Iterable[bytes],
+    ) -> set[bytes]:
+        """Get all trees and blobs reachable from the given trees.
+
+        Args:
+          tree_shas: Starting tree SHAs
+
+        Returns:
+          Set of tree and blob SHAs
+        """
+        ...
+
+
 INFODIR = "info"
 PACKDIR = "pack"
 
@@ -2965,3 +3021,106 @@ def peel_sha(store: ObjectContainer, sha: bytes) -> tuple[ShaFile, ShaFile]:
         obj_class, sha = obj.object
         obj = store[sha]
     return unpeeled, obj
+
+
+# ObjectReachabilityProvider implementation
+
+
+class GraphTraversalReachability:
+    """Naive graph traversal implementation of ObjectReachabilityProvider.
+
+    This implementation wraps existing graph traversal functions
+    (_collect_ancestors, _collect_filetree_revs) to provide the standard
+    reachability interface without any performance optimizations.
+    """
+
+    def __init__(self, object_store: BaseObjectStore) -> None:
+        """Initialize the graph traversal provider.
+
+        Args:
+          object_store: Object store to query
+        """
+        self.store = object_store
+
+    def get_reachable_commits(
+        self,
+        heads: Iterable[bytes],
+        exclude: Iterable[bytes] | None = None,
+        shallow: Set[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all commits reachable from heads, excluding those in exclude.
+
+        Uses _collect_ancestors for commit traversal.
+
+        Args:
+          heads: Starting commit SHAs
+          exclude: Commit SHAs to exclude (and their ancestors)
+          shallow: Set of shallow commit boundaries
+
+        Returns:
+          Set of commit SHAs reachable from heads but not from exclude
+        """
+        exclude_set = frozenset(exclude) if exclude else frozenset()
+        shallow_set = frozenset(shallow) if shallow else frozenset()
+
+        commits, _bases = _collect_ancestors(
+            self.store, heads, exclude_set, shallow_set
+        )
+        return commits
+
+    def get_tree_objects(
+        self,
+        tree_shas: Iterable[bytes],
+    ) -> set[bytes]:
+        """Get all trees and blobs reachable from the given trees.
+
+        Uses _collect_filetree_revs for tree traversal.
+
+        Args:
+          tree_shas: Starting tree SHAs
+
+        Returns:
+          Set of tree and blob SHAs
+        """
+        result = set()
+        for tree_sha in tree_shas:
+            _collect_filetree_revs(self.store, tree_sha, result)
+        return result
+
+    def get_reachable_objects(
+        self,
+        commits: Iterable[bytes],
+        exclude_commits: Iterable[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all objects (commits + trees + blobs) reachable from commits.
+
+        Args:
+          commits: Starting commit SHAs
+          exclude_commits: Commits whose objects should be excluded
+
+        Returns:
+          Set of all object SHAs (commits, trees, blobs)
+        """
+        commits_set = set(commits)
+        result = set(commits_set)
+
+        # Get trees for all commits
+        tree_shas = []
+        for commit_sha in commits_set:
+            try:
+                commit = self.store[commit_sha]
+                if isinstance(commit, Commit):
+                    tree_shas.append(commit.tree)
+            except KeyError:
+                # Commit not in store, skip
+                continue
+
+        # Collect all tree/blob objects
+        result.update(self.get_tree_objects(tree_shas))
+
+        # Exclude objects from exclude_commits if needed
+        if exclude_commits:
+            exclude_objects = self.get_reachable_objects(exclude_commits, None)
+            result -= exclude_objects
+
+        return result

@@ -958,27 +958,32 @@ def build_type_bitmaps(
     Returns:
         Tuple of (commit_bitmap, tree_bitmap, blob_bitmap, tag_bitmap)
     """
+    from .objects import sha_to_hex
+
     commit_bitmap = EWAHBitmap()
     tree_bitmap = EWAHBitmap()
     blob_bitmap = EWAHBitmap()
     tag_bitmap = EWAHBitmap()
 
     for sha, pos in sha_to_pos.items():
+        # Pack index returns binary SHA (20 bytes), but object_store expects hex SHA (40 bytes)
+        hex_sha = sha_to_hex(sha) if len(sha) == 20 else sha
         try:
-            obj = object_store[sha]
+            obj = object_store[hex_sha]
         except KeyError:
-            pass
-        else:
-            obj_type = obj.type_num
+            # Object not in store, skip it
+            continue
 
-            if obj_type == Commit.type_num:
-                commit_bitmap.add(pos)
-            elif obj_type == Tree.type_num:
-                tree_bitmap.add(pos)
-            elif obj_type == Blob.type_num:
-                blob_bitmap.add(pos)
-            elif obj_type == Tag.type_num:
-                tag_bitmap.add(pos)
+        obj_type = obj.type_num
+
+        if obj_type == Commit.type_num:
+            commit_bitmap.add(pos)
+        elif obj_type == Tree.type_num:
+            tree_bitmap.add(pos)
+        elif obj_type == Blob.type_num:
+            blob_bitmap.add(pos)
+        elif obj_type == Tag.type_num:
+            tag_bitmap.add(pos)
 
     return commit_bitmap, tree_bitmap, blob_bitmap, tag_bitmap
 
@@ -999,31 +1004,35 @@ def build_name_hash_cache(
     Returns:
         List of 32-bit hash values, one per object in the pack
     """
+    from .objects import sha_to_hex
+
     # Pre-allocate list with correct size
     num_objects = len(sha_to_pos)
     name_hashes = [0] * num_objects
 
     for sha, pos in sha_to_pos.items():
+        # Pack index returns binary SHA (20 bytes), but object_store expects hex SHA (40 bytes)
+        hex_sha = sha_to_hex(sha) if len(sha) == 20 else sha
         try:
-            obj = object_store[sha]
+            obj = object_store[hex_sha]
         except KeyError:
             # Object not in store, use zero hash
-            pass
-        else:
-            # For tree entries, use the tree entry name
-            # For commits, use the tree SHA
-            # For other objects, use the object SHA
-            if isinstance(obj, Tree):
-                # Tree object - use the SHA as the name
-                name_hash = _compute_name_hash(sha)
-            elif isinstance(obj, Commit):
-                # Commit - use the tree SHA as the name
-                name_hash = _compute_name_hash(obj.tree)
-            else:
-                # Other objects - use the SHA as the name
-                name_hash = _compute_name_hash(sha)
+            continue
 
-            name_hashes[pos] = name_hash
+        # For tree entries, use the tree entry name
+        # For commits, use the tree SHA
+        # For other objects, use the object SHA
+        if isinstance(obj, Tree):
+            # Tree object - use the SHA as the name
+            name_hash = _compute_name_hash(sha)
+        elif isinstance(obj, Commit):
+            # Commit - use the tree SHA as the name
+            name_hash = _compute_name_hash(obj.tree)
+        else:
+            # Other objects - use the SHA as the name
+            name_hash = _compute_name_hash(sha)
+
+        name_hashes[pos] = name_hash
 
     return name_hashes
 
@@ -1035,7 +1044,7 @@ def generate_bitmap(
     pack_checksum: bytes,
     include_hash_cache: bool = True,
     include_lookup_table: bool = True,
-    commit_interval: int = DEFAULT_COMMIT_INTERVAL,
+    commit_interval: int | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> PackBitmap:
     """Generate a complete bitmap for a pack.
@@ -1047,12 +1056,15 @@ def generate_bitmap(
         pack_checksum: SHA-1 checksum of the pack file
         include_hash_cache: Whether to include name-hash cache
         include_lookup_table: Whether to include lookup table
-        commit_interval: Include every Nth commit in history
+        commit_interval: Include every Nth commit in history (None for default)
         progress: Optional progress reporting callback
 
     Returns:
         Complete PackBitmap ready to write to disk
     """
+    if commit_interval is None:
+        commit_interval = DEFAULT_COMMIT_INTERVAL
+
     if progress:
         progress("Building pack index mapping")
 
@@ -1144,7 +1156,7 @@ def generate_bitmap(
 
 
 def find_commit_bitmaps(
-    commit_shas: set[bytes], packs: Iterable[Pack]
+    commit_shas: set[bytes], packs: Iterable["Pack"]
 ) -> dict[bytes, tuple["Pack", "PackBitmap", dict[bytes, int]]]:
     """Find which packs have bitmaps for the given commits.
 

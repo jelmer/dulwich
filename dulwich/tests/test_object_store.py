@@ -78,7 +78,10 @@ class ObjectStoreTests:
     def test_determine_wants_all_zero(self) -> None:
         """Test determine_wants_all with zero ref."""
         self.assertEqual(
-            [], self.store.determine_wants_all({b"refs/heads/foo": b"0" * 40})
+            [],
+            self.store.determine_wants_all(
+                {b"refs/heads/foo": self.store.object_format.zero_oid}
+            ),
         )
 
     def test_determine_wants_all_depth(self) -> None:

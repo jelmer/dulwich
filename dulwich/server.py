@@ -62,6 +62,7 @@ else:
     Buffer = bytes | bytearray | memoryview
 
 if TYPE_CHECKING:
+    from .object_format import ObjectFormat
     from .object_store import BaseObjectStore
     from .repo import BaseRepo
 
@@ -153,6 +154,7 @@ class BackendRepo(TypingProtocol):
 
     object_store: PackBasedObjectStore
     refs: RefsContainer
+    object_format: "ObjectFormat"
 
     def get_refs(self) -> dict[bytes, bytes]:
         """Get all the refs in the repository.
@@ -564,6 +566,7 @@ class UploadPackHandler(PackHandler):
             self.write_pack_data,
             self.repo.object_store,
             object_ids,
+            object_format=self.repo.object_format,
         )
         # we are done
         self.proto.write_pkt_line(None)

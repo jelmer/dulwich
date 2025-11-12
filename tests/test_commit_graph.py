@@ -30,6 +30,7 @@ from dulwich.commit_graph import (
     get_reachable_commits,
     read_commit_graph,
 )
+from dulwich.object_format import SHA1
 
 
 class CommitGraphEntryTests(unittest.TestCase):
@@ -76,13 +77,13 @@ class CommitGraphTests(unittest.TestCase):
     """Tests for CommitGraph."""
 
     def test_init(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         self.assertEqual(graph.hash_version, HASH_VERSION_SHA1)
         self.assertEqual(len(graph.entries), 0)
         self.assertEqual(len(graph.chunks), 0)
 
     def test_len(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         self.assertEqual(len(graph), 0)
 
         # Add a dummy entry
@@ -91,7 +92,7 @@ class CommitGraphTests(unittest.TestCase):
         self.assertEqual(len(graph), 1)
 
     def test_iter(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         entry1 = CommitGraphEntry(b"a" * 40, b"b" * 40, [], 1, 1000)
         entry2 = CommitGraphEntry(b"c" * 40, b"d" * 40, [], 2, 2000)
         graph.entries.extend([entry1, entry2])
@@ -102,17 +103,17 @@ class CommitGraphTests(unittest.TestCase):
         self.assertEqual(entries[1], entry2)
 
     def test_get_entry_by_oid_missing(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         result = graph.get_entry_by_oid(b"f" * 40)
         self.assertIsNone(result)
 
     def test_get_generation_number_missing(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         result = graph.get_generation_number(b"f" * 40)
         self.assertIsNone(result)
 
     def test_get_parents_missing(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         result = graph.get_parents(b"f" * 40)
         self.assertIsNone(result)
 
@@ -262,7 +263,7 @@ class CommitGraphTests(unittest.TestCase):
 
     def test_write_empty_graph_raises(self) -> None:
         """Test that writing empty graph raises ValueError."""
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         f = io.BytesIO()
 
         with self.assertRaises(ValueError):
@@ -271,7 +272,7 @@ class CommitGraphTests(unittest.TestCase):
     def test_write_and_read_round_trip(self) -> None:
         """Test writing and reading a commit graph."""
         # Create a simple commit graph
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         entry = CommitGraphEntry(
             commit_id=b"aa" + b"00" * 19,
             tree_id=b"bb" + b"00" * 19,

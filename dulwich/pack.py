@@ -83,6 +83,7 @@ if TYPE_CHECKING:
 
     from .bitmap import PackBitmap
     from .commit_graph import CommitGraph
+    from .object_format import ObjectFormat
 
 # For some reason the above try, except fails to set has_mmap = False for plan9
 if sys.platform == "Plan9":
@@ -463,15 +464,18 @@ def iter_sha1(iter: Iterable[bytes]) -> bytes:
     return sha.hexdigest().encode("ascii")
 
 
-def load_pack_index(path: str | os.PathLike[str]) -> "PackIndex":
+def load_pack_index(
+    path: str | os.PathLike[str], object_format: Optional["ObjectFormat"] = None
+) -> "PackIndex":
     """Load an index file by path.
 
     Args:
       path: Path to the index file
+      object_format: Hash algorithm used by the repository
     Returns: A PackIndex loaded from the given path
     """
     with GitFile(path, "rb") as f:
-        return load_pack_index_file(path, f)
+        return load_pack_index_file(path, f, object_format=object_format)
 
 
 def _load_file_contents(
@@ -506,26 +510,37 @@ def _load_file_contents(
 
 
 def load_pack_index_file(
-    path: str | os.PathLike[str], f: IO[bytes] | _GitFile
+    path: str | os.PathLike[str],
+    f: IO[bytes] | _GitFile,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> "PackIndex":
     """Load an index file from a file-like object.
 
     Args:
       path: Path for the index file
       f: File-like object
+      object_format: Hash algorithm used by the repository
     Returns: A PackIndex loaded from the given file
     """
     contents, size = _load_file_contents(f)
     if contents[:4] == b"\377tOc":
         version = struct.unpack(b">L", contents[4:8])[0]
         if version == 2:
-            return PackIndex2(path, file=f, contents=contents, size=size)
+            return PackIndex2(
+                path,
+                file=f,
+                contents=contents,
+                size=size,
+                object_format=object_format,
+            )
         elif version == 3:
             return PackIndex3(path, file=f, contents=contents, size=size)
         else:
             raise KeyError(f"Unknown pack index format {version}")
     else:
-        return PackIndex1(path, file=f, contents=contents, size=size)
+        return PackIndex1(
+            path, file=f, contents=contents, size=size, object_format=object_format
+        )
 
 
 def bisect_find_sha(
@@ -564,7 +579,7 @@ class PackIndex:
     """
 
     # Default to SHA-1 for backward compatibility
-    hash_algorithm = 1
+    object_format = 1
     hash_size = 20
 
     def __eq__(self, other: object) -> bool:
@@ -680,12 +695,15 @@ class MemoryPackIndex(PackIndex):
         self,
         entries: list[tuple[bytes, int, int | None]],
         pack_checksum: bytes | None = None,
+        *,
+        object_format: Optional["ObjectFormat"] = None,
     ) -> None:
         """Create a new MemoryPackIndex.
 
         Args:
           entries: Sequence of name, idx, crc32 (sorted)
           pack_checksum: Optional pack checksum
+          object_format: Object format (hash algorithm) to use
         """
         self._by_sha = {}
         self._by_offset = {}
@@ -694,6 +712,17 @@ class MemoryPackIndex(PackIndex):
             self._by_offset[offset] = name
         self._entries = entries
         self._pack_checksum = pack_checksum
+
+        # Set hash size from object format
+        if object_format:
+            self.hash_size = object_format.oid_length
+        else:
+            warnings.warn(
+                "MemoryPackIndex() should be called with object_format parameter",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self.hash_size = 20  # Default to SHA1
 
     def get_pack_checksum(self) -> bytes | None:
         """Return the SHA checksum stored for the corresponding packfile."""
@@ -710,7 +739,7 @@ class MemoryPackIndex(PackIndex):
           sha: SHA to look up (binary or hex)
         Returns: Offset in the pack file
         """
-        if len(sha) == 40:
+        if len(sha) == self.hash_size * 2:  # hex string
             sha = hex_to_sha(sha)
         return self._by_sha[sha]
 
@@ -730,7 +759,9 @@ class MemoryPackIndex(PackIndex):
     def for_pack(cls, pack_data: "PackData") -> "MemoryPackIndex":
         """Create a MemoryPackIndex from a PackData object."""
         return MemoryPackIndex(
-            list(pack_data.sorted_entries()), pack_data.get_stored_checksum()
+            list(pack_data.sorted_entries()),
+            pack_checksum=pack_data.get_stored_checksum(),
+            object_format=pack_data.object_format,
         )
 
     @classmethod
@@ -893,7 +924,7 @@ class FilePackIndex(PackIndex):
         lives at within the corresponding pack file. If the pack file doesn't
         have the object then None will be returned.
         """
-        if len(sha) == 40:
+        if len(sha) == self.hash_size * 2:  # hex string
             sha = hex_to_sha(sha)
         try:
             return self._object_offset(sha)
@@ -909,7 +940,8 @@ class FilePackIndex(PackIndex):
         Args:
           sha: A *binary* SHA string. (20 characters long)_
         """
-        assert len(sha) == 20
+        hash_size = getattr(self, "hash_size", 20)  # Default to SHA1 for v1
+        assert len(sha) == hash_size
         idx = ord(sha[:1])
         if idx == 0:
             start = 0
@@ -953,6 +985,7 @@ class PackIndex1(FilePackIndex):
         file: IO[bytes] | _GitFile | None = None,
         contents: bytes | None = None,
         size: int | None = None,
+        object_format: Optional["ObjectFormat"] = None,
     ) -> None:
         """Initialize a version 1 pack index.
 
@@ -961,24 +994,32 @@ class PackIndex1(FilePackIndex):
             file: Optional file object
             contents: Optional mmap'd contents
             size: Optional size of the index
+            object_format: Object format used by the repository
         """
         super().__init__(filename, file, contents, size)
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
+        # Use provided hash algorithm if available, otherwise default to SHA1
+        if object_format:
+            self.hash_size = object_format.oid_length
+        else:
+            self.hash_size = 20  # Default to SHA1
+
+        self._entry_size = 4 + self.hash_size
 
     def _unpack_entry(self, i: int) -> tuple[bytes, int, None]:
-        (offset, name) = unpack_from(">L20s", self._contents, (0x100 * 4) + (i * 24))
+        base_offset = (0x100 * 4) + (i * self._entry_size)
+        offset = unpack_from(">L", self._contents, base_offset)[0]
+        name = self._contents[base_offset + 4 : base_offset + 4 + self.hash_size]
         return (name, offset, None)
 
     def _unpack_name(self, i: int) -> bytes:
-        offset = (0x100 * 4) + (i * 24) + 4
-        return self._contents[offset : offset + 20]
+        offset = (0x100 * 4) + (i * self._entry_size) + 4
+        return self._contents[offset : offset + self.hash_size]
 
     def _unpack_offset(self, i: int) -> int:
-        offset = (0x100 * 4) + (i * 24)
-        result = unpack_from(">L", self._contents, offset)[0]
-        assert isinstance(result, int)
-        return result
+        offset = (0x100 * 4) + (i * self._entry_size)
+        return int(unpack_from(">L", self._contents, offset)[0])
 
     def _unpack_crc32_checksum(self, i: int) -> None:
         # Not stored in v1 index files
@@ -994,6 +1035,7 @@ class PackIndex2(FilePackIndex):
         file: IO[bytes] | _GitFile | None = None,
         contents: bytes | None = None,
         size: int | None = None,
+        object_format: Optional["ObjectFormat"] = None,
     ) -> None:
         """Initialize a version 2 pack index.
 
@@ -1002,6 +1044,7 @@ class PackIndex2(FilePackIndex):
             file: Optional file object
             contents: Optional mmap'd contents
             size: Optional size of the index
+            object_format: Object format used by the repository
         """
         super().__init__(filename, file, contents, size)
         if self._contents[:4] != b"\377tOc":
@@ -1010,8 +1053,15 @@ class PackIndex2(FilePackIndex):
         if self.version != 2:
             raise AssertionError(f"Version was {self.version}")
         self._fan_out_table = self._read_fan_out_table(8)
+
+        # Use provided hash algorithm if available, otherwise default to SHA1
+        if object_format:
+            self.hash_size = object_format.oid_length
+        else:
+            self.hash_size = 20  # Default to SHA1
+
         self._name_table_offset = 8 + 0x100 * 4
-        self._crc32_table_offset = self._name_table_offset + 20 * len(self)
+        self._crc32_table_offset = self._name_table_offset + self.hash_size * len(self)
         self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
         self._pack_offset_largetable_offset = self._pack_offset_table_offset + 4 * len(
             self
@@ -1025,25 +1075,33 @@ class PackIndex2(FilePackIndex):
         )
 
     def _unpack_name(self, i: int) -> bytes:
-        offset = self._name_table_offset + i * 20
-        return self._contents[offset : offset + 20]
+        offset = self._name_table_offset + i * self.hash_size
+        return self._contents[offset : offset + self.hash_size]
 
     def _unpack_offset(self, i: int) -> int:
-        offset_pos = self._pack_offset_table_offset + i * 4
-        offset = unpack_from(">L", self._contents, offset_pos)[0]
-        assert isinstance(offset, int)
-        if offset & (2**31):
-            large_offset_pos = (
-                self._pack_offset_largetable_offset + (offset & (2**31 - 1)) * 8
+        offset = self._pack_offset_table_offset + i * 4
+        offset_val = int(unpack_from(">L", self._contents, offset)[0])
+        if offset_val & (2**31):
+            offset = (
+                self._pack_offset_largetable_offset + (offset_val & (2**31 - 1)) * 8
             )
-            offset = unpack_from(">Q", self._contents, large_offset_pos)[0]
-            assert isinstance(offset, int)
-        return offset
+            offset_val = int(unpack_from(">Q", self._contents, offset)[0])
+        return offset_val
 
     def _unpack_crc32_checksum(self, i: int) -> int:
-        result = unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
-        assert isinstance(result, int)
-        return result
+        return int(
+            unpack_from(">L", self._contents, self._crc32_table_offset + i * 4)[0]
+        )
+
+    def get_pack_checksum(self) -> bytes:
+        """Return the checksum stored for the corresponding packfile.
+
+        Returns: binary digest (size depends on hash algorithm)
+        """
+        # Index ends with: pack_checksum + index_checksum
+        # Each checksum is hash_size bytes
+        checksum_size = self.hash_size
+        return bytes(self._contents[-2 * checksum_size : -checksum_size])
 
 
 class PackIndex3(FilePackIndex):
@@ -1075,13 +1133,13 @@ class PackIndex3(FilePackIndex):
             raise AssertionError(f"Version was {self.version}")
 
         # Read hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
-        (self.hash_algorithm,) = unpack_from(b">L", self._contents, 8)
-        if self.hash_algorithm == 1:
+        (self.object_format,) = unpack_from(b">L", self._contents, 8)
+        if self.object_format == 1:
             self.hash_size = 20  # SHA-1
-        elif self.hash_algorithm == 2:
+        elif self.object_format == 2:
             self.hash_size = 32  # SHA-256
         else:
-            raise AssertionError(f"Unknown hash algorithm {self.hash_algorithm}")
+            raise AssertionError(f"Unknown hash algorithm {self.object_format}")
 
         # Read length of shortened object names
         (self.shortened_oid_len,) = unpack_from(b">L", self._contents, 12)
@@ -1530,6 +1588,7 @@ class PackData:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Create a PackData object representing the pack in the given filename.
 
@@ -1539,6 +1598,16 @@ class PackData:
         Currently there is a restriction on the size of the pack as the python
         mmap implementation is flawed.
         """
+        from .object_format import DEFAULT_OBJECT_FORMAT
+
+        if object_format is None:
+            warnings.warn(
+                "PackData() should be called with object_format parameter",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            object_format = DEFAULT_OBJECT_FORMAT
+        self.object_format = object_format
         self._filename = filename
         self._size = size
         self._header_size = 12
@@ -1581,29 +1650,40 @@ class PackData:
         return self._filename
 
     @classmethod
-    def from_file(cls, file: IO[bytes], size: int | None = None) -> "PackData":
+    def from_file(
+        cls,
+        file: IO[bytes],
+        size: int | None = None,
+        object_format: Optional["ObjectFormat"] = None,
+    ) -> "PackData":
         """Create a PackData object from an open file.
 
         Args:
           file: Open file object
           size: Optional file size
+          object_format: Object format used by the repository
 
         Returns:
           PackData instance
         """
-        return cls(str(file), file=file, size=size)
+        return cls(str(file), file=file, size=size, object_format=object_format)
 
     @classmethod
-    def from_path(cls, path: str | os.PathLike[str]) -> "PackData":
+    def from_path(
+        cls,
+        path: str | os.PathLike[str],
+        object_format: Optional["ObjectFormat"] = None,
+    ) -> "PackData":
         """Create a PackData object from a file path.
 
         Args:
           path: Path to the pack file
+          object_format: Object format used by the repository
 
         Returns:
           PackData instance
         """
-        return cls(filename=path)
+        return cls(filename=path, object_format=object_format)
 
     def close(self) -> None:
         """Close the underlying pack file."""
@@ -1687,7 +1767,7 @@ class PackData:
 
     def sorted_entries(
         self,
-        progress: ProgressFn | None = None,
+        progress: Callable[[int, int], None] | None = None,
         resolve_ext_ref: ResolveExtRefFn | None = None,
     ) -> list[tuple[bytes, int, int]]:
         """Return entries in this pack, sorted by SHA.
@@ -1753,7 +1833,7 @@ class PackData:
         filename: str,
         progress: Callable[..., None] | None = None,
         resolve_ext_ref: ResolveExtRefFn | None = None,
-        hash_algorithm: int = 1,
+        hash_format: int | None = None,
     ) -> bytes:
         """Create a version 3 index file for this data file.
 
@@ -1761,15 +1841,17 @@ class PackData:
           filename: Index filename.
           progress: Progress report function
           resolve_ext_ref: Function to resolve external references
-          hash_algorithm: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
+          hash_format: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
         Returns: Checksum of index file
         """
         entries = self.sorted_entries(
             progress=progress, resolve_ext_ref=resolve_ext_ref
         )
         with GitFile(filename, "wb") as f:
+            if hash_format is None:
+                hash_format = 1  # Default to SHA-1
             return write_pack_index_v3(
-                f, entries, self.calculate_checksum(), hash_algorithm
+                f, entries, self.calculate_checksum(), hash_format=hash_format
             )
 
     def create_index(
@@ -1778,7 +1860,7 @@ class PackData:
         progress: Callable[..., None] | None = None,
         version: int = 2,
         resolve_ext_ref: ResolveExtRefFn | None = None,
-        hash_algorithm: int = 1,
+        hash_format: int | None = None,
     ) -> bytes:
         """Create an  index file for this data file.
 
@@ -1787,7 +1869,7 @@ class PackData:
           progress: Progress report function
           version: Index version (1, 2, or 3)
           resolve_ext_ref: Function to resolve external references
-          hash_algorithm: Hash algorithm identifier for v3 (1 = SHA-1, 2 = SHA-256)
+          hash_format: Hash algorithm identifier for v3 (1 = SHA-1, 2 = SHA-256)
         Returns: Checksum of index file
         """
         if version == 1:
@@ -1803,15 +1885,16 @@ class PackData:
                 filename,
                 progress,
                 resolve_ext_ref=resolve_ext_ref,
-                hash_algorithm=hash_algorithm,
+                hash_format=hash_format,
             )
         else:
             raise ValueError(f"unknown index format {version}")
 
     def get_stored_checksum(self) -> bytes:
         """Return the expected checksum stored in this pack."""
-        self._file.seek(-20, SEEK_END)
-        return self._file.read(20)
+        checksum_size = self.object_format.oid_length
+        self._file.seek(-checksum_size, SEEK_END)
+        return self._file.read(checksum_size)
 
     def check(self) -> None:
         """Check the consistency of this pack."""
@@ -2443,7 +2526,10 @@ class SHA1Writer(BinaryIO):
 
 
 def pack_object_header(
-    type_num: int, delta_base: bytes | int | None, size: int
+    type_num: int,
+    delta_base: bytes | int | None,
+    size: int,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> bytearray:
     """Create a pack object header for the given object info.
 
@@ -2451,8 +2537,19 @@ def pack_object_header(
       type_num: Numeric type of the object.
       delta_base: Delta base offset or ref, or None for whole objects.
       size: Uncompressed object size.
+      object_format: Object format (hash algorithm) to use.
     Returns: A header for a packed object.
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "pack_object_header() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
+
     header = []
     c = (type_num << 4) | (size & 15)
     size >>= 4
@@ -2472,7 +2569,7 @@ def pack_object_header(
         header.extend(ret)
     elif type_num == REF_DELTA:
         assert isinstance(delta_base, bytes)
-        assert len(delta_base) == 20
+        assert len(delta_base) == object_format.oid_length
         header += delta_base
     return bytearray(header)
 
@@ -2481,6 +2578,7 @@ def pack_object_chunks(
     type: int,
     object: list[bytes] | tuple[bytes | int, list[bytes]],
     compression_level: int = -1,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> Iterator[bytes]:
     """Generate chunks for a pack object.
 
@@ -2488,8 +2586,18 @@ def pack_object_chunks(
       type: Numeric type of the object
       object: Object to write
       compression_level: the zlib compression level
+      object_format: Object format (hash algorithm) to use
     Returns: Chunks
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "pack_object_chunks() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
     if type in DELTA_TYPES:
         if isinstance(object, tuple):
             delta_base, object = object
@@ -2509,7 +2617,11 @@ def pack_object_chunks(
         # Shouldn't reach here with proper typing
         raise TypeError(f"Unexpected object type: {object.__class__.__name__}")
 
-    yield bytes(pack_object_header(type, delta_base, sum(map(len, chunks))))
+    yield bytes(
+        pack_object_header(
+            type, delta_base, sum(map(len, chunks)), object_format=object_format
+        )
+    )
     compressor = zlib.compressobj(level=compression_level)
     for data in chunks:
         yield compressor.compress(data)
@@ -2522,6 +2634,7 @@ def write_pack_object(
     object: list[bytes] | tuple[bytes | int, list[bytes]],
     sha: Optional["HashObject"] = None,
     compression_level: int = -1,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> int:
     """Write pack object to a file.
 
@@ -2531,10 +2644,22 @@ def write_pack_object(
       object: Object to write
       sha: Optional SHA-1 hasher to update
       compression_level: the zlib compression level
+      object_format: Object format (hash algorithm) to use
     Returns: CRC32 checksum of the written object
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "write_pack_object() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
     crc32 = 0
-    for chunk in pack_object_chunks(type, object, compression_level=compression_level):
+    for chunk in pack_object_chunks(
+        type, object, compression_level=compression_level, object_format=object_format
+    ):
         write(chunk)
         if sha is not None:
             sha.update(chunk)
@@ -2549,6 +2674,7 @@ def write_pack(
     deltify: bool | None = None,
     delta_window_size: int | None = None,
     compression_level: int = -1,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> tuple[bytes, bytes]:
     """Write a new pack data file.
 
@@ -2558,8 +2684,18 @@ def write_pack(
       delta_window_size: Delta window size
       deltify: Whether to deltify pack objects
       compression_level: the zlib compression level
+      object_format: Object format
     Returns: Tuple with checksum of pack file and index file
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "write_pack() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
     with GitFile(filename + ".pack", "wb") as f:
         entries, data_sum = write_pack_objects(
             f,
@@ -2567,6 +2703,7 @@ def write_pack(
             delta_window_size=delta_window_size,
             deltify=deltify,
             compression_level=compression_level,
+            object_format=object_format,
         )
     entries_list = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])
     with GitFile(filename + ".idx", "wb") as f:
@@ -2867,6 +3004,7 @@ def write_pack_from_container(
     reuse_deltas: bool = True,
     compression_level: int = -1,
     other_haves: set[bytes] | None = None,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
@@ -2880,6 +3018,7 @@ def write_pack_from_container(
       reuse_deltas: Whether to reuse existing deltas
       compression_level: the zlib compression level to use
       other_haves: Set of additional object IDs the receiver has
+      object_format: Object format (hash algorithm) to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     pack_contents_count = len(object_ids)
@@ -2897,6 +3036,7 @@ def write_pack_from_container(
         pack_contents,
         num_records=pack_contents_count,
         compression_level=compression_level,
+        object_format=object_format,
     )
 
 
@@ -2907,6 +3047,7 @@ def write_pack_objects(
     delta_window_size: int | None = None,
     deltify: bool | None = None,
     compression_level: int = -1,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
@@ -2917,6 +3058,7 @@ def write_pack_objects(
                          Set to None for default window size.
       deltify: Whether to deltify objects
       compression_level: the zlib compression level to use
+      object_format: Object format (hash algorithm) to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     pack_contents_count, pack_contents = pack_objects_to_data(objects, deltify=deltify)
@@ -2926,6 +3068,7 @@ def write_pack_objects(
         pack_contents,
         num_records=pack_contents_count,
         compression_level=compression_level,
+        object_format=object_format,
     )
 
 
@@ -2939,6 +3082,7 @@ class PackChunkGenerator:
         progress: Callable[..., None] | None = None,
         compression_level: int = -1,
         reuse_compressed: bool = True,
+        object_format: Optional["ObjectFormat"] = None,
     ) -> None:
         """Initialize PackChunkGenerator.
 
@@ -2948,7 +3092,18 @@ class PackChunkGenerator:
             progress: Optional progress callback
             compression_level: Compression level (-1 for default)
             reuse_compressed: Whether to reuse compressed chunks
+            object_format: Object format (hash algorithm) to use
         """
+        from .object_format import DEFAULT_OBJECT_FORMAT
+
+        if object_format is None:
+            warnings.warn(
+                "PackChunkGenerator() should be called with object_format parameter",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            object_format = DEFAULT_OBJECT_FORMAT
+        self.object_format = object_format
         self.cs = sha1(b"")
         self.entries: dict[bytes, tuple[int, int]] = {}
         if records is None:
@@ -3022,7 +3177,10 @@ class PackChunkGenerator:
                 chunks = unpacked.comp_chunks
             else:
                 chunks = pack_object_chunks(
-                    type_num, raw, compression_level=compression_level
+                    type_num,
+                    raw,
+                    compression_level=compression_level,
+                    object_format=self.object_format,
                 )
             crc32 = 0
             object_size = 0
@@ -3051,6 +3209,7 @@ def write_pack_data(
     num_records: int | None = None,
     progress: Callable[..., None] | None = None,
     compression_level: int = -1,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
@@ -3060,6 +3219,7 @@ def write_pack_data(
       records: Iterator over type_num, object_id, delta_base, raw
       progress: Function to report progress to
       compression_level: the zlib compression level
+      object_format: Object format (hash algorithm) to use
     Returns: Dict mapping id -> (offset, crc32 checksum), pack checksum
     """
     chunk_generator = PackChunkGenerator(
@@ -3067,6 +3227,7 @@ def write_pack_data(
         records=records,
         progress=progress,
         compression_level=compression_level,
+        object_format=object_format,
     )
     for chunk in chunk_generator:
         if callable(write):
@@ -3099,6 +3260,8 @@ def write_pack_index_v1(
         f.write(struct.pack(">L", fan_out_table[i]))
         fan_out_table[i + 1] += fan_out_table[i]
     for name, offset, _entry_checksum in entries:
+        if len(name) != 20:
+            raise TypeError("pack index v1 only supports SHA-1 names")
         if not (offset <= 0xFFFFFFFF):
             raise TypeError("pack format 1 only supports offsets < 2Gb")
         f.write(struct.pack(">L20s", offset, name))
@@ -3284,12 +3447,20 @@ def write_pack_index_v2(
     fan_out_table: dict[int, int] = defaultdict(lambda: 0)
     for name, offset, entry_checksum in entries:
         fan_out_table[ord(name[:1])] += 1
+    try:
+        hash_size = len(next(iter(entries))[0])
+    except StopIteration:
+        hash_size = 20  # Default to SHA-1 size if no entries
     # Fan-out table
     largetable: list[int] = []
     for i in range(0x100):
         f.write(struct.pack(b">L", fan_out_table[i]))
         fan_out_table[i + 1] += fan_out_table[i]
     for name, offset, entry_checksum in entries:
+        if len(name) != hash_size:
+            raise TypeError(
+                f"Object name has wrong length: expected {hash_size}, got {len(name)}"
+            )
         f.write(name)
     for name, offset, entry_checksum in entries:
         f.write(struct.pack(b">L", entry_checksum))
@@ -3310,7 +3481,7 @@ def write_pack_index_v3(
     f: IO[bytes],
     entries: Iterable[tuple[bytes, int, int | None]],
     pack_checksum: bytes,
-    hash_algorithm: int = 1,
+    hash_format: int = 1,
 ) -> bytes:
     """Write a new pack index file in v3 format.
 
@@ -3319,18 +3490,18 @@ def write_pack_index_v3(
       entries: List of tuples with object name (sha), offset_in_pack, and
         crc32_checksum.
       pack_checksum: Checksum of the pack file.
-      hash_algorithm: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
+      hash_format: Hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
     Returns: The SHA of the index file written
     """
-    if hash_algorithm == 1:
+    if hash_format == 1:
         hash_size = 20  # SHA-1
         writer_cls = SHA1Writer
-    elif hash_algorithm == 2:
+    elif hash_format == 2:
         hash_size = 32  # SHA-256
         # TODO: Add SHA256Writer when SHA-256 support is implemented
         raise NotImplementedError("SHA-256 support not yet implemented")
     else:
-        raise ValueError(f"Unknown hash algorithm {hash_algorithm}")
+        raise ValueError(f"Unknown hash algorithm {hash_format}")
 
     # Convert entries to list to allow multiple iterations
     entries_list = list(entries)
@@ -3342,7 +3513,7 @@ def write_pack_index_v3(
     f = writer_cls(f)
     f.write(b"\377tOc")  # Magic!
     f.write(struct.pack(">L", 3))  # Version 3
-    f.write(struct.pack(">L", hash_algorithm))  # Hash algorithm
+    f.write(struct.pack(">L", hash_format))  # Hash algorithm
     f.write(struct.pack(">L", shortened_oid_len))  # Shortened OID length
 
     fan_out_table: dict[int, int] = defaultdict(lambda: 0)
@@ -3404,6 +3575,9 @@ def write_pack_index(
 
     Returns:
       SHA of the written index file
+
+    Raises:
+      ValueError: If an unsupported version is specified
     """
     if version is None:
         version = DEFAULT_PACK_INDEX_VERSION
@@ -3439,6 +3613,7 @@ class Pack:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
+        object_format: Optional["ObjectFormat"] = None,
     ) -> None:
         """Initialize a Pack object.
 
@@ -3451,6 +3626,7 @@ class Pack:
           depth: Maximum depth for delta chains
           threads: Number of threads to use for operations
           big_file_threshold: Size threshold for big file handling
+          object_format: Hash algorithm to use (defaults to SHA1)
         """
         self._basename = basename
         self._data = None
@@ -3465,6 +3641,10 @@ class Pack:
         self.depth = depth
         self.threads = threads
         self.big_file_threshold = big_file_threshold
+        # Always set object_format, defaulting to default
+        from .object_format import DEFAULT_OBJECT_FORMAT
+
+        self.object_format = object_format if object_format else DEFAULT_OBJECT_FORMAT
         self._data_load = lambda: PackData(
             self._data_path,
             delta_window_size=delta_window_size,
@@ -3473,24 +3653,35 @@ class Pack:
             depth=depth,
             threads=threads,
             big_file_threshold=big_file_threshold,
+            object_format=self.object_format,
         )
-        self._idx_load = lambda: load_pack_index(self._idx_path)
+        self._idx_load = lambda: load_pack_index(
+            self._idx_path, object_format=object_format
+        )
         self.resolve_ext_ref = resolve_ext_ref
 
     @classmethod
     def from_lazy_objects(
-        cls, data_fn: Callable[[], PackData], idx_fn: Callable[[], PackIndex]
+        cls,
+        data_fn: Callable[[], PackData],
+        idx_fn: Callable[[], PackIndex],
+        object_format: Optional["ObjectFormat"] = None,
     ) -> "Pack":
         """Create a new pack object from callables to load pack data and index objects."""
-        ret = cls("")
+        ret = cls("", object_format=object_format)
         ret._data_load = data_fn
         ret._idx_load = idx_fn
         return ret
 
     @classmethod
-    def from_objects(cls, data: PackData, idx: PackIndex) -> "Pack":
+    def from_objects(
+        cls,
+        data: PackData,
+        idx: PackIndex,
+        object_format: Optional["ObjectFormat"] = None,
+    ) -> "Pack":
         """Create a new pack object from pack data and index objects."""
-        ret = cls("")
+        ret = cls("", object_format=object_format)
         ret._data = data
         ret._data_load = None
         ret._idx = idx
@@ -3768,9 +3959,14 @@ class Pack:
                 assert isinstance(base_type, int)
             elif base_type == REF_DELTA:
                 (basename, delta) = base_obj
-                assert isinstance(basename, bytes) and len(basename) == 20
-                base_offset, base_type, base_obj = get_ref(basename)  # type: ignore[assignment]
+                assert (
+                    isinstance(basename, bytes)
+                    and len(basename) == self.object_format.oid_length
+                )
+                base_offset_temp, base_type, base_obj = get_ref(basename)
                 assert isinstance(base_type, int)
+                assert base_offset_temp is not None
+                base_offset = base_offset_temp
                 if base_offset == prev_offset:  # object is based on itself
                     raise UnresolvedDeltas([basename])
             delta_stack.append((prev_offset, base_type, delta))
@@ -3814,7 +4010,7 @@ class Pack:
         )
 
     def sorted_entries(
-        self, progress: ProgressFn | None = None
+        self, progress: Callable[[int, int], None] | None = None
     ) -> Iterator[PackIndexEntry]:
         """Return entries in this pack, sorted by SHA.
 
@@ -3855,12 +4051,22 @@ def extend_pack(
     *,
     compression_level: int = -1,
     progress: Callable[[bytes], None] | None = None,
+    object_format: Optional["ObjectFormat"] = None,
 ) -> tuple[bytes, list[tuple[bytes, int, int]]]:
     """Extend a pack file with more objects.
 
     The caller should make sure that object_ids does not contain any objects
     that are already in the pack
     """
+    from .object_format import DEFAULT_OBJECT_FORMAT
+
+    if object_format is None:
+        warnings.warn(
+            "extend_pack() should be called with object_format parameter",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        object_format = DEFAULT_OBJECT_FORMAT
     # Update the header with the new number of objects.
     f.seek(0)
     _version, num_objects = read_pack_header(f.read)
@@ -3886,7 +4092,7 @@ def extend_pack(
             progress(
                 (f"writing extra base objects: {i}/{len(object_ids)}\r").encode("ascii")
             )
-        assert len(object_id) == 20
+        assert len(object_id) == object_format.oid_length
         type_num, data = get_raw(object_id)
         offset = f.tell()
         crc32 = write_pack_object(
@@ -3895,6 +4101,7 @@ def extend_pack(
             [data],  # Convert bytes to list[bytes]
             sha=new_sha,
             compression_level=compression_level,
+            object_format=object_format,
         )
         extra_entries.append((object_id, offset, crc32))
     pack_sha = new_sha.digest()

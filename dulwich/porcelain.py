@@ -1092,6 +1092,7 @@ def init(
     *,
     bare: bool = False,
     symlinks: bool | None = None,
+    object_format: str | None = None,
 ) -> Repo:
     """Create a new git repository.
 
@@ -1099,15 +1100,16 @@ def init(
       path: Path to repository.
       bare: Whether to create a bare repository.
       symlinks: Whether to create actual symlinks (defaults to autodetect)
+      object_format: Object format to use ("sha1" or "sha256", defaults to "sha1")
     Returns: A Repo instance
     """
     if not os.path.exists(path):
         os.mkdir(path)
 
     if bare:
-        return Repo.init_bare(path)
+        return Repo.init_bare(path, object_format=object_format)
     else:
-        return Repo.init(path, symlinks=symlinks)
+        return Repo.init(path, symlinks=symlinks, object_format=object_format)
 
 
 def _filter_transport_kwargs(**kwargs: object) -> TransportKwargs:
@@ -4883,6 +4885,7 @@ def pack_objects(
             deltify=deltify,
             delta_window_size=delta_window_size,
             reuse_deltas=reuse_deltas,
+            object_format=r.object_format,
         )
     if idxf is not None:
         index_entries = sorted([(k, v[0], v[1]) for (k, v) in entries.items()])

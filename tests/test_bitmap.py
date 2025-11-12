@@ -981,6 +981,8 @@ class ReachabilityProviderTests(unittest.TestCase):
         """Clean up test directory."""
         import shutil
 
+        # Close store to release file handles on Windows
+        self.store.close()
         shutil.rmtree(self.test_dir)
 
     def test_graph_traversal_reachability_single_commit(self):
@@ -1174,6 +1176,8 @@ class PackEnsureBitmapTests(unittest.TestCase):
         os.makedirs(os.path.join(self.temp_dir, "pack"))
 
         self.store = DiskObjectStore(self.temp_dir)
+        # Close store before cleanup to release file handles on Windows
+        self.addCleanup(self.store.close)
 
         # Create test objects
         self.blob = Blob.from_string(b"test content")
@@ -1252,6 +1256,8 @@ class GeneratePackBitmapsTests(unittest.TestCase):
         os.makedirs(os.path.join(self.temp_dir, "pack"))
 
         self.store = DiskObjectStore(self.temp_dir)
+        # Close store before cleanup to release file handles on Windows
+        self.addCleanup(self.store.close)
 
         # Create multiple commits
         self.commits = []

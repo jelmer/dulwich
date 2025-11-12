@@ -30,13 +30,16 @@ for efficient storage and fast bitwise operations.
 
 import os
 import struct
-from collections.abc import Iterator
+from collections import deque
+from collections.abc import Callable, Iterator
 from io import BytesIO
 from typing import IO, TYPE_CHECKING, Optional
 
 from .file import GitFile
+from .objects import Blob, Commit, Tag, Tree
 
 if TYPE_CHECKING:
+    from .object_store import BaseObjectStore
     from .pack import PackIndex
 
 # Bitmap file signature
@@ -50,6 +53,8 @@ BITMAP_OPT_FULL_DAG = 0x1  # Full closure
 BITMAP_OPT_HASH_CACHE = 0x4  # Name-hash cache
 BITMAP_OPT_LOOKUP_TABLE = 0x10  # Lookup table for random access
 BITMAP_OPT_PSEUDO_MERGES = 0x20  # Pseudo-merge bitmaps
+
+DEFAULT_COMMIT_INTERVAL = 100  # Default interval for commit selection
 
 
 def _encode_ewah_words(words: list[int]) -> list[int]:
@@ -138,7 +143,8 @@ class EWAHBitmap:
         """Decode EWAH compressed bitmap data.
 
         Args:
-            data: Compressed bitmap data (EWAH format with header + words + RLW position)
+            data: Compressed bitmap data (EWAH format with header + words +
+                RLW position)
         """
         f = BytesIO(data)
 
@@ -168,7 +174,7 @@ class EWAHBitmap:
         idx = 0
         while idx < len(words):
             # This is an RLW
-            # Bit layout: [literal_words(31 bits)][running_len(32 bits)][running_bit(1 bit)]
+            # Bit layout: [literal_words(31)][running_len(32)][running_bit(1)]
             rlw = words[idx]
             running_bit = rlw & 1
             running_len = (rlw >> 1) & 0xFFFFFFFF
@@ -566,7 +572,7 @@ def read_bitmap_file(
         entry_flags = flags_bytes[0]
 
         # Read self-describing EWAH bitmap
-        # EWAH format: bit_count (4) + word_count (4) + words (word_count * 8) + rlw_pos (4)
+        # EWAH format: bit_count (4) + word_count (4) + words + rlw_pos (4)
         bit_count_bytes = f.read(4)
         word_count_bytes = f.read(4)
 
@@ -735,3 +741,381 @@ def write_bitmap_file(f: IO[bytes], bitmap: PackBitmap) -> None:
     if bitmap.flags & BITMAP_OPT_HASH_CACHE and bitmap.name_hash_cache:
         for hash_value in bitmap.name_hash_cache:
             f.write(struct.pack(">I", hash_value))
+
+
+def _compute_name_hash(name: bytes) -> int:
+    """Compute the name hash for a tree entry.
+
+    This is the same algorithm Git uses for the name-hash cache.
+
+    Args:
+        name: The name of the tree entry
+
+    Returns:
+        32-bit hash value
+    """
+    hash_value = 0
+    for byte in name:
+        hash_value = (hash_value >> 19) | (hash_value << 13)
+        hash_value += byte
+        hash_value &= 0xFFFFFFFF
+    return hash_value
+
+
+def select_bitmap_commits(
+    refs: dict[bytes, bytes],
+    object_store: "BaseObjectStore",
+    commit_interval: int = DEFAULT_COMMIT_INTERVAL,
+) -> list[bytes]:
+    """Select commits for bitmap generation.
+
+    Uses Git's strategy:
+    - All branch and tag tips
+    - Every Nth commit in history
+
+    Args:
+        refs: Dictionary of ref names to commit SHAs
+        object_store: Object store to read commits from
+        commit_interval: Include every Nth commit in history
+
+    Returns:
+        List of commit SHAs to create bitmaps for
+    """
+    selected = set()
+    seen = set()
+
+    # Start with all refs
+    ref_commits = set()
+    for ref_name, sha in refs.items():
+        try:
+            obj = object_store[sha]
+            # Dereference tags to get to commits
+            while isinstance(obj, Tag):
+                obj = object_store[obj.object[1]]
+            if isinstance(obj, Commit):
+                ref_commits.add(obj.id)
+        except KeyError:
+            continue
+
+    # Add all ref tips
+    selected.update(ref_commits)
+
+    # Walk the commit graph and select every Nth commit
+    queue = deque(ref_commits)
+    commit_count = 0
+
+    while queue:
+        commit_sha = queue.popleft()
+        if commit_sha in seen:
+            continue
+        seen.add(commit_sha)
+
+        try:
+            obj = object_store[commit_sha]
+            if not isinstance(obj, Commit):
+                continue
+
+            commit_count += 1
+            if commit_count % commit_interval == 0:
+                selected.add(commit_sha)
+
+            # Add parents to queue
+            for parent in obj.parents:
+                if parent not in seen:
+                    queue.append(parent)
+        except KeyError:
+            continue
+
+    return sorted(selected)
+
+
+def build_reachability_bitmap(
+    commit_sha: bytes,
+    pack_index: "PackIndex",
+    object_store: "BaseObjectStore",
+) -> EWAHBitmap:
+    """Build a reachability bitmap for a commit.
+
+    The bitmap has a bit set for each object that is reachable from the commit.
+    The bit position corresponds to the object's position in the pack index.
+
+    Args:
+        commit_sha: The commit to build a bitmap for
+        pack_index: Pack index to get object positions
+        object_store: Object store to traverse objects
+
+    Returns:
+        EWAH bitmap with bits set for reachable objects
+    """
+    bitmap = EWAHBitmap()
+
+    # Create mapping from SHA to position in pack index
+    sha_to_pos = {}
+    for pos, (sha, _offset, _crc32) in enumerate(pack_index.iterentries()):
+        sha_to_pos[sha] = pos
+
+    # Traverse all objects reachable from the commit
+    seen = set()
+    queue = deque([commit_sha])
+
+    while queue:
+        sha = queue.popleft()
+        if sha in seen:
+            continue
+        seen.add(sha)
+
+        # Add this object to the bitmap if it's in the pack
+        if sha in sha_to_pos:
+            bitmap.add(sha_to_pos[sha])
+
+        # Get the object and traverse its references
+        try:
+            obj = object_store[sha]
+
+            if isinstance(obj, Commit):
+                # Add parents and tree
+                queue.append(obj.tree)
+                queue.extend(obj.parents)
+            elif hasattr(obj, "items"):
+                # Tree object - add all entries
+                for item in obj.items():
+                    queue.append(item.sha)
+        except KeyError:
+            # Object not in store, skip it
+            continue
+
+    return bitmap
+
+
+def apply_xor_compression(
+    bitmaps: list[tuple[bytes, EWAHBitmap]],
+    max_xor_offset: int = 160,
+) -> list[tuple[bytes, EWAHBitmap, int]]:
+    """Apply XOR compression to bitmaps.
+
+    XOR compression stores some bitmaps as XOR differences from previous bitmaps,
+    reducing storage size when bitmaps are similar.
+
+    Args:
+        bitmaps: List of (commit_sha, bitmap) tuples
+        max_xor_offset: Maximum offset to search for XOR base (default: 160)
+
+    Returns:
+        List of (commit_sha, bitmap, xor_offset) tuples
+    """
+    compressed = []
+
+    for i, (sha, bitmap) in enumerate(bitmaps):
+        best_xor_offset = 0
+        best_size = len(bitmap.encode())
+        best_xor_bitmap = bitmap
+
+        # Try XORing with previous bitmaps within max_xor_offset
+        for offset in range(1, min(i + 1, max_xor_offset + 1)):
+            _prev_sha, prev_bitmap = bitmaps[i - offset]
+            xor_bitmap = bitmap ^ prev_bitmap
+            xor_size = len(xor_bitmap.encode())
+
+            # Use XOR if it reduces size
+            if xor_size < best_size:
+                best_size = xor_size
+                best_xor_offset = offset
+                best_xor_bitmap = xor_bitmap
+
+        compressed.append((sha, best_xor_bitmap, best_xor_offset))
+
+    return compressed
+
+
+def build_type_bitmaps(
+    pack_index: "PackIndex",
+    object_store: "BaseObjectStore",
+) -> tuple[EWAHBitmap, EWAHBitmap, EWAHBitmap, EWAHBitmap]:
+    """Build type bitmaps for all objects in a pack.
+
+    Type bitmaps classify objects by type: commit, tree, blob, or tag.
+
+    Args:
+        pack_index: Pack index to iterate objects
+        object_store: Object store to read object types
+
+    Returns:
+        Tuple of (commit_bitmap, tree_bitmap, blob_bitmap, tag_bitmap)
+    """
+    commit_bitmap = EWAHBitmap()
+    tree_bitmap = EWAHBitmap()
+    blob_bitmap = EWAHBitmap()
+    tag_bitmap = EWAHBitmap()
+
+    for pos, (sha, _offset, _crc32) in enumerate(pack_index.iterentries()):
+        try:
+            obj = object_store[sha]
+        except KeyError:
+            pass
+        else:
+            obj_type = obj.type_num
+
+            if obj_type == Commit.type_num:
+                commit_bitmap.add(pos)
+            elif obj_type == Tree.type_num:
+                tree_bitmap.add(pos)
+            elif obj_type == Blob.type_num:
+                blob_bitmap.add(pos)
+            elif obj_type == Tag.type_num:
+                tag_bitmap.add(pos)
+
+    return commit_bitmap, tree_bitmap, blob_bitmap, tag_bitmap
+
+
+def build_name_hash_cache(
+    pack_index: "PackIndex",
+    object_store: "BaseObjectStore",
+) -> list[int]:
+    """Build name-hash cache for all objects in a pack.
+
+    The name-hash cache stores a hash of the name for each object,
+    which can speed up path-based operations.
+
+    Args:
+        pack_index: Pack index to iterate objects
+        object_store: Object store to read objects
+
+    Returns:
+        List of 32-bit hash values, one per object in the pack
+    """
+    name_hashes = []
+
+    for _pos, (sha, _offset, _crc32) in enumerate(pack_index.iterentries()):
+        try:
+            obj = object_store[sha]
+
+            # For tree entries, use the tree entry name
+            # For commits, use the tree SHA
+            # For other objects, use the object SHA
+            if hasattr(obj, "items"):
+                # Tree object - use the SHA as the name
+                name_hash = _compute_name_hash(sha)
+            elif isinstance(obj, Commit):
+                # Commit - use the tree SHA as the name
+                name_hash = _compute_name_hash(obj.tree)
+            else:
+                # Other objects - use the SHA as the name
+                name_hash = _compute_name_hash(sha)
+
+            name_hashes.append(name_hash)
+        except KeyError:
+            # Object not in store, use zero hash
+            name_hashes.append(0)
+
+    return name_hashes
+
+
+def generate_bitmap(
+    pack_index: "PackIndex",
+    object_store: "BaseObjectStore",
+    refs: dict[bytes, bytes],
+    pack_checksum: bytes,
+    include_hash_cache: bool = True,
+    include_lookup_table: bool = True,
+    commit_interval: int = DEFAULT_COMMIT_INTERVAL,
+    progress: Callable[[str], None] | None = None,
+) -> PackBitmap:
+    """Generate a complete bitmap for a pack.
+
+    Args:
+        pack_index: Pack index for the pack
+        object_store: Object store to read objects from
+        refs: Dictionary of ref names to commit SHAs
+        pack_checksum: SHA-1 checksum of the pack file
+        include_hash_cache: Whether to include name-hash cache
+        include_lookup_table: Whether to include lookup table
+        commit_interval: Include every Nth commit in history
+        progress: Optional progress reporting callback
+
+    Returns:
+        Complete PackBitmap ready to write to disk
+    """
+    if progress:
+        progress("Selecting commits for bitmap")
+
+    # Select commits to create bitmaps for
+    selected_commits = select_bitmap_commits(refs, object_store, commit_interval)
+
+    if progress:
+        progress(f"Building bitmaps for {len(selected_commits)} commits")
+
+    # Build reachability bitmaps for selected commits
+    commit_bitmaps = []
+    for i, commit_sha in enumerate(selected_commits):
+        if progress and i % 10 == 0:
+            progress(f"Building bitmap {i + 1}/{len(selected_commits)}")
+
+        bitmap = build_reachability_bitmap(commit_sha, pack_index, object_store)
+        commit_bitmaps.append((commit_sha, bitmap))
+
+    if progress:
+        progress("Applying XOR compression")
+
+    # Apply XOR compression
+    compressed_bitmaps = apply_xor_compression(commit_bitmaps)
+
+    if progress:
+        progress("Building type bitmaps")
+
+    # Build type bitmaps
+    commit_type_bitmap, tree_type_bitmap, blob_type_bitmap, tag_type_bitmap = (
+        build_type_bitmaps(pack_index, object_store)
+    )
+
+    # Create PackBitmap
+    flags = BITMAP_OPT_FULL_DAG
+    if include_hash_cache:
+        flags |= BITMAP_OPT_HASH_CACHE
+    if include_lookup_table:
+        flags |= BITMAP_OPT_LOOKUP_TABLE
+
+    pack_bitmap = PackBitmap(version=1, flags=flags)
+    pack_bitmap.pack_checksum = pack_checksum
+    pack_bitmap.commit_bitmap = commit_type_bitmap
+    pack_bitmap.tree_bitmap = tree_type_bitmap
+    pack_bitmap.blob_bitmap = blob_type_bitmap
+    pack_bitmap.tag_bitmap = tag_type_bitmap
+
+    # Create mapping from SHA to position in pack index
+    sha_to_pos = {}
+    for pos, (sha, _offset, _crc32) in enumerate(pack_index.iterentries()):
+        sha_to_pos[sha] = pos
+
+    # Add bitmap entries
+    for commit_sha, xor_bitmap, xor_offset in compressed_bitmaps:
+        if commit_sha not in sha_to_pos:
+            continue
+
+        entry = BitmapEntry(
+            object_pos=sha_to_pos[commit_sha],
+            xor_offset=xor_offset,
+            flags=0,
+            bitmap=xor_bitmap,
+        )
+        pack_bitmap.entries[commit_sha] = entry
+        pack_bitmap.entries_list.append((commit_sha, entry))
+
+    # Build optional name-hash cache
+    if include_hash_cache:
+        if progress:
+            progress("Building name-hash cache")
+        pack_bitmap.name_hash_cache = build_name_hash_cache(pack_index, object_store)
+
+    # Build optional lookup table
+    if include_lookup_table:
+        if progress:
+            progress("Building lookup table")
+        # The lookup table is built automatically from the entries
+        # For now, we'll leave it as None and let the write function handle it
+        # TODO: Implement lookup table generation if needed
+        pack_bitmap.lookup_table = None
+
+    if progress:
+        progress("Bitmap generation complete")
+
+    return pack_bitmap

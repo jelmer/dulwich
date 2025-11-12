@@ -33,7 +33,7 @@ import struct
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from io import BytesIO
-from typing import IO, TYPE_CHECKING, Callable, Optional
+from typing import IO, TYPE_CHECKING, Optional
 
 from .file import GitFile
 from .objects import Blob, Commit, Tag, Tree
@@ -1143,7 +1143,9 @@ def generate_bitmap(
     return pack_bitmap
 
 
-def find_commit_bitmaps(commit_shas: set[bytes], packs: Iterable[Pack]) -> dict[bytes, tuple]:
+def find_commit_bitmaps(
+    commit_shas: set[bytes], packs: Iterable[Pack]
+) -> dict[bytes, tuple]:
     """Find which packs have bitmaps for the given commits.
 
     Args:

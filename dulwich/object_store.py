@@ -2408,8 +2408,11 @@ class MissingObjectFinder:
             have_commits, exclude=None, shallow=shallow
         )
         # all_missing - complete set of commits between haves and wants
-        # common - commits from all_ancestors we hit into while
-        # traversing parent hierarchy of wants
+        # common_commits - boundary commits directly encountered when traversing wants
+        # We use _collect_ancestors here because we need the exact boundary behavior:
+        # commits that are in all_ancestors and directly reachable from wants,
+        # but we don't traverse past them. This is hard to express with the
+        # reachability abstraction alone.
         missing_commits, common_commits = _collect_ancestors(
             object_store,
             want_commits,
@@ -2417,6 +2420,7 @@ class MissingObjectFinder:
             shallow=frozenset(shallow),
             get_parents=self._get_parents,
         )
+
         self.remote_has: set[bytes] = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally
@@ -2426,8 +2430,10 @@ class MissingObjectFinder:
             self.remote_has.add(h)
             cmt = object_store[h]
             assert isinstance(cmt, Commit)
+            # Get tree objects for this commit
             tree_objects = reachability.get_tree_objects([cmt.tree])
             self.remote_has.update(tree_objects)
+
         # record tags we have as visited, too
         for t in have_tags:
             self.remote_has.add(t)
@@ -3321,7 +3327,9 @@ class BitmapReachability:
                 if exclude_combined:
                     combined_bitmap = combined_bitmap - exclude_combined
 
-        return (combined_bitmap, result_pack) if combined_bitmap else None
+        if combined_bitmap and result_pack:
+            return (combined_bitmap, result_pack)
+        return None
 
     def get_reachable_commits(
         self,
@@ -3357,7 +3365,10 @@ class BitmapReachability:
         combined_bitmap, result_pack = result
 
         # Convert bitmap to commit SHAs, filtering for commits only
-        commit_type_filter = result_pack.bitmap.commit_bitmap
+        pack_bitmap = result_pack.bitmap
+        if pack_bitmap is None:
+            return self._fallback.get_reachable_commits(heads, exclude, shallow)
+        commit_type_filter = pack_bitmap.commit_bitmap
         return bitmap_to_object_shas(
             combined_bitmap, result_pack.index, commit_type_filter
         )

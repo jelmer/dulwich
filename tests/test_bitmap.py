@@ -22,6 +22,7 @@
 """Tests for bitmap support."""
 
 import os
+import shutil
 import tempfile
 import unittest
 from io import BytesIO
@@ -1078,24 +1079,18 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_get_reachability_provider_without_bitmaps(self):
         """Test get_reachability_provider returns GraphTraversalReachability when no bitmaps."""
-        from dulwich.object_store import (
-            GraphTraversalReachability,
-            get_reachability_provider,
-        )
+        from dulwich.object_store import GraphTraversalReachability
 
-        provider = get_reachability_provider(self.store)
+        provider = self.store.get_reachability_provider()
 
         # Should return GraphTraversalReachability when no bitmaps available
         self.assertIsInstance(provider, GraphTraversalReachability)
 
     def test_get_reachability_provider_prefer_bitmaps_false(self):
         """Test get_reachability_provider with prefer_bitmaps=False."""
-        from dulwich.object_store import (
-            GraphTraversalReachability,
-            get_reachability_provider,
-        )
+        from dulwich.object_store import GraphTraversalReachability
 
-        provider = get_reachability_provider(self.store, prefer_bitmaps=False)
+        provider = self.store.get_reachability_provider(prefer_bitmaps=False)
 
         # Should return GraphTraversalReachability when prefer_bitmaps=False
         self.assertIsInstance(provider, GraphTraversalReachability)
@@ -1162,3 +1157,169 @@ class ReachabilityProviderTests(unittest.TestCase):
             [self.commit3.id], exclude_commits=None
         )
         self.assertEqual(graph_objects, bitmap_objects)
+
+
+class PackEnsureBitmapTests(unittest.TestCase):
+    """Tests for Pack.ensure_bitmap() method."""
+
+    def setUp(self):
+        """Set up test repository with a pack."""
+        from dulwich.object_store import DiskObjectStore
+        from dulwich.objects import Blob, Commit, Tree
+
+        self.temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_dir)
+
+        # Create pack directory
+        os.makedirs(os.path.join(self.temp_dir, "pack"))
+
+        self.store = DiskObjectStore(self.temp_dir)
+
+        # Create test objects
+        self.blob = Blob.from_string(b"test content")
+        self.store.add_object(self.blob)
+
+        self.tree = Tree()
+        self.tree.add(b"file.txt", 0o100644, self.blob.id)
+        self.store.add_object(self.tree)
+
+        self.commit = Commit()
+        self.commit.tree = self.tree.id
+        self.commit.author = self.commit.committer = b"Test <test@example.com>"
+        self.commit.author_time = self.commit.commit_time = 1234567890
+        self.commit.author_timezone = self.commit.commit_timezone = 0
+        self.commit.message = b"Test commit"
+        self.store.add_object(self.commit)
+
+        # Repack to create a pack
+        self.store.repack()
+        self.pack = self.store.packs[0]
+
+    def test_ensure_bitmap_creates_bitmap(self):
+        """Test that ensure_bitmap creates a bitmap file."""
+        # Initially no bitmap
+        self.assertFalse(os.path.exists(self.pack._bitmap_path))
+
+        # Ensure bitmap with commit_interval=1 to ensure our single commit is selected
+        refs = {b"refs/heads/master": self.commit.id}
+        bitmap = self.pack.ensure_bitmap(self.store, refs, commit_interval=1)
+
+        # Bitmap should now exist
+        self.assertIsNotNone(bitmap)
+        self.assertTrue(os.path.exists(self.pack._bitmap_path))
+        # Verify it's a PackBitmap instance
+        from dulwich.bitmap import PackBitmap
+
+        self.assertIsInstance(bitmap, PackBitmap)
+
+    def test_ensure_bitmap_returns_existing(self):
+        """Test that ensure_bitmap returns existing bitmap without regenerating."""
+        refs = {b"refs/heads/master": self.commit.id}
+
+        # Create bitmap with commit_interval=1
+        self.pack.ensure_bitmap(self.store, refs, commit_interval=1)
+        mtime1 = os.path.getmtime(self.pack._bitmap_path)
+
+        # Ensure again - should return existing
+        import time
+
+        time.sleep(0.01)  # Ensure time difference
+        self.pack.ensure_bitmap(self.store, refs, commit_interval=1)
+        mtime2 = os.path.getmtime(self.pack._bitmap_path)
+
+        # File should not have been regenerated
+        self.assertEqual(mtime1, mtime2)
+
+    def test_ensure_bitmap_with_custom_interval(self):
+        """Test ensure_bitmap with custom commit_interval."""
+        refs = {b"refs/heads/master": self.commit.id}
+        bitmap = self.pack.ensure_bitmap(self.store, refs, commit_interval=50)
+        self.assertIsNotNone(bitmap)
+
+
+class GeneratePackBitmapsTests(unittest.TestCase):
+    """Tests for PackBasedObjectStore.generate_pack_bitmaps()."""
+
+    def setUp(self):
+        """Set up test repository."""
+        from dulwich.object_store import DiskObjectStore
+        from dulwich.objects import Blob, Commit, Tree
+
+        self.temp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.temp_dir)
+
+        # Create pack directory
+        os.makedirs(os.path.join(self.temp_dir, "pack"))
+
+        self.store = DiskObjectStore(self.temp_dir)
+
+        # Create multiple commits
+        self.commits = []
+        for i in range(3):
+            blob = Blob.from_string(f"content {i}".encode())
+            self.store.add_object(blob)
+
+            tree = Tree()
+            tree.add(f"file{i}.txt".encode(), 0o100644, blob.id)
+            self.store.add_object(tree)
+
+            commit = Commit()
+            commit.tree = tree.id
+            if i > 0:
+                commit.parents = [self.commits[-1].id]
+            commit.author = commit.committer = b"Test <test@example.com>"
+            commit.author_time = commit.commit_time = 1234567890 + i
+            commit.author_timezone = commit.commit_timezone = 0
+            commit.message = f"Commit {i}".encode()
+            self.store.add_object(commit)
+            self.commits.append(commit)
+
+        # Repack to create pack
+        self.store.repack()
+
+    def test_generate_pack_bitmaps(self):
+        """Test generating bitmaps for all packs."""
+        refs = {b"refs/heads/master": self.commits[-1].id}
+
+        # Initially no bitmaps
+        for pack in self.store.packs:
+            self.assertFalse(os.path.exists(pack._bitmap_path))
+
+        # Generate bitmaps
+        count = self.store.generate_pack_bitmaps(refs)
+
+        # Should have generated bitmaps
+        self.assertEqual(count, len(self.store.packs))
+        for pack in self.store.packs:
+            self.assertTrue(os.path.exists(pack._bitmap_path))
+
+    def test_generate_pack_bitmaps_multiple_calls(self):
+        """Test that calling generate_pack_bitmaps multiple times is safe."""
+        refs = {b"refs/heads/master": self.commits[-1].id}
+
+        # Generate once
+        self.store.generate_pack_bitmaps(refs)
+        mtimes1 = [os.path.getmtime(p._bitmap_path) for p in self.store.packs]
+
+        # Generate again
+        import time
+
+        time.sleep(0.01)
+        self.store.generate_pack_bitmaps(refs)
+        mtimes2 = [os.path.getmtime(p._bitmap_path) for p in self.store.packs]
+
+        # Should not regenerate existing bitmaps
+        self.assertEqual(mtimes1, mtimes2)
+
+    def test_generate_pack_bitmaps_with_progress(self):
+        """Test generate_pack_bitmaps with progress callback."""
+        refs = {b"refs/heads/master": self.commits[-1].id}
+        messages = []
+
+        def progress(msg):
+            messages.append(msg)
+
+        self.store.generate_pack_bitmaps(refs, progress=progress)
+
+        # Should have received progress messages
+        self.assertGreater(len(messages), 0)

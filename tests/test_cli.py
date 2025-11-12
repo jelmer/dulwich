@@ -2550,6 +2550,22 @@ class RepackCommandTest(DulwichCliTestCase):
         pack_dir = os.path.join(self.repo_path, ".git", "objects", "pack")
         self.assertTrue(any(f.endswith(".pack") for f in os.listdir(pack_dir)))
 
+    def test_repack_write_bitmap_index(self):
+        """Test repack with --write-bitmap-index flag."""
+        # Create some objects
+        for i in range(5):
+            test_file = os.path.join(self.repo_path, f"test{i}.txt")
+            with open(test_file, "w") as f:
+                f.write(f"content {i}")
+            self._run_cli("add", f"test{i}.txt")
+            self._run_cli("commit", f"--message=Commit {i}")
+
+        _result, _stdout, _stderr = self._run_cli("repack", "--write-bitmap-index")
+        # Should create pack and bitmap files
+        pack_dir = os.path.join(self.repo_path, ".git", "objects", "pack")
+        self.assertTrue(any(f.endswith(".pack") for f in os.listdir(pack_dir)))
+        self.assertTrue(any(f.endswith(".bitmap") for f in os.listdir(pack_dir)))
+
 
 class ResetCommandTest(DulwichCliTestCase):
     """Tests for reset command."""

@@ -2,6 +2,9 @@
 
  * Drop support for Python 3.9. (Jelmer Vernooĳ)
 
+ * Add support for pack bitmap indexes for fast reachability queries.
+   (Jelmer Vernooĳ, #1792)
+
  * Add support for ``git rerere`` (reuse recorded resolution) with CLI
    subcommands and porcelain functions. Supports ``rerere.enabled`` and
    ``rerere.autoupdate`` configuration. (Jelmer Vernooĳ, #1786)

@@ -83,9 +83,11 @@ from .protocol import DEPTH_INFINITE
 from .refs import PEELED_TAG_SUFFIX, Ref
 
 if TYPE_CHECKING:
+    from .bitmap import EWAHBitmap
     from .commit_graph import CommitGraph
     from .config import Config
     from .diff_tree import RenameDetector
+    from .pack import Pack
 
 
 class GraphWalker(Protocol):
@@ -823,14 +825,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             # Check if any packs have bitmaps
             has_bitmap = False
             for pack in self.packs:
-                try:
-                    # Try to access bitmap property
-                    if pack.bitmap is not None:
-                        has_bitmap = True
-                        break
-                except (FileNotFoundError, ValueError, AttributeError):
-                    # No bitmap file, corrupt bitmap, or no bitmap support
-                    continue
+                # Try to access bitmap property
+                if pack.bitmap is not None:
+                    has_bitmap = True
+                    break
 
             if has_bitmap:
                 return BitmapReachability(self)
@@ -3259,7 +3257,7 @@ class BitmapReachability:
         self,
         commit_shas: set[bytes],
         exclude_shas: set[bytes] | None = None,
-    ) -> tuple | None:
+    ) -> tuple["EWAHBitmap", "Pack"] | None:
         """Combine bitmaps for multiple commits using OR, with optional exclusion.
 
         Args:

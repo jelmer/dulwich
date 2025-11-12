@@ -825,10 +825,14 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             # Check if any packs have bitmaps
             has_bitmap = False
             for pack in self.packs:
-                # Try to access bitmap property
-                if pack.bitmap is not None:
-                    has_bitmap = True
-                    break
+                try:
+                    # Try to access bitmap property
+                    if pack.bitmap is not None:
+                        has_bitmap = True
+                        break
+                except FileNotFoundError:
+                    # Bitmap file doesn't exist for this pack
+                    continue
 
             if has_bitmap:
                 return BitmapReachability(self)
@@ -1074,6 +1078,38 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             self._remove_pack(pack)
         self._update_pack_cache()
         return len(objects)
+
+    def generate_pack_bitmaps(
+        self,
+        refs: dict[bytes, bytes],
+        *,
+        commit_interval: int | None = None,
+        progress: Callable[[str], None] | None = None,
+    ) -> int:
+        """Generate bitmap indexes for all packs that don't have them.
+
+        This generates .bitmap files for packfiles, enabling fast reachability
+        queries. Equivalent to the bitmap generation part of 'git repack -b'.
+
+        Args:
+          refs: Dictionary of ref names to commit SHAs
+          commit_interval: Include every Nth commit in bitmap index (None for default)
+          progress: Optional progress reporting callback
+
+        Returns:
+          Number of bitmaps generated
+        """
+        count = 0
+        for pack in self.packs:
+            pack.ensure_bitmap(
+                self, refs, commit_interval=commit_interval, progress=progress
+            )
+            count += 1
+
+        # Update cache to pick up new bitmaps
+        self._update_pack_cache()
+
+        return count
 
     def __iter__(self) -> Iterator[bytes]:
         """Iterate over the SHAs that are present in this store."""

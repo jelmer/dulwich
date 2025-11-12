@@ -4840,16 +4840,21 @@ def ls_remote(
     )
 
 
-def repack(repo: RepoPath) -> None:
+def repack(repo: RepoPath, write_bitmaps: bool = False) -> None:
     """Repack loose files in a repository.
 
     Currently this only packs loose objects.
 
     Args:
       repo: Path to the repository
+      write_bitmaps: Whether to write bitmap indexes for packs
     """
     with open_repo_closing(repo) as r:
         r.object_store.pack_loose_objects()
+        if write_bitmaps:
+            # Update pack cache to pick up newly created packs
+            r.object_store._update_pack_cache()
+            r.object_store.generate_pack_bitmaps(r.refs.as_dict())
 
 
 def pack_objects(

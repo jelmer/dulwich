@@ -360,7 +360,9 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.add_objects)
 
-    def get_reachability_provider(self, prefer_bitmap: bool = True) -> ObjectReachabilityProvider:
+    def get_reachability_provider(
+        self, prefer_bitmap: bool = True
+    ) -> ObjectReachabilityProvider:
         """Get a reachability provider for this object store.
 
         Returns an ObjectReachabilityProvider that can efficiently compute
@@ -3235,7 +3237,6 @@ class GraphTraversalReachability:
         return result
 
 
-
 class BitmapReachability:
     """Bitmap-accelerated implementation of ObjectReachabilityProvider.
 
@@ -3270,8 +3271,82 @@ class BitmapReachability:
         Returns:
           Set of commit SHAs reachable from heads but not from exclude
         """
-        # TODO: Implement bitmap-accelerated version
-        # For now, fall back to graph traversal
+        from .bitmap import bitmap_to_object_shas, find_commit_bitmaps
+
+        heads_set = set(heads)
+        exclude_set = set(exclude) if exclude else set()
+
+        # If shallow is specified, fall back to graph traversal
+        # (bitmap don't support shallow boundaries well)
+        if shallow:
+            return self._fallback.get_reachable_commits(heads, exclude, shallow)
+
+        # Try to find bitmaps for the heads
+        head_bitmaps = find_commit_bitmaps(heads_set, self.store.packs)
+
+        # If we can't find bitmaps for all heads, fall back
+        if len(head_bitmaps) < len(heads_set):
+            return self._fallback.get_reachable_commits(heads, exclude, shallow)
+
+        # Combine bitmaps for all heads using OR
+        combined_bitmap = None
+        result_pack = None
+
+        for commit_sha in heads_set:
+            pack, pack_bitmap, _sha_to_pos = head_bitmaps[commit_sha]
+            commit_bitmap = pack_bitmap.get_bitmap(commit_sha)
+
+            if commit_bitmap is None:
+                # Bitmap not found, fall back
+                return self._fallback.get_reachable_commits(heads, exclude, shallow)
+
+            if combined_bitmap is None:
+                combined_bitmap = commit_bitmap
+                result_pack = pack
+            elif pack == result_pack:
+                # Same pack, can OR directly
+                combined_bitmap = combined_bitmap | commit_bitmap
+            else:
+                # Different packs, fall back to traversal
+                return self._fallback.get_reachable_commits(heads, exclude, shallow)
+
+        # Handle exclusions if provided
+        if exclude_set and result_pack:
+            exclude_bitmaps = find_commit_bitmaps(exclude_set, [result_pack])
+
+            if len(exclude_bitmaps) == len(exclude_set):
+                # All excludes have bitmaps, compute exclusion
+                exclude_combined = None
+
+                for commit_sha in exclude_set:
+                    pack, pack_bitmap, _sha_to_pos = exclude_bitmaps[commit_sha]
+                    exclude_bitmap = pack_bitmap.get_bitmap(commit_sha)
+
+                    if exclude_bitmap is None:
+                        break
+
+                    if exclude_combined is None:
+                        exclude_combined = exclude_bitmap
+                    else:
+                        exclude_combined = exclude_combined | exclude_bitmap
+
+                # Subtract excludes: combined & ~exclude
+                if exclude_combined:
+                    # Create a bitmap with all bits set in exclude_combined inverted
+                    # Then AND with combined_bitmap
+                    combined_bitmap = combined_bitmap & (
+                        combined_bitmap ^ exclude_combined
+                    )
+
+        # Convert bitmap to commit SHAs
+        if combined_bitmap and result_pack:
+            # Filter for commits only using the commit type bitmap
+            commit_type_filter = result_pack.bitmap.commit_bitmap
+            return bitmap_to_object_shas(
+                combined_bitmap, result_pack.index, commit_type_filter
+            )
+
+        # Fallback if anything went wrong
         return self._fallback.get_reachable_commits(heads, exclude, shallow)
 
     def get_tree_objects(
@@ -3303,6 +3378,69 @@ class BitmapReachability:
         Returns:
           Set of all object SHAs (commits, trees, blobs)
         """
-        # TODO: Implement bitmap-accelerated version
-        # For now, fall back to graph traversal
+        from .bitmap import bitmap_to_object_shas, find_commit_bitmaps
+
+        commits_set = set(commits)
+        exclude_set = set(exclude_commits) if exclude_commits else set()
+
+        # Try to find bitmaps for the commits
+        commit_bitmaps = find_commit_bitmaps(commits_set, self.store.packs)
+
+        # If we can't find bitmaps for all commits, fall back
+        if len(commit_bitmaps) < len(commits_set):
+            return self._fallback.get_reachable_objects(commits, exclude_commits)
+
+        # Combine bitmaps for all commits using OR
+        combined_bitmap = None
+        result_pack = None
+
+        for commit_sha in commits_set:
+            pack, pack_bitmap, _sha_to_pos = commit_bitmaps[commit_sha]
+            commit_bitmap = pack_bitmap.get_bitmap(commit_sha)
+
+            if commit_bitmap is None:
+                # Bitmap not found, fall back
+                return self._fallback.get_reachable_objects(commits, exclude_commits)
+
+            if combined_bitmap is None:
+                combined_bitmap = commit_bitmap
+                result_pack = pack
+            elif pack == result_pack:
+                # Same pack, can OR directly
+                combined_bitmap = combined_bitmap | commit_bitmap
+            else:
+                # Different packs, fall back to traversal
+                return self._fallback.get_reachable_objects(commits, exclude_commits)
+
+        # Handle exclusions if provided
+        if exclude_set and result_pack:
+            exclude_bitmaps = find_commit_bitmaps(exclude_set, [result_pack])
+
+            if len(exclude_bitmaps) == len(exclude_set):
+                # All excludes have bitmaps, compute exclusion
+                exclude_combined = None
+
+                for commit_sha in exclude_set:
+                    pack, pack_bitmap, _sha_to_pos = exclude_bitmaps[commit_sha]
+                    exclude_bitmap = pack_bitmap.get_bitmap(commit_sha)
+
+                    if exclude_bitmap is None:
+                        break
+
+                    if exclude_combined is None:
+                        exclude_combined = exclude_bitmap
+                    else:
+                        exclude_combined = exclude_combined | exclude_bitmap
+
+                # Subtract excludes: combined & ~exclude
+                if exclude_combined:
+                    combined_bitmap = combined_bitmap & (
+                        combined_bitmap ^ exclude_combined
+                    )
+
+        # Convert bitmap to all object SHAs (no type filter)
+        if combined_bitmap and result_pack:
+            return bitmap_to_object_shas(combined_bitmap, result_pack.index, None)
+
+        # Fallback if anything went wrong
         return self._fallback.get_reachable_objects(commits, exclude_commits)

@@ -360,6 +360,18 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.add_objects)
 
+    def get_reachability_provider(self) -> ObjectReachabilityProvider:
+        """Get a reachability provider for this object store.
+
+        Returns an ObjectReachabilityProvider that can efficiently compute
+        object reachability queries. Subclasses can override this to provide
+        optimized implementations (e.g., using bitmap indexes).
+
+        Returns:
+          ObjectReachabilityProvider instance
+        """
+        return GraphTraversalReachability(self)
+
     def tree_changes(
         self,
         source: bytes | None,
@@ -2276,6 +2288,7 @@ class MissingObjectFinder:
         if shallow is None:
             shallow = set()
         self._get_parents = get_parents
+        reachability = object_store.get_reachability_provider()
         # process Commits and Tags differently
         # Note, while haves may list commits/tags not available locally,
         # and such SHAs would get filtered out by _split_commits_and_tags,
@@ -2289,12 +2302,9 @@ class MissingObjectFinder:
         )
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')
-        all_ancestors = _collect_ancestors(
-            object_store,
-            have_commits,
-            shallow=frozenset(shallow),
-            get_parents=self._get_parents,
-        )[0]
+        all_ancestors = reachability.get_reachable_commits(
+            have_commits, exclude=None, shallow=shallow
+        )
         # all_missing - complete set of commits between haves and wants
         # common - commits from all_ancestors we hit into while
         # traversing parent hierarchy of wants
@@ -2314,7 +2324,8 @@ class MissingObjectFinder:
             self.remote_has.add(h)
             cmt = object_store[h]
             assert isinstance(cmt, Commit)
-            _collect_filetree_revs(object_store, cmt.tree, self.remote_has)
+            tree_objects = reachability.get_tree_objects([cmt.tree])
+            self.remote_has.update(tree_objects)
         # record tags we have as visited, too
         for t in have_tags:
             self.remote_has.add(t)
@@ -3082,7 +3093,7 @@ class GraphTraversalReachability:
         Returns:
           Set of tree and blob SHAs
         """
-        result = set()
+        result: set[bytes] = set()
         for tree_sha in tree_shas:
             _collect_filetree_revs(self.store, tree_sha, result)
         return result

@@ -31,7 +31,7 @@ for efficient storage and fast bitwise operations.
 import os
 import struct
 from collections import deque
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from io import BytesIO
 from typing import IO, TYPE_CHECKING, Optional
 
@@ -40,7 +40,7 @@ from .objects import Blob, Commit, Tag, Tree
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
-    from .pack import PackIndex
+    from .pack import Pack, PackIndex
 
 # Bitmap file signature
 BITMAP_SIGNATURE = b"BITM"
@@ -1119,3 +1119,73 @@ def generate_bitmap(
         progress("Bitmap generation complete")
 
     return pack_bitmap
+
+
+def find_commit_bitmaps(
+    commit_shas: set[bytes], packs: Iterable[Pack]
+) -> dict[bytes, tuple]:
+    """Find which packs have bitmaps for the given commits.
+
+    Args:
+        commit_shas: Set of commit SHAs to look for
+        packs: Iterable of Pack objects to search
+
+    Returns:
+        Dict mapping commit SHA to (pack, pack_bitmap, position) tuple
+    """
+    result = {}
+    remaining = set(commit_shas)
+
+    for pack in packs:
+        if not remaining:
+            break
+
+        try:
+            pack_bitmap = pack.bitmap
+            if not pack_bitmap:
+                continue
+
+            # Build SHA to position mapping for this pack
+            sha_to_pos = {}
+            for pos, (sha, _offset, _crc32) in enumerate(pack.index.iterentries()):
+                sha_to_pos[sha] = pos
+
+            # Check which commits have bitmaps
+            for commit_sha in list(remaining):
+                if pack_bitmap.has_commit(commit_sha):
+                    if commit_sha in sha_to_pos:
+                        result[commit_sha] = (pack, pack_bitmap, sha_to_pos)
+                        remaining.remove(commit_sha)
+
+        except (FileNotFoundError, ValueError, AttributeError):
+            # No bitmap or corrupt, skip this pack
+            continue
+
+    return result
+
+
+def bitmap_to_object_shas(
+    bitmap: EWAHBitmap,
+    pack_index: "PackIndex",
+    type_filter: EWAHBitmap | None = None,
+) -> set[bytes]:
+    """Convert a bitmap to a set of object SHAs.
+
+    Args:
+        bitmap: The EWAH bitmap with set bits for objects
+        pack_index: Pack index to map positions to SHAs
+        type_filter: Optional type bitmap to filter results (e.g., commits only)
+
+    Returns:
+        Set of object SHAs
+    """
+    result = set()
+
+    for pos, (sha, _offset, _crc32) in enumerate(pack_index.iterentries()):
+        # Check if this position is in the bitmap
+        if pos in bitmap:
+            # Apply type filter if provided
+            if type_filter is None or pos in type_filter:
+                result.add(sha)
+
+    return result

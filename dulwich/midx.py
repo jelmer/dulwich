@@ -42,6 +42,7 @@ from collections.abc import Iterator
 from typing import IO, Any
 
 from .file import GitFile, _GitFile
+from .pack import SHA1Writer
 
 # MIDX signature
 MIDX_SIGNATURE = b"MIDX"
@@ -412,7 +413,182 @@ def load_midx_file(
     return MultiPackIndex(path, file=f)
 
 
-# TODO: Implement MIDX writing functionality
-# TODO: Implement integration with object_store.py
+def write_midx(
+    f: IO[bytes],
+    pack_index_entries: list[tuple[str, list[tuple[bytes, int, int | None]]]],
+    hash_algorithm: int = HASH_ALGORITHM_SHA1,
+) -> bytes:
+    """Write a multi-pack-index file.
+
+    Args:
+        f: File-like object to write to
+        pack_index_entries: List of (pack_name, entries) tuples where entries are
+                          (sha, offset, crc32) tuples, sorted by SHA
+        hash_algorithm: Hash algorithm to use (1=SHA-1, 2=SHA-256)
+
+    Returns:
+        SHA-1 checksum of the written MIDX file
+    """
+    if hash_algorithm == HASH_ALGORITHM_SHA1:
+        hash_size = 20
+    elif hash_algorithm == HASH_ALGORITHM_SHA256:
+        hash_size = 32
+    else:
+        raise ValueError(f"Unknown hash algorithm: {hash_algorithm}")
+
+    # Wrap file in SHA1Writer to compute checksum
+    writer = SHA1Writer(f)
+
+    # Collect all objects from all packs
+    all_objects: list[tuple[bytes, int, int]] = []  # (sha, pack_id, offset)
+    pack_names: list[str] = []
+
+    for pack_id, (pack_name, entries) in enumerate(pack_index_entries):
+        pack_names.append(pack_name)
+        for sha, offset, _crc32 in entries:
+            all_objects.append((sha, pack_id, offset))
+
+    # Sort all objects by SHA
+    all_objects.sort(key=lambda x: x[0])
+
+    # Calculate offsets for chunks
+    num_packs = len(pack_names)
+    num_objects = len(all_objects)
+
+    # Header: 12 bytes
+    header_size = 12
+
+    # Chunk count: PNAM, OIDF, OIDL, OOFF, and optionally LOFF
+    # We'll determine if LOFF is needed later
+    chunk_count = 4  # PNAM, OIDF, OIDL, OOFF
+
+    # Check if we need LOFF chunk (for offsets >= 2^31)
+    need_loff = any(offset >= 2**31 for _sha, _pack_id, offset in all_objects)
+    if need_loff:
+        chunk_count += 1
+
+    # Chunk table: (chunk_count + 1) * 12 bytes (including terminator)
+    chunk_table_size = (chunk_count + 1) * 12
+
+    # Calculate chunk offsets
+    current_offset = header_size + chunk_table_size
+
+    # PNAM chunk: pack names as null-terminated strings, padded to 4-byte boundary
+    pnam_data = b"".join(name.encode("utf-8") + b"\x00" for name in pack_names)
+    # Pad to 4-byte boundary
+    pnam_padding = (4 - len(pnam_data) % 4) % 4
+    pnam_data += b"\x00" * pnam_padding
+    pnam_offset = current_offset
+    current_offset += len(pnam_data)
+
+    # OIDF chunk: 256 * 4 bytes
+    oidf_offset = current_offset
+    oidf_size = 256 * 4
+    current_offset += oidf_size
+
+    # OIDL chunk: num_objects * hash_size bytes
+    oidl_offset = current_offset
+    oidl_size = num_objects * hash_size
+    current_offset += oidl_size
+
+    # OOFF chunk: num_objects * 8 bytes (4 for pack_id + 4 for offset)
+    ooff_offset = current_offset
+    ooff_size = num_objects * 8
+    current_offset += ooff_size
+
+    # LOFF chunk (if needed): variable size
+    loff_offset = current_offset if need_loff else 0
+    large_offsets: list[int] = []
+    if need_loff:
+        # We'll populate this as we write OOFF
+        pass
+
+    # Write header
+    writer.write(MIDX_SIGNATURE)  # 4 bytes: signature
+    writer.write(bytes([MIDX_VERSION]))  # 1 byte: version
+    writer.write(bytes([hash_algorithm]))  # 1 byte: hash algorithm
+    writer.write(bytes([chunk_count]))  # 1 byte: chunk count
+    writer.write(bytes([0]))  # 1 byte: base MIDX files (always 0)
+    writer.write(struct.pack(">L", num_packs))  # 4 bytes: pack count
+
+    # Write chunk table
+    chunk_table = [
+        (CHUNK_PNAM, pnam_offset),
+        (CHUNK_OIDF, oidf_offset),
+        (CHUNK_OIDL, oidl_offset),
+        (CHUNK_OOFF, ooff_offset),
+    ]
+    if need_loff:
+        chunk_table.append((CHUNK_LOFF, loff_offset))
+
+    for chunk_id, chunk_offset in chunk_table:
+        writer.write(chunk_id)  # 4 bytes
+        writer.write(struct.pack(">Q", chunk_offset))  # 8 bytes
+
+    # Write terminator
+    writer.write(b"\x00\x00\x00\x00")  # 4 bytes
+    writer.write(struct.pack(">Q", 0))  # 8 bytes
+
+    # Write PNAM chunk
+    writer.write(pnam_data)
+
+    # Write OIDF chunk (fanout table)
+    fanout: list[int] = [0] * 256
+    for sha, _pack_id, _offset in all_objects:
+        first_byte = sha[0]
+        fanout[first_byte] += 1
+
+    # Convert counts to cumulative
+    cumulative = 0
+    for i in range(256):
+        cumulative += fanout[i]
+        writer.write(struct.pack(">L", cumulative))
+
+    # Write OIDL chunk (object IDs)
+    for sha, _pack_id, _offset in all_objects:
+        writer.write(sha)
+
+    # Write OOFF chunk (pack ID and offset for each object)
+    for _sha, pack_id, offset in all_objects:
+        writer.write(struct.pack(">L", pack_id))
+
+        if offset >= 2**31:
+            # Use large offset table
+            large_offset_index = len(large_offsets)
+            large_offsets.append(offset)
+            # Set MSB to indicate large offset
+            writer.write(struct.pack(">L", 0x80000000 | large_offset_index))
+        else:
+            writer.write(struct.pack(">L", offset))
+
+    # Write LOFF chunk if needed
+    if need_loff:
+        for large_offset in large_offsets:
+            writer.write(struct.pack(">Q", large_offset))
+
+    # Write checksum
+    return writer.write_sha()
+
+
+def write_midx_file(
+    path: str | os.PathLike[str],
+    pack_index_entries: list[tuple[str, list[tuple[bytes, int, int | None]]]],
+    hash_algorithm: int = HASH_ALGORITHM_SHA1,
+) -> bytes:
+    """Write a multi-pack-index file to disk.
+
+    Args:
+        path: Path where to write the MIDX file
+        pack_index_entries: List of (pack_name, entries) tuples where entries are
+                          (sha, offset, crc32) tuples, sorted by SHA
+        hash_algorithm: Hash algorithm to use (1=SHA-1, 2=SHA-256)
+
+    Returns:
+        SHA-1 checksum of the written MIDX file
+    """
+    with GitFile(path, "wb") as f:
+        return write_midx(f, pack_index_entries, hash_algorithm)
+
+
 # TODO: Add support for incremental MIDX chains
 # TODO: Add support for BTMP and RIDX chunks for bitmap integration

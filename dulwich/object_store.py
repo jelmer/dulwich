@@ -2164,6 +2164,37 @@ class DiskObjectStore(PackBasedObjectStore):
         # Fall back to the standard implementation
         return super().get_raw(name)
 
+    def write_midx(self) -> bytes:
+        """Write a multi-pack-index file for this object store.
+
+        Creates a MIDX file that indexes all pack files in the pack directory.
+
+        Returns:
+            SHA-1 checksum of the written MIDX file
+
+        Raises:
+            OSError: If the pack directory doesn't exist or MIDX can't be written
+        """
+        from .midx import write_midx_file
+
+        # Get all pack files
+        packs = self.packs
+        if not packs:
+            # No packs to index
+            return b"\x00" * 20
+
+        # Collect entries from all packs
+        pack_entries: list[tuple[str, list[tuple[bytes, int, int | None]]]] = []
+
+        for pack in packs:
+            pack_name = os.path.basename(pack._basename) + ".pack"
+            entries = list(pack.index.iterentries())
+            pack_entries.append((pack_name, entries))
+
+        # Write MIDX file
+        midx_path = os.path.join(self.pack_dir, "multi-pack-index")
+        return write_midx_file(midx_path, pack_entries)
+
     def write_commit_graph(
         self, refs: Iterable[ObjectID] | None = None, reachable: bool = True
     ) -> None:

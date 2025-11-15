@@ -43,13 +43,13 @@ Currently supported capabilities:
  * symref
 """
 
-import collections
 import os
 import socket
 import socketserver
 import sys
 import time
 import zlib
+from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from functools import partial
@@ -629,7 +629,7 @@ def _want_satisfied(
     Returns: True if the want is satisfied by the haves
     """
     o = store[want]
-    pending = collections.deque([o])
+    pending = deque([o])
     known = {want}
     while pending:
         commit = pending.popleft()

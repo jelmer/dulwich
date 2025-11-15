@@ -73,11 +73,6 @@ except ImportError:
 else:
     has_mmap = True
 
-if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
-else:
-    Buffer = bytes | bytearray | memoryview
-
 if TYPE_CHECKING:
     from _hashlib import HASH as HashObject
 

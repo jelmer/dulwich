@@ -114,10 +114,11 @@ from typing import (
 )
 
 if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
     from typing import override
 else:
-    from typing_extensions import Buffer, override
+    from typing_extensions import override
+
+from ._typing import Buffer
 
 if TYPE_CHECKING:
     import urllib3

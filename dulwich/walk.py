@@ -21,8 +21,8 @@
 
 """General implementation of walking commits and their contents."""
 
-import collections
 import heapq
+from collections import defaultdict, deque
 from collections.abc import Callable, Iterator, Sequence
 from itertools import chain
 from typing import TYPE_CHECKING, Any, cast
@@ -338,7 +338,7 @@ class Walker:
 
         self._num_entries = 0
         self._queue = queue_cls(self)
-        self._out_queue: collections.deque[WalkEntry] = collections.deque()
+        self._out_queue: deque[WalkEntry] = deque()
 
     def _path_matches(self, changed_path: bytes | None) -> bool:
         if changed_path is None:
@@ -481,9 +481,9 @@ def _topo_reorder(
     Returns: iterator over WalkEntry objects from entries in FIFO order, except
         where a parent would be yielded before any of its children.
     """
-    todo: collections.deque[WalkEntry] = collections.deque()
+    todo: deque[WalkEntry] = deque()
     pending: dict[bytes, WalkEntry] = {}
-    num_children: dict[bytes, int] = collections.defaultdict(int)
+    num_children: dict[bytes, int] = defaultdict(int)
     for entry in entries:
         todo.append(entry)
         for p in get_parents(entry.commit):

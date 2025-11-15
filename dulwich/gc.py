@@ -1,9 +1,9 @@
 """Git garbage collection implementation."""
 
-import collections
 import logging
 import os
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
@@ -54,7 +54,7 @@ def find_reachable_objects(
         Set of reachable object SHAs
     """
     reachable = set()
-    pending: collections.deque[ObjectID] = collections.deque()
+    pending: deque[ObjectID] = deque()
 
     # Start with all refs
     for ref in refs_container.allkeys():

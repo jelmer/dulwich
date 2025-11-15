@@ -34,6 +34,17 @@ This module provides:
 - Reading MIDX files
 - Writing MIDX files
 - Integration with pack-based object stores
+
+Limitations:
+- Incremental MIDX chains are not yet supported (base_midx_files must be 0)
+- BTMP (bitmapped packfiles) chunk is not yet implemented
+- RIDX (reverse index) chunk is not yet implemented
+
+Note: Incremental MIDX chains were introduced in Git 2.47 as an experimental
+feature, where multiple MIDX files can be chained together. The format includes
+a base_midx_files field in the header and uses a multi-pack-index.d/ directory
+with a multi-pack-index-chain file. This feature is not yet supported by Dulwich
+as the specification is still evolving.
 """
 
 import os

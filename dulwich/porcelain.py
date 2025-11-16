@@ -3074,10 +3074,14 @@ def push(
         for ref, error in (result.ref_status or {}).items():
             if error is not None:
                 errstream.write(
-                    f"Push of ref {ref.decode('utf-8', 'replace')} failed: {error}\n".encode(err_encoding)
+                    f"Push of ref {ref.decode('utf-8', 'replace')} failed: {error}\n".encode(
+                        err_encoding
+                    )
                 )
             else:
-                errstream.write(f"Ref {ref.decode('utf-8', 'replace')} updated\n".encode())
+                errstream.write(
+                    f"Ref {ref.decode('utf-8', 'replace')} updated\n".encode()
+                )
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)

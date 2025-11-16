@@ -1,12 +1,12 @@
 """Git garbage collection implementation."""
 
-import collections
 import logging
 import os
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from dulwich.object_store import (
     BaseObjectStore,
@@ -54,7 +54,7 @@ def find_reachable_objects(
         Set of reachable object SHAs
     """
     reachable = set()
-    pending: collections.deque[ObjectID] = collections.deque()
+    pending: deque[ObjectID] = deque()
 
     # Start with all refs
     for ref in refs_container.allkeys():
@@ -313,7 +313,7 @@ def garbage_collect(
     return stats
 
 
-def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
+def should_run_gc(repo: "BaseRepo", config: "Config | None" = None) -> bool:
     """Check if automatic garbage collection should run.
 
     Args:
@@ -372,7 +372,7 @@ def should_run_gc(repo: "BaseRepo", config: Optional["Config"] = None) -> bool:
 
 def maybe_auto_gc(
     repo: "Repo",
-    config: Optional["Config"] = None,
+    config: "Config | None" = None,
     progress: Callable[[str], None] | None = None,
 ) -> bool:
     """Run automatic garbage collection if needed.

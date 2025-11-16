@@ -60,7 +60,7 @@ class MIDXWriteTests(TestCase):
         # Create some fake pack entries
         pack_entries = [
             (
-                "pack-abc123.pack",
+                "pack-abc123.idx",
                 [
                     (b"\x01" * 20, 100, 0x12345678),  # sha, offset, crc32
                     (b"\x02" * 20, 200, 0x87654321),
@@ -78,25 +78,25 @@ class MIDXWriteTests(TestCase):
 
         self.assertEqual(3, len(midx))
         self.assertEqual(1, midx.pack_count)
-        self.assertEqual(["pack-abc123.pack"], midx.pack_names)
+        self.assertEqual(["pack-abc123.idx"], midx.pack_names)
 
         # Check object lookups
         result = midx.object_offset(b"\x01" * 20)
         self.assertIsNotNone(result)
         pack_name, offset = result
-        self.assertEqual("pack-abc123.pack", pack_name)
+        self.assertEqual("pack-abc123.idx", pack_name)
         self.assertEqual(100, offset)
 
         result = midx.object_offset(b"\x02" * 20)
         self.assertIsNotNone(result)
         pack_name, offset = result
-        self.assertEqual("pack-abc123.pack", pack_name)
+        self.assertEqual("pack-abc123.idx", pack_name)
         self.assertEqual(200, offset)
 
         result = midx.object_offset(b"\x03" * 20)
         self.assertIsNotNone(result)
         pack_name, offset = result
-        self.assertEqual("pack-abc123.pack", pack_name)
+        self.assertEqual("pack-abc123.idx", pack_name)
         self.assertEqual(300, offset)
 
         # Check non-existent object
@@ -109,14 +109,14 @@ class MIDXWriteTests(TestCase):
 
         pack_entries = [
             (
-                "pack-111.pack",
+                "pack-111.idx",
                 [
                     (b"\x01" * 20, 100, 0),
                     (b"\x03" * 20, 300, 0),
                 ],
             ),
             (
-                "pack-222.pack",
+                "pack-222.idx",
                 [
                     (b"\x02" * 20, 50, 0),
                     (b"\x04" * 20, 150, 0),
@@ -133,16 +133,16 @@ class MIDXWriteTests(TestCase):
 
         self.assertEqual(4, len(midx))
         self.assertEqual(2, midx.pack_count)
-        self.assertEqual(["pack-111.pack", "pack-222.pack"], midx.pack_names)
+        self.assertEqual(["pack-111.idx", "pack-222.idx"], midx.pack_names)
 
         # Objects should be findable across packs
         result = midx.object_offset(b"\x01" * 20)
         self.assertIsNotNone(result)
-        self.assertEqual("pack-111.pack", result[0])
+        self.assertEqual("pack-111.idx", result[0])
 
         result = midx.object_offset(b"\x02" * 20)
         self.assertIsNotNone(result)
-        self.assertEqual("pack-222.pack", result[0])
+        self.assertEqual("pack-222.idx", result[0])
 
     def test_write_large_offsets(self):
         """Test writing a MIDX file with large offsets (>= 2^31)."""
@@ -151,7 +151,7 @@ class MIDXWriteTests(TestCase):
         large_offset = 2**32  # Offset that requires LOFF chunk
         pack_entries = [
             (
-                "pack-large.pack",
+                "pack-large.idx",
                 [
                     (b"\x01" * 20, 100, 0),
                     (b"\x02" * 20, large_offset, 0),  # Large offset
@@ -185,7 +185,7 @@ class MIDXWriteTests(TestCase):
 
             pack_entries = [
                 (
-                    "pack-test.pack",
+                    "pack-test.idx",
                     [
                         (b"\xaa" * 20, 1000, 0),
                     ],
@@ -205,7 +205,7 @@ class MIDXWriteTests(TestCase):
             self.assertEqual(1, len(midx))
             result = midx.object_offset(b"\xaa" * 20)
             self.assertIsNotNone(result)
-            self.assertEqual("pack-test.pack", result[0])
+            self.assertEqual("pack-test.idx", result[0])
             self.assertEqual(1000, result[1])
 
 
@@ -217,7 +217,7 @@ class MIDXContainsTests(TestCase):
         f = BytesIO()
         pack_entries = [
             (
-                "pack-test.pack",
+                "pack-test.idx",
                 [
                     (b"\x01" * 20, 100, 0),
                     (b"\x02" * 20, 200, 0),
@@ -242,14 +242,14 @@ class MIDXIterEntriesTests(TestCase):
         f = BytesIO()
         pack_entries = [
             (
-                "pack-111.pack",
+                "pack-111.idx",
                 [
                     (b"\x01" * 20, 100, 0),
                     (b"\x03" * 20, 300, 0),
                 ],
             ),
             (
-                "pack-222.pack",
+                "pack-222.idx",
                 [
                     (b"\x02" * 20, 50, 0),
                 ],
@@ -265,13 +265,13 @@ class MIDXIterEntriesTests(TestCase):
 
         # Entries should be sorted by SHA
         self.assertEqual(b"\x01" * 20, entries[0][0])
-        self.assertEqual("pack-111.pack", entries[0][1])
+        self.assertEqual("pack-111.idx", entries[0][1])
         self.assertEqual(100, entries[0][2])
 
         self.assertEqual(b"\x02" * 20, entries[1][0])
-        self.assertEqual("pack-222.pack", entries[1][1])
+        self.assertEqual("pack-222.idx", entries[1][1])
         self.assertEqual(50, entries[1][2])
 
         self.assertEqual(b"\x03" * 20, entries[2][0])
-        self.assertEqual("pack-111.pack", entries[2][1])
+        self.assertEqual("pack-111.idx", entries[2][1])
         self.assertEqual(300, entries[2][2])

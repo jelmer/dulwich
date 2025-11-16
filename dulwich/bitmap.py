@@ -32,7 +32,7 @@ import os
 import struct
 from collections.abc import Iterator
 from io import BytesIO
-from typing import IO, TYPE_CHECKING, Optional
+from typing import IO, TYPE_CHECKING
 
 from .file import GitFile
 
@@ -440,7 +440,7 @@ class PackBitmap:
 
 def read_bitmap(
     filename: str | os.PathLike[str],
-    pack_index: Optional["PackIndex"] = None,
+    pack_index: "PackIndex" | None = None,
 ) -> PackBitmap:
     """Read a bitmap index file.
 
@@ -460,7 +460,7 @@ def read_bitmap(
 
 
 def read_bitmap_file(
-    f: IO[bytes], pack_index: Optional["PackIndex"] = None
+    f: IO[bytes], pack_index: "PackIndex" | None = None
 ) -> PackBitmap:
     """Read bitmap data from a file object.
 

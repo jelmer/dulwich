@@ -44,8 +44,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Optional,
-    Union,
 )
 
 if TYPE_CHECKING:
@@ -71,7 +69,7 @@ from .objects import (
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
 
 # Type alias for recursive tree structure used in commit_tree
-TreeDict = dict[bytes, Union["TreeDict", tuple[int, bytes]]]
+TreeDict = dict[bytes, "TreeDict" | tuple[int, bytes]]
 
 # 2-bit stage (during merge)
 FLAG_STAGEMASK = 0x3000
@@ -1888,7 +1886,7 @@ def build_index_from_tree(
         [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
     ]
     | None = None,
-    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
+    blob_normalizer: "FilterBlobNormalizer" | None = None,
     tree_encoding: str = "utf-8",
 ) -> None:
     """Generate and materialize index from a tree.
@@ -2159,7 +2157,7 @@ def _check_file_matches(
     entry_mode: int,
     current_stat: os.stat_result,
     honor_filemode: bool,
-    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
+    blob_normalizer: "FilterBlobNormalizer" | None = None,
     tree_path: bytes | None = None,
 ) -> bool:
     """Check if a file on disk matches the expected git object.
@@ -2255,7 +2253,7 @@ def _transition_to_file(
         [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
     ]
     | None,
-    blob_normalizer: Optional["FilterBlobNormalizer"],
+    blob_normalizer: "FilterBlobNormalizer" | None,
     tree_encoding: str = "utf-8",
 ) -> None:
     """Transition any type to regular file or symlink."""
@@ -2515,7 +2513,7 @@ def update_working_tree(
     ]
     | None = None,
     force_remove_untracked: bool = False,
-    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
+    blob_normalizer: "FilterBlobNormalizer" | None = None,
     tree_encoding: str = "utf-8",
     allow_overwrite_modified: bool = False,
 ) -> None:

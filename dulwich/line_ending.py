@@ -139,7 +139,7 @@ Sources:
 
 import logging
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .config import StackedConfig
@@ -176,7 +176,7 @@ class LineEndingFilter(FilterDriver):
 
     @classmethod
     def from_config(
-        cls, config: Optional["StackedConfig"], for_text_attr: bool = False
+        cls, config: "StackedConfig" | None, for_text_attr: bool = False
     ) -> "LineEndingFilter":
         """Create a LineEndingFilter from git configuration.
 

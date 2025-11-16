@@ -450,11 +450,14 @@ def write_midx(
     # Wrap file in SHA1Writer to compute checksum
     writer = SHA1Writer(f)
 
+    # Sort pack entries by pack name (required by Git)
+    pack_index_entries_sorted = sorted(pack_index_entries, key=lambda x: x[0])
+
     # Collect all objects from all packs
     all_objects: list[tuple[bytes, int, int]] = []  # (sha, pack_id, offset)
     pack_names: list[str] = []
 
-    for pack_id, (pack_name, entries) in enumerate(pack_index_entries):
+    for pack_id, (pack_name, entries) in enumerate(pack_index_entries_sorted):
         pack_names.append(pack_name)
         for sha, offset, _crc32 in entries:
             all_objects.append((sha, pack_id, offset))
@@ -508,11 +511,19 @@ def write_midx(
     current_offset += ooff_size
 
     # LOFF chunk (if needed): variable size
+    # We'll calculate the exact size when we know how many large offsets we have
     loff_offset = current_offset if need_loff else 0
     large_offsets: list[int] = []
+
+    # Calculate trailer offset (where checksum starts)
+    # We need to pre-calculate large offset count for accurate trailer offset
     if need_loff:
-        # We'll populate this as we write OOFF
-        pass
+        # Count large offsets
+        large_offset_count = sum(1 for _, _, offset in all_objects if offset >= 2**31)
+        loff_size = large_offset_count * 8
+        trailer_offset = current_offset + loff_size
+    else:
+        trailer_offset = current_offset
 
     # Write header
     writer.write(MIDX_SIGNATURE)  # 4 bytes: signature
@@ -536,9 +547,9 @@ def write_midx(
         writer.write(chunk_id)  # 4 bytes
         writer.write(struct.pack(">Q", chunk_offset))  # 8 bytes
 
-    # Write terminator
+    # Write terminator (points to where trailer/checksum starts)
     writer.write(b"\x00\x00\x00\x00")  # 4 bytes
-    writer.write(struct.pack(">Q", 0))  # 8 bytes
+    writer.write(struct.pack(">Q", trailer_offset))  # 8 bytes
 
     # Write PNAM chunk
     writer.write(pnam_data)

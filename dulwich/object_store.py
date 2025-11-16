@@ -2069,7 +2069,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """Get a pack by its base name.
 
         Args:
-            pack_name: Base name of the pack (e.g., 'pack-abc123.pack')
+            pack_name: Base name of the pack (e.g., 'pack-abc123.pack' or 'pack-abc123.idx')
 
         Returns:
             Pack object
@@ -2077,9 +2077,11 @@ class DiskObjectStore(PackBasedObjectStore):
         Raises:
             KeyError: If pack doesn't exist
         """
-        # Remove .pack extension if present
+        # Remove .pack or .idx extension if present
         if pack_name.endswith(".pack"):
             base_name = pack_name[:-5]
+        elif pack_name.endswith(".idx"):
+            base_name = pack_name[:-4]
         else:
             base_name = pack_name
 
@@ -2187,7 +2189,8 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_entries: list[tuple[str, list[tuple[bytes, int, int | None]]]] = []
 
         for pack in packs:
-            pack_name = os.path.basename(pack._basename) + ".pack"
+            # Git stores .idx extension in MIDX, not .pack
+            pack_name = os.path.basename(pack._basename) + ".idx"
             entries = list(pack.index.iterentries())
             pack_entries.append((pack_name, entries))
 

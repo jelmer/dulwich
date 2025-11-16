@@ -56,7 +56,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         self,
         base_url: str,
         dumb: bool | None = None,
-        config: "ConfigFile" | None = None,
+        config: "ConfigFile | None" = None,
         username: str | None = None,
         password: str | None = None,
         thin_packs: bool = True,
@@ -133,7 +133,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         return resp, read
 
 
-def get_session(config: "ConfigFile" | None) -> Session:
+def get_session(config: "ConfigFile | None") -> Session:
     """Create a requests session with Git configuration.
 
     Args:

@@ -340,7 +340,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         self,
         objects: Sequence[tuple[ShaFile, str | None]],
         progress: Callable[[str], None] | None = None,
-    ) -> "Pack" | None:
+    ) -> "Pack | None":
         """Add a set of objects to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
 

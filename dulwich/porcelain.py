@@ -281,14 +281,25 @@ class NoneStream(RawIOBase):
         """
         return b""
 
-    @override
-    def readinto(self, b: Buffer) -> int | None:
-        return 0
+    if sys.version_info >= (3, 12):
 
-    @override
-    def write(self, b: Buffer) -> int | None:
-        # All Buffer implementations (bytes, bytearray, memoryview) support len()
-        return len(b) if b else 0  # type: ignore[arg-type]
+        @override
+        def readinto(self, b: Buffer) -> int | None:
+            return 0
+
+        @override
+        def write(self, b: Buffer) -> int | None:
+            return len(cast(bytes, b)) if b else 0
+
+    else:
+
+        @override
+        def readinto(self, b: bytearray | memoryview) -> int | None:  # type: ignore[override]
+            return 0
+
+        @override
+        def write(self, b: bytes | bytearray | memoryview) -> int | None:  # type: ignore[override]
+            return len(b) if b else 0
 
 
 default_bytes_out_stream: BinaryIO = cast(

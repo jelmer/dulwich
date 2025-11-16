@@ -50,7 +50,15 @@ as the specification is still evolving.
 import os
 import struct
 from collections.abc import Iterator
+from io import UnsupportedOperation
 from typing import IO, Any
+
+try:
+    import mmap
+except ImportError:
+    has_mmap = False
+else:
+    has_mmap = True
 
 from .file import GitFile, _GitFile
 from .pack import SHA1Writer
@@ -140,16 +148,28 @@ class MultiPackIndex:
         Returns:
             Tuple of (contents, size)
         """
-        # Simplified version - similar to pack.py's _load_file_contents
-        if size is None:
-            f.seek(0, 2)  # SEEK_END
-            size = f.tell()
-            f.seek(0)
+        try:
+            fd = f.fileno()
+        except (UnsupportedOperation, AttributeError):
+            fd = None
 
-        # For now, just read the entire file into memory
-        # TODO: Add mmap support for large files
-        contents = f.read(size)
-        return contents, size
+        # Attempt to use mmap if possible
+        if fd is not None:
+            if size is None:
+                size = os.fstat(fd).st_size
+            if has_mmap:
+                try:
+                    contents = mmap.mmap(fd, size, access=mmap.ACCESS_READ)
+                except (OSError, ValueError):
+                    # Can't mmap - perhaps a socket or invalid file descriptor
+                    pass
+                else:
+                    return contents, size
+
+        # Fall back to reading entire file into memory
+        contents_bytes = f.read()
+        size = len(contents_bytes)
+        return contents_bytes, size
 
     def _parse_header(self) -> None:
         """Parse the MIDX header."""

@@ -581,7 +581,7 @@ class HTTPGitRequest:
         environ: WSGIEnvironment,
         start_response: StartResponse,
         dumb: bool = False,
-        handlers: dict[bytes, "HandlerConstructor" | Callable[..., Any]]
+        handlers: dict[bytes, "HandlerConstructor | Callable[..., Any]"]
         | None = None,
     ) -> None:
         """Initialize HTTPGitRequest.
@@ -686,7 +686,7 @@ class HTTPGitApplication:
         self,
         backend: Backend,
         dumb: bool = False,
-        handlers: dict[bytes, "HandlerConstructor" | Callable[..., Any]]
+        handlers: dict[bytes, "HandlerConstructor | Callable[..., Any]"]
         | None = None,
         fallback_app: WSGIApplication | None = None,
     ) -> None:

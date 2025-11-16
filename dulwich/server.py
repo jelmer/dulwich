@@ -176,7 +176,7 @@ class BackendRepo(TypingProtocol):
         *,
         get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
         depth: int | None = None,
-    ) -> "MissingObjectFinder" | None:
+    ) -> "MissingObjectFinder | None":
         """Yield the objects required for a list of commits.
 
         Args:

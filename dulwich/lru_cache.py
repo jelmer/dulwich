@@ -37,7 +37,7 @@ class _LRUNode(Generic[K, V]):
 
     __slots__ = ("cleanup", "key", "next_key", "prev", "size", "value")
 
-    prev: "_LRUNode[K, V]" | None
+    prev: "_LRUNode[K, V] | None"
     next_key: K | object
     size: int | None
 

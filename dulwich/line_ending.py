@@ -176,7 +176,7 @@ class LineEndingFilter(FilterDriver):
 
     @classmethod
     def from_config(
-        cls, config: "StackedConfig" | None, for_text_attr: bool = False
+        cls, config: "StackedConfig | None", for_text_attr: bool = False
     ) -> "LineEndingFilter":
         """Create a LineEndingFilter from git configuration.
 

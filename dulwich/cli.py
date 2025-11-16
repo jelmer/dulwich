@@ -51,12 +51,8 @@ from typing import (
     TextIO,
 )
 
-if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
-else:
-    Buffer = bytes | bytearray | memoryview
-
 from dulwich import porcelain
+from dulwich._typing import Buffer
 
 from .bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
 from .client import get_transport_and_path

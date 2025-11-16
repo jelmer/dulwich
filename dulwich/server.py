@@ -43,23 +43,18 @@ Currently supported capabilities:
  * symref
 """
 
-import collections
 import os
 import socket
 import socketserver
 import sys
 import time
 import zlib
+from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from functools import partial
-from typing import IO, TYPE_CHECKING, Optional
+from typing import IO, TYPE_CHECKING
 from typing import Protocol as TypingProtocol
-
-if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
-else:
-    Buffer = bytes | bytearray | memoryview
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
@@ -181,7 +176,7 @@ class BackendRepo(TypingProtocol):
         *,
         get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
         depth: int | None = None,
-    ) -> Optional["MissingObjectFinder"]:
+    ) -> "MissingObjectFinder | None":
         """Yield the objects required for a list of commits.
 
         Args:
@@ -629,7 +624,7 @@ def _want_satisfied(
     Returns: True if the want is satisfied by the haves
     """
     o = store[want]
-    pending = collections.deque([o])
+    pending = deque([o])
     known = {want}
     while pending:
         commit = pending.popleft()

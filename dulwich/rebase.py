@@ -27,7 +27,7 @@ import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Protocol, TypedDict
+from typing import Protocol, TypedDict
 
 from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
@@ -164,7 +164,7 @@ class RebaseTodoEntry:
         return " ".join(parts)
 
     @classmethod
-    def from_string(cls, line: str) -> Optional["RebaseTodoEntry"]:
+    def from_string(cls, line: str) -> "RebaseTodoEntry" | None:
         """Parse a todo entry from a line.
 
         Args:

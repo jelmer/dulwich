@@ -39,7 +39,7 @@ import zlib
 from collections.abc import Callable, Iterator, Mapping
 from configparser import ConfigParser
 from io import BytesIO
-from typing import Any, BinaryIO, Optional, cast
+from typing import Any, BinaryIO, cast
 
 from geventhttpclient import HTTPClient
 
@@ -231,7 +231,7 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
 
 def load_pack_info(
     filename: str,
-    scon: Optional["SwiftConnector"] = None,
+    scon: "SwiftConnector" | None = None,
     file: BinaryIO | None = None,
 ) -> dict[str, Any] | None:
     """Load pack info from Swift or file.
@@ -821,7 +821,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         """
         f = BytesIO()
 
-        def commit() -> Optional["SwiftPack"]:
+        def commit() -> "SwiftPack" | None:
             """Commit the pack to Swift storage.
 
             Returns:

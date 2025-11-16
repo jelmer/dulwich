@@ -55,8 +55,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Optional,
-    Union,
 )
 from urllib.parse import ParseResult, urljoin, urlparse, urlunparse, urlunsplit
 from urllib.parse import quote as urlquote
@@ -1110,7 +1108,7 @@ class GitClient:
         self,
         path: bytes,
         target: BaseRepo,
-        determine_wants: Optional["DetermineWantsFunc"] = None,
+        determine_wants: "DetermineWantsFunc" | None = None,
         progress: Callable[[bytes], None] | None = None,
         depth: int | None = None,
         ref_prefix: Sequence[Ref] | None = None,
@@ -2304,7 +2302,7 @@ class LocalGitClient(GitClient):
         self,
         path: bytes,
         target: BaseRepo,
-        determine_wants: Optional["DetermineWantsFunc"] = None,
+        determine_wants: "DetermineWantsFunc" | None = None,
         progress: Callable[[bytes], None] | None = None,
         depth: int | None = None,
         ref_prefix: Sequence[bytes] | None = None,
@@ -2632,7 +2630,7 @@ class BundleClient(GitClient):
         self,
         path: bytes,
         target: BaseRepo,
-        determine_wants: Optional["DetermineWantsFunc"] = None,
+        determine_wants: "DetermineWantsFunc" | None = None,
         progress: Callable[[bytes], None] | None = None,
         depth: int | None = None,
         ref_prefix: Sequence[Ref] | None = None,
@@ -3221,7 +3219,7 @@ def default_urllib3_manager(
     base_url: str | None = None,
     timeout: float | None = None,
     cert_reqs: str | None = None,
-) -> Union["urllib3.ProxyManager", "urllib3.PoolManager"]:
+) -> "urllib3.ProxyManager" | "urllib3.PoolManager":
     """Return urllib3 connection pool manager.
 
     Honour detected proxy configurations.
@@ -3989,7 +3987,7 @@ class AbstractHttpGitClient(GitClient):
         username: str | None = None,
         password: str | None = None,
         config: Config | None = None,
-        pool_manager: Optional["urllib3.PoolManager"] = None,
+        pool_manager: "urllib3.PoolManager" | None = None,
     ) -> "AbstractHttpGitClient":
         """Create an AbstractHttpGitClient from a parsed URL.
 
@@ -4084,7 +4082,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         self,
         base_url: str,
         dumb: bool | None = None,
-        pool_manager: Optional["urllib3.PoolManager"] = None,
+        pool_manager: "urllib3.PoolManager" | None = None,
         config: Config | None = None,
         username: str | None = None,
         password: str | None = None,
@@ -4229,7 +4227,7 @@ def get_transport_and_path_from_url(
     password: str | None = None,
     key_filename: str | None = None,
     ssh_command: str | None = None,
-    pool_manager: Optional["urllib3.PoolManager"] = None,
+    pool_manager: "urllib3.PoolManager" | None = None,
 ) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
@@ -4282,7 +4280,7 @@ def _get_transport_and_path_from_url(
     password: str | None = None,
     key_filename: str | None = None,
     ssh_command: str | None = None,
-    pool_manager: Optional["urllib3.PoolManager"] = None,
+    pool_manager: "urllib3.PoolManager" | None = None,
 ) -> tuple[GitClient, str]:
     parsed = urlparse(url)
     if parsed.scheme == "git":
@@ -4377,7 +4375,7 @@ def get_transport_and_path(
     password: str | None = None,
     key_filename: str | None = None,
     ssh_command: str | None = None,
-    pool_manager: Optional["urllib3.PoolManager"] = None,
+    pool_manager: "urllib3.PoolManager" | None = None,
 ) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 

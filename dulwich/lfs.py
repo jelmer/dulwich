@@ -39,7 +39,7 @@ import os
 import tempfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, BinaryIO, Optional
+from typing import TYPE_CHECKING, Any, BinaryIO
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
@@ -182,7 +182,7 @@ class LFSPointer:
         self.size = size
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> Optional["LFSPointer"]:
+    def from_bytes(cls, data: bytes) -> "LFSPointer" | None:
         """Parse LFS pointer from bytes.
 
         Returns None if data is not a valid LFS pointer.
@@ -244,7 +244,7 @@ class LFSFilterDriver:
     """LFS filter driver implementation."""
 
     def __init__(
-        self, lfs_store: "LFSStore", config: Optional["Config"] = None
+        self, lfs_store: "LFSStore", config: "Config" | None = None
     ) -> None:
         """Initialize LFSFilterDriver."""
         self.lfs_store = lfs_store
@@ -328,13 +328,13 @@ class LFSFilterDriver:
         """Clean up any resources held by this filter driver."""
         # LFSFilterDriver doesn't hold any resources that need cleanup
 
-    def reuse(self, config: Optional["Config"], filter_name: str) -> bool:
+    def reuse(self, config: "Config" | None, filter_name: str) -> bool:
         """Check if this filter driver should be reused with the given configuration."""
         # LFSFilterDriver is stateless and lightweight, no need to cache
         return False
 
 
-def _get_lfs_user_agent(config: Optional["Config"]) -> str:
+def _get_lfs_user_agent(config: "Config" | None) -> str:
     """Get User-Agent string for LFS requests, respecting git config."""
     try:
         if config:
@@ -385,7 +385,7 @@ def _is_valid_lfs_url(url: str) -> bool:
 class LFSClient:
     """Base class for LFS client operations."""
 
-    def __init__(self, url: str, config: Optional["Config"] = None) -> None:
+    def __init__(self, url: str, config: "Config" | None = None) -> None:
         """Initialize LFS client.
 
         Args:
@@ -427,7 +427,7 @@ class LFSClient:
         raise NotImplementedError
 
     @classmethod
-    def from_config(cls, config: "Config") -> Optional["LFSClient"]:
+    def from_config(cls, config: "Config") -> "LFSClient" | None:
         """Create LFS client from git config.
 
         Returns the appropriate subclass (HTTPLFSClient or FileLFSClient)
@@ -491,7 +491,7 @@ class LFSClient:
 class HTTPLFSClient(LFSClient):
     """LFS client for HTTP/HTTPS operations."""
 
-    def __init__(self, url: str, config: Optional["Config"] = None) -> None:
+    def __init__(self, url: str, config: "Config" | None = None) -> None:
         """Initialize HTTP LFS client.
 
         Args:
@@ -711,7 +711,7 @@ class HTTPLFSClient(LFSClient):
 class FileLFSClient(LFSClient):
     """LFS client for file:// URLs that accesses local filesystem."""
 
-    def __init__(self, url: str, config: Optional["Config"] = None) -> None:
+    def __init__(self, url: str, config: "Config" | None = None) -> None:
         """Initialize File LFS client.
 
         Args:

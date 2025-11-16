@@ -25,7 +25,7 @@ import logging
 import subprocess
 import threading
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from typing import Protocol as TypingProtocol
 
 from .attrs import GitAttributes
@@ -140,7 +140,7 @@ class ProcessFilterDriver:
         self._capabilities: set[bytes] = set()
         self._process_lock = threading.Lock()
 
-    def _get_or_start_process(self) -> Optional["Protocol"]:
+    def _get_or_start_process(self) -> "Protocol" | None:
         """Get or start the long-running process filter."""
         if self._process is None and self.process_cmd:
             from .errors import GitProtocolError, HangupException
@@ -602,8 +602,8 @@ class FilterRegistry:
 
     def __init__(
         self,
-        config: Optional["StackedConfig"] = None,
-        repo: Optional["BaseRepo"] = None,
+        config: "StackedConfig" | None = None,
+        repo: "BaseRepo" | None = None,
     ) -> None:
         """Initialize FilterRegistry.
 
@@ -879,10 +879,10 @@ class FilterBlobNormalizer:
 
     def __init__(
         self,
-        config_stack: Optional["StackedConfig"],
+        config_stack: "StackedConfig" | None,
         gitattributes: GitAttributes,
         filter_registry: FilterRegistry | None = None,
-        repo: Optional["BaseRepo"] = None,
+        repo: "BaseRepo" | None = None,
         filter_context: FilterContext | None = None,
     ) -> None:
         """Initialize FilterBlobNormalizer.

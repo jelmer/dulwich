@@ -243,9 +243,7 @@ class LFSPointer:
 class LFSFilterDriver:
     """LFS filter driver implementation."""
 
-    def __init__(
-        self, lfs_store: "LFSStore", config: "Config | None" = None
-    ) -> None:
+    def __init__(self, lfs_store: "LFSStore", config: "Config | None" = None) -> None:
         """Initialize LFSFilterDriver."""
         self.lfs_store = lfs_store
         self.config = config

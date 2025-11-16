@@ -459,9 +459,7 @@ def read_bitmap(
         return read_bitmap_file(f, pack_index=pack_index)
 
 
-def read_bitmap_file(
-    f: IO[bytes], pack_index: "PackIndex | None" = None
-) -> PackBitmap:
+def read_bitmap_file(f: IO[bytes], pack_index: "PackIndex | None" = None) -> PackBitmap:
     """Read bitmap data from a file object.
 
     Args:

@@ -231,7 +231,7 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
 
 def load_pack_info(
     filename: str,
-    scon: "SwiftConnector" | None = None,
+    scon: "SwiftConnector | None" = None,
     file: BinaryIO | None = None,
 ) -> dict[str, Any] | None:
     """Load pack info from Swift or file.
@@ -821,7 +821,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         """
         f = BytesIO()
 
-        def commit() -> "SwiftPack" | None:
+        def commit() -> "SwiftPack | None":
             """Commit the pack to Swift storage.
 
             Returns:

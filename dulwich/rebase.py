@@ -164,7 +164,7 @@ class RebaseTodoEntry:
         return " ".join(parts)
 
     @classmethod
-    def from_string(cls, line: str) -> "RebaseTodoEntry" | None:
+    def from_string(cls, line: str) -> "RebaseTodoEntry | None":
         """Parse a todo entry from a line.
 
         Args:

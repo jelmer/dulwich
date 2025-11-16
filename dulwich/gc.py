@@ -313,7 +313,7 @@ def garbage_collect(
     return stats
 
 
-def should_run_gc(repo: "BaseRepo", config: "Config" | None = None) -> bool:
+def should_run_gc(repo: "BaseRepo", config: "Config | None" = None) -> bool:
     """Check if automatic garbage collection should run.
 
     Args:
@@ -372,7 +372,7 @@ def should_run_gc(repo: "BaseRepo", config: "Config" | None = None) -> bool:
 
 def maybe_auto_gc(
     repo: "Repo",
-    config: "Config" | None = None,
+    config: "Config | None" = None,
     progress: Callable[[str], None] | None = None,
 ) -> bool:
     """Run automatic garbage collection if needed.

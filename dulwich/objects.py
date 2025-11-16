@@ -394,7 +394,7 @@ class ShaFile:
     type_name: bytes
     type_num: int
     _chunked_text: list[bytes] | None
-    _sha: FixedSha | None | "HASH"
+    _sha: "FixedSha | None | HASH"
 
     @staticmethod
     def _parse_legacy_object_header(
@@ -654,7 +654,7 @@ class ShaFile:
         """Returns the length of the raw string of this object."""
         return sum(map(len, self.as_raw_chunks()))
 
-    def sha(self) -> FixedSha | "HASH":
+    def sha(self) -> "FixedSha | HASH":
         """The SHA1 object that is the name of this object."""
         if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha
@@ -890,7 +890,7 @@ class Tag(ShaFile):
 
     _message: bytes | None
     _name: bytes | None
-    _object_class: type["ShaFile"] | None
+    _object_class: "type[ShaFile] | None"
     _object_sha: bytes | None
     _signature: bytes | None
     _tag_time: int | None

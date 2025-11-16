@@ -105,7 +105,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Optional,
     TextIO,
     TypedDict,
     TypeVar,
@@ -245,7 +244,7 @@ class TransportKwargs(TypedDict, total=False):
     password: str | None
     key_filename: str | None
     ssh_command: str | None
-    pool_manager: Optional["urllib3.PoolManager"]
+    pool_manager: "urllib3.PoolManager" | None
 
 
 @dataclass
@@ -7051,7 +7050,7 @@ def filter_branch(
     repo: RepoPath = ".",
     branch: str | bytes = "HEAD",
     *,
-    filter_fn: Callable[[Commit], Optional["CommitData"]] | None = None,
+    filter_fn: Callable[[Commit], "CommitData" | None] | None = None,
     filter_author: Callable[[bytes], bytes | None] | None = None,
     filter_committer: Callable[[bytes], bytes | None] | None = None,
     filter_message: Callable[[bytes], bytes | None] | None = None,

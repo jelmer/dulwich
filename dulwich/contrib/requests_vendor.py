@@ -33,7 +33,7 @@ This implementation is experimental and does not have any tests.
 
 from collections.abc import Callable, Iterator
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..config import ConfigFile
@@ -56,7 +56,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         self,
         base_url: str,
         dumb: bool | None = None,
-        config: Optional["ConfigFile"] = None,
+        config: "ConfigFile" | None = None,
         username: str | None = None,
         password: str | None = None,
         thin_packs: bool = True,
@@ -133,7 +133,7 @@ class RequestsHttpGitClient(AbstractHttpGitClient):
         return resp, read
 
 
-def get_session(config: Optional["ConfigFile"]) -> Session:
+def get_session(config: "ConfigFile" | None) -> Session:
     """Create a requests session with Git configuration.
 
     Args:

@@ -36,7 +36,6 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     BinaryIO,
-    Optional,
     Protocol,
 )
 
@@ -351,7 +350,7 @@ class BaseObjectStore:
         self,
         objects: Sequence[tuple[ShaFile, str | None]],
         progress: Callable[..., None] | None = None,
-    ) -> Optional["Pack"]:
+    ) -> "Pack" | None:
         """Add a set of objects to this object store.
 
         Args:
@@ -379,7 +378,7 @@ class BaseObjectStore:
         want_unchanged: bool = False,
         include_trees: bool = False,
         change_type_same: bool = False,
-        rename_detector: Optional["RenameDetector"] = None,
+        rename_detector: "RenameDetector" | None = None,
         paths: Sequence[bytes] | None = None,
     ) -> Iterator[
         tuple[
@@ -648,7 +647,7 @@ class BaseObjectStore:
             if sha.startswith(prefix):
                 yield sha
 
-    def get_commit_graph(self) -> Optional["CommitGraph"]:
+    def get_commit_graph(self) -> "CommitGraph" | None:
         """Get the commit graph for this object store.
 
         Returns:
@@ -708,7 +707,7 @@ class PackCapableObjectStore(BaseObjectStore, PackedObjectContainer):
         count: int,
         unpacked_objects: Iterator["UnpackedObject"],
         progress: Callable[..., None] | None = None,
-    ) -> Optional["Pack"]:
+    ) -> "Pack" | None:
         """Add pack data to this object store.
 
         Args:
@@ -805,7 +804,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         count: int,
         unpacked_objects: Iterator[UnpackedObject],
         progress: Callable[..., None] | None = None,
-    ) -> Optional["Pack"]:
+    ) -> "Pack" | None:
         """Add pack data to this object store.
 
         Args:
@@ -1234,7 +1233,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         self,
         objects: Sequence[tuple[ShaFile, str | None]],
         progress: Callable[[str], None] | None = None,
-    ) -> Optional["Pack"]:
+    ) -> "Pack" | None:
         """Add a set of objects to this object store.
 
         Args:
@@ -1254,7 +1253,7 @@ class DiskObjectStore(PackBasedObjectStore):
     path: str | os.PathLike[str]
     pack_dir: str | os.PathLike[str]
     _alternates: list["BaseObjectStore"] | None
-    _commit_graph: Optional["CommitGraph"]
+    _commit_graph: "CommitGraph" | None
 
     def __init__(
         self,
@@ -1735,7 +1734,7 @@ class DiskObjectStore(PackBasedObjectStore):
         f = os.fdopen(fd, "w+b")
         os.chmod(path, PACK_MODE)
 
-        def commit() -> Optional["Pack"]:
+        def commit() -> "Pack" | None:
             if f.tell() > 0:
                 f.seek(0)
 
@@ -1837,7 +1836,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     seen.add(sha)
                     yield sha
 
-    def get_commit_graph(self) -> Optional["CommitGraph"]:
+    def get_commit_graph(self) -> "CommitGraph" | None:
         """Get the commit graph for this object store.
 
         Returns:

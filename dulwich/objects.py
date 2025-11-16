@@ -36,7 +36,6 @@ from typing import (
     TYPE_CHECKING,
     NamedTuple,
     TypeVar,
-    Union,
 )
 
 if sys.version_info >= (3, 11):
@@ -395,11 +394,11 @@ class ShaFile:
     type_name: bytes
     type_num: int
     _chunked_text: list[bytes] | None
-    _sha: Union[FixedSha, None, "HASH"]
+    _sha: FixedSha | None | "HASH"
 
     @staticmethod
     def _parse_legacy_object_header(
-        magic: bytes, f: Union[BufferedIOBase, IO[bytes], "_GitFile"]
+        magic: bytes, f: BufferedIOBase | IO[bytes] | "_GitFile"
     ) -> "ShaFile":
         """Parse a legacy object, creating it but not reading the file."""
         bufsize = 1024
@@ -500,7 +499,7 @@ class ShaFile:
 
     @staticmethod
     def _parse_object_header(
-        magic: bytes, f: Union[BufferedIOBase, IO[bytes], "_GitFile"]
+        magic: bytes, f: BufferedIOBase | IO[bytes] | "_GitFile"
     ) -> "ShaFile":
         """Parse a new style object, creating it but not reading the file."""
         num_type = (ord(magic[0:1]) >> 4) & 7
@@ -529,7 +528,7 @@ class ShaFile:
         return (b0 & 0x8F) == 0x08 and (word % 31) == 0
 
     @classmethod
-    def _parse_file(cls, f: Union[BufferedIOBase, IO[bytes], "_GitFile"]) -> "ShaFile":
+    def _parse_file(cls, f: BufferedIOBase | IO[bytes] | "_GitFile") -> "ShaFile":
         map = f.read()
         if not map:
             raise EmptyFileException("Corrupted empty file detected")
@@ -561,7 +560,7 @@ class ShaFile:
             return cls.from_file(f)
 
     @classmethod
-    def from_file(cls, f: Union[BufferedIOBase, IO[bytes], "_GitFile"]) -> "ShaFile":
+    def from_file(cls, f: BufferedIOBase | IO[bytes] | "_GitFile") -> "ShaFile":
         """Get the contents of a SHA file on disk."""
         try:
             obj = cls._parse_file(f)
@@ -655,7 +654,7 @@ class ShaFile:
         """Returns the length of the raw string of this object."""
         return sum(map(len, self.as_raw_chunks()))
 
-    def sha(self) -> Union[FixedSha, "HASH"]:
+    def sha(self) -> FixedSha | "HASH":
         """The SHA1 object that is the name of this object."""
         if self._sha is None or self._needs_serialization:
             # this is a local because as_raw_chunks() overwrites self._sha

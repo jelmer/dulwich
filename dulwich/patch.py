@@ -37,7 +37,6 @@ from typing import (
     IO,
     TYPE_CHECKING,
     BinaryIO,
-    Optional,
     TextIO,
 )
 
@@ -487,8 +486,8 @@ def gen_diff_header(
 # TODO(jelmer): Support writing unicode, rather than bytes.
 def write_blob_diff(
     f: IO[bytes],
-    old_file: tuple[bytes | None, int | None, Optional["Blob"]],
-    new_file: tuple[bytes | None, int | None, Optional["Blob"]],
+    old_file: tuple[bytes | None, int | None, "Blob" | None],
+    new_file: tuple[bytes | None, int | None, "Blob" | None],
     diff_algorithm: str | None = None,
 ) -> None:
     """Write blob diff.
@@ -506,7 +505,7 @@ def write_blob_diff(
     patched_old_path = patch_filename(old_path, b"a")
     patched_new_path = patch_filename(new_path, b"b")
 
-    def lines(blob: Optional["Blob"]) -> list[bytes]:
+    def lines(blob: "Blob" | None) -> list[bytes]:
         """Split blob content into lines.
 
         Args:

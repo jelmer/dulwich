@@ -60,10 +60,8 @@ from typing import (
     Any,
     BinaryIO,
     Generic,
-    Optional,
     Protocol,
     TypeVar,
-    Union,
 )
 
 try:
@@ -132,7 +130,7 @@ class ObjectContainer(Protocol):
         self,
         objects: Sequence[tuple[ShaFile, str | None]],
         progress: Callable[..., None] | None = None,
-    ) -> Optional["Pack"]:
+    ) -> "Pack" | None:
         """Add a set of objects to this object store.
 
         Args:
@@ -147,7 +145,7 @@ class ObjectContainer(Protocol):
     def __getitem__(self, sha1: bytes) -> ShaFile:
         """Retrieve an object."""
 
-    def get_commit_graph(self) -> Optional["CommitGraph"]:
+    def get_commit_graph(self) -> "CommitGraph" | None:
         """Get the commit graph for this object store.
 
         Returns:
@@ -753,7 +751,7 @@ class FilePackIndex(PackIndex):
         self,
         filename: str | os.PathLike[str],
         file: IO[bytes] | _GitFile | None = None,
-        contents: Union[bytes, "mmap.mmap"] | None = None,
+        contents: bytes | "mmap.mmap" | None = None,
         size: int | None = None,
     ) -> None:
         """Create a pack index object.
@@ -1406,7 +1404,7 @@ class PackStreamCopier(PackStreamReader):
         read_all: Callable[[int], bytes],
         read_some: Callable[[int], bytes] | None,
         outfile: IO[bytes],
-        delta_iter: Optional["DeltaChainIterator[UnpackedObject]"] = None,
+        delta_iter: "DeltaChainIterator[UnpackedObject]" | None = None,
     ) -> None:
         """Initialize the copier.
 
@@ -2515,7 +2513,7 @@ def write_pack_object(
     write: Callable[[bytes], int],
     type: int,
     object: list[bytes] | tuple[bytes | int, list[bytes]],
-    sha: Optional["HashObject"] = None,
+    sha: "HashObject" | None = None,
     compression_level: int = -1,
 ) -> int:
     """Write pack object to a file.
@@ -3518,7 +3516,7 @@ class Pack:
         return self._idx
 
     @property
-    def bitmap(self) -> Optional["PackBitmap"]:
+    def bitmap(self) -> "PackBitmap" | None:
         """The bitmap being used, if available.
 
         Returns:

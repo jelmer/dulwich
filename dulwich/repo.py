@@ -41,7 +41,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Optional,
     TypeVar,
 )
 
@@ -918,7 +917,7 @@ class BaseRepo:
         reverse: bool = False,
         max_entries: int | None = None,
         paths: Sequence[bytes] | None = None,
-        rename_detector: Optional["RenameDetector"] = None,
+        rename_detector: "RenameDetector" | None = None,
         follow: bool = False,
         since: int | None = None,
         until: int | None = None,
@@ -1208,7 +1207,7 @@ class Repo(BaseRepo):
     path: str
     bare: bool
     object_store: DiskObjectStore
-    filter_context: Optional["FilterContext"]
+    filter_context: "FilterContext" | None
 
     def __init__(
         self,
@@ -1857,7 +1856,7 @@ class Repo(BaseRepo):
         controldir: str | bytes | os.PathLike[str],
         bare: bool,
         object_store: PackBasedObjectStore | None = None,
-        config: Optional["StackedConfig"] = None,
+        config: "StackedConfig" | None = None,
         default_branch: bytes | None = None,
         symlinks: bool | None = None,
         format: int | None = None,
@@ -1892,7 +1891,7 @@ class Repo(BaseRepo):
         path: str | bytes | os.PathLike[str],
         *,
         mkdir: bool = False,
-        config: Optional["StackedConfig"] = None,
+        config: "StackedConfig" | None = None,
         default_branch: bytes | None = None,
         symlinks: bool | None = None,
         format: int | None = None,
@@ -1982,7 +1981,7 @@ class Repo(BaseRepo):
         *,
         mkdir: bool = False,
         object_store: PackBasedObjectStore | None = None,
-        config: Optional["StackedConfig"] = None,
+        config: "StackedConfig" | None = None,
         default_branch: bytes | None = None,
         format: int | None = None,
     ) -> "Repo":
@@ -2217,7 +2216,7 @@ class MemoryRepo(BaseRepo):
     those have a stronger dependency on the filesystem.
     """
 
-    filter_context: Optional["FilterContext"]
+    filter_context: "FilterContext" | None
 
     def __init__(self) -> None:
         """Create a new repository in memory."""

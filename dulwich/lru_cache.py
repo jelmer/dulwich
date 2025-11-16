@@ -23,7 +23,7 @@
 """A simple least-recently-used (LRU) cache."""
 
 from collections.abc import Callable, Iterable, Iterator
-from typing import Generic, Optional, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 _null_key = object()
 
@@ -37,7 +37,7 @@ class _LRUNode(Generic[K, V]):
 
     __slots__ = ("cleanup", "key", "next_key", "prev", "size", "value")
 
-    prev: Optional["_LRUNode[K, V]"]
+    prev: "_LRUNode[K, V]" | None
     next_key: K | object
     size: int | None
 

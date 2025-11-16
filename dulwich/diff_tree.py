@@ -27,7 +27,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from io import BytesIO
 from itertools import chain
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from .object_store import BaseObjectStore
 from .objects import S_ISGITLINK, ObjectID, ShaFile, Tree, TreeEntry
@@ -260,7 +260,7 @@ def tree_changes(
     tree1_id: ObjectID | None,
     tree2_id: ObjectID | None,
     want_unchanged: bool = False,
-    rename_detector: Optional["RenameDetector"] = None,
+    rename_detector: "RenameDetector" | None = None,
     include_trees: bool = False,
     change_type_same: bool = False,
     paths: Sequence[bytes] | None = None,
@@ -347,7 +347,7 @@ def tree_changes_for_merge(
     store: BaseObjectStore,
     parent_tree_ids: Sequence[ObjectID],
     tree_id: ObjectID,
-    rename_detector: Optional["RenameDetector"] = None,
+    rename_detector: "RenameDetector" | None = None,
 ) -> Iterator[list[TreeChange | None]]:
     """Get the tree changes for a merge tree relative to all its parents.
 

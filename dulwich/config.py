@@ -45,7 +45,6 @@ from typing import (
     IO,
     Generic,
     TypeVar,
-    Union,
     overload,
 )
 
@@ -197,7 +196,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
     @classmethod
     def make(
         cls,
-        dict_in: Union[MutableMapping[K, V], "CaseInsensitiveOrderedMultiDict[K, V]"]
+        dict_in: MutableMapping[K, V] | "CaseInsensitiveOrderedMultiDict[K, V]"
         | None = None,
         default_factory: Callable[[], V] | None = None,
     ) -> "CaseInsensitiveOrderedMultiDict[K, V]":

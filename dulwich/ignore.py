@@ -30,7 +30,7 @@ import os.path
 import re
 from collections.abc import Iterable, Sequence
 from contextlib import suppress
-from typing import TYPE_CHECKING, BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 if TYPE_CHECKING:
     from .repo import Repo
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 from .config import Config, get_xdg_config_home_path
 
 
-def _pattern_to_str(pattern: Union["Pattern", bytes, str]) -> str:
+def _pattern_to_str(pattern: "Pattern" | bytes | str) -> str:
     """Convert a pattern to string, handling both Pattern objects and raw patterns."""
     if isinstance(pattern, Pattern):
         pattern_data: bytes | str = pattern.pattern

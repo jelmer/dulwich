@@ -26,7 +26,7 @@ import tempfile
 import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from io import BytesIO
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urljoin
 
 from .errors import NotGitRepository, ObjectFormatException
@@ -340,7 +340,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         self,
         objects: Sequence[tuple[ShaFile, str | None]],
         progress: Callable[[str], None] | None = None,
-    ) -> Optional["Pack"]:
+    ) -> "Pack" | None:
         """Add a set of objects to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
 

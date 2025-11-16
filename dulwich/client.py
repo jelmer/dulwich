@@ -3219,7 +3219,7 @@ def default_urllib3_manager(
     base_url: str | None = None,
     timeout: float | None = None,
     cert_reqs: str | None = None,
-) -> "urllib3.ProxyManager" | "urllib3.PoolManager":
+) -> "urllib3.ProxyManager | urllib3.PoolManager":
     """Return urllib3 connection pool manager.
 
     Honour detected proxy configurations.

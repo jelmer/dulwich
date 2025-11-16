@@ -196,8 +196,7 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
     @classmethod
     def make(
         cls,
-        dict_in: MutableMapping[K, V] | "CaseInsensitiveOrderedMultiDict[K, V]"
-        | None = None,
+        dict_in: "MutableMapping[K, V] | CaseInsensitiveOrderedMultiDict[K, V] | None" = None,
         default_factory: Callable[[], V] | None = None,
     ) -> "CaseInsensitiveOrderedMultiDict[K, V]":
         """Create a CaseInsensitiveOrderedMultiDict from an existing mapping.

@@ -609,7 +609,7 @@ class Notes:
     def get_notes_ref(
         self,
         notes_ref: bytes | None = None,
-        config: "StackedConfig" | None = None,
+        config: "StackedConfig | None" = None,
     ) -> bytes:
         """Get the notes reference to use.
 
@@ -631,7 +631,7 @@ class Notes:
         self,
         object_sha: bytes,
         notes_ref: bytes | None = None,
-        config: "StackedConfig" | None = None,
+        config: "StackedConfig | None" = None,
     ) -> bytes | None:
         """Get the note for an object.
 
@@ -675,7 +675,7 @@ class Notes:
         author: bytes | None = None,
         committer: bytes | None = None,
         message: bytes | None = None,
-        config: "StackedConfig" | None = None,
+        config: "StackedConfig | None" = None,
     ) -> bytes:
         """Set or update a note for an object.
 
@@ -759,7 +759,7 @@ class Notes:
         author: bytes | None = None,
         committer: bytes | None = None,
         message: bytes | None = None,
-        config: "StackedConfig" | None = None,
+        config: "StackedConfig | None" = None,
     ) -> bytes | None:
         """Remove a note for an object.
 
@@ -837,7 +837,7 @@ class Notes:
     def list_notes(
         self,
         notes_ref: bytes | None = None,
-        config: "StackedConfig" | None = None,
+        config: "StackedConfig | None" = None,
     ) -> list[tuple[bytes, bytes]]:
         """List all notes in a notes ref.
 

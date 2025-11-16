@@ -140,7 +140,7 @@ class ProcessFilterDriver:
         self._capabilities: set[bytes] = set()
         self._process_lock = threading.Lock()
 
-    def _get_or_start_process(self) -> "Protocol" | None:
+    def _get_or_start_process(self) -> "Protocol | None":
         """Get or start the long-running process filter."""
         if self._process is None and self.process_cmd:
             from .errors import GitProtocolError, HangupException
@@ -602,8 +602,8 @@ class FilterRegistry:
 
     def __init__(
         self,
-        config: "StackedConfig" | None = None,
-        repo: "BaseRepo" | None = None,
+        config: "StackedConfig | None" = None,
+        repo: "BaseRepo | None" = None,
     ) -> None:
         """Initialize FilterRegistry.
 
@@ -879,10 +879,10 @@ class FilterBlobNormalizer:
 
     def __init__(
         self,
-        config_stack: "StackedConfig" | None,
+        config_stack: "StackedConfig | None",
         gitattributes: GitAttributes,
         filter_registry: FilterRegistry | None = None,
-        repo: "BaseRepo" | None = None,
+        repo: "BaseRepo | None" = None,
         filter_context: FilterContext | None = None,
     ) -> None:
         """Initialize FilterBlobNormalizer.

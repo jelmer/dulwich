@@ -260,7 +260,7 @@ def tree_changes(
     tree1_id: ObjectID | None,
     tree2_id: ObjectID | None,
     want_unchanged: bool = False,
-    rename_detector: "RenameDetector" | None = None,
+    rename_detector: "RenameDetector | None" = None,
     include_trees: bool = False,
     change_type_same: bool = False,
     paths: Sequence[bytes] | None = None,
@@ -347,7 +347,7 @@ def tree_changes_for_merge(
     store: BaseObjectStore,
     parent_tree_ids: Sequence[ObjectID],
     tree_id: ObjectID,
-    rename_detector: "RenameDetector" | None = None,
+    rename_detector: "RenameDetector | None" = None,
 ) -> Iterator[list[TreeChange | None]]:
     """Get the tree changes for a merge tree relative to all its parents.
 

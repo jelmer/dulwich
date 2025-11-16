@@ -34,6 +34,7 @@ def test_suite() -> unittest.TestSuite:
         "dumb",
         "index",
         "lfs",
+        "midx",
         "pack",
         "patch",
         "porcelain",

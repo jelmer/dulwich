@@ -22,7 +22,7 @@
 """Object specification."""
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 from .objects import Commit, ShaFile, Tag, Tree
 from .refs import local_branch_name, local_tag_name
@@ -290,7 +290,7 @@ def parse_tree(repo: "BaseRepo", treeish: bytes | str | Tree | Commit | Tag) -> 
     return o
 
 
-def parse_ref(container: Union["Repo", "RefsContainer"], refspec: str | bytes) -> "Ref":
+def parse_ref(container: "Repo" | "RefsContainer", refspec: str | bytes) -> "Ref":
     """Parse a string referring to a reference.
 
     Args:
@@ -316,11 +316,11 @@ def parse_ref(container: Union["Repo", "RefsContainer"], refspec: str | bytes) -
 
 
 def parse_reftuple(
-    lh_container: Union["Repo", "RefsContainer"],
-    rh_container: Union["Repo", "RefsContainer"],
+    lh_container: "Repo" | "RefsContainer",
+    rh_container: "Repo" | "RefsContainer",
     refspec: str | bytes,
     force: bool = False,
-) -> tuple[Optional["Ref"], Optional["Ref"], bool]:
+) -> tuple["Ref" | None, "Ref" | None, bool]:
     """Parse a reftuple spec.
 
     Args:
@@ -359,11 +359,11 @@ def parse_reftuple(
 
 
 def parse_reftuples(
-    lh_container: Union["Repo", "RefsContainer"],
-    rh_container: Union["Repo", "RefsContainer"],
+    lh_container: "Repo" | "RefsContainer",
+    rh_container: "Repo" | "RefsContainer",
     refspecs: bytes | Sequence[bytes],
     force: bool = False,
-) -> list[tuple[Optional["Ref"], Optional["Ref"], bool]]:
+) -> list[tuple["Ref" | None, "Ref" | None, bool]]:
     """Parse a list of reftuple specs to a list of reftuples.
 
     Args:
@@ -385,7 +385,7 @@ def parse_reftuples(
 
 
 def parse_refs(
-    container: Union["Repo", "RefsContainer"],
+    container: "Repo" | "RefsContainer",
     refspecs: bytes | str | Sequence[bytes | str],
 ) -> list["Ref"]:
     """Parse a list of refspecs to a list of refs.

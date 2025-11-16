@@ -105,7 +105,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Optional,
     TextIO,
     TypedDict,
     TypeVar,
@@ -114,10 +113,11 @@ from typing import (
 )
 
 if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
     from typing import override
 else:
-    from typing_extensions import Buffer, override
+    from typing_extensions import override
+
+from ._typing import Buffer
 
 if TYPE_CHECKING:
     import urllib3
@@ -244,7 +244,7 @@ class TransportKwargs(TypedDict, total=False):
     password: str | None
     key_filename: str | None
     ssh_command: str | None
-    pool_manager: Optional["urllib3.PoolManager"]
+    pool_manager: "urllib3.PoolManager | None"
 
 
 @dataclass
@@ -281,14 +281,25 @@ class NoneStream(RawIOBase):
         """
         return b""
 
-    @override
-    def readinto(self, b: Buffer) -> int | None:
-        return 0
+    if sys.version_info >= (3, 12):
 
-    @override
-    def write(self, b: Buffer) -> int | None:
-        # All Buffer implementations (bytes, bytearray, memoryview) support len()
-        return len(b) if b else 0  # type: ignore[arg-type]
+        @override
+        def readinto(self, b: Buffer) -> int | None:
+            return 0
+
+        @override
+        def write(self, b: Buffer) -> int | None:
+            return len(cast(bytes, b)) if b else 0
+
+    else:
+
+        @override
+        def readinto(self, b: bytearray | memoryview) -> int | None:  # type: ignore[override]
+            return 0
+
+        @override
+        def write(self, b: bytes | bytearray | memoryview) -> int | None:  # type: ignore[override]
+            return len(b) if b else 0
 
 
 default_bytes_out_stream: BinaryIO = cast(
@@ -3074,10 +3085,14 @@ def push(
         for ref, error in (result.ref_status or {}).items():
             if error is not None:
                 errstream.write(
-                    b"Push of ref %s failed: %s\n" % (ref, error.encode(err_encoding))
+                    f"Push of ref {ref.decode('utf-8', 'replace')} failed: {error}\n".encode(
+                        err_encoding
+                    )
                 )
             else:
-                errstream.write(b"Ref %s updated\n" % ref)
+                errstream.write(
+                    f"Ref {ref.decode('utf-8', 'replace')} updated\n".encode()
+                )
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)
@@ -7050,7 +7065,7 @@ def filter_branch(
     repo: RepoPath = ".",
     branch: str | bytes = "HEAD",
     *,
-    filter_fn: Callable[[Commit], Optional["CommitData"]] | None = None,
+    filter_fn: Callable[[Commit], "CommitData | None"] | None = None,
     filter_author: Callable[[bytes], bytes | None] | None = None,
     filter_committer: Callable[[bytes], bytes | None] | None = None,
     filter_message: Callable[[bytes], bytes | None] | None = None,

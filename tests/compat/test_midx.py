@@ -98,16 +98,18 @@ class MIDXCompatTests(CompatTestCase):
 
         # Load the MIDX file with Dulwich
         midx = load_midx(midx_path)
+        try:
+            # Verify we can read it
+            self.assertGreater(len(midx), 0, "MIDX should contain objects")
+            self.assertGreater(midx.pack_count, 0, "MIDX should reference packs")
 
-        # Verify we can read it
-        self.assertGreater(len(midx), 0, "MIDX should contain objects")
-        self.assertGreater(midx.pack_count, 0, "MIDX should reference packs")
-
-        # Verify the pack names look reasonable
-        # Git stores .idx extensions in MIDX files
-        for pack_name in midx.pack_names:
-            self.assertTrue(pack_name.startswith("pack-"))
-            self.assertTrue(pack_name.endswith(".idx"))
+            # Verify the pack names look reasonable
+            # Git stores .idx extensions in MIDX files
+            for pack_name in midx.pack_names:
+                self.assertTrue(pack_name.startswith("pack-"))
+                self.assertTrue(pack_name.endswith(".idx"))
+        finally:
+            midx.close()
 
     def test_git_uses_dulwich_midx(self):
         """Test that Git can use a MIDX file created by Dulwich."""
@@ -115,12 +117,15 @@ class MIDXCompatTests(CompatTestCase):
 
         # Use Dulwich to create a MIDX file
         repo = Repo(self.repo_path)
-        store = repo.object_store
-        self.assertIsInstance(store, DiskObjectStore)
+        try:
+            store = repo.object_store
+            self.assertIsInstance(store, DiskObjectStore)
 
-        # Write MIDX with Dulwich
-        checksum = store.write_midx()
-        self.assertEqual(20, len(checksum))
+            # Write MIDX with Dulwich
+            checksum = store.write_midx()
+            self.assertEqual(20, len(checksum))
+        finally:
+            repo.close()
 
         # Verify the file was created
         midx_path = os.path.join(self.repo_path, "objects", "pack", "multi-pack-index")
@@ -142,40 +147,45 @@ class MIDXCompatTests(CompatTestCase):
 
         # Load with Dulwich
         repo = Repo(self.repo_path)
-        store = repo.object_store
+        try:
+            store = repo.object_store
 
-        # Get MIDX
-        midx = store.get_midx()
-        self.assertIsNotNone(midx, "MIDX should be loaded")
+            # Get MIDX
+            midx = store.get_midx()
+            self.assertIsNotNone(midx, "MIDX should be loaded")
 
-        # Get all objects from Git
-        result = run_git_or_fail(["rev-list", "--all", "--objects"], cwd=work_dir)
-        object_shas = [
-            line.split()[0].encode("ascii")
-            for line in result.decode("utf-8").strip().split("\n")
-            if line
-        ]
+            # Get all objects from Git
+            result = run_git_or_fail(["rev-list", "--all", "--objects"], cwd=work_dir)
+            object_shas = [
+                line.split()[0].encode("ascii")
+                for line in result.decode("utf-8").strip().split("\n")
+                if line
+            ]
 
-        # Verify we can find these objects through the MIDX
-        found_count = 0
-        for sha_hex in object_shas:
-            # Convert hex to binary
-            sha_bin = bytes.fromhex(sha_hex.decode("ascii"))
+            # Verify we can find these objects through the MIDX
+            found_count = 0
+            for sha_hex in object_shas:
+                # Convert hex to binary
+                sha_bin = bytes.fromhex(sha_hex.decode("ascii"))
 
-            # Check if it's in the MIDX
-            if sha_bin in midx:
-                found_count += 1
+                # Check if it's in the MIDX
+                if sha_bin in midx:
+                    found_count += 1
 
-                # Verify we can get the object location
-                result = midx.object_offset(sha_bin)
-                self.assertIsNotNone(result)
-                pack_name, offset = result
-                self.assertIsInstance(pack_name, str)
-                self.assertIsInstance(offset, int)
-                self.assertGreater(offset, 0)
+                    # Verify we can get the object location
+                    result = midx.object_offset(sha_bin)
+                    self.assertIsNotNone(result)
+                    pack_name, offset = result
+                    self.assertIsInstance(pack_name, str)
+                    self.assertIsInstance(offset, int)
+                    self.assertGreater(offset, 0)
 
-        # We should find at least some objects in the MIDX
-        self.assertGreater(found_count, 0, "Should find at least some objects in MIDX")
+            # We should find at least some objects in the MIDX
+            self.assertGreater(
+                found_count, 0, "Should find at least some objects in MIDX"
+            )
+        finally:
+            repo.close()
 
     def test_midx_with_multiple_packs(self):
         """Test MIDX functionality with multiple pack files."""
@@ -191,23 +201,25 @@ class MIDXCompatTests(CompatTestCase):
         # Load with Dulwich
         midx_path = os.path.join(self.repo_path, "objects", "pack", "multi-pack-index")
         midx = load_midx(midx_path)
+        try:
+            # Should have multiple packs
+            # (Exact count may vary depending on Git version and repacking)
+            self.assertGreaterEqual(midx.pack_count, 1)
 
-        # Should have multiple packs
-        # (Exact count may vary depending on Git version and repacking)
-        self.assertGreaterEqual(midx.pack_count, 1)
+            # Verify we can iterate over all entries
+            entries = list(midx.iterentries())
+            self.assertGreater(len(entries), 0)
 
-        # Verify we can iterate over all entries
-        entries = list(midx.iterentries())
-        self.assertGreater(len(entries), 0)
-
-        # All entries should have valid structure
-        for sha, pack_name, offset in entries:
-            self.assertEqual(20, len(sha))  # SHA-1 is 20 bytes
-            self.assertIsInstance(pack_name, str)
-            # Git stores .idx extensions in MIDX files
-            self.assertTrue(pack_name.endswith(".idx"))
-            self.assertIsInstance(offset, int)
-            self.assertGreaterEqual(offset, 0)
+            # All entries should have valid structure
+            for sha, pack_name, offset in entries:
+                self.assertEqual(20, len(sha))  # SHA-1 is 20 bytes
+                self.assertIsInstance(pack_name, str)
+                # Git stores .idx extensions in MIDX files
+                self.assertTrue(pack_name.endswith(".idx"))
+                self.assertIsInstance(offset, int)
+                self.assertGreaterEqual(offset, 0)
+        finally:
+            midx.close()
 
     def test_dulwich_object_store_with_git_midx(self):
         """Test that DiskObjectStore can use Git-created MIDX for lookups."""
@@ -218,16 +230,18 @@ class MIDXCompatTests(CompatTestCase):
 
         # Load repo with Dulwich
         repo = Repo(self.repo_path)
+        try:
+            # Get a commit from the repo
+            result = run_git_or_fail(["rev-parse", "HEAD"], cwd=work_dir)
+            head_sha = result.decode("utf-8").strip().encode("ascii")
 
-        # Get a commit from the repo
-        result = run_git_or_fail(["rev-parse", "HEAD"], cwd=work_dir)
-        head_sha = result.decode("utf-8").strip().encode("ascii")
-
-        # Verify we can access it through Dulwich
-        # This should use the MIDX for lookup
-        obj = repo.object_store[head_sha]
-        self.assertIsNotNone(obj)
-        self.assertEqual(b"commit", obj.type_name)
+            # Verify we can access it through Dulwich
+            # This should use the MIDX for lookup
+            obj = repo.object_store[head_sha]
+            self.assertIsNotNone(obj)
+            self.assertEqual(b"commit", obj.type_name)
+        finally:
+            repo.close()
 
     def test_repack_with_midx(self):
         """Test that repacking works correctly with MIDX present."""
@@ -235,7 +249,10 @@ class MIDXCompatTests(CompatTestCase):
 
         # Create MIDX with Dulwich
         repo = Repo(self.repo_path)
-        repo.object_store.write_midx()
+        try:
+            repo.object_store.write_midx()
+        finally:
+            repo.close()
 
         # Verify Git can still repack
         run_git_or_fail(["repack", "-d"], cwd=work_dir)
@@ -244,4 +261,7 @@ class MIDXCompatTests(CompatTestCase):
         midx_path = os.path.join(self.repo_path, "objects", "pack", "multi-pack-index")
         if os.path.exists(midx_path):  # Git may remove it during repack
             midx = load_midx(midx_path)
-            self.assertGreaterEqual(len(midx), 0)
+            try:
+                self.assertGreaterEqual(len(midx), 0)
+            finally:
+                midx.close()

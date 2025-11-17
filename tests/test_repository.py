@@ -2083,6 +2083,7 @@ class RepoConfigIncludeIfTests(TestCase):
             r.close()
 
 
+@skipIf(sys.platform == "win32", "Windows does not support Unix file permissions")
 class SharedRepositoryTests(TestCase):
     """Tests for core.sharedRepository functionality."""
 

@@ -1258,6 +1258,7 @@ class DiskObjectStore(PackBasedObjectStore):
     def __init__(
         self,
         path: str | os.PathLike[str],
+        *,
         loose_compression_level: int = -1,
         pack_compression_level: int = -1,
         pack_index_version: int | None = None,
@@ -1268,6 +1269,8 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         fsync_object_files: bool = False,
+        file_mode: int | None = None,
+        dir_mode: int | None = None,
     ) -> None:
         """Open an object store.
 
@@ -1283,6 +1286,8 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_threads: number of threads for pack operations
           pack_big_file_threshold: threshold for treating files as big
           fsync_object_files: whether to fsync object files for durability
+          file_mode: File permission mask for shared repository
+          dir_mode: Directory permission mask for shared repository
         """
         super().__init__(
             pack_compression_level=pack_compression_level,
@@ -1301,6 +1306,8 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.fsync_object_files = fsync_object_files
+        self.file_mode = file_mode
+        self.dir_mode = dir_mode
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -1316,13 +1323,20 @@ class DiskObjectStore(PackBasedObjectStore):
 
     @classmethod
     def from_config(
-        cls, path: str | os.PathLike[str], config: "Config"
+        cls,
+        path: str | os.PathLike[str],
+        config: "Config",
+        *,
+        file_mode: int | None = None,
+        dir_mode: int | None = None,
     ) -> "DiskObjectStore":
         """Create a DiskObjectStore from a configuration object.
 
         Args:
           path: Path to the object store directory
           config: Configuration object to read settings from
+          file_mode: Optional file permission mask for shared repository
+          dir_mode: Optional directory permission mask for shared repository
 
         Returns:
           New DiskObjectStore instance configured according to config
@@ -1390,16 +1404,18 @@ class DiskObjectStore(PackBasedObjectStore):
 
         instance = cls(
             path,
-            loose_compression_level,
-            pack_compression_level,
-            pack_index_version,
-            pack_delta_window_size,
-            pack_window_memory,
-            pack_delta_cache_size,
-            pack_depth,
-            pack_threads,
-            pack_big_file_threshold,
-            fsync_object_files,
+            loose_compression_level=loose_compression_level,
+            pack_compression_level=pack_compression_level,
+            pack_index_version=pack_index_version,
+            pack_delta_window_size=pack_delta_window_size,
+            pack_window_memory=pack_window_memory,
+            pack_delta_cache_size=pack_delta_cache_size,
+            pack_depth=pack_depth,
+            pack_threads=pack_threads,
+            pack_big_file_threshold=pack_big_file_threshold,
+            fsync_object_files=fsync_object_files,
+            file_mode=file_mode,
+            dir_mode=dir_mode,
         )
         instance._use_commit_graph = use_commit_graph
         return instance
@@ -1437,12 +1453,16 @@ class DiskObjectStore(PackBasedObjectStore):
 
     def add_alternate_path(self, path: str | os.PathLike[str]) -> None:
         """Add an alternate path to this object store."""
+        info_dir = os.path.join(self.path, INFODIR)
         try:
-            os.mkdir(os.path.join(self.path, INFODIR))
+            os.mkdir(info_dir)
+            if self.dir_mode is not None:
+                os.chmod(info_dir, self.dir_mode)
         except FileExistsError:
             pass
         alternates_path = os.path.join(self.path, INFODIR, "alternates")
-        with GitFile(alternates_path, "wb") as f:
+        mask = self.file_mode if self.file_mode is not None else 0o644
+        with GitFile(alternates_path, "wb", mask=mask) as f:
             try:
                 orig_f = open(alternates_path, "rb")
             except FileNotFoundError:
@@ -1667,8 +1687,12 @@ class DiskObjectStore(PackBasedObjectStore):
         os.rename(path, target_pack_path)
 
         # Write the index.
+        mask = self.file_mode if self.file_mode is not None else PACK_MODE
         with GitFile(
-            target_index_path, "wb", mask=PACK_MODE, fsync=self.fsync_object_files
+            target_index_path,
+            "wb",
+            mask=mask,
+            fsync=self.fsync_object_files,
         ) as index_file:
             write_pack_index(
                 index_file, entries, pack_sha, version=self.pack_index_version
@@ -1732,7 +1756,8 @@ class DiskObjectStore(PackBasedObjectStore):
 
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, "w+b")
-        os.chmod(path, PACK_MODE)
+        mask = self.file_mode if self.file_mode is not None else PACK_MODE
+        os.chmod(path, mask)
 
         def commit() -> "Pack | None":
             if f.tell() > 0:
@@ -1765,34 +1790,52 @@ class DiskObjectStore(PackBasedObjectStore):
         dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
+            if self.dir_mode is not None:
+                os.chmod(dir, self.dir_mode)
         except FileExistsError:
             pass
         if os.path.exists(path):
             return  # Already there, no need to write again
-        with GitFile(path, "wb", mask=PACK_MODE, fsync=self.fsync_object_files) as f:
+        mask = self.file_mode if self.file_mode is not None else PACK_MODE
+        with GitFile(path, "wb", mask=mask, fsync=self.fsync_object_files) as f:
             f.write(
                 obj.as_legacy_object(compression_level=self.loose_compression_level)
             )
 
     @classmethod
-    def init(cls, path: str | os.PathLike[str]) -> "DiskObjectStore":
+    def init(
+        cls,
+        path: str | os.PathLike[str],
+        *,
+        file_mode: int | None = None,
+        dir_mode: int | None = None,
+    ) -> "DiskObjectStore":
         """Initialize a new disk object store.
 
         Creates the necessary directory structure for a Git object store.
 
         Args:
           path: Path where the object store should be created
+          file_mode: Optional file permission mask for shared repository
+          dir_mode: Optional directory permission mask for shared repository
 
         Returns:
           New DiskObjectStore instance
         """
         try:
             os.mkdir(path)
+            if dir_mode is not None:
+                os.chmod(path, dir_mode)
         except FileExistsError:
             pass
-        os.mkdir(os.path.join(path, "info"))
-        os.mkdir(os.path.join(path, PACKDIR))
-        return cls(path)
+        info_path = os.path.join(path, "info")
+        pack_path = os.path.join(path, PACKDIR)
+        os.mkdir(info_path)
+        os.mkdir(pack_path)
+        if dir_mode is not None:
+            os.chmod(info_path, dir_mode)
+            os.chmod(pack_path, dir_mode)
+        return cls(path, file_mode=file_mode, dir_mode=dir_mode)
 
     def iter_prefix(self, prefix: bytes) -> Iterator[bytes]:
         """Iterate over all object SHAs with the given prefix.
@@ -1914,10 +1957,13 @@ class DiskObjectStore(PackBasedObjectStore):
                 # Ensure the info directory exists
                 info_dir = os.path.join(self.path, "info")
                 os.makedirs(info_dir, exist_ok=True)
+                if self.dir_mode is not None:
+                    os.chmod(info_dir, self.dir_mode)
 
                 # Write using GitFile for atomic operation
                 graph_path = os.path.join(info_dir, "commit-graph")
-                with GitFile(graph_path, "wb") as f:
+                mask = self.file_mode if self.file_mode is not None else 0o644
+                with GitFile(graph_path, "wb", mask=mask) as f:
                     assert isinstance(
                         f, _GitFile
                     )  # GitFile in write mode always returns _GitFile

@@ -1,5 +1,11 @@
 0.25.0	UNRELEASED
 
+ * Implement support for ``core.sharedRepository`` configuration option.
+   Repository files and directories now respect shared repository permissions
+   for group-writable or world-writable repositories. Affects loose objects,
+   pack files, pack indexes, index files, and other git metadata files.
+   (Jelmer Vernooĳ, #1804)
+
  * Drop support for Python 3.9. (Jelmer Vernooĳ)
 
  * Add support for ``git rerere`` (reuse recorded resolution) with CLI
@@ -131,7 +137,7 @@
    commit metadata. Supports automatic upstream detection from tracking branches
    and verbose mode to display commit messages. (Jelmer Vernooĳ, #1782)
 
- * Add support for ``git mailsplit`` command to split mbox files and Maildir
+ * Add support for ``dulwich mailsplit`` command to split mbox files and Maildir
    into individual message files. Supports mboxrd format, custom precision,
    and all standard git mailsplit options. (Jelmer Vernooĳ, #1840)
 
@@ -487,7 +493,7 @@
 
  * Add ``merge-tree`` plumbing command to ``dulwich.porcelain`` and CLI.
    This command performs three-way tree merges without touching the working
-   directory or creating commits, similar to ``git merge-tree``. It outputs
+   directory or creating commits, similar to ``dulwich merge-tree``. It outputs
    the merged tree SHA and lists any conflicted paths. (Jelmer Vernooĳ)
 
  * Add ``porcelain.count_objects()`` function to count unpacked objects and

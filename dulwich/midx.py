@@ -410,7 +410,14 @@ class MultiPackIndex:
             yield sha, pack_name, offset
 
     def close(self) -> None:
-        """Close the MIDX file."""
+        """Close the MIDX file and release mmap resources."""
+        # Close mmap'd contents first if it's an mmap object
+        if self._contents is not None and has_mmap:
+            if isinstance(self._contents, mmap.mmap):
+                self._contents.close()
+        self._contents = None
+
+        # Close file handle
         if self._file is not None:
             self._file.close()
             self._file = None

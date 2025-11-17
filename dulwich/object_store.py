@@ -2311,6 +2311,25 @@ class DiskObjectStore(PackBasedObjectStore):
                 if time.time() - mtime > grace_period:
                     os.remove(pack_path)
 
+    def close(self) -> None:
+        """Close the object store and release resources.
+
+        This method closes all cached pack files, MIDX, and frees associated resources.
+        """
+        # Close MIDX if it's loaded
+        if self._midx is not None:
+            self._midx.close()
+            self._midx = None
+
+        # Close alternates
+        if self._alternates is not None:
+            for alt in self._alternates:
+                alt.close()
+            self._alternates = None
+
+        # Call parent class close to handle pack files
+        super().close()
+
 
 class MemoryObjectStore(PackCapableObjectStore):
     """Object store that keeps all objects in memory."""

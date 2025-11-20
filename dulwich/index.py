@@ -2758,6 +2758,37 @@ def update_working_tree(
     index.write()
 
 
+def _stat_matches_entry(st: os.stat_result, entry: IndexEntry) -> bool:
+    """Check if filesystem stat matches index entry stat.
+
+    This is used to determine if a file might have changed without reading its content.
+    Git uses this optimization to avoid expensive filter operations on unchanged files.
+
+    Args:
+      st: Filesystem stat result
+      entry: Index entry to compare against
+    Returns: True if stat matches and file is likely unchanged
+    """
+    # Get entry mtime
+    if isinstance(entry.mtime, tuple):
+        entry_mtime_sec = entry.mtime[0]
+    else:
+        entry_mtime_sec = int(entry.mtime)
+
+    # Compare modification time (seconds only for now)
+    # Note: We use int() to compare only seconds, as nanosecond precision
+    # can vary across filesystems
+    if int(st.st_mtime) != entry_mtime_sec:
+        return False
+
+    # Compare file size
+    if st.st_size != entry.size:
+        return False
+
+    # If both mtime and size match, file is likely unchanged
+    return True
+
+
 def _check_entry_for_changes(
     tree_path: bytes,
     entry: IndexEntry | ConflictedIndexEntry,
@@ -2786,6 +2817,16 @@ def _check_entry_for_changes(
             return None
 
         if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+            return None
+
+        # Optimization: If stat matches index entry (mtime and size unchanged),
+        # we can skip reading and filtering the file entirely. This is a significant
+        # performance improvement for repositories with many unchanged files.
+        # Even with filters (e.g., LFS), if the file hasn't been modified (stat unchanged),
+        # the filter output would be the same, so we can safely skip the expensive
+        # filter operation. This addresses performance issues with LFS repositories
+        # where filter operations can be very slow.
+        if _stat_matches_entry(st, entry):
             return None
 
         blob = blob_from_path_and_stat(full_path, st)

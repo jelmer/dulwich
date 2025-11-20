@@ -384,7 +384,7 @@ class LFSStatusCompatTest(LFSCompatTestCase):
 
         # Modify the file
         with open(test_file, "wb") as f:
-            f.write(b"modified content\n")
+            f.write(b"slightly modified content\n")
 
         # Check status - should show file as modified
         status = porcelain.status(repo_dir, untracked_files="no")

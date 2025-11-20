@@ -32,6 +32,9 @@
    Dulwich version, and installed dependencies with their versions.
    (Jelmer Vernooĳ, #1835)
 
+ * Add basic ``dulwich restore`` and ``dulwich switch``
+   commands. (Jelmer Vernooĳ, #1777)
+
 0.24.10	2025-11-10
 
  * Fix compatibility with python 3.9. (Jelmer Vernooĳ, #1991)

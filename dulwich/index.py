@@ -2125,7 +2125,7 @@ def _remove_empty_parents(path: bytes, stop_at: bytes) -> None:
             # Directory doesn't exist - stop trying
             break
         except OSError as e:
-            if e.errno == errno.ENOTEMPTY:
+            if e.errno in (errno.ENOTEMPTY, errno.EEXIST):
                 # Directory not empty - stop trying
                 break
             raise
@@ -2314,7 +2314,7 @@ def _transition_to_file(
             try:
                 os.rmdir(full_path)
             except OSError as e:
-                if e.errno == errno.ENOTEMPTY:
+                if e.errno in (errno.ENOTEMPTY, errno.EEXIST):
                     raise IsADirectoryError(
                         f"Cannot replace non-empty directory with file: {full_path!r}"
                     )

@@ -21,6 +21,7 @@
 
 """Tests for dulwich.rebase."""
 
+import importlib.util
 import os
 import tempfile
 
@@ -38,7 +39,7 @@ from dulwich.rebase import (
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests.utils import make_commit
 
-from . import TestCase
+from . import DependencyMissing, TestCase
 
 
 class RebaserTestCase(TestCase):
@@ -163,6 +164,10 @@ class RebaserTestCase(TestCase):
         self.assertIn(b"file.txt", new_tree)
 
     def test_rebase_with_conflicts(self):
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         """Test rebase with merge conflicts."""
         self._setup_initial_commit()
         # Create feature branch with conflicting change

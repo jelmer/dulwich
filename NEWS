@@ -6,6 +6,13 @@
    pack files, pack indexes, index files, and other git metadata files.
    (Jelmer Vernooĳ, #1804)
 
+ * Optimize status performance by using stat matching to skip reading
+   and filtering unchanged files. This provides significant performance
+   improvements for repositories with LFS filters, where filter operations can
+   be very expensive. The optimization matches Git's behavior of using mtime
+   and size comparisons to determine if files need processing.
+   (Jelmer Vernooĳ, #1999)
+
  * Drop support for Python 3.9. (Jelmer Vernooĳ)
 
  * Add support for ``git rerere`` (reuse recorded resolution) with CLI

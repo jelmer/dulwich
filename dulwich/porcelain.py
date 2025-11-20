@@ -198,6 +198,7 @@ from .refs import (
     LOCAL_REMOTE_PREFIX,
     LOCAL_REPLACE_PREFIX,
     LOCAL_TAG_PREFIX,
+    DictRefsContainer,
     Ref,
     SymrefLoop,
     _import_remote_refs,
@@ -205,6 +206,7 @@ from .refs import (
     local_branch_name,
     local_replace_name,
     local_tag_name,
+    parse_remote_ref,
     shorten_ref_name,
 )
 from .repo import BaseRepo, Repo, get_user_identity
@@ -641,8 +643,6 @@ def _get_variables(repo: RepoPath = ".") -> dict[str, str]:
     Returns:
       A dictionary of all logical variables with values
     """
-    from .repo import get_user_identity
-
     with open_repo_closing(repo) as repo_obj:
         config = repo_obj.get_config_stack()
 
@@ -838,8 +838,6 @@ def commit(
             if normalizer is not None:
 
                 def filter_callback(data: bytes, path: bytes) -> bytes:
-                    from dulwich.objects import Blob
-
                     blob = Blob()
                     blob.data = data
                     normalized_blob = normalizer.checkin_normalize(blob, path)
@@ -1077,7 +1075,7 @@ def stripspace(
         >>> stripspace(b"line\\n", comment_lines=True)
         b'# line\\n'
     """
-    from dulwich.stripspace import stripspace as _stripspace
+    from .stripspace import stripspace as _stripspace
 
     # Convert text to bytes
     if isinstance(text, str):
@@ -1301,8 +1299,6 @@ def add(
         if normalizer is not None:
 
             def filter_callback(data: bytes, path: bytes) -> bytes:
-                from dulwich.objects import Blob
-
                 blob = Blob()
                 blob.data = data
                 normalized_blob = normalizer.checkin_normalize(blob, path)
@@ -3015,8 +3011,6 @@ def push(
         remote_changed_refs: dict[bytes, bytes | None] = {}
 
         def update_refs(refs: dict[bytes, bytes]) -> dict[bytes, bytes]:
-            from .refs import DictRefsContainer
-
             remote_refs = DictRefsContainer(refs)
             selected_refs.extend(
                 parse_reftuples(r.refs, remote_refs, refspecs_bytes, force=force)
@@ -3163,8 +3157,6 @@ def pull(
         def determine_wants(
             remote_refs: dict[bytes, bytes], depth: int | None = None
         ) -> list[bytes]:
-            from .refs import DictRefsContainer
-
             remote_refs_container = DictRefsContainer(remote_refs)
             selected_refs.extend(
                 parse_reftuples(
@@ -3301,18 +3293,17 @@ def status(
         untracked - list of untracked, un-ignored & non-.git paths
     """
     with open_repo_closing(repo) as r:
-        # 1. Get status of staged
-        tracked_changes = get_tree_changes(r)
-        # 2. Get status of unstaged
+        # Open the index once and reuse it for both staged and unstaged checks
         index = r.open_index()
+        # 1. Get status of staged
+        tracked_changes = get_tree_changes(r, index)
+        # 2. Get status of unstaged
         normalizer = r.get_blob_normalizer()
 
         # Create a wrapper that handles the bytes -> Blob conversion
         if normalizer is not None:
 
             def filter_callback(data: bytes, path: bytes) -> bytes:
-                from dulwich.objects import Blob
-
                 blob = Blob()
                 blob.data = data
                 normalized_blob = normalizer.checkin_normalize(blob, path)
@@ -3699,15 +3690,19 @@ def grep(
                         outstream.write(f"{path_str}:{line_str}\n")
 
 
-def get_tree_changes(repo: RepoPath) -> dict[str, list[str | bytes]]:
+def get_tree_changes(
+    repo: RepoPath, index: Index | None = None
+) -> dict[str, list[str | bytes]]:
     """Return add/delete/modify changes to tree by comparing index to HEAD.
 
     Args:
       repo: repo path or object
+      index: optional Index object to reuse (avoids re-opening the index)
     Returns: dict with lists for each type of change
     """
     with open_repo_closing(repo) as r:
-        index = r.open_index()
+        if index is None:
+            index = r.open_index()
 
         # Compares the Index to the HEAD & determines changes
         # Iterate through the changes and report add/delete/modify
@@ -4513,8 +4508,6 @@ def show_ref(
                 try:
                     obj = r.get_object(sha)
                     # Peel tag objects to get the underlying commit/object
-                    from .objects import Tag
-
                     while obj.type_name == b"tag":
                         assert isinstance(obj, Tag)
                         _obj_class, sha = obj.object
@@ -5341,8 +5334,6 @@ def checkout(
             update_head(r, new_branch)
 
             # Set up tracking if creating from a remote branch
-            from .refs import LOCAL_REMOTE_PREFIX, local_branch_name, parse_remote_ref
-
             if isinstance(original_target, bytes) and target_bytes.startswith(
                 LOCAL_REMOTE_PREFIX
             ):
@@ -6921,6 +6912,7 @@ def rebase(
     Raises:
       Error: If rebase fails or conflicts occur
     """
+    # TODO: Avoid importing from .cli
     from .cli import launch_editor
     from .rebase import (
         RebaseConflict,
@@ -7048,7 +7040,7 @@ def annotate(
     """
     if committish is None:
         committish = "HEAD"
-    from dulwich.annotate import annotate_lines
+    from .annotate import annotate_lines
 
     with open_repo_closing(repo) as r:
         commit_id = parse_commit(r, committish).id
@@ -8587,7 +8579,6 @@ def merge_base(
         List of commit IDs that are merge bases
     """
     from .graph import find_merge_base, find_octopus_base
-    from .objects import Commit
     from .objectspec import parse_object
 
     if committishes is None or len(committishes) < 2:
@@ -8630,7 +8621,6 @@ def is_ancestor(
         True if ancestor is an ancestor of descendant, False otherwise
     """
     from .graph import find_merge_base
-    from .objects import Commit
     from .objectspec import parse_object
 
     if ancestor is None or descendant is None:
@@ -8666,7 +8656,6 @@ def independent_commits(
         List of commit IDs that are not ancestors of any other commits in the list
     """
     from .graph import independent
-    from .objects import Commit
     from .objectspec import parse_object
 
     if committishes is None or len(committishes) == 0:
@@ -8736,8 +8725,6 @@ def mailsplit(
             keep_cr=keep_cr,
         )
     else:
-        from typing import BinaryIO, cast
-
         if input_path is None:
             # Read from stdin
             input_file: str | bytes | BinaryIO = sys.stdin.buffer
@@ -8798,8 +8785,6 @@ def mailinfo(
         >>> print(f"Author: {result.author_name} <{result.author_email}>")
         >>> print(f"Subject: {result.subject}")
     """
-    from typing import BinaryIO, TextIO, cast
-
     from .mbox import mailinfo as mbox_mailinfo
 
     if input_path is None:
@@ -8858,14 +8843,12 @@ def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
         - List of tuples (path, conflict_id) for recorded conflicts
         - List of paths where resolutions were automatically applied
     """
-    from dulwich.rerere import _has_conflict_markers, rerere_auto
+    from .rerere import _has_conflict_markers, rerere_auto
 
     with open_repo_closing(repo) as r:
         # Get conflicts from the index (if available)
         index = r.open_index()
         conflicts = []
-
-        from dulwich.index import ConflictedIndexEntry
 
         for path, entry in index.items():
             if isinstance(entry, ConflictedIndexEntry):
@@ -8899,7 +8882,7 @@ def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
     Returns:
         List of tuples (conflict_id, has_resolution)
     """
-    from dulwich.rerere import RerereCache
+    from .rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -8918,7 +8901,7 @@ def rerere_diff(
     Returns:
         List of tuples (conflict_id, preimage, postimage)
     """
-    from dulwich.rerere import RerereCache
+    from .rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -8945,7 +8928,7 @@ def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> 
         repo: Path to the repository
         pathspec: Path to forget (currently not implemented, forgets all)
     """
-    from dulwich.rerere import RerereCache
+    from .rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -8965,7 +8948,7 @@ def rerere_clear(repo: RepoPath = ".") -> None:
     Args:
         repo: Path to the repository
     """
-    from dulwich.rerere import RerereCache
+    from .rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -8979,7 +8962,7 @@ def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
         repo: Path to the repository
         max_age_days: Maximum age in days for keeping resolutions
     """
-    from dulwich.rerere import RerereCache
+    from .rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)

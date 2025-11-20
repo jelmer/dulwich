@@ -4559,6 +4559,157 @@ class CheckoutTests(PorcelainTestCase):
         remote_repo.close()
 
 
+class RestoreTests(PorcelainTestCase):
+    """Tests for the restore command."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._sha, self._foo_path = _commit_file_with_content(
+            self.repo, "foo", "original\n"
+        )
+
+    def test_restore_worktree_from_index(self) -> None:
+        # Modify the working tree file
+        with open(self._foo_path, "w") as f:
+            f.write("modified\n")
+
+        # Restore from index (should restore to original)
+        porcelain.restore(self.repo, paths=["foo"])
+
+        with open(self._foo_path) as f:
+            content = f.read()
+        self.assertEqual("original\n", content)
+
+    def test_restore_worktree_from_head(self) -> None:
+        # Modify and stage the file
+        with open(self._foo_path, "w") as f:
+            f.write("staged\n")
+        porcelain.add(self.repo, paths=[self._foo_path])
+
+        # Now modify it again in worktree
+        with open(self._foo_path, "w") as f:
+            f.write("worktree\n")
+
+        # Restore from HEAD (should restore to original, not staged)
+        porcelain.restore(self.repo, paths=["foo"], source="HEAD")
+
+        with open(self._foo_path) as f:
+            content = f.read()
+        self.assertEqual("original\n", content)
+
+    def test_restore_staged_from_head(self) -> None:
+        # Modify and stage the file
+        with open(self._foo_path, "w") as f:
+            f.write("staged\n")
+        porcelain.add(self.repo, paths=[self._foo_path])
+
+        # Verify it's staged
+        status = list(porcelain.status(self.repo))
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": [b"foo"]}, [], []], status
+        )
+
+        # Restore staged from HEAD
+        porcelain.restore(self.repo, paths=["foo"], staged=True, worktree=False)
+
+        # Verify it's no longer staged
+        status = list(porcelain.status(self.repo))
+        # Now it should show as unstaged modification
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
+        )
+
+    def test_restore_both_staged_and_worktree(self) -> None:
+        # Modify and stage the file
+        with open(self._foo_path, "w") as f:
+            f.write("staged\n")
+        porcelain.add(self.repo, paths=[self._foo_path])
+
+        # Now modify it again in worktree
+        with open(self._foo_path, "w") as f:
+            f.write("worktree\n")
+
+        # Restore both from HEAD
+        porcelain.restore(self.repo, paths=["foo"], staged=True, worktree=True)
+
+        # Verify content is restored
+        with open(self._foo_path) as f:
+            content = f.read()
+        self.assertEqual("original\n", content)
+
+        # Verify nothing is staged
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
+
+    def test_restore_nonexistent_path(self) -> None:
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.restore(self.repo, paths=["nonexistent"])
+
+
+class SwitchTests(PorcelainTestCase):
+    """Tests for the switch command."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._sha, self._foo_path = _commit_file_with_content(
+            self.repo, "foo", "hello\n"
+        )
+        porcelain.branch_create(self.repo, "dev")
+
+    def test_switch_to_existing_branch(self) -> None:
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        porcelain.switch(self.repo, "dev")
+        self.assertEqual(b"dev", porcelain.active_branch(self.repo))
+
+    def test_switch_to_non_existing_branch(self) -> None:
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+        with self.assertRaises(KeyError):
+            porcelain.switch(self.repo, "nonexistent")
+
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+    def test_switch_with_create(self) -> None:
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        porcelain.switch(self.repo, "master", create="feature")
+        self.assertEqual(b"feature", porcelain.active_branch(self.repo))
+
+    def test_switch_with_detach(self) -> None:
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        porcelain.switch(self.repo, self._sha.decode(), detach=True)
+        # In detached HEAD state, active_branch raises IndexError
+        with self.assertRaises(IndexError):
+            porcelain.active_branch(self.repo)
+
+    def test_switch_with_uncommitted_changes(self) -> None:
+        # Modify the file
+        with open(self._foo_path, "a") as f:
+            f.write("new content\n")
+        porcelain.add(self.repo, paths=[self._foo_path])
+
+        # Switch should fail due to uncommitted changes
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.switch(self.repo, "dev")
+
+        # Should still be on master
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+
+    def test_switch_with_force(self) -> None:
+        # Modify the file
+        with open(self._foo_path, "a") as f:
+            f.write("new content\n")
+        porcelain.add(self.repo, paths=[self._foo_path])
+
+        # Force switch should work
+        porcelain.switch(self.repo, "dev", force=True)
+        self.assertEqual(b"dev", porcelain.active_branch(self.repo))
+
+    def test_switch_to_commit_without_detach(self) -> None:
+        # Switching to a commit SHA without --detach should fail
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.switch(self.repo, self._sha.decode())
+
+
 class GeneralCheckoutTests(PorcelainTestCase):
     """Tests for the general checkout function that handles branches, tags, and commits."""
 

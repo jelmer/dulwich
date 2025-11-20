@@ -6071,9 +6071,11 @@ class StatusTests(PorcelainTestCase):
             {"add": [b"crlf-new"], "delete": [], "modify": []}, results.staged
         )
         # File committed with CRLF before autocrlf=input was enabled
-        # will appear as unstaged because working tree is normalized to LF
-        # during comparison but index still has CRLF
-        self.assertListEqual(results.unstaged, [b"crlf-exists"])
+        # will NOT appear as unstaged because stat matching optimization
+        # skips filter processing when file hasn't been modified.
+        # This matches Git's behavior, which uses stat matching to avoid
+        # expensive filter operations. Git shows a warning instead.
+        self.assertListEqual(results.unstaged, [])
         self.assertListEqual(results.untracked, [])
 
     def test_status_autocrlf_input_modified(self) -> None:

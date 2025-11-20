@@ -21,12 +21,13 @@
 
 """Tests for porcelain cherry-pick functionality."""
 
+import importlib.util
 import os
 import tempfile
 
 from dulwich import porcelain
 
-from . import TestCase
+from . import DependencyMissing, TestCase
 
 
 class PorcelainCherryPickTests(TestCase):
@@ -107,6 +108,11 @@ class PorcelainCherryPickTests(TestCase):
 
     def test_cherry_pick_conflict(self):
         """Test cherry-pick with conflicts."""
+
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo
             porcelain.init(tmpdir)
@@ -164,6 +170,11 @@ class PorcelainCherryPickTests(TestCase):
 
     def test_cherry_pick_abort(self):
         """Test aborting a cherry-pick."""
+
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo
             porcelain.init(tmpdir)

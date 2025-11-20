@@ -3301,10 +3301,11 @@ def status(
         untracked - list of untracked, un-ignored & non-.git paths
     """
     with open_repo_closing(repo) as r:
-        # 1. Get status of staged
-        tracked_changes = get_tree_changes(r)
-        # 2. Get status of unstaged
+        # Open the index once and reuse it for both staged and unstaged checks
         index = r.open_index()
+        # 1. Get status of staged
+        tracked_changes = get_tree_changes(r, index)
+        # 2. Get status of unstaged
         normalizer = r.get_blob_normalizer()
 
         # Create a wrapper that handles the bytes -> Blob conversion
@@ -3699,15 +3700,19 @@ def grep(
                         outstream.write(f"{path_str}:{line_str}\n")
 
 
-def get_tree_changes(repo: RepoPath) -> dict[str, list[str | bytes]]:
+def get_tree_changes(
+    repo: RepoPath, index: Index | None = None
+) -> dict[str, list[str | bytes]]:
     """Return add/delete/modify changes to tree by comparing index to HEAD.
 
     Args:
       repo: repo path or object
+      index: optional Index object to reuse (avoids re-opening the index)
     Returns: dict with lists for each type of change
     """
     with open_repo_closing(repo) as r:
-        index = r.open_index()
+        if index is None:
+            index = r.open_index()
 
         # Compares the Index to the HEAD & determines changes
         # Iterate through the changes and report add/delete/modify

@@ -2845,42 +2845,6 @@ def reset(
 
         elif mode == "hard":
             # Hard reset: update HEAD, index, and working tree
-            # Get configuration for working directory update
-            config = r.get_config()
-            honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
-
-            if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
-                validate_path_element = validate_path_element_ntfs
-            elif config.get_boolean(
-                b"core", b"core.protectHFS", sys.platform == "darwin"
-            ):
-                validate_path_element = validate_path_element_hfs
-            else:
-                validate_path_element = validate_path_element_default
-
-            if config.get_boolean(b"core", b"symlinks", True):
-
-                def symlink_wrapper(
-                    source: str | bytes | os.PathLike[str],
-                    target: str | bytes | os.PathLike[str],
-                ) -> None:
-                    symlink(source, target)  # type: ignore[arg-type,unused-ignore]
-
-                symlink_fn = symlink_wrapper
-            else:
-
-                def symlink_fallback(
-                    source: str | bytes | os.PathLike[str],
-                    target: str | bytes | os.PathLike[str],
-                ) -> None:
-                    mode = "w" + ("b" if isinstance(source, bytes) else "")
-                    with open(target, mode) as f:
-                        f.write(source)
-
-                symlink_fn = symlink_fallback
-
-            # Update working tree and index
-            blob_normalizer = r.get_blob_normalizer()
             # For reset --hard, use current index tree as old tree to get proper deletions
             index = r.open_index()
             if len(index) > 0:
@@ -2889,6 +2853,12 @@ def reset(
                 # Empty index
                 index_tree_id = None
 
+            # Get configuration for working tree updates
+            honor_filemode, validate_path_element, symlink_fn = (
+                _get_worktree_update_config(r)
+            )
+
+            blob_normalizer = r.get_blob_normalizer()
             changes = tree_changes(
                 r.object_store, index_tree_id, tree.id, want_unchanged=True
             )
@@ -5176,6 +5146,8 @@ def _get_worktree_update_config(
 
     if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
         validate_path_element = validate_path_element_ntfs
+    elif config.get_boolean(b"core", b"core.protectHFS", sys.platform == "darwin"):
+        validate_path_element = validate_path_element_hfs
     else:
         validate_path_element = validate_path_element_default
 

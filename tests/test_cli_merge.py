@@ -21,6 +21,7 @@
 
 """Tests for dulwich merge CLI command."""
 
+import importlib.util
 import os
 import tempfile
 import unittest
@@ -28,7 +29,7 @@ import unittest
 from dulwich import porcelain
 from dulwich.cli import main
 
-from . import TestCase
+from . import DependencyMissing, TestCase
 
 
 class CLIMergeTests(TestCase):
@@ -77,6 +78,11 @@ class CLIMergeTests(TestCase):
 
     def test_merge_with_conflicts(self):
         """Test CLI merge with conflicts."""
+
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo
             porcelain.init(tmpdir)
@@ -334,6 +340,11 @@ class CLIMergeTests(TestCase):
 
     def test_octopus_merge_with_conflicts(self):
         """Test CLI octopus merge with conflicts."""
+
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo
             porcelain.init(tmpdir)

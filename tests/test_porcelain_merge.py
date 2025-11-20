@@ -167,7 +167,6 @@ class PorcelainMergeTests(TestCase):
                 self.assertEqual(f.read(), "Master file2\n")
 
     def test_merge_with_conflicts(self):
-
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")
@@ -345,7 +344,6 @@ class PorcelainMergeTests(TestCase):
                 self.assertEqual(f.read(), "Branch3 modified file3\n")
 
     def test_octopus_merge_with_conflicts(self):
-
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")
@@ -531,7 +529,6 @@ class PorcelainMergeTreeTests(TestCase):
             self.assertIn(b"file3.txt", merged_tree)
 
     def test_merge_tree_with_conflicts(self):
-
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")
@@ -623,7 +620,6 @@ class PorcelainMergeTreeTests(TestCase):
             self.assertIn(b"file2.txt", merged_tree)
 
     def test_merge_tree_with_tree_objects(self):
-
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")

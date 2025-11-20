@@ -164,7 +164,6 @@ class RebaserTestCase(TestCase):
         self.assertIn(b"file.txt", new_tree)
 
     def test_rebase_with_conflicts(self):
-
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")

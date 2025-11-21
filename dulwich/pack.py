@@ -76,6 +76,7 @@ if TYPE_CHECKING:
 
     from .bitmap import PackBitmap
     from .commit_graph import CommitGraph
+    from .object_store import BaseObjectStore
 
 # For some reason the above try, except fails to set has_mmap = False for plan9
 if sys.platform == "Plan9":
@@ -3530,6 +3531,58 @@ class Pack:
 
             self._bitmap = read_bitmap(self._bitmap_path, pack_index=self.index)
         return self._bitmap
+
+    def ensure_bitmap(
+        self,
+        object_store: "BaseObjectStore",
+        refs: dict[bytes, bytes],
+        commit_interval: int | None = None,
+        progress: Callable[[str], None] | None = None,
+    ) -> "PackBitmap":
+        """Ensure a bitmap exists for this pack, generating one if needed.
+
+        Args:
+          object_store: Object store to read objects from
+          refs: Dictionary of ref names to commit SHAs
+          commit_interval: Include every Nth commit in bitmap index
+          progress: Optional progress reporting callback
+
+        Returns:
+          PackBitmap instance (either existing or newly generated)
+        """
+        from .bitmap import generate_bitmap, write_bitmap
+
+        # Check if bitmap already exists
+        try:
+            existing = self.bitmap
+            if existing is not None:
+                return existing
+        except FileNotFoundError:
+            pass  # No bitmap, we'll generate one
+
+        # Generate new bitmap
+        if progress:
+            progress(f"Generating bitmap for {self.name().decode('utf-8')}...\n")
+
+        pack_bitmap = generate_bitmap(
+            self.index,
+            object_store,
+            refs,
+            self.get_stored_checksum(),
+            commit_interval=commit_interval,
+            progress=progress,
+        )
+
+        # Write bitmap file
+        write_bitmap(self._bitmap_path, pack_bitmap)
+
+        if progress:
+            progress(f"Wrote {self._bitmap_path}\n")
+
+        # Update cached bitmap
+        self._bitmap = pack_bitmap
+
+        return pack_bitmap
 
     def close(self) -> None:
         """Close the pack file and index."""

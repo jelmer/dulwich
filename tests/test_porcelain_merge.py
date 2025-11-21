@@ -21,6 +21,7 @@
 
 """Tests for porcelain merge functionality."""
 
+import importlib.util
 import os
 import tempfile
 import unittest
@@ -28,7 +29,7 @@ import unittest
 from dulwich import porcelain
 from dulwich.repo import Repo
 
-from . import TestCase
+from . import DependencyMissing, TestCase
 
 
 class PorcelainMergeTests(TestCase):
@@ -166,6 +167,10 @@ class PorcelainMergeTests(TestCase):
                 self.assertEqual(f.read(), "Master file2\n")
 
     def test_merge_with_conflicts(self):
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         """Test merge with conflicts."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo
@@ -339,6 +344,10 @@ class PorcelainMergeTests(TestCase):
                 self.assertEqual(f.read(), "Branch3 modified file3\n")
 
     def test_octopus_merge_with_conflicts(self):
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         """Test that octopus merge refuses to proceed with conflicts."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo
@@ -520,6 +529,10 @@ class PorcelainMergeTreeTests(TestCase):
             self.assertIn(b"file3.txt", merged_tree)
 
     def test_merge_tree_with_conflicts(self):
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         """Test merge_tree with conflicts."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo
@@ -607,6 +620,10 @@ class PorcelainMergeTreeTests(TestCase):
             self.assertIn(b"file2.txt", merged_tree)
 
     def test_merge_tree_with_tree_objects(self):
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         """Test merge_tree with tree objects instead of commits."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Initialize repo

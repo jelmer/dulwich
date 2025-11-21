@@ -82,9 +82,11 @@ from .protocol import DEPTH_INFINITE
 from .refs import PEELED_TAG_SUFFIX, Ref
 
 if TYPE_CHECKING:
+    from .bitmap import EWAHBitmap
     from .commit_graph import CommitGraph
     from .config import Config
     from .diff_tree import RenameDetector
+    from .pack import Pack
 
 
 class GraphWalker(Protocol):
@@ -359,12 +361,18 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.add_objects)
 
-    def get_reachability_provider(self) -> ObjectReachabilityProvider:
+    def get_reachability_provider(
+        self, prefer_bitmap: bool = True
+    ) -> ObjectReachabilityProvider:
         """Get a reachability provider for this object store.
 
         Returns an ObjectReachabilityProvider that can efficiently compute
         object reachability queries. Subclasses can override this to provide
         optimized implementations (e.g., using bitmap indexes).
+
+        Args:
+            prefer_bitmap: Whether to prefer bitmap-based reachability if
+                available.
 
         Returns:
           ObjectReachabilityProvider instance
@@ -481,9 +489,12 @@ class BaseObjectStore:
 
         Args:
           shas: Iterable of object SHAs to retrieve
-          include_comp: Whether to include compressed data (ignored in base implementation)
-          allow_missing: If True, skip missing objects; if False, raise KeyError
-          convert_ofs_delta: Whether to convert OFS_DELTA objects (ignored in base implementation)
+          include_comp: Whether to include compressed data (ignored in base
+            implementation)
+          allow_missing: If True, skip missing objects; if False, raise
+            KeyError
+          convert_ofs_delta: Whether to convert OFS_DELTA objects (ignored in
+            base implementation)
 
         Returns:
           Iterator of UnpackedObject instances
@@ -795,6 +806,39 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         self.pack_threads = pack_threads
         self.pack_big_file_threshold = pack_big_file_threshold
 
+    def get_reachability_provider(
+        self,
+        prefer_bitmaps: bool = True,
+    ) -> ObjectReachabilityProvider:
+        """Get the best reachability provider for the object store.
+
+        Args:
+          object_store: The object store to query
+          prefer_bitmaps: Whether to use bitmaps if available
+
+        Returns:
+          ObjectReachabilityProvider implementation (either bitmap-accelerated
+          or graph traversal)
+        """
+        if prefer_bitmaps:
+            # Check if any packs have bitmaps
+            has_bitmap = False
+            for pack in self.packs:
+                try:
+                    # Try to access bitmap property
+                    if pack.bitmap is not None:
+                        has_bitmap = True
+                        break
+                except FileNotFoundError:
+                    # Bitmap file doesn't exist for this pack
+                    continue
+
+            if has_bitmap:
+                return BitmapReachability(self)
+
+        # Fall back to graph traversal
+        return GraphTraversalReachability(self)
+
     def add_pack(self) -> tuple[BinaryIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack to this object store."""
         raise NotImplementedError(self.add_pack)
@@ -1034,6 +1078,38 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         self._update_pack_cache()
         return len(objects)
 
+    def generate_pack_bitmaps(
+        self,
+        refs: dict[bytes, bytes],
+        *,
+        commit_interval: int | None = None,
+        progress: Callable[[str], None] | None = None,
+    ) -> int:
+        """Generate bitmap indexes for all packs that don't have them.
+
+        This generates .bitmap files for packfiles, enabling fast reachability
+        queries. Equivalent to the bitmap generation part of 'git repack -b'.
+
+        Args:
+          refs: Dictionary of ref names to commit SHAs
+          commit_interval: Include every Nth commit in bitmap index (None for default)
+          progress: Optional progress reporting callback
+
+        Returns:
+          Number of bitmaps generated
+        """
+        count = 0
+        for pack in self.packs:
+            pack.ensure_bitmap(
+                self, refs, commit_interval=commit_interval, progress=progress
+            )
+            count += 1
+
+        # Update cache to pick up new bitmaps
+        self._update_pack_cache()
+
+        return count
+
     def __iter__(self) -> Iterator[bytes]:
         """Iterate over the SHAs that are present in this store."""
         self._update_pack_cache()
@@ -1269,6 +1345,9 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         fsync_object_files: bool = False,
+        pack_write_bitmaps: bool = False,
+        pack_write_bitmap_hash_cache: bool = True,
+        pack_write_bitmap_lookup_table: bool = True,
         file_mode: int | None = None,
         dir_mode: int | None = None,
     ) -> None:
@@ -1286,6 +1365,9 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_threads: number of threads for pack operations
           pack_big_file_threshold: threshold for treating files as big
           fsync_object_files: whether to fsync object files for durability
+          pack_write_bitmaps: whether to write bitmap indexes for packs
+          pack_write_bitmap_hash_cache: whether to include name-hash cache in bitmaps
+          pack_write_bitmap_lookup_table: whether to include lookup table in bitmaps
           file_mode: File permission mask for shared repository
           dir_mode: Directory permission mask for shared repository
         """
@@ -1306,6 +1388,9 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.fsync_object_files = fsync_object_files
+        self.pack_write_bitmaps = pack_write_bitmaps
+        self.pack_write_bitmap_hash_cache = pack_write_bitmap_hash_cache
+        self.pack_write_bitmap_lookup_table = pack_write_bitmap_lookup_table
         self.file_mode = file_mode
         self.dir_mode = dir_mode
 
@@ -1402,6 +1487,20 @@ class DiskObjectStore(PackBasedObjectStore):
         # Read core.fsyncObjectFiles setting
         fsync_object_files = config.get_boolean((b"core",), b"fsyncObjectFiles", False)
 
+        # Read bitmap settings
+        pack_write_bitmaps = config.get_boolean((b"pack",), b"writeBitmaps", False)
+        pack_write_bitmap_hash_cache = config.get_boolean(
+            (b"pack",), b"writeBitmapHashCache", True
+        )
+        pack_write_bitmap_lookup_table = config.get_boolean(
+            (b"pack",), b"writeBitmapLookupTable", True
+        )
+        # Also check repack.writeBitmaps for backwards compatibility
+        if not pack_write_bitmaps:
+            pack_write_bitmaps = config.get_boolean(
+                (b"repack",), b"writeBitmaps", False
+            )
+
         instance = cls(
             path,
             loose_compression_level=loose_compression_level,
@@ -1414,6 +1513,9 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
             fsync_object_files=fsync_object_files,
+            pack_write_bitmaps=pack_write_bitmaps,
+            pack_write_bitmap_hash_cache=pack_write_bitmap_hash_cache,
+            pack_write_bitmap_lookup_table=pack_write_bitmap_lookup_table,
             file_mode=file_mode,
             dir_mode=dir_mode,
         )
@@ -1631,6 +1733,7 @@ class DiskObjectStore(PackBasedObjectStore):
         num_objects: int,
         indexer: PackIndexer,
         progress: Callable[..., None] | None = None,
+        refs: dict[bytes, bytes] | None = None,
     ) -> Pack:
         """Move a specific file containing a pack into the pack directory.
 
@@ -1643,6 +1746,7 @@ class DiskObjectStore(PackBasedObjectStore):
           num_objects: Number of objects in the pack.
           indexer: A PackIndexer for indexing the pack.
           progress: Optional progress reporting function.
+          refs: Optional dictionary of refs for bitmap generation.
         """
         entries = []
         for i, entry in enumerate(indexer):
@@ -1697,6 +1801,40 @@ class DiskObjectStore(PackBasedObjectStore):
             write_pack_index(
                 index_file, entries, pack_sha, version=self.pack_index_version
             )
+
+        # Generate bitmap if configured and refs are available
+        if self.pack_write_bitmaps and refs:
+            from .bitmap import generate_bitmap, write_bitmap
+            from .pack import load_pack_index_file
+
+            if progress:
+                progress("Generating bitmap index\r".encode("ascii"))
+
+            # Load the index we just wrote
+            with open(target_index_path, "rb") as idx_file:
+                pack_index = load_pack_index_file(
+                    os.path.basename(target_index_path), idx_file
+                )
+
+            # Generate the bitmap
+            bitmap = generate_bitmap(
+                pack_index=pack_index,
+                object_store=self,
+                refs=refs,
+                pack_checksum=pack_sha,
+                include_hash_cache=self.pack_write_bitmap_hash_cache,
+                include_lookup_table=self.pack_write_bitmap_lookup_table,
+                progress=lambda msg: progress(msg.encode("ascii"))
+                if progress and isinstance(msg, str)
+                else None,
+            )
+
+            # Write the bitmap
+            target_bitmap_path = pack_base_name + ".bitmap"
+            write_bitmap(target_bitmap_path, bitmap)
+
+            if progress:
+                progress("Bitmap index written\r".encode("ascii"))
 
         # Add the pack to the store and return it.
         final_pack = Pack(
@@ -2351,8 +2489,11 @@ class MissingObjectFinder:
             have_commits, exclude=None, shallow=shallow
         )
         # all_missing - complete set of commits between haves and wants
-        # common - commits from all_ancestors we hit into while
-        # traversing parent hierarchy of wants
+        # common_commits - boundary commits directly encountered when traversing wants
+        # We use _collect_ancestors here because we need the exact boundary behavior:
+        # commits that are in all_ancestors and directly reachable from wants,
+        # but we don't traverse past them. This is hard to express with the
+        # reachability abstraction alone.
         missing_commits, common_commits = _collect_ancestors(
             object_store,
             want_commits,
@@ -2360,6 +2501,7 @@ class MissingObjectFinder:
             shallow=frozenset(shallow),
             get_parents=self._get_parents,
         )
+
         self.remote_has: set[bytes] = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally
@@ -2369,8 +2511,10 @@ class MissingObjectFinder:
             self.remote_has.add(h)
             cmt = object_store[h]
             assert isinstance(cmt, Commit)
+            # Get tree objects for this commit
             tree_objects = reachability.get_tree_objects([cmt.tree])
             self.remote_has.update(tree_objects)
+
         # record tags we have as visited, too
         for t in have_tags:
             self.remote_has.add(t)
@@ -3079,9 +3223,6 @@ def peel_sha(store: ObjectContainer, sha: bytes) -> tuple[ShaFile, ShaFile]:
     return unpeeled, obj
 
 
-# ObjectReachabilityProvider implementation
-
-
 class GraphTraversalReachability:
     """Naive graph traversal implementation of ObjectReachabilityProvider.
 
@@ -3118,7 +3259,6 @@ class GraphTraversalReachability:
         """
         exclude_set = frozenset(exclude) if exclude else frozenset()
         shallow_set = frozenset(shallow) if shallow else frozenset()
-
         commits, _bases = _collect_ancestors(
             self.store, heads, exclude_set, shallow_set
         )
@@ -3180,3 +3320,180 @@ class GraphTraversalReachability:
             result -= exclude_objects
 
         return result
+
+
+class BitmapReachability:
+    """Bitmap-accelerated implementation of ObjectReachabilityProvider.
+
+    This implementation uses packfile bitmap indexes where available to
+    accelerate reachability queries. Falls back to graph traversal when
+    bitmaps don't cover the requested commits.
+    """
+
+    def __init__(self, object_store: "PackBasedObjectStore") -> None:
+        """Initialize the bitmap provider.
+
+        Args:
+          object_store: Pack-based object store with bitmap support
+        """
+        self.store = object_store
+        # Fallback to graph traversal for operations not yet optimized
+        self._fallback = GraphTraversalReachability(object_store)
+
+    def _combine_commit_bitmaps(
+        self,
+        commit_shas: set[bytes],
+        exclude_shas: set[bytes] | None = None,
+    ) -> tuple["EWAHBitmap", "Pack"] | None:
+        """Combine bitmaps for multiple commits using OR, with optional exclusion.
+
+        Args:
+          commit_shas: Set of commit SHAs to combine
+          exclude_shas: Optional set of commit SHAs to exclude
+
+        Returns:
+          Tuple of (combined_bitmap, pack) or None if bitmaps unavailable
+        """
+        from .bitmap import find_commit_bitmaps
+
+        # Find bitmaps for the commits
+        commit_bitmaps = find_commit_bitmaps(commit_shas, self.store.packs)
+
+        # If we can't find bitmaps for all commits, return None
+        if len(commit_bitmaps) < len(commit_shas):
+            return None
+
+        # Combine bitmaps using OR
+        combined_bitmap = None
+        result_pack = None
+
+        for commit_sha in commit_shas:
+            pack, pack_bitmap, _sha_to_pos = commit_bitmaps[commit_sha]
+            commit_bitmap = pack_bitmap.get_bitmap(commit_sha)
+
+            if commit_bitmap is None:
+                return None
+
+            if combined_bitmap is None:
+                combined_bitmap = commit_bitmap
+                result_pack = pack
+            elif pack == result_pack:
+                # Same pack, can OR directly
+                combined_bitmap = combined_bitmap | commit_bitmap
+            else:
+                # Different packs, can't combine
+                return None
+
+        # Handle exclusions if provided
+        if exclude_shas and result_pack and combined_bitmap:
+            exclude_bitmaps = find_commit_bitmaps(exclude_shas, [result_pack])
+
+            if len(exclude_bitmaps) == len(exclude_shas):
+                # All excludes have bitmaps, compute exclusion
+                exclude_combined = None
+
+                for commit_sha in exclude_shas:
+                    _pack, pack_bitmap, _sha_to_pos = exclude_bitmaps[commit_sha]
+                    exclude_bitmap = pack_bitmap.get_bitmap(commit_sha)
+
+                    if exclude_bitmap is None:
+                        break
+
+                    if exclude_combined is None:
+                        exclude_combined = exclude_bitmap
+                    else:
+                        exclude_combined = exclude_combined | exclude_bitmap
+
+                # Subtract excludes using set difference
+                if exclude_combined:
+                    combined_bitmap = combined_bitmap - exclude_combined
+
+        if combined_bitmap and result_pack:
+            return (combined_bitmap, result_pack)
+        return None
+
+    def get_reachable_commits(
+        self,
+        heads: Iterable[bytes],
+        exclude: Iterable[bytes] | None = None,
+        shallow: Set[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all commits reachable from heads using bitmaps where possible.
+
+        Args:
+          heads: Starting commit SHAs
+          exclude: Commit SHAs to exclude (and their ancestors)
+          shallow: Set of shallow commit boundaries
+
+        Returns:
+          Set of commit SHAs reachable from heads but not from exclude
+        """
+        from .bitmap import bitmap_to_object_shas
+
+        # If shallow is specified, fall back to graph traversal
+        # (bitmaps don't support shallow boundaries well)
+        if shallow:
+            return self._fallback.get_reachable_commits(heads, exclude, shallow)
+
+        heads_set = set(heads)
+        exclude_set = set(exclude) if exclude else None
+
+        # Try to combine bitmaps
+        result = self._combine_commit_bitmaps(heads_set, exclude_set)
+        if result is None:
+            return self._fallback.get_reachable_commits(heads, exclude, shallow)
+
+        combined_bitmap, result_pack = result
+
+        # Convert bitmap to commit SHAs, filtering for commits only
+        pack_bitmap = result_pack.bitmap
+        if pack_bitmap is None:
+            return self._fallback.get_reachable_commits(heads, exclude, shallow)
+        commit_type_filter = pack_bitmap.commit_bitmap
+        return bitmap_to_object_shas(
+            combined_bitmap, result_pack.index, commit_type_filter
+        )
+
+    def get_tree_objects(
+        self,
+        tree_shas: Iterable[bytes],
+    ) -> set[bytes]:
+        """Get all trees and blobs reachable from the given trees.
+
+        Args:
+          tree_shas: Starting tree SHAs
+
+        Returns:
+          Set of tree and blob SHAs
+        """
+        # Tree traversal doesn't benefit much from bitmaps, use fallback
+        return self._fallback.get_tree_objects(tree_shas)
+
+    def get_reachable_objects(
+        self,
+        commits: Iterable[bytes],
+        exclude_commits: Iterable[bytes] | None = None,
+    ) -> set[bytes]:
+        """Get all objects reachable from commits using bitmaps.
+
+        Args:
+          commits: Starting commit SHAs
+          exclude_commits: Commits whose objects should be excluded
+
+        Returns:
+          Set of all object SHAs (commits, trees, blobs)
+        """
+        from .bitmap import bitmap_to_object_shas
+
+        commits_set = set(commits)
+        exclude_set = set(exclude_commits) if exclude_commits else None
+
+        # Try to combine bitmaps
+        result = self._combine_commit_bitmaps(commits_set, exclude_set)
+        if result is None:
+            return self._fallback.get_reachable_objects(commits, exclude_commits)
+
+        combined_bitmap, result_pack = result
+
+        # Convert bitmap to all object SHAs (no type filter)
+        return bitmap_to_object_shas(combined_bitmap, result_pack.index, None)

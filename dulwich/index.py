@@ -44,8 +44,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Optional,
-    Union,
 )
 
 if TYPE_CHECKING:
@@ -71,7 +69,7 @@ from .objects import (
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
 
 # Type alias for recursive tree structure used in commit_tree
-TreeDict = dict[bytes, Union["TreeDict", tuple[int, bytes]]]
+TreeDict = dict[bytes, "TreeDict | tuple[int, bytes]"]
 
 # 2-bit stage (during merge)
 FLAG_STAGEMASK = 0x3000
@@ -1062,6 +1060,8 @@ class Index:
         read: bool = True,
         skip_hash: bool = False,
         version: int | None = None,
+        *,
+        file_mode: int | None = None,
     ) -> None:
         """Create an index object associated with the given filename.
 
@@ -1070,11 +1070,13 @@ class Index:
           read: Whether to initialize the index from the given file, should it exist.
           skip_hash: Whether to skip SHA1 hash when writing (for manyfiles feature)
           version: Index format version to use (None = auto-detect from file or use default)
+          file_mode: Optional file permission mask for shared repository
         """
         self._filename = os.fspath(filename)
         # TODO(jelmer): Store the version returned by read_index
         self._version = version
         self._skip_hash = skip_hash
+        self._file_mode = file_mode
         self._extensions: list[IndexExtension] = []
         self.clear()
         if read:
@@ -1095,7 +1097,8 @@ class Index:
 
     def write(self) -> None:
         """Write current contents of index to disk."""
-        f = GitFile(self._filename, "wb")
+        mask = self._file_mode if self._file_mode is not None else 0o644
+        f = GitFile(self._filename, "wb", mask=mask)
         try:
             # Filter out extensions with no meaningful data
             meaningful_extensions = []
@@ -1653,7 +1656,7 @@ if sys.platform == "win32":
 
         def __init__(self, errno: int, msg: str, filename: str | None) -> None:
             """Initialize WindowsSymlinkPermissionError."""
-            super(PermissionError, self).__init__(
+            super().__init__(
                 errno,
                 f"Unable to create symlink; do you have developer mode enabled? {msg}",
                 filename,
@@ -1888,7 +1891,7 @@ def build_index_from_tree(
         [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
     ]
     | None = None,
-    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
+    blob_normalizer: "FilterBlobNormalizer | None" = None,
     tree_encoding: str = "utf-8",
 ) -> None:
     """Generate and materialize index from a tree.
@@ -2122,7 +2125,7 @@ def _remove_empty_parents(path: bytes, stop_at: bytes) -> None:
             # Directory doesn't exist - stop trying
             break
         except OSError as e:
-            if e.errno == errno.ENOTEMPTY:
+            if e.errno in (errno.ENOTEMPTY, errno.EEXIST):
                 # Directory not empty - stop trying
                 break
             raise
@@ -2159,7 +2162,7 @@ def _check_file_matches(
     entry_mode: int,
     current_stat: os.stat_result,
     honor_filemode: bool,
-    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
+    blob_normalizer: "FilterBlobNormalizer | None" = None,
     tree_path: bytes | None = None,
 ) -> bool:
     """Check if a file on disk matches the expected git object.
@@ -2255,7 +2258,7 @@ def _transition_to_file(
         [str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None
     ]
     | None,
-    blob_normalizer: Optional["FilterBlobNormalizer"],
+    blob_normalizer: "FilterBlobNormalizer | None",
     tree_encoding: str = "utf-8",
 ) -> None:
     """Transition any type to regular file or symlink."""
@@ -2311,7 +2314,7 @@ def _transition_to_file(
             try:
                 os.rmdir(full_path)
             except OSError as e:
-                if e.errno == errno.ENOTEMPTY:
+                if e.errno in (errno.ENOTEMPTY, errno.EEXIST):
                     raise IsADirectoryError(
                         f"Cannot replace non-empty directory with file: {full_path!r}"
                     )
@@ -2515,7 +2518,7 @@ def update_working_tree(
     ]
     | None = None,
     force_remove_untracked: bool = False,
-    blob_normalizer: Optional["FilterBlobNormalizer"] = None,
+    blob_normalizer: "FilterBlobNormalizer | None" = None,
     tree_encoding: str = "utf-8",
     allow_overwrite_modified: bool = False,
 ) -> None:
@@ -2755,6 +2758,37 @@ def update_working_tree(
     index.write()
 
 
+def _stat_matches_entry(st: os.stat_result, entry: IndexEntry) -> bool:
+    """Check if filesystem stat matches index entry stat.
+
+    This is used to determine if a file might have changed without reading its content.
+    Git uses this optimization to avoid expensive filter operations on unchanged files.
+
+    Args:
+      st: Filesystem stat result
+      entry: Index entry to compare against
+    Returns: True if stat matches and file is likely unchanged
+    """
+    # Get entry mtime
+    if isinstance(entry.mtime, tuple):
+        entry_mtime_sec = entry.mtime[0]
+    else:
+        entry_mtime_sec = int(entry.mtime)
+
+    # Compare modification time (seconds only for now)
+    # Note: We use int() to compare only seconds, as nanosecond precision
+    # can vary across filesystems
+    if int(st.st_mtime) != entry_mtime_sec:
+        return False
+
+    # Compare file size
+    if st.st_size != entry.size:
+        return False
+
+    # If both mtime and size match, file is likely unchanged
+    return True
+
+
 def _check_entry_for_changes(
     tree_path: bytes,
     entry: IndexEntry | ConflictedIndexEntry,
@@ -2783,6 +2817,16 @@ def _check_entry_for_changes(
             return None
 
         if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+            return None
+
+        # Optimization: If stat matches index entry (mtime and size unchanged),
+        # we can skip reading and filtering the file entirely. This is a significant
+        # performance improvement for repositories with many unchanged files.
+        # Even with filters (e.g., LFS), if the file hasn't been modified (stat unchanged),
+        # the filter output would be the same, so we can safely skip the expensive
+        # filter operation. This addresses performance issues with LFS repositories
+        # where filter operations can be very slow.
+        if _stat_matches_entry(st, entry):
             return None
 
         blob = blob_from_path_and_stat(full_path, st)

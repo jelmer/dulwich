@@ -48,15 +48,10 @@ import io
 import logging
 import os
 import stat
-import sys
 from collections.abc import Iterable, Sequence
 from typing import BinaryIO
 
-if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
-else:
-    Buffer = bytes | bytearray | memoryview
-
+from ._typing import Buffer
 from .index import ConflictedIndexEntry, commit_index
 from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK, Blob, Commit

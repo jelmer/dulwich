@@ -24,7 +24,7 @@ def make_merge3(
     a: Sequence[bytes],
     b: Sequence[bytes],
     is_cherrypick: bool = False,
-    sequence_matcher: type["SequenceMatcherProtocol[bytes]"] | None = None,
+    sequence_matcher: "type[SequenceMatcherProtocol[bytes]] | None" = None,
 ) -> "merge3.Merge3[bytes]":
     """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
     if merge3 is None:

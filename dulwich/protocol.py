@@ -247,7 +247,7 @@ def pkt_line(data: bytes | None) -> bytes:
     """
     if data is None:
         return b"0000"
-    return ("%04x" % (len(data) + 4)).encode("ascii") + data
+    return f"{len(data) + 4:04x}".encode("ascii") + data
 
 
 def pkt_seq(*seq: bytes | None) -> bytes:

@@ -33,7 +33,7 @@ import struct
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from io import BytesIO
-from typing import IO, TYPE_CHECKING, Optional
+from typing import IO, TYPE_CHECKING
 
 from .file import GitFile
 from .objects import Blob, Commit, Tag, Tree
@@ -466,7 +466,7 @@ class PackBitmap:
 
 def read_bitmap(
     filename: str | os.PathLike[str],
-    pack_index: Optional["PackIndex"] = None,
+    pack_index: "PackIndex | None" = None,
 ) -> PackBitmap:
     """Read a bitmap index file.
 
@@ -485,9 +485,7 @@ def read_bitmap(
         return read_bitmap_file(f, pack_index=pack_index)
 
 
-def read_bitmap_file(
-    f: IO[bytes], pack_index: Optional["PackIndex"] = None
-) -> PackBitmap:
+def read_bitmap_file(f: IO[bytes], pack_index: "PackIndex | None" = None) -> PackBitmap:
     """Read bitmap data from a file object.
 
     Args:

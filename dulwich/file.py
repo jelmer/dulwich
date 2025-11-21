@@ -28,10 +28,7 @@ from collections.abc import Iterable, Iterator
 from types import TracebackType
 from typing import IO, Any, ClassVar, Literal, overload
 
-if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
-else:
-    Buffer = bytes | bytearray | memoryview
+from ._typing import Buffer
 
 
 def ensure_dir_exists(

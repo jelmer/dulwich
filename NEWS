@@ -1,5 +1,18 @@
 0.25.0	UNRELEASED
 
+ * Implement support for ``core.sharedRepository`` configuration option.
+   Repository files and directories now respect shared repository permissions
+   for group-writable or world-writable repositories. Affects loose objects,
+   pack files, pack indexes, index files, and other git metadata files.
+   (Jelmer Vernooĳ, #1804)
+
+ * Optimize status performance by using stat matching to skip reading
+   and filtering unchanged files. This provides significant performance
+   improvements for repositories with LFS filters, where filter operations can
+   be very expensive. The optimization matches Git's behavior of using mtime
+   and size comparisons to determine if files need processing.
+   (Jelmer Vernooĳ, #1999)
+
  * Drop support for Python 3.9. (Jelmer Vernooĳ)
 
  * Add support for pack bitmap indexes for fast reachability queries.
@@ -22,7 +35,10 @@
    Dulwich version, and installed dependencies with their versions.
    (Jelmer Vernooĳ, #1835)
 
-024.10	2025-11-10
+ * Add basic ``dulwich restore`` and ``dulwich switch``
+   commands. (Jelmer Vernooĳ, #1777)
+
+0.24.10	2025-11-10
 
  * Fix compatibility with python 3.9. (Jelmer Vernooĳ, #1991)
 
@@ -134,7 +150,7 @@
    commit metadata. Supports automatic upstream detection from tracking branches
    and verbose mode to display commit messages. (Jelmer Vernooĳ, #1782)
 
- * Add support for ``git mailsplit`` command to split mbox files and Maildir
+ * Add support for ``dulwich mailsplit`` command to split mbox files and Maildir
    into individual message files. Supports mboxrd format, custom precision,
    and all standard git mailsplit options. (Jelmer Vernooĳ, #1840)
 
@@ -490,7 +506,7 @@
 
  * Add ``merge-tree`` plumbing command to ``dulwich.porcelain`` and CLI.
    This command performs three-way tree merges without touching the working
-   directory or creating commits, similar to ``git merge-tree``. It outputs
+   directory or creating commits, similar to ``dulwich merge-tree``. It outputs
    the merged tree SHA and lists any conflicted paths. (Jelmer Vernooĳ)
 
  * Add ``porcelain.count_objects()`` function to count unpacked objects and

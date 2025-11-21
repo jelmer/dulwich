@@ -51,12 +51,8 @@ from typing import (
     TextIO,
 )
 
-if sys.version_info >= (3, 12):
-    from collections.abc import Buffer
-else:
-    Buffer = bytes | bytearray | memoryview
-
 from dulwich import porcelain
+from dulwich._typing import Buffer
 
 from .bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
 from .client import get_transport_and_path
@@ -3850,6 +3846,117 @@ class cmd_checkout(Command):
         return 0
 
 
+class cmd_restore(Command):
+    """Restore working tree files."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Execute the restore command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "paths",
+            nargs="+",
+            type=str,
+            help="Paths to restore",
+        )
+        parser.add_argument(
+            "-s",
+            "--source",
+            type=str,
+            help="Restore from a specific commit (default: HEAD for --staged, index for worktree)",
+        )
+        parser.add_argument(
+            "--staged",
+            action="store_true",
+            help="Restore files in the index",
+        )
+        parser.add_argument(
+            "--worktree",
+            action="store_true",
+            help="Restore files in the working tree",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # If neither --staged nor --worktree is specified, default to --worktree
+        if not parsed_args.staged and not parsed_args.worktree:
+            worktree = True
+            staged = False
+        else:
+            worktree = parsed_args.worktree
+            staged = parsed_args.staged
+
+        try:
+            porcelain.restore(
+                ".",
+                paths=parsed_args.paths,
+                source=parsed_args.source,
+                staged=staged,
+                worktree=worktree,
+            )
+        except porcelain.CheckoutError as e:
+            sys.stderr.write(f"{e}\n")
+            return 1
+        return 0
+
+
+class cmd_switch(Command):
+    """Switch branches."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Execute the switch command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "target",
+            type=str,
+            help="Branch or commit to switch to",
+        )
+        parser.add_argument(
+            "-c",
+            "--create",
+            type=str,
+            help="Create a new branch at the target and switch to it",
+        )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force switch even if there are local changes",
+        )
+        parser.add_argument(
+            "-d",
+            "--detach",
+            action="store_true",
+            help="Switch to a commit in detached HEAD state",
+        )
+        parsed_args = parser.parse_args(args)
+
+        if not parsed_args.target:
+            logger.error(
+                "Usage: dulwich switch TARGET [-c NEW_BRANCH] [--force] [--detach]"
+            )
+            return 1
+
+        try:
+            porcelain.switch(
+                ".",
+                target=parsed_args.target,
+                create=parsed_args.create,
+                force=parsed_args.force,
+                detach=parsed_args.detach,
+            )
+        except porcelain.CheckoutError as e:
+            sys.stderr.write(f"{e}\n")
+            return 1
+        return 0
+
+
 class cmd_stash_list(Command):
     """List stash entries."""
 
@@ -6559,6 +6666,7 @@ commands = {
     "repack": cmd_repack,
     "replace": cmd_replace,
     "reset": cmd_reset,
+    "restore": cmd_restore,
     "revert": cmd_revert,
     "rev-list": cmd_rev_list,
     "rm": cmd_rm,
@@ -6570,6 +6678,7 @@ commands = {
     "status": cmd_status,
     "stripspace": cmd_stripspace,
     "shortlog": cmd_shortlog,
+    "switch": cmd_switch,
     "symbolic-ref": cmd_symbolic_ref,
     "submodule": cmd_submodule,
     "tag": cmd_tag,

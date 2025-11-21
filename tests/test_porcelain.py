@@ -7885,6 +7885,29 @@ class RepackTests(PorcelainTestCase):
         porcelain.add(repo=self.repo.path, paths=fullpath)
         porcelain.repack(self.repo)
 
+    def test_write_bitmaps(self) -> None:
+        """Test that write_bitmaps generates bitmap files."""
+        # Create some content
+        handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+        os.close(handle)
+        with open(fullpath, "w") as f:
+            f.write("test content")
+        porcelain.add(repo=self.repo.path, paths=fullpath)
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"test commit",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        # Repack with bitmaps
+        porcelain.repack(self.repo, write_bitmaps=True)
+
+        # Check that bitmap files were created
+        pack_dir = os.path.join(self.repo.path, ".git", "objects", "pack")
+        bitmap_files = [f for f in os.listdir(pack_dir) if f.endswith(".bitmap")]
+        self.assertGreater(len(bitmap_files), 0)
+
 
 class LsTreeTests(PorcelainTestCase):
     def test_empty(self) -> None:

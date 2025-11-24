@@ -813,7 +813,6 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """Get the best reachability provider for the object store.
 
         Args:
-          object_store: The object store to query
           prefer_bitmaps: Whether to use bitmaps if available
 
         Returns:

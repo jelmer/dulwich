@@ -25,4 +25,4 @@ jobs:
         run: |
           pip3 install pydoctor
       - name: Generate docs
-        run: make apidocs
+        run: make apidocs PYDOCTOR_ARGS=--warnings-as-errors

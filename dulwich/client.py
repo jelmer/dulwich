@@ -3233,9 +3233,9 @@ def default_urllib3_manager(
       cert_reqs: SSL certificate requirements (e.g. "CERT_REQUIRED", "CERT_NONE")
 
     Returns:
-      Either pool_manager_cls (defaults to `urllib3.ProxyManager`) instance for
+      Either pool_manager_cls (defaults to ``urllib3.ProxyManager``) instance for
       proxy configurations, proxy_manager_cls
-      (defaults to `urllib3.PoolManager`) instance otherwise
+      (defaults to ``urllib3.PoolManager``) instance otherwise
 
     """
     proxy_server: str | None = None

@@ -1065,7 +1065,7 @@ def process_interactive_rebase(
         editor_callback: Optional callback for reword operations
 
     Returns:
-        Tuple of (``is_complete``, ``pause_reason``):
+        tuple of (``is_complete``, ``pause_reason``):
 
         * ``is_complete``: True if rebase is complete, False if paused
         * ``pause_reason``: Reason for pause (e.g., "edit", "conflict", "break") or None

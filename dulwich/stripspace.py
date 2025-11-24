@@ -29,7 +29,7 @@ def stripspace(
 ) -> bytes:
     """Strip unnecessary whitespace from text.
 
-    This function mimics the behavior of `git stripspace`, which is commonly
+    This function mimics the behavior of ``git stripspace``, which is commonly
     used to clean up commit messages and other text content.
 
     Args:

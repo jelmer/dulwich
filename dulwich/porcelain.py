@@ -445,7 +445,7 @@ def _get_reflog_message(
       explicit_message: Explicit message passed as argument (takes precedence)
 
     Returns:
-      The reflog message to use, with priority:
+      The reflog message with priority:
         1. explicit_message if provided
         2. GIT_REFLOG_ACTION environment variable if set
         3. default_message otherwise
@@ -949,7 +949,7 @@ def interpret_trailers(
 ) -> bytes:
     r"""Parse and manipulate trailers in a commit message.
 
-    This function implements the functionality of `git interpret-trailers`,
+    This function implements the functionality of ``git interpret-trailers``,
     allowing parsing and manipulation of structured metadata (trailers) in
     commit messages.
 
@@ -1044,7 +1044,7 @@ def stripspace(
 ) -> bytes:
     r"""Strip unnecessary whitespace from text.
 
-    This function implements the functionality of `git stripspace`, commonly
+    This function implements the functionality of ``git stripspace``, commonly
     used to clean up commit messages and other text content.
 
     Args:
@@ -3320,7 +3320,7 @@ def shortlog(
         sort_by_commits: If True, sort authors by number of commits.
 
     Returns:
-        A list of dictionaries, each containing:
+        A list where each item is a dict containing:
 
             - "author": the author's name as a string
             - "messages": all commit messages concatenated into a single string
@@ -4094,7 +4094,7 @@ def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
         repo: Path to the repository
 
     Yields:
-        Tuple of (``branch_name``, ``is_merged``) where:
+        tuple of (``branch_name``, ``is_merged``) where:
 
         - ``branch_name``: Branch name without refs/heads/ prefix
         - ``is_merged``: True if branch is merged into HEAD, False otherwise

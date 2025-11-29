@@ -24,8 +24,8 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from .objects import Commit, ShaFile, Tag, Tree
-from .refs import local_branch_name, local_tag_name
+from .objects import Commit, ObjectID, RawObjectID, ShaFile, Tag, Tree
+from .refs import Ref, local_branch_name, local_tag_name
 from .repo import BaseRepo
 
 if TYPE_CHECKING:
@@ -48,7 +48,9 @@ def to_bytes(text: str | bytes) -> bytes:
     return text
 
 
-def _resolve_object(repo: "Repo", ref: bytes) -> "ShaFile":
+def _resolve_object(
+    repo: "Repo", ref: Ref | ObjectID | RawObjectID | bytes
+) -> "ShaFile":
     """Resolve a reference to an object using multiple strategies."""
     try:
         return repo[ref]
@@ -58,7 +60,7 @@ def _resolve_object(repo: "Repo", ref: bytes) -> "ShaFile":
             return repo[ref_sha]
         except KeyError:
             try:
-                return repo.object_store[ref]
+                return repo.object_store[ref]  # type: ignore[index]
             except (KeyError, ValueError):
                 # Re-raise original KeyError for consistency
                 raise KeyError(ref)
@@ -262,12 +264,13 @@ def parse_tree(repo: "BaseRepo", treeish: bytes | str | Tree | Commit | Tag) -> 
         treeish = treeish.id
     else:
         treeish = to_bytes(treeish)
+    treeish_typed: Ref | ObjectID
     try:
-        treeish = parse_ref(repo.refs, treeish)
+        treeish_typed = parse_ref(repo.refs, treeish)
     except KeyError:  # treeish is commit sha
-        pass
+        treeish_typed = ObjectID(treeish)
     try:
-        o = repo[treeish]
+        o = repo[treeish_typed]
     except KeyError:
         # Try parsing as commit (handles short hashes)
         try:
@@ -311,7 +314,7 @@ def parse_ref(container: "Repo | RefsContainer", refspec: str | bytes) -> "Ref":
     ]
     for ref in possible_refs:
         if ref in container:
-            return ref
+            return Ref(ref)
     raise KeyError(refspec)
 
 
@@ -336,25 +339,31 @@ def parse_reftuple(
     if refspec.startswith(b"+"):
         force = True
         refspec = refspec[1:]
-    lh: bytes | None
-    rh: bytes | None
+    lh_bytes: bytes | None
+    rh_bytes: bytes | None
     if b":" in refspec:
-        (lh, rh) = refspec.split(b":")
+        (lh_bytes, rh_bytes) = refspec.split(b":")
     else:
-        lh = rh = refspec
-    if lh == b"":
+        lh_bytes = rh_bytes = refspec
+
+    lh: Ref | None
+    if lh_bytes == b"":
         lh = None
     else:
-        lh = parse_ref(lh_container, lh)
-    if rh == b"":
+        lh = parse_ref(lh_container, lh_bytes)
+
+    rh: Ref | None
+    if rh_bytes == b"":
         rh = None
     else:
         try:
-            rh = parse_ref(rh_container, rh)
+            rh = parse_ref(rh_container, rh_bytes)
         except KeyError:
             # TODO: check force?
-            if b"/" not in rh:
-                rh = local_branch_name(rh)
+            if b"/" not in rh_bytes:
+                rh = Ref(local_branch_name(rh_bytes))
+            else:
+                rh = Ref(rh_bytes)
     return (lh, rh, force)
 
 

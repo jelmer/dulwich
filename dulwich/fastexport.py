@@ -66,7 +66,7 @@ class GitFastExporter:
         """
         self.outf = outf
         self.store = store
-        self.markers: dict[bytes, bytes] = {}
+        self.markers: dict[bytes, ObjectID] = {}
         self._marker_idx = 0
 
     def print_cmd(self, cmd: object) -> None:
@@ -117,7 +117,7 @@ class GitFastExporter:
         return marker
 
     def _iter_files(
-        self, base_tree: bytes | None, new_tree: bytes | None
+        self, base_tree: ObjectID | None, new_tree: ObjectID | None
     ) -> Generator[Any, None, None]:
         for (
             (old_path, new_path),
@@ -216,7 +216,7 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
         processor.ImportProcessor.__init__(self, params, verbose)  # type: ignore[no-untyped-call,unused-ignore]
         self.repo = repo
         self.last_commit = ZERO_SHA
-        self.markers: dict[bytes, bytes] = {}
+        self.markers: dict[bytes, ObjectID] = {}
         self._contents: dict[bytes, tuple[int, bytes]] = {}
 
     def lookup_object(self, objectish: bytes) -> ObjectID:
@@ -230,9 +230,9 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
         """
         if objectish.startswith(b":"):
             return self.markers[objectish[1:]]
-        return objectish
+        return ObjectID(objectish)
 
-    def import_stream(self, stream: BinaryIO) -> dict[bytes, bytes]:
+    def import_stream(self, stream: BinaryIO) -> dict[bytes, ObjectID]:
         """Import from a fast-import stream.
 
         Args:
@@ -314,9 +314,14 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
                 self._contents = {}
             else:
                 raise Exception(f"Command {filecmd.name!r} not supported")
+        from dulwich.objects import ObjectID
+
         commit.tree = commit_tree(
             self.repo.object_store,
-            ((path, hexsha, mode) for (path, (mode, hexsha)) in self._contents.items()),
+            (
+                (path, ObjectID(hexsha), mode)
+                for (path, (mode, hexsha)) in self._contents.items()
+            ),
         )
         if self.last_commit != ZERO_SHA:
             commit.parents.append(self.last_commit)
@@ -363,7 +368,7 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
         else:
             from_ = self.lookup_object(cmd.from_)
         self._reset_base(from_)
-        self.repo.refs[cmd.ref] = from_
+        self.repo.refs[Ref(cmd.ref)] = from_
 
     def tag_handler(self, cmd: commands.TagCommand) -> None:
         """Process a TagCommand."""

@@ -28,7 +28,7 @@ DEFAULT_GC_AUTO_PACK_LIMIT = 50
 class GCStats:
     """Statistics from garbage collection."""
 
-    pruned_objects: set[bytes] = field(default_factory=set)
+    pruned_objects: set[ObjectID] = field(default_factory=set)
     bytes_freed: int = 0
     packs_before: int = 0
     packs_after: int = 0
@@ -41,7 +41,7 @@ def find_reachable_objects(
     refs_container: RefsContainer,
     include_reflogs: bool = True,
     progress: Callable[[str], None] | None = None,
-) -> set[bytes]:
+) -> set[ObjectID]:
     """Find all reachable objects in the repository.
 
     Args:
@@ -53,7 +53,7 @@ def find_reachable_objects(
     Returns:
         Set of reachable object SHAs
     """
-    reachable = set()
+    reachable: set[ObjectID] = set()
     pending: deque[ObjectID] = deque()
 
     # Start with all refs
@@ -115,7 +115,7 @@ def find_unreachable_objects(
     refs_container: RefsContainer,
     include_reflogs: bool = True,
     progress: Callable[[str], None] | None = None,
-) -> set[bytes]:
+) -> set[ObjectID]:
     """Find all unreachable objects in the repository.
 
     Args:
@@ -131,7 +131,7 @@ def find_unreachable_objects(
         object_store, refs_container, include_reflogs, progress
     )
 
-    unreachable = set()
+    unreachable: set[ObjectID] = set()
     for sha in object_store:
         if sha not in reachable:
             unreachable.add(sha)
@@ -145,7 +145,7 @@ def prune_unreachable_objects(
     grace_period: int | None = None,
     dry_run: bool = False,
     progress: Callable[[str], None] | None = None,
-) -> tuple[set[bytes], int]:
+) -> tuple[set[ObjectID], int]:
     """Remove unreachable objects from the repository.
 
     Args:
@@ -162,7 +162,7 @@ def prune_unreachable_objects(
         object_store, refs_container, progress=progress
     )
 
-    pruned = set()
+    pruned: set[ObjectID] = set()
     bytes_freed = 0
 
     for sha in unreachable:

@@ -36,6 +36,7 @@ from .objects import (
     Blob,
     Commit,
     ObjectID,
+    RawObjectID,
     ShaFile,
     Tag,
     Tree,
@@ -201,7 +202,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
                 return idx
         raise KeyError(f"Pack not found: {pack_name}")
 
-    def _fetch_from_pack(self, sha: bytes) -> tuple[int, bytes]:
+    def _fetch_from_pack(self, sha: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Try to fetch an object from pack files.
 
         Args:
@@ -215,7 +216,10 @@ class DumbHTTPObjectStore(BaseObjectStore):
         """
         self._load_packs()
         # Convert hex to binary for pack operations
-        binsha = hex_to_sha(sha)
+        if len(sha) == 20:
+            binsha = RawObjectID(sha)  # Already binary
+        else:
+            binsha = hex_to_sha(ObjectID(sha))  # Convert hex to binary
 
         for pack_name, pack_idx in self._packs or []:
             if pack_idx is None:
@@ -251,7 +255,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
         raise KeyError(sha)
 
-    def get_raw(self, sha: bytes) -> tuple[int, bytes]:
+    def get_raw(self, sha: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Obtain the raw text for an object.
 
         Args:
@@ -276,7 +280,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         self._cached_objects[sha] = result
         return result
 
-    def contains_loose(self, sha: bytes) -> bool:
+    def contains_loose(self, sha: RawObjectID | ObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is loose."""
         try:
             self._fetch_loose_object(sha)
@@ -284,7 +288,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         except KeyError:
             return False
 
-    def __contains__(self, sha: bytes) -> bool:
+    def __contains__(self, sha: RawObjectID | ObjectID) -> bool:
         """Check if a particular object is present by SHA1."""
         if sha in self._cached_objects:
             return True
@@ -303,7 +307,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         except KeyError:
             return False
 
-    def __iter__(self) -> Iterator[bytes]:
+    def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over all SHAs in the store.
 
         Note: This is inefficient for dumb HTTP as it requires
@@ -322,7 +326,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
             for sha in idx:
                 if sha not in seen:
                     seen.add(sha)
-                    yield sha_to_hex(sha)
+                    yield sha_to_hex(RawObjectID(sha))
 
     @property
     def packs(self) -> list[Any]:
@@ -405,7 +409,10 @@ class DumbRemoteHTTPRepo:
 
             refs_hex = read_info_refs(BytesIO(refs_data))
             # Keep SHAs as hex
-            self._refs, self._peeled = split_peeled_refs(refs_hex)
+            refs_raw, peeled_raw = split_peeled_refs(refs_hex)
+            # Convert to typed dicts
+            self._refs = {Ref(k): ObjectID(v) for k, v in refs_raw.items()}
+            self._peeled = peeled_raw
 
         return dict(self._refs)
 
@@ -417,13 +424,12 @@ class DumbRemoteHTTPRepo:
         """
         head_resp_bytes = self._fetch_url("HEAD")
         head_split = head_resp_bytes.replace(b"\n", b"").split(b" ")
-        head_target = head_split[1] if len(head_split) > 1 else head_split[0]
+        head_target_bytes = head_split[1] if len(head_split) > 1 else head_split[0]
         # handle HEAD legacy format containing a commit id instead of a ref name
         for ref_name, ret_target in self.get_refs().items():
-            if ret_target == head_target:
-                head_target = ref_name
-                break
-        return head_target
+            if ret_target == head_target_bytes:
+                return ref_name
+        return Ref(head_target_bytes)
 
     def get_peeled(self, ref: Ref) -> ObjectID:
         """Get the peeled value of a ref."""

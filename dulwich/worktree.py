@@ -67,7 +67,7 @@ class WorkTreeInfo:
         self,
         path: str,
         head: bytes | None = None,
-        branch: bytes | None = None,
+        branch: Ref | None = None,
         bare: bool = False,
         detached: bool = False,
         locked: bool = False,
@@ -358,7 +358,7 @@ class WorkTree:
 
         index = self._repo.open_index()
         try:
-            commit = self._repo[b"HEAD"]
+            commit = self._repo[Ref(b"HEAD")]
         except KeyError:
             # no head mean no commit in the repo
             for fs_path in fs_paths:
@@ -425,7 +425,7 @@ class WorkTree:
         author_timezone: int | None = None,
         tree: ObjectID | None = None,
         encoding: bytes | None = None,
-        ref: Ref | None = b"HEAD",
+        ref: Ref | None = Ref(b"HEAD"),
         merge_heads: Sequence[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool | None = None,
@@ -670,7 +670,7 @@ class WorkTree:
 
         return c.id
 
-    def reset_index(self, tree: bytes | None = None) -> None:
+    def reset_index(self, tree: ObjectID | None = None) -> None:
         """Reset the index back to a specific tree.
 
         Args:
@@ -685,7 +685,7 @@ class WorkTree:
         )
 
         if tree is None:
-            head = self._repo[b"HEAD"]
+            head = self._repo[Ref(b"HEAD")]
             if isinstance(head, Tag):
                 _cls, obj = head.object
                 head = self._repo.get_object(obj)
@@ -840,7 +840,7 @@ def list_worktrees(repo: Repo) -> list[WorkTreeInfo]:
         with open(os.path.join(repo.controldir(), "HEAD"), "rb") as f:
             head_contents = f.read().strip()
             if head_contents.startswith(SYMREF):
-                ref_name = head_contents[len(SYMREF) :].strip()
+                ref_name = Ref(head_contents[len(SYMREF) :].strip())
                 main_wt_info.branch = ref_name
             else:
                 main_wt_info.detached = True
@@ -892,7 +892,7 @@ def list_worktrees(repo: Repo) -> list[WorkTreeInfo]:
                 with open(head_path, "rb") as f:
                     head_contents = f.read().strip()
                     if head_contents.startswith(SYMREF):
-                        ref_name = head_contents[len(SYMREF) :].strip()
+                        ref_name = Ref(head_contents[len(SYMREF) :].strip())
                         wt_info.branch = ref_name
                         # Resolve ref to get commit sha
                         try:
@@ -1005,7 +1005,9 @@ def add_worktree(
     else:
         # Point to branch
         assert branch is not None  # Should be guaranteed by logic above
-        wt_repo.refs.set_symbolic_ref(b"HEAD", branch)
+        from dulwich.refs import HEADREF
+
+        wt_repo.refs.set_symbolic_ref(HEADREF, branch)
 
     # Reset index to match HEAD
     wt_repo.get_worktree().reset_index()

@@ -498,7 +498,7 @@ class ReftableCompatTestCase(CompatTestCase):
 
         # Delete a ref using dulwich
         with repo.refs.batch_update():
-            repo.refs.set_if_equals(b"refs/heads/feature", commit_sha2, None)
+            repo.refs.remove_if_equals(b"refs/heads/feature", commit_sha2)
 
         repo.close()
 
@@ -725,8 +725,8 @@ class ReftableCompatTestCase(CompatTestCase):
             repo.refs.set_if_equals(
                 b"refs/heads/develop", commits[1], commits[4]
             )  # Update develop
-            repo.refs.set_if_equals(
-                b"refs/heads/feature", commits[3], None
+            repo.refs.remove_if_equals(
+                b"refs/heads/feature", commits[3]
             )  # Delete feature
             repo.refs.set_symbolic_ref(
                 b"HEAD", b"refs/heads/develop"

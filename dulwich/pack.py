@@ -62,6 +62,7 @@ from typing import (
     Generic,
     Protocol,
     TypeVar,
+    cast,
 )
 
 try:
@@ -77,6 +78,7 @@ if TYPE_CHECKING:
     from .bitmap import PackBitmap
     from .commit_graph import CommitGraph
     from .object_store import BaseObjectStore
+    from .refs import Ref
 
 # For some reason the above try, except fails to set has_mmap = False for plan9
 if sys.platform == "Plan9":
@@ -86,7 +88,14 @@ from . import replace_me
 from .errors import ApplyDeltaError, ChecksumMismatch
 from .file import GitFile, _GitFile
 from .lru_cache import LRUSizeCache
-from .objects import ObjectID, ShaFile, hex_to_sha, object_header, sha_to_hex
+from .objects import (
+    ObjectID,
+    RawObjectID,
+    ShaFile,
+    hex_to_sha,
+    object_header,
+    sha_to_hex,
+)
 
 OFS_DELTA = 6
 REF_DELTA = 7
@@ -140,10 +149,10 @@ class ObjectContainer(Protocol):
         Returns: Optional Pack object of the objects written.
         """
 
-    def __contains__(self, sha1: bytes) -> bool:
+    def __contains__(self, sha1: "ObjectID") -> bool:
         """Check if a hex sha is present."""
 
-    def __getitem__(self, sha1: bytes) -> ShaFile:
+    def __getitem__(self, sha1: "ObjectID | RawObjectID") -> ShaFile:
         """Retrieve an object."""
 
     def get_commit_graph(self) -> "CommitGraph | None":
@@ -159,7 +168,7 @@ class PackedObjectContainer(ObjectContainer):
     """Container for objects packed in a pack file."""
 
     def get_unpacked_object(
-        self, sha1: bytes, *, include_comp: bool = False
+        self, sha1: "ObjectID | RawObjectID", *, include_comp: bool = False
     ) -> "UnpackedObject":
         """Get a raw unresolved object.
 
@@ -173,7 +182,7 @@ class PackedObjectContainer(ObjectContainer):
         raise NotImplementedError(self.get_unpacked_object)
 
     def iterobjects_subset(
-        self, shas: Iterable[bytes], *, allow_missing: bool = False
+        self, shas: Iterable["ObjectID"], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects.
 
@@ -188,7 +197,7 @@ class PackedObjectContainer(ObjectContainer):
 
     def iter_unpacked_subset(
         self,
-        shas: Iterable[bytes],
+        shas: Iterable["ObjectID | RawObjectID"],
         *,
         include_comp: bool = False,
         allow_missing: bool = False,
@@ -332,12 +341,12 @@ class UnpackedObject:
             self.obj_chunks = self.decomp_chunks
             self.delta_base = delta_base
 
-    def sha(self) -> bytes:
+    def sha(self) -> RawObjectID:
         """Return the binary SHA of this object."""
         if self._sha is None:
             assert self.obj_type_num is not None and self.obj_chunks is not None
             self._sha = obj_sha(self.obj_type_num, self.obj_chunks)
-        return self._sha
+        return RawObjectID(self._sha)
 
     def sha_file(self) -> ShaFile:
         """Return a ShaFile from this object."""
@@ -547,7 +556,7 @@ def bisect_find_sha(
     return None
 
 
-PackIndexEntry = tuple[bytes, int, int | None]
+PackIndexEntry = tuple[RawObjectID, int, int | None]
 
 
 class PackIndex:
@@ -581,9 +590,9 @@ class PackIndex:
         """Return the number of entries in this pack index."""
         raise NotImplementedError(self.__len__)
 
-    def __iter__(self) -> Iterator[bytes]:
+    def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs in this pack."""
-        return map(sha_to_hex, self._itersha())
+        return map(lambda sha: sha_to_hex(RawObjectID(sha)), self._itersha())
 
     def iterentries(self) -> Iterator[PackIndexEntry]:
         """Iterate over the entries in this pack index.
@@ -601,7 +610,7 @@ class PackIndex:
         raise NotImplementedError(self.get_pack_checksum)
 
     @replace_me(since="0.21.0", remove_in="0.23.0")
-    def object_index(self, sha: bytes) -> int:
+    def object_index(self, sha: ObjectID | RawObjectID) -> int:
         """Return the index for the given SHA.
 
         Args:
@@ -612,7 +621,7 @@ class PackIndex:
         """
         return self.object_offset(sha)
 
-    def object_offset(self, sha: bytes) -> int:
+    def object_offset(self, sha: ObjectID | RawObjectID) -> int:
         """Return the offset in to the corresponding packfile for the object.
 
         Given the name of an object it will return the offset that object
@@ -648,7 +657,7 @@ class PackIndex:
         """Yield all the SHA1's of the objects in the index, sorted."""
         raise NotImplementedError(self._itersha)
 
-    def iter_prefix(self, prefix: bytes) -> Iterator[bytes]:
+    def iter_prefix(self, prefix: bytes) -> Iterator[RawObjectID]:
         """Iterate over all SHA1s with the given prefix.
 
         Args:
@@ -658,7 +667,7 @@ class PackIndex:
         # Default implementation for PackIndex classes that don't override
         for sha, _, _ in self.iterentries():
             if sha.startswith(prefix):
-                yield sha
+                yield RawObjectID(sha)
 
     def close(self) -> None:
         """Close any open files."""
@@ -672,7 +681,7 @@ class MemoryPackIndex(PackIndex):
 
     def __init__(
         self,
-        entries: list[tuple[bytes, int, int | None]],
+        entries: list[PackIndexEntry],
         pack_checksum: bytes | None = None,
     ) -> None:
         """Create a new MemoryPackIndex.
@@ -697,7 +706,7 @@ class MemoryPackIndex(PackIndex):
         """Return the number of entries in this pack index."""
         return len(self._entries)
 
-    def object_offset(self, sha: bytes) -> int:
+    def object_offset(self, sha: ObjectID | RawObjectID) -> int:
         """Return the offset for the given SHA.
 
         Args:
@@ -705,8 +714,8 @@ class MemoryPackIndex(PackIndex):
         Returns: Offset in the pack file
         """
         if len(sha) == 40:
-            sha = hex_to_sha(sha)
-        return self._by_sha[sha]
+            sha = hex_to_sha(cast(ObjectID, sha))
+        return self._by_sha[cast(RawObjectID, sha)]
 
     def object_sha1(self, offset: int) -> bytes:
         """Return the SHA1 for the object at the given offset."""
@@ -880,7 +889,7 @@ class FilePackIndex(PackIndex):
         """
         return bytes(self._contents[-20:])
 
-    def object_offset(self, sha: bytes) -> int:
+    def object_offset(self, sha: ObjectID | RawObjectID) -> int:
         """Return the offset in to the corresponding packfile for the object.
 
         Given the name of an object it will return the offset that object
@@ -888,7 +897,7 @@ class FilePackIndex(PackIndex):
         have the object then None will be returned.
         """
         if len(sha) == 40:
-            sha = hex_to_sha(sha)
+            sha = hex_to_sha(cast(ObjectID, sha))
         try:
             return self._object_offset(sha)
         except ValueError as exc:
@@ -915,7 +924,7 @@ class FilePackIndex(PackIndex):
             raise KeyError(sha)
         return self._unpack_offset(i)
 
-    def iter_prefix(self, prefix: bytes) -> Iterator[bytes]:
+    def iter_prefix(self, prefix: bytes) -> Iterator[RawObjectID]:
         """Iterate over all SHA1s with the given prefix."""
         start = ord(prefix[:1])
         if start == 0:
@@ -932,7 +941,7 @@ class FilePackIndex(PackIndex):
         for i in range(start, end):
             name: bytes = self._unpack_name(i)
             if name.startswith(prefix):
-                yield name
+                yield RawObjectID(name)
                 started = True
             elif started:
                 break
@@ -960,9 +969,9 @@ class PackIndex1(FilePackIndex):
         self.version = 1
         self._fan_out_table = self._read_fan_out_table(0)
 
-    def _unpack_entry(self, i: int) -> tuple[bytes, int, None]:
+    def _unpack_entry(self, i: int) -> tuple[RawObjectID, int, None]:
         (offset, name) = unpack_from(">L20s", self._contents, (0x100 * 4) + (i * 24))
-        return (name, offset, None)
+        return (RawObjectID(name), offset, None)
 
     def _unpack_name(self, i: int) -> bytes:
         offset = (0x100 * 4) + (i * 24) + 4
@@ -1011,9 +1020,9 @@ class PackIndex2(FilePackIndex):
             self
         )
 
-    def _unpack_entry(self, i: int) -> tuple[bytes, int, int]:
+    def _unpack_entry(self, i: int) -> tuple[RawObjectID, int, int]:
         return (
-            self._unpack_name(i),
+            RawObjectID(self._unpack_name(i)),
             self._unpack_offset(i),
             self._unpack_crc32_checksum(i),
         )
@@ -1091,9 +1100,9 @@ class PackIndex3(FilePackIndex):
             self
         )
 
-    def _unpack_entry(self, i: int) -> tuple[bytes, int, int]:
+    def _unpack_entry(self, i: int) -> tuple[RawObjectID, int, int]:
         return (
-            self._unpack_name(i),
+            RawObjectID(self._unpack_name(i)),
             self._unpack_offset(i),
             self._unpack_crc32_checksum(i),
         )
@@ -1390,7 +1399,9 @@ class PackStreamReader:
 
         pack_sha = bytearray(self._trailer)
         if pack_sha != self.sha.digest():
-            raise ChecksumMismatch(sha_to_hex(bytes(pack_sha)), self.sha.hexdigest())
+            raise ChecksumMismatch(
+                sha_to_hex(RawObjectID(bytes(pack_sha))), self.sha.hexdigest()
+            )
 
 
 class PackStreamCopier(PackStreamReader):
@@ -1663,7 +1674,7 @@ class PackData:
         self,
         progress: Callable[[int, int], None] | None = None,
         resolve_ext_ref: ResolveExtRefFn | None = None,
-    ) -> Iterator[tuple[bytes, int, int | None]]:
+    ) -> Iterator[PackIndexEntry]:
         """Yield entries summarizing the contents of this pack.
 
         Args:
@@ -1683,7 +1694,7 @@ class PackData:
         self,
         progress: ProgressFn | None = None,
         resolve_ext_ref: ResolveExtRefFn | None = None,
-    ) -> list[tuple[bytes, int, int]]:
+    ) -> list[tuple[RawObjectID, int, int]]:
         """Return entries in this pack, sorted by SHA.
 
         Args:
@@ -1883,7 +1894,7 @@ class DeltaChainIterator(Generic[T]):
         self._pending_ofs: dict[int, list[int]] = defaultdict(list)
         self._pending_ref: dict[bytes, list[int]] = defaultdict(list)
         self._full_ofs: list[tuple[int, int]] = []
-        self._ext_refs: list[bytes] = []
+        self._ext_refs: list[RawObjectID] = []
 
     @classmethod
     def for_pack_data(
@@ -1908,7 +1919,7 @@ class DeltaChainIterator(Generic[T]):
     def for_pack_subset(
         cls,
         pack: "Pack",
-        shas: Iterable[bytes],
+        shas: Iterable[ObjectID | RawObjectID],
         *,
         allow_missing: bool = False,
         resolve_ext_ref: ResolveExtRefFn | None = None,
@@ -1928,7 +1939,6 @@ class DeltaChainIterator(Generic[T]):
         walker.set_pack_data(pack.data)
         todo = set()
         for sha in shas:
-            assert isinstance(sha, bytes)
             try:
                 off = pack.index.object_offset(sha)
             except KeyError:
@@ -1951,7 +1961,7 @@ class DeltaChainIterator(Generic[T]):
             elif unpacked.pack_type_num == REF_DELTA:
                 with suppress(KeyError):
                     assert isinstance(unpacked.delta_base, bytes)
-                    base_ofs = pack.index.object_index(unpacked.delta_base)
+                    base_ofs = pack.index.object_index(RawObjectID(unpacked.delta_base))
             if base_ofs is not None and base_ofs not in done:
                 todo.add(base_ofs)
         return walker
@@ -1992,7 +2002,9 @@ class DeltaChainIterator(Generic[T]):
 
     def _ensure_no_pending(self) -> None:
         if self._pending_ref:
-            raise UnresolvedDeltas([sha_to_hex(s) for s in self._pending_ref])
+            raise UnresolvedDeltas(
+                [sha_to_hex(RawObjectID(s)) for s in self._pending_ref]
+            )
 
     def _walk_ref_chains(self) -> Iterator[T]:
         if not self._resolve_ext_ref:
@@ -2009,7 +2021,7 @@ class DeltaChainIterator(Generic[T]):
                 # get popped via a _follow_chain call, or we will raise an
                 # error below.
                 continue
-            self._ext_refs.append(base_sha)
+            self._ext_refs.append(RawObjectID(base_sha))
             self._pending_ref.pop(base_sha)
             for new_offset in pending:
                 yield from self._follow_chain(new_offset, type_num, chunks)  # type: ignore[arg-type]
@@ -2063,7 +2075,7 @@ class DeltaChainIterator(Generic[T]):
         """Iterate over objects in the pack."""
         return self._walk_all_chains()
 
-    def ext_refs(self) -> list[bytes]:
+    def ext_refs(self) -> list[RawObjectID]:
         """Return external references."""
         return self._ext_refs
 
@@ -2088,7 +2100,7 @@ class PackIndexer(DeltaChainIterator[PackIndexEntry]):
 
     _compute_crc32 = True
 
-    def _result(self, unpacked: UnpackedObject) -> tuple[bytes, int, int | None]:
+    def _result(self, unpacked: UnpackedObject) -> PackIndexEntry:
         """Convert unpacked object to pack index entry.
 
         Args:
@@ -2154,9 +2166,12 @@ class SHA1Reader(BinaryIO):
         # If git option index.skipHash is set the index will be empty
         if stored != self.sha1.digest() and (
             not allow_empty
-            or sha_to_hex(stored) != b"0000000000000000000000000000000000000000"
+            or sha_to_hex(RawObjectID(stored))
+            != b"0000000000000000000000000000000000000000"
         ):
-            raise ChecksumMismatch(self.sha1.hexdigest(), sha_to_hex(stored))
+            raise ChecksumMismatch(
+                self.sha1.hexdigest(), sha_to_hex(RawObjectID(stored))
+            )
 
     def close(self) -> None:
         """Close the underlying file."""
@@ -2595,9 +2610,9 @@ def write_pack_header(
 
 def find_reusable_deltas(
     container: PackedObjectContainer,
-    object_ids: Set[bytes],
+    object_ids: Set[ObjectID],
     *,
-    other_haves: Set[bytes] | None = None,
+    other_haves: Set[ObjectID] | None = None,
     progress: Callable[..., None] | None = None,
 ) -> Iterator[UnpackedObject]:
     """Find deltas in a pack that can be reused.
@@ -2799,7 +2814,7 @@ def generate_unpacked_objects(
     deltify: bool | None = None,
     reuse_deltas: bool = True,
     ofs_delta: bool = True,
-    other_haves: set[bytes] | None = None,
+    other_haves: set[ObjectID] | None = None,
     progress: Callable[..., None] | None = None,
 ) -> Iterator[UnpackedObject]:
     """Create pack data from objects.
@@ -2811,7 +2826,7 @@ def generate_unpacked_objects(
         for unpack in find_reusable_deltas(
             container, set(todo), other_haves=other_haves, progress=progress
         ):
-            del todo[sha_to_hex(unpack.sha())]
+            del todo[sha_to_hex(RawObjectID(unpack.sha()))]
             yield unpack
     if deltify is None:
         # PERFORMANCE/TODO(jelmer): This should be enabled but is *much* too
@@ -2860,7 +2875,7 @@ def write_pack_from_container(
     deltify: bool | None = None,
     reuse_deltas: bool = True,
     compression_level: int = -1,
-    other_haves: set[bytes] | None = None,
+    other_haves: set[ObjectID] | None = None,
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
 
@@ -3535,7 +3550,7 @@ class Pack:
     def ensure_bitmap(
         self,
         object_store: "BaseObjectStore",
-        refs: dict[bytes, bytes],
+        refs: dict["Ref", "ObjectID"],
         commit_interval: int | None = None,
         progress: Callable[[str], None] | None = None,
     ) -> "PackBitmap":
@@ -3618,7 +3633,7 @@ class Pack:
         """Return string representation of this pack."""
         return f"{self.__class__.__name__}({self._basename!r})"
 
-    def __iter__(self) -> Iterator[bytes]:
+    def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over all the sha1s of the objects in this pack."""
         return iter(self.index)
 
@@ -3634,8 +3649,8 @@ class Pack:
             and idx_stored_checksum != data_stored_checksum
         ):
             raise ChecksumMismatch(
-                sha_to_hex(idx_stored_checksum),
-                sha_to_hex(data_stored_checksum),
+                sha_to_hex(RawObjectID(idx_stored_checksum)),
+                sha_to_hex(RawObjectID(data_stored_checksum)),
             )
 
     def check(self) -> None:
@@ -3658,7 +3673,7 @@ class Pack:
         """Return pack tuples for all objects in pack."""
         return [(o, None) for o in self.iterobjects()]
 
-    def __contains__(self, sha1: bytes) -> bool:
+    def __contains__(self, sha1: ObjectID | RawObjectID) -> bool:
         """Check whether this pack contains a particular SHA1."""
         try:
             self.index.object_offset(sha1)
@@ -3666,14 +3681,14 @@ class Pack:
         except KeyError:
             return False
 
-    def get_raw(self, sha1: bytes) -> tuple[int, bytes]:
+    def get_raw(self, sha1: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Get raw object data by SHA1."""
         offset = self.index.object_offset(sha1)
         obj_type, obj = self.data.get_object_at(offset)
         type_num, chunks = self.resolve_object(offset, obj_type, obj)
         return type_num, b"".join(chunks)  # type: ignore[arg-type]
 
-    def __getitem__(self, sha1: bytes) -> ShaFile:
+    def __getitem__(self, sha1: "ObjectID | RawObjectID") -> ShaFile:
         """Retrieve the specified SHA1."""
         type, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type, uncomp, sha=sha1)
@@ -3701,7 +3716,7 @@ class Pack:
 
     def iter_unpacked_subset(
         self,
-        shas: Iterable[ObjectID],
+        shas: Iterable[ObjectID | RawObjectID],
         *,
         include_comp: bool = False,
         allow_missing: bool = False,
@@ -3710,12 +3725,12 @@ class Pack:
         """Iterate over unpacked objects in subset."""
         ofs_pending: dict[int, list[UnpackedObject]] = defaultdict(list)
         ofs: dict[int, bytes] = {}
-        todo = set(shas)
+        todo: set[ObjectID | RawObjectID] = set(shas)
         for unpacked in self.iter_unpacked(include_comp=include_comp):
             sha = unpacked.sha()
             if unpacked.offset is not None:
                 ofs[unpacked.offset] = sha
-            hexsha = sha_to_hex(sha)
+            hexsha = sha_to_hex(RawObjectID(sha))
             if hexsha in todo:
                 if unpacked.pack_type_num == OFS_DELTA:
                     assert isinstance(unpacked.delta_base, int)
@@ -3766,7 +3781,9 @@ class Pack:
                 keepfile.write(b"\n")
         return keepfile_name
 
-    def get_ref(self, sha: bytes) -> tuple[int | None, int, OldUnpackedObject]:
+    def get_ref(
+        self, sha: RawObjectID | ObjectID
+    ) -> tuple[int | None, int, OldUnpackedObject]:
         """Get the object for a ref SHA, only looking in this pack."""
         # TODO: cache these results
         try:
@@ -3786,7 +3803,9 @@ class Pack:
         offset: int,
         type: int,
         obj: OldUnpackedObject,
-        get_ref: Callable[[bytes], tuple[int | None, int, OldUnpackedObject]]
+        get_ref: Callable[
+            [RawObjectID | ObjectID], tuple[int | None, int, OldUnpackedObject]
+        ]
         | None = None,
     ) -> tuple[int, OldUnpackedObject]:
         """Resolve an object, possibly resolving deltas when necessary.
@@ -3795,7 +3814,7 @@ class Pack:
         """
         # Walk down the delta chain, building a stack of deltas to reach
         # the requested object.
-        base_offset = offset
+        base_offset: int | None = offset
         base_type = type
         base_obj = obj
         delta_stack = []
@@ -3809,13 +3828,14 @@ class Pack:
                 assert isinstance(delta_offset, int), (
                     f"Expected int, got {delta_offset.__class__}"
                 )
+                assert base_offset is not None
                 base_offset = base_offset - delta_offset
                 base_type, base_obj = self.data.get_object_at(base_offset)
                 assert isinstance(base_type, int)
             elif base_type == REF_DELTA:
                 (basename, delta) = base_obj
                 assert isinstance(basename, bytes) and len(basename) == 20
-                base_offset, base_type, base_obj = get_ref(basename)  # type: ignore[assignment]
+                base_offset, base_type, base_obj = get_ref(cast(RawObjectID, basename))
                 assert isinstance(base_type, int)
                 if base_offset == prev_offset:  # object is based on itself
                     raise UnresolvedDeltas([basename])
@@ -3876,7 +3896,11 @@ class Pack:
         )
 
     def get_unpacked_object(
-        self, sha: bytes, *, include_comp: bool = False, convert_ofs_delta: bool = True
+        self,
+        sha: ObjectID | RawObjectID,
+        *,
+        include_comp: bool = False,
+        convert_ofs_delta: bool = True,
     ) -> UnpackedObject:
         """Get the unpacked object for a sha.
 
@@ -3896,12 +3920,12 @@ class Pack:
 
 def extend_pack(
     f: BinaryIO,
-    object_ids: Set[ObjectID],
-    get_raw: Callable[[ObjectID], tuple[int, bytes]],
+    object_ids: Set["RawObjectID"],
+    get_raw: Callable[["RawObjectID | ObjectID"], tuple[int, bytes]],
     *,
     compression_level: int = -1,
     progress: Callable[[bytes], None] | None = None,
-) -> tuple[bytes, list[tuple[bytes, int, int]]]:
+) -> tuple[bytes, list[tuple["RawObjectID", int, int]]]:
     """Extend a pack file with more objects.
 
     The caller should make sure that object_ids does not contain any objects

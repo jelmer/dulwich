@@ -30,6 +30,7 @@ from os import SEEK_END
 import dulwich
 
 from .errors import GitProtocolError, HangupException
+from .objects import ObjectID
 
 TCP_GIT_PORT = 9418
 
@@ -49,7 +50,10 @@ GIT_PROTOCOL_VERSIONS = [0, 1, 2]
 DEFAULT_GIT_PROTOCOL_VERSION_FETCH = 2
 DEFAULT_GIT_PROTOCOL_VERSION_SEND = 0
 
-ZERO_SHA = b"0" * 40
+# Suffix used in the Git protocol to indicate peeled tag references
+PEELED_TAG_SUFFIX = b"^{}"
+
+ZERO_SHA: ObjectID = ObjectID(b"0" * 40)
 
 SINGLE_ACK = 0
 MULTI_ACK = 1

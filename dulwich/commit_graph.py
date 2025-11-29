@@ -26,7 +26,7 @@ from .file import _GitFile
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
 
-from .objects import Commit, ObjectID, hex_to_sha, sha_to_hex
+from .objects import Commit, ObjectID, RawObjectID, hex_to_sha, sha_to_hex
 
 # File format constants
 COMMIT_GRAPH_SIGNATURE = b"CGPH"
@@ -188,9 +188,9 @@ class CommitGraph:
         for i in range(num_commits):
             start = i * self._hash_size
             end = start + self._hash_size
-            oid = oid_lookup_data[start:end]
+            oid = RawObjectID(oid_lookup_data[start:end])
             oids.append(oid)
-            self._oid_to_index[oid] = i
+            self._oid_to_index[sha_to_hex(oid)] = i
 
         # Parse commit data chunk
         commit_data = self.chunks[CHUNK_COMMIT_DATA].data
@@ -205,7 +205,7 @@ class CommitGraph:
             offset = i * (self._hash_size + 16)
 
             # Tree OID
-            tree_id = commit_data[offset : offset + self._hash_size]
+            tree_id = RawObjectID(commit_data[offset : offset + self._hash_size])
             offset += self._hash_size
 
             # Parent positions (2 x 4 bytes)
@@ -271,14 +271,7 @@ class CommitGraph:
 
     def get_entry_by_oid(self, oid: ObjectID) -> CommitGraphEntry | None:
         """Get commit graph entry by commit OID."""
-        # Convert hex ObjectID to binary if needed for lookup
-        if isinstance(oid, bytes) and len(oid) == 40:
-            # Input is hex ObjectID, convert to binary for internal lookup
-            lookup_oid = hex_to_sha(oid)
-        else:
-            # Input is already binary
-            lookup_oid = oid
-        index = self._oid_to_index.get(lookup_oid)
+        index = self._oid_to_index.get(oid)
         if index is not None:
             return self.entries[index]
         return None
@@ -288,7 +281,7 @@ class CommitGraph:
         entry = self.get_entry_by_oid(oid)
         return entry.generation if entry else None
 
-    def get_parents(self, oid: ObjectID) -> list[bytes] | None:
+    def get_parents(self, oid: ObjectID) -> list[ObjectID] | None:
         """Get parent commit IDs for a commit."""
         entry = self.get_entry_by_oid(oid)
         return entry.parents if entry else None
@@ -443,20 +436,20 @@ def generate_commit_graph(
 
     # Ensure all commit_ids are in the correct format for object store access
     # DiskObjectStore expects hex ObjectIDs (40-byte hex strings)
-    normalized_commit_ids = []
+    normalized_commit_ids: list[ObjectID] = []
     for commit_id in commit_ids:
         if isinstance(commit_id, bytes) and len(commit_id) == 40:
             # Already hex ObjectID
-            normalized_commit_ids.append(commit_id)
+            normalized_commit_ids.append(ObjectID(commit_id))
         elif isinstance(commit_id, bytes) and len(commit_id) == 20:
             # Binary SHA, convert to hex ObjectID
-            normalized_commit_ids.append(sha_to_hex(commit_id))
+            normalized_commit_ids.append(sha_to_hex(RawObjectID(commit_id)))
         else:
             # Assume it's already correct format
-            normalized_commit_ids.append(commit_id)
+            normalized_commit_ids.append(ObjectID(commit_id))
 
     # Build a map of all commits and their metadata
-    commit_map: dict[bytes, Commit] = {}
+    commit_map: dict[ObjectID, Commit] = {}
     for commit_id in normalized_commit_ids:
         try:
             commit_obj = object_store[commit_id]
@@ -503,19 +496,20 @@ def generate_commit_graph(
     # Build commit graph entries
     for commit_id, commit_obj in commit_map.items():
         # commit_id is already hex ObjectID from normalized_commit_ids
-        commit_hex = commit_id
+        commit_hex: ObjectID = commit_id
 
         # Handle tree ID - might already be hex ObjectID
+        tree_hex: ObjectID
         if isinstance(commit_obj.tree, bytes) and len(commit_obj.tree) == 40:
-            tree_hex = commit_obj.tree  # Already hex ObjectID
+            tree_hex = ObjectID(commit_obj.tree)  # Already hex ObjectID
         else:
             tree_hex = sha_to_hex(commit_obj.tree)  # Binary, convert to hex
 
         # Handle parent IDs - might already be hex ObjectIDs
-        parents_hex = []
+        parents_hex: list[ObjectID] = []
         for parent_id in commit_obj.parents:
             if isinstance(parent_id, bytes) and len(parent_id) == 40:
-                parents_hex.append(parent_id)  # Already hex ObjectID
+                parents_hex.append(ObjectID(parent_id))  # Already hex ObjectID
             else:
                 parents_hex.append(sha_to_hex(parent_id))  # Binary, convert to hex
 
@@ -531,8 +525,7 @@ def generate_commit_graph(
     # Build the OID to index mapping for lookups
     graph._oid_to_index = {}
     for i, entry in enumerate(graph.entries):
-        binary_oid = hex_to_sha(entry.commit_id.decode())
-        graph._oid_to_index[binary_oid] = i
+        graph._oid_to_index[entry.commit_id] = i
 
     return graph
 
@@ -582,25 +575,27 @@ def get_reachable_commits(
     Returns:
         List of all reachable commit IDs (including the starting commits)
     """
-    visited = set()
-    reachable = []
-    stack = []
+    visited: set[ObjectID] = set()
+    reachable: list[ObjectID] = []
+    stack: list[ObjectID] = []
 
     # Normalize commit IDs for object store access and tracking
     for commit_id in start_commits:
         if isinstance(commit_id, bytes) and len(commit_id) == 40:
             # Hex ObjectID - use directly for object store access
-            if commit_id not in visited:
-                stack.append(commit_id)
+            oid = ObjectID(commit_id)
+            if oid not in visited:
+                stack.append(oid)
         elif isinstance(commit_id, bytes) and len(commit_id) == 20:
             # Binary SHA, convert to hex ObjectID for object store access
-            hex_id = sha_to_hex(commit_id)
+            hex_id = sha_to_hex(RawObjectID(commit_id))
             if hex_id not in visited:
                 stack.append(hex_id)
         else:
             # Assume it's already correct format
-            if commit_id not in visited:
-                stack.append(commit_id)
+            oid = ObjectID(commit_id)
+            if oid not in visited:
+                stack.append(oid)
 
     while stack:
         commit_id = stack.pop()

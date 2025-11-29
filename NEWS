@@ -1,5 +1,9 @@
 0.25.0	UNRELEASED
 
+ * The ``ObjectID`` and ``Ref`` types are now newtypes, making it harder to
+   accidentally pass the wrong type - as notified by mypy. Most of this is in
+   lower-level code. (Jelmer Vernooĳ)
+
  * Implement support for ``core.sharedRepository`` configuration option.
    Repository files and directories now respect shared repository permissions
    for group-writable or world-writable repositories. Affects loose objects,

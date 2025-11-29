@@ -169,6 +169,7 @@ from .object_store import BaseObjectStore, tree_lookup_path
 from .objects import (
     Blob,
     Commit,
+    ObjectID,
     Tag,
     Tree,
     TreeEntry,
@@ -193,6 +194,7 @@ from .patch import (
 )
 from .protocol import ZERO_SHA, Protocol
 from .refs import (
+    HEADREF,
     LOCAL_BRANCH_PREFIX,
     LOCAL_NOTES_PREFIX,
     LOCAL_REMOTE_PREFIX,
@@ -543,7 +545,7 @@ class DivergedBranches(Error):
         self.new_sha = new_sha
 
 
-def check_diverged(repo: BaseRepo, current_sha: bytes, new_sha: bytes) -> None:
+def check_diverged(repo: BaseRepo, current_sha: ObjectID, new_sha: ObjectID) -> None:
     """Check if updating to a sha can be done with fast forwarding.
 
     Args:
@@ -625,7 +627,7 @@ def symbolic_ref(repo: RepoPath, ref_name: str | bytes, force: bool = False) -> 
                 else ref_name
             )
             raise Error(f"fatal: ref `{ref_name_str}` is not a ref")
-        repo_obj.refs.set_symbolic_ref(b"HEAD", ref_path)
+        repo_obj.refs.set_symbolic_ref(HEADREF, ref_path)
 
 
 def pack_refs(repo: RepoPath, all: bool = False) -> None:
@@ -878,7 +880,7 @@ def commit(
             )
             # Update HEAD to point to the new commit with reflog message
             try:
-                old_head = r.refs[b"HEAD"]
+                old_head = r.refs[HEADREF]
             except KeyError:
                 old_head = None
 
@@ -892,7 +894,7 @@ def commit(
                 default_message = default_message[:97] + b"..."
             reflog_message = _get_reflog_message(default_message)
 
-            r.refs.set_if_equals(b"HEAD", old_head, commit_sha, message=reflog_message)
+            r.refs.set_if_equals(HEADREF, old_head, commit_sha, message=reflog_message)
             return commit_sha
         else:
             return r.get_worktree().commit(
@@ -911,11 +913,11 @@ def commit(
 
 def commit_tree(
     repo: RepoPath,
-    tree: bytes,
+    tree: ObjectID,
     message: str | bytes | None = None,
     author: bytes | None = None,
     committer: bytes | None = None,
-) -> bytes:
+) -> ObjectID:
     """Create a new commit object.
 
     Args:
@@ -2002,18 +2004,18 @@ def diff_tree(
     """
     with open_repo_closing(repo) as r:
         if isinstance(old_tree, Tree):
-            old_tree_id: bytes | None = old_tree.id
+            old_tree_id: ObjectID | None = old_tree.id
         elif isinstance(old_tree, str):
-            old_tree_id = old_tree.encode()
+            old_tree_id = ObjectID(old_tree.encode())
         else:
-            old_tree_id = old_tree
+            old_tree_id = ObjectID(old_tree)
 
         if isinstance(new_tree, Tree):
-            new_tree_id: bytes | None = new_tree.id
+            new_tree_id: ObjectID | None = new_tree.id
         elif isinstance(new_tree, str):
-            new_tree_id = new_tree.encode()
+            new_tree_id = ObjectID(new_tree.encode())
         else:
-            new_tree_id = new_tree
+            new_tree_id = ObjectID(new_tree)
 
         write_tree_diff(outstream, r.object_store, old_tree_id, new_tree_id)
 
@@ -2323,7 +2325,7 @@ def submodule_update(
                     sub_config.write_to_path()
 
                     # Checkout the target commit
-                    sub_repo.refs[b"HEAD"] = target_sha
+                    sub_repo.refs[HEADREF] = target_sha
 
                     # Build the index and checkout files
                     tree = sub_repo[target_sha]
@@ -2346,7 +2348,7 @@ def submodule_update(
                     client.fetch(path_segments.encode(), sub_repo)
 
                     # Update to the target commit
-                    sub_repo.refs[b"HEAD"] = target_sha
+                    sub_repo.refs[HEADREF] = target_sha
 
                     # Reset the working directory
                     reset(sub_repo, "hard", target_sha)
@@ -2513,7 +2515,7 @@ def verify_tag(
         tag_obj.verify(keyids)
 
 
-def tag_list(repo: RepoPath, outstream: TextIO = sys.stdout) -> list[bytes]:
+def tag_list(repo: RepoPath, outstream: TextIO = sys.stdout) -> list[Ref]:
     """List all tags.
 
     Args:
@@ -2521,7 +2523,7 @@ def tag_list(repo: RepoPath, outstream: TextIO = sys.stdout) -> list[bytes]:
       outstream: Stream to write tags to
     """
     with open_repo_closing(repo) as r:
-        tags = sorted(r.refs.as_dict(b"refs/tags"))
+        tags: list[Ref] = sorted(r.refs.as_dict(Ref(b"refs/tags")))
         return tags
 
 
@@ -2666,7 +2668,7 @@ def notes_show(
         return r.notes.get_note(object_sha, notes_ref, config=config)
 
 
-def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[bytes, bytes]]:
+def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[ObjectID, bytes]]:
     """List all notes in a notes ref.
 
     Args:
@@ -2686,7 +2688,7 @@ def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[bytes, byt
         return r.notes.list_notes(notes_ref, config=config)
 
 
-def replace_list(repo: RepoPath) -> list[tuple[bytes, bytes]]:
+def replace_list(repo: RepoPath) -> list[tuple[ObjectID, ObjectID]]:
     """List all replacement refs.
 
     Args:
@@ -2697,16 +2699,16 @@ def replace_list(repo: RepoPath) -> list[tuple[bytes, bytes]]:
       object being replaced and replacement_sha is what it's replaced with
     """
     with open_repo_closing(repo) as r:
-        replacements = []
+        replacements: list[tuple[ObjectID, ObjectID]] = []
         for ref in r.refs.keys():
             if ref.startswith(LOCAL_REPLACE_PREFIX):
-                object_sha = ref[len(LOCAL_REPLACE_PREFIX) :]
+                object_sha = ObjectID(ref[len(LOCAL_REPLACE_PREFIX) :])
                 replacement_sha = r.refs[ref]
                 replacements.append((object_sha, replacement_sha))
         return replacements
 
 
-def replace_delete(repo: RepoPath, object_sha: bytes | str) -> None:
+def replace_delete(repo: RepoPath, object_sha: ObjectID | str) -> None:
     """Delete a replacement ref.
 
     Args:
@@ -2714,24 +2716,24 @@ def replace_delete(repo: RepoPath, object_sha: bytes | str) -> None:
       object_sha: SHA of the object whose replacement should be removed
     """
     with open_repo_closing(repo) as r:
-        # Convert to bytes if string
+        # Convert to ObjectID if string
         if isinstance(object_sha, str):
-            object_sha_hex = object_sha.encode("ascii")
+            object_sha_id = ObjectID(object_sha.encode("ascii"))
         else:
-            object_sha_hex = object_sha
+            object_sha_id = object_sha
 
-        replace_ref = _make_replace_ref(object_sha_hex)
+        replace_ref = _make_replace_ref(object_sha_id)
         if replace_ref not in r.refs:
             raise KeyError(
-                f"No replacement ref found for {object_sha_hex.decode('ascii')}"
+                f"No replacement ref found for {object_sha_id.decode('ascii')}"
             )
         del r.refs[replace_ref]
 
 
 def replace_create(
     repo: RepoPath,
-    object_sha: str | bytes,
-    replacement_sha: str | bytes,
+    object_sha: str | ObjectID,
+    replacement_sha: str | ObjectID,
 ) -> None:
     """Create a replacement ref to replace one object with another.
 
@@ -2741,20 +2743,20 @@ def replace_create(
       replacement_sha: SHA of the replacement object
     """
     with open_repo_closing(repo) as r:
-        # Convert to bytes if string
+        # Convert to ObjectID if string
         if isinstance(object_sha, str):
-            object_sha_hex = object_sha.encode("ascii")
+            object_sha_id = ObjectID(object_sha.encode("ascii"))
         else:
-            object_sha_hex = object_sha
+            object_sha_id = object_sha
 
         if isinstance(replacement_sha, str):
-            replacement_sha_hex = replacement_sha.encode("ascii")
+            replacement_sha_id = ObjectID(replacement_sha.encode("ascii"))
         else:
-            replacement_sha_hex = replacement_sha
+            replacement_sha_id = replacement_sha
 
         # Create the replacement ref
-        replace_ref = _make_replace_ref(object_sha_hex)
-        r.refs[replace_ref] = replacement_sha_hex
+        replace_ref = _make_replace_ref(object_sha_id)
+        r.refs[replace_ref] = replacement_sha_id
 
 
 def reset(
@@ -2783,7 +2785,7 @@ def reset(
         if target_commit is not None:
             # Get the current HEAD value for set_if_equals
             try:
-                old_head = r.refs[b"HEAD"]
+                old_head = r.refs[HEADREF]
             except KeyError:
                 old_head = None
 
@@ -2800,7 +2802,7 @@ def reset(
 
             # Update HEAD with reflog message
             r.refs.set_if_equals(
-                b"HEAD", old_head, target_commit.id, message=reflog_message
+                HEADREF, old_head, target_commit.id, message=reflog_message
             )
 
         if mode == "soft":
@@ -2978,14 +2980,14 @@ def push(
         )
 
         selected_refs = []
-        remote_changed_refs: dict[bytes, bytes | None] = {}
+        remote_changed_refs: dict[Ref, ObjectID | None] = {}
 
-        def update_refs(refs: dict[bytes, bytes]) -> dict[bytes, bytes]:
-            remote_refs = DictRefsContainer(refs)
+        def update_refs(refs: dict[Ref, ObjectID]) -> dict[Ref, ObjectID]:
+            remote_refs = DictRefsContainer(refs)  # type: ignore[arg-type]
             selected_refs.extend(
                 parse_reftuples(r.refs, remote_refs, refspecs_bytes, force=force)
             )
-            new_refs = {}
+            new_refs: dict[Ref, ObjectID] = {}
 
             # In mirror mode, delete remote refs that don't exist locally
             if mirror_mode:
@@ -3019,8 +3021,8 @@ def push(
         try:
 
             def generate_pack_data_wrapper(
-                have: AbstractSet[bytes],
-                want: AbstractSet[bytes],
+                have: AbstractSet[ObjectID],
+                want: AbstractSet[ObjectID],
                 *,
                 ofs_delta: bool = False,
                 progress: Callable[..., None] | None = None,
@@ -3046,7 +3048,7 @@ def push(
                 b"Push to " + remote_location.encode(err_encoding) + b" successful.\n"
             )
 
-        for ref, error in (result.ref_status or {}).items():
+        for ref, error in (result.ref_status or {}).items():  # type: ignore[assignment]
             if error is not None:
                 errstream.write(
                     f"Push of ref {ref.decode('utf-8', 'replace')} failed: {error}\n".encode(
@@ -3125,9 +3127,9 @@ def pull(
                     refspecs_normalized.append(spec)
 
         def determine_wants(
-            remote_refs: dict[bytes, bytes], depth: int | None = None
-        ) -> list[bytes]:
-            remote_refs_container = DictRefsContainer(remote_refs)
+            remote_refs: dict[Ref, ObjectID], depth: int | None = None
+        ) -> list[ObjectID]:
+            remote_refs_container = DictRefsContainer(remote_refs)  # type: ignore[arg-type]
             selected_refs.extend(
                 parse_reftuples(
                     remote_refs_container, r.refs, refspecs_normalized, force=force
@@ -3166,7 +3168,7 @@ def pull(
 
         # Store the old HEAD tree before making changes
         try:
-            old_head = r.refs[b"HEAD"]
+            old_head = r.refs[HEADREF]
             old_commit = r[old_head]
             assert isinstance(old_commit, Commit)
             old_tree_id = old_commit.tree
@@ -3202,7 +3204,7 @@ def pull(
             if rh is not None and lh is not None:
                 lh_value = fetch_result.refs[lh]
                 if lh_value is not None:
-                    r.refs[rh] = lh_value
+                    r.refs[Ref(rh)] = lh_value
 
         # Only update HEAD if we didn't perform a merge
         if selected_refs and not merged:
@@ -3833,7 +3835,7 @@ def _make_tag_ref(name: str | bytes) -> Ref:
     return local_tag_name(name)
 
 
-def _make_replace_ref(name: str | bytes) -> Ref:
+def _make_replace_ref(name: str | bytes | ObjectID) -> Ref:
     if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return local_replace_name(name)
@@ -3881,7 +3883,7 @@ def branch_create(
             else objectish
         )
 
-        if b"refs/remotes/" + objectish_bytes in r.refs:
+        if Ref(b"refs/remotes/" + objectish_bytes) in r.refs:
             objectish = b"refs/remotes/" + objectish_bytes
         elif local_branch_name(objectish_bytes) in r.refs:
             objectish = local_branch_name(objectish_bytes)
@@ -3918,15 +3920,15 @@ def branch_create(
                 else original_objectish
             )
 
-            if objectish_bytes in r.refs:
+            if Ref(objectish_bytes) in r.refs:
                 objectish_ref = objectish_bytes
-            elif b"refs/remotes/" + objectish_bytes in r.refs:
+            elif Ref(b"refs/remotes/" + objectish_bytes) in r.refs:
                 objectish_ref = b"refs/remotes/" + objectish_bytes
             elif local_branch_name(objectish_bytes) in r.refs:
                 objectish_ref = local_branch_name(objectish_bytes)
         else:
             # HEAD might point to a remote-tracking branch
-            head_ref = r.refs.follow(b"HEAD")[0][1]
+            head_ref = r.refs.follow(HEADREF)[0][1]
             if head_ref.startswith(b"refs/remotes/"):
                 objectish_ref = head_ref
 
@@ -3974,7 +3976,7 @@ def filter_branches_by_pattern(branches: Iterable[bytes], pattern: str) -> list[
     ]
 
 
-def branch_list(repo: RepoPath) -> list[bytes]:
+def branch_list(repo: RepoPath) -> list[Ref]:
     """List all branches.
 
     Args:
@@ -3983,7 +3985,7 @@ def branch_list(repo: RepoPath) -> list[bytes]:
       List of branch names (without refs/heads/ prefix)
     """
     with open_repo_closing(repo) as r:
-        branches = list(r.refs.keys(base=LOCAL_BRANCH_PREFIX))
+        branches: list[Ref] = list(r.refs.keys(base=Ref(LOCAL_BRANCH_PREFIX)))
 
         # Check for branch.sort configuration
         config = r.get_config_stack()
@@ -4040,7 +4042,7 @@ def branch_remotes_list(repo: RepoPath) -> list[bytes]:
       List of branch names (without refs/remotes/ prefix, and without remote name; e.g. 'main' from 'origin/main')
     """
     with open_repo_closing(repo) as r:
-        branches = list(r.refs.keys(base=LOCAL_REMOTE_PREFIX))
+        branches = [bytes(ref) for ref in r.refs.keys(base=Ref(LOCAL_REMOTE_PREFIX))]
 
         config = r.get_config_stack()
         try:
@@ -4063,7 +4065,7 @@ def branch_remotes_list(repo: RepoPath) -> list[bytes]:
             # Sort by date
             def get_commit_date(branch_name: bytes) -> int:
                 ref = LOCAL_REMOTE_PREFIX + branch_name
-                sha = r.refs[ref]
+                sha = r.refs[Ref(ref)]
                 commit = r.object_store[sha]
                 assert isinstance(commit, Commit)
                 if sort_key == "committerdate":
@@ -4100,9 +4102,9 @@ def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
         - ``is_merged``: True if branch is merged into HEAD, False otherwise
     """
     with open_repo_closing(repo) as r:
-        current_sha = r.refs[b"HEAD"]
+        current_sha = r.refs[HEADREF]
 
-        for branch_ref, branch_sha in r.refs.as_dict(base=b"refs/heads/").items():
+        for branch_ref, branch_sha in r.refs.as_dict(base=Ref(b"refs/heads/")).items():
             # Check if branch is an ancestor of HEAD (fully merged)
             is_merged = can_fast_forward(r, branch_sha, current_sha)
             yield branch_ref, is_merged
@@ -4154,7 +4156,9 @@ def branches_containing(repo: RepoPath, commit: str) -> Iterator[bytes]:
         commit_obj = parse_commit(r, commit)
         commit_sha = commit_obj.id
 
-        for branch_ref, branch_sha in r.refs.as_dict(base=LOCAL_BRANCH_PREFIX).items():
+        for branch_ref, branch_sha in r.refs.as_dict(
+            base=Ref(LOCAL_BRANCH_PREFIX)
+        ).items():
             if can_fast_forward(r, commit_sha, branch_sha):
                 yield branch_ref
 
@@ -4171,7 +4175,7 @@ def active_branch(repo: RepoPath) -> bytes:
       IndexError: if HEAD is floating
     """
     with open_repo_closing(repo) as r:
-        active_ref = r.refs.follow(b"HEAD")[0][1]
+        active_ref = r.refs.follow(HEADREF)[0][1]
         if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
             raise ValueError(active_ref)
         return active_ref[len(LOCAL_BRANCH_PREFIX) :]
@@ -4352,7 +4356,7 @@ def for_each_ref(
         refs = r.get_refs()
 
     if pattern:
-        matching_refs: dict[bytes, bytes] = {}
+        matching_refs: dict[Ref, ObjectID] = {}
         pattern_parts = pattern.split(b"/")
         for ref, sha in refs.items():
             matches = False
@@ -4429,12 +4433,12 @@ def show_ref(
             filtered_refs = filter_ref_prefix(refs, [b"refs/"])
 
         # Add HEAD if requested
-        if head and b"HEAD" in refs:
-            filtered_refs[b"HEAD"] = refs[b"HEAD"]
+        if head and HEADREF in refs:
+            filtered_refs[HEADREF] = refs[HEADREF]
 
         # Filter by patterns if specified
         if byte_patterns:
-            matching_refs: dict[bytes, bytes] = {}
+            matching_refs: dict[Ref, ObjectID] = {}
             for ref, sha in filtered_refs.items():
                 for pattern in byte_patterns:
                     if verify:
@@ -4527,7 +4531,7 @@ def show_branch(
         refs = r.get_refs()
 
         # Determine which branches to show
-        branch_refs: dict[bytes, bytes] = {}
+        branch_refs: dict[Ref, ObjectID] = {}
 
         if branches:
             # Specific branches requested
@@ -4536,18 +4540,19 @@ def show_branch(
                     os.fsencode(branch) if isinstance(branch, str) else branch
                 )
                 # Try as full ref name first
-                if branch_bytes in refs:
-                    branch_refs[branch_bytes] = refs[branch_bytes]
+                branch_ref_check = Ref(branch_bytes)
+                if branch_ref_check in refs:
+                    branch_refs[branch_ref_check] = refs[branch_ref_check]
                 else:
                     # Try as branch name
                     branch_ref = local_branch_name(branch_bytes)
                     if branch_ref in refs:
                         branch_refs[branch_ref] = refs[branch_ref]
                     # Try as remote branch
-                    elif LOCAL_REMOTE_PREFIX + branch_bytes in refs:
-                        branch_refs[LOCAL_REMOTE_PREFIX + branch_bytes] = refs[
-                            LOCAL_REMOTE_PREFIX + branch_bytes
-                        ]
+                    else:
+                        remote_ref = Ref(LOCAL_REMOTE_PREFIX + branch_bytes)
+                        if remote_ref in refs:
+                            branch_refs[remote_ref] = refs[remote_ref]
         else:
             # Default behavior: show local branches
             if all_branches:
@@ -4565,7 +4570,7 @@ def show_branch(
         # Add current branch if requested and not already included
         if current:
             try:
-                head_refs, _ = r.refs.follow(b"HEAD")
+                head_refs, _ = r.refs.follow(HEADREF)
                 if head_refs:
                     head_ref = head_refs[0]
                     if head_ref not in branch_refs and head_ref in refs:
@@ -4579,7 +4584,7 @@ def show_branch(
 
         # Sort branches for consistent output
         sorted_branches = sorted(branch_refs.items(), key=lambda x: x[0])
-        branch_sha_list = [sha for _, sha in sorted_branches]
+        branch_sha_list: list[ObjectID] = [sha for _, sha in sorted_branches]
 
         # Handle --independent flag
         if independent_branches:
@@ -4604,7 +4609,7 @@ def show_branch(
         # Get current branch for marking
         current_branch: bytes | None = None
         try:
-            head_refs, _ = r.refs.follow(b"HEAD")
+            head_refs, _ = r.refs.follow(HEADREF)
             if head_refs:
                 current_branch = head_refs[0]
         except (KeyError, TypeError):
@@ -4837,7 +4842,7 @@ def repack(repo: RepoPath, write_bitmaps: bool = False) -> None:
 
 def pack_objects(
     repo: RepoPath,
-    object_ids: Sequence[bytes],
+    object_ids: Sequence[ObjectID],
     packf: BinaryIO,
     idxf: BinaryIO | None,
     delta_window_size: int | None = None,
@@ -4889,7 +4894,7 @@ def ls_tree(
       name_only: Only print item name
     """
 
-    def list_tree(store: BaseObjectStore, treeid: bytes, base: bytes) -> None:
+    def list_tree(store: BaseObjectStore, treeid: ObjectID, base: bytes) -> None:
         tree = store[treeid]
         assert isinstance(tree, Tree)
         for name, mode, sha in tree.iteritems():
@@ -5057,7 +5062,7 @@ def check_ignore(
                 yield _quote_path(output_path) if quote_path else output_path
 
 
-def _get_current_head_tree(repo: Repo) -> bytes | None:
+def _get_current_head_tree(repo: Repo) -> ObjectID | None:
     """Get the current HEAD tree ID.
 
     Args:
@@ -5067,10 +5072,10 @@ def _get_current_head_tree(repo: Repo) -> bytes | None:
       Tree ID of current HEAD, or None if no HEAD exists (empty repo)
     """
     try:
-        current_head = repo.refs[b"HEAD"]
+        current_head = repo.refs[HEADREF]
         current_commit = repo[current_head]
         assert isinstance(current_commit, Commit), "Expected a Commit object"
-        tree_id: bytes = current_commit.tree
+        tree_id: ObjectID = current_commit.tree
         return tree_id
     except KeyError:
         # No HEAD yet (empty repo)
@@ -5078,7 +5083,7 @@ def _get_current_head_tree(repo: Repo) -> bytes | None:
 
 
 def _check_uncommitted_changes(
-    repo: Repo, target_tree_id: bytes, force: bool = False
+    repo: Repo, target_tree_id: ObjectID, force: bool = False
 ) -> None:
     """Check for uncommitted changes that would conflict with a checkout/switch.
 
@@ -5182,8 +5187,8 @@ def _get_worktree_update_config(
 
 def _perform_tree_switch(
     repo: Repo,
-    current_tree_id: bytes | None,
-    target_tree_id: bytes,
+    current_tree_id: ObjectID | None,
+    target_tree_id: ObjectID,
     force: bool = False,
 ) -> None:
     """Perform the actual working tree switch.
@@ -5239,7 +5244,7 @@ def update_head(
         if new_branch is not None:
             to_set = _make_branch_ref(new_branch)
         else:
-            to_set = b"HEAD"
+            to_set = HEADREF
         if detached:
             # TODO(jelmer): Provide some way so that the actual ref gets
             # updated rather than what it points to, so the delete isn't
@@ -5249,7 +5254,7 @@ def update_head(
         else:
             r.refs.set_symbolic_ref(to_set, parse_ref(r, target))
         if new_branch is not None:
-            r.refs.set_symbolic_ref(b"HEAD", to_set)
+            r.refs.set_symbolic_ref(HEADREF, to_set)
 
 
 def checkout(
@@ -5297,7 +5302,7 @@ def checkout(
             # If no target specified, use HEAD
             if target is None:
                 try:
-                    target = r.refs[b"HEAD"]
+                    target = r.refs[HEADREF]
                 except KeyError:
                     raise CheckoutError("No HEAD reference found")
             else:
@@ -5464,7 +5469,7 @@ def restore(
             if staged:
                 # Restoring staged files from HEAD
                 try:
-                    source = r.refs[b"HEAD"]
+                    source = r.refs[HEADREF]
                 except KeyError:
                     raise CheckoutError("No HEAD reference found")
             elif worktree:
@@ -5626,8 +5631,6 @@ def switch(
             update_head(r, create)
 
             # Set up tracking if creating from a remote branch
-            from .refs import LOCAL_REMOTE_PREFIX, local_branch_name, parse_remote_ref
-
             if isinstance(original_target, bytes) and target_bytes.startswith(
                 LOCAL_REMOTE_PREFIX
             ):
@@ -6121,13 +6124,13 @@ def write_tree(repo: RepoPath) -> bytes:
 
 def _do_merge(
     r: Repo,
-    merge_commit_id: bytes,
+    merge_commit_id: ObjectID,
     no_commit: bool = False,
     no_ff: bool = False,
     message: bytes | None = None,
     author: bytes | None = None,
     committer: bytes | None = None,
-) -> tuple[bytes | None, list[bytes]]:
+) -> tuple[ObjectID | None, list[bytes]]:
     """Internal merge implementation that operates on an open repository.
 
     Args:
@@ -6148,7 +6151,7 @@ def _do_merge(
 
     # Get HEAD commit
     try:
-        head_commit_id = r.refs[b"HEAD"]
+        head_commit_id = r.refs[HEADREF]
     except KeyError:
         raise Error("No HEAD reference found")
 
@@ -6174,7 +6177,7 @@ def _do_merge(
     # Check for fast-forward
     if base_commit_id == head_commit_id and not no_ff:
         # Fast-forward merge
-        r.refs[b"HEAD"] = merge_commit_id
+        r.refs[HEADREF] = merge_commit_id
         # Update the working directory
         changes = tree_changes(r.object_store, head_commit.tree, merge_commit.tree)
         update_working_tree(
@@ -6235,20 +6238,20 @@ def _do_merge(
     r.object_store.add_object(merge_commit_obj)
 
     # Update HEAD
-    r.refs[b"HEAD"] = merge_commit_obj.id
+    r.refs[HEADREF] = merge_commit_obj.id
 
     return (merge_commit_obj.id, [])
 
 
 def _do_octopus_merge(
     r: Repo,
-    merge_commit_ids: list[bytes],
+    merge_commit_ids: list[ObjectID],
     no_commit: bool = False,
     no_ff: bool = False,
     message: bytes | None = None,
     author: bytes | None = None,
     committer: bytes | None = None,
-) -> tuple[bytes | None, list[bytes]]:
+) -> tuple[ObjectID | None, list[bytes]]:
     """Internal octopus merge implementation that operates on an open repository.
 
     Args:
@@ -6269,7 +6272,7 @@ def _do_octopus_merge(
 
     # Get HEAD commit
     try:
-        head_commit_id = r.refs[b"HEAD"]
+        head_commit_id = r.refs[HEADREF]
     except KeyError:
         raise Error("No HEAD reference found")
 
@@ -6367,7 +6370,7 @@ def _do_octopus_merge(
     r.object_store.add_object(merge_commit_obj)
 
     # Update HEAD
-    r.refs[b"HEAD"] = merge_commit_obj.id
+    r.refs[HEADREF] = merge_commit_obj.id
 
     return (merge_commit_obj.id, [])
 
@@ -6544,7 +6547,7 @@ def cherry(
         if upstream is None:
             # Try to find tracking branch
             upstream_found = False
-            head_refs, _ = r.refs.follow(b"HEAD")
+            head_refs, _ = r.refs.follow(HEADREF)
             if head_refs:
                 head_ref = head_refs[0]
                 if head_ref.startswith(b"refs/heads/"):
@@ -6566,7 +6569,7 @@ def cherry(
 
                         if remote_name:
                             # Build the tracking branch ref
-                            upstream_refname = (
+                            upstream_refname = Ref(
                                 b"refs/remotes/"
                                 + remote_name
                                 + b"/"
@@ -6578,7 +6581,7 @@ def cherry(
 
             if not upstream_found:
                 # Default to HEAD^ if no tracking branch found
-                head_commit = r[b"HEAD"]
+                head_commit = r[HEADREF]
                 if isinstance(head_commit, Commit) and head_commit.parents:
                     upstream = head_commit.parents[0]
                 else:
@@ -6873,7 +6876,7 @@ def revert(
 
         # Get current HEAD
         try:
-            head_commit_id = r.refs[b"HEAD"]
+            head_commit_id = r.refs[HEADREF]
         except KeyError:
             raise Error("No HEAD reference found")
 
@@ -6973,7 +6976,7 @@ def revert(
                 r.object_store.add_object(revert_commit)
 
                 # Update HEAD
-                r.refs[b"HEAD"] = revert_commit.id
+                r.refs[HEADREF] = revert_commit.id
                 head_commit_id = revert_commit.id
 
         return head_commit_id if not no_commit else None
@@ -7362,17 +7365,17 @@ def filter_branch(
     filter_author: Callable[[bytes], bytes | None] | None = None,
     filter_committer: Callable[[bytes], bytes | None] | None = None,
     filter_message: Callable[[bytes], bytes | None] | None = None,
-    tree_filter: Callable[[bytes, str], bytes | None] | None = None,
-    index_filter: Callable[[bytes, str], bytes | None] | None = None,
-    parent_filter: Callable[[Sequence[bytes]], list[bytes]] | None = None,
-    commit_filter: Callable[[Commit, bytes], bytes | None] | None = None,
+    tree_filter: Callable[[ObjectID, str], ObjectID | None] | None = None,
+    index_filter: Callable[[ObjectID, str], ObjectID | None] | None = None,
+    parent_filter: Callable[[Sequence[ObjectID]], list[ObjectID]] | None = None,
+    commit_filter: Callable[[Commit, ObjectID], ObjectID | None] | None = None,
     subdirectory_filter: str | bytes | None = None,
     prune_empty: bool = False,
     tag_name_filter: Callable[[bytes], bytes | None] | None = None,
     force: bool = False,
     keep_original: bool = True,
     refs: list[bytes] | None = None,
-) -> dict[bytes, bytes]:
+) -> dict[ObjectID, ObjectID]:
     """Rewrite branch history by creating new commits with filtered properties.
 
     This is similar to git filter-branch, allowing you to rewrite commit
@@ -7422,7 +7425,7 @@ def filter_branch(
             if branch == b"HEAD":
                 # Resolve HEAD to actual branch
                 try:
-                    resolved = r.refs.follow(b"HEAD")
+                    resolved = r.refs.follow(HEADREF)
                     if resolved and resolved[0]:
                         # resolved is a list of (refname, sha) tuples
                         resolved_ref = resolved[0][-1]
@@ -7465,7 +7468,7 @@ def filter_branch(
         )
 
         # Tag callback for renaming tags
-        def rename_tag(old_ref: bytes, new_ref: bytes) -> None:
+        def rename_tag(old_ref: Ref, new_ref: Ref) -> None:
             # Copy tag to new name
             r.refs[new_ref] = r.refs[old_ref]
             # Delete old tag
@@ -7488,7 +7491,7 @@ def filter_branch(
 
 def format_patch(
     repo: RepoPath = ".",
-    committish: bytes | tuple[bytes, bytes] | None = None,
+    committish: ObjectID | tuple[ObjectID, ObjectID] | None = None,
     outstream: TextIO = sys.stdout,
     outdir: str | os.PathLike[str] | None = None,
     n: int = 1,
@@ -7664,7 +7667,7 @@ def bisect_start(
                 old_commit = r[r.head()]
                 assert isinstance(old_commit, Commit)
                 old_tree = old_commit.tree if r.head() else None
-                r.refs[b"HEAD"] = next_sha
+                r.refs[HEADREF] = next_sha
                 commit = r[next_sha]
                 assert isinstance(commit, Commit)
                 changes = tree_changes(r.object_store, old_tree, commit.tree)
@@ -7696,7 +7699,7 @@ def bisect_bad(
             old_commit = r[r.head()]
             assert isinstance(old_commit, Commit)
             old_tree = old_commit.tree if r.head() else None
-            r.refs[b"HEAD"] = next_sha
+            r.refs[HEADREF] = next_sha
             commit = r[next_sha]
             assert isinstance(commit, Commit)
             changes = tree_changes(r.object_store, old_tree, commit.tree)
@@ -7728,7 +7731,7 @@ def bisect_good(
             old_commit = r[r.head()]
             assert isinstance(old_commit, Commit)
             old_tree = old_commit.tree if r.head() else None
-            r.refs[b"HEAD"] = next_sha
+            r.refs[HEADREF] = next_sha
             commit = r[next_sha]
             assert isinstance(commit, Commit)
             changes = tree_changes(r.object_store, old_tree, commit.tree)
@@ -7773,7 +7776,7 @@ def bisect_skip(
             old_commit = r[r.head()]
             assert isinstance(old_commit, Commit)
             old_tree = old_commit.tree if r.head() else None
-            r.refs[b"HEAD"] = next_sha
+            r.refs[HEADREF] = next_sha
             commit = r[next_sha]
             assert isinstance(commit, Commit)
             changes = tree_changes(r.object_store, old_tree, commit.tree)
@@ -7942,7 +7945,7 @@ def reflog_expire(
             refs_to_process = [ref]
 
         # Build set of reachable objects if we have unreachable expiration time
-        reachable_objects: set[bytes] | None = None
+        reachable_objects: set[ObjectID] | None = None
         if expire_unreachable_time is not None:
             from .gc import find_reachable_objects
 
@@ -8461,9 +8464,13 @@ def lfs_fetch(
 
         for ref in refs:
             if isinstance(ref, str):
-                ref = ref.encode()
+                ref_key = Ref(ref.encode())
+            elif isinstance(ref, bytes):
+                ref_key = Ref(ref)
+            else:
+                ref_key = ref
             try:
-                commit = r[r.refs[ref]]
+                commit = r[r.refs[ref_key]]
             except KeyError:
                 continue
 
@@ -8583,19 +8590,21 @@ def lfs_push(
         # Find all LFS objects to push
         if refs is None:
             # Push current branch
-            head_ref = r.refs.read_ref(b"HEAD")
+            head_ref = r.refs.read_ref(HEADREF)
             refs = [head_ref] if head_ref else []
 
         objects_to_push = set()
 
         for ref in refs:
             if isinstance(ref, str):
-                ref = ref.encode()
+                ref_bytes = ref.encode()
+            else:
+                ref_bytes = ref
             try:
-                if ref.startswith(b"refs/"):
-                    commit = r[r.refs[ref]]
+                if ref_bytes.startswith(b"refs/"):
+                    commit = r[r.refs[Ref(ref_bytes)]]
                 else:
-                    commit = r[ref]
+                    commit = r[ref_bytes]
             except KeyError:
                 continue
 
@@ -8736,8 +8745,9 @@ def worktree_add(
 
     with open_repo_closing(repo) as r:
         commit_bytes = commit.encode() if isinstance(commit, str) else commit
+        commit_id = ObjectID(commit_bytes) if commit_bytes is not None else None
         wt_repo = add_worktree(
-            r, path, branch=branch, commit=commit_bytes, detach=detach, force=force
+            r, path, branch=branch, commit=commit_id, detach=detach, force=force
         )
         return wt_repo.path
 
@@ -8867,7 +8877,7 @@ def merge_base(
     committishes: Sequence[str | bytes] | None = None,
     all: bool = False,
     octopus: bool = False,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Find the best common ancestor(s) between commits.
 
     Args:
@@ -8946,7 +8956,7 @@ def is_ancestor(
 def independent_commits(
     repo: RepoPath = ".",
     committishes: Sequence[str | bytes] | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Filter commits to only those that are not reachable from others.
 
     Args:

@@ -22,6 +22,7 @@ from typing import BinaryIO
 from dulwich.objects import ObjectID
 from dulwich.refs import (
     SYMREF,
+    Ref,
     RefsContainer,
 )
 
@@ -909,7 +910,7 @@ class ReftableRefsContainer(RefsContainer):
                     files.append(os.path.join(self.reftable_dir, table_name))
         return files
 
-    def _read_all_tables(self) -> dict[bytes, tuple[int, bytes]]:
+    def _read_all_tables(self) -> dict[Ref, tuple[int, bytes]]:
         """Read all reftable files and merge results."""
         # First, read all tables and sort them by min_update_index
         table_data = []
@@ -924,19 +925,20 @@ class ReftableRefsContainer(RefsContainer):
         table_data.sort(key=lambda x: x[0])
 
         # Merge results in chronological order
-        all_refs: dict[bytes, tuple[int, bytes]] = {}
+        all_refs: dict[Ref, tuple[int, bytes]] = {}
         for min_update_index, table_file, refs in table_data:
             # Apply updates from this table
             for refname, (value_type, value) in refs.items():
+                ref = Ref(refname)
                 if value_type == REF_VALUE_DELETE:
                     # Remove ref if it exists
-                    all_refs.pop(refname, None)
+                    all_refs.pop(ref, None)
                 else:
                     # Add/update ref
-                    all_refs[refname] = (value_type, value)
+                    all_refs[ref] = (value_type, value)
         return all_refs
 
-    def allkeys(self) -> set[bytes]:
+    def allkeys(self) -> set[Ref]:
         """Return set of all ref names."""
         refs = self._read_all_tables()
         result = set(refs.keys())
@@ -946,17 +948,17 @@ class ReftableRefsContainer(RefsContainer):
             if value_type == REF_VALUE_SYMREF:
                 # Add the target ref as an implicit ref
                 target = value
-                result.add(target)
+                result.add(Ref(target))
 
         return result
 
-    def follow(self, name: bytes) -> tuple[list[bytes], bytes]:
+    def follow(self, name: Ref) -> tuple[list[Ref], ObjectID | None]:
         """Follow a reference name.
 
         Returns: a tuple of (refnames, sha), where refnames are the names of
             references in the chain
         """
-        refnames = []
+        refnames: list[Ref] = []
         current = name
         refs = self._read_all_tables()
 
@@ -968,11 +970,11 @@ class ReftableRefsContainer(RefsContainer):
 
             value_type, value = ref_data
             if value_type == REF_VALUE_REF:
-                return refnames, value
+                return refnames, ObjectID(value)
             if value_type == REF_VALUE_PEELED:
-                return refnames, value[:SHA1_HEX_SIZE]  # First SHA1 hex chars
+                return refnames, ObjectID(value[:SHA1_HEX_SIZE])  # First SHA1 hex chars
             if value_type == REF_VALUE_SYMREF:
-                current = value
+                current = Ref(value)
                 continue
 
             # Unknown value type
@@ -981,7 +983,7 @@ class ReftableRefsContainer(RefsContainer):
         # Too many levels of indirection
         raise ValueError(f"Too many levels of symbolic ref indirection for {name!r}")
 
-    def __getitem__(self, name: bytes) -> ObjectID:
+    def __getitem__(self, name: Ref) -> ObjectID:
         """Get the SHA1 for a reference name.
 
         This method follows all symbolic references.
@@ -991,7 +993,7 @@ class ReftableRefsContainer(RefsContainer):
             raise KeyError(name)
         return sha
 
-    def read_loose_ref(self, name: bytes) -> bytes:
+    def read_loose_ref(self, name: Ref) -> bytes:
         """Read a reference value without following symbolic refs.
 
         Args:
@@ -1019,18 +1021,18 @@ class ReftableRefsContainer(RefsContainer):
 
         raise ValueError(f"Unknown ref value type: {value_type}")
 
-    def get_packed_refs(self) -> dict[bytes, bytes]:
+    def get_packed_refs(self) -> dict[Ref, ObjectID]:
         """Get packed refs. Reftable doesn't distinguish packed/loose."""
         refs = self._read_all_tables()
         result = {}
         for name, (value_type, value) in refs.items():
             if value_type == REF_VALUE_REF:
-                result[name] = value
+                result[name] = ObjectID(value)
             elif value_type == REF_VALUE_PEELED:
-                result[name] = value[:SHA1_HEX_SIZE]  # First SHA1 hex chars
+                result[name] = ObjectID(value[:SHA1_HEX_SIZE])  # First SHA1 hex chars
         return result
 
-    def get_peeled(self, name: bytes) -> bytes | None:
+    def get_peeled(self, name: Ref) -> ObjectID | None:
         """Return the cached peeled value of a ref, if available.
 
         Args:
@@ -1048,10 +1050,10 @@ class ReftableRefsContainer(RefsContainer):
         value_type, value = ref_data
         if value_type == REF_VALUE_PEELED:
             # Return the peeled SHA (second 40 hex chars)
-            return value[40:80]
+            return ObjectID(value[40:80])
         elif value_type == REF_VALUE_REF:
             # Known not to be peeled
-            return value
+            return ObjectID(value)
         else:
             # Symbolic ref or other - no peeled info
             return None
@@ -1073,12 +1075,14 @@ class ReftableRefsContainer(RefsContainer):
         table_name = f"0x{min_idx:016x}-0x{max_idx:016x}-{hash_part:08x}.ref"
         return os.path.join(self.reftable_dir, table_name)
 
-    def add_packed_refs(self, new_refs: Mapping[bytes, bytes | None]) -> None:
+    def add_packed_refs(self, new_refs: Mapping[Ref, ObjectID | None]) -> None:
         """Add packed refs. Creates a new reftable file with all refs consolidated."""
         if not new_refs:
             return
 
-        self._write_batch_updates(new_refs)
+        # Convert to bytes for internal use
+        byte_refs = {bytes(k): bytes(v) if v else None for k, v in new_refs.items()}
+        self._write_batch_updates(byte_refs)
 
     def _write_batch_updates(self, updates: Mapping[bytes, bytes | None]) -> None:
         """Write multiple ref updates to a single reftable file."""
@@ -1100,9 +1104,9 @@ class ReftableRefsContainer(RefsContainer):
 
     def set_if_equals(
         self,
-        name: bytes,
-        old_ref: bytes | None,
-        new_ref: bytes | None,
+        name: Ref,
+        old_ref: ObjectID | None,
+        new_ref: ObjectID,
         committer: bytes | None = None,
         timestamp: int | None = None,
         timezone: int | None = None,
@@ -1116,22 +1120,19 @@ class ReftableRefsContainer(RefsContainer):
         except KeyError:
             current = None
 
-        if current != old_ref:
+        old_ref_bytes = bytes(old_ref) if old_ref else None
+        if current != old_ref_bytes:
             return False
 
-        if new_ref is None:
-            # Delete ref
-            self._write_ref_update(name, REF_VALUE_DELETE, b"")
-        else:
-            # Update ref
-            self._write_ref_update(name, REF_VALUE_REF, new_ref)
+        # Update ref
+        self._write_ref_update(bytes(name), REF_VALUE_REF, bytes(new_ref))
 
         return True
 
     def add_if_new(
         self,
-        name: bytes,
-        ref: bytes,
+        name: Ref,
+        ref: ObjectID,
         committer: bytes | None = None,
         timestamp: int | None = None,
         timezone: int | None = None,
@@ -1143,28 +1144,31 @@ class ReftableRefsContainer(RefsContainer):
             return False  # Ref exists
         except KeyError:
             pass  # Ref doesn't exist, continue
-        self._write_ref_update(name, REF_VALUE_REF, ref)
+        self._write_ref_update(bytes(name), REF_VALUE_REF, bytes(ref))
         return True
 
     def remove_if_equals(
         self,
-        name: bytes,
-        old_ref: bytes | None,
+        name: Ref,
+        old_ref: ObjectID | None,
         committer: bytes | None = None,
         timestamp: int | None = None,
         timezone: int | None = None,
         message: bytes | None = None,
     ) -> bool:
         """Remove a ref if it equals old_ref."""
-        return self.set_if_equals(
-            name,
-            old_ref,
-            None,
-            committer=committer,
-            timestamp=timestamp,
-            timezone=timezone,
-            message=message,
-        )
+        # For deletion, we need to use the internal method since set_if_equals requires new_ref
+        try:
+            current = self.read_loose_ref(name)
+        except KeyError:
+            current = None
+
+        old_ref_bytes = bytes(old_ref) if old_ref else None
+        if current != old_ref_bytes:
+            return False
+
+        self._write_ref_update(bytes(name), REF_VALUE_DELETE, b"")
+        return True
 
     def set_symbolic_ref(
         self,
@@ -1234,14 +1238,19 @@ class ReftableRefsContainer(RefsContainer):
         # Get next update index - all refs in batch get the SAME index
         batch_update_index = self._get_next_update_index()
 
+        # Convert Ref keys to bytes for internal methods
+        all_refs_bytes = {bytes(k): v for k, v in all_refs.items()}
+
         # Apply updates to get final state
         self._apply_batch_updates(
-            all_refs, other_updates, head_update, batch_update_index
+            all_refs_bytes, other_updates, head_update, batch_update_index
         )
 
         # Write consolidated batch file
         created_files = (
-            self._write_batch_file(all_refs, batch_update_index) if all_refs else []
+            self._write_batch_file(all_refs_bytes, batch_update_index)
+            if all_refs_bytes
+            else []
         )
 
         # Update tables list with new files (don't compact, keep separate)

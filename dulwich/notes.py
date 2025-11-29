@@ -24,7 +24,8 @@ import stat
 from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING
 
-from .objects import Blob, Tree
+from .objects import Blob, ObjectID, Tree
+from .refs import Ref
 
 if TYPE_CHECKING:
     from .config import StackedConfig
@@ -240,7 +241,7 @@ class NotesTree:
 
             # Build new tree structure
             def update_tree(
-                tree: Tree, components: Sequence[bytes], blob_sha: bytes
+                tree: Tree, components: Sequence[bytes], blob_sha: ObjectID
             ) -> Tree:
                 """Update tree with new note entry.
 
@@ -302,7 +303,7 @@ class NotesTree:
             self._object_store.add_object(self._tree)
 
     def _update_tree_entry(
-        self, tree: Tree, name: bytes, mode: int, sha: bytes
+        self, tree: Tree, name: bytes, mode: int, sha: ObjectID
     ) -> Tree:
         """Update a tree entry and return the updated tree.
 
@@ -333,7 +334,7 @@ class NotesTree:
 
         return new_tree
 
-    def _get_note_sha(self, object_sha: bytes) -> bytes | None:
+    def _get_note_sha(self, object_sha: bytes) -> ObjectID | None:
         """Get the SHA of the note blob for an object.
 
         Args:
@@ -412,7 +413,7 @@ class NotesTree:
 
         # Build new tree structure
         def update_tree(
-            tree: Tree, components: Sequence[bytes], blob_sha: bytes
+            tree: Tree, components: Sequence[bytes], blob_sha: ObjectID
         ) -> Tree:
             """Update tree with new note entry.
 
@@ -546,14 +547,16 @@ class NotesTree:
         self._fanout_level = self._detect_fanout_level()
         return new_tree
 
-    def list_notes(self) -> Iterator[tuple[bytes, bytes]]:
+    def list_notes(self) -> Iterator[tuple[ObjectID, ObjectID]]:
         """List all notes in this tree.
 
         Yields:
             Tuples of (object_sha, note_sha)
         """
 
-        def walk_tree(tree: Tree, prefix: bytes = b"") -> Iterator[tuple[bytes, bytes]]:
+        def walk_tree(
+            tree: Tree, prefix: bytes = b""
+        ) -> Iterator[tuple[ObjectID, ObjectID]]:
             """Walk the notes tree recursively.
 
             Args:
@@ -572,7 +575,7 @@ class NotesTree:
                 elif stat.S_ISREG(mode):  # File
                     # Reconstruct the full hex SHA from the path
                     full_hex = prefix + name
-                    yield (full_hex, sha)
+                    yield (ObjectID(full_hex), sha)
 
         yield from walk_tree(self._tree)
 
@@ -610,7 +613,7 @@ class Notes:
         self,
         notes_ref: bytes | None = None,
         config: "StackedConfig | None" = None,
-    ) -> bytes:
+    ) -> Ref:
         """Get the notes reference to use.
 
         Args:
@@ -625,7 +628,7 @@ class Notes:
                 notes_ref = config.get((b"notes",), b"displayRef")
             if notes_ref is None:
                 notes_ref = DEFAULT_NOTES_REF
-        return notes_ref
+        return Ref(notes_ref)
 
     def get_note(
         self,
@@ -838,7 +841,7 @@ class Notes:
         self,
         notes_ref: bytes | None = None,
         config: "StackedConfig | None" = None,
-    ) -> list[tuple[bytes, bytes]]:
+    ) -> list[tuple[ObjectID, bytes]]:
         """List all notes in a notes ref.
 
         Args:
@@ -870,7 +873,7 @@ class Notes:
             return []
 
         notes_tree_obj = NotesTree(notes_tree, self._object_store)
-        result = []
+        result: list[tuple[ObjectID, bytes]] = []
         for object_sha, note_sha in notes_tree_obj.list_notes():
             note_obj = self._object_store[note_sha]
             if isinstance(note_obj, Blob):

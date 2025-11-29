@@ -107,6 +107,7 @@ else:
 from dulwich import log_utils
 
 from .errors import NotGitRepository
+from .objects import ObjectID
 from .protocol import ReceivableProtocol
 from .repo import BaseRepo, Repo
 from .server import (
@@ -309,7 +310,7 @@ def get_loose_object(
     Returns:
       Iterator yielding object contents as bytes
     """
-    sha = (mat.group(1) + mat.group(2)).encode("ascii")
+    sha = cast(ObjectID, (mat.group(1) + mat.group(2)).encode("ascii"))
     logger.info("Sending loose object %s", sha)
     object_store = get_repo(backend, mat).object_store
     if not object_store.contains_loose(sha):

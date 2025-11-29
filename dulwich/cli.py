@@ -53,6 +53,7 @@ from typing import (
 
 from dulwich import porcelain
 from dulwich._typing import Buffer
+from dulwich.refs import HEADREF, Ref
 
 from .bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
 from .client import get_transport_and_path
@@ -65,7 +66,7 @@ from .errors import (
 )
 from .index import Index
 from .log_utils import _configure_logging_from_trace
-from .objects import Commit, sha_to_hex, valid_hexsha
+from .objects import Commit, ObjectID, RawObjectID, sha_to_hex, valid_hexsha
 from .objectspec import parse_commit_range
 from .pack import Pack
 from .patch import DiffAlgorithmNotAvailable
@@ -1237,9 +1238,13 @@ class cmd_fetch_pack(Command):
         else:
 
             def determine_wants(
-                refs: Mapping[bytes, bytes], depth: int | None = None
-            ) -> list[bytes]:
-                return [y.encode("utf-8") for y in args.refs if y not in r.object_store]
+                refs: Mapping[Ref, ObjectID], depth: int | None = None
+            ) -> list[ObjectID]:
+                return [
+                    ObjectID(y.encode("utf-8"))
+                    for y in args.refs
+                    if y not in r.object_store
+                ]
 
         client.fetch(path.encode("utf-8"), r, determine_wants)
 
@@ -1552,7 +1557,7 @@ class cmd_dump_pack(Command):
         basename, _ = os.path.splitext(parsed_args.filename)
         x = Pack(basename)
         logger.info("Object names checksum: %s", x.name().decode("ascii", "replace"))
-        logger.info("Checksum: %r", sha_to_hex(x.get_stored_checksum()))
+        logger.info("Checksum: %r", sha_to_hex(RawObjectID(x.get_stored_checksum())))
         x.check()
         logger.info("Length: %d", len(x))
         for name in x:
@@ -1921,7 +1926,7 @@ def _get_commit_message_with_template(
     # Add branch info if repo is provided
     if repo:
         try:
-            ref_names, _ref_sha = repo.refs.follow(b"HEAD")
+            ref_names, _ref_sha = repo.refs.follow(HEADREF)
             ref_path = ref_names[-1]  # Get the final reference
             if ref_path.startswith(b"refs/heads/"):
                 branch = ref_path[11:]  # Remove 'refs/heads/' prefix
@@ -3348,7 +3353,7 @@ class cmd_pack_objects(Command):
         if not parsed_args.stdout and not parsed_args.basename:
             parser.error("basename required when not using --stdout")
 
-        object_ids = [line.strip().encode() for line in sys.stdin.readlines()]
+        object_ids = [ObjectID(line.strip().encode()) for line in sys.stdin.readlines()]
         deltify = parsed_args.deltify
         reuse_deltas = not parsed_args.no_reuse_deltas
 
@@ -4102,7 +4107,7 @@ class cmd_bisect(SuperCommand):
                     with porcelain.open_repo_closing(".") as r:
                         bad_ref = os.path.join(r.controldir(), "refs", "bisect", "bad")
                         with open(bad_ref, "rb") as f:
-                            bad_sha = f.read().strip()
+                            bad_sha = ObjectID(f.read().strip())
                         commit = r.object_store[bad_sha]
                         assert isinstance(commit, Commit)
                         message = commit.message.decode(
@@ -5342,7 +5347,7 @@ class cmd_filter_branch(Command):
         tree_filter = None
         if parsed_args.tree_filter:
 
-            def tree_filter(tree_sha: bytes, tmpdir: str) -> bytes:
+            def tree_filter(tree_sha: ObjectID, tmpdir: str) -> ObjectID:
                 from dulwich.objects import Blob, Tree
 
                 # Export tree to tmpdir
@@ -5364,7 +5369,7 @@ class cmd_filter_branch(Command):
                     run_filter(parsed_args.tree_filter, cwd=tmpdir)
 
                     # Rebuild tree from modified temp directory
-                    def build_tree_from_dir(dir_path: str) -> bytes:
+                    def build_tree_from_dir(dir_path: str) -> ObjectID:
                         tree = Tree()
                         for name in sorted(os.listdir(dir_path)):
                             if name.startswith("."):
@@ -5393,7 +5398,7 @@ class cmd_filter_branch(Command):
         index_filter = None
         if parsed_args.index_filter:
 
-            def index_filter(tree_sha: bytes, index_path: str) -> bytes | None:
+            def index_filter(tree_sha: ObjectID, index_path: str) -> ObjectID | None:
                 run_filter(
                     parsed_args.index_filter, extra_env={"GIT_INDEX_FILE": index_path}
                 )
@@ -5402,7 +5407,7 @@ class cmd_filter_branch(Command):
         parent_filter = None
         if parsed_args.parent_filter:
 
-            def parent_filter(parents: Sequence[bytes]) -> list[bytes]:
+            def parent_filter(parents: Sequence[ObjectID]) -> list[ObjectID]:
                 parent_str = " ".join(p.hex() for p in parents)
                 result = run_filter(
                     parsed_args.parent_filter, input_data=parent_str.encode()
@@ -5417,13 +5422,15 @@ class cmd_filter_branch(Command):
                 for sha in output.split():
                     sha_bytes = sha.encode()
                     if valid_hexsha(sha_bytes):
-                        new_parents.append(sha_bytes)
+                        new_parents.append(ObjectID(sha_bytes))
                 return new_parents
 
         commit_filter = None
         if parsed_args.commit_filter:
 
-            def commit_filter(commit_obj: Commit, tree_sha: bytes) -> bytes | None:
+            def commit_filter(
+                commit_obj: Commit, tree_sha: ObjectID
+            ) -> ObjectID | None:
                 # The filter receives: tree parent1 parent2...
                 cmd_input = tree_sha.hex()
                 for parent in commit_obj.parents:
@@ -5442,7 +5449,7 @@ class cmd_filter_branch(Command):
                     return None  # Skip commit
 
                 if valid_hexsha(output):
-                    return output.encode()
+                    return ObjectID(output.encode())
                 return None
 
         tag_name_filter = None
@@ -5775,7 +5782,7 @@ class cmd_format_patch(Command):
         parsed_args = parser.parse_args(args)
 
         # Parse committish using the new function
-        committish: bytes | tuple[bytes, bytes] | None = None
+        committish: ObjectID | tuple[ObjectID, ObjectID] | None = None
         if parsed_args.committish:
             with Repo(".") as r:
                 range_result = parse_commit_range(r, parsed_args.committish)
@@ -5783,7 +5790,7 @@ class cmd_format_patch(Command):
                     # Convert Commit objects to their SHAs
                     committish = (range_result[0].id, range_result[1].id)
                 else:
-                    committish = (
+                    committish = ObjectID(
                         parsed_args.committish.encode()
                         if isinstance(parsed_args.committish, str)
                         else parsed_args.committish
@@ -6025,7 +6032,7 @@ class cmd_bundle(Command):
                     msg = msg.decode("utf-8", "replace")
                 logger.error("%s", msg)
 
-        refs_to_include = []
+        refs_to_include: list[Ref] = []
         prerequisites = []
 
         if parsed_args.all:
@@ -6034,7 +6041,7 @@ class cmd_bundle(Command):
             for line in sys.stdin:
                 ref = line.strip().encode("utf-8")
                 if ref:
-                    refs_to_include.append(ref)
+                    refs_to_include.append(Ref(ref))
         elif parsed_args.refs:
             for ref_arg in parsed_args.refs:
                 if ".." in ref_arg:
@@ -6046,19 +6053,19 @@ class cmd_bundle(Command):
                         # Split the range to get the end part
                         end_part = ref_arg.split("..")[1]
                         if end_part:  # Not empty (not "A..")
-                            end_ref = end_part.encode("utf-8")
+                            end_ref = Ref(end_part.encode("utf-8"))
                             if end_ref in repo.refs:
                                 refs_to_include.append(end_ref)
                     else:
-                        sha = repo.refs[ref_arg.encode("utf-8")]
-                        refs_to_include.append(ref_arg.encode("utf-8"))
+                        sha = repo.refs[Ref(ref_arg.encode("utf-8"))]
+                        refs_to_include.append(Ref(ref_arg.encode("utf-8")))
                 else:
                     if ref_arg.startswith("^"):
-                        sha = repo.refs[ref_arg[1:].encode("utf-8")]
+                        sha = repo.refs[Ref(ref_arg[1:].encode("utf-8"))]
                         prerequisites.append(sha)
                     else:
-                        sha = repo.refs[ref_arg.encode("utf-8")]
-                        refs_to_include.append(ref_arg.encode("utf-8"))
+                        sha = repo.refs[Ref(ref_arg.encode("utf-8"))]
+                        refs_to_include.append(Ref(ref_arg.encode("utf-8")))
         else:
             logger.error("No refs specified. Use --all, --stdin, or specify refs")
             return 1

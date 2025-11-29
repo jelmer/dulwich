@@ -99,6 +99,7 @@ from .protocol import (
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     NAK_LINE,
+    PEELED_TAG_SUFFIX,
     SIDE_BAND_CHANNEL_DATA,
     SIDE_BAND_CHANNEL_FATAL,
     SIDE_BAND_CHANNEL_PROGRESS,
@@ -118,7 +119,7 @@ from .protocol import (
     format_unshallow_line,
     symref_capabilities,
 )
-from .refs import PEELED_TAG_SUFFIX, Ref, RefsContainer, write_info_refs
+from .refs import Ref, RefsContainer, write_info_refs
 from .repo import Repo
 
 logger = log_utils.getLogger(__name__)
@@ -156,7 +157,7 @@ class BackendRepo(TypingProtocol):
         """
         raise NotImplementedError
 
-    def get_peeled(self, name: bytes) -> bytes | None:
+    def get_peeled(self, name: bytes) -> ObjectID | None:
         """Return the cached peeled value of a ref, if available.
 
         Args:
@@ -170,11 +171,11 @@ class BackendRepo(TypingProtocol):
 
     def find_missing_objects(
         self,
-        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]],
+        determine_wants: Callable[[Mapping[Ref, ObjectID], int | None], list[ObjectID]],
         graph_walker: "_ProtocolGraphWalker",
         progress: Callable[[bytes], None] | None,
         *,
-        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
+        get_tagged: Callable[[], dict[ObjectID, ObjectID]] | None = None,
         depth: int | None = None,
     ) -> "MissingObjectFinder | None":
         """Yield the objects required for a list of commits.
@@ -496,8 +497,8 @@ class UploadPackHandler(PackHandler):
         tagged = {}
         for name, sha in refs.items():
             peeled_sha = repo.get_peeled(name)
-            if peeled_sha is not None and peeled_sha != sha:
-                tagged[peeled_sha] = sha
+            if peeled_sha is not None and peeled_sha != ObjectID(sha):
+                tagged[peeled_sha] = ObjectID(sha)
         return tagged
 
     def handle(self) -> None:
@@ -517,11 +518,11 @@ class UploadPackHandler(PackHandler):
             self.repo.get_peeled,
             self.repo.refs.get_symrefs,
         )
-        wants = []
+        wants: list[ObjectID] = []
 
         def wants_wrapper(
-            refs: Mapping[bytes, bytes], depth: int | None = None
-        ) -> list[bytes]:
+            refs: Mapping[Ref, ObjectID], depth: int | None = None
+        ) -> list[ObjectID]:
             wants.extend(graph_walker.determine_wants(refs, depth))
             return wants
 
@@ -612,7 +613,7 @@ def _split_proto_line(
 
 
 def _want_satisfied(
-    store: ObjectContainer, haves: set[bytes], want: bytes, earliest: int
+    store: ObjectContainer, haves: set[ObjectID], want: ObjectID, earliest: int
 ) -> bool:
     """Check if a specific want is satisfied by a set of haves.
 
@@ -646,7 +647,7 @@ def _want_satisfied(
 
 
 def _all_wants_satisfied(
-    store: ObjectContainer, haves: AbstractSet[bytes], wants: set[bytes]
+    store: ObjectContainer, haves: AbstractSet[ObjectID], wants: set[ObjectID]
 ) -> bool:
     """Check whether all the current wants are satisfied by a set of haves.
 
@@ -712,8 +713,8 @@ class _ProtocolGraphWalker:
         self,
         handler: PackHandler,
         object_store: ObjectContainer,
-        get_peeled: Callable[[bytes], bytes | None],
-        get_symrefs: Callable[[], dict[bytes, bytes]],
+        get_peeled: Callable[[bytes], ObjectID | None],
+        get_symrefs: Callable[[], dict[Ref, Ref]],
     ) -> None:
         """Initialize a ProtocolGraphWalker.
 
@@ -730,18 +731,18 @@ class _ProtocolGraphWalker:
         self.proto = handler.proto
         self.stateless_rpc = handler.stateless_rpc
         self.advertise_refs = handler.advertise_refs
-        self._wants: list[bytes] = []
-        self.shallow: set[bytes] = set()
-        self.client_shallow: set[bytes] = set()
-        self.unshallow: set[bytes] = set()
+        self._wants: list[ObjectID] = []
+        self.shallow: set[ObjectID] = set()
+        self.client_shallow: set[ObjectID] = set()
+        self.unshallow: set[ObjectID] = set()
         self._cached = False
-        self._cache: list[bytes] = []
+        self._cache: list[ObjectID] = []
         self._cache_index = 0
         self._impl: AckGraphWalkerImpl | None = None
 
     def determine_wants(
-        self, heads: Mapping[bytes, bytes], depth: int | None = None
-    ) -> list[bytes]:
+        self, heads: Mapping[Ref, ObjectID], depth: int | None = None
+    ) -> list[ObjectID]:
         """Determine the wants for a set of heads.
 
         The given heads are advertised to the client, who then specifies which
@@ -804,12 +805,12 @@ class _ProtocolGraphWalker:
         allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, None)
         command, sha_result = _split_proto_line(line, allowed)
 
-        want_revs = []
+        want_revs: list[ObjectID] = []
         while command == COMMAND_WANT:
             assert isinstance(sha_result, bytes)
             if sha_result not in values:
                 raise GitProtocolError(f"Client wants invalid object {sha_result!r}")
-            want_revs.append(sha_result)
+            want_revs.append(ObjectID(sha_result))
             command, sha_result = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
@@ -841,7 +842,7 @@ class _ProtocolGraphWalker:
     def nak(self) -> None:
         """Send a NAK response."""
 
-    def ack(self, have_ref: bytes) -> None:
+    def ack(self, have_ref: ObjectID) -> None:
         """Acknowledge a have reference.
 
         Args:
@@ -860,7 +861,7 @@ class _ProtocolGraphWalker:
         self._cached = True
         self._cache_index = 0
 
-    def next(self) -> bytes | None:
+    def next(self) -> ObjectID | None:
         """Get the next SHA from the graph walker.
 
         Returns: Next SHA or None if done
@@ -891,7 +892,7 @@ class _ProtocolGraphWalker:
         """
         return _split_proto_line(self.proto.read_pkt_line(), allowed)
 
-    def _handle_shallow_request(self, wants: Sequence[bytes]) -> None:
+    def _handle_shallow_request(self, wants: Sequence[ObjectID]) -> None:
         """Handle shallow clone requests from the client.
 
         Args:
@@ -904,7 +905,7 @@ class _ProtocolGraphWalker:
                 depth = val
                 break
             assert isinstance(val, bytes)
-            self.client_shallow.add(val)
+            self.client_shallow.add(ObjectID(val))
         self.read_proto_line((None,))  # consume client's flush-pkt
 
         shallow, not_shallow = find_shallow(self.store, wants, depth)
@@ -918,7 +919,7 @@ class _ProtocolGraphWalker:
         self.update_shallow(new_shallow, unshallow)
 
     def update_shallow(
-        self, new_shallow: AbstractSet[bytes], unshallow: AbstractSet[bytes]
+        self, new_shallow: AbstractSet[ObjectID], unshallow: AbstractSet[ObjectID]
     ) -> None:
         """Update shallow/unshallow information to the client.
 
@@ -938,7 +939,7 @@ class _ProtocolGraphWalker:
         # relay the message down to the handler.
         self.handler.notify_done()
 
-    def send_ack(self, sha: bytes, ack_type: bytes = b"") -> None:
+    def send_ack(self, sha: ObjectID, ack_type: bytes = b"") -> None:
         """Send an ACK to the client.
 
         Args:
@@ -963,7 +964,7 @@ class _ProtocolGraphWalker:
         assert self._impl is not None
         return self._impl.handle_done(done_required, done_received)
 
-    def set_wants(self, wants: list[bytes]) -> None:
+    def set_wants(self, wants: list[ObjectID]) -> None:
         """Set the list of wanted objects.
 
         Args:
@@ -971,7 +972,7 @@ class _ProtocolGraphWalker:
         """
         self._wants = wants
 
-    def all_wants_satisfied(self, haves: AbstractSet[bytes]) -> bool:
+    def all_wants_satisfied(self, haves: AbstractSet[ObjectID]) -> bool:
         """Check whether all the current wants are satisfied by a set of haves.
 
         Args:
@@ -1008,9 +1009,9 @@ class SingleAckGraphWalkerImpl(AckGraphWalkerImpl):
           walker: Parent ProtocolGraphWalker instance
         """
         self.walker = walker
-        self._common: list[bytes] = []
+        self._common: list[ObjectID] = []
 
-    def ack(self, have_ref: bytes) -> None:
+    def ack(self, have_ref: ObjectID) -> None:
         """Acknowledge a have reference.
 
         Args:
@@ -1020,7 +1021,7 @@ class SingleAckGraphWalkerImpl(AckGraphWalkerImpl):
             self.walker.send_ack(have_ref)
             self._common.append(have_ref)
 
-    def next(self) -> bytes | None:
+    def next(self) -> ObjectID | None:
         """Get next SHA from graph walker.
 
         Returns:
@@ -1033,7 +1034,7 @@ class SingleAckGraphWalkerImpl(AckGraphWalkerImpl):
             return None
         elif command == COMMAND_HAVE:
             assert isinstance(sha, bytes)
-            return sha
+            return ObjectID(sha)
         return None
 
     __next__ = next
@@ -1079,9 +1080,9 @@ class MultiAckGraphWalkerImpl(AckGraphWalkerImpl):
         """
         self.walker = walker
         self._found_base = False
-        self._common: list[bytes] = []
+        self._common: list[ObjectID] = []
 
-    def ack(self, have_ref: bytes) -> None:
+    def ack(self, have_ref: ObjectID) -> None:
         """Acknowledge a have reference.
 
         Args:
@@ -1094,7 +1095,7 @@ class MultiAckGraphWalkerImpl(AckGraphWalkerImpl):
                 self._found_base = True
         # else we blind ack within next
 
-    def next(self) -> bytes | None:
+    def next(self) -> ObjectID | None:
         """Get next SHA from graph walker.
 
         Returns:
@@ -1112,10 +1113,11 @@ class MultiAckGraphWalkerImpl(AckGraphWalkerImpl):
                 return None
             elif command == COMMAND_HAVE:
                 assert isinstance(sha, bytes)
+                sha_id = ObjectID(sha)
                 if self._found_base:
                     # blind ack
-                    self.walker.send_ack(sha, b"continue")
-                return sha
+                    self.walker.send_ack(sha_id, b"continue")
+                return sha_id
 
     __next__ = next
 
@@ -1162,9 +1164,9 @@ class MultiAckDetailedGraphWalkerImpl(AckGraphWalkerImpl):
             walker: Parent ProtocolGraphWalker instance
         """
         self.walker = walker
-        self._common: list[bytes] = []
+        self._common: list[ObjectID] = []
 
-    def ack(self, have_ref: bytes) -> None:
+    def ack(self, have_ref: ObjectID) -> None:
         """Acknowledge a have reference.
 
         Args:
@@ -1174,7 +1176,7 @@ class MultiAckDetailedGraphWalkerImpl(AckGraphWalkerImpl):
         self._common.append(have_ref)
         self.walker.send_ack(have_ref, b"common")
 
-    def next(self) -> bytes | None:
+    def next(self) -> ObjectID | None:
         """Get next SHA from graph walker.
 
         Returns:
@@ -1203,7 +1205,7 @@ class MultiAckDetailedGraphWalkerImpl(AckGraphWalkerImpl):
                 # return the sha and let the caller ACK it with the
                 # above ack method.
                 assert isinstance(sha, bytes)
-                return sha
+                return ObjectID(sha)
         # don't nak unless no common commits were found, even if not
         # everything is satisfied
         return None
@@ -1432,7 +1434,7 @@ class ReceivePackHandler(PackHandler):
         # client will now send us a list of (oldsha, newsha, ref)
         while ref_line:
             (oldsha, newsha, ref_name) = ref_line.split()
-            client_refs.append((oldsha, newsha, ref_name))
+            client_refs.append((ObjectID(oldsha), ObjectID(newsha), Ref(ref_name)))
             ref_line = self.proto.read_pkt_line()
 
         # backend can now deal with this refs and read a pack using self.read
@@ -1492,7 +1494,7 @@ class UploadArchiveHandler(Handler):
                 i += 1
                 format = arguments[i].decode("ascii")
             else:
-                commit_sha = self.repo.refs[argument]
+                commit_sha = self.repo.refs[Ref(argument)]
                 commit_obj = store[commit_sha]
                 assert isinstance(commit_obj, Commit)
                 tree_obj = store[commit_obj.tree]

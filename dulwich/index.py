@@ -69,7 +69,7 @@ from .objects import (
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
 
 # Type alias for recursive tree structure used in commit_tree
-TreeDict = dict[bytes, "TreeDict | tuple[int, bytes]"]
+TreeDict = dict[bytes, "TreeDict | tuple[int, ObjectID]"]
 
 # 2-bit stage (during merge)
 FLAG_STAGEMASK = 0x3000
@@ -294,7 +294,7 @@ class SerializedIndexEntry:
     uid: int
     gid: int
     size: int
-    sha: bytes
+    sha: ObjectID
     flags: int
     extended_flags: int
 
@@ -505,7 +505,7 @@ class IndexEntry:
     uid: int
     gid: int
     size: int
-    sha: bytes
+    sha: ObjectID
     flags: int = 0
     extended_flags: int = 0
 
@@ -1168,7 +1168,7 @@ class Index:
         """Check if a path exists in the index."""
         return key in self._byname
 
-    def get_sha1(self, path: bytes) -> bytes:
+    def get_sha1(self, path: bytes) -> ObjectID:
         """Return the (git object) SHA1 for the object at a path."""
         value = self[path]
         if isinstance(value, ConflictedIndexEntry):
@@ -1182,7 +1182,7 @@ class Index:
             raise UnmergedEntries
         return value.mode
 
-    def iterobjects(self) -> Iterable[tuple[bytes, bytes, int]]:
+    def iterobjects(self) -> Iterable[tuple[bytes, ObjectID, int]]:
         """Iterate over path, sha, mode tuples for use with commit_tree."""
         for path in self:
             entry = self[path]
@@ -1291,7 +1291,7 @@ class Index:
             want_unchanged=want_unchanged,
         )
 
-    def commit(self, object_store: ObjectContainer) -> bytes:
+    def commit(self, object_store: ObjectContainer) -> ObjectID:
         """Create a new tree from an index.
 
         Args:
@@ -1398,7 +1398,7 @@ class Index:
     def convert_to_sparse(
         self,
         object_store: "BaseObjectStore",
-        tree_sha: bytes,
+        tree_sha: ObjectID,
         sparse_dirs: Set[bytes],
     ) -> None:
         """Convert full index entries to sparse directory entries.
@@ -1443,6 +1443,8 @@ class Index:
 
             # Create a sparse directory entry
             # Use minimal metadata since it's not a real file
+            from dulwich.objects import ObjectID
+
             sparse_entry = IndexEntry(
                 ctime=0,
                 mtime=0,
@@ -1452,7 +1454,7 @@ class Index:
                 uid=0,
                 gid=0,
                 size=0,
-                sha=subtree_sha,
+                sha=ObjectID(subtree_sha),
                 flags=0,
                 extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
             )
@@ -1505,8 +1507,8 @@ class Index:
 
 
 def commit_tree(
-    object_store: ObjectContainer, blobs: Iterable[tuple[bytes, bytes, int]]
-) -> bytes:
+    object_store: ObjectContainer, blobs: Iterable[tuple[bytes, ObjectID, int]]
+) -> ObjectID:
     """Commit a new tree.
 
     Args:
@@ -1533,7 +1535,7 @@ def commit_tree(
         tree = add_tree(tree_path)
         tree[basename] = (mode, sha)
 
-    def build_tree(path: bytes) -> bytes:
+    def build_tree(path: bytes) -> ObjectID:
         tree = Tree()
         for basename, entry in trees[path].items():
             if isinstance(entry, dict):
@@ -1548,7 +1550,7 @@ def commit_tree(
     return build_tree(b"")
 
 
-def commit_index(object_store: ObjectContainer, index: Index) -> bytes:
+def commit_index(object_store: ObjectContainer, index: Index) -> ObjectID:
     """Create a new tree from an index.
 
     Args:
@@ -1564,7 +1566,7 @@ def changes_from_tree(
     names: Iterable[bytes],
     lookup_entry: Callable[[bytes], tuple[bytes, int]],
     object_store: ObjectContainer,
-    tree: bytes | None,
+    tree: ObjectID | None,
     want_unchanged: bool = False,
 ) -> Iterable[
     tuple[
@@ -1625,6 +1627,8 @@ def index_entry_from_stat(
     if mode is None:
         mode = cleanup_mode(stat_val.st_mode)
 
+    from dulwich.objects import ObjectID
+
     return IndexEntry(
         ctime=stat_val.st_ctime,
         mtime=stat_val.st_mtime,
@@ -1634,7 +1638,7 @@ def index_entry_from_stat(
         uid=stat_val.st_uid,
         gid=stat_val.st_gid,
         size=stat_val.st_size,
-        sha=hex_sha,
+        sha=ObjectID(hex_sha),
         flags=0,
         extended_flags=0,
     )
@@ -1884,7 +1888,7 @@ def build_index_from_tree(
     root_path: str | bytes,
     index_path: str | bytes,
     object_store: ObjectContainer,
-    tree_id: bytes,
+    tree_id: ObjectID,
     honor_filemode: bool = True,
     validate_path_element: Callable[[bytes], bool] = validate_path_element_default,
     symlink_fn: Callable[
@@ -2132,7 +2136,7 @@ def _remove_empty_parents(path: bytes, stop_at: bytes) -> None:
 
 
 def _check_symlink_matches(
-    full_path: bytes, repo_object_store: "BaseObjectStore", entry_sha: bytes
+    full_path: bytes, repo_object_store: "BaseObjectStore", entry_sha: ObjectID
 ) -> bool:
     """Check if symlink target matches expected target.
 
@@ -2158,7 +2162,7 @@ def _check_symlink_matches(
 def _check_file_matches(
     repo_object_store: "BaseObjectStore",
     full_path: bytes,
-    entry_sha: bytes,
+    entry_sha: ObjectID,
     entry_mode: int,
     current_stat: os.stat_result,
     honor_filemode: bool,
@@ -3045,7 +3049,7 @@ def iter_fresh_objects(
     root_path: bytes,
     include_deleted: bool = False,
     object_store: ObjectContainer | None = None,
-) -> Iterator[tuple[bytes, bytes | None, int | None]]:
+) -> Iterator[tuple[bytes, ObjectID | None, int | None]]:
     """Iterate over versions of objects on disk referenced by index.
 
     Args:

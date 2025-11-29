@@ -413,7 +413,9 @@ class BundleTests(TestCase):
         repo.refs[b"refs/heads/feature"] = commit.id
 
         # Create bundle with only master ref
-        bundle = create_bundle_from_repo(repo, refs=[b"refs/heads/master"])
+        from dulwich.refs import Ref
+
+        bundle = create_bundle_from_repo(repo, refs=[Ref(b"refs/heads/master")])
 
         # Verify only master ref is included
         self.assertEqual(len(bundle.references), 1)

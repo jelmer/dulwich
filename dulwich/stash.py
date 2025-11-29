@@ -58,7 +58,7 @@ class CommitKwargs(TypedDict, total=False):
     author: bytes
 
 
-DEFAULT_STASH_REF = b"refs/stash"
+DEFAULT_STASH_REF = Ref(b"refs/stash")
 
 
 class Stash:
@@ -135,7 +135,9 @@ class Stash:
 
         # Get current HEAD to determine if we can apply cleanly
         try:
-            current_head = self._repo.refs[b"HEAD"]
+            from dulwich.refs import HEADREF
+
+            current_head = self._repo.refs[HEADREF]
         except KeyError:
             raise ValueError("Cannot pop stash: no HEAD")
 

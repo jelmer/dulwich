@@ -92,6 +92,7 @@ from .objects import (
     Blob,
     Commit,
     ObjectID,
+    RawObjectID,
     ShaFile,
     Tag,
     Tree,
@@ -100,7 +101,7 @@ from .objects import (
 )
 from .pack import generate_unpacked_objects
 from .refs import (
-    ANNOTATED_TAG_SUFFIX,  # noqa: F401
+    HEADREF,
     LOCAL_TAG_PREFIX,  # noqa: F401
     SYMREF,  # noqa: F401
     DictRefsContainer,
@@ -268,7 +269,7 @@ def check_user_identity(identity: bytes) -> None:
 
 def parse_graftpoints(
     graftpoints: Iterable[bytes],
-) -> dict[bytes, list[bytes]]:
+) -> dict[ObjectID, list[ObjectID]]:
     """Convert a list of graftpoints into a dict.
 
     Args:
@@ -282,13 +283,13 @@ def parse_graftpoints(
 
     https://git.wiki.kernel.org/index.php/GraftPoint
     """
-    grafts = {}
+    grafts: dict[ObjectID, list[ObjectID]] = {}
     for line in graftpoints:
         raw_graft = line.split(None, 1)
 
-        commit = raw_graft[0]
+        commit = ObjectID(raw_graft[0])
         if len(raw_graft) == 2:
-            parents = raw_graft[1].split()
+            parents = [ObjectID(p) for p in raw_graft[1].split()]
         else:
             parents = []
 
@@ -299,7 +300,7 @@ def parse_graftpoints(
     return grafts
 
 
-def serialize_graftpoints(graftpoints: Mapping[bytes, Sequence[bytes]]) -> bytes:
+def serialize_graftpoints(graftpoints: Mapping[ObjectID, Sequence[ObjectID]]) -> bytes:
     """Convert a dictionary of grafts into string.
 
     The graft dictionary is:
@@ -414,8 +415,8 @@ class ParentsProvider:
     def __init__(
         self,
         store: "BaseObjectStore",
-        grafts: dict[bytes, list[bytes]] = {},
-        shallows: Iterable[bytes] = [],
+        grafts: dict[ObjectID, list[ObjectID]] = {},
+        shallows: Iterable[ObjectID] = [],
     ) -> None:
         """Initialize ParentsProvider.
 
@@ -432,8 +433,8 @@ class ParentsProvider:
         self.commit_graph = store.get_commit_graph()
 
     def get_parents(
-        self, commit_id: bytes, commit: Commit | None = None
-    ) -> list[bytes]:
+        self, commit_id: ObjectID, commit: Commit | None = None
+    ) -> list[ObjectID]:
         """Get parents for a commit using the parents provider."""
         try:
             return self.grafts[commit_id]
@@ -453,9 +454,8 @@ class ParentsProvider:
             obj = self.store[commit_id]
             assert isinstance(obj, Commit)
             commit = obj
-        parents = commit.parents
-        assert isinstance(parents, list)
-        return parents
+        result: list[ObjectID] = commit.parents
+        return result
 
 
 class BaseRepo:
@@ -486,7 +486,7 @@ class BaseRepo:
         self.object_store = object_store
         self.refs = refs
 
-        self._graftpoints: dict[bytes, list[bytes]] = {}
+        self._graftpoints: dict[ObjectID, list[ObjectID]] = {}
         self.hooks: dict[str, Hook] = {}
 
     def _determine_file_mode(self) -> bool:
@@ -585,11 +585,11 @@ class BaseRepo:
     def fetch(
         self,
         target: "BaseRepo",
-        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]]
+        determine_wants: Callable[[Mapping[Ref, ObjectID], int | None], list[ObjectID]]
         | None = None,
         progress: Callable[..., None] | None = None,
         depth: int | None = None,
-    ) -> dict[bytes, bytes]:
+    ) -> dict[Ref, ObjectID]:
         """Fetch objects into another repository.
 
         Args:
@@ -613,11 +613,11 @@ class BaseRepo:
 
     def fetch_pack_data(
         self,
-        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]],
+        determine_wants: Callable[[Mapping[Ref, ObjectID], int | None], list[ObjectID]],
         graph_walker: "GraphWalker",
         progress: Callable[[bytes], None] | None,
         *,
-        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
+        get_tagged: Callable[[], dict[ObjectID, ObjectID]] | None = None,
         depth: int | None = None,
     ) -> tuple[int, Iterator["UnpackedObject"]]:
         """Fetch the pack data required for a set of revisions.
@@ -648,11 +648,11 @@ class BaseRepo:
 
     def find_missing_objects(
         self,
-        determine_wants: Callable[[Mapping[bytes, bytes], int | None], list[bytes]],
+        determine_wants: Callable[[Mapping[Ref, ObjectID], int | None], list[ObjectID]],
         graph_walker: "GraphWalker",
         progress: Callable[[bytes], None] | None,
         *,
-        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
+        get_tagged: Callable[[], dict[ObjectID, ObjectID]] | None = None,
         depth: int | None = None,
     ) -> MissingObjectFinder | None:
         """Fetch the missing objects required for a set of revisions.
@@ -670,9 +670,11 @@ class BaseRepo:
           depth: Shallow fetch depth
         Returns: iterator over objects, with __len__ implemented
         """
+        # TODO: serialize_refs returns dict[bytes, ObjectID] with peeled refs (^{}),
+        # but determine_wants expects Mapping[Ref, ObjectID]. Need to reconcile this.
         refs = serialize_refs(self.object_store, self.get_refs())
 
-        wants = determine_wants(refs, depth)
+        wants = determine_wants(refs, depth)  # type: ignore[arg-type]
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 
@@ -721,7 +723,7 @@ class BaseRepo:
 
         parents_provider = ParentsProvider(self.object_store, shallows=current_shallow)
 
-        def get_parents(commit: Commit) -> list[bytes]:
+        def get_parents(commit: Commit) -> list[ObjectID]:
             """Get parents for a commit using the parents provider.
 
             Args:
@@ -785,7 +787,7 @@ class BaseRepo:
         if heads is None:
             heads = [
                 sha
-                for sha in self.refs.as_dict(b"refs/heads").values()
+                for sha in self.refs.as_dict(Ref(b"refs/heads")).values()
                 if sha in self.object_store
             ]
         parents_provider = ParentsProvider(self.object_store)
@@ -796,21 +798,22 @@ class BaseRepo:
             update_shallow=self.update_shallow,
         )
 
-    def get_refs(self) -> dict[bytes, bytes]:
+    def get_refs(self) -> dict[Ref, ObjectID]:
         """Get dictionary with all refs.
 
         Returns: A ``dict`` mapping ref names to SHA1s
         """
         return self.refs.as_dict()
 
-    def head(self) -> bytes:
+    def head(self) -> ObjectID:
         """Return the SHA1 pointed at by HEAD."""
         # TODO: move this method to WorkTree
-        return self.refs[b"HEAD"]
+        return self.refs[HEADREF]
 
     def _get_object(self, sha: bytes, cls: type[T]) -> T:
         assert len(sha) in (20, 40)
-        ret = self.get_object(sha)
+        obj_id = ObjectID(sha) if len(sha) == 40 else RawObjectID(sha)
+        ret = self.get_object(obj_id)
         if not isinstance(ret, cls):
             if cls is Commit:
                 raise NotCommitError(ret.id)
@@ -824,7 +827,7 @@ class BaseRepo:
                 raise Exception(f"Type invalid: {ret.type_name!r} != {cls.type_name!r}")
         return ret
 
-    def get_object(self, sha: bytes) -> ShaFile:
+    def get_object(self, sha: ObjectID | RawObjectID) -> ShaFile:
         """Retrieve the object with the specified SHA.
 
         Args:
@@ -847,7 +850,9 @@ class BaseRepo:
             shallows=self.get_shallow(),
         )
 
-    def get_parents(self, sha: bytes, commit: Commit | None = None) -> list[bytes]:
+    def get_parents(
+        self, sha: ObjectID, commit: Commit | None = None
+    ) -> list[ObjectID]:
         """Retrieve the parents of a specific commit.
 
         If the specific commit is a graftpoint, the graft parents
@@ -940,10 +945,10 @@ class BaseRepo:
         if f is None:
             return set()
         with f:
-            return {line.strip() for line in f}
+            return {ObjectID(line.strip()) for line in f}
 
     def update_shallow(
-        self, new_shallow: set[bytes] | None, new_unshallow: set[bytes] | None
+        self, new_shallow: set[ObjectID] | None, new_unshallow: set[ObjectID] | None
     ) -> None:
         """Update the list of shallow objects.
 
@@ -988,8 +993,8 @@ class BaseRepo:
 
     def get_walker(
         self,
-        include: Sequence[bytes] | None = None,
-        exclude: Sequence[bytes] | None = None,
+        include: Sequence[ObjectID] | None = None,
+        exclude: Sequence[ObjectID] | None = None,
         order: str = "date",
         reverse: bool = False,
         max_entries: int | None = None,
@@ -1047,7 +1052,7 @@ class BaseRepo:
             queue_cls=queue_cls if queue_cls is not None else _CommitTimeQueue,
         )
 
-    def __getitem__(self, name: ObjectID | Ref) -> "ShaFile":
+    def __getitem__(self, name: ObjectID | Ref | bytes) -> "ShaFile":
         """Retrieve a Git object by SHA1 or ref.
 
         Args:
@@ -1060,11 +1065,14 @@ class BaseRepo:
             raise TypeError(f"'name' must be bytestring, not {type(name).__name__:.80}")
         if len(name) in (20, 40):
             try:
-                return self.object_store[name]
+                # Try as ObjectID/RawObjectID
+                return self.object_store[
+                    ObjectID(name) if len(name) == 40 else RawObjectID(name)
+                ]
             except (KeyError, ValueError):
                 pass
         try:
-            return self.object_store[self.refs[name]]
+            return self.object_store[self.refs[Ref(name)]]
         except RefFormatError as exc:
             raise KeyError(name) from exc
 
@@ -1074,10 +1082,12 @@ class BaseRepo:
         Args:
           name: Git object SHA1 or ref name
         """
-        if len(name) == 20 or (len(name) == 40 and valid_hexsha(name)):
-            return name in self.object_store or name in self.refs
+        if len(name) == 20:
+            return RawObjectID(name) in self.object_store or Ref(name) in self.refs
+        elif len(name) == 40 and valid_hexsha(name):
+            return ObjectID(name) in self.object_store or Ref(name) in self.refs
         else:
-            return name in self.refs
+            return Ref(name) in self.refs
 
     def __setitem__(self, name: bytes, value: ShaFile | bytes) -> None:
         """Set a ref.
@@ -1086,11 +1096,12 @@ class BaseRepo:
           name: ref name
           value: Ref value - either a ShaFile object, or a hex sha
         """
-        if name.startswith(b"refs/") or name == b"HEAD":
+        if name.startswith(b"refs/") or name == HEADREF:
+            ref_name = Ref(name)
             if isinstance(value, ShaFile):
-                self.refs[name] = value.id
+                self.refs[ref_name] = value.id
             elif isinstance(value, bytes):
-                self.refs[name] = value
+                self.refs[ref_name] = ObjectID(value)
             else:
                 raise TypeError(value)
         else:
@@ -1102,8 +1113,8 @@ class BaseRepo:
         Args:
           name: Name of the ref to remove
         """
-        if name.startswith(b"refs/") or name == b"HEAD":
-            del self.refs[name]
+        if name.startswith(b"refs/") or name == HEADREF:
+            del self.refs[Ref(name)]
         else:
             raise ValueError(name)
 
@@ -1117,7 +1128,9 @@ class BaseRepo:
         )
         return get_user_identity(config)
 
-    def _add_graftpoints(self, updated_graftpoints: dict[bytes, list[bytes]]) -> None:
+    def _add_graftpoints(
+        self, updated_graftpoints: dict[ObjectID, list[ObjectID]]
+    ) -> None:
         """Add or modify graftpoints.
 
         Args:
@@ -1130,7 +1143,7 @@ class BaseRepo:
 
         self._graftpoints.update(updated_graftpoints)
 
-    def _remove_graftpoints(self, to_remove: Sequence[bytes] = ()) -> None:
+    def _remove_graftpoints(self, to_remove: Sequence[ObjectID] = ()) -> None:
         """Remove graftpoints.
 
         Args:
@@ -1139,12 +1152,12 @@ class BaseRepo:
         for sha in to_remove:
             del self._graftpoints[sha]
 
-    def _read_heads(self, name: str) -> list[bytes]:
+    def _read_heads(self, name: str) -> list[ObjectID]:
         f = self.get_named_file(name)
         if f is None:
             return []
         with f:
-            return [line.strip() for line in f.readlines() if line.strip()]
+            return [ObjectID(line.strip()) for line in f.readlines() if line.strip()]
 
     def get_worktree(self) -> "WorkTree":
         """Get the working tree for this repository.
@@ -1171,7 +1184,7 @@ class BaseRepo:
         author_timezone: int | None = None,
         tree: ObjectID | None = None,
         encoding: bytes | None = None,
-        ref: Ref | None = b"HEAD",
+        ref: Ref | None = HEADREF,
         merge_heads: list[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool = False,
@@ -1782,19 +1795,21 @@ class Repo(BaseRepo):
                 ref_message = b"clone: from " + encoded_path
                 self.fetch(target, depth=depth)
                 target.refs.import_refs(
-                    b"refs/remotes/" + origin,
-                    self.refs.as_dict(b"refs/heads"),
+                    Ref(b"refs/remotes/" + origin),
+                    self.refs.as_dict(Ref(b"refs/heads")),
                     message=ref_message,
                 )
                 target.refs.import_refs(
-                    b"refs/tags", self.refs.as_dict(b"refs/tags"), message=ref_message
+                    Ref(b"refs/tags"),
+                    self.refs.as_dict(Ref(b"refs/tags")),
+                    message=ref_message,
                 )
 
-                head_chain, origin_sha = self.refs.follow(b"HEAD")
+                head_chain, origin_sha = self.refs.follow(HEADREF)
                 origin_head = head_chain[-1] if head_chain else None
                 if origin_sha and not origin_head:
                     # set detached HEAD
-                    target.refs[b"HEAD"] = origin_sha
+                    target.refs[HEADREF] = origin_sha
                 else:
                     _set_origin_head(target.refs, origin, origin_head)
                     head_ref = _set_default_branch(
@@ -1821,7 +1836,7 @@ class Repo(BaseRepo):
         return target
 
     @replace_me(remove_in="0.26.0")
-    def reset_index(self, tree: bytes | None = None) -> None:
+    def reset_index(self, tree: ObjectID | None = None) -> None:
         """Reset the index back to a specific tree.
 
         Args:
@@ -1896,7 +1911,7 @@ class Repo(BaseRepo):
             """
             try:
                 # Get the current branch using refs
-                ref_chain, _ = self.refs.follow(b"HEAD")
+                ref_chain, _ = self.refs.follow(HEADREF)
                 head_ref = ref_chain[-1]  # Get the final resolved ref
             except KeyError:
                 pass
@@ -2037,7 +2052,7 @@ class Repo(BaseRepo):
                 default_branch = config.get("init", "defaultBranch")
             except KeyError:
                 default_branch = DEFAULT_BRANCH
-        ret.refs.set_symbolic_ref(b"HEAD", local_branch_name(default_branch))
+        ret.refs.set_symbolic_ref(HEADREF, local_branch_name(default_branch))
         ret._init_files(
             bare=bare,
             symlinks=symlinks,
@@ -2559,7 +2574,7 @@ class MemoryRepo(BaseRepo):
         author_timezone: int | None = None,
         tree: ObjectID | None = None,
         encoding: bytes | None = None,
-        ref: Ref | None = b"HEAD",
+        ref: Ref | None = HEADREF,
         merge_heads: list[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool = False,
@@ -2682,7 +2697,7 @@ class MemoryRepo(BaseRepo):
     def init_bare(
         cls,
         objects: Iterable[ShaFile],
-        refs: Mapping[bytes, bytes],
+        refs: Mapping[Ref, ObjectID],
         format: int | None = None,
     ) -> "MemoryRepo":
         """Create a new bare repository in memory.

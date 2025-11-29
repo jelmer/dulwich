@@ -38,12 +38,14 @@ from dulwich.object_store import (
 from dulwich.objects import (
     Blob,
     Commit,
+    ObjectID,
     ShaFile,
     Tag,
     Tree,
     TreeEntry,
 )
 from dulwich.protocol import DEPTH_INFINITE
+from dulwich.refs import Ref
 
 from .utils import make_commit, make_object, make_tag
 
@@ -71,20 +73,25 @@ class ObjectStoreTests:
     def test_determine_wants_all(self) -> None:
         """Test determine_wants_all with valid ref."""
         self.assertEqual(
-            [b"1" * 40],
-            self.store.determine_wants_all({b"refs/heads/foo": b"1" * 40}),
+            [ObjectID(b"1" * 40)],
+            self.store.determine_wants_all(
+                {Ref(b"refs/heads/foo"): ObjectID(b"1" * 40)}
+            ),
         )
 
     def test_determine_wants_all_zero(self) -> None:
         """Test determine_wants_all with zero ref."""
         self.assertEqual(
-            [], self.store.determine_wants_all({b"refs/heads/foo": b"0" * 40})
+            [],
+            self.store.determine_wants_all(
+                {Ref(b"refs/heads/foo"): ObjectID(b"0" * 40)}
+            ),
         )
 
     def test_determine_wants_all_depth(self) -> None:
         """Test determine_wants_all with depth parameter."""
         self.store.add_object(testobject)
-        refs = {b"refs/heads/foo": testobject.id}
+        refs = {Ref(b"refs/heads/foo"): testobject.id}
         with patch.object(self.store, "_get_depth", return_value=1) as m:
             self.assertEqual([], self.store.determine_wants_all(refs, depth=0))
             self.assertEqual(
@@ -124,7 +131,7 @@ class ObjectStoreTests:
 
     def test_get_nonexistant(self) -> None:
         """Test getting non-existent object raises KeyError."""
-        self.assertRaises(KeyError, lambda: self.store[b"a" * 40])
+        self.assertRaises(KeyError, lambda: self.store[ObjectID(b"a" * 40)])
 
     def test_contains_nonexistant(self) -> None:
         """Test checking for non-existent object."""
@@ -300,7 +307,7 @@ class ObjectStoreTests:
         """Test iterating with missing objects when not allowed."""
         blob1 = make_object(Blob, data=b"blob 1 data")
         self.store.add_object(blob1)
-        missing_sha = b"1" * 40
+        missing_sha = ObjectID(b"1" * 40)
 
         self.assertRaises(
             KeyError,
@@ -311,7 +318,7 @@ class ObjectStoreTests:
         """Test iterating with missing objects when allowed."""
         blob1 = make_object(Blob, data=b"blob 1 data")
         self.store.add_object(blob1)
-        missing_sha = b"1" * 40
+        missing_sha = ObjectID(b"1" * 40)
 
         objects = list(
             self.store.iterobjects_subset([blob1.id, missing_sha], allow_missing=True)

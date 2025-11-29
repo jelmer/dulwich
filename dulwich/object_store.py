@@ -37,6 +37,7 @@ from typing import (
     TYPE_CHECKING,
     BinaryIO,
     Protocol,
+    cast,
 )
 
 from .errors import NotTreeError
@@ -47,6 +48,7 @@ from .objects import (
     Blob,
     Commit,
     ObjectID,
+    RawObjectID,
     ShaFile,
     Tag,
     Tree,
@@ -78,8 +80,8 @@ from .pack import (
     write_pack_data,
     write_pack_index,
 )
-from .protocol import DEPTH_INFINITE
-from .refs import PEELED_TAG_SUFFIX, Ref
+from .protocol import DEPTH_INFINITE, PEELED_TAG_SUFFIX
+from .refs import Ref
 
 if TYPE_CHECKING:
     from .bitmap import EWAHBitmap
@@ -92,11 +94,11 @@ if TYPE_CHECKING:
 class GraphWalker(Protocol):
     """Protocol for graph walker objects."""
 
-    def __next__(self) -> bytes | None:
+    def __next__(self) -> ObjectID | None:
         """Return the next object SHA to visit."""
         ...
 
-    def ack(self, sha: bytes) -> None:
+    def ack(self, sha: ObjectID) -> None:
         """Acknowledge that an object has been received."""
         ...
 
@@ -114,10 +116,10 @@ class ObjectReachabilityProvider(Protocol):
 
     def get_reachable_commits(
         self,
-        heads: Iterable[bytes],
-        exclude: Iterable[bytes] | None = None,
-        shallow: Set[bytes] | None = None,
-    ) -> set[bytes]:
+        heads: Iterable[ObjectID],
+        exclude: Iterable[ObjectID] | None = None,
+        shallow: Set[ObjectID] | None = None,
+    ) -> set[ObjectID]:
         """Get all commits reachable from heads, excluding those in exclude.
 
         Args:
@@ -132,9 +134,9 @@ class ObjectReachabilityProvider(Protocol):
 
     def get_reachable_objects(
         self,
-        commits: Iterable[bytes],
-        exclude_commits: Iterable[bytes] | None = None,
-    ) -> set[bytes]:
+        commits: Iterable[ObjectID],
+        exclude_commits: Iterable[ObjectID] | None = None,
+    ) -> set[ObjectID]:
         """Get all objects (commits + trees + blobs) reachable from commits.
 
         Args:
@@ -148,8 +150,8 @@ class ObjectReachabilityProvider(Protocol):
 
     def get_tree_objects(
         self,
-        tree_shas: Iterable[bytes],
-    ) -> set[bytes]:
+        tree_shas: Iterable[ObjectID],
+    ) -> set[ObjectID]:
         """Get all trees and blobs reachable from the given trees.
 
         Args:
@@ -175,8 +177,8 @@ DEFAULT_TEMPFILE_GRACE_PERIOD = 14 * 24 * 60 * 60  # 2 weeks
 
 
 def find_shallow(
-    store: ObjectContainer, heads: Iterable[bytes], depth: int
-) -> tuple[set[bytes], set[bytes]]:
+    store: ObjectContainer, heads: Iterable[ObjectID], depth: int
+) -> tuple[set[ObjectID], set[ObjectID]]:
     """Find shallow commits according to a given depth.
 
     Args:
@@ -188,10 +190,10 @@ def find_shallow(
         considered shallow and unshallow according to the arguments. Note that
         these sets may overlap if a commit is reachable along multiple paths.
     """
-    parents: dict[bytes, list[bytes]] = {}
+    parents: dict[ObjectID, list[ObjectID]] = {}
     commit_graph = store.get_commit_graph()
 
-    def get_parents(sha: bytes) -> list[bytes]:
+    def get_parents(sha: ObjectID) -> list[ObjectID]:
         result = parents.get(sha, None)
         if not result:
             # Try to use commit graph first if available
@@ -234,8 +236,8 @@ def find_shallow(
 
 def get_depth(
     store: ObjectContainer,
-    head: bytes,
-    get_parents: Callable[..., list[bytes]] = lambda commit: commit.parents,
+    head: ObjectID,
+    get_parents: Callable[..., list[ObjectID]] = lambda commit: commit.parents,
     max_depth: int | None = None,
 ) -> int:
     """Return the current available depth for the given head.
@@ -291,7 +293,7 @@ class BaseObjectStore:
     ) -> list[ObjectID]:
         """Determine which objects are wanted based on refs."""
 
-        def _want_deepen(sha: bytes) -> bool:
+        def _want_deepen(sha: ObjectID) -> bool:
             if not depth:
                 return False
             if depth == DEPTH_INFINITE:
@@ -306,15 +308,15 @@ class BaseObjectStore:
             and not sha == ZERO_SHA
         ]
 
-    def contains_loose(self, sha: bytes) -> bool:
+    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is loose."""
         raise NotImplementedError(self.contains_loose)
 
-    def contains_packed(self, sha: bytes) -> bool:
+    def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is packed."""
         return False  # Default implementation for stores that don't support packing
 
-    def __contains__(self, sha1: bytes) -> bool:
+    def __contains__(self, sha1: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1.
 
         This method makes no distinction between loose and packed objects.
@@ -326,7 +328,7 @@ class BaseObjectStore:
         """Iterable of pack objects."""
         raise NotImplementedError
 
-    def get_raw(self, name: bytes) -> tuple[int, bytes]:
+    def get_raw(self, name: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Obtain the raw text for an object.
 
         Args:
@@ -335,12 +337,12 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.get_raw)
 
-    def __getitem__(self, sha1: ObjectID) -> ShaFile:
+    def __getitem__(self, sha1: ObjectID | RawObjectID) -> ShaFile:
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(type_num, uncomp, sha=sha1)
 
-    def __iter__(self) -> Iterator[bytes]:
+    def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""
         raise NotImplementedError(self.__iter__)
 
@@ -381,8 +383,8 @@ class BaseObjectStore:
 
     def tree_changes(
         self,
-        source: bytes | None,
-        target: bytes | None,
+        source: ObjectID | None,
+        target: ObjectID | None,
         want_unchanged: bool = False,
         include_trees: bool = False,
         change_type_same: bool = False,
@@ -392,7 +394,7 @@ class BaseObjectStore:
         tuple[
             tuple[bytes | None, bytes | None],
             tuple[int | None, int | None],
-            tuple[bytes | None, bytes | None],
+            tuple[ObjectID | None, ObjectID | None],
         ]
     ]:
         """Find the differences between the contents of two trees.
@@ -434,7 +436,7 @@ class BaseObjectStore:
             )
 
     def iter_tree_contents(
-        self, tree_id: bytes, include_trees: bool = False
+        self, tree_id: ObjectID, include_trees: bool = False
     ) -> Iterator[TreeEntry]:
         """Iterate the contents of a tree and all subtrees.
 
@@ -454,7 +456,7 @@ class BaseObjectStore:
         return iter_tree_contents(self, tree_id, include_trees=include_trees)
 
     def iterobjects_subset(
-        self, shas: Iterable[bytes], *, allow_missing: bool = False
+        self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects in the store.
 
@@ -477,7 +479,7 @@ class BaseObjectStore:
 
     def iter_unpacked_subset(
         self,
-        shas: Iterable[bytes],
+        shas: Iterable[ObjectID | RawObjectID],
         include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
@@ -518,13 +520,13 @@ class BaseObjectStore:
 
     def find_missing_objects(
         self,
-        haves: Iterable[bytes],
-        wants: Iterable[bytes],
-        shallow: Set[bytes] | None = None,
+        haves: Iterable[ObjectID],
+        wants: Iterable[ObjectID],
+        shallow: Set[ObjectID] | None = None,
         progress: Callable[..., None] | None = None,
-        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
-        get_parents: Callable[..., list[bytes]] = lambda commit: commit.parents,
-    ) -> Iterator[tuple[bytes, PackHint | None]]:
+        get_tagged: Callable[[], dict[ObjectID, ObjectID]] | None = None,
+        get_parents: Callable[..., list[ObjectID]] = lambda commit: commit.parents,
+    ) -> Iterator[tuple[ObjectID, PackHint | None]]:
         """Find the missing objects required for a set of revisions.
 
         Args:
@@ -551,7 +553,7 @@ class BaseObjectStore:
         )
         return iter(finder)
 
-    def find_common_revisions(self, graphwalker: GraphWalker) -> list[bytes]:
+    def find_common_revisions(self, graphwalker: GraphWalker) -> list[ObjectID]:
         """Find which revisions this store has in common using graphwalker.
 
         Args:
@@ -569,10 +571,10 @@ class BaseObjectStore:
 
     def generate_pack_data(
         self,
-        have: Iterable[bytes],
-        want: Iterable[bytes],
+        have: Iterable[ObjectID],
+        want: Iterable[ObjectID],
         *,
-        shallow: Set[bytes] | None = None,
+        shallow: Set[ObjectID] | None = None,
         progress: Callable[..., None] | None = None,
         ofs_delta: bool = True,
     ) -> tuple[int, Iterator[UnpackedObject]]:
@@ -597,7 +599,7 @@ class BaseObjectStore:
             progress=progress,
         )
 
-    def peel_sha(self, sha: bytes) -> bytes:
+    def peel_sha(self, sha: ObjectID | RawObjectID) -> ObjectID:
         """Peel all tags from a SHA.
 
         Args:
@@ -615,8 +617,8 @@ class BaseObjectStore:
 
     def _get_depth(
         self,
-        head: bytes,
-        get_parents: Callable[..., list[bytes]] = lambda commit: commit.parents,
+        head: ObjectID,
+        get_parents: Callable[..., list[ObjectID]] = lambda commit: commit.parents,
         max_depth: int | None = None,
     ) -> int:
         """Return the current available depth for the given head.
@@ -667,7 +669,7 @@ class BaseObjectStore:
         return None
 
     def write_commit_graph(
-        self, refs: Sequence[bytes] | None = None, reachable: bool = True
+        self, refs: Iterable[ObjectID] | None = None, reachable: bool = True
     ) -> None:
         """Write a commit graph file for this object store.
 
@@ -682,7 +684,7 @@ class BaseObjectStore:
         """
         raise NotImplementedError(self.write_commit_graph)
 
-    def get_object_mtime(self, sha: bytes) -> float:
+    def get_object_mtime(self, sha: ObjectID) -> float:
         """Get the modification time of an object.
 
         Args:
@@ -729,7 +731,7 @@ class PackCapableObjectStore(BaseObjectStore, PackedObjectContainer):
         raise NotImplementedError(self.add_pack_data)
 
     def get_unpacked_object(
-        self, sha1: bytes, *, include_comp: bool = False
+        self, sha1: ObjectID | RawObjectID, *, include_comp: bool = False
     ) -> "UnpackedObject":
         """Get a raw unresolved object.
 
@@ -746,7 +748,7 @@ class PackCapableObjectStore(BaseObjectStore, PackedObjectContainer):
         return UnpackedObject(obj.type_num, sha=sha1, decomp_chunks=obj.as_raw_chunks())
 
     def iterobjects_subset(
-        self, shas: Iterable[bytes], *, allow_missing: bool = False
+        self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects.
 
@@ -878,7 +880,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """Return list of alternate object stores."""
         return []
 
-    def contains_packed(self, sha: bytes) -> bool:
+    def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is packed.
 
         This does not check alternates.
@@ -891,7 +893,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 pass
         return False
 
-    def __contains__(self, sha: bytes) -> bool:
+    def __contains__(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1.
 
         This method makes no distinction between loose and packed objects.
@@ -913,10 +915,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     def generate_pack_data(
         self,
-        have: Iterable[bytes],
-        want: Iterable[bytes],
+        have: Iterable[ObjectID],
+        want: Iterable[ObjectID],
         *,
-        shallow: Set[bytes] | None = None,
+        shallow: Set[ObjectID] | None = None,
         progress: Callable[..., None] | None = None,
         ofs_delta: bool = True,
     ) -> tuple[int, Iterator[UnpackedObject]]:
@@ -981,19 +983,19 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 count += 1
         return count
 
-    def _iter_alternate_objects(self) -> Iterator[bytes]:
+    def _iter_alternate_objects(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs of all the objects in alternate stores."""
         for alternate in self.alternates:
             yield from alternate
 
-    def _iter_loose_objects(self) -> Iterator[bytes]:
+    def _iter_loose_objects(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs of all loose objects."""
         raise NotImplementedError(self._iter_loose_objects)
 
-    def _get_loose_object(self, sha: bytes) -> ShaFile | None:
+    def _get_loose_object(self, sha: ObjectID | RawObjectID) -> ShaFile | None:
         raise NotImplementedError(self._get_loose_object)
 
-    def delete_loose_object(self, sha: bytes) -> None:
+    def delete_loose_object(self, sha: ObjectID) -> None:
         """Delete a loose object.
 
         This method only handles loose objects. For packed objects,
@@ -1079,7 +1081,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     def generate_pack_bitmaps(
         self,
-        refs: dict[bytes, bytes],
+        refs: dict[Ref, ObjectID],
         *,
         commit_interval: int | None = None,
         progress: Callable[[str], None] | None = None,
@@ -1109,7 +1111,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
         return count
 
-    def __iter__(self) -> Iterator[bytes]:
+    def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""
         self._update_pack_cache()
         for pack in self._iter_cached_packs():
@@ -1120,14 +1122,14 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         yield from self._iter_loose_objects()
         yield from self._iter_alternate_objects()
 
-    def contains_loose(self, sha: bytes) -> bool:
+    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is loose.
 
         This does not check alternates.
         """
         return self._get_loose_object(sha) is not None
 
-    def get_raw(self, name: bytes) -> tuple[int, bytes]:
+    def get_raw(self, name: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Obtain the raw fulltext for an object.
 
         Args:
@@ -1137,10 +1139,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         if name == ZERO_SHA:
             raise KeyError(name)
         if len(name) == 40:
-            sha = hex_to_sha(name)
-            hexsha = name
+            sha = hex_to_sha(cast(ObjectID, name))
+            hexsha = cast(ObjectID, name)
         elif len(name) == 20:
-            sha = name
+            sha = cast(RawObjectID, name)
             hexsha = None
         else:
             raise AssertionError(f"Invalid object name {name!r}")
@@ -1150,7 +1152,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             except (KeyError, PackFileDisappeared):
                 pass
         if hexsha is None:
-            hexsha = sha_to_hex(name)
+            hexsha = sha_to_hex(sha)
         ret = self._get_loose_object(hexsha)
         if ret is not None:
             return ret.type_num, ret.as_raw_string()
@@ -1170,7 +1172,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     def iter_unpacked_subset(
         self,
-        shas: Iterable[bytes],
+        shas: Iterable[ObjectID | RawObjectID],
         include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
@@ -1189,7 +1191,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         Raises:
           KeyError: If an object is missing and allow_missing is False
         """
-        todo: set[bytes] = set(shas)
+        todo: set[ObjectID | RawObjectID] = set(shas)
         for p in self._iter_cached_packs():
             for unpacked in p.iter_unpacked_subset(
                 todo,
@@ -1225,7 +1227,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 todo.remove(hexsha)
 
     def iterobjects_subset(
-        self, shas: Iterable[bytes], *, allow_missing: bool = False
+        self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects in the store.
 
@@ -1241,7 +1243,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         Raises:
           KeyError: If an object is missing and allow_missing is False
         """
-        todo: set[bytes] = set(shas)
+        todo: set[ObjectID] = set(shas)
         for p in self._iter_cached_packs():
             for o in p.iterobjects_subset(todo, allow_missing=True):
                 yield o
@@ -1275,10 +1277,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         if sha1 == ZERO_SHA:
             raise KeyError(sha1)
         if len(sha1) == 40:
-            sha = hex_to_sha(sha1)
-            hexsha = sha1
+            sha = hex_to_sha(cast(ObjectID, sha1))
+            hexsha = cast(ObjectID, sha1)
         elif len(sha1) == 20:
-            sha = sha1
+            sha = cast(RawObjectID, sha1)
             hexsha = None
         else:
             raise AssertionError(f"Invalid object sha1 {sha1!r}")
@@ -1288,7 +1290,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             except (KeyError, PackFileDisappeared):
                 pass
         if hexsha is None:
-            hexsha = sha_to_hex(sha1)
+            hexsha = sha_to_hex(sha)
         # Maybe something else has added a pack with the object
         # in the mean time?
         for pack in self._update_pack_cache():
@@ -1614,11 +1616,11 @@ class DiskObjectStore(PackBasedObjectStore):
             self._pack_cache.pop(f).close()
         return new_packs
 
-    def _get_shafile_path(self, sha: bytes) -> str:
+    def _get_shafile_path(self, sha: ObjectID | RawObjectID) -> str:
         # Check from object dir
         return hex_to_filename(os.fspath(self.path), sha)
 
-    def _iter_loose_objects(self) -> Iterator[bytes]:
+    def _iter_loose_objects(self) -> Iterator[ObjectID]:
         for base in os.listdir(self.path):
             if len(base) != 2:
                 continue
@@ -1626,7 +1628,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 sha = os.fsencode(base + rest)
                 if not valid_hexsha(sha):
                     continue
-                yield sha
+                yield ObjectID(sha)
 
     def count_loose_objects(self) -> int:
         """Count the number of loose objects in the object store.
@@ -1654,14 +1656,14 @@ class DiskObjectStore(PackBasedObjectStore):
 
         return count
 
-    def _get_loose_object(self, sha: bytes) -> ShaFile | None:
+    def _get_loose_object(self, sha: ObjectID | RawObjectID) -> ShaFile | None:
         path = self._get_shafile_path(sha)
         try:
             return ShaFile.from_path(path)
         except FileNotFoundError:
             return None
 
-    def delete_loose_object(self, sha: bytes) -> None:
+    def delete_loose_object(self, sha: ObjectID) -> None:
         """Delete a loose object from disk.
 
         Args:
@@ -1672,7 +1674,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         os.remove(self._get_shafile_path(sha))
 
-    def get_object_mtime(self, sha: bytes) -> float:
+    def get_object_mtime(self, sha: ObjectID) -> float:
         """Get the modification time of an object.
 
         Args:
@@ -1732,7 +1734,7 @@ class DiskObjectStore(PackBasedObjectStore):
         num_objects: int,
         indexer: PackIndexer,
         progress: Callable[..., None] | None = None,
-        refs: dict[bytes, bytes] | None = None,
+        refs: dict[Ref, ObjectID] | None = None,
     ) -> Pack:
         """Move a specific file containing a pack into the pack directory.
 
@@ -1974,14 +1976,14 @@ class DiskObjectStore(PackBasedObjectStore):
             os.chmod(pack_path, dir_mode)
         return cls(path, file_mode=file_mode, dir_mode=dir_mode)
 
-    def iter_prefix(self, prefix: bytes) -> Iterator[bytes]:
+    def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
         """Iterate over all object SHAs with the given prefix.
 
         Args:
           prefix: Hex prefix to search for (as bytes)
 
         Returns:
-          Iterator of object SHAs (as bytes) matching the prefix
+          Iterator of object SHAs (as ObjectID) matching the prefix
         """
         if len(prefix) < 2:
             yield from super().iter_prefix(prefix)
@@ -1992,7 +1994,7 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             for name in os.listdir(os.path.join(self.path, dir)):
                 if name.startswith(rest):
-                    sha = os.fsencode(dir + name)
+                    sha = ObjectID(os.fsencode(dir + name))
                     if sha not in seen:
                         seen.add(sha)
                         yield sha
@@ -2005,8 +2007,8 @@ class DiskObjectStore(PackBasedObjectStore):
                 if len(prefix) % 2 == 0
                 else binascii.unhexlify(prefix[:-1])
             )
-            for sha in p.index.iter_prefix(bin_prefix):
-                sha = sha_to_hex(sha)
+            for bin_sha in p.index.iter_prefix(bin_prefix):
+                sha = sha_to_hex(bin_sha)
                 if sha.startswith(prefix) and sha not in seen:
                     seen.add(sha)
                     yield sha
@@ -2035,7 +2037,7 @@ class DiskObjectStore(PackBasedObjectStore):
         return self._commit_graph
 
     def write_commit_graph(
-        self, refs: Iterable[bytes] | None = None, reachable: bool = True
+        self, refs: Iterable[ObjectID] | None = None, reachable: bool = True
     ) -> None:
         """Write a commit graph file for this object store.
 
@@ -2068,20 +2070,8 @@ class DiskObjectStore(PackBasedObjectStore):
             # Get all reachable commits
             commit_ids = get_reachable_commits(self, all_refs)
         else:
-            # Just use the direct ref targets - ensure they're hex ObjectIDs
-            commit_ids = []
-            for ref in all_refs:
-                if isinstance(ref, bytes) and len(ref) == 40:
-                    # Already hex ObjectID
-                    commit_ids.append(ref)
-                elif isinstance(ref, bytes) and len(ref) == 20:
-                    # Binary SHA, convert to hex ObjectID
-                    from .objects import sha_to_hex
-
-                    commit_ids.append(sha_to_hex(ref))
-                else:
-                    # Assume it's already correct format
-                    commit_ids.append(ref)
+            # Just use the direct ref targets (already ObjectIDs)
+            commit_ids = all_refs
 
         if commit_ids:
             # Write commit graph directly to our object store path
@@ -2169,26 +2159,26 @@ class MemoryObjectStore(PackCapableObjectStore):
         Creates an empty in-memory object store.
         """
         super().__init__()
-        self._data: dict[bytes, ShaFile] = {}
+        self._data: dict[ObjectID, ShaFile] = {}
         self.pack_compression_level = -1
 
-    def _to_hexsha(self, sha: bytes) -> bytes:
+    def _to_hexsha(self, sha: ObjectID | RawObjectID) -> ObjectID:
         if len(sha) == 40:
-            return sha
+            return cast(ObjectID, sha)
         elif len(sha) == 20:
-            return sha_to_hex(sha)
+            return sha_to_hex(cast(RawObjectID, sha))
         else:
             raise ValueError(f"Invalid sha {sha!r}")
 
-    def contains_loose(self, sha: bytes) -> bool:
+    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is loose."""
         return self._to_hexsha(sha) in self._data
 
-    def contains_packed(self, sha: bytes) -> bool:
+    def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is packed."""
         return False
 
-    def __iter__(self) -> Iterator[bytes]:
+    def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""
         return iter(self._data.keys())
 
@@ -2197,7 +2187,7 @@ class MemoryObjectStore(PackCapableObjectStore):
         """List with pack objects."""
         return []
 
-    def get_raw(self, name: ObjectID) -> tuple[int, bytes]:
+    def get_raw(self, name: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Obtain the raw text for an object.
 
         Args:
@@ -2207,7 +2197,7 @@ class MemoryObjectStore(PackCapableObjectStore):
         obj = self[self._to_hexsha(name)]
         return obj.type_num, obj.as_raw_string()
 
-    def __getitem__(self, name: ObjectID) -> ShaFile:
+    def __getitem__(self, name: ObjectID | RawObjectID) -> ShaFile:
         """Retrieve an object by SHA.
 
         Args:
@@ -2350,8 +2340,10 @@ class ObjectIterator(Protocol):
 
 
 def tree_lookup_path(
-    lookup_obj: Callable[[bytes], ShaFile], root_sha: bytes, path: bytes
-) -> tuple[int, bytes]:
+    lookup_obj: Callable[[ObjectID | RawObjectID], ShaFile],
+    root_sha: ObjectID | RawObjectID,
+    path: bytes,
+) -> tuple[int, ObjectID]:
     """Look up an object in a Git tree.
 
     Args:
@@ -2388,8 +2380,8 @@ def _collect_filetree_revs(
 
 
 def _split_commits_and_tags(
-    obj_store: ObjectContainer, lst: Iterable[bytes], *, ignore_unknown: bool = False
-) -> tuple[set[bytes], set[bytes], set[bytes]]:
+    obj_store: ObjectContainer, lst: Iterable[ObjectID], *, ignore_unknown: bool = False
+) -> tuple[set[ObjectID], set[ObjectID], set[ObjectID]]:
     """Split object id list into three lists with commit, tag, and other SHAs.
 
     Commits referenced by tags are included into commits
@@ -2404,9 +2396,9 @@ def _split_commits_and_tags(
         silently.
     Returns: A tuple of (commits, tags, others) SHA1s
     """
-    commits: set[bytes] = set()
-    tags: set[bytes] = set()
-    others: set[bytes] = set()
+    commits: set[ObjectID] = set()
+    tags: set[ObjectID] = set()
+    others: set[ObjectID] = set()
     for e in lst:
         try:
             o = obj_store[e]
@@ -2447,13 +2439,13 @@ class MissingObjectFinder:
     def __init__(
         self,
         object_store: BaseObjectStore,
-        haves: Iterable[bytes],
-        wants: Iterable[bytes],
+        haves: Iterable[ObjectID],
+        wants: Iterable[ObjectID],
         *,
-        shallow: Set[bytes] | None = None,
+        shallow: Set[ObjectID] | None = None,
         progress: Callable[[bytes], None] | None = None,
-        get_tagged: Callable[[], dict[bytes, bytes]] | None = None,
-        get_parents: Callable[[Commit], list[bytes]] = lambda commit: commit.parents,
+        get_tagged: Callable[[], dict[ObjectID, ObjectID]] | None = None,
+        get_parents: Callable[[Commit], list[ObjectID]] = lambda commit: commit.parents,
     ) -> None:
         """Initialize a MissingObjectFinder.
 
@@ -2501,7 +2493,7 @@ class MissingObjectFinder:
             get_parents=self._get_parents,
         )
 
-        self.remote_has: set[bytes] = set()
+        self.remote_has: set[ObjectID] = set()
         # Now, fill sha_done with commits and revisions of
         # files and directories known to be both locally
         # and on target. Thus these commits and files
@@ -2537,7 +2529,7 @@ class MissingObjectFinder:
             self.progress = progress
         self._tagged = (get_tagged and get_tagged()) or {}
 
-    def get_remote_has(self) -> set[bytes]:
+    def get_remote_has(self) -> set[ObjectID]:
         """Get the set of SHAs the remote has.
 
         Returns:
@@ -2555,7 +2547,7 @@ class MissingObjectFinder:
         """
         self.objects_to_send.update([e for e in entries if e[0] not in self.sha_done])
 
-    def __next__(self) -> tuple[bytes, PackHint | None]:
+    def __next__(self) -> tuple[ObjectID, PackHint | None]:
         """Get the next object to send.
 
         Returns:
@@ -2606,7 +2598,7 @@ class MissingObjectFinder:
             pack_hint = (type_num, name)
         return (sha, pack_hint)
 
-    def __iter__(self) -> Iterator[tuple[bytes, PackHint | None]]:
+    def __iter__(self) -> Iterator[tuple[ObjectID, PackHint | None]]:
         """Return iterator over objects to send.
 
         Returns:
@@ -2698,7 +2690,7 @@ class ObjectStoreGraphWalker:
 def commit_tree_changes(
     object_store: BaseObjectStore,
     tree: ObjectID | Tree,
-    changes: Sequence[tuple[bytes, int | None, bytes | None]],
+    changes: Sequence[tuple[bytes, int | None, ObjectID | None]],
 ) -> ObjectID:
     """Commit a specified set of changes to a tree structure.
 
@@ -2729,7 +2721,7 @@ def commit_tree_changes(
         sha_obj = object_store[tree]
         assert isinstance(sha_obj, Tree)
         tree_obj = sha_obj
-    nested_changes: dict[bytes, list[tuple[bytes, int | None, bytes | None]]] = {}
+    nested_changes: dict[bytes, list[tuple[bytes, int | None, ObjectID | None]]] = {}
     for path, new_mode, new_sha in changes:
         try:
             (dirname, subpath) = path.split(b"/", 1)
@@ -2743,7 +2735,7 @@ def commit_tree_changes(
             nested_changes.setdefault(dirname, []).append((subpath, new_mode, new_sha))
     for name, subchanges in nested_changes.items():
         try:
-            orig_subtree_id: bytes | Tree = tree_obj[name][1]
+            orig_subtree_id: ObjectID | Tree = tree_obj[name][1]
         except KeyError:
             # For new directories, pass an empty Tree object
             orig_subtree_id = Tree()
@@ -2832,7 +2824,7 @@ class OverlayObjectStore(BaseObjectStore):
                     done.add(o_id)
 
     def iterobjects_subset(
-        self, shas: Iterable[bytes], *, allow_missing: bool = False
+        self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects from the overlaid stores.
 
@@ -2847,7 +2839,7 @@ class OverlayObjectStore(BaseObjectStore):
           KeyError: If an object is missing and allow_missing is False
         """
         todo = set(shas)
-        found: set[bytes] = set()
+        found: set[ObjectID] = set()
 
         for b in self.bases:
             # Create a copy of todo for each base to avoid modifying
@@ -2864,7 +2856,7 @@ class OverlayObjectStore(BaseObjectStore):
 
     def iter_unpacked_subset(
         self,
-        shas: Iterable[bytes],
+        shas: Iterable[ObjectID | RawObjectID],
         include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
@@ -2883,7 +2875,7 @@ class OverlayObjectStore(BaseObjectStore):
         Raises:
           KeyError: If an object is missing and allow_missing is False
         """
-        todo = set(shas)
+        todo: set[ObjectID | RawObjectID] = set(shas)
         for b in self.bases:
             for o in b.iter_unpacked_subset(
                 todo,
@@ -2896,7 +2888,7 @@ class OverlayObjectStore(BaseObjectStore):
         if todo and not allow_missing:
             raise KeyError(next(iter(todo)))
 
-    def get_raw(self, sha_id: ObjectID) -> tuple[int, bytes]:
+    def get_raw(self, sha_id: ObjectID | RawObjectID) -> tuple[int, bytes]:
         """Get the raw object data from the overlaid stores.
 
         Args:
@@ -2915,7 +2907,7 @@ class OverlayObjectStore(BaseObjectStore):
                 pass
         raise KeyError(sha_id)
 
-    def contains_packed(self, sha: bytes) -> bool:
+    def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if an object is packed in any base store.
 
         Args:
@@ -2929,7 +2921,7 @@ class OverlayObjectStore(BaseObjectStore):
                 return True
         return False
 
-    def contains_loose(self, sha: bytes) -> bool:
+    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if an object is loose in any base store.
 
         Args:
@@ -2958,14 +2950,14 @@ def read_packs_file(f: BinaryIO) -> Iterator[str]:
 class BucketBasedObjectStore(PackBasedObjectStore):
     """Object store implementation that uses a bucket store like S3 as backend."""
 
-    def _iter_loose_objects(self) -> Iterator[bytes]:
+    def _iter_loose_objects(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs of all loose objects."""
         return iter([])
 
-    def _get_loose_object(self, sha: bytes) -> None:
+    def _get_loose_object(self, sha: ObjectID | RawObjectID) -> None:
         return None
 
-    def delete_loose_object(self, sha: bytes) -> None:
+    def delete_loose_object(self, sha: ObjectID) -> None:
         """Delete a loose object (no-op for bucket stores).
 
         Bucket-based stores don't have loose objects, so this is a no-op.
@@ -3069,7 +3061,7 @@ def _collect_ancestors(
     heads: Iterable[ObjectID],
     common: frozenset[ObjectID] = frozenset(),
     shallow: frozenset[ObjectID] = frozenset(),
-    get_parents: Callable[[Commit], list[bytes]] = lambda commit: commit.parents,
+    get_parents: Callable[[Commit], list[ObjectID]] = lambda commit: commit.parents,
 ) -> tuple[set[ObjectID], set[ObjectID]]:
     """Collect all ancestors of heads up to (excluding) those in common.
 
@@ -3154,7 +3146,7 @@ def iter_tree_contents(
 
 def iter_commit_contents(
     store: ObjectContainer,
-    commit: Commit | bytes,
+    commit: Commit | ObjectID | RawObjectID,
     *,
     include: Sequence[str | bytes | Path] | None = None,
 ) -> Iterator[TreeEntry]:
@@ -3203,7 +3195,9 @@ def iter_commit_contents(
             yield TreeEntry(path, mode, obj_id)
 
 
-def peel_sha(store: ObjectContainer, sha: bytes) -> tuple[ShaFile, ShaFile]:
+def peel_sha(
+    store: ObjectContainer, sha: ObjectID | RawObjectID
+) -> tuple[ShaFile, ShaFile]:
     """Peel all tags from a SHA.
 
     Args:
@@ -3240,10 +3234,10 @@ class GraphTraversalReachability:
 
     def get_reachable_commits(
         self,
-        heads: Iterable[bytes],
-        exclude: Iterable[bytes] | None = None,
-        shallow: Set[bytes] | None = None,
-    ) -> set[bytes]:
+        heads: Iterable[ObjectID],
+        exclude: Iterable[ObjectID] | None = None,
+        shallow: Set[ObjectID] | None = None,
+    ) -> set[ObjectID]:
         """Get all commits reachable from heads, excluding those in exclude.
 
         Uses _collect_ancestors for commit traversal.
@@ -3265,8 +3259,8 @@ class GraphTraversalReachability:
 
     def get_tree_objects(
         self,
-        tree_shas: Iterable[bytes],
-    ) -> set[bytes]:
+        tree_shas: Iterable[ObjectID],
+    ) -> set[ObjectID]:
         """Get all trees and blobs reachable from the given trees.
 
         Uses _collect_filetree_revs for tree traversal.
@@ -3277,16 +3271,16 @@ class GraphTraversalReachability:
         Returns:
           Set of tree and blob SHAs
         """
-        result: set[bytes] = set()
+        result: set[ObjectID] = set()
         for tree_sha in tree_shas:
             _collect_filetree_revs(self.store, tree_sha, result)
         return result
 
     def get_reachable_objects(
         self,
-        commits: Iterable[bytes],
-        exclude_commits: Iterable[bytes] | None = None,
-    ) -> set[bytes]:
+        commits: Iterable[ObjectID],
+        exclude_commits: Iterable[ObjectID] | None = None,
+    ) -> set[ObjectID]:
         """Get all objects (commits + trees + blobs) reachable from commits.
 
         Args:
@@ -3341,8 +3335,8 @@ class BitmapReachability:
 
     def _combine_commit_bitmaps(
         self,
-        commit_shas: set[bytes],
-        exclude_shas: set[bytes] | None = None,
+        commit_shas: set[ObjectID],
+        exclude_shas: set[ObjectID] | None = None,
     ) -> tuple["EWAHBitmap", "Pack"] | None:
         """Combine bitmaps for multiple commits using OR, with optional exclusion.
 
@@ -3413,10 +3407,10 @@ class BitmapReachability:
 
     def get_reachable_commits(
         self,
-        heads: Iterable[bytes],
-        exclude: Iterable[bytes] | None = None,
-        shallow: Set[bytes] | None = None,
-    ) -> set[bytes]:
+        heads: Iterable[ObjectID],
+        exclude: Iterable[ObjectID] | None = None,
+        shallow: Set[ObjectID] | None = None,
+    ) -> set[ObjectID]:
         """Get all commits reachable from heads using bitmaps where possible.
 
         Args:
@@ -3455,8 +3449,8 @@ class BitmapReachability:
 
     def get_tree_objects(
         self,
-        tree_shas: Iterable[bytes],
-    ) -> set[bytes]:
+        tree_shas: Iterable[ObjectID],
+    ) -> set[ObjectID]:
         """Get all trees and blobs reachable from the given trees.
 
         Args:
@@ -3470,9 +3464,9 @@ class BitmapReachability:
 
     def get_reachable_objects(
         self,
-        commits: Iterable[bytes],
-        exclude_commits: Iterable[bytes] | None = None,
-    ) -> set[bytes]:
+        commits: Iterable[ObjectID],
+        exclude_commits: Iterable[ObjectID] | None = None,
+    ) -> set[ObjectID]:
         """Get all objects reachable from commits using bitmaps.
 
         Args:

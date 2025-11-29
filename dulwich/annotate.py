@@ -39,7 +39,7 @@ from dulwich.walk import (
 if TYPE_CHECKING:
     from dulwich.diff_tree import TreeChange
     from dulwich.object_store import BaseObjectStore
-    from dulwich.objects import Commit, TreeEntry
+    from dulwich.objects import Commit, ObjectID, TreeEntry
 
 # Walk over ancestry graph breadth-first
 # When checking each revision, find lines that according to difflib.Differ()
@@ -74,7 +74,7 @@ def update_lines(
 
 def annotate_lines(
     store: "BaseObjectStore",
-    commit_id: bytes,
+    commit_id: "ObjectID",
     path: bytes,
     order: str = ORDER_DATE,
     lines: Sequence[tuple[tuple["Commit", "TreeEntry"], bytes]] | None = None,

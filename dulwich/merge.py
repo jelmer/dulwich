@@ -16,7 +16,7 @@ from dulwich.attrs import GitAttributes
 from dulwich.config import Config
 from dulwich.merge_drivers import get_merge_driver_registry
 from dulwich.object_store import BaseObjectStore
-from dulwich.objects import S_ISGITLINK, Blob, Commit, Tree, is_blob, is_tree
+from dulwich.objects import S_ISGITLINK, Blob, Commit, ObjectID, Tree, is_blob, is_tree
 
 
 def make_merge3(
@@ -303,7 +303,7 @@ class Merger:
             tuple of (merged_tree, list_of_conflicted_paths)
         """
         conflicts: list[bytes] = []
-        merged_entries: dict[bytes, tuple[int | None, bytes | None]] = {}
+        merged_entries: dict[bytes, tuple[int | None, ObjectID | None]] = {}
 
         # Get all paths from all trees
         all_paths = set()
@@ -481,7 +481,7 @@ class Merger:
 def _create_virtual_commit(
     object_store: BaseObjectStore,
     tree: Tree,
-    parents: list[bytes],
+    parents: list[ObjectID],
     message: bytes = b"Virtual merge base",
 ) -> Commit:
     """Create a virtual commit object for recursive merging.
@@ -519,7 +519,7 @@ def _create_virtual_commit(
 
 def recursive_merge(
     object_store: BaseObjectStore,
-    merge_bases: list[bytes],
+    merge_bases: list[ObjectID],
     ours_commit: Commit,
     theirs_commit: Commit,
     gitattributes: GitAttributes | None = None,
@@ -671,7 +671,7 @@ def three_way_merge(
 
 def octopus_merge(
     object_store: BaseObjectStore,
-    merge_bases: list[bytes],
+    merge_bases: list[ObjectID],
     head_commit: Commit,
     other_commits: list[Commit],
     gitattributes: GitAttributes | None = None,

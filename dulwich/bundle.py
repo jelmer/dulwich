@@ -30,7 +30,9 @@ from typing import (
     runtime_checkable,
 )
 
+from .objects import ObjectID
 from .pack import PackData, UnpackedObject, write_pack_data
+from .refs import Ref
 
 
 @runtime_checkable
@@ -57,8 +59,8 @@ class Bundle:
     version: int | None
 
     capabilities: dict[str, str | None]
-    prerequisites: list[tuple[bytes, bytes]]
-    references: dict[bytes, bytes]
+    prerequisites: list[tuple[ObjectID, bytes]]
+    references: dict[Ref, ObjectID]
     pack_data: PackDataLike | None
 
     def __repr__(self) -> str:
@@ -121,7 +123,7 @@ class Bundle:
 def _read_bundle(f: BinaryIO, version: int) -> Bundle:
     capabilities = {}
     prerequisites = []
-    references = {}
+    references: dict[Ref, ObjectID] = {}
     line = f.readline()
     if version >= 3:
         while line.startswith(b"@"):
@@ -136,11 +138,11 @@ def _read_bundle(f: BinaryIO, version: int) -> Bundle:
             line = f.readline()
     while line.startswith(b"-"):
         (obj_id, comment) = line[1:].rstrip(b"\n").split(b" ", 1)
-        prerequisites.append((obj_id, comment))
+        prerequisites.append((ObjectID(obj_id), comment))
         line = f.readline()
     while line != b"\n":
         (obj_id, ref) = line.rstrip(b"\n").split(b" ", 1)
-        references[ref] = obj_id
+        references[Ref(ref)] = ObjectID(obj_id)
         line = f.readline()
     # Extract pack data to separate stream since PackData expects
     # the file to start with PACK header at position 0
@@ -220,7 +222,7 @@ def write_bundle(f: BinaryIO, bundle: Bundle) -> None:
 
 def create_bundle_from_repo(
     repo: "BaseRepo",
-    refs: Sequence[bytes] | None = None,
+    refs: Sequence[Ref] | None = None,
     prerequisites: Sequence[bytes] | None = None,
     version: int | None = None,
     capabilities: dict[str, str | None] | None = None,
@@ -249,8 +251,8 @@ def create_bundle_from_repo(
         capabilities = {}
 
     # Build the references dictionary for the bundle
-    bundle_refs = {}
-    want_objects = set()
+    bundle_refs: dict[Ref, ObjectID] = {}
+    want_objects: set[ObjectID] = set()
 
     for ref in refs:
         if ref in repo.refs:
@@ -268,7 +270,7 @@ def create_bundle_from_repo(
 
     # Convert prerequisites to proper format
     bundle_prerequisites = []
-    have_objects = set()
+    have_objects: set[ObjectID] = set()
     for prereq in prerequisites:
         if not isinstance(prereq, bytes):
             raise TypeError(
@@ -284,8 +286,8 @@ def create_bundle_from_repo(
         except ValueError:
             raise ValueError(f"Invalid prerequisite format: {prereq!r}")
         # Store hex in bundle and for pack generation
-        bundle_prerequisites.append((prereq, b""))
-        have_objects.add(prereq)
+        bundle_prerequisites.append((ObjectID(prereq), b""))
+        have_objects.add(ObjectID(prereq))
 
     # Generate pack data containing all objects needed for the refs
     pack_count, pack_objects = repo.generate_pack_data(

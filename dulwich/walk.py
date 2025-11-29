@@ -274,8 +274,8 @@ class Walker:
     def __init__(
         self,
         store: "BaseObjectStore",
-        include: Sequence[bytes],
-        exclude: Sequence[bytes] | None = None,
+        include: ObjectID | Sequence[ObjectID],
+        exclude: Sequence[ObjectID] | None = None,
         order: str = "date",
         reverse: bool = False,
         max_entries: int | None = None,
@@ -284,7 +284,7 @@ class Walker:
         follow: bool = False,
         since: int | None = None,
         until: int | None = None,
-        get_parents: Callable[[Commit], list[bytes]] = lambda commit: commit.parents,
+        get_parents: Callable[[Commit], list[ObjectID]] = lambda commit: commit.parents,
         queue_cls: type = _CommitTimeQueue,
     ) -> None:
         """Constructor.
@@ -468,7 +468,7 @@ class Walker:
 
 def _topo_reorder(
     entries: Iterator[WalkEntry],
-    get_parents: Callable[[Commit], list[bytes]] = lambda commit: commit.parents,
+    get_parents: Callable[[Commit], list[ObjectID]] = lambda commit: commit.parents,
 ) -> Iterator[WalkEntry]:
     """Reorder an iterable of entries topologically.
 

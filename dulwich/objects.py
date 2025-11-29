@@ -43,7 +43,7 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-from typing import TypeGuard
+from typing import NewType, TypeGuard
 
 from . import replace_me
 from .errors import (
@@ -61,8 +61,6 @@ if TYPE_CHECKING:
     from _hashlib import HASH
 
     from .file import _GitFile
-
-ZERO_SHA = b"0" * 40
 
 # Header fields for commits
 _TREE_HEADER = b"tree"
@@ -93,7 +91,14 @@ SIGNATURE_PGP = b"pgp"
 SIGNATURE_SSH = b"ssh"
 
 
-ObjectID = bytes
+# Hex SHA type
+ObjectID = NewType("ObjectID", bytes)
+
+# Raw SHA type
+RawObjectID = NewType("RawObjectID", bytes)
+
+# Zero SHA constant
+ZERO_SHA: ObjectID = ObjectID(b"0" * 40)
 
 
 class EmptyFileException(FileFormatException):
@@ -117,18 +122,18 @@ def _decompress(string: bytes) -> bytes:
     return dcomped
 
 
-def sha_to_hex(sha: ObjectID) -> bytes:
+def sha_to_hex(sha: RawObjectID) -> ObjectID:
     """Takes a string and returns the hex of the sha within."""
     hexsha = binascii.hexlify(sha)
     assert len(hexsha) == 40, f"Incorrect length of sha1 string: {hexsha!r}"
-    return hexsha
+    return ObjectID(hexsha)
 
 
-def hex_to_sha(hex: bytes | str) -> bytes:
+def hex_to_sha(hex: ObjectID | str) -> RawObjectID:
     """Takes a hex sha and returns a binary sha."""
     assert len(hex) == 40, f"Incorrect length of hexsha: {hex!r}"
     try:
-        return binascii.unhexlify(hex)
+        return RawObjectID(binascii.unhexlify(hex))
     except TypeError as exc:
         if not isinstance(hex, bytes):
             raise
@@ -206,7 +211,7 @@ def filename_to_hex(filename: str | bytes) -> str:
         base_b, rest_b = names_b
         assert len(base_b) == 2 and len(rest_b) == 38, errmsg
         hex_bytes = base_b + rest_b
-    hex_to_sha(hex_bytes)
+    hex_to_sha(ObjectID(hex_bytes))
     return hex_bytes.decode("ascii")
 
 
@@ -337,7 +342,7 @@ class FixedSha:
         if not isinstance(hexsha, bytes):
             raise TypeError(f"Expected bytes for hexsha, got {hexsha!r}")
         self._hexsha = hexsha
-        self._sha = hex_to_sha(hexsha)
+        self._sha = hex_to_sha(ObjectID(hexsha))
 
     def digest(self) -> bytes:
         """Return the raw SHA digest."""
@@ -481,13 +486,17 @@ class ShaFile:
         """Return a string representing this object, fit for display."""
         return self.as_raw_string().decode("utf-8", "replace")
 
-    def set_raw_string(self, text: bytes, sha: ObjectID | None = None) -> None:
+    def set_raw_string(
+        self, text: bytes, sha: ObjectID | RawObjectID | None = None
+    ) -> None:
         """Set the contents of this object from a serialized string."""
         if not isinstance(text, bytes):
             raise TypeError(f"Expected bytes for text, got {text!r}")
         self.set_raw_chunks([text], sha)
 
-    def set_raw_chunks(self, chunks: list[bytes], sha: ObjectID | None = None) -> None:
+    def set_raw_chunks(
+        self, chunks: list[bytes], sha: ObjectID | RawObjectID | None = None
+    ) -> None:
         """Set the contents of this object from a list of chunks."""
         self._chunked_text = chunks
         self._deserialize(chunks)
@@ -571,7 +580,7 @@ class ShaFile:
 
     @staticmethod
     def from_raw_string(
-        type_num: int, string: bytes, sha: ObjectID | None = None
+        type_num: int, string: bytes, sha: ObjectID | RawObjectID | None = None
     ) -> "ShaFile":
         """Creates an object of the indicated type from the raw string given.
 
@@ -589,7 +598,7 @@ class ShaFile:
 
     @staticmethod
     def from_raw_chunks(
-        type_num: int, chunks: list[bytes], sha: ObjectID | None = None
+        type_num: int, chunks: list[bytes], sha: ObjectID | RawObjectID | None = None
     ) -> "ShaFile":
         """Creates an object of the indicated type from the raw chunks given.
 
@@ -673,9 +682,9 @@ class ShaFile:
         return obj_class.from_raw_string(self.type_num, self.as_raw_string(), self.id)
 
     @property
-    def id(self) -> bytes:
+    def id(self) -> ObjectID:
         """The hex SHA of this object."""
-        return self.sha().hexdigest().encode("ascii")
+        return ObjectID(self.sha().hexdigest().encode("ascii"))
 
     def __repr__(self) -> str:
         """Return string representation of this object."""
@@ -1178,7 +1187,7 @@ class TreeEntry(NamedTuple):
 
     path: bytes
     mode: int
-    sha: bytes
+    sha: ObjectID
 
     def in_path(self, path: bytes) -> "TreeEntry":
         """Return a copy of this entry with the given path prepended."""
@@ -1187,7 +1196,9 @@ class TreeEntry(NamedTuple):
         return TreeEntry(posixpath.join(path, self.path), self.mode, self.sha)
 
 
-def parse_tree(text: bytes, strict: bool = False) -> Iterator[tuple[bytes, int, bytes]]:
+def parse_tree(
+    text: bytes, strict: bool = False
+) -> Iterator[tuple[bytes, int, ObjectID]]:
     """Parse a tree text.
 
     Args:
@@ -1215,11 +1226,11 @@ def parse_tree(text: bytes, strict: bool = False) -> Iterator[tuple[bytes, int, 
         sha = text[name_end + 1 : count]
         if len(sha) != 20:
             raise ObjectFormatException("Sha has invalid length")
-        hexsha = sha_to_hex(sha)
+        hexsha = sha_to_hex(RawObjectID(sha))
         yield (name, mode, hexsha)
 
 
-def serialize_tree(items: Iterable[tuple[bytes, int, bytes]]) -> Iterator[bytes]:
+def serialize_tree(items: Iterable[tuple[bytes, int, ObjectID]]) -> Iterator[bytes]:
     """Serialize the items in a tree to a text.
 
     Args:
@@ -1233,7 +1244,7 @@ def serialize_tree(items: Iterable[tuple[bytes, int, bytes]]) -> Iterator[bytes]
 
 
 def sorted_tree_items(
-    entries: dict[bytes, tuple[int, bytes]], name_order: bool
+    entries: dict[bytes, tuple[int, ObjectID]], name_order: bool
 ) -> Iterator[TreeEntry]:
     """Iterate over a tree entries dictionary.
 
@@ -1275,7 +1286,7 @@ def key_entry_name_order(entry: tuple[bytes, tuple[int, ObjectID]]) -> bytes:
 
 
 def pretty_format_tree_entry(
-    name: bytes, mode: int, hexsha: bytes, encoding: str = "utf-8"
+    name: bytes, mode: int, hexsha: ObjectID, encoding: str = "utf-8"
 ) -> str:
     """Pretty format tree entry.
 
@@ -1323,7 +1334,7 @@ class Tree(ShaFile):
     def __init__(self) -> None:
         """Initialize an empty Tree."""
         super().__init__()
-        self._entries: dict[bytes, tuple[int, bytes]] = {}
+        self._entries: dict[bytes, tuple[int, ObjectID]] = {}
 
     @classmethod
     def from_path(cls, filename: str | bytes) -> "Tree":
@@ -1377,7 +1388,7 @@ class Tree(ShaFile):
         """Iterate over tree entry names."""
         return iter(self._entries)
 
-    def add(self, name: bytes, mode: int, hexsha: bytes) -> None:
+    def add(self, name: bytes, mode: int, hexsha: ObjectID) -> None:
         """Add an entry to the tree.
 
         Args:
@@ -1698,7 +1709,7 @@ class Commit(ShaFile):
     def __init__(self) -> None:
         """Initialize an empty Commit."""
         super().__init__()
-        self._parents: list[bytes] = []
+        self._parents: list[ObjectID] = []
         self._encoding: bytes | None = None
         self._mergetag: list[Tag] = []
         self._gpgsig: bytes | None = None
@@ -1749,7 +1760,7 @@ class Commit(ShaFile):
                 self._tree = value
             elif field == _PARENT_HEADER:
                 assert value is not None
-                self._parents.append(value)
+                self._parents.append(ObjectID(value))
             elif field == _AUTHOR_HEADER:
                 if value is None:
                     raise ObjectFormatException("missing author value")
@@ -1976,11 +1987,11 @@ class Commit(ShaFile):
 
     tree = serializable_property("tree", "Tree that is the state of this commit")
 
-    def _get_parents(self) -> list[bytes]:
+    def _get_parents(self) -> list[ObjectID]:
         """Return a list of parents of this commit."""
         return self._parents
 
-    def _set_parents(self, value: list[bytes]) -> None:
+    def _set_parents(self, value: list[ObjectID]) -> None:
         """Set a list of parents of this commit."""
         self._needs_serialization = True
         self._parents = value

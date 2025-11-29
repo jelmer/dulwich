@@ -47,7 +47,7 @@ from ..file import _GitFile
 from ..greenthreads import GreenThreadsMissingObjectFinder
 from ..lru_cache import LRUSizeCache
 from ..object_store import INFODIR, PACKDIR, PackBasedObjectStore
-from ..objects import S_ISGITLINK, Blob, Commit, Tag, Tree
+from ..objects import S_ISGITLINK, Blob, Commit, ObjectID, Tag, Tree
 from ..pack import (
     ObjectContainer,
     Pack,
@@ -66,7 +66,14 @@ from ..pack import (
     write_pack_object,
 )
 from ..protocol import TCP_GIT_PORT
-from ..refs import InfoRefsContainer, read_info_refs, split_peeled_refs, write_info_refs
+from ..refs import (
+    HEADREF,
+    InfoRefsContainer,
+    Ref,
+    read_info_refs,
+    split_peeled_refs,
+    write_info_refs,
+)
 from ..repo import OBJECTDIR, BaseRepo
 from ..server import Backend, BackendRepo, TCPGitServer
 
@@ -763,7 +770,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         """Loose objects are not supported by this repository."""
         return iter([])
 
-    def pack_info_get(self, sha: bytes) -> tuple[Any, ...] | None:
+    def pack_info_get(self, sha: ObjectID) -> tuple[Any, ...] | None:
         """Get pack info for a specific SHA.
 
         Args:
@@ -786,7 +793,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         if common is None:
             common = set()
 
-        def _find_parents(commit: bytes) -> list[Any]:
+        def _find_parents(commit: ObjectID) -> list[Any]:
             for pack in self.packs:
                 if commit in pack:
                     try:
@@ -983,8 +990,8 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         super().__init__(f)
 
     def _load_check_ref(
-        self, name: bytes, old_ref: bytes | None
-    ) -> dict[bytes, bytes] | bool:
+        self, name: Ref, old_ref: ObjectID | None
+    ) -> dict[Ref, ObjectID] | bool:
         self._check_refname(name)
         obj = self.scon.get_object(self.filename)
         if not obj:
@@ -1000,23 +1007,23 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
                 return False
         return refs
 
-    def _write_refs(self, refs: Mapping[bytes, bytes]) -> None:
+    def _write_refs(self, refs: Mapping[Ref, ObjectID]) -> None:
         f = BytesIO()
         f.writelines(write_info_refs(refs, cast("ObjectContainer", self.store)))
         self.scon.put_object(self.filename, f)
 
     def set_if_equals(
         self,
-        name: bytes,
-        old_ref: bytes | None,
-        new_ref: bytes,
+        name: Ref,
+        old_ref: ObjectID | None,
+        new_ref: ObjectID,
         committer: bytes | None = None,
         timestamp: float | None = None,
         timezone: int | None = None,
         message: bytes | None = None,
     ) -> bool:
         """Set a refname to new_ref only if it currently equals old_ref."""
-        if name == b"HEAD":
+        if name == HEADREF:
             return True
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
@@ -1028,15 +1035,15 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
 
     def remove_if_equals(
         self,
-        name: bytes,
-        old_ref: bytes | None,
+        name: Ref,
+        old_ref: ObjectID | None,
         committer: object = None,
         timestamp: object = None,
         timezone: object = None,
         message: object = None,
     ) -> bool:
         """Remove a refname only if it currently equals old_ref."""
-        if name == b"HEAD":
+        if name == HEADREF:
             return True
         refs = self._load_check_ref(name, old_ref)
         if not isinstance(refs, dict):
@@ -1046,14 +1053,14 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         del self._refs[name]
         return True
 
-    def allkeys(self) -> set[bytes]:
+    def allkeys(self) -> set[Ref]:
         """Get all reference names.
 
         Returns:
-          Set of reference names as bytes
+          Set of reference names as Ref
         """
         try:
-            self._refs[b"HEAD"] = self._refs[b"refs/heads/master"]
+            self._refs[HEADREF] = self._refs[Ref(b"refs/heads/master")]
         except KeyError:
             pass
         return set(self._refs.keys())

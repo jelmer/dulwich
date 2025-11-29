@@ -137,4 +137,4 @@ class GreenThreadsMissingObjectFinder(MissingObjectFinder):
             self.progress: Callable[[bytes], None] = lambda x: None
         else:
             self.progress = progress
-        self._tagged = (get_tagged and get_tagged()) or {}
+        self._tagged: dict[ObjectID, ObjectID] = (get_tagged and get_tagged()) or {}

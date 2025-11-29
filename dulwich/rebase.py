@@ -31,9 +31,9 @@ from typing import Protocol, TypedDict
 
 from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
-from dulwich.objects import Commit
+from dulwich.objects import Commit, ObjectID
 from dulwich.objectspec import parse_commit
-from dulwich.refs import local_branch_name
+from dulwich.refs import HEADREF, Ref, local_branch_name, set_ref_from_raw
 from dulwich.repo import BaseRepo, Repo
 
 
@@ -119,7 +119,7 @@ class RebaseTodoEntry:
     """Represents a single entry in a rebase todo list."""
 
     command: RebaseTodoCommand
-    commit_sha: bytes | None = None  # Store as hex string encoded as bytes
+    commit_sha: ObjectID | None = None  # Store as hex string encoded as bytes
     short_message: str | None = None
     arguments: str | None = None
 
@@ -209,7 +209,7 @@ class RebaseTodoEntry:
             # Commands that operate on commits
             if len(parts) > 1:
                 # Store SHA as hex string encoded as bytes
-                commit_sha = parts[1].encode()
+                commit_sha = ObjectID(parts[1].encode())
 
                 # Parse commit message if present
                 if len(parts) > 2:
@@ -374,8 +374,8 @@ class RebaseStateManager(Protocol):
     def save(
         self,
         original_head: bytes | None,
-        rebasing_branch: bytes | None,
-        onto: bytes | None,
+        rebasing_branch: Ref | None,
+        onto: ObjectID | None,
         todo: list[Commit],
         done: list[Commit],
     ) -> None:
@@ -386,8 +386,8 @@ class RebaseStateManager(Protocol):
         self,
     ) -> tuple[
         bytes | None,  # original_head
-        bytes | None,  # rebasing_branch
-        bytes | None,  # onto
+        Ref | None,  # rebasing_branch
+        ObjectID | None,  # onto
         list[Commit],  # todo
         list[Commit],  # done
     ]:
@@ -425,8 +425,8 @@ class DiskRebaseStateManager:
     def save(
         self,
         original_head: bytes | None,
-        rebasing_branch: bytes | None,
-        onto: bytes | None,
+        rebasing_branch: Ref | None,
+        onto: ObjectID | None,
         todo: list[Commit],
         done: list[Commit],
     ) -> None:
@@ -467,22 +467,26 @@ class DiskRebaseStateManager:
         self,
     ) -> tuple[
         bytes | None,
-        bytes | None,
-        bytes | None,
+        Ref | None,
+        ObjectID | None,
         list[Commit],
         list[Commit],
     ]:
         """Load rebase state from disk."""
         original_head = None
-        rebasing_branch = None
-        onto = None
+        rebasing_branch_bytes = None
+        onto_bytes = None
         todo: list[Commit] = []
         done: list[Commit] = []
 
         # Load rebase state files
         original_head = self._read_file("orig-head")
-        rebasing_branch = self._read_file("head-name")
-        onto = self._read_file("onto")
+        rebasing_branch_bytes = self._read_file("head-name")
+        rebasing_branch = (
+            Ref(rebasing_branch_bytes) if rebasing_branch_bytes is not None else None
+        )
+        onto_bytes = self._read_file("onto")
+        onto = ObjectID(onto_bytes) if onto_bytes is not None else None
 
         return original_head, rebasing_branch, onto, todo, done
 
@@ -532,8 +536,8 @@ class RebaseState(TypedDict):
     """Type definition for rebase state."""
 
     original_head: bytes | None
-    rebasing_branch: bytes | None
-    onto: bytes | None
+    rebasing_branch: Ref | None
+    onto: ObjectID | None
     todo: list[Commit]
     done: list[Commit]
 
@@ -554,8 +558,8 @@ class MemoryRebaseStateManager:
     def save(
         self,
         original_head: bytes | None,
-        rebasing_branch: bytes | None,
-        onto: bytes | None,
+        rebasing_branch: Ref | None,
+        onto: ObjectID | None,
         todo: list[Commit],
         done: list[Commit],
     ) -> None:
@@ -572,8 +576,8 @@ class MemoryRebaseStateManager:
         self,
     ) -> tuple[
         bytes | None,
-        bytes | None,
-        bytes | None,
+        Ref | None,
+        ObjectID | None,
         list[Commit],
         list[Commit],
     ]:
@@ -630,10 +634,10 @@ class Rebaser:
 
         # Initialize state
         self._original_head: bytes | None = None
-        self._onto: bytes | None = None
+        self._onto: ObjectID | None = None
         self._todo: list[Commit] = []
         self._done: list[Commit] = []
-        self._rebasing_branch: bytes | None = None
+        self._rebasing_branch: Ref | None = None
 
         # Load any existing rebase state
         self._load_rebase_state()
@@ -653,7 +657,7 @@ class Rebaser:
         # Get the branch commit
         if branch is None:
             # Use current HEAD
-            _head_ref, head_sha = self.repo.refs.follow(b"HEAD")
+            _head_ref, head_sha = self.repo.refs.follow(HEADREF)
             if head_sha is None:
                 raise ValueError("HEAD does not point to a valid commit")
             branch_commit = self.repo[head_sha]
@@ -688,8 +692,8 @@ class Rebaser:
         return list(reversed(commits))
 
     def _cherry_pick(
-        self, commit: Commit, onto: bytes
-    ) -> tuple[bytes | None, list[bytes]]:
+        self, commit: Commit, onto: ObjectID
+    ) -> tuple[ObjectID | None, list[bytes]]:
         """Cherry-pick a commit onto another commit.
 
         Args:
@@ -754,22 +758,22 @@ class Rebaser:
             List of commits that will be rebased
         """
         # Save original HEAD
-        self._original_head = self.repo.refs.read_ref(b"HEAD")
+        self._original_head = self.repo.refs.read_ref(HEADREF)
 
         # Save which branch we're rebasing (for later update)
         if branch is not None:
             # Parse the branch ref
             if branch.startswith(b"refs/heads/"):
-                self._rebasing_branch = branch
+                self._rebasing_branch = Ref(branch)
             else:
                 # Assume it's a branch name
-                self._rebasing_branch = local_branch_name(branch)
+                self._rebasing_branch = Ref(local_branch_name(branch))
         else:
             # Use current branch
             if self._original_head is not None and self._original_head.startswith(
                 b"ref: "
             ):
-                self._rebasing_branch = self._original_head[5:]
+                self._rebasing_branch = Ref(self._original_head[5:])
             else:
                 self._rebasing_branch = None
 
@@ -844,7 +848,7 @@ class Rebaser:
         # Restore original HEAD
         if self._original_head is None:
             raise RebaseError("No original HEAD to restore")
-        self.repo.refs[b"HEAD"] = self._original_head
+        set_ref_from_raw(self.repo.refs, HEADREF, self._original_head)
 
         # Clean up rebase state
         self._clean_rebase_state()
@@ -870,13 +874,13 @@ class Rebaser:
             # If HEAD was pointing to this branch, it will follow automatically
         else:
             # If we don't know which branch, check current HEAD
-            head_ref = self.repo.refs[b"HEAD"]
+            head_ref = self.repo.refs[HEADREF]
             if head_ref.startswith(b"ref: "):
-                branch_ref = head_ref[5:]
+                branch_ref = Ref(head_ref[5:])
                 self.repo.refs[branch_ref] = last_commit.id
             else:
                 # Detached HEAD
-                self.repo.refs[b"HEAD"] = last_commit.id
+                self.repo.refs[HEADREF] = last_commit.id
 
         # Clean up rebase state
         self._clean_rebase_state()

@@ -96,7 +96,7 @@ def _find_lcas(
         List of lowest common ancestor commit IDs
     """
     cands = []
-    cstates = {}
+    cstates: dict[ObjectID, int] = {}
 
     # Flags to Record State
     _ANC_OF_1 = 1  # ancestor of commit 1
@@ -124,7 +124,7 @@ def _find_lcas(
 
     # initialize the working list states with ancestry info
     # note possibility of c1 being one of c2s should be handled
-    wlst: WorkList[bytes] = WorkList()
+    wlst: WorkList[ObjectID] = WorkList()
     cstates[c1] = _ANC_OF_1
     try:
         wlst.add((lookup_stamp(c1), c1))
@@ -298,7 +298,7 @@ def find_octopus_base(
     return lcas
 
 
-def can_fast_forward(repo: "BaseRepo", c1: bytes, c2: bytes) -> bool:
+def can_fast_forward(repo: "BaseRepo", c1: ObjectID, c2: ObjectID) -> bool:
     """Is it possible to fast-forward from c1 to c2?
 
     Args:

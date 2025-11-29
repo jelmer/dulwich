@@ -29,13 +29,14 @@ from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK
 
 if TYPE_CHECKING:
+    from .objects import ObjectID
     from .pack import ObjectContainer
     from .repo import Repo
 
 
 def iter_cached_submodules(
-    store: "ObjectContainer", root_tree_id: bytes
-) -> Iterator[tuple[bytes, bytes]]:
+    store: "ObjectContainer", root_tree_id: "ObjectID"
+) -> Iterator[tuple[bytes, "ObjectID"]]:
     """Iterate over cached submodules.
 
     Args:

@@ -43,7 +43,7 @@ from typing import (
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
 
-from .objects import S_ISGITLINK, Blob, Commit
+from .objects import S_ISGITLINK, Blob, Commit, ObjectID, RawObjectID
 
 FIRST_FEW_BYTES = 8000
 
@@ -361,8 +361,8 @@ def patch_filename(p: bytes | None, root: bytes) -> bytes:
 def write_object_diff(
     f: IO[bytes],
     store: "BaseObjectStore",
-    old_file: tuple[bytes | None, int | None, bytes | None],
-    new_file: tuple[bytes | None, int | None, bytes | None],
+    old_file: tuple[bytes | None, int | None, ObjectID | None],
+    new_file: tuple[bytes | None, int | None, ObjectID | None],
     diff_binary: bool = False,
     diff_algorithm: str | None = None,
 ) -> None:
@@ -384,7 +384,7 @@ def write_object_diff(
     patched_old_path = patch_filename(old_path, b"a")
     patched_new_path = patch_filename(new_path, b"b")
 
-    def content(mode: int | None, hexsha: bytes | None) -> Blob:
+    def content(mode: int | None, hexsha: ObjectID | None) -> Blob:
         """Get blob content for a file.
 
         Args:
@@ -542,8 +542,8 @@ def write_blob_diff(
 def write_tree_diff(
     f: IO[bytes],
     store: "BaseObjectStore",
-    old_tree: bytes | None,
-    new_tree: bytes | None,
+    old_tree: ObjectID | None,
+    new_tree: ObjectID | None,
     diff_binary: bool = False,
     diff_algorithm: str | None = None,
 ) -> None:
@@ -731,7 +731,9 @@ def patch_id(diff_data: bytes) -> bytes:
     return hashlib.sha1(normalized).hexdigest().encode("ascii")
 
 
-def commit_patch_id(store: "BaseObjectStore", commit_id: bytes) -> bytes:
+def commit_patch_id(
+    store: "BaseObjectStore", commit_id: ObjectID | RawObjectID
+) -> bytes:
     """Compute patch ID for a commit.
 
     Args:

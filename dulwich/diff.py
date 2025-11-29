@@ -54,7 +54,7 @@ from typing import BinaryIO
 from ._typing import Buffer
 from .index import ConflictedIndexEntry, commit_index
 from .object_store import iter_tree_contents
-from .objects import S_ISGITLINK, Blob, Commit
+from .objects import S_ISGITLINK, Blob, Commit, ObjectID
 from .patch import write_blob_diff, write_object_diff
 from .repo import Repo
 
@@ -79,7 +79,7 @@ def should_include_path(path: bytes, paths: Sequence[bytes] | None) -> bool:
 def diff_index_to_tree(
     repo: Repo,
     outstream: BinaryIO,
-    commit_sha: bytes | None = None,
+    commit_sha: ObjectID | None = None,
     paths: Sequence[bytes] | None = None,
     diff_algorithm: str | None = None,
 ) -> None:
@@ -94,7 +94,9 @@ def diff_index_to_tree(
     """
     if commit_sha is None:
         try:
-            commit_sha = repo.refs[b"HEAD"]
+            from dulwich.refs import HEADREF
+
+            commit_sha = repo.refs[HEADREF]
             old_commit = repo[commit_sha]
             assert isinstance(old_commit, Commit)
             old_tree = old_commit.tree
@@ -124,7 +126,7 @@ def diff_index_to_tree(
 def diff_working_tree_to_tree(
     repo: Repo,
     outstream: BinaryIO,
-    commit_sha: bytes,
+    commit_sha: ObjectID,
     paths: Sequence[bytes] | None = None,
     diff_algorithm: str | None = None,
 ) -> None:

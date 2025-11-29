@@ -36,11 +36,21 @@ from io import BytesIO
 from typing import IO, TYPE_CHECKING
 
 from .file import GitFile
-from .objects import Blob, Commit, Tag, Tree
+from .objects import (
+    Blob,
+    Commit,
+    ObjectID,
+    RawObjectID,
+    Tag,
+    Tree,
+    hex_to_sha,
+    sha_to_hex,
+)
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .pack import Pack, PackIndex
+    from .refs import Ref
 
 # Bitmap file signature
 BITMAP_SIGNATURE = b"BITM"
@@ -781,10 +791,10 @@ def _compute_name_hash(name: bytes) -> int:
 
 
 def select_bitmap_commits(
-    refs: dict[bytes, bytes],
+    refs: dict["Ref", ObjectID],
     object_store: "BaseObjectStore",
     commit_interval: int = DEFAULT_COMMIT_INTERVAL,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Select commits for bitmap generation.
 
     Uses Git's strategy:
@@ -849,8 +859,8 @@ def select_bitmap_commits(
 
 
 def build_reachability_bitmap(
-    commit_sha: bytes,
-    sha_to_pos: dict[bytes, int],
+    commit_sha: ObjectID,
+    sha_to_pos: dict[RawObjectID, int],
     object_store: "BaseObjectStore",
 ) -> EWAHBitmap:
     """Build a reachability bitmap for a commit.
@@ -879,8 +889,10 @@ def build_reachability_bitmap(
         seen.add(sha)
 
         # Add this object to the bitmap if it's in the pack
-        if sha in sha_to_pos:
-            bitmap.add(sha_to_pos[sha])
+        # Convert hex SHA to binary for pack index lookup
+        raw_sha = hex_to_sha(sha)
+        if raw_sha in sha_to_pos:
+            bitmap.add(sha_to_pos[raw_sha])
 
         # Get the object and traverse its references
         try:
@@ -902,9 +914,9 @@ def build_reachability_bitmap(
 
 
 def apply_xor_compression(
-    bitmaps: list[tuple[bytes, EWAHBitmap]],
+    bitmaps: list[tuple[ObjectID, EWAHBitmap]],
     max_xor_offset: int = MAX_XOR_OFFSET,
-) -> list[tuple[bytes, EWAHBitmap, int]]:
+) -> list[tuple[ObjectID, EWAHBitmap, int]]:
     """Apply XOR compression to bitmaps.
 
     XOR compression stores some bitmaps as XOR differences from previous bitmaps,
@@ -942,7 +954,7 @@ def apply_xor_compression(
 
 
 def build_type_bitmaps(
-    sha_to_pos: dict[bytes, int],
+    sha_to_pos: dict["RawObjectID", int],
     object_store: "BaseObjectStore",
 ) -> tuple[EWAHBitmap, EWAHBitmap, EWAHBitmap, EWAHBitmap]:
     """Build type bitmaps for all objects in a pack.
@@ -956,8 +968,6 @@ def build_type_bitmaps(
     Returns:
         Tuple of (commit_bitmap, tree_bitmap, blob_bitmap, tag_bitmap)
     """
-    from .objects import sha_to_hex
-
     commit_bitmap = EWAHBitmap()
     tree_bitmap = EWAHBitmap()
     blob_bitmap = EWAHBitmap()
@@ -965,7 +975,7 @@ def build_type_bitmaps(
 
     for sha, pos in sha_to_pos.items():
         # Pack index returns binary SHA (20 bytes), but object_store expects hex SHA (40 bytes)
-        hex_sha = sha_to_hex(sha) if len(sha) == 20 else sha
+        hex_sha = sha_to_hex(sha) if len(sha) == 20 else ObjectID(sha)
         try:
             obj = object_store[hex_sha]
         except KeyError:
@@ -987,7 +997,7 @@ def build_type_bitmaps(
 
 
 def build_name_hash_cache(
-    sha_to_pos: dict[bytes, int],
+    sha_to_pos: dict["RawObjectID", int],
     object_store: "BaseObjectStore",
 ) -> list[int]:
     """Build name-hash cache for all objects in a pack.
@@ -1002,15 +1012,13 @@ def build_name_hash_cache(
     Returns:
         List of 32-bit hash values, one per object in the pack
     """
-    from .objects import sha_to_hex
-
     # Pre-allocate list with correct size
     num_objects = len(sha_to_pos)
     name_hashes = [0] * num_objects
 
     for sha, pos in sha_to_pos.items():
         # Pack index returns binary SHA (20 bytes), but object_store expects hex SHA (40 bytes)
-        hex_sha = sha_to_hex(sha) if len(sha) == 20 else sha
+        hex_sha = sha_to_hex(sha) if len(sha) == 20 else ObjectID(sha)
         try:
             obj = object_store[hex_sha]
         except KeyError:
@@ -1038,7 +1046,7 @@ def build_name_hash_cache(
 def generate_bitmap(
     pack_index: "PackIndex",
     object_store: "BaseObjectStore",
-    refs: dict[bytes, bytes],
+    refs: dict["Ref", ObjectID],
     pack_checksum: bytes,
     include_hash_cache: bool = True,
     include_lookup_table: bool = True,
@@ -1068,7 +1076,7 @@ def generate_bitmap(
 
     # Build mapping from SHA to position in pack index ONCE
     # This is used by all subsequent operations and avoids repeated enumeration
-    sha_to_pos = {}
+    sha_to_pos: dict[RawObjectID, int] = {}
     for pos, (sha, _offset, _crc32) in enumerate(pack_index.iterentries()):
         sha_to_pos[sha] = pos
 
@@ -1120,11 +1128,12 @@ def generate_bitmap(
 
     # Add bitmap entries
     for commit_sha, xor_bitmap, xor_offset in compressed_bitmaps:
-        if commit_sha not in sha_to_pos:
+        raw_commit_sha = hex_to_sha(commit_sha)
+        if raw_commit_sha not in sha_to_pos:
             continue
 
         entry = BitmapEntry(
-            object_pos=sha_to_pos[commit_sha],
+            object_pos=sha_to_pos[raw_commit_sha],
             xor_offset=xor_offset,
             flags=0,
             bitmap=xor_bitmap,
@@ -1154,8 +1163,8 @@ def generate_bitmap(
 
 
 def find_commit_bitmaps(
-    commit_shas: set[bytes], packs: Iterable["Pack"]
-) -> dict[bytes, tuple["Pack", "PackBitmap", dict[bytes, int]]]:
+    commit_shas: set["ObjectID"], packs: Iterable["Pack"]
+) -> dict["ObjectID", tuple["Pack", "PackBitmap", dict[RawObjectID, int]]]:
     """Find which packs have bitmaps for the given commits.
 
     Args:
@@ -1178,14 +1187,15 @@ def find_commit_bitmaps(
             continue
 
         # Build SHA to position mapping for this pack
-        sha_to_pos = {}
+        sha_to_pos: dict[RawObjectID, int] = {}
         for pos, (sha, _offset, _crc32) in enumerate(pack.index.iterentries()):
             sha_to_pos[sha] = pos
 
         # Check which commits have bitmaps
         for commit_sha in list(remaining):
             if pack_bitmap.has_commit(commit_sha):
-                if commit_sha in sha_to_pos:
+                raw_commit_sha = hex_to_sha(commit_sha)
+                if raw_commit_sha in sha_to_pos:
                     result[commit_sha] = (pack, pack_bitmap, sha_to_pos)
                     remaining.remove(commit_sha)
 
@@ -1196,7 +1206,7 @@ def bitmap_to_object_shas(
     bitmap: EWAHBitmap,
     pack_index: "PackIndex",
     type_filter: EWAHBitmap | None = None,
-) -> set[bytes]:
+) -> set[ObjectID]:
     """Convert a bitmap to a set of object SHAs.
 
     Args:
@@ -1205,15 +1215,15 @@ def bitmap_to_object_shas(
         type_filter: Optional type bitmap to filter results (e.g., commits only)
 
     Returns:
-        Set of object SHAs
+        Set of object SHAs (hex format)
     """
-    result = set()
+    result: set[ObjectID] = set()
 
     for pos, (sha, _offset, _crc32) in enumerate(pack_index.iterentries()):
         # Check if this position is in the bitmap
         if pos in bitmap:
             # Apply type filter if provided
             if type_filter is None or pos in type_filter:
-                result.add(sha)
+                result.add(sha_to_hex(sha))
 
     return result

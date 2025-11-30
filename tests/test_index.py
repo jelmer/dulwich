@@ -1443,9 +1443,11 @@ class TestIndexEntryFromPath(TestCase):
         self.assertEqual(sorted(changes), [b"conflict", b"file1", b"file3", b"file4"])
 
         # Create a custom blob filter function
-        def filter_blob_callback(data, path):
+        def filter_blob_callback(blob, path):
             # Modify blob data to make it look changed
-            return b"modified " + data
+            result_blob = Blob()
+            result_blob.data = b"modified " + blob.data
+            return result_blob
 
         # Get unstaged changes with blob filter
         changes = list(get_unstaged_changes(index, repo_dir, filter_blob_callback))
@@ -1454,6 +1456,57 @@ class TestIndexEntryFromPath(TestCase):
         self.assertEqual(
             sorted(changes), [b"conflict", b"file1", b"file2", b"file3", b"file4"]
         )
+
+    def test_get_unstaged_changes_with_blob_filter(self) -> None:
+        """Test get_unstaged_changes with filter that expects Blob objects.
+
+        This reproduces issue #2010 where passing blob.data instead of blob
+        to the filter callback causes AttributeError when the callback expects
+        a Blob object (like checkin_normalize does).
+        """
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            # Create and commit a test file
+            test_file = os.path.join(repo_dir, "test.txt")
+            with open(test_file, "wb") as f:
+                f.write(b"original content")
+
+            repo.get_worktree().stage(["test.txt"])
+            repo.get_worktree().commit(
+                message=b"Initial commit",
+                committer=b"Test <test@example.com>",
+                author=b"Test <test@example.com>",
+            )
+
+            # Create a .gitattributes file
+            gitattributes_file = os.path.join(repo_dir, ".gitattributes")
+            with open(gitattributes_file, "wb") as f:
+                f.write(b"*.txt text\n")
+
+            # Modify the test file
+            with open(test_file, "wb") as f:
+                f.write(b"modified content")
+
+            # Force mtime change to ensure stat doesn't match
+            os.utime(test_file, (0, 0))
+
+            # Create a filter callback that expects Blob objects (like checkin_normalize)
+            def blob_filter_callback(blob: Blob, path: bytes) -> Blob:
+                """Filter that expects a Blob object, not bytes."""
+                # This should receive a Blob object with a .data attribute
+                self.assertIsInstance(blob, Blob)
+                self.assertTrue(hasattr(blob, "data"))
+                # Return the blob unchanged for this test
+                return blob
+
+            # This should not raise AttributeError: 'bytes' object has no attribute 'data'
+            changes = list(
+                get_unstaged_changes(repo.open_index(), repo_dir, blob_filter_callback)
+            )
+
+            # Should detect the change in test.txt
+            self.assertIn(b"test.txt", changes)
 
 
 class TestManyFilesFeature(TestCase):

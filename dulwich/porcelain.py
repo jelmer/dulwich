@@ -836,15 +836,9 @@ def commit(
             index = r.open_index()
             normalizer = r.get_blob_normalizer()
 
-            # Create a wrapper that handles the bytes -> Blob conversion
+            # Pass the normalizer's checkin_normalize method directly
             if normalizer is not None:
-
-                def filter_callback(data: bytes, path: bytes) -> bytes:
-                    blob = Blob()
-                    blob.data = data
-                    normalized_blob = normalizer.checkin_normalize(blob, path)
-                    data_bytes: bytes = normalized_blob.data
-                    return data_bytes
+                filter_callback = normalizer.checkin_normalize
             else:
                 filter_callback = None
 
@@ -1299,13 +1293,7 @@ def add(
         index = r.open_index()
         normalizer = r.get_blob_normalizer()
         if normalizer is not None:
-
-            def filter_callback(data: bytes, path: bytes) -> bytes:
-                blob = Blob()
-                blob.data = data
-                normalized_blob = normalizer.checkin_normalize(blob, path)
-                data_bytes: bytes = normalized_blob.data
-                return data_bytes
+            filter_callback = normalizer.checkin_normalize
         else:
             filter_callback = None
 
@@ -3272,15 +3260,9 @@ def status(
         # 2. Get status of unstaged
         normalizer = r.get_blob_normalizer()
 
-        # Create a wrapper that handles the bytes -> Blob conversion
+        # Pass the normalizer's checkin_normalize method directly
         if normalizer is not None:
-
-            def filter_callback(data: bytes, path: bytes) -> bytes:
-                blob = Blob()
-                blob.data = data
-                normalized_blob = normalizer.checkin_normalize(blob, path)
-                result_data: bytes = normalized_blob.data
-                return result_data
+            filter_callback = normalizer.checkin_normalize
         else:
             filter_callback = None
 

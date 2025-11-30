@@ -2797,7 +2797,7 @@ def _check_entry_for_changes(
     tree_path: bytes,
     entry: IndexEntry | ConflictedIndexEntry,
     root_path: bytes,
-    filter_blob_callback: Callable[[bytes, bytes], bytes] | None = None,
+    filter_blob_callback: Callable[[Blob, bytes], Blob] | None = None,
 ) -> bytes | None:
     """Check a single index entry for changes.
 
@@ -2836,7 +2836,7 @@ def _check_entry_for_changes(
         blob = blob_from_path_and_stat(full_path, st)
 
         if filter_blob_callback is not None:
-            blob.data = filter_blob_callback(blob.data, tree_path)
+            blob = filter_blob_callback(blob, tree_path)
     except FileNotFoundError:
         # The file was removed, so we assume that counts as
         # different from whatever file used to exist.

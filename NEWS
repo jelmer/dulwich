@@ -1,5 +1,10 @@
 0.25.0	UNRELEASED
 
+ * Fix ``get_unstaged_changes()`` to correctly pass Blob objects to filter
+   callbacks instead of raw bytes. This fixes crashes when using ``.gitattributes``
+   files with filter callbacks like ``checkin_normalize``.
+   (Jelmer Vernooĳ, #2010)
+
  * The ``ObjectID`` and ``Ref`` types are now newtypes, making it harder to
    accidentally pass the wrong type - as notified by mypy. Most of this is in
    lower-level code. (Jelmer Vernooĳ)

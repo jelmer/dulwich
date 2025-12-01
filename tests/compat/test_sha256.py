@@ -28,7 +28,7 @@ from dulwich.object_format import SHA256
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 
-from .utils import CompatTestCase, run_git_or_fail
+from .utils import CompatTestCase, rmtree_ro, run_git_or_fail
 
 
 class GitSHA256CompatibilityTests(CompatTestCase):
@@ -44,7 +44,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test that dulwich-created SHA256 repos are readable by git."""
         # Create SHA256 repo with dulwich
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
 
         # Add a blob and tree using dulwich
@@ -75,7 +75,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test that git-created SHA256 repos are readable by dulwich."""
         # Create SHA256 repo with git
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         self._run_git(["init", "--object-format=sha256", repo_path])
 
         # Create a file and commit with git
@@ -111,7 +111,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test that object hashing is consistent between dulwich and git."""
         # Create SHA256 repo with git
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         self._run_git(["init", "--object-format=sha256", repo_path])
 
         # Create a test file with known content
@@ -135,7 +135,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test that tree hashing is consistent between dulwich and git."""
         # Create SHA256 repo with git
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         self._run_git(["init", "--object-format=sha256", repo_path])
 
         # Create a test file and add to index
@@ -164,7 +164,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test commit creation interoperability between dulwich and git."""
         # Create SHA256 repo with dulwich
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
 
         # Create objects with dulwich
@@ -207,7 +207,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test that ref updates work between dulwich and git."""
         # Create repo with git
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         self._run_git(["init", "--object-format=sha256", repo_path])
 
         # Create initial commit with git
@@ -260,7 +260,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test cloning a git SHA256 repository with dulwich."""
         # Create source repo with git
         source_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(source_path))
+        self.addCleanup(rmtree_ro, source_path)
         self._run_git(["init", "--object-format=sha256", source_path])
 
         # Add content
@@ -273,7 +273,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
 
         # Clone with dulwich
         target_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(target_path))
+        self.addCleanup(rmtree_ro, target_path)
 
         target_repo = Repo.init(target_path, mkdir=False, object_format="sha256")
 
@@ -311,7 +311,7 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         """Test that git fsck works on dulwich-created SHA256 repos."""
         # Create repo with dulwich
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
 
         # Create a more complex object graph

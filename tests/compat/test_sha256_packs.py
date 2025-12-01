@@ -29,7 +29,7 @@ from dulwich.objects import Blob, Commit, Tree
 from dulwich.pack import load_pack_index_file
 from dulwich.repo import Repo
 
-from .utils import CompatTestCase, run_git_or_fail
+from .utils import CompatTestCase, rmtree_ro, run_git_or_fail
 
 
 class GitSHA256PackCompatibilityTests(CompatTestCase):
@@ -45,7 +45,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
         """Test that git-created SHA256 pack files are readable by dulwich."""
         # Create SHA256 repo with git
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         self._run_git(["init", "--object-format=sha256", repo_path])
 
         # Create multiple files to ensure pack creation
@@ -116,7 +116,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
         """Test that dulwich-created SHA256 objects are readable by git."""
         # Create SHA256 repo with dulwich
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
 
         # Create objects
@@ -170,7 +170,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
         """Test pack index v1 interoperability with SHA256."""
         # Create repo with git using pack index v1
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         self._run_git(["init", "--object-format=sha256", repo_path])
         self._run_git(["config", "pack.indexVersion", "1"], cwd=repo_path)
 
@@ -213,7 +213,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
         """Test large pack file interoperability."""
         # Create repo with dulwich
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
 
         # Create a large file that will use delta compression
@@ -273,7 +273,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
         """Test repositories with both loose and packed objects."""
         # Create repo with git
         repo_path = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(repo_path))
+        self.addCleanup(rmtree_ro, repo_path)
         self._run_git(["init", "--object-format=sha256", repo_path])
 
         # Create initial objects that will be packed

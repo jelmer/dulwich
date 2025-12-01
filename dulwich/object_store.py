@@ -42,6 +42,7 @@ from typing import (
 
 from .errors import NotTreeError
 from .file import GitFile, _GitFile
+from .midx import MultiPackIndex, load_midx
 from .objects import (
     S_ISGITLINK,
     ZERO_SHA,
@@ -1399,6 +1400,10 @@ class DiskObjectStore(PackBasedObjectStore):
         self._commit_graph = None
         self._use_commit_graph = True  # Default to true
 
+        # Multi-pack-index support - lazy loaded
+        self._midx: MultiPackIndex | None = None
+        self._use_midx = True  # Default to true
+
     def __repr__(self) -> str:
         """Return string representation of DiskObjectStore.
 
@@ -1485,6 +1490,9 @@ class DiskObjectStore(PackBasedObjectStore):
         # Read core.commitGraph setting
         use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
 
+        # Read core.multiPackIndex setting
+        use_midx = config.get_boolean((b"core",), b"multiPackIndex", True)
+
         # Read core.fsyncObjectFiles setting
         fsync_object_files = config.get_boolean((b"core",), b"fsyncObjectFiles", False)
 
@@ -1521,6 +1529,7 @@ class DiskObjectStore(PackBasedObjectStore):
             dir_mode=dir_mode,
         )
         instance._use_commit_graph = use_commit_graph
+        instance._use_midx = use_midx
         return instance
 
     @property
@@ -2036,6 +2045,162 @@ class DiskObjectStore(PackBasedObjectStore):
                 self._commit_graph = read_commit_graph(graph_file)
         return self._commit_graph
 
+    def get_midx(self) -> MultiPackIndex | None:
+        """Get the multi-pack-index for this object store.
+
+        Returns:
+          MultiPackIndex object if available, None otherwise
+
+        Raises:
+          ValueError: If MIDX file is corrupt
+          OSError: If MIDX file cannot be read
+        """
+        if not self._use_midx:
+            return None
+
+        if self._midx is None:
+            # Look for MIDX in pack directory
+            midx_file = os.path.join(self.pack_dir, "multi-pack-index")
+            if os.path.exists(midx_file):
+                self._midx = load_midx(midx_file)
+        return self._midx
+
+    def _get_pack_by_name(self, pack_name: str) -> Pack:
+        """Get a pack by its base name.
+
+        Args:
+            pack_name: Base name of the pack (e.g., 'pack-abc123.pack' or 'pack-abc123.idx')
+
+        Returns:
+            Pack object
+
+        Raises:
+            KeyError: If pack doesn't exist
+        """
+        # Remove .pack or .idx extension if present
+        if pack_name.endswith(".pack"):
+            base_name = pack_name[:-5]
+        elif pack_name.endswith(".idx"):
+            base_name = pack_name[:-4]
+        else:
+            base_name = pack_name
+
+        # Check if already in cache
+        if base_name in self._pack_cache:
+            return self._pack_cache[base_name]
+
+        # Load the pack
+        pack_path = os.path.join(self.pack_dir, base_name)
+        if not os.path.exists(pack_path + ".pack"):
+            raise KeyError(f"Pack {pack_name} not found")
+
+        pack = Pack(
+            pack_path,
+            delta_window_size=self.pack_delta_window_size,
+            window_memory=self.pack_window_memory,
+            delta_cache_size=self.pack_delta_cache_size,
+            depth=self.pack_depth,
+            threads=self.pack_threads,
+            big_file_threshold=self.pack_big_file_threshold,
+        )
+        self._pack_cache[base_name] = pack
+        return pack
+
+    def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
+        """Check if a particular object is present by SHA1 and is packed.
+
+        This checks the MIDX first if available, then falls back to checking
+        individual pack indexes.
+
+        Args:
+            sha: Binary SHA of the object
+
+        Returns:
+            True if the object is in a pack file
+        """
+        # Check MIDX first for faster lookup
+        midx = self.get_midx()
+        if midx is not None and sha in midx:
+            return True
+
+        # Fall back to checking individual packs
+        return super().contains_packed(sha)
+
+    def get_raw(self, name: RawObjectID | ObjectID) -> tuple[int, bytes]:
+        """Obtain the raw fulltext for an object.
+
+        This uses the MIDX if available for faster lookups.
+
+        Args:
+            name: SHA for the object (20 bytes binary or 40 bytes hex)
+
+        Returns:
+            Tuple with numeric type and object contents
+
+        Raises:
+            KeyError: If object not found
+        """
+        if name == ZERO_SHA:
+            raise KeyError(name)
+
+        sha: RawObjectID
+        if len(name) == 40:
+            # name is ObjectID (hex), convert to RawObjectID
+            sha = hex_to_sha(cast(ObjectID, name))
+        elif len(name) == 20:
+            # name is already RawObjectID (binary)
+            sha = RawObjectID(name)
+        else:
+            raise AssertionError(f"Invalid object name {name!r}")
+
+        # Try MIDX first for faster lookup
+        midx = self.get_midx()
+        if midx is not None:
+            result = midx.object_offset(sha)
+            if result is not None:
+                pack_name, _offset = result
+                try:
+                    pack = self._get_pack_by_name(pack_name)
+                    return pack.get_raw(sha)
+                except (KeyError, PackFileDisappeared):
+                    # Pack disappeared or object not found, fall through to standard lookup
+                    pass
+
+        # Fall back to the standard implementation
+        return super().get_raw(name)
+
+    def write_midx(self) -> bytes:
+        """Write a multi-pack-index file for this object store.
+
+        Creates a MIDX file that indexes all pack files in the pack directory.
+
+        Returns:
+            SHA-1 checksum of the written MIDX file
+
+        Raises:
+            OSError: If the pack directory doesn't exist or MIDX can't be written
+        """
+        from .midx import write_midx_file
+
+        # Get all pack files
+        packs = self.packs
+        if not packs:
+            # No packs to index
+            return b"\x00" * 20
+
+        # Collect entries from all packs
+        pack_entries: list[tuple[str, list[tuple[RawObjectID, int, int | None]]]] = []
+
+        for pack in packs:
+            # Git stores .idx extension in MIDX, not .pack
+            pack_name = os.path.basename(pack._basename) + ".idx"
+            entries = list(pack.index.iterentries())
+            pack_entries.append((pack_name, entries))
+
+        # Write MIDX file
+        midx_path = os.path.join(self.pack_dir, "multi-pack-index")
+        return write_midx_file(midx_path, pack_entries)
+
     def write_commit_graph(
         self, refs: Iterable[ObjectID] | None = None, reachable: bool = True
     ) -> None:
@@ -2148,6 +2313,25 @@ class DiskObjectStore(PackBasedObjectStore):
                 mtime = os.path.getmtime(pack_path)
                 if time.time() - mtime > grace_period:
                     os.remove(pack_path)
+
+    def close(self) -> None:
+        """Close the object store and release resources.
+
+        This method closes all cached pack files, MIDX, and frees associated resources.
+        """
+        # Close MIDX if it's loaded
+        if self._midx is not None:
+            self._midx.close()
+            self._midx = None
+
+        # Close alternates
+        if self._alternates is not None:
+            for alt in self._alternates:
+                alt.close()
+            self._alternates = None
+
+        # Call parent class close to handle pack files
+        super().close()
 
 
 class MemoryObjectStore(PackCapableObjectStore):

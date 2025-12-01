@@ -14,5 +14,5 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: jelmer/action-disperse-validate@v2.0.0

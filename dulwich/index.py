@@ -1629,9 +1629,31 @@ def index_entry_from_stat(
 
     from dulwich.objects import ObjectID
 
+    # Use nanosecond precision when available to avoid precision loss
+    # through float representation
+    ctime: int | float | tuple[int, int]
+    mtime: int | float | tuple[int, int]
+    st_ctime_ns = getattr(stat_val, "st_ctime_ns", None)
+    if st_ctime_ns is not None:
+        ctime = (
+            st_ctime_ns // 1_000_000_000,
+            st_ctime_ns % 1_000_000_000,
+        )
+    else:
+        ctime = stat_val.st_ctime
+
+    st_mtime_ns = getattr(stat_val, "st_mtime_ns", None)
+    if st_mtime_ns is not None:
+        mtime = (
+            st_mtime_ns // 1_000_000_000,
+            st_mtime_ns % 1_000_000_000,
+        )
+    else:
+        mtime = stat_val.st_mtime
+
     return IndexEntry(
-        ctime=stat_val.st_ctime,
-        mtime=stat_val.st_mtime,
+        ctime=ctime,
+        mtime=mtime,
         dev=stat_val.st_dev,
         ino=stat_val.st_ino,
         mode=mode,

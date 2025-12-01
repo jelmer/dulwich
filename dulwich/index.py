@@ -2773,17 +2773,27 @@ def _stat_matches_entry(st: os.stat_result, entry: IndexEntry) -> bool:
       entry: Index entry to compare against
     Returns: True if stat matches and file is likely unchanged
     """
-    # Get entry mtime
+    # Get entry mtime with nanosecond precision if available
     if isinstance(entry.mtime, tuple):
         entry_mtime_sec = entry.mtime[0]
+        entry_mtime_nsec = entry.mtime[1]
     else:
         entry_mtime_sec = int(entry.mtime)
+        entry_mtime_nsec = 0
 
-    # Compare modification time (seconds only for now)
-    # Note: We use int() to compare only seconds, as nanosecond precision
-    # can vary across filesystems
-    if int(st.st_mtime) != entry_mtime_sec:
-        return False
+    # Compare modification time with nanosecond precision if available
+    # This is important for fast workflows (e.g., stash) where files can be
+    # modified multiple times within the same second
+    if hasattr(st, "st_mtime_ns"):
+        # Use nanosecond precision when available
+        st_mtime_nsec = st.st_mtime_ns
+        entry_mtime_nsec_total = entry_mtime_sec * 1_000_000_000 + entry_mtime_nsec
+        if st_mtime_nsec != entry_mtime_nsec_total:
+            return False
+    else:
+        # Fall back to second precision
+        if int(st.st_mtime) != entry_mtime_sec:
+            return False
 
     # Compare file size
     if st.st_size != entry.size:

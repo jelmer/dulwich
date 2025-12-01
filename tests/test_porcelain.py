@@ -6207,6 +6207,17 @@ class StatusTests(PorcelainTestCase):
             committer=b"committer <email>",
         )
 
+        # Get the index entry mtime and set the file mtime to match it exactly
+        # This ensures stat matching works correctly with nanosecond precision
+        index = self.repo.open_index()
+        entry = index[b"crlf-exists"]
+        if isinstance(entry.mtime, tuple):
+            mtime_nsec = entry.mtime[0] * 1_000_000_000 + entry.mtime[1]
+        else:
+            mtime_nsec = int(entry.mtime * 1_000_000_000)
+        # Use ns parameter to preserve nanosecond precision
+        os.utime(file_path, ns=(mtime_nsec, mtime_nsec))
+
         c = self.repo.get_config()
         c.set("core", "autocrlf", "input")
         c.write_to_path()

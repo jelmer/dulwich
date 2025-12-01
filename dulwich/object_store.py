@@ -1189,11 +1189,12 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         if name == ZERO_SHA:
             raise KeyError(name)
+        sha: RawObjectID
         if len(name) == self.object_format.hex_length:
-            sha = hex_to_sha(name)
+            sha = hex_to_sha(ObjectID(name))
             hexsha = name
         elif len(name) == self.object_format.oid_length:
-            sha = name
+            sha = RawObjectID(name)
             hexsha = None
         else:
             raise AssertionError(f"Invalid object name {name!r}")
@@ -1423,7 +1424,6 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_write_bitmap_lookup_table: whether to include lookup table in bitmaps
           file_mode: File permission mask for shared repository
           dir_mode: Directory permission mask for shared repository
-          object_format: Hash algorithm to use (SHA1 or SHA256)
           object_format: Hash algorithm to use (SHA1 or SHA256)
         """
         # Import here to avoid circular dependency
@@ -1745,7 +1745,12 @@ class DiskObjectStore(PackBasedObjectStore):
         path = self._get_shafile_path(sha)
         try:
             # Load the object from path with SHA and hash algorithm from object store
-            return ShaFile.from_path(path, sha, object_format=self.object_format)
+            # Convert to hex ObjectID if needed
+            if len(sha) == self.object_format.oid_length:
+                hex_sha: ObjectID = sha_to_hex(RawObjectID(sha))
+            else:
+                hex_sha = ObjectID(sha)
+            return ShaFile.from_path(path, hex_sha, object_format=self.object_format)
         except FileNotFoundError:
             return None
 
@@ -2014,7 +2019,7 @@ class DiskObjectStore(PackBasedObjectStore):
           obj: Object to add
         """
         # Use the correct hash algorithm for the object ID
-        obj_id = obj.get_id(self.object_format)
+        obj_id = ObjectID(obj.get_id(self.object_format))
         path = self._get_shafile_path(obj_id)
         dir = os.path.dirname(path)
         try:
@@ -2334,7 +2339,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     # Binary SHA, convert to hex ObjectID
                     from .objects import sha_to_hex
 
-                    commit_ids.append(sha_to_hex(ref))
+                    commit_ids.append(sha_to_hex(RawObjectID(ref)))
                 else:
                     # Assume it's already correct format
                     commit_ids.append(ref)
@@ -2446,10 +2451,8 @@ class MemoryObjectStore(PackCapableObjectStore):
         Args:
             object_format: Hash algorithm to use (defaults to SHA1)
         """
-        super().__init__()
-        self._data: dict[ObjectID, ShaFile] = {}
         super().__init__(object_format=object_format)
-        self._data: dict[bytes, ShaFile] = {}
+        self._data: dict[ObjectID, ShaFile] = {}
         self.pack_compression_level = -1
 
     def _to_hexsha(self, sha: ObjectID | RawObjectID) -> ObjectID:

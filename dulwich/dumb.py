@@ -447,7 +447,7 @@ class DumbRemoteHTTPRepo:
         """Get the peeled value of a ref."""
         # For dumb HTTP, we don't have peeled refs readily available
         # We would need to fetch and parse tag objects
-        sha = self.get_refs().get(ref, None)
+        sha: ObjectID | None = self.get_refs().get(ref, None)
         return sha if sha is not None else ZERO_SHA
 
     def fetch_pack_data(

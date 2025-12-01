@@ -113,8 +113,7 @@ if TYPE_CHECKING:
 
     from .file import _GitFile
 
-# Zero SHA constants for backward compatibility
-ZERO_SHA = b"0" * 40  # SHA1 - kept for backward compatibility
+# Zero SHA constants for backward compatibility - now defined below as ObjectID
 
 
 # Header fields for commits
@@ -1610,7 +1609,7 @@ class Tree(ShaFile):
         # TODO: list comprehension is for efficiency in the common (small)
         # case; if memory efficiency in the large case is a concern, use a
         # genexp.
-        self._entries = {n: (m, s) for n, m, s in parsed_entries}
+        self._entries = {n: (m, ObjectID(s)) for n, m, s in parsed_entries}
 
     def check(self) -> None:
         """Check this object for internal consistency.
@@ -1644,7 +1643,7 @@ class Tree(ShaFile):
             if mode not in allowed_modes:
                 raise ObjectFormatException(f"invalid mode {mode:06o}")
 
-            entry = (name, (mode, sha))
+            entry = (name, (mode, ObjectID(sha)))
             if last:
                 if key_entry(last) > key_entry(entry):
                     raise ObjectFormatException("entries not sorted")

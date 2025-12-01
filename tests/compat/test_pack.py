@@ -253,7 +253,7 @@ class TestPackIndexCompat(PackTests):
         idx = load_pack_index(v3_path)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
-        self.assertEqual(idx.object_format, 1)  # SHA-1
+        self.assertEqual(idx.hash_format, 1)  # SHA-1
         self.assertEqual(idx.hash_size, 20)
 
         # Verify SHA-256 would raise NotImplementedError

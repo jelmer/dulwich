@@ -310,6 +310,7 @@ class Stash:
             message=b"Index stash",
             merge_heads=[self._repo.head()],
             no_verify=True,
+            sign=False,
             ref=None,  # Don't update any ref
             **commit_kwargs,
         )
@@ -342,6 +343,7 @@ class Stash:
             message=message,
             merge_heads=[index_commit_id],
             no_verify=True,
+            sign=False,
             **commit_kwargs,
         )
 

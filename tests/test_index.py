@@ -908,6 +908,51 @@ class GetUnstagedChangesTests(TestCase):
             self.assertEqual(changes_serial, changes_parallel)
             self.assertEqual(changes_serial, sorted(modified_files))
 
+    def test_get_unstaged_changes_nanosecond_precision(self) -> None:
+        """Test that nanosecond precision mtime is used for change detection."""
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            # Commit a file
+            foo_fullpath = os.path.join(repo_dir, "foo")
+            with open(foo_fullpath, "wb") as f:
+                f.write(b"original content")
+
+            repo.get_worktree().stage(["foo"])
+            repo.get_worktree().commit(
+                message=b"initial commit",
+                committer=b"committer <email>",
+                author=b"author <email>",
+            )
+
+            # Get the current index entry
+            index = repo.open_index()
+            entry = index[b"foo"]
+
+            # Modify the file with the same size but different content
+            # This simulates a very fast change within the same second
+            with open(foo_fullpath, "wb") as f:
+                f.write(b"modified content")
+
+            # Set mtime to match the index entry exactly (same second)
+            # but with different nanoseconds if the filesystem supports it
+            st = os.stat(foo_fullpath)
+            if isinstance(entry.mtime, tuple) and hasattr(st, "st_mtime_ns"):
+                # Set the mtime to the same second as the index entry
+                # but with a slightly different nanosecond value
+                entry_sec = entry.mtime[0]
+                entry_nsec = entry.mtime[1]
+                new_mtime_ns = entry_sec * 1_000_000_000 + entry_nsec + 1000
+                new_mtime = new_mtime_ns / 1_000_000_000
+                os.utime(foo_fullpath, (st.st_atime, new_mtime))
+
+                # The file should be detected as changed due to nanosecond difference
+                changes = list(get_unstaged_changes(repo.open_index(), repo_dir))
+                self.assertEqual(changes, [b"foo"])
+            else:
+                # If nanosecond precision is not available, skip this test
+                self.skipTest("Nanosecond precision not available on this system")
+
     def test_get_unstaged_deleted_changes(self) -> None:
         """Unit test for get_unstaged_changes."""
         repo_dir = tempfile.mkdtemp()

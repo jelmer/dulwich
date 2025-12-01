@@ -646,7 +646,7 @@ class PackIndex:
     """
 
     # Default to SHA-1 for backward compatibility
-    object_format = 1
+    hash_format = 1
     hash_size = 20
 
     def __eq__(self, other: object) -> bool:
@@ -806,9 +806,12 @@ class MemoryPackIndex(PackIndex):
           sha: SHA to look up (binary or hex)
         Returns: Offset in the pack file
         """
+        lookup_sha: RawObjectID
         if len(sha) == self.hash_size * 2:  # hex string
-            sha = hex_to_sha(sha)
-        return self._by_sha[sha]
+            lookup_sha = hex_to_sha(ObjectID(sha))
+        else:
+            lookup_sha = RawObjectID(sha)
+        return self._by_sha[lookup_sha]
 
     def object_sha1(self, offset: int) -> bytes:
         """Return the SHA1 for the object at the given offset."""
@@ -991,10 +994,13 @@ class FilePackIndex(PackIndex):
         lives at within the corresponding pack file. If the pack file doesn't
         have the object then None will be returned.
         """
+        lookup_sha: RawObjectID
         if len(sha) == self.hash_size * 2:  # hex string
-            sha = hex_to_sha(sha)
+            lookup_sha = hex_to_sha(ObjectID(sha))
+        else:
+            lookup_sha = RawObjectID(sha)
         try:
-            return self._object_offset(sha)
+            return self._object_offset(lookup_sha)
         except ValueError as exc:
             closed = getattr(self._contents, "closed", None)
             if closed in (None, True):
@@ -1078,7 +1084,7 @@ class PackIndex1(FilePackIndex):
         base_offset = (0x100 * 4) + (i * self._entry_size)
         offset = unpack_from(">L", self._contents, base_offset)[0]
         name = self._contents[base_offset + 4 : base_offset + 4 + self.hash_size]
-        return (name, offset, None)
+        return (RawObjectID(name), offset, None)
 
     def _unpack_name(self, i: int) -> bytes:
         offset = (0x100 * 4) + (i * self._entry_size) + 4
@@ -1200,13 +1206,13 @@ class PackIndex3(FilePackIndex):
             raise AssertionError(f"Version was {self.version}")
 
         # Read hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
-        (self.object_format,) = unpack_from(b">L", self._contents, 8)
-        if self.object_format == 1:
+        (self.hash_format,) = unpack_from(b">L", self._contents, 8)
+        if self.hash_format == 1:
             self.hash_size = 20  # SHA-1
-        elif self.object_format == 2:
+        elif self.hash_format == 2:
             self.hash_size = 32  # SHA-256
         else:
-            raise AssertionError(f"Unknown hash algorithm {self.object_format}")
+            raise AssertionError(f"Unknown hash algorithm {self.hash_format}")
 
         # Read length of shortened object names
         (self.shortened_oid_len,) = unpack_from(b">L", self._contents, 12)
@@ -3076,7 +3082,7 @@ def write_pack_from_container(
     deltify: bool | None = None,
     reuse_deltas: bool = True,
     compression_level: int = -1,
-    other_haves: set[bytes] | None = None,
+    other_haves: set[ObjectID] | None = None,
     object_format: Optional["ObjectFormat"] = None,
 ) -> tuple[dict[bytes, tuple[int, int]], bytes]:
     """Write a new pack data file.
@@ -4093,7 +4099,7 @@ class Pack:
                     isinstance(basename, bytes)
                     and len(basename) == self.object_format.oid_length
                 )
-                base_offset_temp, base_type, base_obj = get_ref(basename)
+                base_offset_temp, base_type, base_obj = get_ref(RawObjectID(basename))
                 assert isinstance(base_type, int)
                 # base_offset_temp can be None for thin packs (external references)
                 base_offset = base_offset_temp
@@ -4186,7 +4192,7 @@ def extend_pack(
     compression_level: int = -1,
     progress: Callable[[bytes], None] | None = None,
     object_format: Optional["ObjectFormat"] = None,
-) -> tuple[bytes, list[tuple[bytes, int, int]]]:
+) -> tuple[bytes, list[tuple[RawObjectID, int, int]]]:
     """Extend a pack file with more objects.
 
     The caller should make sure that object_ids does not contain any objects

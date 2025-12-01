@@ -1176,10 +1176,10 @@ class BaseRepo:
         elif len(name) == 40 and valid_hexsha(name):
             return ObjectID(name) in self.object_store or Ref(name) in self.refs
         # Check if it's a binary or hex SHA
-        if len(name) == self.object_format.oid_length or (
-            len(name) == self.object_format.hex_length and valid_hexsha(name)
-        ):
-            return name in self.object_store or name in self.refs
+        if len(name) == self.object_format.oid_length:
+            return RawObjectID(name) in self.object_store or Ref(name) in self.refs
+        elif len(name) == self.object_format.hex_length and valid_hexsha(name):
+            return ObjectID(name) in self.object_store or Ref(name) in self.refs
         else:
             return Ref(name) in self.refs
 

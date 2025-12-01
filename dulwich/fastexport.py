@@ -369,6 +369,7 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
 
     def reset_handler(self, cmd: commands.ResetCommand) -> None:
         """Process a ResetCommand."""
+        from_: ObjectID
         if cmd.from_ is None:
             from_ = ZERO_SHA
         else:

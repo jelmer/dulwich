@@ -20,7 +20,7 @@ jobs:
       matrix: ${{ steps.merged-identifiers.outputs.merged-identifiers }}
 
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
@@ -67,7 +67,7 @@ jobs:
       fail-fast: true
 
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           cache: pip
@@ -91,7 +91,7 @@ jobs:
   build-android-wheels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           cache: pip
@@ -113,7 +113,7 @@ jobs:
   build-pure-wheels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           cache: pip
@@ -128,7 +128,7 @@ jobs:
   build-sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.0
       - uses: actions/setup-python@v6
         with:
           cache: pip

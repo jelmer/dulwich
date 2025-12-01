@@ -61,6 +61,7 @@ else:
     has_mmap = True
 
 from .file import GitFile, _GitFile
+from .objects import ObjectID, RawObjectID
 from .pack import SHA1Writer
 
 # MIDX signature
@@ -304,7 +305,7 @@ class MultiPackIndex:
         """Return the number of objects in this MIDX."""
         return self.object_count
 
-    def _get_oid(self, index: int) -> bytes:
+    def _get_oid(self, index: int) -> RawObjectID:
         """Get the object ID at the given index.
 
         Args:
@@ -317,7 +318,7 @@ class MultiPackIndex:
             raise IndexError(f"Index {index} out of range")
 
         offset = self._oidl_offset + index * self.hash_size
-        return self._contents[offset : offset + self.hash_size]
+        return RawObjectID(self._contents[offset : offset + self.hash_size])
 
     def _get_pack_info(self, index: int) -> tuple[int, int]:
         """Get pack ID and offset for object at the given index.
@@ -351,7 +352,7 @@ class MultiPackIndex:
 
         return pack_id, pack_offset
 
-    def object_offset(self, sha: bytes) -> tuple[str, int] | None:
+    def object_offset(self, sha: ObjectID | RawObjectID) -> tuple[str, int] | None:
         """Return the pack name and offset for the given object.
 
         Args:
@@ -386,7 +387,7 @@ class MultiPackIndex:
 
         return None
 
-    def __contains__(self, sha: bytes) -> bool:
+    def __contains__(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if the given object SHA is in this MIDX.
 
         Args:
@@ -397,7 +398,7 @@ class MultiPackIndex:
         """
         return self.object_offset(sha) is not None
 
-    def iterentries(self) -> Iterator[tuple[bytes, str, int]]:
+    def iterentries(self) -> Iterator[tuple[RawObjectID, str, int]]:
         """Iterate over all entries in this MIDX.
 
         Yields:
@@ -453,7 +454,7 @@ def load_midx_file(
 
 def write_midx(
     f: IO[bytes],
-    pack_index_entries: list[tuple[str, list[tuple[bytes, int, int | None]]]],
+    pack_index_entries: list[tuple[str, list[tuple[RawObjectID, int, int | None]]]],
     hash_algorithm: int = HASH_ALGORITHM_SHA1,
 ) -> bytes:
     """Write a multi-pack-index file.
@@ -481,7 +482,7 @@ def write_midx(
     pack_index_entries_sorted = sorted(pack_index_entries, key=lambda x: x[0])
 
     # Collect all objects from all packs
-    all_objects: list[tuple[bytes, int, int]] = []  # (sha, pack_id, offset)
+    all_objects: list[tuple[RawObjectID, int, int]] = []  # (sha, pack_id, offset)
     pack_names: list[str] = []
 
     for pack_id, (pack_name, entries) in enumerate(pack_index_entries_sorted):
@@ -621,7 +622,7 @@ def write_midx(
 
 def write_midx_file(
     path: str | os.PathLike[str],
-    pack_index_entries: list[tuple[str, list[tuple[bytes, int, int | None]]]],
+    pack_index_entries: list[tuple[str, list[tuple[RawObjectID, int, int | None]]]],
     hash_algorithm: int = HASH_ALGORITHM_SHA1,
 ) -> bytes:
     """Write a multi-pack-index file to disk.

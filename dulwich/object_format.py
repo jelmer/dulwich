@@ -32,6 +32,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from _hashlib import HASH
 
+    from .objects import ObjectID, RawObjectID
+
 
 class ObjectFormat:
     """Object format (hash algorithm) used in Git."""
@@ -55,8 +57,10 @@ class ObjectFormat:
         self.oid_length = oid_length
         self.hex_length = hex_length
         self.hash_func = hash_func
-        self.zero_oid = b"0" * hex_length
-        self.zero_oid_bin = b"\x00" * oid_length
+        # Type annotations for proper ObjectID/RawObjectID types
+        # These are bytes at runtime but typed as NewType wrappers for type safety
+        self.zero_oid: ObjectID = b"0" * hex_length  # type: ignore[assignment]
+        self.zero_oid_bin: RawObjectID = b"\x00" * oid_length  # type: ignore[assignment]
 
     def __str__(self) -> str:
         """Return string representation."""

@@ -180,7 +180,7 @@ class CommitGraph:
         )
         self.chunks: dict[bytes, CommitGraphChunk] = {}
         self.entries: list[CommitGraphEntry] = []
-        self._oid_to_index: dict[ObjectID, int] = {}
+        self._oid_to_index: dict[RawObjectID, int] = {}
 
     @classmethod
     def from_file(cls, f: BinaryIO) -> "CommitGraph":
@@ -256,7 +256,7 @@ class CommitGraph:
         for i in range(num_commits):
             start = i * self.object_format.oid_length
             end = start + self.object_format.oid_length
-            oid = oid_lookup_data[start:end]
+            oid = RawObjectID(oid_lookup_data[start:end])
             oids.append(oid)
             self._oid_to_index[oid] = i
 
@@ -307,14 +307,16 @@ class CommitGraph:
 
             entry = CommitGraphEntry(
                 commit_id=sha_to_hex(oids[i]),
-                tree_id=sha_to_hex(tree_id),
+                tree_id=sha_to_hex(RawObjectID(tree_id)),
                 parents=[sha_to_hex(p) for p in parents],
                 generation=generation,
                 commit_time=commit_time,
             )
             self.entries.append(entry)
 
-    def _parse_extra_edges(self, offset: int, oids: Sequence[bytes]) -> list[bytes]:
+    def _parse_extra_edges(
+        self, offset: int, oids: Sequence[RawObjectID]
+    ) -> list[RawObjectID]:
         """Parse extra parent edges for commits with 3+ parents."""
         if CHUNK_EXTRA_EDGE_LIST not in self.chunks:
             return []
@@ -342,10 +344,10 @@ class CommitGraph:
         # Convert hex ObjectID to binary if needed for lookup
         if isinstance(oid, bytes) and len(oid) == self.object_format.hex_length:
             # Input is hex ObjectID, convert to binary for internal lookup
-            lookup_oid = hex_to_sha(oid)
+            lookup_oid: RawObjectID = hex_to_sha(oid)
         else:
             # Input is already binary
-            lookup_oid = oid
+            lookup_oid = RawObjectID(oid)
         index = self._oid_to_index.get(lookup_oid)
         if index is not None:
             return self.entries[index]
@@ -574,19 +576,9 @@ def generate_commit_graph(
         # commit_id is already hex ObjectID from normalized_commit_ids
         commit_hex: ObjectID = commit_id
 
-        # Handle tree ID - might already be hex ObjectID
-        if isinstance(commit_obj.tree, bytes) and len(commit_obj.tree) == hex_length:
-            tree_hex = commit_obj.tree  # Already hex ObjectID
-        else:
-            tree_hex = sha_to_hex(commit_obj.tree)  # Binary, convert to hex
-
-        # Handle parent IDs - might already be hex ObjectIDs
-        parents_hex: list[ObjectID] = []
-        for parent_id in commit_obj.parents:
-            if isinstance(parent_id, bytes) and len(parent_id) == hex_length:
-                parents_hex.append(parent_id)  # Already hex ObjectID
-            else:
-                parents_hex.append(sha_to_hex(parent_id))  # Binary, convert to hex
+        # commit_obj.tree and commit_obj.parents are already ObjectIDs
+        tree_hex = commit_obj.tree
+        parents_hex: list[ObjectID] = commit_obj.parents
 
         entry = CommitGraphEntry(
             commit_id=commit_hex,
@@ -600,7 +592,8 @@ def generate_commit_graph(
     # Build the OID to index mapping for lookups
     graph._oid_to_index = {}
     for i, entry in enumerate(graph.entries):
-        graph._oid_to_index[entry.commit_id] = i
+        # Convert hex ObjectID to binary RawObjectID for consistent lookup
+        graph._oid_to_index[hex_to_sha(entry.commit_id)] = i
 
     return graph
 

@@ -81,10 +81,12 @@ class ObjectStoreTests:
 
     def test_determine_wants_all_zero(self) -> None:
         """Test determine_wants_all with zero ref."""
+        from dulwich.refs import Ref
+
         self.assertEqual(
             [],
             self.store.determine_wants_all(
-                {b"refs/heads/foo": self.store.object_format.zero_oid}
+                {Ref(b"refs/heads/foo"): self.store.object_format.zero_oid}
             ),
         )
 

@@ -582,7 +582,7 @@ class PackIndex:
     """
 
     # Default to SHA-1 for backward compatibility
-    object_format = 1
+    hash_format = 1
     hash_size = 20
 
     def __eq__(self, other: object) -> bool:
@@ -1136,13 +1136,13 @@ class PackIndex3(FilePackIndex):
             raise AssertionError(f"Version was {self.version}")
 
         # Read hash algorithm identifier (1 = SHA-1, 2 = SHA-256)
-        (self.object_format,) = unpack_from(b">L", self._contents, 8)
-        if self.object_format == 1:
+        (self.hash_format,) = unpack_from(b">L", self._contents, 8)
+        if self.hash_format == 1:
             self.hash_size = 20  # SHA-1
-        elif self.object_format == 2:
+        elif self.hash_format == 2:
             self.hash_size = 32  # SHA-256
         else:
-            raise AssertionError(f"Unknown hash algorithm {self.object_format}")
+            raise AssertionError(f"Unknown hash algorithm {self.hash_format}")
 
         # Read length of shortened object names
         (self.shortened_oid_len,) = unpack_from(b">L", self._contents, 12)

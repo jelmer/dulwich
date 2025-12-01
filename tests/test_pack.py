@@ -1130,7 +1130,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         idx = load_pack_index(filename)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
-        self.assertEqual(idx.object_format, 1)  # SHA-1
+        self.assertEqual(idx.hash_format, 1)  # SHA-1
         self.assertEqual(idx.hash_size, 20)
         self.assertEqual(idx.shortened_oid_len, 20)
 
@@ -1142,7 +1142,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         with GitFile(filename, "wb") as f:
             write_pack_index_v3(f, entries, b"1" * 20, hash_format=1)
         idx = load_pack_index(filename)
-        self.assertEqual(idx.object_format, 1)
+        self.assertEqual(idx.hash_format, 1)
         self.assertEqual(idx.hash_size, 20)
 
     def test_v3_sha256_length(self) -> None:

@@ -2106,7 +2106,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self._pack_cache[base_name] = pack
         return pack
 
-    def contains_packed(self, sha: bytes) -> bool:
+    def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is packed.
 
         This checks the MIDX first if available, then falls back to checking
@@ -2126,7 +2126,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Fall back to checking individual packs
         return super().contains_packed(sha)
 
-    def get_raw(self, name: bytes) -> tuple[int, bytes]:
+    def get_raw(self, name: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Obtain the raw fulltext for an object.
 
         This uses the MIDX if available for faster lookups.
@@ -2143,10 +2143,13 @@ class DiskObjectStore(PackBasedObjectStore):
         if name == ZERO_SHA:
             raise KeyError(name)
 
+        sha: RawObjectID
         if len(name) == 40:
-            sha = hex_to_sha(name)
+            # name is ObjectID (hex), convert to RawObjectID
+            sha = hex_to_sha(cast(ObjectID, name))
         elif len(name) == 20:
-            sha = name
+            # name is already RawObjectID (binary)
+            sha = RawObjectID(name)
         else:
             raise AssertionError(f"Invalid object name {name!r}")
 
@@ -2186,7 +2189,7 @@ class DiskObjectStore(PackBasedObjectStore):
             return b"\x00" * 20
 
         # Collect entries from all packs
-        pack_entries: list[tuple[str, list[tuple[bytes, int, int | None]]]] = []
+        pack_entries: list[tuple[str, list[tuple[RawObjectID, int, int | None]]]] = []
 
         for pack in packs:
             # Git stores .idx extension in MIDX, not .pack

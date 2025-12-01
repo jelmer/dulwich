@@ -162,6 +162,7 @@ def self_test_suite() -> unittest.TestSuite:
         "mbox",
         "merge",
         "merge_drivers",
+        "midx",
         "missing_obj_finder",
         "notes",
         "objects",

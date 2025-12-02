@@ -26,7 +26,7 @@ import time
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Commit, Tree, parse_timezone
 
-from . import TestCase, skipIf
+from .. import TestCase, skipIf
 
 try:
     import gevent  # noqa: F401
@@ -36,7 +36,7 @@ except ImportError:
     gevent_support = False
 
 if gevent_support:
-    from dulwich.greenthreads import GreenThreadsMissingObjectFinder
+    from dulwich.contrib.greenthreads import GreenThreadsMissingObjectFinder
 
 skipmsg = "Gevent library is not installed"
 

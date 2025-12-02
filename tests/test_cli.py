@@ -1193,6 +1193,25 @@ class DiffCommandTest(DulwichCliTestCase):
         self.assertIn("+newer1", stdout)
         self.assertNotIn("file2.txt", stdout)
 
+    def test_diff_stat(self):
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("initial content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Initial")
+
+        # Modify the file
+        with open(test_file, "w") as f:
+            f.write("initial content\nmodified\n")
+
+        # Test --stat output
+        _result, stdout, _stderr = self._run_cli("diff", "--stat")
+        self.assertEqual(
+            stdout,
+            " test.txt | 1 +\n 1 files changed, 1 insertions(+), 0 deletions(-)\n",
+        )
+
 
 class FilterBranchCommandTest(DulwichCliTestCase):
     """Tests for filter-branch command."""

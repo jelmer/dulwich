@@ -1469,6 +1469,11 @@ class cmd_diff(Command):
             help="Choose a diff algorithm",
         )
         parser.add_argument(
+            "--stat",
+            action="store_true",
+            help="Show diffstat instead of full diff",
+        )
+        parser.add_argument(
             "--", dest="separator", action="store_true", help=argparse.SUPPRESS
         )
         parser.add_argument("paths", nargs="*", default=[], help="Paths to limit diff")
@@ -1518,7 +1523,17 @@ class cmd_diff(Command):
         with Repo(".") as repo:
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="diff") as outstream:
-                output_stream = _create_output_stream(outstream)
+                # For --stat mode, capture the diff in a BytesIO buffer
+                if parsed_args.stat:
+                    import io
+
+                    from .diffstat import diffstat
+
+                    diff_buffer: BinaryIO = io.BytesIO()
+                    output_stream: BinaryIO = diff_buffer
+                else:
+                    output_stream = _create_output_stream(outstream)
+
                 try:
                     if len(parsed_args.committish) == 0:
                         # Show diff for working tree or staged changes
@@ -1559,9 +1574,17 @@ class cmd_diff(Command):
                     sys.stderr.write(f"fatal: {e}\n")
                     sys.exit(1)
 
-                # Flush any remaining output
-                if hasattr(output_stream, "flush"):
-                    output_stream.flush()
+                if parsed_args.stat:
+                    # Generate and output diffstat from captured diff
+                    assert isinstance(diff_buffer, io.BytesIO)
+                    diff_data = diff_buffer.getvalue()
+                    lines = diff_data.split(b"\n")
+                    stat_output = diffstat(lines)
+                    outstream.buffer.write(stat_output + b"\n")
+                else:
+                    # Flush any remaining output
+                    if hasattr(output_stream, "flush"):
+                        output_stream.flush()
 
 
 class cmd_dump_pack(Command):

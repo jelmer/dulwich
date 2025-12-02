@@ -46,6 +46,7 @@ statistics about changes, including:
 __all__ = [
     "diffstat",
     "main",
+    "parse_patch",
 ]
 
 import re
@@ -71,7 +72,7 @@ _GIT_UNCHANGED_START = b" "
 # properly interface with diffstat routine
 
 
-def _parse_patch(
+def parse_patch(
     lines: Sequence[bytes],
 ) -> tuple[list[bytes], list[bool], list[tuple[int, int]]]:
     """Parse a git style diff or patch to generate diff stats.
@@ -136,7 +137,7 @@ def diffstat(lines: Sequence[bytes], max_width: int = 80) -> bytes:
     Returns: A byte string that lists the changed files with change
              counts and histogram.
     """
-    names, nametypes, counts = _parse_patch(lines)
+    names, nametypes, counts = parse_patch(lines)
     insert = []
     delete = []
     namelen = 0

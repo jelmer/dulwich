@@ -21,6 +21,17 @@
 
 """Implementation of Git filter drivers (clean/smudge filters)."""
 
+__all__ = [
+    "CompositeFilterDriver",
+    "FilterBlobNormalizer",
+    "FilterContext",
+    "FilterDriver",
+    "FilterError",
+    "FilterRegistry",
+    "ProcessFilterDriver",
+    "get_filter_for_path",
+]
+
 import logging
 import subprocess
 import threading

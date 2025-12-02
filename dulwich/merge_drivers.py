@@ -20,6 +20,13 @@
 
 """Merge driver support for dulwich."""
 
+__all__ = [
+    "MergeDriver",
+    "MergeDriverRegistry",
+    "ProcessMergeDriver",
+    "get_merge_driver_registry",
+]
+
 import os
 import subprocess
 import tempfile

@@ -1,5 +1,15 @@
 """Git merge implementation."""
 
+__all__ = [
+    "MergeConflict",
+    "Merger",
+    "make_merge3",
+    "merge_blobs",
+    "octopus_merge",
+    "recursive_merge",
+    "three_way_merge",
+]
+
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 

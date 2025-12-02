@@ -20,6 +20,8 @@
 
 """Git bisect implementation."""
 
+__all__ = ["BisectState"]
+
 import os
 from collections.abc import Sequence, Set
 

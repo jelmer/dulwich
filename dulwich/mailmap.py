@@ -21,6 +21,12 @@
 
 """Mailmap file reader."""
 
+__all__ = [
+    "Mailmap",
+    "parse_identity",
+    "read_mailmap",
+]
+
 from collections.abc import Iterator
 from typing import IO
 

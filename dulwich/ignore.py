@@ -26,6 +26,17 @@ Important: When checking if directories are ignored, include a trailing slash in
 For example, use "dir/" instead of "dir" to check if a directory is ignored.
 """
 
+__all__ = [
+    "IgnoreFilter",
+    "IgnoreFilterManager",
+    "IgnoreFilterStack",
+    "Pattern",
+    "default_user_ignore_filter_path",
+    "match_pattern",
+    "read_ignore_patterns",
+    "translate",
+]
+
 import os.path
 import re
 from collections.abc import Iterable, Sequence

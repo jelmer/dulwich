@@ -26,6 +26,12 @@ https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
 
 """
 
+__all__ = [
+    "match_partial_url",
+    "match_urls",
+    "urlmatch_credential_sections",
+]
+
 import sys
 from collections.abc import Iterator
 from urllib.parse import ParseResult, urlparse

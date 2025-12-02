@@ -20,6 +20,14 @@
 
 """Implementation of merge-base following the approach of git."""
 
+__all__ = [
+    "WorkList",
+    "can_fast_forward",
+    "find_merge_base",
+    "find_octopus_base",
+    "independent",
+]
+
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from heapq import heappop, heappush
 from typing import TYPE_CHECKING, Generic, TypeVar

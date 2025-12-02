@@ -21,6 +21,14 @@
 
 """General implementation of walking commits and their contents."""
 
+__all__ = [
+    "ALL_ORDERS",
+    "ORDER_DATE",
+    "ORDER_TOPO",
+    "WalkEntry",
+    "Walker",
+]
+
 import heapq
 from collections import defaultdict, deque
 from collections.abc import Callable, Iterator, Sequence

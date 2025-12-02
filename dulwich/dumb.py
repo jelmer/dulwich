@@ -21,6 +21,11 @@
 
 """Support for dumb HTTP(S) git repositories."""
 
+__all__ = [
+    "DumbHTTPObjectStore",
+    "DumbRemoteHTTPRepo",
+]
+
 import os
 import tempfile
 import zlib

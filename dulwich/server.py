@@ -43,6 +43,30 @@ Currently supported capabilities:
  * symref
 """
 
+__all__ = [
+    "DEFAULT_HANDLERS",
+    "AckGraphWalkerImpl",
+    "Backend",
+    "BackendRepo",
+    "DictBackend",
+    "FileSystemBackend",
+    "Handler",
+    "MultiAckDetailedGraphWalkerImpl",
+    "MultiAckGraphWalkerImpl",
+    "PackHandler",
+    "ReceivePackHandler",
+    "SingleAckGraphWalkerImpl",
+    "TCPGitRequestHandler",
+    "TCPGitServer",
+    "UploadArchiveHandler",
+    "UploadPackHandler",
+    "generate_info_refs",
+    "generate_objects_info_packs",
+    "main",
+    "serve_command",
+    "update_server_info",
+]
+
 import os
 import socket
 import socketserver

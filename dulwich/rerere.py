@@ -6,6 +6,13 @@ conflict and the resolution. If the same conflict happens again, rerere can
 automatically apply the recorded resolution.
 """
 
+__all__ = [
+    "RerereCache",
+    "is_rerere_autoupdate",
+    "is_rerere_enabled",
+    "rerere_auto",
+]
+
 import hashlib
 import os
 import time

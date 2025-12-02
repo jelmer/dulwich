@@ -28,6 +28,33 @@ The bitmap format uses EWAH (Enhanced Word-Aligned Hybrid) compression
 for efficient storage and fast bitwise operations.
 """
 
+__all__ = [
+    "BITMAP_OPT_FULL_DAG",
+    "BITMAP_OPT_HASH_CACHE",
+    "BITMAP_OPT_LOOKUP_TABLE",
+    "BITMAP_OPT_PSEUDO_MERGES",
+    "BITMAP_SIGNATURE",
+    "BITMAP_VERSION",
+    "DEFAULT_COMMIT_INTERVAL",
+    "MAX_LITERAL_WORDS",
+    "MAX_XOR_OFFSET",
+    "BitmapEntry",
+    "EWAHBitmap",
+    "PackBitmap",
+    "apply_xor_compression",
+    "bitmap_to_object_shas",
+    "build_name_hash_cache",
+    "build_reachability_bitmap",
+    "build_type_bitmaps",
+    "find_commit_bitmaps",
+    "generate_bitmap",
+    "read_bitmap",
+    "read_bitmap_file",
+    "select_bitmap_commits",
+    "write_bitmap",
+    "write_bitmap_file",
+]
+
 import os
 import struct
 from collections import deque

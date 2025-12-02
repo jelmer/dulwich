@@ -45,6 +45,13 @@ EG::
 
 """
 
+__all__ = [
+    "PATTERN",
+    "PROJDIR",
+    "get_current_version",
+    "get_recent_tags",
+]
+
 import datetime
 import logging
 import re

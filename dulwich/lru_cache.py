@@ -22,6 +22,11 @@
 
 """A simple least-recently-used (LRU) cache."""
 
+__all__ = [
+    "LRUCache",
+    "LRUSizeCache",
+]
+
 from collections.abc import Callable, Iterable, Iterator
 from typing import Generic, TypeVar, cast
 

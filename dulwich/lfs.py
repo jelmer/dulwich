@@ -32,6 +32,20 @@ Key components:
 - Integration with dulwich repositories
 """
 
+__all__ = [
+    "FileLFSClient",
+    "HTTPLFSClient",
+    "LFSAction",
+    "LFSBatchObject",
+    "LFSBatchResponse",
+    "LFSClient",
+    "LFSError",
+    "LFSErrorInfo",
+    "LFSFilterDriver",
+    "LFSPointer",
+    "LFSStore",
+]
+
 import hashlib
 import json
 import logging

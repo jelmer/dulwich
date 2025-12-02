@@ -21,6 +21,11 @@
 
 """Working with Git submodules."""
 
+__all__ = [
+    "ensure_submodule_placeholder",
+    "iter_cached_submodules",
+]
+
 import os
 from collections.abc import Iterator
 from typing import TYPE_CHECKING

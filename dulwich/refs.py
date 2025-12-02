@@ -22,6 +22,39 @@
 
 """Ref handling."""
 
+__all__ = [
+    "HEADREF",
+    "LOCAL_BRANCH_PREFIX",
+    "LOCAL_NOTES_PREFIX",
+    "LOCAL_REMOTE_PREFIX",
+    "LOCAL_REPLACE_PREFIX",
+    "LOCAL_TAG_PREFIX",
+    "SYMREF",
+    "DictRefsContainer",
+    "DiskRefsContainer",
+    "NamespacedRefsContainer",
+    "Ref",
+    "RefsContainer",
+    "SymrefLoop",
+    "check_ref_format",
+    "extract_branch_name",
+    "extract_tag_name",
+    "filter_ref_prefix",
+    "is_local_branch",
+    "is_per_worktree_ref",
+    "local_branch_name",
+    "local_replace_name",
+    "local_tag_name",
+    "parse_remote_ref",
+    "parse_symref_value",
+    "read_info_refs",
+    "read_packed_refs",
+    "read_packed_refs_with_peeled",
+    "set_ref_from_raw",
+    "shorten_ref_name",
+    "write_packed_refs",
+]
+
 import os
 import types
 from collections.abc import Callable, Iterable, Iterator, Mapping

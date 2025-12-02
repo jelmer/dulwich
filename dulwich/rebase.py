@@ -21,6 +21,24 @@
 
 """Git rebase implementation."""
 
+__all__ = [
+    "DiskRebaseStateManager",
+    "MemoryRebaseStateManager",
+    "RebaseAbort",
+    "RebaseConflict",
+    "RebaseError",
+    "RebaseState",
+    "RebaseStateManager",
+    "RebaseTodo",
+    "RebaseTodoCommand",
+    "RebaseTodoEntry",
+    "Rebaser",
+    "edit_todo",
+    "process_interactive_rebase",
+    "rebase",
+    "start_interactive",
+]
+
 import os
 import shutil
 import subprocess

@@ -28,6 +28,29 @@ no means intended to be a full-blown Git command-line interface but just
 a way to test Dulwich.
 """
 
+__all__ = [
+    "AutoFlushBinaryIOWrapper",
+    "AutoFlushTextIOWrapper",
+    "Command",
+    "CommitMessageError",
+    "Pager",
+    "PagerBuffer",
+    "SuperCommand",
+    "detect_terminal_width",
+    "disable_pager",
+    "enable_pager",
+    "format_bytes",
+    "format_columns",
+    "get_pager",
+    "launch_editor",
+    "main",
+    "parse_time_to_timestamp",
+    "signal_int",
+    "signal_quit",
+    "to_display_str",
+    "write_columns",
+]
+
 # TODO: Add support for GIT_NAMESPACE environment variable by wrapping
 # repository refs with NamespacedRefsContainer when the environment
 # variable is set. See issue #1809 and dulwich.refs.NamespacedRefsContainer.

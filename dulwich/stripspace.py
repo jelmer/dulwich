@@ -19,6 +19,10 @@
 
 """Git stripspace functionality for cleaning up text and commit messages."""
 
+__all__ = [
+    "stripspace",
+]
+
 
 def stripspace(
     text: bytes,

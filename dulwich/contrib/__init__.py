@@ -33,3 +33,5 @@ Available modules:
 - requests_vendor: HTTP client implementation using requests
 - swift: OpenStack Swift object storage backend
 """
+
+__all__ = []

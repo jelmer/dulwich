@@ -36,6 +36,12 @@ module needs something else, it can import the standard logging module
 directly.
 """
 
+__all__ = [
+    "default_logging_config",
+    "getLogger",
+    "remove_null_handler",
+]
+
 import logging
 import os
 import sys

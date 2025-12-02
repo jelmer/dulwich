@@ -21,6 +21,16 @@
 
 """Utilities for reading and generating reflogs."""
 
+__all__ = [
+    "drop_reflog_entry",
+    "expire_reflog",
+    "format_reflog_line",
+    "iter_reflogs",
+    "parse_reflog_line",
+    "parse_reflog_spec",
+    "read_reflog",
+]
+
 import collections
 from collections.abc import Callable, Generator
 from typing import IO, BinaryIO

@@ -22,6 +22,10 @@
 
 """Storage of repositories on GCS."""
 
+__all__ = [
+    "GcsObjectStore",
+]
+
 import posixpath
 import tempfile
 from collections.abc import Iterator

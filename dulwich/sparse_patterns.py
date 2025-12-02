@@ -21,6 +21,17 @@
 
 """Sparse checkout pattern handling."""
 
+__all__ = [
+    "BlobNotFoundError",
+    "SparseCheckoutConflictError",
+    "apply_included_paths",
+    "compute_included_paths_cone",
+    "compute_included_paths_full",
+    "determine_included_paths",
+    "match_gitignore_patterns",
+    "parse_sparse_patterns",
+]
+
 import os
 from collections.abc import Sequence, Set
 from fnmatch import fnmatch

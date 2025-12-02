@@ -22,6 +22,12 @@
 
 """Fast export/import functionality."""
 
+__all__ = [
+    "GitFastExporter",
+    "GitImportProcessor",
+    "split_email",
+]
+
 import stat
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Any, BinaryIO

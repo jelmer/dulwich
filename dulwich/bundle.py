@@ -21,6 +21,14 @@
 
 """Bundle format support."""
 
+__all__ = [
+    "Bundle",
+    "PackDataLike",
+    "create_bundle_from_repo",
+    "read_bundle",
+    "write_bundle",
+]
+
 from collections.abc import Callable, Iterator, Sequence
 from typing import (
     TYPE_CHECKING,

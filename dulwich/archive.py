@@ -22,6 +22,8 @@
 
 """Generates tarballs for Git trees."""
 
+__all__ = ["ChunkedBytesIO", "tar_stream"]
+
 import posixpath
 import stat
 import struct

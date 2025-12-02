@@ -47,6 +47,24 @@ with a multi-pack-index-chain file. This feature is not yet supported by Dulwich
 as the specification is still evolving.
 """
 
+__all__ = [
+    "CHUNK_BTMP",
+    "CHUNK_LOFF",
+    "CHUNK_OIDF",
+    "CHUNK_OIDL",
+    "CHUNK_OOFF",
+    "CHUNK_PNAM",
+    "CHUNK_RIDX",
+    "HASH_ALGORITHM_SHA1",
+    "HASH_ALGORITHM_SHA256",
+    "MIDX_SIGNATURE",
+    "MIDX_VERSION",
+    "MultiPackIndex",
+    "load_midx",
+    "load_midx_file",
+    "write_midx",
+]
+
 import os
 import struct
 from collections.abc import Iterator

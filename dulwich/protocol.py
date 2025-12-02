@@ -23,14 +23,19 @@
 """Generic functions for talking the git smart server protocol."""
 
 import types
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from io import BytesIO
 from os import SEEK_END
+from typing import TYPE_CHECKING
 
 import dulwich
 
 from .errors import GitProtocolError, HangupException
 from .objects import ObjectID
+
+if TYPE_CHECKING:
+    from .pack import ObjectContainer
+    from .refs import Ref
 
 TCP_GIT_PORT = 9418
 
@@ -774,3 +779,113 @@ def format_ack_line(sha: bytes, ack_type: bytes = b"") -> bytes:
     if ack_type:
         ack_type = b" " + ack_type
     return b"ACK " + sha + ack_type + b"\n"
+
+
+def strip_peeled_refs(
+    refs: "Mapping[Ref, ObjectID | None]",
+) -> "dict[Ref, ObjectID | None]":
+    """Remove all peeled refs from a refs dictionary.
+
+    Args:
+      refs: Dictionary of refs (may include peeled refs with ^{} suffix)
+
+    Returns:
+      Dictionary with peeled refs removed
+    """
+    return {
+        ref: sha for (ref, sha) in refs.items() if not ref.endswith(PEELED_TAG_SUFFIX)
+    }
+
+
+def split_peeled_refs(
+    refs: "Mapping[Ref, ObjectID]",
+) -> "tuple[dict[Ref, ObjectID], dict[Ref, ObjectID]]":
+    """Split peeled refs from regular refs.
+
+    Args:
+      refs: Dictionary of refs (may include peeled refs with ^{} suffix)
+
+    Returns:
+      Tuple of (regular_refs, peeled_refs) where peeled_refs keys have
+      the ^{} suffix removed
+    """
+    from .refs import Ref
+
+    peeled: dict[Ref, ObjectID] = {}
+    regular = {k: v for k, v in refs.items() if not k.endswith(PEELED_TAG_SUFFIX)}
+
+    for ref, sha in refs.items():
+        if ref.endswith(PEELED_TAG_SUFFIX):
+            # Peeled refs are always ObjectID values
+            peeled[Ref(ref[: -len(PEELED_TAG_SUFFIX)])] = sha
+
+    return regular, peeled
+
+
+def write_info_refs(
+    refs: "Mapping[Ref, ObjectID]", store: "ObjectContainer"
+) -> "Iterator[bytes]":
+    """Generate info refs in the format used by the dumb HTTP protocol.
+
+    Args:
+      refs: Dictionary of refs
+      store: Object store to peel tags from
+
+    Yields:
+      Lines in info/refs format (sha + tab + refname)
+    """
+    from .object_store import peel_sha
+    from .refs import HEADREF
+
+    for name, sha in sorted(refs.items()):
+        # get_refs() includes HEAD as a special case, but we don't want to
+        # advertise it
+        if name == HEADREF:
+            continue
+        try:
+            o = store[sha]
+        except KeyError:
+            continue
+        _unpeeled, peeled = peel_sha(store, sha)
+        yield o.id + b"\t" + name + b"\n"
+        if o.id != peeled.id:
+            yield peeled.id + b"\t" + name + PEELED_TAG_SUFFIX + b"\n"
+
+
+def serialize_refs(
+    store: "ObjectContainer", refs: "Mapping[Ref, ObjectID]"
+) -> "dict[bytes, ObjectID]":
+    """Serialize refs with peeled refs for Git protocol v0/v1.
+
+    This function is used to prepare refs for transmission over the Git protocol.
+    For tags, it includes both the tag object and the dereferenced object.
+
+    Args:
+      store: Object store to peel refs from
+      refs: Dictionary of ref names to SHAs
+
+    Returns:
+      Dictionary with refs and peeled refs (marked with ^{})
+    """
+    import warnings
+
+    from .object_store import peel_sha
+    from .objects import Tag
+
+    ret: dict[bytes, ObjectID] = {}
+    for ref, sha in refs.items():
+        try:
+            unpeeled, peeled = peel_sha(store, ObjectID(sha))
+        except KeyError:
+            warnings.warn(
+                "ref {} points at non-present sha {}".format(
+                    ref.decode("utf-8", "replace"), sha.decode("ascii")
+                ),
+                UserWarning,
+            )
+            continue
+        else:
+            if isinstance(unpeeled, Tag):
+                ret[ref + PEELED_TAG_SUFFIX] = peeled.id
+            ret[ref] = unpeeled.id
+    return ret

@@ -2564,22 +2564,30 @@ def _collect_filetree_revs(
 
 
 def _split_commits_and_tags(
-    obj_store: ObjectContainer, lst: Iterable[ObjectID], *, ignore_unknown: bool = False
+    obj_store: ObjectContainer,
+    lst: Iterable[ObjectID],
+    *,
+    unknown: str = "error",
 ) -> tuple[set[ObjectID], set[ObjectID], set[ObjectID]]:
     """Split object id list into three lists with commit, tag, and other SHAs.
 
     Commits referenced by tags are included into commits
     list as well. Only SHA1s known in this repository will get
-    through, and unless ignore_unknown argument is True, KeyError
-    is thrown for SHA1 missing in the repository
+    through, controlled by the unknown parameter.
 
     Args:
       obj_store: Object store to get objects by SHA1 from
       lst: Collection of commit and tag SHAs
-      ignore_unknown: True to skip SHA1 missing in the repository
-        silently.
+      unknown: How to handle unknown objects: "error", "warn", or "ignore"
     Returns: A tuple of (commits, tags, others) SHA1s
     """
+    import logging
+
+    if unknown not in ("error", "warn", "ignore"):
+        raise ValueError(
+            f"unknown must be 'error', 'warn', or 'ignore', got {unknown!r}"
+        )
+
     commits: set[ObjectID] = set()
     tags: set[ObjectID] = set()
     others: set[ObjectID] = set()
@@ -2587,17 +2595,20 @@ def _split_commits_and_tags(
         try:
             o = obj_store[e]
         except KeyError:
-            if not ignore_unknown:
+            if unknown == "error":
                 raise
+            elif unknown == "warn":
+                logging.warning(
+                    "Object %s not found in object store", e.decode("ascii")
+                )
+            # else: ignore
         else:
             if isinstance(o, Commit):
                 commits.add(e)
             elif isinstance(o, Tag):
                 tags.add(e)
                 tagged = o.object[1]
-                c, t, os = _split_commits_and_tags(
-                    obj_store, [tagged], ignore_unknown=ignore_unknown
-                )
+                c, t, os = _split_commits_and_tags(obj_store, [tagged], unknown=unknown)
                 commits |= c
                 tags |= t
                 others |= os
@@ -2648,15 +2659,13 @@ class MissingObjectFinder:
         self._get_parents = get_parents
         reachability = object_store.get_reachability_provider()
         # process Commits and Tags differently
-        # Note, while haves may list commits/tags not available locally,
-        # and such SHAs would get filtered out by _split_commits_and_tags,
-        # wants shall list only known SHAs, and otherwise
-        # _split_commits_and_tags fails with KeyError
+        # haves may list commits/tags not available locally (silently ignore them).
+        # wants should only contain valid SHAs (fail fast if not).
         have_commits, have_tags, have_others = _split_commits_and_tags(
-            object_store, haves, ignore_unknown=True
+            object_store, haves, unknown="ignore"
         )
         want_commits, want_tags, want_others = _split_commits_and_tags(
-            object_store, wants, ignore_unknown=False
+            object_store, wants, unknown="error"
         )
         # all_ancestors is a set of commits that shall not be sent
         # (complete repository up to 'haves')

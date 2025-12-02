@@ -106,7 +106,6 @@ from .refs import (
     SYMREF,  # noqa: F401
     DictRefsContainer,
     DiskRefsContainer,
-    InfoRefsContainer,  # noqa: F401
     Ref,
     RefsContainer,
     _set_default_branch,
@@ -118,7 +117,6 @@ from .refs import (
     local_branch_name,
     read_packed_refs,  # noqa: F401
     read_packed_refs_with_peeled,  # noqa: F401
-    serialize_refs,
     write_packed_refs,  # noqa: F401
 )
 
@@ -670,11 +668,24 @@ class BaseRepo:
           depth: Shallow fetch depth
         Returns: iterator over objects, with __len__ implemented
         """
-        # TODO: serialize_refs returns dict[bytes, ObjectID] with peeled refs (^{}),
-        # but determine_wants expects Mapping[Ref, ObjectID]. Need to reconcile this.
-        refs = serialize_refs(self.object_store, self.get_refs())
+        import logging
 
-        wants = determine_wants(refs, depth)  # type: ignore[arg-type]
+        # Filter out refs pointing to missing objects to avoid errors downstream.
+        # This makes Dulwich more robust when dealing with broken refs on disk.
+        # Previously serialize_refs() did this filtering as a side-effect.
+        all_refs = self.get_refs()
+        refs: dict[Ref, ObjectID] = {}
+        for ref, sha in all_refs.items():
+            if sha in self.object_store:
+                refs[ref] = sha
+            else:
+                logging.warning(
+                    "ref %s points at non-present sha %s",
+                    ref.decode("utf-8", "replace"),
+                    sha.decode("ascii"),
+                )
+
+        wants = determine_wants(refs, depth)
         if not isinstance(wants, list):
             raise TypeError("determine_wants() did not return a list")
 

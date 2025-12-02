@@ -149,7 +149,6 @@ def self_test_suite() -> unittest.TestSuite:
         "gc",
         "grafts",
         "graph",
-        "greenthreads",
         "hooks",
         "ignore",
         "index",

@@ -3,25 +3,25 @@
 # Copyright (c) 2025 Test Contributor
 # All rights reserved.
 
-"""Tests for dulwich.contrib.diffstat."""
+"""Tests for dulwich.diffstat."""
 
 import os
 import tempfile
 import unittest
 
-from dulwich.contrib.diffstat import (
-    _parse_patch,
+from dulwich.diffstat import (
     diffstat,
     main,
+    parse_patch,
 )
 
 
 class ParsePatchTests(unittest.TestCase):
-    """Tests for _parse_patch function."""
+    """Tests for parse_patch function."""
 
     def test_empty_input(self):
         """Test parsing an empty list of lines."""
-        names, nametypes, counts = _parse_patch([])
+        names, nametypes, counts = parse_patch([])
         self.assertEqual(names, [])
         self.assertEqual(nametypes, [])
         self.assertEqual(counts, [])
@@ -42,7 +42,7 @@ class ParsePatchTests(unittest.TestCase):
             b"+third added line",
             b" unchanged line",
         ]
-        names, nametypes, counts = _parse_patch(diff)
+        names, nametypes, counts = parse_patch(diff)
         self.assertEqual(names, [b"file.txt"])
         self.assertEqual(nametypes, [False])  # Not a binary file
         self.assertEqual(counts, [(3, 2)])  # 3 additions, 2 deletions
@@ -73,7 +73,7 @@ class ParsePatchTests(unittest.TestCase):
             b"+added in file2",
             b" another unchanged in file2",
         ]
-        names, nametypes, counts = _parse_patch(diff)
+        names, nametypes, counts = parse_patch(diff)
         self.assertEqual(names, [b"file.txt", b"file2.txt"])
         self.assertEqual(nametypes, [False, False])
         self.assertEqual(
@@ -87,7 +87,7 @@ class ParsePatchTests(unittest.TestCase):
             b"index 1234567..abcdefg 100644",
             b"Binary files a/image.png and b/image.png differ",
         ]
-        names, nametypes, counts = _parse_patch(diff)
+        names, nametypes, counts = parse_patch(diff)
         self.assertEqual(names, [b"image.png"])
         self.assertEqual(nametypes, [True])  # Is a binary file
         self.assertEqual(counts, [(0, 0)])  # No additions/deletions counted
@@ -108,7 +108,7 @@ class ParsePatchTests(unittest.TestCase):
             b"+added line",
             b" third unchanged line",
         ]
-        names, nametypes, counts = _parse_patch(diff)
+        names, nametypes, counts = parse_patch(diff)
         # The name should include both old and new names
         self.assertEqual(names, [b"oldname.txt => newname.txt"])
         self.assertEqual(nametypes, [False])  # Not a binary file
@@ -137,7 +137,7 @@ class ParsePatchTests(unittest.TestCase):
             b"-deleted",
             b" unchanged",
         ]
-        names, nametypes, counts = _parse_patch(diff)
+        names, nametypes, counts = parse_patch(diff)
         self.assertEqual(names, [b"file1.txt", b"file2.txt"])
         self.assertEqual(nametypes, [False, False])
         self.assertEqual(
@@ -471,7 +471,7 @@ index 1234567..abcdefg 100644
         import io
         import sys
 
-        from dulwich.contrib.diffstat import diffstat as real_diffstat
+        from dulwich.diffstat import diffstat as real_diffstat
 
         # Save original sys.argv, diffstat function, and stdout
         orig_argv = sys.argv
@@ -488,7 +488,7 @@ index 1234567..abcdefg 100644
 
             # Mock the diffstat function to return a wrong result
             # This will trigger the self-test failure path
-            from dulwich.contrib import diffstat as diffstat_module
+            from dulwich import diffstat as diffstat_module
 
             diffstat_module.diffstat = lambda lines, max_width=80: b"WRONG OUTPUT"
 

@@ -118,8 +118,9 @@ from .protocol import (
     format_shallow_line,
     format_unshallow_line,
     symref_capabilities,
+    write_info_refs,
 )
-from .refs import Ref, RefsContainer, write_info_refs
+from .refs import Ref, RefsContainer
 from .repo import Repo
 
 logger = log_utils.getLogger(__name__)

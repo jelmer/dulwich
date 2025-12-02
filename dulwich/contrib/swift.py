@@ -65,15 +65,8 @@ from ..pack import (
     write_pack_index_v2,
     write_pack_object,
 )
-from ..protocol import TCP_GIT_PORT
-from ..refs import (
-    HEADREF,
-    InfoRefsContainer,
-    Ref,
-    read_info_refs,
-    split_peeled_refs,
-    write_info_refs,
-)
+from ..protocol import TCP_GIT_PORT, split_peeled_refs, write_info_refs
+from ..refs import HEADREF, Ref, RefsContainer, read_info_refs
 from ..repo import OBJECTDIR, BaseRepo
 from ..server import Backend, BackendRepo, TCPGitServer
 
@@ -969,7 +962,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         return final_pack
 
 
-class SwiftInfoRefsContainer(InfoRefsContainer):
+class SwiftInfoRefsContainer(RefsContainer):
     """Manage references in info/refs object."""
 
     def __init__(self, scon: SwiftConnector, store: object) -> None:
@@ -987,7 +980,12 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
             f = BytesIO(b"")
         elif isinstance(f, bytes):
             f = BytesIO(f)
-        super().__init__(f)
+
+        # Initialize refs from info/refs file
+        self._refs: dict[Ref, ObjectID] = {}
+        self._peeled: dict[Ref, ObjectID] = {}
+        refs = read_info_refs(f)
+        (self._refs, self._peeled) = split_peeled_refs(refs)
 
     def _load_check_ref(
         self, name: Ref, old_ref: ObjectID | None
@@ -1052,6 +1050,25 @@ class SwiftInfoRefsContainer(InfoRefsContainer):
         self._write_refs(refs)
         del self._refs[name]
         return True
+
+    def read_loose_ref(self, name: Ref) -> bytes | None:
+        """Read a loose reference."""
+        return self._refs.get(name, None)
+
+    def get_packed_refs(self) -> dict[Ref, ObjectID]:
+        """Get packed references."""
+        return {}
+
+    def get_peeled(self, name: Ref) -> ObjectID | None:
+        """Get peeled version of a reference."""
+        try:
+            return self._peeled[name]
+        except KeyError:
+            ref_value = self._refs.get(name)
+            # Only return if it's an ObjectID (not a symref)
+            if isinstance(ref_value, bytes) and len(ref_value) == 40:
+                return ObjectID(ref_value)
+            return None
 
     def allkeys(self) -> set[Ref]:
         """Get all reference names.

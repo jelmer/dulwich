@@ -4,6 +4,9 @@
 is ahead of a 1.0 release, after which API changes will be kept backwards
 compatible.
 
+ * Fix UTF-8 decode error in process filter protocol when handling binary files.
+   (Jelmer Vernooĳ, #2023)
+
  * Move greenthreads support to dulwich/contrib.
    This code isn't really developed and only used
    by the swift support.

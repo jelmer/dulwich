@@ -23,6 +23,26 @@
 
 """Repo implementation atop OpenStack SWIFT."""
 
+__all__ = [
+    "PackInfoMissingObjectFinder",
+    "SwiftConnector",
+    "SwiftException",
+    "SwiftInfoRefsContainer",
+    "SwiftObjectStore",
+    "SwiftPack",
+    "SwiftPackData",
+    "SwiftPackReader",
+    "SwiftRepo",
+    "SwiftSystemBackend",
+    "cmd_daemon",
+    "cmd_init",
+    "load_conf",
+    "load_pack_info",
+    "main",
+    "pack_info_create",
+    "swift_load_pack_index",
+]
+
 # TODO: Refactor to share more code with dulwich/repo.py.
 # TODO(fbo): Second attempt to _send() must be notified via real log
 # TODO(fbo): More logs for operations

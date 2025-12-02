@@ -20,6 +20,17 @@
 
 """Git notes handling."""
 
+__all__ = [
+    "DEFAULT_NOTES_REF",
+    "NOTES_REF_PREFIX",
+    "Notes",
+    "NotesTree",
+    "create_notes_tree",
+    "get_note_fanout_level",
+    "get_note_path",
+    "split_path_for_fanout",
+]
+
 import stat
 from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING

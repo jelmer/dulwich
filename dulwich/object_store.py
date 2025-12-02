@@ -23,6 +23,36 @@
 
 """Git object store interfaces and implementation."""
 
+__all__ = [
+    "DEFAULT_TEMPFILE_GRACE_PERIOD",
+    "INFODIR",
+    "PACKDIR",
+    "PACK_MODE",
+    "BaseObjectStore",
+    "BitmapReachability",
+    "BucketBasedObjectStore",
+    "DiskObjectStore",
+    "GraphTraversalReachability",
+    "GraphWalker",
+    "MemoryObjectStore",
+    "MissingObjectFinder",
+    "ObjectIterator",
+    "ObjectReachabilityProvider",
+    "ObjectStoreGraphWalker",
+    "OverlayObjectStore",
+    "PackBasedObjectStore",
+    "PackCapableObjectStore",
+    "PackContainer",
+    "commit_tree_changes",
+    "find_shallow",
+    "get_depth",
+    "iter_commit_contents",
+    "iter_tree_contents",
+    "peel_sha",
+    "read_packs_file",
+    "tree_lookup_path",
+]
+
 import binascii
 import os
 import stat

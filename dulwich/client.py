@@ -39,6 +39,49 @@ Known capabilities that are not supported:
  * include-tag
 """
 
+__all__ = [
+    "COMMON_CAPABILITIES",
+    "DEFAULT_GIT_CREDENTIALS_PATHS",
+    "DEFAULT_REF_PREFIX",
+    "RECEIVE_CAPABILITIES",
+    "UPLOAD_CAPABILITIES",
+    "AbstractHttpGitClient",
+    "BundleClient",
+    "FetchPackResult",
+    "GitClient",
+    "HTTPProxyUnauthorized",
+    "HTTPUnauthorized",
+    "InvalidWants",
+    "LocalGitClient",
+    "LsRemoteResult",
+    "PLinkSSHVendor",
+    "ReportStatusParser",
+    "SSHGitClient",
+    "SSHVendor",
+    "SendPackResult",
+    "StrangeHostname",
+    "SubprocessGitClient",
+    "SubprocessSSHVendor",
+    "SubprocessWrapper",
+    "TCPGitClient",
+    "TraditionalGitClient",
+    "Urllib3HttpGitClient",
+    "check_for_proxy_bypass",
+    "check_wants",
+    "default_urllib3_manager",
+    "default_user_agent_string",
+    "find_capability",
+    "find_git_command",
+    "get_credentials_from_store",
+    "get_transport_and_path",
+    "get_transport_and_path_from_url",
+    "negotiate_protocol_version",
+    "parse_rsync_url",
+    "read_pkt_refs_v1",
+    "read_pkt_refs_v2",
+    "read_server_capabilities",
+]
+
 import copy
 import functools
 import logging

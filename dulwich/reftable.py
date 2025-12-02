@@ -7,6 +7,41 @@ loose refs format.
 See: https://git-scm.com/docs/reftable
 """
 
+__all__ = [
+    "BLOCK_TYPE_INDEX",
+    "BLOCK_TYPE_LOG",
+    "BLOCK_TYPE_OBJ",
+    "BLOCK_TYPE_REF",
+    "CRC_DATA_SIZE",
+    "DEFAULT_BLOCK_SIZE",
+    "EMBEDDED_FOOTER_MARKER",
+    "FINAL_PADDING_SIZE",
+    "HEADER_SIZE_V1",
+    "MAX_REASONABLE_BLOCK_SIZE",
+    "MAX_REASONABLE_SUFFIX_LEN",
+    "MAX_SYMREF_DEPTH",
+    "MIN_RECORD_SIZE",
+    "REFTABLE_MAGIC",
+    "REFTABLE_VERSION",
+    "REF_VALUE_DELETE",
+    "REF_VALUE_PEELED",
+    "REF_VALUE_REF",
+    "REF_VALUE_SYMREF",
+    "SHA1_BINARY_SIZE",
+    "SHA1_HEX_SIZE",
+    "SHA1_PEELED_HEX_SIZE",
+    "LogBlock",
+    "RefBlock",
+    "RefRecord",
+    "RefUpdate",
+    "RefValue",
+    "ReftableReader",
+    "ReftableRefsContainer",
+    "ReftableWriter",
+    "decode_varint_from_stream",
+    "encode_varint",
+]
+
 import os
 import random
 import shutil

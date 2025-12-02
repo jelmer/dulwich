@@ -21,6 +21,16 @@
 
 """Parse .gitattributes file."""
 
+__all__ = [
+    "AttributeValue",
+    "GitAttributes",
+    "Pattern",
+    "match_path",
+    "parse_git_attributes",
+    "parse_gitattributes_file",
+    "read_gitattributes",
+]
+
 import os
 import re
 from collections.abc import Generator, Iterator, Mapping, Sequence

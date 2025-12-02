@@ -25,6 +25,29 @@ Todo:
  * preserve formatting when updating configuration files
 """
 
+__all__ = [
+    "DEFAULT_MAX_INCLUDE_DEPTH",
+    "MAX_INCLUDE_FILE_SIZE",
+    "CaseInsensitiveOrderedMultiDict",
+    "ConditionMatcher",
+    "Config",
+    "ConfigDict",
+    "ConfigFile",
+    "ConfigKey",
+    "ConfigValue",
+    "FileOpener",
+    "StackedConfig",
+    "apply_instead_of",
+    "get_win_legacy_system_paths",
+    "get_win_system_paths",
+    "get_xdg_config_home_path",
+    "iter_instead_of",
+    "lower_key",
+    "match_glob_pattern",
+    "parse_submodules",
+    "read_submodules",
+]
+
 import logging
 import os
 import re

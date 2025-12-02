@@ -21,6 +21,15 @@
 
 """Access to hooks."""
 
+__all__ = [
+    "CommitMsgShellHook",
+    "Hook",
+    "PostCommitShellHook",
+    "PostReceiveShellHook",
+    "PreCommitShellHook",
+    "ShellHook",
+]
+
 import os
 import subprocess
 from collections.abc import Callable, Sequence

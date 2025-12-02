@@ -21,6 +21,12 @@
 
 """Stash handling."""
 
+__all__ = [
+    "DEFAULT_STASH_REF",
+    "CommitKwargs",
+    "Stash",
+]
+
 import os
 import sys
 from typing import TYPE_CHECKING, TypedDict

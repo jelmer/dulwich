@@ -23,6 +23,8 @@
 
 """Utility module for querying an ObjectStore with gevent."""
 
+__all__ = ["GreenThreadsMissingObjectFinder"]
+
 from collections.abc import Callable, Sequence
 
 import gevent

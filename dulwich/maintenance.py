@@ -4,6 +4,22 @@ This module provides the git maintenance functionality for optimizing
 and maintaining Git repositories.
 """
 
+__all__ = [
+    "CommitGraphTask",
+    "GcTask",
+    "IncrementalRepackTask",
+    "LooseObjectsTask",
+    "MaintenanceResult",
+    "MaintenanceSchedule",
+    "MaintenanceTask",
+    "PackRefsTask",
+    "PrefetchTask",
+    "get_enabled_tasks",
+    "register_repository",
+    "run_maintenance",
+    "unregister_repository",
+]
+
 import logging
 import os
 from abc import ABC, abstractmethod

@@ -1,5 +1,17 @@
 """Git garbage collection implementation."""
 
+__all__ = [
+    "DEFAULT_GC_AUTO",
+    "DEFAULT_GC_AUTO_PACK_LIMIT",
+    "GCStats",
+    "find_reachable_objects",
+    "find_unreachable_objects",
+    "garbage_collect",
+    "maybe_auto_gc",
+    "prune_unreachable_objects",
+    "should_run_gc",
+]
+
 import logging
 import os
 import time

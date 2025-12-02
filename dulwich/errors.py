@@ -22,6 +22,30 @@
 
 """Dulwich-related exception classes and utility functions."""
 
+__all__ = [
+    "ApplyDeltaError",
+    "ChecksumMismatch",
+    "CommitError",
+    "FileFormatException",
+    "GitProtocolError",
+    "HangupException",
+    "HookError",
+    "MissingCommitError",
+    "NoIndexPresent",
+    "NotBlobError",
+    "NotCommitError",
+    "NotGitRepository",
+    "NotTagError",
+    "NotTreeError",
+    "ObjectFormatException",
+    "ObjectMissing",
+    "PackedRefsException",
+    "RefFormatError",
+    "SendPackError",
+    "UnexpectedCommandError",
+    "WorkingTreeModifiedError",
+    "WrongObjectException",
+]
 
 # Please do not add more errors here, but instead add them close to the code
 # that raises the error.

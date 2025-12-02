@@ -31,6 +31,10 @@ the dulwich.client.get_ssh_vendor attribute:
 This implementation has comprehensive tests in tests/contrib/test_paramiko_vendor.py.
 """
 
+__all__ = [
+    "ParamikoSSHVendor",
+]
+
 import os
 import warnings
 from typing import Any, BinaryIO, cast

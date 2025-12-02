@@ -26,6 +26,8 @@ but its speed could be improved - in particular because it uses
 Python's difflib.
 """
 
+__all__ = ["annotate_lines", "update_lines"]
+
 import difflib
 from collections.abc import Sequence
 from typing import TYPE_CHECKING

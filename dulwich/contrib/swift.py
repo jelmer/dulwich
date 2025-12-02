@@ -44,7 +44,6 @@ from typing import Any, BinaryIO, cast
 from geventhttpclient import HTTPClient
 
 from ..file import _GitFile
-from ..greenthreads import GreenThreadsMissingObjectFinder
 from ..lru_cache import LRUSizeCache
 from ..object_store import INFODIR, PACKDIR, PackBasedObjectStore
 from ..objects import S_ISGITLINK, Blob, Commit, ObjectID, Tag, Tree
@@ -69,6 +68,7 @@ from ..protocol import TCP_GIT_PORT, split_peeled_refs, write_info_refs
 from ..refs import HEADREF, Ref, RefsContainer, read_info_refs
 from ..repo import OBJECTDIR, BaseRepo
 from ..server import Backend, BackendRepo, TCPGitServer
+from .greenthreads import GreenThreadsMissingObjectFinder
 
 """
 # Configuration file sample

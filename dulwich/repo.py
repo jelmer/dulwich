@@ -29,6 +29,35 @@ local disk (Repo).
 
 """
 
+__all__ = [
+    "BASE_DIRECTORIES",
+    "COMMONDIR",
+    "CONTROLDIR",
+    "DEFAULT_BRANCH",
+    "DEFAULT_OFS_DELTA",
+    "GITDIR",
+    "INDEX_FILENAME",
+    "OBJECTDIR",
+    "REFSDIR",
+    "REFSDIR_HEADS",
+    "REFSDIR_TAGS",
+    "WORKTREES",
+    "BaseRepo",
+    "DefaultIdentityNotFound",
+    "InvalidUserIdentity",
+    "MemoryRepo",
+    "ParentsProvider",
+    "Repo",
+    "UnsupportedExtension",
+    "UnsupportedVersion",
+    "check_user_identity",
+    "get_user_identity",
+    "parse_graftpoints",
+    "parse_shared_repository",
+    "read_gitfile",
+    "serialize_graftpoints",
+]
+
 import os
 import stat
 import sys

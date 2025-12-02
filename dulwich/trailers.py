@@ -31,6 +31,13 @@ They are similar to RFC 822 email headers and appear at the end of commit
 messages after free-form content.
 """
 
+__all__ = [
+    "Trailer",
+    "add_trailer_to_message",
+    "format_trailers",
+    "parse_trailers",
+]
+
 
 class Trailer:
     """Represents a single Git trailer.

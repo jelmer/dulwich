@@ -26,6 +26,12 @@ into individual message files, similar to git mailsplit, and to extract
 patch information from email messages, similar to git mailinfo.
 """
 
+__all__ = [
+    "mailinfo",
+    "split_maildir",
+    "split_mbox",
+]
+
 import mailbox
 import os
 from collections.abc import Iterable, Iterator

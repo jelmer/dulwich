@@ -137,6 +137,26 @@ Sources:
 - https://adaptivepatchwork.com/2012/03/01/mind-the-end-of-your-line/
 """
 
+__all__ = [
+    "CRLF",
+    "LF",
+    "BlobNormalizer",
+    "LineEndingFilter",
+    "TreeBlobNormalizer",
+    "check_safecrlf",
+    "convert_crlf_to_lf",
+    "convert_lf_to_crlf",
+    "get_checkin_filter",
+    "get_checkin_filter_autocrlf",
+    "get_checkout_filter",
+    "get_checkout_filter_autocrlf",
+    "get_clean_filter",
+    "get_clean_filter_autocrlf",
+    "get_smudge_filter",
+    "get_smudge_filter_autocrlf",
+    "normalize_blob",
+]
+
 import logging
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any

@@ -21,6 +21,12 @@
 
 """Safe access to git files."""
 
+__all__ = [
+    "FileLocked",
+    "GitFile",
+    "ensure_dir_exists",
+]
+
 import os
 import sys
 import warnings

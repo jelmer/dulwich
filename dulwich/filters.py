@@ -272,13 +272,16 @@ class ProcessFilterDriver:
                     pkt = self._protocol.read_pkt_line()
                     if pkt is None:  # flush packet ends headers
                         break
-                    key, _, value = pkt.decode().rstrip("\n\r").partition("=")
+                    key, _, value = pkt.rstrip(b"\n\r").partition(b"=")
                     response_headers[key] = value
 
                 # Check status
-                status = response_headers.get("status", "error")
-                if status != "success":
-                    raise FilterError(f"Process filter {operation} failed: {status}")
+                status = response_headers.get(b"status", b"error")
+                if status != b"success":
+                    status_str = status.decode("utf-8", errors="replace")
+                    raise FilterError(
+                        f"Process filter {operation} failed: {status_str}"
+                    )
 
                 # Read result data
                 result_chunks = []
@@ -295,14 +298,15 @@ class ProcessFilterDriver:
                     pkt = self._protocol.read_pkt_line()
                     if pkt is None:  # flush packet ends final headers
                         break
-                    key, _, value = pkt.decode().rstrip("\n\r").partition("=")
+                    key, _, value = pkt.rstrip(b"\n\r").partition(b"=")
                     final_headers[key] = value
 
                 # Check final status (if provided, it overrides the initial status)
-                final_status = final_headers.get("status", status)
-                if final_status != "success":
+                final_status = final_headers.get(b"status", status)
+                if final_status != b"success":
+                    final_status_str = final_status.decode("utf-8", errors="replace")
                     raise FilterError(
-                        f"Process filter {operation} failed with final status: {final_status}"
+                        f"Process filter {operation} failed with final status: {final_status_str}"
                     )
 
                 return b"".join(result_chunks)

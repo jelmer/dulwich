@@ -1,5 +1,14 @@
 0.25.0	UNRELEASED
 
+**PLEASE NOTE**: This release makes quite a lot of changes to public APIs. This
+is ahead of a 1.0 release, after which API changes will be kept backwards
+compatible.
+
+ * Move greenthreads support to dulwich/contrib.
+   This code isn't really developed and only used
+   by the swift support.
+   (Jelmer Vernooĳ)
+
  * Move protocol-level peeled tags functions (``serialize_refs()``,
    ``write_info_refs()``, ``split_peeled_refs()``, ``strip_peeled_refs()``)
    from ``dulwich.refs`` to ``dulwich.protocol``. The ``^{}`` peeled tags syntax

@@ -27,6 +27,7 @@ have additional dependencies or more specialized use cases.
 
 Available modules:
 - diffstat: Generate diff statistics similar to git's --stat option
+- greenthreads: Green-threaded support for finding missing objects
 - paramiko_vendor: SSH client implementation using paramiko
 - release_robot: Automated release management utilities
 - requests_vendor: HTTP client implementation using requests

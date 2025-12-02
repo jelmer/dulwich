@@ -28,13 +28,13 @@ from collections.abc import Callable, Sequence
 import gevent
 from gevent import pool
 
-from .object_store import (
+from ..object_store import (
     BaseObjectStore,
     MissingObjectFinder,
     _collect_ancestors,
     _collect_filetree_revs,
 )
-from .objects import Commit, ObjectID, Tag
+from ..objects import Commit, ObjectID, Tag
 
 
 def _split_commits_and_tags(

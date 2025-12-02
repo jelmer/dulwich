@@ -6,6 +6,8 @@ This module allows dulwich to be run as a Python module using the -m flag:
 It serves as the main entry point for the dulwich command-line interface.
 """
 
+__all__ = []
+
 from . import cli
 
 if __name__ == "__main__":

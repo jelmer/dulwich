@@ -44,6 +44,14 @@ Example usage:
     diff_index_to_tree(repo, sys.stdout.buffer, paths=[b'src/', b'README.md'])
 """
 
+__all__ = [
+    "ColorizedDiffStream",
+    "diff_index_to_tree",
+    "diff_working_tree_to_index",
+    "diff_working_tree_to_tree",
+    "should_include_path",
+]
+
 import io
 import logging
 import os

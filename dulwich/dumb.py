@@ -44,7 +44,8 @@ from .objects import (
     sha_to_hex,
 )
 from .pack import Pack, PackData, PackIndex, UnpackedObject, load_pack_index_file
-from .refs import Ref, read_info_refs, split_peeled_refs
+from .protocol import split_peeled_refs
+from .refs import Ref, read_info_refs
 
 
 class DumbHTTPObjectStore(BaseObjectStore):

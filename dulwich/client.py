@@ -164,6 +164,7 @@ from .protocol import (
     parse_capability,
     pkt_line,
     pkt_seq,
+    split_peeled_refs,
 )
 from .refs import (
     HEADREF,
@@ -175,7 +176,6 @@ from .refs import (
     _set_origin_head,
     filter_ref_prefix,
     read_info_refs,
-    split_peeled_refs,
 )
 from .repo import BaseRepo, Repo
 

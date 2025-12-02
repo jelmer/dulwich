@@ -985,15 +985,33 @@ while True:
         # Binary data with null bytes, high bytes, etc.
         binary_data = bytes(range(256))
 
-        try:
-            result = driver.clean(binary_data)
-            # Should handle binary data without crashing
-            self.assertIsInstance(result, bytes)
-            # Our test filter uppercases, which may not work for all binary data
-            # but should not crash
-        except UnicodeDecodeError:
-            # This might happen with binary data - acceptable
-            pass
+        result = driver.clean(binary_data)
+        # Should handle binary data without crashing
+        self.assertIsInstance(result, bytes)
+        # Our test filter uppercases bytes directly, which works for binary data
+        # The fix ensures headers are kept as bytes, so binary content doesn't cause decode errors
+
+    def test_binary_data_with_invalid_utf8_sequences(self):
+        """Test handling of binary data with invalid UTF-8 sequences.
+
+        Regression test for https://github.com/jelmer/dulwich/issues/2023
+        where binary files (like .ogg, .jpg) caused UTF-8 decode errors.
+        """
+        import sys
+
+        driver = ProcessFilterDriver(
+            process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
+        )
+
+        # Create binary data with the specific byte that caused the issue (0xe5 at position 14)
+        # plus other invalid UTF-8 sequences
+        binary_data = b"some header \xe5\xff\xfe binary data"
+
+        result = driver.clean(binary_data)
+        # Should handle binary data without UTF-8 decode errors
+        self.assertIsInstance(result, bytes)
+        # The filter should process it successfully
+        self.assertEqual(result, binary_data.upper())
 
     def test_large_file_chunking(self):
         """Test proper chunking of large files."""

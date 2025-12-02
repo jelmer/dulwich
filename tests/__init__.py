@@ -141,6 +141,7 @@ def self_test_suite() -> unittest.TestSuite:
         "credentials",
         "diff",
         "diff_tree",
+        "diffstat",
         "dumb",
         "fastexport",
         "file",

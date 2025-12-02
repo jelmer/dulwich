@@ -16,6 +16,37 @@ The commit graph format is documented at:
 https://git-scm.com/docs/gitformat-commit-graph
 """
 
+__all__ = [
+    "CHUNK_BASE_GRAPHS_LIST",
+    "CHUNK_BLOOM_FILTER_DATA",
+    "CHUNK_BLOOM_FILTER_INDEX",
+    "CHUNK_COMMIT_DATA",
+    "CHUNK_EXTRA_EDGE_LIST",
+    "CHUNK_GENERATION_DATA",
+    "CHUNK_GENERATION_DATA_OVERFLOW",
+    "CHUNK_OID_FANOUT",
+    "CHUNK_OID_LOOKUP",
+    "COMMIT_GRAPH_SIGNATURE",
+    "COMMIT_GRAPH_VERSION",
+    "GENERATION_NUMBER_INFINITY",
+    "GENERATION_NUMBER_V1_MAX",
+    "GENERATION_NUMBER_ZERO",
+    "GRAPH_EXTRA_EDGES_NEEDED",
+    "GRAPH_LAST_EDGE",
+    "GRAPH_PARENT_MISSING",
+    "GRAPH_PARENT_NONE",
+    "HASH_VERSION_SHA1",
+    "HASH_VERSION_SHA256",
+    "CommitGraph",
+    "CommitGraphChunk",
+    "CommitGraphEntry",
+    "find_commit_graph_file",
+    "generate_commit_graph",
+    "get_reachable_commits",
+    "read_commit_graph",
+    "write_commit_graph",
+]
+
 import os
 import struct
 from collections.abc import Iterator, Sequence

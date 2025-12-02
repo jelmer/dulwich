@@ -21,6 +21,12 @@
 
 """Git filter-branch implementation."""
 
+__all__ = [
+    "CommitData",
+    "CommitFilter",
+    "filter_refs",
+]
+
 import os
 import tempfile
 import warnings

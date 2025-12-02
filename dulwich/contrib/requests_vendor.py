@@ -31,6 +31,11 @@ the dulwich.client.HttpGitClient attribute:
 This implementation is experimental and does not have any tests.
 """
 
+__all__ = [
+    "RequestsHttpGitClient",
+    "get_session",
+]
+
 from collections.abc import Callable, Iterator
 from io import BytesIO
 from typing import TYPE_CHECKING, Any

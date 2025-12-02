@@ -24,6 +24,14 @@ This module implements Git's core.whitespace configuration and related
 whitespace error detection capabilities.
 """
 
+__all__ = [
+    "DEFAULT_WHITESPACE_ERRORS",
+    "WHITESPACE_ERROR_TYPES",
+    "WhitespaceChecker",
+    "fix_whitespace_errors",
+    "parse_whitespace_config",
+]
+
 from collections.abc import Sequence, Set
 
 # Default whitespace errors Git checks for

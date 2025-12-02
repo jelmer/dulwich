@@ -25,6 +25,29 @@ These patches are basically unified diffs with some extra metadata tacked
 on.
 """
 
+__all__ = [
+    "DEFAULT_DIFF_ALGORITHM",
+    "FIRST_FEW_BYTES",
+    "DiffAlgorithmNotAvailable",
+    "MailinfoResult",
+    "commit_patch_id",
+    "gen_diff_header",
+    "get_summary",
+    "git_am_patch_split",
+    "is_binary",
+    "mailinfo",
+    "parse_patch_message",
+    "patch_filename",
+    "patch_id",
+    "shortid",
+    "unified_diff",
+    "unified_diff_with_algorithm",
+    "write_blob_diff",
+    "write_commit_patch",
+    "write_object_diff",
+    "write_tree_diff",
+]
+
 import email.message
 import email.parser
 import email.utils

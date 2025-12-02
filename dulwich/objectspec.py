@@ -21,6 +21,20 @@
 
 """Object specification."""
 
+__all__ = [
+    "AmbiguousShortId",
+    "parse_commit",
+    "parse_commit_range",
+    "parse_object",
+    "parse_ref",
+    "parse_refs",
+    "parse_reftuple",
+    "parse_reftuples",
+    "parse_tree",
+    "scan_for_short_id",
+    "to_bytes",
+]
+
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 

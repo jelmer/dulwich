@@ -21,6 +21,12 @@
 
 """Simple Git LFS server implementation for testing."""
 
+__all__ = [
+    "LFSRequestHandler",
+    "LFSServer",
+    "run_lfs_server",
+]
+
 import hashlib
 import json
 import tempfile

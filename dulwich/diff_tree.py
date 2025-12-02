@@ -21,6 +21,24 @@
 
 """Utilities for diffing files and trees."""
 
+__all__ = [
+    "CHANGE_ADD",
+    "CHANGE_COPY",
+    "CHANGE_DELETE",
+    "CHANGE_MODIFY",
+    "CHANGE_RENAME",
+    "CHANGE_UNCHANGED",
+    "MAX_FILES",
+    "RENAME_CHANGE_TYPES",
+    "RENAME_THRESHOLD",
+    "REWRITE_THRESHOLD",
+    "RenameDetector",
+    "TreeChange",
+    "tree_changes",
+    "tree_changes_for_merge",
+    "walk_trees",
+]
+
 import stat
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Mapping, Sequence

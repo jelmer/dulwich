@@ -23,6 +23,22 @@
 
 from __future__ import annotations
 
+__all__ = [
+    "WorkTree",
+    "WorkTreeContainer",
+    "WorkTreeInfo",
+    "add_worktree",
+    "list_worktrees",
+    "lock_worktree",
+    "move_worktree",
+    "prune_worktrees",
+    "read_worktree_lock_reason",
+    "remove_worktree",
+    "repair_worktree",
+    "temporary_worktree",
+    "unlock_worktree",
+]
+
 import builtins
 import os
 import shutil

@@ -8,3 +8,5 @@ traditional filesystem-based storage.
 Available backends:
 - GCS (Google Cloud Storage): Store Git objects in Google Cloud Storage buckets
 """
+
+__all__ = []

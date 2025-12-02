@@ -43,6 +43,11 @@ statistics about changes, including:
 - Formatted output similar to git diff --stat
 """
 
+__all__ = [
+    "diffstat",
+    "main",
+]
+
 import re
 import sys
 from collections.abc import Sequence

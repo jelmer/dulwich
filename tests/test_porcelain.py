@@ -2139,6 +2139,18 @@ class AddTests(PorcelainTestCase):
         self.assertIn(b"existing.txt", index)
         self.assertIn(b"new.txt", index)
 
+    def test_add_empty_paths_list(self) -> None:
+        """Test that passing paths=[] does not add any files."""
+        # Create an untracked file
+        with open(os.path.join(self.repo.path, "file.txt"), "w") as f:
+            f.write("content")
+
+        # Add with empty paths list
+        added, _ignored = porcelain.add(self.repo.path, paths=[])
+
+        # Should not add any files
+        self.assertEqual(len(added), 0)
+
 
 class RemoveTests(PorcelainTestCase):
     def test_remove_file(self) -> None:

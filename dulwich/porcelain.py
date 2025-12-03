@@ -1485,7 +1485,7 @@ def add(
             get_unstaged_changes(index, r.path, filter_callback, preload_index)
         )
 
-        if not paths:
+        if paths is None:
             # When no paths specified, add all untracked and modified files from repo root
             paths = [str(repo_path)]
         relpaths = []

@@ -144,12 +144,13 @@ class ParamikoSSHVendor:
     def run_command(
         self,
         host: str,
-        command: str,
+        command: bytes,
         username: str | None = None,
         port: int | None = None,
         password: str | None = None,
         pkey: paramiko.PKey | None = None,
         key_filename: str | None = None,
+        ssh_command: str | None = None,
         protocol_version: int | None = None,
         **kwargs: object,
     ) -> _ParamikoWrapper:
@@ -157,18 +158,22 @@ class ParamikoSSHVendor:
 
         Args:
             host: Hostname to connect to
-            command: Command to execute
+            command: Command to execute (as bytes)
             username: SSH username (optional)
             port: SSH port (optional)
             password: SSH password (optional)
             pkey: Private key for authentication (optional)
             key_filename: Path to private key file (optional)
+            ssh_command: SSH command (ignored - Paramiko doesn't use external SSH)
             protocol_version: SSH protocol version (optional)
             **kwargs: Additional keyword arguments
 
         Returns:
             _ParamikoWrapper instance for the SSH channel
         """
+        # Convert bytes command to str for paramiko
+        command_str = command.decode("utf-8")
+
         client = paramiko.SSHClient()
 
         # Get SSH config for this host
@@ -220,6 +225,6 @@ class ParamikoSSHVendor:
             channel.set_environment_variable(name="GIT_PROTOCOL", value="version=2")
 
         # Run commands
-        channel.exec_command(command)
+        channel.exec_command(command_str)
 
         return _ParamikoWrapper(client, channel)

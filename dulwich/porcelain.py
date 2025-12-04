@@ -2558,9 +2558,7 @@ def tag_create(
       objectish: object the tag should point at, defaults to HEAD
       tag_time: Optional time for annotated tag
       tag_timezone: Optional timezone for annotated tag
-      sign: GPG Sign the tag (bool, defaults to False,
-        pass True to use default GPG key,
-        pass a str containing Key ID to use a specific GPG key)
+      sign: False or pysequoia.PySigner instance, gotten from Cert.secrets.signer()
       encoding: Encoding to use for tag messages
     """
     with open_repo_closing(repo) as r:
@@ -2597,29 +2595,25 @@ def tag_create(
                 tag_timezone = parse_timezone(tag_timezone.encode())
             tag_obj.tag_timezone = tag_timezone
 
+            # todo: this used to check "tag->gpgSign" config and/or
+            # "user->signingKey" to find GnuPG keys to use; provide
+            # attempts at backwards-compat by shelling to "sq" or
+            # leave that to user code?
+
             # Check if we should sign the tag
-            config = r.get_config_stack()
-
-            if sign is None:
-                # Check tag.gpgSign configuration when sign is not explicitly set
-                try:
-                    should_sign = config.get_boolean(
-                        (b"tag",), b"gpgsign", default=False
+            if sign not in (None, False):
+                if isinstance(sign, str):
+                    # backwards-"compat"?
+                    raise RuntimeError(
+                        "sign no longer takes a keyid\n\n"
+                        'To get an object suitable to pass to "sign" using the "sq" tool:\n'
+                        '  keyid = "<hex key fingerprint>"\n'
+                        '  args = ["sq", "key", "export", "--cert", keyid]\n'
+                        "  certdata = subprocess.check_output(args)\n"
+                        "  cert = pysequoia.Cert.from_bytes(certdata)\n"
+                        '  signer = cert.secrets.signer("optional passphrase")\n'
                     )
-                except KeyError:
-                    should_sign = False  # Default to not signing if no config
-            else:
-                should_sign = sign
-
-            # Get the signing key from config if signing is enabled
-            keyid = None
-            if should_sign:
-                try:
-                    keyid_bytes = config.get((b"user",), b"signingkey")
-                    keyid = keyid_bytes.decode() if keyid_bytes else None
-                except KeyError:
-                    keyid = None
-                tag_obj.sign(keyid)
+                tag_obj.sign(sign)
 
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id

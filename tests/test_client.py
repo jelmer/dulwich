@@ -62,7 +62,8 @@ from dulwich.client import (
     parse_rsync_url,
 )
 from dulwich.config import ConfigDict
-from dulwich.objects import Blob, Commit, Tree
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
 from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
@@ -404,7 +405,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
@@ -428,7 +429,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
@@ -461,7 +462,7 @@ class GitClientTests(TestCase):
             return 0, []
 
         f = BytesIO()
-        write_pack_objects(f.write, [])
+        write_pack_objects(f.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         self.client.send_pack("/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -507,7 +508,11 @@ class GitClientTests(TestCase):
 
         f = BytesIO()
         count, records = generate_pack_data(None, None)
-        write_pack_data(f.write, records, num_records=count)
+        from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+
+        write_pack_data(
+            f.write, records, num_records=count, object_format=DEFAULT_OBJECT_FORMAT
+        )
         self.client.send_pack(b"/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -532,7 +537,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []

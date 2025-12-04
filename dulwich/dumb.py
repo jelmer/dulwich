@@ -31,8 +31,11 @@ import tempfile
 import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from io import BytesIO
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
+
+if TYPE_CHECKING:
+    from .object_format import ObjectFormat
 
 from .errors import NotGitRepository, ObjectFormatException
 from .object_store import BaseObjectStore
@@ -62,6 +65,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
         http_request_func: Callable[
             [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
         ],
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize a DumbHTTPObjectStore.
 
@@ -69,7 +73,9 @@ class DumbHTTPObjectStore(BaseObjectStore):
           base_url: Base URL of the remote repository (e.g. "https://example.com/repo.git/")
           http_request_func: Function to make HTTP requests, should accept (url, headers)
                            and return (response, read_func).
+          object_format: Object format to use (defaults to DEFAULT_OBJECT_FORMAT)
         """
+        super().__init__(object_format=object_format)
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
         self._packs: list[tuple[str, PackIndex | None]] | None = None
@@ -252,7 +258,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
                     f.write(data)
 
             # Open the pack and get the object
-            pack_data = PackData(pack_path)
+            pack_data = PackData(pack_path, object_format=self.object_format)
             pack = Pack.from_objects(pack_data, pack_idx)
             try:
                 return pack.get_raw(binsha)
@@ -441,7 +447,7 @@ class DumbRemoteHTTPRepo:
         """Get the peeled value of a ref."""
         # For dumb HTTP, we don't have peeled refs readily available
         # We would need to fetch and parse tag objects
-        sha = self.get_refs().get(ref, None)
+        sha: ObjectID | None = self.get_refs().get(ref, None)
         return sha if sha is not None else ZERO_SHA
 
     def fetch_pack_data(

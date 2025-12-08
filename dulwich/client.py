@@ -1164,12 +1164,22 @@ class GitClient:
                 else:
                     head = None
             else:
+                from dulwich import porcelain
+
                 _set_origin_head(target.refs, origin.encode("utf-8"), origin_head)
+
+                default_branch_name = porcelain.var(
+                    target, variable="GIT_DEFAULT_BRANCH"
+                ).encode("utf-8")
+                default_branch: bytes | None = default_branch_name
+                default_ref = Ref(b"refs/remotes/origin/" + default_branch_name)
+                if default_ref not in target.refs:
+                    default_branch = None
                 head_ref = _set_default_branch(
                     target.refs,
                     origin.encode("utf-8"),
                     origin_head,
-                    branch.encode("utf-8") if branch is not None else None,
+                    (branch.encode("utf-8") if branch is not None else default_branch),
                     ref_message,
                 )
 
@@ -4096,7 +4106,9 @@ class AbstractHttpGitClient(GitClient):
                 )
             )
 
-            symrefs[HEADREF] = dumb_repo.get_head()
+            head = dumb_repo.get_head()
+            if head is not None:
+                symrefs[HEADREF] = head
 
             # Write pack data
             if pack_data_list:

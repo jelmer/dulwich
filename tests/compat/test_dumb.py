@@ -110,6 +110,7 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
     """Tests for dumb HTTP client against real git repositories."""
 
     with_pack = False
+    with_missing_remote_head = False
 
     def setUp(self):
         super().setUp()
@@ -151,6 +152,9 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
 
         # Update server info for dumb HTTP
         run_git_or_fail(["update-server-info"], cwd=self.origin_path)
+
+        if self.with_missing_remote_head:
+            os.remove(os.path.join(self.origin_path, "HEAD"))
 
         # Start HTTP server
         self.server = DumbHTTPGitServer(self.origin_path)
@@ -314,3 +318,16 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
 
 class DumbHTTPClientWithPackTests(DumbHTTPClientNoPackTests):
     with_pack = True
+
+
+class DumbHTTPClientWithMissingRemoteHEAD(DumbHTTPClientNoPackTests):
+    with_missing_remote_head = True
+
+    # we only want to test clone operation as removing the HEAD file
+    # prevents any push operation used in tests below
+
+    def test_fetch_from_dumb_http_with_tags(self):
+        pass
+
+    def test_fetch_new_commit_from_dumb_http(self):
+        pass

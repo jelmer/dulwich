@@ -430,19 +430,27 @@ class DumbRemoteHTTPRepo:
 
         return dict(self._refs)
 
-    def get_head(self) -> Ref:
+    def get_head(self) -> Ref | None:
         """Get the current HEAD reference.
 
         Returns:
           HEAD reference name or commit ID
         """
-        head_resp_bytes = self._fetch_url("HEAD")
-        head_split = head_resp_bytes.replace(b"\n", b"").split(b" ")
-        head_target_bytes = head_split[1] if len(head_split) > 1 else head_split[0]
-        # handle HEAD legacy format containing a commit id instead of a ref name
-        for ref_name, ret_target in self.get_refs().items():
-            if ret_target == head_target_bytes:
-                return ref_name
+        try:
+            head_resp_bytes = self._fetch_url("HEAD")
+        except OSError as e:
+            if "HTTP error 429" not in str(e):
+                return None
+            else:
+                # rate-limit reached so raise exception
+                raise
+        else:
+            head_split = head_resp_bytes.replace(b"\n", b"").split(b" ")
+            head_target_bytes = head_split[1] if len(head_split) > 1 else head_split[0]
+            # handle HEAD legacy format containing a commit id instead of a ref name
+            for ref_name, ret_target in self.get_refs().items():
+                if ret_target == head_target_bytes:
+                    return ref_name
         return Ref(head_target_bytes)
 
     def get_peeled(self, ref: Ref) -> ObjectID:

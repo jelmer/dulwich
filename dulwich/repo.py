@@ -674,6 +674,15 @@ class BaseRepo:
           depth: Optional shallow fetch depth
         Returns: The local refs
         """
+        # Validate object format compatibility
+        if self.object_format != target.object_format:
+            from .errors import GitProtocolError
+
+            raise GitProtocolError(
+                f"Object format mismatch: source uses {self.object_format.name}, "
+                f"target uses {target.object_format.name}"
+            )
+
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all
         count, pack_data = self.fetch_pack_data(

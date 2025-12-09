@@ -1115,6 +1115,54 @@ class LocalGitClientTests(TestCase):
         expected[b"refs/remotes/origin/master"] = expected[b"refs/heads/master"]
         self.assertEqual(expected, result_repo.get_refs())
 
+    def test_clone_sha256_local(self) -> None:
+        """Test that cloning a SHA-256 local repo creates a SHA-256 clone."""
+        client = LocalGitClient()
+
+        # Create a SHA-256 source repository
+        source_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, source_path)
+        source_repo = Repo.init(source_path, object_format="sha256")
+
+        # Verify source is SHA-256
+        self.assertEqual("sha256", source_repo.object_format.name)
+        source_repo.close()
+
+        # Clone the repository
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        cloned_repo = client.clone(source_path, target_path, mkdir=False)
+        self.addCleanup(cloned_repo.close)
+
+        # Verify the clone uses SHA-256
+        self.assertEqual("sha256", cloned_repo.object_format.name)
+
+        # Verify the config has the correct objectformat extension
+        config = cloned_repo.get_config()
+        self.assertEqual(b"sha256", config.get((b"extensions",), b"objectformat"))
+
+    def test_clone_sha1_local(self) -> None:
+        """Test that cloning a SHA-1 local repo creates a SHA-1 clone."""
+        client = LocalGitClient()
+
+        # Create a SHA-1 source repository
+        source_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, source_path)
+        source_repo = Repo.init(source_path, object_format="sha1")
+
+        # Verify source is SHA-1
+        self.assertEqual("sha1", source_repo.object_format.name)
+        source_repo.close()
+
+        # Clone the repository
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        cloned_repo = client.clone(source_path, target_path, mkdir=False)
+        self.addCleanup(cloned_repo.close)
+
+        # Verify the clone uses SHA-1
+        self.assertEqual("sha1", cloned_repo.object_format.name)
+
     def test_fetch_empty(self) -> None:
         c = LocalGitClient()
         s = open_repo("a.git")

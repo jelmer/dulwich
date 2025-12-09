@@ -407,7 +407,7 @@ def extract_object_format_from_capabilities(
     """
     for capability in capabilities:
         k, v = parse_capability(capability)
-        if k == b"object-format":
+        if k == b"object-format" and v is not None:
             return v.decode("ascii")
     return None
 
@@ -1105,8 +1105,9 @@ class GitClient:
             os.mkdir(target_path)
 
         try:
-            # Create repository with default SHA-1 format initially
-            # We'll update it based on the remote's object format after the first fetch
+            # For network clones, create repository with default SHA-1 format
+            # If remote uses SHA-256, fetch() will raise GitProtocolError
+            # Subclasses (e.g., LocalGitClient) override to detect format first
             target = None
             if not bare:
                 target = Repo.init(target_path)
@@ -1147,14 +1148,11 @@ class GitClient:
                 protocol_version=protocol_version,
             )
 
-            # Update object format if the remote uses a different one
-            # This must happen before any objects are written, but fetch has already
-            # transferred them. Subclasses can override to detect format earlier.
-            if (
-                result.object_format
-                and result.object_format != target.object_format.name
-            ):
-                target._update_object_format(result.object_format)
+            # Note: For network clones, if remote uses a different object format than
+            # the default SHA-1, fetch() will raise GitProtocolError. Subclasses like
+            # LocalGitClient override clone() to detect format before creating the repo.
+            # TODO: Fix network clones to detect object format before creating target repo.
+
             if origin is not None:
                 _import_remote_refs(
                     target.refs, origin, result.refs, message=ref_message
@@ -2570,6 +2568,113 @@ class LocalGitClient(GitClient):
             return LsRemoteResult(
                 refs, symrefs, object_format=target.object_format.name
             )
+
+    def clone(
+        self,
+        path: str,
+        target_path: str,
+        mkdir: bool = True,
+        bare: bool = False,
+        origin: str | None = "origin",
+        checkout: bool | None = None,
+        branch: str | None = None,
+        progress: Callable[[bytes], None] | None = None,
+        depth: int | None = None,
+        ref_prefix: Sequence[bytes] | None = None,
+        filter_spec: bytes | None = None,
+        protocol_version: int | None = None,
+    ) -> Repo:
+        """Clone a local repository.
+
+        For local clones, we can detect the object format before creating
+        the target repository.
+        """
+        # Detect the object format from the source repository
+        with self._open_repo(path) as source_repo:
+            object_format_name = source_repo.object_format.name
+
+        if mkdir:
+            os.mkdir(target_path)
+
+        try:
+            # Create repository with the correct object format from the start
+            target = None
+            if not bare:
+                target = Repo.init(target_path, object_format=object_format_name)
+                if checkout is None:
+                    checkout = True
+            else:
+                if checkout:
+                    raise ValueError("checkout and bare are incompatible")
+                target = Repo.init_bare(target_path, object_format=object_format_name)
+
+            encoded_path = path.encode("utf-8")
+
+            assert target is not None
+            if origin is not None:
+                target_config = target.get_config()
+                target_config.set(
+                    (b"remote", origin.encode("utf-8")), b"url", encoded_path
+                )
+                target_config.set(
+                    (b"remote", origin.encode("utf-8")),
+                    b"fetch",
+                    b"+refs/heads/*:refs/remotes/" + origin.encode("utf-8") + b"/*",
+                )
+                target_config.write_to_path()
+
+            ref_message = b"clone: from " + encoded_path
+            result = self.fetch(
+                path.encode("utf-8"),
+                target,
+                progress=progress,
+                depth=depth,
+                ref_prefix=ref_prefix,
+                filter_spec=filter_spec,
+                protocol_version=protocol_version,
+            )
+
+            if origin is not None:
+                _import_remote_refs(
+                    target.refs, origin, result.refs, message=ref_message
+                )
+
+            origin_head = result.symrefs.get(HEADREF)
+            origin_sha = result.refs.get(HEADREF)
+            if origin is None or (origin_sha and not origin_head):
+                # set detached HEAD
+                if origin_sha is not None:
+                    target.refs[HEADREF] = origin_sha
+                    head = origin_sha
+                else:
+                    head = None
+            else:
+                _set_origin_head(target.refs, origin.encode("utf-8"), origin_head)
+                head_ref = _set_default_branch(
+                    target.refs,
+                    origin.encode("utf-8"),
+                    origin_head,
+                    branch.encode("utf-8") if branch is not None else None,
+                    ref_message,
+                )
+
+                # Update target head
+                if head_ref:
+                    head = _set_head(target.refs, head_ref, ref_message)
+                else:
+                    head = None
+
+            if checkout and head is not None:
+                target.get_worktree().reset_index()
+        except BaseException:
+            if target is not None:
+                target.close()
+            if mkdir:
+                import shutil
+
+                shutil.rmtree(target_path)
+            raise
+        return target
 
 
 class BundleClient(GitClient):

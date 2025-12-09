@@ -1198,6 +1198,78 @@ class LocalGitClientTests(TestCase):
         # Check that symrefs are detected correctly
         self.assertIn(b"HEAD", result.symrefs)
 
+    def test_fetch_object_format_mismatch_sha256_to_sha1(self) -> None:
+        """Test that fetching from SHA-256 to SHA-1 repository fails."""
+        from dulwich.errors import GitProtocolError
+
+        client = LocalGitClient()
+
+        # Create SHA-256 source repository
+        sha256_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_path)
+        sha256_repo = Repo.init(sha256_path, object_format="sha256")
+        self.addCleanup(sha256_repo.close)
+
+        # Create SHA-1 target repository
+        sha1_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha1_path)
+        sha1_repo = Repo.init(sha1_path, object_format="sha1")
+        self.addCleanup(sha1_repo.close)
+
+        # Attempt to fetch should raise GitProtocolError
+        with self.assertRaises(GitProtocolError) as cm:
+            client.fetch(sha256_path, sha1_repo)
+
+        self.assertIn("Object format mismatch", str(cm.exception))
+        self.assertIn("sha256", str(cm.exception))
+        self.assertIn("sha1", str(cm.exception))
+
+    def test_fetch_object_format_mismatch_sha1_to_sha256(self) -> None:
+        """Test that fetching from SHA-1 to SHA-256 repository fails."""
+        from dulwich.errors import GitProtocolError
+
+        client = LocalGitClient()
+
+        # Create SHA-1 source repository
+        sha1_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha1_path)
+        sha1_repo = Repo.init(sha1_path, object_format="sha1")
+        self.addCleanup(sha1_repo.close)
+
+        # Create SHA-256 target repository
+        sha256_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_path)
+        sha256_repo = Repo.init(sha256_path, object_format="sha256")
+        self.addCleanup(sha256_repo.close)
+
+        # Attempt to fetch should raise GitProtocolError
+        with self.assertRaises(GitProtocolError) as cm:
+            client.fetch(sha1_path, sha256_repo)
+
+        self.assertIn("Object format mismatch", str(cm.exception))
+        self.assertIn("sha1", str(cm.exception))
+        self.assertIn("sha256", str(cm.exception))
+
+    def test_fetch_object_format_same(self) -> None:
+        """Test that fetching between repositories with same object format works."""
+        client = LocalGitClient()
+
+        # Create SHA-256 source repository
+        sha256_src = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_src)
+        src_repo = Repo.init(sha256_src, object_format="sha256")
+        self.addCleanup(src_repo.close)
+
+        # Create SHA-256 target repository
+        sha256_dst = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_dst)
+        dst_repo = Repo.init(sha256_dst, object_format="sha256")
+        self.addCleanup(dst_repo.close)
+
+        # Fetch should succeed without error
+        result = client.fetch(sha256_src, dst_repo)
+        self.assertIsNotNone(result)
+
     def send_and_verify(self, branch, local, target) -> None:
         """Send branch from local to remote repository and verify it worked."""
         client = LocalGitClient()

@@ -1271,6 +1271,16 @@ class GitClient:
                 shallow_since=shallow_since,
                 shallow_exclude=shallow_exclude,
             )
+
+            # Validate object format compatibility
+            if (
+                result.object_format
+                and result.object_format != target.object_format.name
+            ):
+                raise GitProtocolError(
+                    f"Object format mismatch: remote uses {result.object_format}, "
+                    f"local repository uses {target.object_format.name}"
+                )
         except BaseException:
             abort()
             raise

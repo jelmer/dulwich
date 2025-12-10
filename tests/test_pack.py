@@ -606,23 +606,26 @@ class TestPackData(PackTests):
         f = BytesIO(b"abcd1234wxyz")
         try:
             self.assertEqual(
-                sha1(b"abcd1234wxyz").hexdigest(), compute_file_sha(f).hexdigest()
+                sha1(b"abcd1234wxyz").hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"abcd1234wxyz").hexdigest(),
-                compute_file_sha(f, buffer_size=5).hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT, buffer_size=5).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"abcd1234").hexdigest(),
-                compute_file_sha(f, end_ofs=-4).hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT, end_ofs=-4).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234wxyz").hexdigest(),
-                compute_file_sha(f, start_ofs=4).hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT, start_ofs=4).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234").hexdigest(),
-                compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT, start_ofs=4, end_ofs=-4
+                ).hexdigest(),
             )
         finally:
             f.close()
@@ -630,10 +633,14 @@ class TestPackData(PackTests):
     def test_compute_file_sha_short_file(self) -> None:
         f = BytesIO(b"abcd1234wxyz")
         try:
-            self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=-20)
-            self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=20)
             self.assertRaises(
-                AssertionError, compute_file_sha, f, start_ofs=10, end_ofs=-12
+                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT, -20
+            )
+            self.assertRaises(
+                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT, 0, 20
+            )
+            self.assertRaises(
+                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT, 10, -12
             )
         finally:
             f.close()
@@ -934,7 +941,9 @@ class WritePackTests(TestCase):
 
             f.write(b"x")  # unpack_object needs extra trailing data.
             f.seek(offset)
-            unpacked, unused = unpack_object(f.read, compute_crc32=True)
+            unpacked, unused = unpack_object(
+                f.read, DEFAULT_OBJECT_FORMAT.hash_func, compute_crc32=True
+            )
             self.assertEqual(Blob.type_num, unpacked.pack_type_num)
             self.assertEqual(Blob.type_num, unpacked.obj_type_num)
             self.assertEqual([b"blob"], unpacked.decomp_chunks)
@@ -1410,7 +1419,7 @@ class TestPackStreamReader(TestCase):
     def test_read_objects_emtpy(self) -> None:
         f = BytesIO()
         build_pack(f, [])
-        reader = PackStreamReader(f.read)
+        reader = PackStreamReader(DEFAULT_OBJECT_FORMAT.hash_func, f.read)
         self.assertEqual(0, len(list(reader.read_objects())))
 
     def test_read_objects(self) -> None:
@@ -1422,7 +1431,7 @@ class TestPackStreamReader(TestCase):
                 (OFS_DELTA, (0, b"blob1")),
             ],
         )
-        reader = PackStreamReader(f.read)
+        reader = PackStreamReader(DEFAULT_OBJECT_FORMAT.hash_func, f.read)
         objects = list(reader.read_objects(compute_crc32=True))
         self.assertEqual(2, len(objects))
 
@@ -1455,11 +1464,13 @@ class TestPackStreamReader(TestCase):
                 (OFS_DELTA, (0, b"blob1")),
             ],
         )
-        reader = PackStreamReader(f.read, zlib_bufsize=4)
+        reader = PackStreamReader(
+            DEFAULT_OBJECT_FORMAT.hash_func, f.read, zlib_bufsize=4
+        )
         self.assertEqual(2, len(list(reader.read_objects())))
 
     def test_read_objects_empty(self) -> None:
-        reader = PackStreamReader(BytesIO().read)
+        reader = PackStreamReader(DEFAULT_OBJECT_FORMAT.hash_func, BytesIO().read)
         self.assertRaises(AssertionError, list, reader.read_objects())
 
 

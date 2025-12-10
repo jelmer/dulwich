@@ -709,6 +709,19 @@ class ConfigDict(Config):
 
         self._values.setdefault(section)[name] = value
 
+    def remove(self, section: SectionLike, name: NameLike) -> None:
+        """Remove a configuration setting.
+
+        Args:
+            section: Section name
+            name: Setting name
+
+        Raises:
+            KeyError: If the section or name doesn't exist
+        """
+        section, name = self._check_section_and_name(section, name)
+        del self._values[section][name]
+
     def items(self, section: SectionLike) -> Iterator[tuple[Name, Value]]:
         """Get items in a section."""
         section_bytes, _ = self._check_section_and_name(section, b"")

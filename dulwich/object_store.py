@@ -2606,8 +2606,8 @@ class MemoryObjectStore(PackCapableObjectStore):
 
     def add_thin_pack(
         self,
-        read_all: Callable[[], bytes],
-        read_some: Callable[[int], bytes],
+        read_all: Callable[[int], bytes],
+        read_some: Callable[[int], bytes] | None,
         progress: Callable[[str], None] | None = None,
     ) -> None:
         """Add a new thin pack to this object store.
@@ -2629,7 +2629,7 @@ class MemoryObjectStore(PackCapableObjectStore):
                 self.object_format.hash_func,
                 read_all,
                 read_some,
-                f,  # type: ignore[arg-type]
+                f,
             )
             copier.verify()
         except BaseException:

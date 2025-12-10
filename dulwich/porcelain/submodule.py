@@ -23,12 +23,11 @@
 
 import os
 from collections.abc import Iterator, Sequence
-from typing import BinaryIO, TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 from ..config import ConfigFile, read_submodules
 from ..objects import Commit
 from ..repo import Repo
-
 
 if TYPE_CHECKING:
     from . import RepoPath

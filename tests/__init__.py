@@ -171,12 +171,6 @@ def self_test_suite() -> unittest.TestSuite:
         "object_store",
         "pack",
         "patch",
-        "porcelain",
-        "porcelain_cherry_pick",
-        "porcelain_filters",
-        "porcelain_lfs",
-        "porcelain_merge",
-        "porcelain_notes",
         "protocol",
         "rebase",
         "reflog",
@@ -197,6 +191,14 @@ def self_test_suite() -> unittest.TestSuite:
         "worktree",
     ]
     module_names = ["tests.test_" + name for name in names]
+    porcelain_names = [
+        "cherry_pick",
+        "filters",
+        "lfs",
+        "merge",
+        "notes",
+    ]
+    module_names += ["tests.porcelain"] + ["tests.porcelain.test_" + name for name in porcelain_names]
     loader = unittest.TestLoader()
     return loader.loadTestsFromNames(module_names)
 

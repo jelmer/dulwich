@@ -297,26 +297,26 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from ._typing import Buffer
+from .._typing import Buffer
 
 if TYPE_CHECKING:
     import urllib3
 
-    from .filter_branch import CommitData
-    from .gc import GCStats
-    from .maintenance import MaintenanceResult
+    from ..filter_branch import CommitData
+    from ..gc import GCStats
+    from ..maintenance import MaintenanceResult
 
-from . import replace_me
-from .archive import tar_stream
-from .bisect import BisectState
-from .client import (
+from .. import replace_me
+from ..archive import tar_stream
+from ..bisect import BisectState
+from ..client import (
     FetchPackResult,
     LsRemoteResult,
     SendPackResult,
     get_transport_and_path,
 )
-from .config import Config, ConfigFile, StackedConfig, read_submodules
-from .diff_tree import (
+from ..config import Config, ConfigFile, StackedConfig, read_submodules
+from ..diff_tree import (
     CHANGE_ADD,
     CHANGE_COPY,
     CHANGE_DELETE,
@@ -326,10 +326,10 @@ from .diff_tree import (
     TreeChange,
     tree_changes,
 )
-from .errors import SendPackError
-from .graph import can_fast_forward
-from .ignore import IgnoreFilterManager
-from .index import (
+from ..errors import SendPackError
+from ..graph import can_fast_forward
+from ..ignore import IgnoreFilterManager
+from ..index import (
     ConflictedIndexEntry,
     Index,
     IndexEntry,
@@ -345,8 +345,8 @@ from .index import (
     validate_path_element_hfs,
     validate_path_element_ntfs,
 )
-from .object_store import BaseObjectStore, tree_lookup_path
-from .objects import (
+from ..object_store import BaseObjectStore, tree_lookup_path
+from ..objects import (
     Blob,
     Commit,
     ObjectID,
@@ -357,23 +357,23 @@ from .objects import (
     parse_timezone,
     pretty_format_tree_entry,
 )
-from .objectspec import (
+from ..objectspec import (
     parse_commit,
     parse_object,
     parse_ref,
     parse_reftuples,
     parse_tree,
 )
-from .pack import UnpackedObject, write_pack_from_container, write_pack_index
-from .patch import (
+from ..pack import UnpackedObject, write_pack_from_container, write_pack_index
+from ..patch import (
     MailinfoResult,
     get_summary,
     write_commit_patch,
     write_object_diff,
     write_tree_diff,
 )
-from .protocol import ZERO_SHA, Protocol
-from .refs import (
+from ..protocol import ZERO_SHA, Protocol
+from ..refs import (
     HEADREF,
     LOCAL_BRANCH_PREFIX,
     LOCAL_NOTES_PREFIX,
@@ -391,20 +391,20 @@ from .refs import (
     parse_remote_ref,
     shorten_ref_name,
 )
-from .repo import BaseRepo, Repo, get_user_identity
-from .server import (
+from ..repo import BaseRepo, Repo, get_user_identity
+from ..server import (
     FileSystemBackend,
     ReceivePackHandler,
     TCPGitServer,
     UploadPackHandler,
 )
-from .server import update_server_info as server_update_server_info
-from .sparse_patterns import (
+from ..server import update_server_info as server_update_server_info
+from ..sparse_patterns import (
     SparseCheckoutConflictError,
     apply_included_paths,
     determine_included_paths,
 )
-from .trailers import add_trailer_to_message, format_trailers, parse_trailers
+from ..trailers import add_trailer_to_message, format_trailers, parse_trailers
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -1251,7 +1251,7 @@ def stripspace(
         >>> stripspace(b"line\\n", comment_lines=True)
         b'# line\\n'
     """
-    from .stripspace import stripspace as _stripspace
+    from ..stripspace import stripspace as _stripspace
 
     # Convert text to bytes
     if isinstance(text, str):
@@ -1393,7 +1393,7 @@ def clone(
 
     if isinstance(source, Repo):
         # For direct repo cloning, use LocalGitClient
-        from .client import GitClient, LocalGitClient
+        from ..client import GitClient, LocalGitClient
 
         client: GitClient = LocalGitClient(config=config)
         path = source.path
@@ -1923,7 +1923,7 @@ def show_commit(
       decode: Function for decoding bytes to unicode string
       outstream: Stream to write to
     """
-    from .diff import ColorizedDiffStream
+    from ..diff import ColorizedDiffStream
 
     # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
     class _StreamWrapper:
@@ -2215,7 +2215,7 @@ def diff(
       diff_algorithm: Algorithm to use for diffing ("myers" or "patience"),
                       defaults to the underlying function's default if None
     """
-    from . import diff as diff_module
+    from .. import diff as diff_module
 
     with open_repo_closing(repo) as r:
         # Normalize paths to bytes
@@ -2379,7 +2379,7 @@ def submodule_list(repo: RepoPath) -> Iterator[tuple[str, str]]:
     Args:
       repo: Path to repository
     """
-    from .submodule import iter_cached_submodules
+    from ..submodule import iter_cached_submodules
 
     with open_repo_closing(repo) as r:
         head_commit = r[r.head()]
@@ -2406,7 +2406,7 @@ def submodule_update(
       recursive: If True, recursively update nested submodules
       errstream: Error stream for error messages
     """
-    from .submodule import iter_cached_submodules
+    from ..submodule import iter_cached_submodules
 
     with open_repo_closing(repo) as r:
         if init:
@@ -2432,7 +2432,7 @@ def submodule_update(
                 path.decode(DEFAULT_ENCODING) if isinstance(path, bytes) else path
             )
 
-            # Find the submodule name from .gitmodules
+            # Find the submodule name from ..gitmodules
             submodule_name: bytes | None = None
             for sm_path, sm_url, sm_name in read_submodules(gitmodules_path):
                 if sm_path == path:
@@ -2979,7 +2979,7 @@ def reset(
 
         elif mode == "mixed":
             # Mixed reset: update HEAD and index, but leave working tree unchanged
-            from .object_store import iter_tree_contents
+            from ..object_store import iter_tree_contents
 
             # Open the index
             index = r.open_index()
@@ -3234,7 +3234,7 @@ def push(
         return result
 
     # Trigger auto GC if needed
-    from .gc import maybe_auto_gc
+    from ..gc import maybe_auto_gc
 
     with open_repo_closing(repo) as r:
         maybe_auto_gc(r)
@@ -3402,7 +3402,7 @@ def pull(
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 
     # Trigger auto GC if needed
-    from .gc import maybe_auto_gc
+    from ..gc import maybe_auto_gc
 
     with open_repo_closing(repo) as r:
         maybe_auto_gc(r)
@@ -3727,7 +3727,7 @@ def grep(
       max_depth: Maximum directory depth to search
       respect_ignores: Whether to respect .gitignore patterns
     """
-    from .object_store import iter_tree_contents
+    from ..object_store import iter_tree_contents
 
     # Compile the pattern
     flags = re.IGNORECASE if ignore_case else 0
@@ -3898,7 +3898,7 @@ def web_daemon(
       address: Optional address to listen on (defaults to ::)
       port: Optional port to listen on (defaults to 80)
     """
-    from .web import (
+    from ..web import (
         WSGIRequestHandlerLogger,
         WSGIServerLogger,
         make_server,
@@ -4492,7 +4492,7 @@ def fetch(
             )
 
     # Trigger auto GC if needed
-    from .gc import maybe_auto_gc
+    from ..gc import maybe_auto_gc
 
     with open_repo_closing(repo) as r:
         maybe_auto_gc(r)
@@ -4685,7 +4685,7 @@ def show_branch(
     Returns:
       List of output lines
     """
-    from .graph import find_octopus_base, independent
+    from ..graph import find_octopus_base, independent
 
     output_lines: list[str] = []
 
@@ -5624,7 +5624,7 @@ def restore(
         raise ValueError("At least one of staged or worktree must be True")
 
     with open_repo_closing(repo) as r:
-        from .index import _fs_to_tree_path, build_file_from_blob
+        from ..index import _fs_to_tree_path, build_file_from_blob
 
         # Determine the source tree
         if source is None:
@@ -5636,7 +5636,7 @@ def restore(
                     raise CheckoutError("No HEAD reference found")
             elif worktree:
                 # Restoring worktree files from index
-                from .index import ConflictedIndexEntry, IndexEntry
+                from ..index import ConflictedIndexEntry, IndexEntry
 
                 index = r.open_index()
                 for path in paths:
@@ -5699,7 +5699,7 @@ def restore(
 
             if staged:
                 # Update the index with the blob from source
-                from .index import IndexEntry
+                from ..index import IndexEntry
 
                 index = r.open_index()
 
@@ -5721,7 +5721,7 @@ def restore(
                     )
                 else:
                     # If we also updated worktree, use actual stat
-                    from .index import index_entry_from_stat
+                    from ..index import index_entry_from_stat
 
                     st = os.lstat(full_path)
                     new_entry = index_entry_from_stat(st, sha, mode)
@@ -6033,7 +6033,7 @@ def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:
     Returns: Canonical contact data
     """
     with open_repo_closing(repo) as r:
-        from .mailmap import Mailmap
+        from ..mailmap import Mailmap
 
         try:
             mailmap = Mailmap.from_path(os.path.join(r.path, ".mailmap"))
@@ -6079,7 +6079,7 @@ def stash_list(
 ) -> Iterator[tuple[int, tuple[bytes, bytes]]]:
     """List all stashes in a repository."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         entries = stash.stashes()
@@ -6090,7 +6090,7 @@ def stash_list(
 def stash_push(repo: str | os.PathLike[str] | Repo) -> None:
     """Push a new stash onto the stack."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         stash.push()
@@ -6099,7 +6099,7 @@ def stash_push(repo: str | os.PathLike[str] | Repo) -> None:
 def stash_pop(repo: str | os.PathLike[str] | Repo) -> None:
     """Pop a stash from the stack."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         stash.pop(0)
@@ -6108,7 +6108,7 @@ def stash_pop(repo: str | os.PathLike[str] | Repo) -> None:
 def stash_drop(repo: str | os.PathLike[str] | Repo, index: int) -> None:
     """Drop a stash from the stack."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         stash.drop(index)
@@ -6308,8 +6308,8 @@ def _do_merge(
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
       if no_commit=True or there were conflicts
     """
-    from .graph import find_merge_base
-    from .merge import recursive_merge
+    from ..graph import find_merge_base
+    from ..merge import recursive_merge
 
     # Get HEAD commit
     try:
@@ -6429,8 +6429,8 @@ def _do_octopus_merge(
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
       if no_commit=True or there were conflicts
     """
-    from .graph import find_octopus_base
-    from .merge import octopus_merge
+    from ..graph import find_octopus_base
+    from ..merge import octopus_merge
 
     # Get HEAD commit
     try:
@@ -6604,7 +6604,7 @@ def merge(
             )
 
         # Trigger auto GC if needed
-        from .gc import maybe_auto_gc
+        from ..gc import maybe_auto_gc
 
         maybe_auto_gc(r)
 
@@ -6623,7 +6623,7 @@ def unpack_objects(
     Returns:
       Number of objects unpacked
     """
-    from .pack import Pack
+    from ..pack import Pack
 
     with open_repo_closing(target) as r:
         pack_basename = os.path.splitext(pack_path)[0]
@@ -6661,7 +6661,7 @@ def merge_tree(
     Raises:
       KeyError: If any of the tree-ish arguments cannot be resolved
     """
-    from .merge import Merger
+    from ..merge import Merger
 
     with open_repo_closing(repo) as r:
         # Resolve tree-ish arguments to actual trees
@@ -6702,7 +6702,7 @@ def cherry(
         '+' means commit is not in upstream, '-' means equivalent patch exists upstream
         message is None unless verbose=True
     """
-    from .patch import commit_patch_id
+    from ..patch import commit_patch_id
 
     with open_repo_closing(repo) as r:
         # Resolve upstream
@@ -6841,7 +6841,7 @@ def cherry_pick(  # noqa: D417
     Raises:
       Error: If there is no HEAD reference, commit cannot be found, or operation fails
     """
-    from .merge import three_way_merge
+    from ..merge import three_way_merge
 
     # Validate that committish is provided when needed
     if not (continue_ or abort) and committish is None:
@@ -7021,7 +7021,7 @@ def revert(
     Raises:
       Error: If revert fails due to conflicts or other issues
     """
-    from .merge import three_way_merge
+    from ..merge import three_way_merge
 
     # Normalize commits to a list
     if isinstance(commits, (str, bytes, Commit, Tag)):
@@ -7167,7 +7167,7 @@ def gc(
     Returns:
       GCStats object with garbage collection statistics
     """
-    from .gc import garbage_collect
+    from ..gc import garbage_collect
 
     with open_repo_closing(repo) as r:
         return garbage_collect(
@@ -7224,7 +7224,7 @@ def maintenance_run(
     Returns:
       MaintenanceResult object with task execution results
     """
-    from .maintenance import run_maintenance
+    from ..maintenance import run_maintenance
 
     with open_repo_closing(repo) as r:
         return run_maintenance(r, tasks=tasks, auto=auto, progress=progress)
@@ -7239,7 +7239,7 @@ def maintenance_register(repo: RepoPath) -> None:
     Args:
       repo: Path to the repository or repository object
     """
-    from .maintenance import register_repository
+    from ..maintenance import register_repository
 
     with open_repo_closing(repo) as r:
         register_repository(r)
@@ -7254,7 +7254,7 @@ def maintenance_unregister(repo: RepoPath, force: bool = False) -> None:
       repo: Path to the repository or repository object
       force: If True, don't error if repository is not registered
     """
-    from .maintenance import unregister_repository
+    from ..maintenance import unregister_repository
 
     with open_repo_closing(repo) as r:
         unregister_repository(r, force=force)
@@ -7278,7 +7278,7 @@ def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsRe
         loose_size = 0
         for sha in object_store._iter_loose_objects():
             loose_count += 1
-            from .object_store import DiskObjectStore
+            from ..object_store import DiskObjectStore
 
             assert isinstance(object_store, DiskObjectStore)
             path = object_store._get_shafile_path(sha)
@@ -7378,16 +7378,16 @@ def rebase(
     Raises:
       Error: If rebase fails or conflicts occur
     """
-    # TODO: Avoid importing from .cli
-    from .cli import launch_editor
-    from .rebase import (
+    # TODO: Avoid importing from ..cli
+    from ..cli import launch_editor
+    from ..rebase import (
         RebaseConflict,
         RebaseError,
         Rebaser,
         process_interactive_rebase,
         start_interactive,
     )
-    from .rebase import (
+    from ..rebase import (
         edit_todo as edit_todo_func,
     )
 
@@ -7506,7 +7506,7 @@ def annotate(
     """
     if committish is None:
         committish = "HEAD"
-    from .annotate import annotate_lines
+    from ..annotate import annotate_lines
 
     with open_repo_closing(repo) as r:
         commit_id = parse_commit(r, committish).id
@@ -7575,7 +7575,7 @@ def filter_branch(
     Raises:
       Error: If branch is already filtered and force is False
     """
-    from .filter_branch import CommitFilter, filter_refs
+    from ..filter_branch import CommitFilter, filter_refs
 
     with open_repo_closing(repo) as r:
         # Parse branch/committish
@@ -8038,7 +8038,7 @@ def reflog(
     """
     import os
 
-    from .reflog import iter_reflogs
+    from ..reflog import iter_reflogs
 
     if isinstance(ref, str):
         ref = ref.encode("utf-8")
@@ -8079,7 +8079,7 @@ def reflog_expire(
     import os
     import time
 
-    from .reflog import expire_reflog, iter_reflogs
+    from ..reflog import expire_reflog, iter_reflogs
 
     if not all and ref is None:
         raise ValueError("Must specify either ref or all=True")
@@ -8109,7 +8109,7 @@ def reflog_expire(
         # Build set of reachable objects if we have unreachable expiration time
         reachable_objects: set[ObjectID] | None = None
         if expire_unreachable_time is not None:
-            from .gc import find_reachable_objects
+            from ..gc import find_reachable_objects
 
             reachable_objects = find_reachable_objects(
                 r.object_store, r.refs, include_reflogs=False
@@ -8132,7 +8132,7 @@ def reflog_expire(
             if dry_run:
                 # For dry run, just read and count what would be expired
                 with open(reflog_path, "rb") as f:
-                    from .reflog import read_reflog
+                    from ..reflog import read_reflog
 
                     count = 0
                     for entry in read_reflog(f):
@@ -8182,7 +8182,7 @@ def reflog_delete(
     """
     import os
 
-    from .reflog import drop_reflog_entry
+    from ..reflog import drop_reflog_entry
 
     if isinstance(ref, str):
         ref = ref.encode("utf-8")
@@ -8210,7 +8210,7 @@ def lfs_track(
     Returns:
       List of tracked patterns
     """
-    from .attrs import GitAttributes
+    from ..attrs import GitAttributes
 
     with open_repo_closing(repo) as r:
         gitattributes_path = os.path.join(r.path, ".gitattributes")
@@ -8262,7 +8262,7 @@ def lfs_untrack(
     Returns:
       List of remaining tracked patterns
     """
-    from .attrs import GitAttributes
+    from ..attrs import GitAttributes
 
     if not patterns:
         return lfs_track(repo)
@@ -8307,7 +8307,7 @@ def lfs_init(repo: str | os.PathLike[str] | Repo = ".") -> None:
     Returns:
       None
     """
-    from .lfs import LFSStore
+    from ..lfs import LFSStore
 
     with open_repo_closing(repo) as r:
         # Create LFS store
@@ -8335,7 +8335,7 @@ def lfs_clean(
     Returns:
       LFS pointer content as bytes
     """
-    from .lfs import LFSFilterDriver, LFSStore
+    from ..lfs import LFSFilterDriver, LFSStore
 
     with open_repo_closing(repo) as r:
         if path is None:
@@ -8367,7 +8367,7 @@ def lfs_smudge(
     Returns:
       Actual file content as bytes
     """
-    from .lfs import LFSFilterDriver, LFSStore
+    from ..lfs import LFSFilterDriver, LFSStore
 
     with open_repo_closing(repo) as r:
         if pointer_content is None:
@@ -8394,8 +8394,8 @@ def lfs_ls_files(
     Returns:
       List of (path, oid, size) tuples for LFS files
     """
-    from .lfs import LFSPointer
-    from .object_store import iter_tree_contents
+    from ..lfs import LFSPointer
+    from ..object_store import iter_tree_contents
 
     with open_repo_closing(repo) as r:
         if ref is None:
@@ -8450,7 +8450,7 @@ def lfs_migrate(
     Returns:
       Number of migrated files
     """
-    from .lfs import LFSFilterDriver, LFSStore
+    from ..lfs import LFSFilterDriver, LFSStore
 
     with open_repo_closing(repo) as r:
         # Initialize LFS if needed
@@ -8548,7 +8548,7 @@ def lfs_pointer_check(
     Returns:
       Dict mapping paths to LFSPointer objects (or None if not a pointer)
     """
-    from .lfs import LFSPointer
+    from ..lfs import LFSPointer
 
     with open_repo_closing(repo) as r:
         results = {}
@@ -8589,7 +8589,7 @@ def lfs_fetch(
     Returns:
       Number of objects fetched
     """
-    from .lfs import LFSClient, LFSPointer, LFSStore
+    from ..lfs import LFSClient, LFSPointer, LFSStore
 
     with open_repo_closing(repo) as r:
         # Get LFS server URL from config
@@ -8675,7 +8675,7 @@ def lfs_pull(repo: str | os.PathLike[str] | Repo = ".", remote: str = "origin") 
     Returns:
       Number of objects fetched
     """
-    from .lfs import LFSPointer, LFSStore
+    from ..lfs import LFSPointer, LFSStore
 
     with open_repo_closing(repo) as r:
         # First do a fetch for HEAD
@@ -8721,7 +8721,7 @@ def lfs_push(
     Returns:
       Number of objects pushed
     """
-    from .lfs import LFSClient, LFSPointer, LFSStore
+    from ..lfs import LFSClient, LFSPointer, LFSStore
 
     with open_repo_closing(repo) as r:
         # Get LFS server URL from config
@@ -8809,7 +8809,7 @@ def lfs_status(repo: str | os.PathLike[str] | Repo = ".") -> dict[str, list[str]
     Returns:
       Dict with status information
     """
-    from .lfs import LFSPointer, LFSStore
+    from ..lfs import LFSPointer, LFSStore
 
     with open_repo_closing(repo) as r:
         store = LFSStore.from_repo(r)
@@ -8873,7 +8873,7 @@ def worktree_list(repo: RepoPath = ".") -> list[Any]:
     Returns:
         List of WorkTreeInfo objects
     """
-    from .worktree import list_worktrees
+    from ..worktree import list_worktrees
 
     with open_repo_closing(repo) as r:
         return list_worktrees(r)
@@ -8900,7 +8900,7 @@ def worktree_add(
     Returns:
         Path to the newly created worktree
     """
-    from .worktree import add_worktree
+    from ..worktree import add_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree add")
@@ -8926,7 +8926,7 @@ def worktree_remove(
         path: Path to worktree to remove
         force: Force removal even if there are local changes
     """
-    from .worktree import remove_worktree
+    from ..worktree import remove_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree remove")
@@ -8948,7 +8948,7 @@ def worktree_prune(
     Returns:
         List of pruned worktree names
     """
-    from .worktree import prune_worktrees
+    from ..worktree import prune_worktrees
 
     with open_repo_closing(repo) as r:
         return prune_worktrees(r, expire=expire, dry_run=dry_run)
@@ -8966,7 +8966,7 @@ def worktree_lock(
         path: Path to worktree to lock
         reason: Optional reason for locking
     """
-    from .worktree import lock_worktree
+    from ..worktree import lock_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree lock")
@@ -8984,7 +8984,7 @@ def worktree_unlock(
         repo: Path to repository
         path: Path to worktree to unlock
     """
-    from .worktree import unlock_worktree
+    from ..worktree import unlock_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree unlock")
@@ -9005,7 +9005,7 @@ def worktree_move(
         old_path: Current path of worktree
         new_path: New path for worktree
     """
-    from .worktree import move_worktree
+    from ..worktree import move_worktree
 
     if old_path is None or new_path is None:
         raise ValueError("Both old_path and new_path are required for worktree move")
@@ -9028,7 +9028,7 @@ def worktree_repair(
     Returns:
         List of repaired worktree paths
     """
-    from .worktree import repair_worktree
+    from ..worktree import repair_worktree
 
     with open_repo_closing(repo) as r:
         return repair_worktree(r, paths=paths)
@@ -9051,8 +9051,8 @@ def merge_base(
     Returns:
         List of commit IDs that are merge bases
     """
-    from .graph import find_merge_base, find_octopus_base
-    from .objectspec import parse_object
+    from ..graph import find_merge_base, find_octopus_base
+    from ..objectspec import parse_object
 
     if committishes is None or len(committishes) < 2:
         raise ValueError("At least two commits are required")
@@ -9093,8 +9093,8 @@ def is_ancestor(
     Returns:
         True if ancestor is an ancestor of descendant, False otherwise
     """
-    from .graph import find_merge_base
-    from .objectspec import parse_object
+    from ..graph import find_merge_base
+    from ..objectspec import parse_object
 
     if ancestor is None or descendant is None:
         raise ValueError("Both ancestor and descendant are required")
@@ -9128,8 +9128,8 @@ def independent_commits(
     Returns:
         List of commit IDs that are not ancestors of any other commits in the list
     """
-    from .graph import independent
-    from .objectspec import parse_object
+    from ..graph import independent
+    from ..objectspec import parse_object
 
     if committishes is None or len(committishes) == 0:
         return []
@@ -9176,7 +9176,7 @@ def mailsplit(
         ValueError: If output_dir doesn't exist or input is invalid
         OSError: If there are issues reading/writing files
     """
-    from .mbox import split_maildir, split_mbox
+    from ..mbox import split_maildir, split_mbox
 
     if is_maildir:
         if input_path is None:
@@ -9258,7 +9258,7 @@ def mailinfo(
         >>> print(f"Author: {result.author_name} <{result.author_email}>")
         >>> print(f"Subject: {result.subject}")
     """
-    from .mbox import mailinfo as mbox_mailinfo
+    from ..mbox import mailinfo as mbox_mailinfo
 
     if input_path is None:
         # Read from stdin
@@ -9316,7 +9316,7 @@ def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
         - List of tuples (path, conflict_id) for recorded conflicts
         - List of paths where resolutions were automatically applied
     """
-    from .rerere import _has_conflict_markers, rerere_auto
+    from ..rerere import _has_conflict_markers, rerere_auto
 
     with open_repo_closing(repo) as r:
         # Get conflicts from the index (if available)
@@ -9355,7 +9355,7 @@ def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
     Returns:
         List of tuples (conflict_id, has_resolution)
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9374,7 +9374,7 @@ def rerere_diff(
     Returns:
         List of tuples (conflict_id, preimage, postimage)
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9401,7 +9401,7 @@ def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> 
         repo: Path to the repository
         pathspec: Path to forget (currently not implemented, forgets all)
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9421,7 +9421,7 @@ def rerere_clear(repo: RepoPath = ".") -> None:
     Args:
         repo: Path to the repository
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9435,7 +9435,7 @@ def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
         repo: Path to the repository
         max_age_days: Maximum age in days for keeping resolutions
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)

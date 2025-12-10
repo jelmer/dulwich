@@ -130,7 +130,6 @@ from .protocol import (
     SIDE_BAND_CHANNEL_PROGRESS,
     SINGLE_ACK,
     TCP_GIT_PORT,
-    ZERO_SHA,
     BufferedPktLineWriter,
     Protocol,
     ReceivableProtocol,
@@ -878,12 +877,12 @@ class _ProtocolGraphWalker:
         """Acknowledge a have reference.
 
         Args:
-          have_ref: SHA to acknowledge (40 bytes hex)
+          have_ref: SHA to acknowledge (40 bytes hex for SHA-1, 64 bytes for SHA-256)
 
         Raises:
-          ValueError: If have_ref is not 40 bytes
+          ValueError: If have_ref is not a valid length
         """
-        if len(have_ref) != 40:
+        if len(have_ref) not in (40, 64):
             raise ValueError(f"invalid sha {have_ref!r}")
         assert self._impl is not None
         return self._impl.ack(have_ref)
@@ -1339,9 +1338,10 @@ class ReceivePackHandler(PackHandler):
             ObjectFormatException,
         )
         will_send_pack = False
+        zero_sha = ObjectID(b"0" * self.repo.object_format.hex_length)
 
         for command in refs:
-            if command[1] != ZERO_SHA:
+            if command[1] != zero_sha:
                 will_send_pack = True
 
         if will_send_pack:
@@ -1363,7 +1363,7 @@ class ReceivePackHandler(PackHandler):
         for oldsha, sha, ref in refs:
             ref_status = b"ok"
             try:
-                if sha == ZERO_SHA:
+                if sha == zero_sha:
                     if CAPABILITY_DELETE_REFS not in self.capabilities():
                         raise GitProtocolError(
                             "Attempted to delete refs without delete-refs capability."
@@ -1436,7 +1436,8 @@ class ReceivePackHandler(PackHandler):
             symrefs = sorted(self.repo.refs.get_symrefs().items())
 
             if not refs:
-                refs = [(CAPABILITIES_REF, ZERO_SHA)]
+                zero_sha = ObjectID(b"0" * self.repo.object_format.hex_length)
+                refs = [(CAPABILITIES_REF, zero_sha)]
             logger.info("Sending capabilities: %s", self.capabilities())
             self.proto.write_pkt_line(
                 format_ref_line(

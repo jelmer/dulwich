@@ -32,8 +32,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from _hashlib import HASH
 
-    from .objects import ObjectID, RawObjectID
-
 
 class ObjectFormat:
     """Object format (hash algorithm) used in Git."""
@@ -41,6 +39,7 @@ class ObjectFormat:
     def __init__(
         self,
         name: str,
+        type_num: int,
         oid_length: int,
         hex_length: int,
         hash_func: Callable[[], "HASH"],
@@ -49,18 +48,16 @@ class ObjectFormat:
 
         Args:
             name: Name of the format (e.g., "sha1", "sha256")
+            type_num: Format type number used in Git
             oid_length: Length of the binary object ID in bytes
             hex_length: Length of the hexadecimal object ID in characters
             hash_func: Hash function from hashlib
         """
         self.name = name
+        self.type_num = type_num
         self.oid_length = oid_length
         self.hex_length = hex_length
         self.hash_func = hash_func
-        # Type annotations for proper ObjectID/RawObjectID types
-        # These are bytes at runtime but typed as NewType wrappers for type safety
-        self.zero_oid: ObjectID = b"0" * hex_length  # type: ignore[assignment]
-        self.zero_oid_bin: RawObjectID = b"\x00" * oid_length  # type: ignore[assignment]
 
     def __str__(self) -> str:
         """Return string representation."""
@@ -102,13 +99,21 @@ class ObjectFormat:
 
 
 # Define the supported object formats
-SHA1 = ObjectFormat("sha1", 20, 40, sha1)
-SHA256 = ObjectFormat("sha256", 32, 64, sha256)
+SHA1 = ObjectFormat("sha1", type_num=1, oid_length=20, hex_length=40, hash_func=sha1)
+SHA256 = ObjectFormat(
+    "sha256", type_num=20, oid_length=32, hex_length=64, hash_func=sha256
+)
 
 # Map of format names to ObjectFormat instances
 OBJECT_FORMATS = {
     "sha1": SHA1,
     "sha256": SHA256,
+}
+
+# Map of format numbers to ObjectFormat instances
+OBJECT_FORMAT_TYPE_NUMS = {
+    1: SHA1,
+    2: SHA256,
 }
 
 # Default format for backward compatibility

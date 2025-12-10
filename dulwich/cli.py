@@ -1598,10 +1598,19 @@ class cmd_dump_pack(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("filename", help="Pack file to dump")
+        parser.add_argument(
+            "--object-format",
+            choices=["sha1", "sha256"],
+            default="sha1",
+            help="Object format (hash algorithm) used in the pack file",
+        )
         parsed_args = parser.parse_args(args)
 
+        from .object_format import OBJECT_FORMAT_NAMES
+
+        object_format = OBJECT_FORMAT_NAMES[parsed_args.object_format]
         basename, _ = os.path.splitext(parsed_args.filename)
-        x = Pack(basename)
+        x = Pack(basename, object_format=object_format)
         logger.info("Object names checksum: %s", x.name().decode("ascii", "replace"))
         logger.info("Checksum: %r", sha_to_hex(RawObjectID(x.get_stored_checksum())))
         x.check()

@@ -29,8 +29,8 @@ from io import BytesIO
 from dulwich import porcelain
 from dulwich.repo import Repo
 
-from . import TestCase
-from .compat.utils import rmtree_ro
+from .. import TestCase
+from ..compat.utils import rmtree_ro
 
 
 class PorcelainFilterTests(TestCase):

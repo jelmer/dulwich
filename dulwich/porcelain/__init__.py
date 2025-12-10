@@ -297,26 +297,26 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
-from ._typing import Buffer
+from .._typing import Buffer
 
 if TYPE_CHECKING:
     import urllib3
 
-    from .filter_branch import CommitData
-    from .gc import GCStats
-    from .maintenance import MaintenanceResult
+    from ..filter_branch import CommitData
+    from ..gc import GCStats
+    from ..maintenance import MaintenanceResult
 
-from . import replace_me
-from .archive import tar_stream
-from .bisect import BisectState
-from .client import (
+from .. import replace_me
+from ..archive import tar_stream
+from ..bisect import BisectState
+from ..client import (
     FetchPackResult,
     LsRemoteResult,
     SendPackResult,
     get_transport_and_path,
 )
-from .config import Config, ConfigFile, StackedConfig, read_submodules
-from .diff_tree import (
+from ..config import Config, StackedConfig
+from ..diff_tree import (
     CHANGE_ADD,
     CHANGE_COPY,
     CHANGE_DELETE,
@@ -326,27 +326,25 @@ from .diff_tree import (
     TreeChange,
     tree_changes,
 )
-from .errors import SendPackError
-from .graph import can_fast_forward
-from .ignore import IgnoreFilterManager
-from .index import (
+from ..errors import SendPackError
+from ..graph import can_fast_forward
+from ..ignore import IgnoreFilterManager
+from ..index import (
     ConflictedIndexEntry,
     Index,
     IndexEntry,
     _fs_to_tree_path,
     blob_from_path_and_stat,
     build_file_from_blob,
-    build_index_from_tree,
     get_unstaged_changes,
-    index_entry_from_stat,
     symlink,
     update_working_tree,
     validate_path_element_default,
     validate_path_element_hfs,
     validate_path_element_ntfs,
 )
-from .object_store import BaseObjectStore, tree_lookup_path
-from .objects import (
+from ..object_store import BaseObjectStore, tree_lookup_path
+from ..objects import (
     Blob,
     Commit,
     ObjectID,
@@ -357,26 +355,25 @@ from .objects import (
     parse_timezone,
     pretty_format_tree_entry,
 )
-from .objectspec import (
+from ..objectspec import (
     parse_commit,
     parse_object,
     parse_ref,
     parse_reftuples,
     parse_tree,
 )
-from .pack import UnpackedObject, write_pack_from_container, write_pack_index
-from .patch import (
+from ..pack import UnpackedObject, write_pack_from_container, write_pack_index
+from ..patch import (
     MailinfoResult,
     get_summary,
     write_commit_patch,
     write_object_diff,
     write_tree_diff,
 )
-from .protocol import ZERO_SHA, Protocol
-from .refs import (
+from ..protocol import ZERO_SHA, Protocol
+from ..refs import (
     HEADREF,
     LOCAL_BRANCH_PREFIX,
-    LOCAL_NOTES_PREFIX,
     LOCAL_REMOTE_PREFIX,
     LOCAL_REPLACE_PREFIX,
     LOCAL_TAG_PREFIX,
@@ -387,24 +384,50 @@ from .refs import (
     filter_ref_prefix,
     local_branch_name,
     local_replace_name,
-    local_tag_name,
     parse_remote_ref,
     shorten_ref_name,
 )
-from .repo import BaseRepo, Repo, get_user_identity
-from .server import (
+from ..repo import BaseRepo, Repo, get_user_identity
+from ..server import (
     FileSystemBackend,
     ReceivePackHandler,
     TCPGitServer,
     UploadPackHandler,
 )
-from .server import update_server_info as server_update_server_info
-from .sparse_patterns import (
+from ..server import update_server_info as server_update_server_info
+from ..sparse_patterns import (
     SparseCheckoutConflictError,
     apply_included_paths,
     determine_included_paths,
 )
-from .trailers import add_trailer_to_message, format_trailers, parse_trailers
+from ..trailers import add_trailer_to_message, format_trailers, parse_trailers
+from .lfs import (
+    lfs_clean,
+    lfs_fetch,
+    lfs_init,
+    lfs_ls_files,
+    lfs_migrate,
+    lfs_pointer_check,
+    lfs_pull,
+    lfs_push,
+    lfs_smudge,
+    lfs_status,
+    lfs_track,
+    lfs_untrack,
+)
+from .notes import (
+    notes_add,
+    notes_list,
+    notes_remove,
+    notes_show,
+)
+from .submodule import (
+    submodule_add,
+    submodule_init,
+    submodule_list,
+    submodule_update,
+)
+from .tag import tag_create, tag_delete, tag_list, verify_tag
 
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
@@ -1251,7 +1274,7 @@ def stripspace(
         >>> stripspace(b"line\\n", comment_lines=True)
         b'# line\\n'
     """
-    from .stripspace import stripspace as _stripspace
+    from ..stripspace import stripspace as _stripspace
 
     # Convert text to bytes
     if isinstance(text, str):
@@ -1393,7 +1416,7 @@ def clone(
 
     if isinstance(source, Repo):
         # For direct repo cloning, use LocalGitClient
-        from .client import GitClient, LocalGitClient
+        from ..client import GitClient, LocalGitClient
 
         client: GitClient = LocalGitClient(config=config)
         path = source.path
@@ -1923,7 +1946,7 @@ def show_commit(
       decode: Function for decoding bytes to unicode string
       outstream: Stream to write to
     """
-    from .diff import ColorizedDiffStream
+    from ..diff import ColorizedDiffStream
 
     # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
     class _StreamWrapper:
@@ -2215,7 +2238,7 @@ def diff(
       diff_algorithm: Algorithm to use for diffing ("myers" or "patience"),
                       defaults to the underlying function's default if None
     """
-    from . import diff as diff_module
+    from .. import diff as diff_module
 
     with open_repo_closing(repo) as r:
         # Normalize paths to bytes
@@ -2323,312 +2346,6 @@ def _canonical_part(url: str) -> str:
     return name
 
 
-def submodule_add(
-    repo: str | os.PathLike[str] | Repo,
-    url: str,
-    path: str | os.PathLike[str] | None = None,
-    name: str | None = None,
-) -> None:
-    """Add a new submodule.
-
-    Args:
-      repo: Path to repository
-      url: URL of repository to add as submodule
-      path: Path where submodule should live
-      name: Name for the submodule
-    """
-    with open_repo_closing(repo) as r:
-        if path is None:
-            path = os.path.relpath(_canonical_part(url), r.path)
-        if name is None:
-            name = os.fsdecode(path) if path is not None else None
-
-        if name is None:
-            raise Error("Submodule name must be specified or derivable from path")
-
-        # TODO(jelmer): Move this logic to dulwich.submodule
-        gitmodules_path = os.path.join(r.path, ".gitmodules")
-        try:
-            config = ConfigFile.from_path(gitmodules_path)
-        except FileNotFoundError:
-            config = ConfigFile()
-            config.path = gitmodules_path
-        config.set(("submodule", name), "url", url)
-        config.set(("submodule", name), "path", os.fsdecode(path))
-        config.write_to_path()
-
-
-def submodule_init(repo: str | os.PathLike[str] | Repo) -> None:
-    """Initialize submodules.
-
-    Args:
-      repo: Path to repository
-    """
-    with open_repo_closing(repo) as r:
-        config = r.get_config()
-        gitmodules_path = os.path.join(r.path, ".gitmodules")
-        for path, url, name in read_submodules(gitmodules_path):
-            config.set((b"submodule", name), b"active", True)
-            config.set((b"submodule", name), b"url", url)
-        config.write_to_path()
-
-
-def submodule_list(repo: RepoPath) -> Iterator[tuple[str, str]]:
-    """List submodules.
-
-    Args:
-      repo: Path to repository
-    """
-    from .submodule import iter_cached_submodules
-
-    with open_repo_closing(repo) as r:
-        head_commit = r[r.head()]
-        assert isinstance(head_commit, Commit)
-        for path, sha in iter_cached_submodules(r.object_store, head_commit.tree):
-            yield path.decode(DEFAULT_ENCODING), sha.decode(DEFAULT_ENCODING)
-
-
-def submodule_update(
-    repo: str | os.PathLike[str] | Repo,
-    paths: Sequence[str | bytes | os.PathLike[str]] | None = None,
-    init: bool = False,
-    force: bool = False,
-    recursive: bool = False,
-    errstream: BinaryIO | None = None,
-) -> None:
-    """Update submodules.
-
-    Args:
-      repo: Path to repository
-      paths: Optional list of specific submodule paths to update. If None, updates all.
-      init: If True, initialize submodules first
-      force: Force update even if local changes exist
-      recursive: If True, recursively update nested submodules
-      errstream: Error stream for error messages
-    """
-    from .submodule import iter_cached_submodules
-
-    with open_repo_closing(repo) as r:
-        if init:
-            submodule_init(r)
-
-        config = r.get_config()
-        gitmodules_path = os.path.join(r.path, ".gitmodules")
-
-        # Get list of submodules to update
-        submodules_to_update = []
-        head_commit = r[r.head()]
-        assert isinstance(head_commit, Commit)
-        for path, sha in iter_cached_submodules(r.object_store, head_commit.tree):
-            path_str = (
-                path.decode(DEFAULT_ENCODING) if isinstance(path, bytes) else path
-            )
-            if paths is None or path_str in paths:
-                submodules_to_update.append((path, sha))
-
-        # Read submodule configuration
-        for path, target_sha in submodules_to_update:
-            path_str = (
-                path.decode(DEFAULT_ENCODING) if isinstance(path, bytes) else path
-            )
-
-            # Find the submodule name from .gitmodules
-            submodule_name: bytes | None = None
-            for sm_path, sm_url, sm_name in read_submodules(gitmodules_path):
-                if sm_path == path:
-                    submodule_name = sm_name
-                    break
-
-            if not submodule_name:
-                continue
-
-            # Get the URL from config
-            section = (
-                b"submodule",
-                submodule_name
-                if isinstance(submodule_name, bytes)
-                else submodule_name.encode(),
-            )
-            try:
-                url_value = config.get(section, b"url")
-                if isinstance(url_value, bytes):
-                    url = url_value.decode(DEFAULT_ENCODING)
-                else:
-                    url = url_value
-            except KeyError:
-                # URL not in config, skip this submodule
-                continue
-
-            # Get or create the submodule repository paths
-            submodule_path = os.path.join(r.path, path_str)
-            submodule_git_dir = os.path.join(r.controldir(), "modules", path_str)
-
-            # Clone or fetch the submodule
-            if not os.path.exists(submodule_git_dir):
-                # Clone the submodule as bare repository
-                os.makedirs(os.path.dirname(submodule_git_dir), exist_ok=True)
-
-                # Clone to the git directory
-                sub_repo = clone(url, submodule_git_dir, bare=True, checkout=False)
-                sub_repo.close()
-
-                # Create the submodule directory if it doesn't exist
-                if not os.path.exists(submodule_path):
-                    os.makedirs(submodule_path)
-
-                # Create .git file in the submodule directory
-                relative_git_dir = os.path.relpath(submodule_git_dir, submodule_path)
-                git_file_path = os.path.join(submodule_path, ".git")
-                with open(git_file_path, "w") as f:
-                    f.write(f"gitdir: {relative_git_dir}\n")
-
-                # Set up working directory configuration
-                with open_repo_closing(submodule_git_dir) as sub_repo:
-                    sub_config = sub_repo.get_config()
-                    sub_config.set(
-                        (b"core",),
-                        b"worktree",
-                        os.path.abspath(submodule_path).encode(),
-                    )
-                    sub_config.write_to_path()
-
-                    # Checkout the target commit
-                    sub_repo.refs[HEADREF] = target_sha
-
-                    # Build the index and checkout files
-                    tree = sub_repo[target_sha]
-                    if hasattr(tree, "tree"):  # If it's a commit, get the tree
-                        tree_id = tree.tree
-                    else:
-                        tree_id = target_sha
-
-                    build_index_from_tree(
-                        submodule_path,
-                        sub_repo.index_path(),
-                        sub_repo.object_store,
-                        tree_id,
-                    )
-            else:
-                # Fetch and checkout in existing submodule
-                with open_repo_closing(submodule_git_dir) as sub_repo:
-                    # Fetch from remote
-                    client, path_segments = get_transport_and_path(url)
-                    client.fetch(path_segments.encode(), sub_repo)
-
-                    # Update to the target commit
-                    sub_repo.refs[HEADREF] = target_sha
-
-                    # Reset the working directory
-                    reset(sub_repo, "hard", target_sha)
-
-            # Recursively update nested submodules if requested
-            if recursive:
-                submodule_gitmodules = os.path.join(submodule_path, ".gitmodules")
-                if os.path.exists(submodule_gitmodules):
-                    submodule_update(
-                        submodule_path,
-                        paths=None,
-                        init=True,  # Always initialize nested submodules
-                        force=force,
-                        recursive=True,
-                        errstream=errstream,
-                    )
-
-
-def tag_create(
-    repo: RepoPath,
-    tag: str | bytes,
-    author: str | bytes | None = None,
-    message: str | bytes | None = None,
-    annotated: bool = False,
-    objectish: str | bytes = "HEAD",
-    tag_time: int | None = None,
-    tag_timezone: int | None = None,
-    sign: bool | None = None,
-    encoding: str = DEFAULT_ENCODING,
-) -> None:
-    """Creates a tag in git via dulwich calls.
-
-    Args:
-      repo: Path to repository
-      tag: tag string
-      author: tag author (optional, if annotated is set)
-      message: tag message (optional)
-      annotated: whether to create an annotated tag
-      objectish: object the tag should point at, defaults to HEAD
-      tag_time: Optional time for annotated tag
-      tag_timezone: Optional timezone for annotated tag
-      sign: GPG Sign the tag (bool, defaults to False,
-        pass True to use default GPG key,
-        pass a str containing Key ID to use a specific GPG key)
-      encoding: Encoding to use for tag messages
-    """
-    with open_repo_closing(repo) as r:
-        object = parse_object(r, objectish)
-
-        if isinstance(tag, str):
-            tag = tag.encode(encoding)
-
-        if annotated:
-            # Create the tag object
-            tag_obj = Tag()
-            if author is None:
-                author = get_user_identity(r.get_config_stack())
-            elif isinstance(author, str):
-                author = author.encode(encoding)
-            else:
-                assert isinstance(author, bytes)
-            tag_obj.tagger = author
-            if isinstance(message, str):
-                message = message.encode(encoding)
-            elif isinstance(message, bytes):
-                pass
-            else:
-                message = b""
-            tag_obj.message = message + "\n".encode(encoding)
-            tag_obj.name = tag
-            tag_obj.object = (type(object), object.id)
-            if tag_time is None:
-                tag_time = int(time.time())
-            tag_obj.tag_time = tag_time
-            if tag_timezone is None:
-                tag_timezone = get_user_timezones()[1]
-            elif isinstance(tag_timezone, str):
-                tag_timezone = parse_timezone(tag_timezone.encode())
-            tag_obj.tag_timezone = tag_timezone
-
-            # Check if we should sign the tag
-            config = r.get_config_stack()
-
-            if sign is None:
-                # Check tag.gpgSign configuration when sign is not explicitly set
-                try:
-                    should_sign = config.get_boolean(
-                        (b"tag",), b"gpgsign", default=False
-                    )
-                except KeyError:
-                    should_sign = False  # Default to not signing if no config
-            else:
-                should_sign = sign
-
-            # Get the signing key from config if signing is enabled
-            keyid = None
-            if should_sign:
-                try:
-                    keyid_bytes = config.get((b"user",), b"signingkey")
-                    keyid = keyid_bytes.decode() if keyid_bytes else None
-                except KeyError:
-                    keyid = None
-                tag_obj.sign(keyid)
-
-            r.object_store.add_object(tag_obj)
-            tag_id = tag_obj.id
-        else:
-            tag_id = object.id
-
-        r.refs[_make_tag_ref(tag)] = tag_id
-
-
 def verify_commit(
     repo: RepoPath,
     committish: str | bytes = "HEAD",
@@ -2651,209 +2368,6 @@ def verify_commit(
     with open_repo_closing(repo) as r:
         commit = parse_commit(r, committish)
         commit.verify(keyids)
-
-
-def verify_tag(
-    repo: RepoPath,
-    tagname: str | bytes,
-    keyids: list[str] | None = None,
-) -> None:
-    """Verify GPG signature on a tag.
-
-    Args:
-      repo: Path to repository
-      tagname: Name of tag to verify
-      keyids: Optional list of trusted key IDs. If provided, the tag
-        must be signed by one of these keys. If not provided, just verifies
-        that the tag has a valid signature.
-
-    Raises:
-      gpg.errors.BadSignatures: if GPG signature verification fails
-      gpg.errors.MissingSignatures: if tag was not signed by a key
-        specified in keyids
-    """
-    with open_repo_closing(repo) as r:
-        if isinstance(tagname, str):
-            tagname = tagname.encode()
-        tag_ref = _make_tag_ref(tagname)
-        tag_id = r.refs[tag_ref]
-        tag_obj = r[tag_id]
-        if not isinstance(tag_obj, Tag):
-            raise Error(f"{tagname!r} does not point to a tag object")
-        tag_obj.verify(keyids)
-
-
-def tag_list(repo: RepoPath, outstream: TextIO = sys.stdout) -> list[Ref]:
-    """List all tags.
-
-    Args:
-      repo: Path to repository
-      outstream: Stream to write tags to
-    """
-    with open_repo_closing(repo) as r:
-        tags: list[Ref] = sorted(r.refs.as_dict(Ref(b"refs/tags")))
-        return tags
-
-
-def tag_delete(repo: RepoPath, name: str | bytes) -> None:
-    """Remove a tag.
-
-    Args:
-      repo: Path to repository
-      name: Name of tag to remove
-    """
-    with open_repo_closing(repo) as r:
-        if isinstance(name, bytes):
-            names = [name]
-        elif isinstance(name, list):
-            names = name
-        else:
-            raise Error(f"Unexpected tag name type {name!r}")
-        for name in names:
-            del r.refs[_make_tag_ref(name)]
-
-
-def _make_notes_ref(name: bytes) -> bytes:
-    """Make a notes ref name."""
-    if name.startswith(b"refs/notes/"):
-        return name
-    return LOCAL_NOTES_PREFIX + name
-
-
-def notes_add(
-    repo: RepoPath,
-    object_sha: bytes,
-    note: bytes,
-    ref: bytes = b"commits",
-    author: bytes | None = None,
-    committer: bytes | None = None,
-    message: bytes | None = None,
-) -> bytes:
-    """Add or update a note for an object.
-
-    Args:
-      repo: Path to repository
-      object_sha: SHA of the object to annotate
-      note: Note content
-      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
-      author: Author identity (defaults to committer)
-      committer: Committer identity (defaults to config)
-      message: Commit message for the notes update
-
-    Returns:
-      SHA of the new notes commit
-    """
-    with open_repo_closing(repo) as r:
-        # Parse the object to get its SHA
-        obj = parse_object(r, object_sha)
-        object_sha = obj.id
-
-        if isinstance(note, str):
-            note = note.encode(DEFAULT_ENCODING)
-        if isinstance(ref, str):
-            ref = ref.encode(DEFAULT_ENCODING)
-
-        notes_ref = _make_notes_ref(ref)
-        config = r.get_config_stack()
-
-        return r.notes.set_note(
-            object_sha,
-            note,
-            notes_ref,
-            author=author,
-            committer=committer,
-            message=message,
-            config=config,
-        )
-
-
-def notes_remove(
-    repo: RepoPath,
-    object_sha: bytes,
-    ref: bytes = b"commits",
-    author: bytes | None = None,
-    committer: bytes | None = None,
-    message: bytes | None = None,
-) -> bytes | None:
-    """Remove a note for an object.
-
-    Args:
-      repo: Path to repository
-      object_sha: SHA of the object to remove notes from
-      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
-      author: Author identity (defaults to committer)
-      committer: Committer identity (defaults to config)
-      message: Commit message for the notes removal
-
-    Returns:
-      SHA of the new notes commit, or None if no note existed
-    """
-    with open_repo_closing(repo) as r:
-        # Parse the object to get its SHA
-        obj = parse_object(r, object_sha)
-        object_sha = obj.id
-
-        if isinstance(ref, str):
-            ref = ref.encode(DEFAULT_ENCODING)
-
-        notes_ref = _make_notes_ref(ref)
-        config = r.get_config_stack()
-
-        return r.notes.remove_note(
-            object_sha,
-            notes_ref,
-            author=author,
-            committer=committer,
-            message=message,
-            config=config,
-        )
-
-
-def notes_show(
-    repo: str | os.PathLike[str] | Repo, object_sha: bytes, ref: bytes = b"commits"
-) -> bytes | None:
-    """Show the note for an object.
-
-    Args:
-      repo: Path to repository
-      object_sha: SHA of the object
-      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
-
-    Returns:
-      Note content as bytes, or None if no note exists
-    """
-    with open_repo_closing(repo) as r:
-        # Parse the object to get its SHA
-        obj = parse_object(r, object_sha)
-        object_sha = obj.id
-
-        if isinstance(ref, str):
-            ref = ref.encode(DEFAULT_ENCODING)
-
-        notes_ref = _make_notes_ref(ref)
-        config = r.get_config_stack()
-
-        return r.notes.get_note(object_sha, notes_ref, config=config)
-
-
-def notes_list(repo: RepoPath, ref: bytes = b"commits") -> list[tuple[ObjectID, bytes]]:
-    """List all notes in a notes ref.
-
-    Args:
-      repo: Path to repository
-      ref: Notes ref to use (defaults to "commits" for refs/notes/commits)
-
-    Returns:
-      List of tuples of (object_sha, note_content)
-    """
-    with open_repo_closing(repo) as r:
-        if isinstance(ref, str):
-            ref = ref.encode(DEFAULT_ENCODING)
-
-        notes_ref = _make_notes_ref(ref)
-        config = r.get_config_stack()
-
-        return r.notes.list_notes(notes_ref, config=config)
 
 
 def replace_list(repo: RepoPath) -> list[tuple[ObjectID, ObjectID]]:
@@ -2979,7 +2493,7 @@ def reset(
 
         elif mode == "mixed":
             # Mixed reset: update HEAD and index, but leave working tree unchanged
-            from .object_store import iter_tree_contents
+            from ..object_store import iter_tree_contents
 
             # Open the index
             index = r.open_index()
@@ -3234,7 +2748,7 @@ def push(
         return result
 
     # Trigger auto GC if needed
-    from .gc import maybe_auto_gc
+    from ..gc import maybe_auto_gc
 
     with open_repo_closing(repo) as r:
         maybe_auto_gc(r)
@@ -3402,7 +2916,7 @@ def pull(
             _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 
     # Trigger auto GC if needed
-    from .gc import maybe_auto_gc
+    from ..gc import maybe_auto_gc
 
     with open_repo_closing(repo) as r:
         maybe_auto_gc(r)
@@ -3727,7 +3241,7 @@ def grep(
       max_depth: Maximum directory depth to search
       respect_ignores: Whether to respect .gitignore patterns
     """
-    from .object_store import iter_tree_contents
+    from ..object_store import iter_tree_contents
 
     # Compile the pattern
     flags = re.IGNORECASE if ignore_case else 0
@@ -3898,7 +3412,7 @@ def web_daemon(
       address: Optional address to listen on (defaults to ::)
       port: Optional port to listen on (defaults to 80)
     """
-    from .web import (
+    from ..web import (
         WSGIRequestHandlerLogger,
         WSGIServerLogger,
         make_server,
@@ -3989,12 +3503,6 @@ def _make_branch_ref(name: str | bytes) -> Ref:
     if isinstance(name, str):
         name = name.encode(DEFAULT_ENCODING)
     return local_branch_name(name)
-
-
-def _make_tag_ref(name: str | bytes) -> Ref:
-    if isinstance(name, str):
-        name = name.encode(DEFAULT_ENCODING)
-    return local_tag_name(name)
 
 
 def _make_replace_ref(name: str | bytes | ObjectID) -> Ref:
@@ -4492,7 +4000,7 @@ def fetch(
             )
 
     # Trigger auto GC if needed
-    from .gc import maybe_auto_gc
+    from ..gc import maybe_auto_gc
 
     with open_repo_closing(repo) as r:
         maybe_auto_gc(r)
@@ -4685,7 +4193,7 @@ def show_branch(
     Returns:
       List of output lines
     """
-    from .graph import find_octopus_base, independent
+    from ..graph import find_octopus_base, independent
 
     output_lines: list[str] = []
 
@@ -4782,7 +4290,7 @@ def show_branch(
         for ref_name, sha in sorted_branches:
             try:
                 commit = r[sha]
-                if hasattr(commit, "message"):
+                if isinstance(commit, Commit):
                     message = commit.message.decode("utf-8", errors="replace").split(
                         "\n"
                     )[0]
@@ -4819,14 +4327,18 @@ def show_branch(
 
             try:
                 commit = r[sha]
-                if not hasattr(commit, "commit_time"):
+            except KeyError:
+                # Commit not found, stop traversal
+                pass
+            else:
+                if not isinstance(commit, Commit):
                     return
 
                 timestamp = commit.commit_time
-                parents = commit.parents if hasattr(commit, "parents") else []
+                parents = commit.parents if isinstance(commit, Commit) else []
                 message = (
                     commit.message.decode("utf-8", errors="replace").split("\n")[0]
-                    if hasattr(commit, "message")
+                    if isinstance(commit, Commit)
                     else ""
                 )
 
@@ -4836,9 +4348,6 @@ def show_branch(
                 # Recurse to parents
                 for parent in parents:
                     collect_commits(parent, branch_idx, visited)
-            except KeyError:
-                # Commit not found, stop traversal
-                pass
 
         # Collect commits from all branches
         for i, (_, sha) in enumerate(sorted_branches):
@@ -5624,7 +5133,7 @@ def restore(
         raise ValueError("At least one of staged or worktree must be True")
 
     with open_repo_closing(repo) as r:
-        from .index import _fs_to_tree_path, build_file_from_blob
+        from ..index import _fs_to_tree_path, build_file_from_blob
 
         # Determine the source tree
         if source is None:
@@ -5636,7 +5145,7 @@ def restore(
                     raise CheckoutError("No HEAD reference found")
             elif worktree:
                 # Restoring worktree files from index
-                from .index import ConflictedIndexEntry, IndexEntry
+                from ..index import ConflictedIndexEntry, IndexEntry
 
                 index = r.open_index()
                 for path in paths:
@@ -5699,7 +5208,7 @@ def restore(
 
             if staged:
                 # Update the index with the blob from source
-                from .index import IndexEntry
+                from ..index import IndexEntry
 
                 index = r.open_index()
 
@@ -5721,7 +5230,7 @@ def restore(
                     )
                 else:
                     # If we also updated worktree, use actual stat
-                    from .index import index_entry_from_stat
+                    from ..index import index_entry_from_stat
 
                     st = os.lstat(full_path)
                     new_entry = index_entry_from_stat(st, sha, mode)
@@ -6033,7 +5542,7 @@ def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:
     Returns: Canonical contact data
     """
     with open_repo_closing(repo) as r:
-        from .mailmap import Mailmap
+        from ..mailmap import Mailmap
 
         try:
             mailmap = Mailmap.from_path(os.path.join(r.path, ".mailmap"))
@@ -6079,7 +5588,7 @@ def stash_list(
 ) -> Iterator[tuple[int, tuple[bytes, bytes]]]:
     """List all stashes in a repository."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         entries = stash.stashes()
@@ -6090,7 +5599,7 @@ def stash_list(
 def stash_push(repo: str | os.PathLike[str] | Repo) -> None:
     """Push a new stash onto the stack."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         stash.push()
@@ -6099,7 +5608,7 @@ def stash_push(repo: str | os.PathLike[str] | Repo) -> None:
 def stash_pop(repo: str | os.PathLike[str] | Repo) -> None:
     """Pop a stash from the stack."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         stash.pop(0)
@@ -6108,7 +5617,7 @@ def stash_pop(repo: str | os.PathLike[str] | Repo) -> None:
 def stash_drop(repo: str | os.PathLike[str] | Repo, index: int) -> None:
     """Drop a stash from the stack."""
     with open_repo_closing(repo) as r:
-        from .stash import Stash
+        from ..stash import Stash
 
         stash = Stash.from_repo(r)
         stash.drop(index)
@@ -6308,8 +5817,8 @@ def _do_merge(
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
       if no_commit=True or there were conflicts
     """
-    from .graph import find_merge_base
-    from .merge import recursive_merge
+    from ..graph import find_merge_base
+    from ..merge import recursive_merge
 
     # Get HEAD commit
     try:
@@ -6429,8 +5938,8 @@ def _do_octopus_merge(
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
       if no_commit=True or there were conflicts
     """
-    from .graph import find_octopus_base
-    from .merge import octopus_merge
+    from ..graph import find_octopus_base
+    from ..merge import octopus_merge
 
     # Get HEAD commit
     try:
@@ -6604,7 +6113,7 @@ def merge(
             )
 
         # Trigger auto GC if needed
-        from .gc import maybe_auto_gc
+        from ..gc import maybe_auto_gc
 
         maybe_auto_gc(r)
 
@@ -6623,7 +6132,7 @@ def unpack_objects(
     Returns:
       Number of objects unpacked
     """
-    from .pack import Pack
+    from ..pack import Pack
 
     with open_repo_closing(target) as r:
         pack_basename = os.path.splitext(pack_path)[0]
@@ -6661,7 +6170,7 @@ def merge_tree(
     Raises:
       KeyError: If any of the tree-ish arguments cannot be resolved
     """
-    from .merge import Merger
+    from ..merge import Merger
 
     with open_repo_closing(repo) as r:
         # Resolve tree-ish arguments to actual trees
@@ -6702,7 +6211,7 @@ def cherry(
         '+' means commit is not in upstream, '-' means equivalent patch exists upstream
         message is None unless verbose=True
     """
-    from .patch import commit_patch_id
+    from ..patch import commit_patch_id
 
     with open_repo_closing(repo) as r:
         # Resolve upstream
@@ -6841,7 +6350,7 @@ def cherry_pick(  # noqa: D417
     Raises:
       Error: If there is no HEAD reference, commit cannot be found, or operation fails
     """
-    from .merge import three_way_merge
+    from ..merge import three_way_merge
 
     # Validate that committish is provided when needed
     if not (continue_ or abort) and committish is None:
@@ -7021,7 +6530,7 @@ def revert(
     Raises:
       Error: If revert fails due to conflicts or other issues
     """
-    from .merge import three_way_merge
+    from ..merge import three_way_merge
 
     # Normalize commits to a list
     if isinstance(commits, (str, bytes, Commit, Tag)):
@@ -7167,7 +6676,7 @@ def gc(
     Returns:
       GCStats object with garbage collection statistics
     """
-    from .gc import garbage_collect
+    from ..gc import garbage_collect
 
     with open_repo_closing(repo) as r:
         return garbage_collect(
@@ -7224,7 +6733,7 @@ def maintenance_run(
     Returns:
       MaintenanceResult object with task execution results
     """
-    from .maintenance import run_maintenance
+    from ..maintenance import run_maintenance
 
     with open_repo_closing(repo) as r:
         return run_maintenance(r, tasks=tasks, auto=auto, progress=progress)
@@ -7239,7 +6748,7 @@ def maintenance_register(repo: RepoPath) -> None:
     Args:
       repo: Path to the repository or repository object
     """
-    from .maintenance import register_repository
+    from ..maintenance import register_repository
 
     with open_repo_closing(repo) as r:
         register_repository(r)
@@ -7254,7 +6763,7 @@ def maintenance_unregister(repo: RepoPath, force: bool = False) -> None:
       repo: Path to the repository or repository object
       force: If True, don't error if repository is not registered
     """
-    from .maintenance import unregister_repository
+    from ..maintenance import unregister_repository
 
     with open_repo_closing(repo) as r:
         unregister_repository(r, force=force)
@@ -7278,7 +6787,7 @@ def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsRe
         loose_size = 0
         for sha in object_store._iter_loose_objects():
             loose_count += 1
-            from .object_store import DiskObjectStore
+            from ..object_store import DiskObjectStore
 
             assert isinstance(object_store, DiskObjectStore)
             path = object_store._get_shafile_path(sha)
@@ -7378,16 +6887,16 @@ def rebase(
     Raises:
       Error: If rebase fails or conflicts occur
     """
-    # TODO: Avoid importing from .cli
-    from .cli import launch_editor
-    from .rebase import (
+    # TODO: Avoid importing from ..cli
+    from ..cli import launch_editor
+    from ..rebase import (
         RebaseConflict,
         RebaseError,
         Rebaser,
         process_interactive_rebase,
         start_interactive,
     )
-    from .rebase import (
+    from ..rebase import (
         edit_todo as edit_todo_func,
     )
 
@@ -7506,7 +7015,7 @@ def annotate(
     """
     if committish is None:
         committish = "HEAD"
-    from .annotate import annotate_lines
+    from ..annotate import annotate_lines
 
     with open_repo_closing(repo) as r:
         commit_id = parse_commit(r, committish).id
@@ -7575,7 +7084,7 @@ def filter_branch(
     Raises:
       Error: If branch is already filtered and force is False
     """
-    from .filter_branch import CommitFilter, filter_refs
+    from ..filter_branch import CommitFilter, filter_refs
 
     with open_repo_closing(repo) as r:
         # Parse branch/committish
@@ -8038,7 +7547,7 @@ def reflog(
     """
     import os
 
-    from .reflog import iter_reflogs
+    from ..reflog import iter_reflogs
 
     if isinstance(ref, str):
         ref = ref.encode("utf-8")
@@ -8079,7 +7588,7 @@ def reflog_expire(
     import os
     import time
 
-    from .reflog import expire_reflog, iter_reflogs
+    from ..reflog import expire_reflog, iter_reflogs
 
     if not all and ref is None:
         raise ValueError("Must specify either ref or all=True")
@@ -8109,7 +7618,7 @@ def reflog_expire(
         # Build set of reachable objects if we have unreachable expiration time
         reachable_objects: set[ObjectID] | None = None
         if expire_unreachable_time is not None:
-            from .gc import find_reachable_objects
+            from ..gc import find_reachable_objects
 
             reachable_objects = find_reachable_objects(
                 r.object_store, r.refs, include_reflogs=False
@@ -8132,7 +7641,7 @@ def reflog_expire(
             if dry_run:
                 # For dry run, just read and count what would be expired
                 with open(reflog_path, "rb") as f:
-                    from .reflog import read_reflog
+                    from ..reflog import read_reflog
 
                     count = 0
                     for entry in read_reflog(f):
@@ -8182,7 +7691,7 @@ def reflog_delete(
     """
     import os
 
-    from .reflog import drop_reflog_entry
+    from ..reflog import drop_reflog_entry
 
     if isinstance(ref, str):
         ref = ref.encode("utf-8")
@@ -8196,674 +7705,6 @@ def reflog_delete(
             drop_reflog_entry(f, index, rewrite=rewrite)
 
 
-def lfs_track(
-    repo: str | os.PathLike[str] | Repo = ".",
-    patterns: Sequence[str] | None = None,
-) -> list[str]:
-    """Track file patterns with Git LFS.
-
-    Args:
-      repo: Path to repository
-      patterns: List of file patterns to track (e.g., ["*.bin", "*.pdf"])
-                If None, returns current tracked patterns
-
-    Returns:
-      List of tracked patterns
-    """
-    from .attrs import GitAttributes
-
-    with open_repo_closing(repo) as r:
-        gitattributes_path = os.path.join(r.path, ".gitattributes")
-
-        # Load existing GitAttributes
-        if os.path.exists(gitattributes_path):
-            gitattributes = GitAttributes.from_file(gitattributes_path)
-        else:
-            gitattributes = GitAttributes()
-
-        if patterns is None:
-            # Return current LFS tracked patterns
-            tracked = []
-            for pattern_obj, attrs in gitattributes:
-                if attrs.get(b"filter") == b"lfs":
-                    tracked.append(pattern_obj.pattern.decode())
-            return tracked
-
-        # Add new patterns
-        for pattern in patterns:
-            # Ensure pattern is bytes
-            pattern_bytes = pattern.encode() if isinstance(pattern, str) else pattern
-
-            # Set LFS attributes for the pattern
-            gitattributes.set_attribute(pattern_bytes, b"filter", b"lfs")
-            gitattributes.set_attribute(pattern_bytes, b"diff", b"lfs")
-            gitattributes.set_attribute(pattern_bytes, b"merge", b"lfs")
-            gitattributes.set_attribute(pattern_bytes, b"text", False)
-
-        # Write updated attributes
-        gitattributes.write_to_file(gitattributes_path)
-
-        # Stage the .gitattributes file
-        add(r, [".gitattributes"])
-
-        return lfs_track(r)  # Return updated list
-
-
-def lfs_untrack(
-    repo: str | os.PathLike[str] | Repo = ".",
-    patterns: Sequence[str] | None = None,
-) -> list[str]:
-    """Untrack file patterns from Git LFS.
-
-    Args:
-      repo: Path to repository
-      patterns: List of file patterns to untrack
-
-    Returns:
-      List of remaining tracked patterns
-    """
-    from .attrs import GitAttributes
-
-    if not patterns:
-        return lfs_track(repo)
-
-    with open_repo_closing(repo) as r:
-        gitattributes_path = os.path.join(r.path, ".gitattributes")
-
-        if not os.path.exists(gitattributes_path):
-            return []
-
-        # Load existing GitAttributes
-        gitattributes = GitAttributes.from_file(gitattributes_path)
-
-        # Remove specified patterns
-        for pattern in patterns:
-            pattern_bytes = pattern.encode() if isinstance(pattern, str) else pattern
-
-            # Check if pattern is tracked by LFS
-            for pattern_obj, attrs in list(gitattributes):
-                if (
-                    pattern_obj.pattern == pattern_bytes
-                    and attrs.get(b"filter") == b"lfs"
-                ):
-                    gitattributes.remove_pattern(pattern_bytes)
-                    break
-
-        # Write updated attributes
-        gitattributes.write_to_file(gitattributes_path)
-
-        # Stage the .gitattributes file
-        add(r, [".gitattributes"])
-
-        return lfs_track(r)  # Return updated list
-
-
-def lfs_init(repo: str | os.PathLike[str] | Repo = ".") -> None:
-    """Initialize Git LFS in a repository.
-
-    Args:
-      repo: Path to repository
-
-    Returns:
-      None
-    """
-    from .lfs import LFSStore
-
-    with open_repo_closing(repo) as r:
-        # Create LFS store
-        LFSStore.from_repo(r, create=True)
-
-        # Set up Git config for LFS
-        config = r.get_config()
-        config.set((b"filter", b"lfs"), b"process", b"git-lfs filter-process")
-        config.set((b"filter", b"lfs"), b"required", b"true")
-        config.set((b"filter", b"lfs"), b"clean", b"git-lfs clean -- %f")
-        config.set((b"filter", b"lfs"), b"smudge", b"git-lfs smudge -- %f")
-        config.write_to_path()
-
-
-def lfs_clean(
-    repo: str | os.PathLike[str] | Repo = ".",
-    path: str | os.PathLike[str] | None = None,
-) -> bytes:
-    """Clean a file by converting it to an LFS pointer.
-
-    Args:
-      repo: Path to repository
-      path: Path to file to clean (relative to repo root)
-
-    Returns:
-      LFS pointer content as bytes
-    """
-    from .lfs import LFSFilterDriver, LFSStore
-
-    with open_repo_closing(repo) as r:
-        if path is None:
-            raise ValueError("Path must be specified")
-
-        # Get LFS store
-        lfs_store = LFSStore.from_repo(r)
-        filter_driver = LFSFilterDriver(lfs_store, config=r.get_config())
-
-        # Read file content
-        full_path = os.path.join(r.path, path)
-        with open(full_path, "rb") as f:
-            content = f.read()
-
-        # Clean the content (convert to LFS pointer)
-        return filter_driver.clean(content)
-
-
-def lfs_smudge(
-    repo: str | os.PathLike[str] | Repo = ".",
-    pointer_content: bytes | None = None,
-) -> bytes:
-    """Smudge an LFS pointer by retrieving the actual content.
-
-    Args:
-      repo: Path to repository
-      pointer_content: LFS pointer content as bytes
-
-    Returns:
-      Actual file content as bytes
-    """
-    from .lfs import LFSFilterDriver, LFSStore
-
-    with open_repo_closing(repo) as r:
-        if pointer_content is None:
-            raise ValueError("Pointer content must be specified")
-
-        # Get LFS store
-        lfs_store = LFSStore.from_repo(r)
-        filter_driver = LFSFilterDriver(lfs_store, config=r.get_config())
-
-        # Smudge the pointer (retrieve actual content)
-        return filter_driver.smudge(pointer_content)
-
-
-def lfs_ls_files(
-    repo: str | os.PathLike[str] | Repo = ".",
-    ref: str | bytes | None = None,
-) -> list[tuple[bytes, str, int]]:
-    """List files tracked by Git LFS.
-
-    Args:
-      repo: Path to repository
-      ref: Git ref to check (defaults to HEAD)
-
-    Returns:
-      List of (path, oid, size) tuples for LFS files
-    """
-    from .lfs import LFSPointer
-    from .object_store import iter_tree_contents
-
-    with open_repo_closing(repo) as r:
-        if ref is None:
-            ref = b"HEAD"
-        elif isinstance(ref, str):
-            ref = ref.encode()
-
-        # Get the commit and tree
-        try:
-            commit = r[ref]
-            assert isinstance(commit, Commit)
-            tree = r[commit.tree]
-            assert isinstance(tree, Tree)
-        except KeyError:
-            return []
-
-        lfs_files = []
-
-        # Walk the tree
-        for path, mode, sha in iter_tree_contents(r.object_store, tree.id):
-            assert path is not None
-            assert mode is not None
-            assert sha is not None
-            if not stat.S_ISREG(mode):
-                continue
-
-            # Check if it's an LFS pointer
-            obj = r.object_store[sha]
-            if not isinstance(obj, Blob):
-                raise AssertionError(f"Expected Blob object, got {type(obj).__name__}")
-            pointer = LFSPointer.from_bytes(obj.data)
-            if pointer is not None:
-                lfs_files.append((path, pointer.oid, pointer.size))
-
-        return lfs_files
-
-
-def lfs_migrate(
-    repo: str | os.PathLike[str] | Repo = ".",
-    include: list[str] | None = None,
-    exclude: list[str] | None = None,
-    everything: bool = False,
-) -> int:
-    """Migrate files to Git LFS.
-
-    Args:
-      repo: Path to repository
-      include: Patterns of files to include
-      exclude: Patterns of files to exclude
-      everything: Migrate all files above a certain size
-
-    Returns:
-      Number of migrated files
-    """
-    from .lfs import LFSFilterDriver, LFSStore
-
-    with open_repo_closing(repo) as r:
-        # Initialize LFS if needed
-        lfs_store = LFSStore.from_repo(r, create=True)
-        filter_driver = LFSFilterDriver(lfs_store, config=r.get_config())
-
-        # Get current index
-        index = r.open_index()
-
-        migrated = 0
-
-        # Determine files to migrate
-        files_to_migrate = []
-
-        if everything:
-            # Migrate all files above 100MB
-            for path, entry in index.items():
-                full_path = os.path.join(r.path, path.decode())
-                if os.path.exists(full_path):
-                    size = os.path.getsize(full_path)
-                    if size > 100 * 1024 * 1024:  # 100MB
-                        files_to_migrate.append(path.decode())
-        else:
-            # Use include/exclude patterns
-            for path, entry in index.items():
-                path_str = path.decode()
-
-                # Check include patterns
-                if include:
-                    matched = any(
-                        fnmatch.fnmatch(path_str, pattern) for pattern in include
-                    )
-                    if not matched:
-                        continue
-
-                # Check exclude patterns
-                if exclude:
-                    excluded = any(
-                        fnmatch.fnmatch(path_str, pattern) for pattern in exclude
-                    )
-                    if excluded:
-                        continue
-
-                files_to_migrate.append(path_str)
-
-        # Migrate files
-        for path_str in files_to_migrate:
-            full_path = os.path.join(r.path, path_str)
-            if not os.path.exists(full_path):
-                continue
-
-            # Read file content
-            with open(full_path, "rb") as f:
-                content = f.read()
-
-            # Convert to LFS pointer
-            pointer_content = filter_driver.clean(content)
-
-            # Write pointer back to file
-            with open(full_path, "wb") as f:
-                f.write(pointer_content)
-
-            # Create blob for pointer content and update index
-            blob = Blob()
-            blob.data = pointer_content
-            r.object_store.add_object(blob)
-
-            st = os.stat(full_path)
-            index_entry = index_entry_from_stat(st, blob.id, 0)
-            path_bytes = path_str.encode() if isinstance(path_str, str) else path_str
-            index[path_bytes] = index_entry
-
-            migrated += 1
-
-        # Write updated index
-        index.write()
-
-        # Track patterns if include was specified
-        if include:
-            lfs_track(r, include)
-
-        return migrated
-
-
-def lfs_pointer_check(
-    repo: str | os.PathLike[str] | Repo = ".",
-    paths: Sequence[str] | None = None,
-) -> dict[str, Any | None]:
-    """Check if files are valid LFS pointers.
-
-    Args:
-      repo: Path to repository
-      paths: List of file paths to check (if None, check all files)
-
-    Returns:
-      Dict mapping paths to LFSPointer objects (or None if not a pointer)
-    """
-    from .lfs import LFSPointer
-
-    with open_repo_closing(repo) as r:
-        results = {}
-
-        if paths is None:
-            # Check all files in index
-            index = r.open_index()
-            paths = [path.decode() for path in index]
-
-        for path in paths:
-            full_path = os.path.join(r.path, path)
-            if os.path.exists(full_path):
-                try:
-                    with open(full_path, "rb") as f:
-                        content = f.read()
-                    pointer = LFSPointer.from_bytes(content)
-                    results[path] = pointer
-                except OSError:
-                    results[path] = None
-            else:
-                results[path] = None
-
-        return results
-
-
-def lfs_fetch(
-    repo: str | os.PathLike[str] | Repo = ".",
-    remote: str = "origin",
-    refs: list[str | bytes] | None = None,
-) -> int:
-    """Fetch LFS objects from remote.
-
-    Args:
-      repo: Path to repository
-      remote: Remote name (default: origin)
-      refs: Specific refs to fetch LFS objects for (default: all refs)
-
-    Returns:
-      Number of objects fetched
-    """
-    from .lfs import LFSClient, LFSPointer, LFSStore
-
-    with open_repo_closing(repo) as r:
-        # Get LFS server URL from config
-        config = r.get_config()
-        lfs_url_bytes = config.get((b"lfs",), b"url")
-        if not lfs_url_bytes:
-            # Try remote URL
-            remote_url = config.get((b"remote", remote.encode()), b"url")
-            if remote_url:
-                # Append /info/lfs to remote URL
-                remote_url_str = remote_url.decode()
-                if remote_url_str.endswith(".git"):
-                    remote_url_str = remote_url_str[:-4]
-                lfs_url = f"{remote_url_str}/info/lfs"
-            else:
-                raise ValueError(f"No LFS URL configured for remote {remote}")
-        else:
-            lfs_url = lfs_url_bytes.decode()
-
-        # Get authentication
-        auth = None
-        # TODO: Support credential helpers and other auth methods
-
-        # Create LFS client and store
-        client = LFSClient(lfs_url, auth)
-        store = LFSStore.from_repo(r)
-
-        # Find all LFS pointers in the refs
-        pointers_to_fetch = []
-
-        if refs is None:
-            # Get all refs
-            refs = list(r.refs.keys())
-
-        for ref in refs:
-            if isinstance(ref, str):
-                ref_key = Ref(ref.encode())
-            elif isinstance(ref, bytes):
-                ref_key = Ref(ref)
-            else:
-                ref_key = ref
-            try:
-                commit = r[r.refs[ref_key]]
-            except KeyError:
-                continue
-
-            # Walk the commit tree
-            assert isinstance(commit, Commit)
-            for path, mode, sha in r.object_store.iter_tree_contents(commit.tree):
-                assert sha is not None
-                try:
-                    obj = r.object_store[sha]
-                except KeyError:
-                    pass
-                else:
-                    if isinstance(obj, Blob):
-                        pointer = LFSPointer.from_bytes(obj.data)
-                        if pointer and pointer.is_valid_oid():
-                            # Check if we already have it
-                            try:
-                                with store.open_object(pointer.oid):
-                                    pass  # Object exists, no need to fetch
-                            except KeyError:
-                                pointers_to_fetch.append((pointer.oid, pointer.size))
-
-        # Fetch missing objects
-        fetched = 0
-        for oid, size in pointers_to_fetch:
-            content = client.download(oid, size)
-            store.write_object([content])
-            fetched += 1
-
-        return fetched
-
-
-def lfs_pull(repo: str | os.PathLike[str] | Repo = ".", remote: str = "origin") -> int:
-    """Pull LFS objects for current checkout.
-
-    Args:
-      repo: Path to repository
-      remote: Remote name (default: origin)
-
-    Returns:
-      Number of objects fetched
-    """
-    from .lfs import LFSPointer, LFSStore
-
-    with open_repo_closing(repo) as r:
-        # First do a fetch for HEAD
-        fetched = lfs_fetch(repo, remote, [b"HEAD"])
-
-        # Then checkout LFS files in working directory
-        store = LFSStore.from_repo(r)
-        index = r.open_index()
-
-        for path, entry in index.items():
-            full_path = os.path.join(r.path, path.decode())
-            if os.path.exists(full_path):
-                with open(full_path, "rb") as f:
-                    content = f.read()
-
-                pointer = LFSPointer.from_bytes(content)
-                if pointer and pointer.is_valid_oid():
-                    try:
-                        # Replace pointer with actual content
-                        with store.open_object(pointer.oid) as lfs_file:
-                            lfs_content = lfs_file.read()
-                        with open(full_path, "wb") as f:
-                            f.write(lfs_content)
-                    except KeyError:
-                        # Object not available
-                        pass
-
-        return fetched
-
-
-def lfs_push(
-    repo: str | os.PathLike[str] | Repo = ".",
-    remote: str = "origin",
-    refs: list[str | bytes] | None = None,
-) -> int:
-    """Push LFS objects to remote.
-
-    Args:
-      repo: Path to repository
-      remote: Remote name (default: origin)
-      refs: Specific refs to push LFS objects for (default: current branch)
-
-    Returns:
-      Number of objects pushed
-    """
-    from .lfs import LFSClient, LFSPointer, LFSStore
-
-    with open_repo_closing(repo) as r:
-        # Get LFS server URL from config
-        config = r.get_config()
-        lfs_url_bytes = config.get((b"lfs",), b"url")
-        if not lfs_url_bytes:
-            # Try remote URL
-            remote_url = config.get((b"remote", remote.encode()), b"url")
-            if remote_url:
-                # Append /info/lfs to remote URL
-                remote_url_str = remote_url.decode()
-                if remote_url_str.endswith(".git"):
-                    remote_url_str = remote_url_str[:-4]
-                lfs_url = f"{remote_url_str}/info/lfs"
-            else:
-                raise ValueError(f"No LFS URL configured for remote {remote}")
-        else:
-            lfs_url = lfs_url_bytes.decode()
-
-        # Get authentication
-        auth = None
-        # TODO: Support credential helpers and other auth methods
-
-        # Create LFS client and store
-        client = LFSClient(lfs_url, auth)
-        store = LFSStore.from_repo(r)
-
-        # Find all LFS objects to push
-        if refs is None:
-            # Push current branch
-            head_ref = r.refs.read_ref(HEADREF)
-            refs = [head_ref] if head_ref else []
-
-        objects_to_push = set()
-
-        for ref in refs:
-            if isinstance(ref, str):
-                ref_bytes = ref.encode()
-            else:
-                ref_bytes = ref
-            try:
-                if ref_bytes.startswith(b"refs/"):
-                    commit = r[r.refs[Ref(ref_bytes)]]
-                else:
-                    commit = r[ref_bytes]
-            except KeyError:
-                continue
-
-            # Walk the commit tree
-            assert isinstance(commit, Commit)
-            for path, mode, sha in r.object_store.iter_tree_contents(commit.tree):
-                assert sha is not None
-                try:
-                    obj = r.object_store[sha]
-                except KeyError:
-                    pass
-                else:
-                    if isinstance(obj, Blob):
-                        pointer = LFSPointer.from_bytes(obj.data)
-                        if pointer and pointer.is_valid_oid():
-                            objects_to_push.add((pointer.oid, pointer.size))
-
-        # Push objects
-        pushed = 0
-        for oid, size in objects_to_push:
-            try:
-                with store.open_object(oid) as f:
-                    content = f.read()
-            except KeyError:
-                # Object not in local store
-                logging.warn("LFS object %s not found locally", oid)
-            else:
-                client.upload(oid, size, content)
-                pushed += 1
-
-        return pushed
-
-
-def lfs_status(repo: str | os.PathLike[str] | Repo = ".") -> dict[str, list[str]]:
-    """Show status of LFS files.
-
-    Args:
-      repo: Path to repository
-
-    Returns:
-      Dict with status information
-    """
-    from .lfs import LFSPointer, LFSStore
-
-    with open_repo_closing(repo) as r:
-        store = LFSStore.from_repo(r)
-        index = r.open_index()
-
-        status: dict[str, list[str]] = {
-            "tracked": [],
-            "not_staged": [],
-            "not_committed": [],
-            "not_pushed": [],
-            "missing": [],
-        }
-
-        # Check working directory files
-        for path, entry in index.items():
-            path_str = path.decode()
-            full_path = os.path.join(r.path, path_str)
-
-            if os.path.exists(full_path):
-                with open(full_path, "rb") as f:
-                    content = f.read()
-
-                pointer = LFSPointer.from_bytes(content)
-                if pointer and pointer.is_valid_oid():
-                    status["tracked"].append(path_str)
-
-                    # Check if object exists locally
-                    try:
-                        with store.open_object(pointer.oid):
-                            pass  # Object exists locally
-                    except KeyError:
-                        status["missing"].append(path_str)
-
-                    # Check if file has been modified
-                    if isinstance(entry, ConflictedIndexEntry):
-                        continue  # Skip conflicted entries
-                    try:
-                        staged_obj = r.object_store[entry.sha]
-                    except KeyError:
-                        pass
-                    else:
-                        if not isinstance(staged_obj, Blob):
-                            raise AssertionError(
-                                f"Expected Blob object, got {type(staged_obj).__name__}"
-                            )
-                        staged_pointer = LFSPointer.from_bytes(staged_obj.data)
-                        if staged_pointer and staged_pointer.oid != pointer.oid:
-                            status["not_staged"].append(path_str)
-
-        # TODO: Check for not committed and not pushed files
-
-        return status
-
-
 def worktree_list(repo: RepoPath = ".") -> list[Any]:
     """List all worktrees for a repository.
 
@@ -8873,7 +7714,7 @@ def worktree_list(repo: RepoPath = ".") -> list[Any]:
     Returns:
         List of WorkTreeInfo objects
     """
-    from .worktree import list_worktrees
+    from ..worktree import list_worktrees
 
     with open_repo_closing(repo) as r:
         return list_worktrees(r)
@@ -8900,7 +7741,7 @@ def worktree_add(
     Returns:
         Path to the newly created worktree
     """
-    from .worktree import add_worktree
+    from ..worktree import add_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree add")
@@ -8926,7 +7767,7 @@ def worktree_remove(
         path: Path to worktree to remove
         force: Force removal even if there are local changes
     """
-    from .worktree import remove_worktree
+    from ..worktree import remove_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree remove")
@@ -8948,7 +7789,7 @@ def worktree_prune(
     Returns:
         List of pruned worktree names
     """
-    from .worktree import prune_worktrees
+    from ..worktree import prune_worktrees
 
     with open_repo_closing(repo) as r:
         return prune_worktrees(r, expire=expire, dry_run=dry_run)
@@ -8966,7 +7807,7 @@ def worktree_lock(
         path: Path to worktree to lock
         reason: Optional reason for locking
     """
-    from .worktree import lock_worktree
+    from ..worktree import lock_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree lock")
@@ -8984,7 +7825,7 @@ def worktree_unlock(
         repo: Path to repository
         path: Path to worktree to unlock
     """
-    from .worktree import unlock_worktree
+    from ..worktree import unlock_worktree
 
     if path is None:
         raise ValueError("Path is required for worktree unlock")
@@ -9005,7 +7846,7 @@ def worktree_move(
         old_path: Current path of worktree
         new_path: New path for worktree
     """
-    from .worktree import move_worktree
+    from ..worktree import move_worktree
 
     if old_path is None or new_path is None:
         raise ValueError("Both old_path and new_path are required for worktree move")
@@ -9028,7 +7869,7 @@ def worktree_repair(
     Returns:
         List of repaired worktree paths
     """
-    from .worktree import repair_worktree
+    from ..worktree import repair_worktree
 
     with open_repo_closing(repo) as r:
         return repair_worktree(r, paths=paths)
@@ -9051,8 +7892,8 @@ def merge_base(
     Returns:
         List of commit IDs that are merge bases
     """
-    from .graph import find_merge_base, find_octopus_base
-    from .objectspec import parse_object
+    from ..graph import find_merge_base, find_octopus_base
+    from ..objectspec import parse_object
 
     if committishes is None or len(committishes) < 2:
         raise ValueError("At least two commits are required")
@@ -9093,8 +7934,8 @@ def is_ancestor(
     Returns:
         True if ancestor is an ancestor of descendant, False otherwise
     """
-    from .graph import find_merge_base
-    from .objectspec import parse_object
+    from ..graph import find_merge_base
+    from ..objectspec import parse_object
 
     if ancestor is None or descendant is None:
         raise ValueError("Both ancestor and descendant are required")
@@ -9128,8 +7969,8 @@ def independent_commits(
     Returns:
         List of commit IDs that are not ancestors of any other commits in the list
     """
-    from .graph import independent
-    from .objectspec import parse_object
+    from ..graph import independent
+    from ..objectspec import parse_object
 
     if committishes is None or len(committishes) == 0:
         return []
@@ -9176,7 +8017,7 @@ def mailsplit(
         ValueError: If output_dir doesn't exist or input is invalid
         OSError: If there are issues reading/writing files
     """
-    from .mbox import split_maildir, split_mbox
+    from ..mbox import split_maildir, split_mbox
 
     if is_maildir:
         if input_path is None:
@@ -9258,7 +8099,7 @@ def mailinfo(
         >>> print(f"Author: {result.author_name} <{result.author_email}>")
         >>> print(f"Subject: {result.subject}")
     """
-    from .mbox import mailinfo as mbox_mailinfo
+    from ..mbox import mailinfo as mbox_mailinfo
 
     if input_path is None:
         # Read from stdin
@@ -9316,7 +8157,7 @@ def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
         - List of tuples (path, conflict_id) for recorded conflicts
         - List of paths where resolutions were automatically applied
     """
-    from .rerere import _has_conflict_markers, rerere_auto
+    from ..rerere import _has_conflict_markers, rerere_auto
 
     with open_repo_closing(repo) as r:
         # Get conflicts from the index (if available)
@@ -9355,7 +8196,7 @@ def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
     Returns:
         List of tuples (conflict_id, has_resolution)
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9374,7 +8215,7 @@ def rerere_diff(
     Returns:
         List of tuples (conflict_id, preimage, postimage)
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9401,7 +8242,7 @@ def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> 
         repo: Path to the repository
         pathspec: Path to forget (currently not implemented, forgets all)
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9421,7 +8262,7 @@ def rerere_clear(repo: RepoPath = ".") -> None:
     Args:
         repo: Path to the repository
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
@@ -9435,7 +8276,7 @@ def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
         repo: Path to the repository
         max_age_days: Maximum age in days for keeping resolutions
     """
-    from .rerere import RerereCache
+    from ..rerere import RerereCache
 
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)

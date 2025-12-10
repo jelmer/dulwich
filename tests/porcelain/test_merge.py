@@ -29,7 +29,7 @@ import unittest
 from dulwich import porcelain
 from dulwich.repo import Repo
 
-from . import DependencyMissing, TestCase
+from .. import DependencyMissing, TestCase
 
 
 class PorcelainMergeTests(TestCase):

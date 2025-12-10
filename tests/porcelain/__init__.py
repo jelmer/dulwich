@@ -53,7 +53,7 @@ from dulwich.server import DictBackend
 from dulwich.tests.utils import build_commit_graph, make_commit, make_object
 from dulwich.web import make_server, make_wsgi_chain
 
-from . import TestCase
+from .. import TestCase
 
 try:
     import gpg

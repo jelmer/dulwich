@@ -350,12 +350,9 @@ class ServerTests:
 class NoSideBand64kReceivePackHandler(ReceivePackHandler):
     """ReceivePackHandler that does not support side-band-64k."""
 
-    @classmethod
-    def capabilities(cls):
+    def capabilities(self):
         return [
-            c
-            for c in ReceivePackHandler.capabilities()
-            if c != CAPABILITY_SIDE_BAND_64K
+            c for c in super().capabilities() if c != CAPABILITY_SIDE_BAND_64K
         ]
 
 

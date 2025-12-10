@@ -59,7 +59,10 @@ import zlib
 from collections.abc import Callable, Iterator, Mapping
 from configparser import ConfigParser
 from io import BytesIO
-from typing import Any, BinaryIO, cast
+from typing import TYPE_CHECKING, Any, BinaryIO, cast
+
+if TYPE_CHECKING:
+    from dulwich.object_format import ObjectFormat
 
 from geventhttpclient import HTTPClient
 
@@ -655,13 +658,31 @@ class SwiftPackData(PackData):
     using the Range header feature of Swift.
     """
 
-    def __init__(self, scon: SwiftConnector, filename: str | os.PathLike[str]) -> None:
+    def __init__(
+        self,
+        scon: SwiftConnector,
+        filename: str | os.PathLike[str],
+        object_format: "ObjectFormat | None" = None,
+    ) -> None:
         """Initialize a SwiftPackReader.
 
         Args:
           scon: a `SwiftConnector` instance
           filename: the pack filename
+          object_format: Object format for this pack
         """
+        from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+
+        if object_format is None:
+            import warnings
+
+            warnings.warn(
+                "SwiftPackData() should be called with object_format parameter",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            object_format = DEFAULT_OBJECT_FORMAT
+        self.object_format = object_format
         self.scon = scon
         self._filename = filename
         self._header_size = 12
@@ -693,7 +714,7 @@ class SwiftPackData(PackData):
         assert offset >= self._header_size
         pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
         pack_reader.seek(offset)
-        unpacked, _ = unpack_object(pack_reader.read)
+        unpacked, _ = unpack_object(pack_reader.read, self.object_format.hash_func)
         obj_data = unpacked._obj()
         return (unpacked.pack_type_num, obj_data)
 
@@ -910,9 +931,17 @@ class SwiftObjectStore(PackBasedObjectStore):
         fd, path = tempfile.mkstemp(prefix="tmp_pack_")
         f = os.fdopen(fd, "w+b")
         try:
-            pack_data = PackData(file=cast(_GitFile, f), filename=path)
-            indexer = PackIndexer(cast(BinaryIO, pack_data._file), resolve_ext_ref=None)
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=None)
+            pack_data = PackData(
+                file=cast(_GitFile, f), filename=path, object_format=self.object_format
+            )
+            indexer = PackIndexer(
+                cast(BinaryIO, pack_data._file),
+                self.object_format.hash_func,
+                resolve_ext_ref=None,
+            )
+            copier = PackStreamCopier(
+                self.object_format.hash_func, read_all, read_some, f, delta_iter=None
+            )
             copier.verify()
             return self._complete_thin_pack(f, path, copier, indexer)
         finally:
@@ -932,7 +961,9 @@ class SwiftObjectStore(PackBasedObjectStore):
         f.flush()
 
         # Rescan the rest of the pack, computing the SHA with the new header.
-        new_sha = compute_file_sha(f, end_ofs=-20)
+        new_sha = compute_file_sha(
+            f, self.object_format, end_ofs=-self.object_format.oid_length
+        )
 
         # Must reposition before writing (http://bugs.python.org/issue3207)
         f.seek(0, os.SEEK_CUR)

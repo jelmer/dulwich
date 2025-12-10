@@ -2658,6 +2658,18 @@ class SHA1Writer(BinaryIO):
         """Exit context manager and close file."""
         self.f.close()
 
+    def __iter__(self) -> "SHA1Writer":
+        """Return iterator."""
+        return self
+
+    def __next__(self) -> bytes:
+        """Not supported for write-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
+        raise UnsupportedOperation("__next__")
+
     def fileno(self) -> int:
         """Return file descriptor number."""
         return self.f.fileno()
@@ -2812,6 +2824,18 @@ class HashWriter(BinaryIO):
     ) -> None:
         """Exit context manager and close file."""
         self.close()
+
+    def __iter__(self) -> "HashWriter":
+        """Return iterator."""
+        return self
+
+    def __next__(self) -> bytes:
+        """Not supported for write-only file.
+
+        Raises:
+            UnsupportedOperation: Always raised
+        """
+        raise UnsupportedOperation("__next__")
 
     def fileno(self) -> int:
         """Return file descriptor number."""
@@ -3754,7 +3778,7 @@ def write_pack_index_v2(
     else:
         raise ValueError(f"Unsupported pack checksum length: {len(pack_checksum)}")
 
-    f_writer = HashWriter(f, hash_func)  # type: ignore[abstract]
+    f_writer = HashWriter(f, hash_func)
     f_writer.write(b"\377tOc")  # Magic!
     f_writer.write(struct.pack(">L", 2))
 

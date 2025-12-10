@@ -33,6 +33,7 @@ __all__ = [
 ]
 
 import logging
+import shlex
 import subprocess
 import threading
 from collections.abc import Callable
@@ -318,6 +319,8 @@ class ProcessFilterDriver:
 
     def clean(self, data: bytes) -> bytes:
         """Apply clean filter using external process."""
+        import os
+
         # Try process filter first (much faster)
         if self.process_cmd:
             try:
@@ -333,10 +336,15 @@ class ProcessFilterDriver:
                 raise FilterError("Clean command is required but not configured")
             return data
 
+        # Parse command into list of arguments
+        # Use shlex.split for proper handling of quoted arguments
+        # On Windows, shlex needs posix=False for correct parsing
+        cmd_args = shlex.split(self.clean_cmd, posix=(os.name != "nt"))
+
         try:
             result = subprocess.run(
-                self.clean_cmd,
-                shell=True,
+                cmd_args,
+                shell=False,
                 input=data,
                 capture_output=True,
                 check=True,
@@ -352,6 +360,8 @@ class ProcessFilterDriver:
 
     def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Apply smudge filter using external process."""
+        import os
+
         path_str = path.decode("utf-8", errors="replace")
 
         # Try process filter first (much faster)
@@ -369,13 +379,18 @@ class ProcessFilterDriver:
                 raise FilterError("Smudge command is required but not configured")
             return data
 
-        # Substitute %f placeholder with file path
-        cmd = self.smudge_cmd.replace("%f", path_str)
+        # Parse command into list of arguments and substitute %f placeholder
+        # Use shlex.split for proper handling of quoted arguments
+        # On Windows, shlex needs posix=False for correct parsing
+        cmd_args = shlex.split(self.smudge_cmd, posix=(os.name != "nt"))
+
+        # Replace %f placeholder with actual path
+        cmd_args = [arg.replace("%f", path_str) for arg in cmd_args]
 
         try:
             result = subprocess.run(
-                cmd,
-                shell=True,
+                cmd_args,
+                shell=False,
                 input=data,
                 capture_output=True,
                 check=True,
@@ -384,7 +399,9 @@ class ProcessFilterDriver:
             return result.stdout
         except subprocess.CalledProcessError as e:
             if self.required:
-                raise FilterError(f"Required smudge filter failed: {e}")
+                raise FilterError(
+                    f"Required smudge filter failed: {e} {e.stderr} {e.stdout}"
+                )
             # If not required, log warning and return original data on failure
             logging.warning("Optional smudge filter failed: %s", e)
             return data

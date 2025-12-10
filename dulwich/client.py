@@ -408,7 +408,7 @@ def extract_object_format_from_capabilities(
     for capability in capabilities:
         k, v = parse_capability(capability)
         if k == b"object-format" and v is not None:
-            return v.decode("ascii")
+            return v.decode("ascii").strip()
     return None
 
 
@@ -1105,9 +1105,10 @@ class GitClient:
             os.mkdir(target_path)
 
         try:
-            # For network clones, create repository with default SHA-1 format
-            # If remote uses SHA-256, fetch() will raise GitProtocolError
-            # Subclasses (e.g., LocalGitClient) override to detect format first
+            # For network clones, create repository with default SHA-1 format initially.
+            # If remote uses a different format, fetch() will auto-change the repo's format
+            # (since repo is empty at this point).
+            # Subclasses (e.g., LocalGitClient) override to detect format first for efficiency.
             target = None
             if not bare:
                 target = Repo.init(target_path)
@@ -1147,11 +1148,6 @@ class GitClient:
                 filter_spec=filter_spec,
                 protocol_version=protocol_version,
             )
-
-            # Note: For network clones, if remote uses a different object format than
-            # the default SHA-1, fetch() will raise GitProtocolError. Subclasses like
-            # LocalGitClient override clone() to detect format before creating the repo.
-            # TODO: Fix network clones to detect object format before creating target repo.
 
             if origin is not None:
                 _import_remote_refs(
@@ -1270,15 +1266,13 @@ class GitClient:
                 shallow_exclude=shallow_exclude,
             )
 
-            # Validate object format compatibility
+            # Fix object format if needed
             if (
                 result.object_format
                 and result.object_format != target.object_format.name
             ):
-                raise GitProtocolError(
-                    f"Object format mismatch: remote uses {result.object_format}, "
-                    f"local repository uses {target.object_format.name}"
-                )
+                # Change the target repo's format if it's empty
+                target._change_object_format(result.object_format)
         except BaseException:
             abort()
             raise

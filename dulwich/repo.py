@@ -656,6 +656,46 @@ class BaseRepo:
         """
         raise NotImplementedError(self.open_index)
 
+    def _change_object_format(self, object_format_name: str) -> None:
+        """Change the object format of this repository.
+
+        This can only be done if the object store is empty (no objects written yet).
+
+        Args:
+          object_format_name: Name of the new object format (e.g., "sha1", "sha256")
+
+        Raises:
+          AssertionError: If the object store is not empty
+        """
+        # Check if object store has any objects
+        for _ in self.object_store:
+            raise AssertionError(
+                "Cannot change object format: repository already contains objects"
+            )
+
+        # Update the object format
+        from .object_format import get_object_format
+
+        new_format = get_object_format(object_format_name)
+        self.object_format = new_format
+        self.object_store.object_format = new_format
+
+        # Update config file
+        config = self.get_config()
+
+        if object_format_name == "sha1":
+            # For SHA-1, explicitly remove objectformat extension if present
+            try:
+                config.remove("extensions", "objectformat")
+            except KeyError:
+                pass
+        else:
+            # For non-SHA-1 formats, set repositoryformatversion to 1 and objectformat extension
+            config.set("core", "repositoryformatversion", "1")
+            config.set("extensions", "objectformat", object_format_name)
+
+        config.write_to_path()
+
     def fetch(
         self,
         target: "BaseRepo",
@@ -674,14 +714,10 @@ class BaseRepo:
           depth: Optional shallow fetch depth
         Returns: The local refs
         """
-        # Validate object format compatibility
+        # Fix object format if needed
         if self.object_format != target.object_format:
-            from .errors import GitProtocolError
-
-            raise GitProtocolError(
-                f"Object format mismatch: source uses {self.object_format.name}, "
-                f"target uses {target.object_format.name}"
-            )
+            # Change the target repo's format if it's empty
+            target._change_object_format(self.object_format.name)
 
         if determine_wants is None:
             determine_wants = target.object_store.determine_wants_all

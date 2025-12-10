@@ -54,15 +54,23 @@ class GitServerTestCase(ServerTests, CompatTestCase):
     def _handlers(self):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
-    def _check_server(self, dul_server) -> None:
+    def _check_server(self, dul_server, repo) -> None:
+        from dulwich.protocol import Protocol
+
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
-        caps = receive_pack_handler_cls.capabilities()
+        # Create a handler instance to check capabilities
+        handler = receive_pack_handler_cls(
+            dul_server.backend,
+            [b"/"],
+            Protocol(lambda x: b"", lambda x: None),
+        )
+        caps = handler.capabilities()
         self.assertNotIn(b"side-band-64k", caps)
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
         dul_server = TCPGitServer(backend, b"localhost", 0, handlers=self._handlers())
-        self._check_server(dul_server)
+        self._check_server(dul_server, repo)
 
         # Start server in a thread
         server_thread = threading.Thread(target=dul_server.serve)
@@ -100,9 +108,17 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
     def _handlers(self) -> None:
         return None  # default handlers include side-band-64k
 
-    def _check_server(self, server) -> None:
+    def _check_server(self, server, repo) -> None:
+        from dulwich.protocol import Protocol
+
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
-        caps = receive_pack_handler_cls.capabilities()
+        # Create a handler instance to check capabilities
+        handler = receive_pack_handler_cls(
+            server.backend,
+            [b"/"],
+            Protocol(lambda x: b"", lambda x: None),
+        )
+        caps = handler.capabilities()
         self.assertIn(b"side-band-64k", caps)
 
 

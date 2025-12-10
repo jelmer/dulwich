@@ -319,6 +319,8 @@ class ProcessFilterDriver:
 
     def clean(self, data: bytes) -> bytes:
         """Apply clean filter using external process."""
+        import os
+
         # Try process filter first (much faster)
         if self.process_cmd:
             try:
@@ -334,10 +336,15 @@ class ProcessFilterDriver:
                 raise FilterError("Clean command is required but not configured")
             return data
 
+        # Parse command into list of arguments
+        # Use shlex.split for proper handling of quoted arguments
+        # On Windows, shlex needs posix=False for correct parsing
+        cmd_args = shlex.split(self.clean_cmd, posix=(os.name != "nt"))
+
         try:
             result = subprocess.run(
-                self.clean_cmd,
-                shell=True,
+                cmd_args,
+                shell=False,
                 input=data,
                 capture_output=True,
                 check=True,
@@ -372,18 +379,18 @@ class ProcessFilterDriver:
                 raise FilterError("Smudge command is required but not configured")
             return data
 
-        # quote path according to platform and Substitute %f placeholder with file path
-        quoted_path = (
-            subprocess.list2cmdline([path_str])
-            if os.name == "nt"
-            else shlex.quote(path_str)
-        )
-        cmd = self.smudge_cmd.replace("%f", quoted_path)
+        # Parse command into list of arguments and substitute %f placeholder
+        # Use shlex.split for proper handling of quoted arguments
+        # On Windows, shlex needs posix=False for correct parsing
+        cmd_args = shlex.split(self.smudge_cmd, posix=(os.name != "nt"))
+
+        # Replace %f placeholder with actual path
+        cmd_args = [arg.replace("%f", path_str) for arg in cmd_args]
 
         try:
             result = subprocess.run(
-                cmd,
-                shell=True,
+                cmd_args,
+                shell=False,
                 input=data,
                 capture_output=True,
                 check=True,

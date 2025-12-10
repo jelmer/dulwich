@@ -1906,7 +1906,9 @@ class DiskObjectStore(PackBasedObjectStore):
             # Load the index we just wrote
             with open(target_index_path, "rb") as idx_file:
                 pack_index = load_pack_index_file(
-                    os.path.basename(target_index_path), idx_file
+                    os.path.basename(target_index_path),
+                    idx_file,
+                    object_format=self.object_format,
                 )
 
             # Generate the bitmap
@@ -1970,8 +1972,18 @@ class DiskObjectStore(PackBasedObjectStore):
         fd, path = tempfile.mkstemp(dir=self.path, prefix="tmp_pack_")
         with os.fdopen(fd, "w+b") as f:
             os.chmod(path, PACK_MODE)
-            indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)  # type: ignore[arg-type]
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)  # type: ignore[arg-type]
+            indexer = PackIndexer(
+                f,
+                self.object_format.hash_func,
+                resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
+            )
+            copier = PackStreamCopier(
+                self.object_format.hash_func,
+                read_all,
+                read_some,
+                f,
+                delta_iter=indexer,  # type: ignore[arg-type]
+            )
             copier.verify(progress=progress)
             return self._complete_pack(f, path, len(copier), indexer, progress=progress)
 
@@ -2192,6 +2204,7 @@ class DiskObjectStore(PackBasedObjectStore):
             depth=self.pack_depth,
             threads=self.pack_threads,
             big_file_threshold=self.pack_big_file_threshold,
+            object_format=self.object_format,
         )
         self._pack_cache[base_name] = pack
         return pack
@@ -2612,7 +2625,12 @@ class MemoryObjectStore(PackCapableObjectStore):
         """
         f, commit, abort = self.add_pack()
         try:
-            copier = PackStreamCopier(read_all, read_some, f)  # type: ignore[arg-type]
+            copier = PackStreamCopier(
+                self.object_format.hash_func,
+                read_all,
+                read_some,
+                f,  # type: ignore[arg-type]
+            )
             copier.verify()
         except BaseException:
             abort()
@@ -3353,7 +3371,9 @@ class BucketBasedObjectStore(PackBasedObjectStore):
             checksum = p.get_stored_checksum()
             write_pack_index(idxf, entries, checksum, version=self.pack_index_version)
             idxf.seek(0)
-            idx = load_pack_index_file(basename + ".idx", idxf)
+            idx = load_pack_index_file(
+                basename + ".idx", idxf, object_format=self.object_format
+            )
             for pack in self.packs:
                 if pack.get_stored_checksum() == p.get_stored_checksum():
                     p.close()

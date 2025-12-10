@@ -168,6 +168,7 @@ def _read_bundle(f: BinaryIO, version: int) -> Bundle:
     from .object_format import DEFAULT_OBJECT_FORMAT
 
     pack_file = BytesIO(pack_bytes)
+    # TODO: Support specifying object format based on bundle metadata
     pack_data = PackData.from_file(pack_file, object_format=DEFAULT_OBJECT_FORMAT)
     ret = Bundle()
     ret.references = references

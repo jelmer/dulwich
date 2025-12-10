@@ -197,12 +197,15 @@ def load_conf(path: str | None = None, file: str | None = None) -> ConfigParser:
     return conf
 
 
-def swift_load_pack_index(scon: "SwiftConnector", filename: str) -> "PackIndex":
+def swift_load_pack_index(
+    scon: "SwiftConnector", filename: str, object_format: ObjectFormat
+) -> "PackIndex":
     """Read a pack index file from Swift.
 
     Args:
       scon: a `SwiftConnector` instance
       filename: Path to the index file objectise
+      object_format: Object format for this pack
     Returns: a `PackIndexer` instance
     """
     f = scon.get_object(filename)
@@ -210,7 +213,7 @@ def swift_load_pack_index(scon: "SwiftConnector", filename: str) -> "PackIndex":
         raise Exception(f"Could not retrieve index file {filename}")
     if isinstance(f, bytes):
         f = BytesIO(f)
-    return load_pack_index_file(filename, f)
+    return load_pack_index_file(filename, f, object_format)
 
 
 def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
@@ -223,7 +226,9 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
     Returns:
       Compressed JSON bytes containing pack information
     """
-    pack = Pack.from_objects(pack_data, pack_index)
+    pack = Pack.from_objects(
+        pack_data, pack_index
+    )
     info: dict[bytes, Any] = {}
     for obj in pack.iterobjects():
         # Commit
@@ -754,7 +759,9 @@ class SwiftPack(Pack):
         self._pack_info_load: Callable[[], dict[str, Any] | None] = (
             lambda: load_pack_info(self._pack_info_path, self.scon)
         )
-        self._idx_load = lambda: swift_load_pack_index(self.scon, self._idx_path)
+        self._idx_load = lambda: swift_load_pack_index(
+            self.scon, self._idx_path, self.object_format
+        )
         self._data_load = lambda: SwiftPackData(self.scon, self._data_path)
 
     @property
@@ -795,7 +802,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         ]
         ret = []
         for basename in pack_files:
-            pack = SwiftPack(basename, scon=self.scon)
+            pack = SwiftPack(basename, object_format=self.object_format, scon=self.scon)
             self._pack_cache[basename] = pack
             ret.append(pack)
         return ret
@@ -873,7 +880,9 @@ class SwiftObjectStore(PackBasedObjectStore):
 
             from ..file import _GitFile
 
-            pack = PackData(file=cast(_GitFile, f), filename="")
+            pack = PackData(
+                file=cast(_GitFile, f), filename="", object_format=self.object_format
+            )
             entries = pack.sorted_entries()
             if entries:
                 basename = posixpath.join(
@@ -886,7 +895,7 @@ class SwiftObjectStore(PackBasedObjectStore):
                 f.close()
                 self.scon.put_object(basename + ".idx", index)
                 index.close()
-                final_pack = SwiftPack(basename, scon=self.scon)
+                final_pack = SwiftPack(basename, object_format=self.object_format, scon=self.scon)
                 final_pack.check_length_and_checksum()
                 self._add_cached_pack(basename, final_pack)
                 return final_pack
@@ -962,7 +971,9 @@ class SwiftObjectStore(PackBasedObjectStore):
 
         # Rescan the rest of the pack, computing the SHA with the new header.
         new_sha = compute_file_sha(
-            f, self.object_format, end_ofs=-self.object_format.oid_length
+            f,
+            hash_func=self.object_format.hash_func,
+            end_ofs=-self.object_format.oid_length,
         )
 
         # Must reposition before writing (http://bugs.python.org/issue3207)
@@ -995,9 +1006,11 @@ class SwiftObjectStore(PackBasedObjectStore):
 
         # Write pack info.
         f.seek(0)
-        pack_data = PackData(filename="", file=cast(_GitFile, f))
+        pack_data = PackData(
+            filename="", file=cast(_GitFile, f), object_format=self.object_format
+        )
         index_file.seek(0)
-        pack_index = load_pack_index_file("", index_file)
+        pack_index = load_pack_index_file("", index_file, self.object_format)
         serialized_pack_info = pack_info_create(pack_data, pack_index)
         f.close()
         index_file.close()
@@ -1007,7 +1020,7 @@ class SwiftObjectStore(PackBasedObjectStore):
         pack_info_file.close()
 
         # Add the pack to the store and return it.
-        final_pack = SwiftPack(pack_base_name, scon=self.scon)
+        final_pack = SwiftPack(pack_base_name, object_format=self.object_format, scon=self.scon)
         final_pack.check_length_and_checksum()
         self._add_cached_pack(pack_base_name, final_pack)
         return final_pack

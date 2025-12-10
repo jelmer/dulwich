@@ -78,7 +78,6 @@ from .file import GitFile, _GitFile
 from .midx import MultiPackIndex, load_midx
 from .objects import (
     S_ISGITLINK,
-    ZERO_SHA,
     Blob,
     Commit,
     ObjectID,
@@ -349,7 +348,6 @@ class BaseObjectStore:
             for (ref, sha) in refs.items()
             if (sha not in self or _want_deepen(sha))
             and not ref.endswith(PEELED_TAG_SUFFIX)
-            and not sha == ZERO_SHA
         ]
 
     def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
@@ -1187,8 +1185,6 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           name: sha for the object.
         Returns: tuple with numeric type and object contents.
         """
-        if name == ZERO_SHA:
-            raise KeyError(name)
         sha: RawObjectID
         if len(name) == self.object_format.hex_length:
             sha = hex_to_sha(ObjectID(name))
@@ -1326,8 +1322,6 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           sha1: sha for the object.
           include_comp: Whether to include compression metadata.
         """
-        if sha1 == self.object_format.zero_oid:
-            raise KeyError(sha1)
         if len(sha1) == self.object_format.hex_length:
             sha = hex_to_sha(cast(ObjectID, sha1))
             hexsha = cast(ObjectID, sha1)
@@ -1687,13 +1681,13 @@ class DiskObjectStore(PackBasedObjectStore):
             if f not in self._pack_cache:
                 pack = Pack(
                     os.path.join(self.pack_dir, f),
+                    object_format=self.object_format,
                     delta_window_size=self.pack_delta_window_size,
                     window_memory=self.pack_window_memory,
                     delta_cache_size=self.pack_delta_cache_size,
                     depth=self.pack_depth,
                     threads=self.pack_threads,
                     big_file_threshold=self.pack_big_file_threshold,
-                    object_format=self.object_format,
                 )
                 new_packs.append(pack)
                 self._pack_cache[f] = pack
@@ -1908,7 +1902,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 pack_index = load_pack_index_file(
                     os.path.basename(target_index_path),
                     idx_file,
-                    object_format=self.object_format,
+                    self.object_format,
                 )
 
             # Generate the bitmap
@@ -1934,13 +1928,13 @@ class DiskObjectStore(PackBasedObjectStore):
         # Add the pack to the store and return it.
         final_pack = Pack(
             pack_base_name,
+            object_format=self.object_format,
             delta_window_size=self.pack_delta_window_size,
             window_memory=self.pack_window_memory,
             delta_cache_size=self.pack_delta_cache_size,
             depth=self.pack_depth,
             threads=self.pack_threads,
             big_file_threshold=self.pack_big_file_threshold,
-            object_format=self.object_format,
         )
         final_pack.check_length_and_checksum()
         self._add_cached_pack(pack_base_name, final_pack)
@@ -2007,7 +2001,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if f.tell() > 0:
                 f.seek(0)
 
-                with PackData(path, f, object_format=self.object_format) as pd:
+                with PackData(path, file=f, object_format=self.object_format) as pd:
                     indexer = PackIndexer.for_pack_data(
                         pd,
                         resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
@@ -2198,13 +2192,13 @@ class DiskObjectStore(PackBasedObjectStore):
 
         pack = Pack(
             pack_path,
+            object_format=self.object_format,
             delta_window_size=self.pack_delta_window_size,
             window_memory=self.pack_window_memory,
             delta_cache_size=self.pack_delta_cache_size,
             depth=self.pack_depth,
             threads=self.pack_threads,
             big_file_threshold=self.pack_big_file_threshold,
-            object_format=self.object_format,
         )
         self._pack_cache[base_name] = pack
         return pack
@@ -2243,9 +2237,6 @@ class DiskObjectStore(PackBasedObjectStore):
         Raises:
             KeyError: If object not found
         """
-        if name == ZERO_SHA:
-            raise KeyError(name)
-
         sha: RawObjectID
         if len(name) in (40, 64):
             # name is ObjectID (hex), convert to RawObjectID
@@ -2557,7 +2548,7 @@ class MemoryObjectStore(PackCapableObjectStore):
             if size > 0:
                 f.seek(0)
 
-                p = PackData.from_file(f, size, object_format=self.object_format)
+                p = PackData.from_file(f, self.object_format, size)
                 for obj in PackInflater.for_pack_data(p, self.get_raw):  # type: ignore[arg-type]
                     self.add_object(obj)
                 p.close()
@@ -3362,7 +3353,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
 
             pf.seek(0)
 
-            p = PackData(pf.name, pf)
+            p = PackData(pf.name, file=pf, object_format=self.object_format)
             entries = p.sorted_entries()
             basename = iter_sha1(entry[0] for entry in entries).decode("ascii")
             idxf = tempfile.SpooledTemporaryFile(
@@ -3371,9 +3362,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
             checksum = p.get_stored_checksum()
             write_pack_index(idxf, entries, checksum, version=self.pack_index_version)
             idxf.seek(0)
-            idx = load_pack_index_file(
-                basename + ".idx", idxf, object_format=self.object_format
-            )
+            idx = load_pack_index_file(basename + ".idx", idxf, self.object_format)
             for pack in self.packs:
                 if pack.get_stored_checksum() == p.get_stored_checksum():
                     p.close()

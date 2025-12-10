@@ -6139,7 +6139,7 @@ def unpack_objects(
 
     with open_repo_closing(target) as r:
         pack_basename = os.path.splitext(pack_path)[0]
-        with Pack(pack_basename) as pack:
+        with Pack(pack_basename, object_format=r.object_store.object_format) as pack:
             count = 0
             for unpacked in pack.iter_unpacked():
                 obj = unpacked.sha_file()

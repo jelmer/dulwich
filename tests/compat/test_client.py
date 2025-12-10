@@ -576,11 +576,6 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         def test_fetch_pack_no_side_band_64k(self) -> None:
             DulwichClientTestBase.test_fetch_pack_no_side_band_64k(self)
 
-    def test_send_remove_branch(self) -> None:
-        # This test fails intermittently on my machine, probably due to some sort
-        # of race condition. Probably also related to #1015
-        self.skipTest("skip flaky test; see #1015")
-
 
 @patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
 class DulwichTCPClientTestGitProtov0(DulwichTCPClientTest):

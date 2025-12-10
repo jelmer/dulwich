@@ -208,7 +208,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
                     # Fetch and cache the index
                     idx_data = self._fetch_url(f"objects/pack/{pack_name}.idx")
 
-                    idx = load_pack_index_file("<http>", BytesIO(idx_data))
+                    idx = load_pack_index_file("<http>", BytesIO(idx_data), self.object_format)
                     if self._packs is not None:
                         self._packs[i] = (name, idx)
                 return idx
@@ -259,7 +259,9 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
             # Open the pack and get the object
             pack_data = PackData(pack_path, object_format=self.object_format)
-            pack = Pack.from_objects(pack_data, pack_idx)
+            pack = Pack.from_objects(
+                pack_data, pack_idx
+            )
             try:
                 return pack.get_raw(binsha)
             finally:

@@ -231,7 +231,7 @@ class TestPackIndexCompat(PackTests):
         run_git_or_fail(["index-pack", pack_path + ".pack"])
 
         # Load with dulwich
-        idx = load_pack_index(pack_path + ".idx")
+        idx = load_pack_index(pack_path + ".idx", DEFAULT_OBJECT_FORMAT)
 
         # Verify it works
         self.assertIn(blob.id, idx)
@@ -250,7 +250,7 @@ class TestPackIndexCompat(PackTests):
             write_pack_index_v3(f, entries, b"x" * 20, hash_format=1)
 
         # Load and verify structure
-        idx = load_pack_index(v3_path)
+        idx = load_pack_index(v3_path, DEFAULT_OBJECT_FORMAT)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
         self.assertEqual(idx.hash_format, 1)  # SHA-1

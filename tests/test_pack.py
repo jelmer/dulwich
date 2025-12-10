@@ -101,7 +101,8 @@ class PackTests(TestCase):
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha."""
         return load_pack_index(
-            os.path.join(self.datadir, "pack-{}.idx".format(sha.decode("ascii")))
+            os.path.join(self.datadir, "pack-{}.idx".format(sha.decode("ascii"))),
+            DEFAULT_OBJECT_FORMAT,
         )
 
     def get_pack_data(self, sha):
@@ -112,7 +113,10 @@ class PackTests(TestCase):
         )
 
     def get_pack(self, sha):
-        return Pack(os.path.join(self.datadir, "pack-{}".format(sha.decode("ascii"))))
+        return Pack(
+            os.path.join(self.datadir, "pack-{}".format(sha.decode("ascii"))),
+            object_format=DEFAULT_OBJECT_FORMAT,
+        )
 
     def assertSucceeds(self, func, *args, **kwargs) -> None:
         try:
@@ -474,9 +478,7 @@ class TestPackData(PackTests):
             self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii"))
         )
         with open(path, "rb") as f:
-            PackData.from_file(
-                f, os.path.getsize(path), object_format=DEFAULT_OBJECT_FORMAT
-            )
+            PackData.from_file(f, DEFAULT_OBJECT_FORMAT, os.path.getsize(path))
 
     def test_pack_len(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
@@ -569,7 +571,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "v1test.idx")
             p.create_index_v1(filename)
-            idx1 = load_pack_index(filename)
+            idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -578,7 +580,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "v2test.idx")
             p.create_index_v2(filename)
-            idx1 = load_pack_index(filename)
+            idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -587,7 +589,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "v3test.idx")
             p.create_index_v3(filename)
-            idx1 = load_pack_index(filename)
+            idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -598,7 +600,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "version3test.idx")
             p.create_index(filename, version=3)
-            idx = load_pack_index(filename)
+            idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             self.assertIsInstance(idx, PackIndex3)
             self.assertEqual(idx.version, 3)
 
@@ -607,24 +609,24 @@ class TestPackData(PackTests):
         try:
             self.assertEqual(
                 sha1(b"abcd1234wxyz").hexdigest(),
-                compute_file_sha(f, DEFAULT_OBJECT_FORMAT).hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"abcd1234wxyz").hexdigest(),
-                compute_file_sha(f, DEFAULT_OBJECT_FORMAT, buffer_size=5).hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func, buffer_size=5).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"abcd1234").hexdigest(),
-                compute_file_sha(f, DEFAULT_OBJECT_FORMAT, end_ofs=-4).hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func, end_ofs=-4).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234wxyz").hexdigest(),
-                compute_file_sha(f, DEFAULT_OBJECT_FORMAT, start_ofs=4).hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func, start_ofs=4).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234").hexdigest(),
                 compute_file_sha(
-                    f, DEFAULT_OBJECT_FORMAT, start_ofs=4, end_ofs=-4
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, start_ofs=4, end_ofs=-4
                 ).hexdigest(),
             )
         finally:
@@ -634,13 +636,13 @@ class TestPackData(PackTests):
         f = BytesIO(b"abcd1234wxyz")
         try:
             self.assertRaises(
-                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT, -20
+                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT.hash_func, -20
             )
             self.assertRaises(
-                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT, 0, 20
+                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT.hash_func, 0, 20
             )
             self.assertRaises(
-                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT, 10, -12
+                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT.hash_func, 10, -12
             )
         finally:
             f.close()
@@ -699,7 +701,7 @@ class TestPack(PackTests):
                 basename, origpack.pack_tuples(), object_format=DEFAULT_OBJECT_FORMAT
             )
 
-            with Pack(basename) as newpack:
+            with Pack(basename, object_format=DEFAULT_OBJECT_FORMAT) as newpack:
                 self.assertEqual(origpack, newpack)
                 self.assertSucceeds(newpack.index.check)
                 self.assertEqual(origpack.name(), newpack.name())
@@ -727,7 +729,7 @@ class TestPack(PackTests):
         write_pack(
             basename, origpack.pack_tuples(), object_format=DEFAULT_OBJECT_FORMAT
         )
-        return Pack(basename)
+        return Pack(basename, object_format=DEFAULT_OBJECT_FORMAT)
 
     def test_keep_no_message(self) -> None:
         with self.get_pack(pack1_sha) as p:
@@ -871,6 +873,7 @@ class TestThinPack(PackTests):
     def make_pack(self, resolve_ext_ref):
         return Pack(
             self.pack_prefix,
+            object_format=DEFAULT_OBJECT_FORMAT,
             resolve_ext_ref=self.store.get_raw if resolve_ext_ref else None,
         )
 
@@ -1062,7 +1065,7 @@ class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
     def index(self, filename, entries, pack_checksum):
         path = os.path.join(self.tempdir, filename)
         self.writeIndex(path, entries, pack_checksum)
-        idx = load_pack_index(path)
+        idx = load_pack_index(path, DEFAULT_OBJECT_FORMAT)
         self.assertSucceeds(idx.check)
         self.assertEqual(idx.version, self._expected_version)
         return idx
@@ -1082,9 +1085,7 @@ class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
     def index(self, filename, entries, pack_checksum):
         from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 
-        return MemoryPackIndex(
-            entries, pack_checksum, object_format=DEFAULT_OBJECT_FORMAT
-        )
+        return MemoryPackIndex(entries, DEFAULT_OBJECT_FORMAT, pack_checksum)
 
     def tearDown(self) -> None:
         TestCase.tearDown(self)
@@ -1136,7 +1137,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         entries = [(b"abcd" * 5, 0, zlib.crc32(b""))]
         filename = os.path.join(self.tempdir, "test.idx")
         self.writeIndex(filename, entries, b"1234567890" * 2)
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
         self.assertEqual(idx.hash_format, 1)  # SHA-1
@@ -1150,7 +1151,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         # Write v3 index with SHA-1 (algorithm=1)
         with GitFile(filename, "wb") as f:
             write_pack_index_v3(f, entries, b"1" * 20, hash_format=1)
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(idx.hash_format, 1)
         self.assertEqual(idx.hash_size, 20)
 
@@ -1213,7 +1214,7 @@ class WritePackIndexTests(TestCase):
         with GitFile(filename, "wb") as f:
             write_pack_index(f, entries, b"P" * 20)
 
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(DEFAULT_PACK_INDEX_VERSION, idx.version)
 
     def test_write_pack_index_version_1(self) -> None:
@@ -1230,7 +1231,7 @@ class WritePackIndexTests(TestCase):
         with GitFile(filename, "wb") as f:
             write_pack_index(f, entries, b"P" * 20, version=1)
 
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(1, idx.version)
 
     def test_write_pack_index_version_3(self) -> None:
@@ -1247,7 +1248,7 @@ class WritePackIndexTests(TestCase):
         with GitFile(filename, "wb") as f:
             write_pack_index(f, entries, b"P" * 20, version=3)
 
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(3, idx.version)
 
     def test_write_pack_index_invalid_version(self) -> None:
@@ -1800,7 +1801,7 @@ class DeltaChainIteratorTests(TestCase):
         )
         fsize = f.tell()
         f.seek(0)
-        packdata = PackData.from_file(f, fsize, object_format=DEFAULT_OBJECT_FORMAT)
+        packdata = PackData.from_file(f, DEFAULT_OBJECT_FORMAT, fsize)
         td = tempfile.mkdtemp()
         idx_path = os.path.join(td, "test.idx")
         self.addCleanup(shutil.rmtree, td)
@@ -1809,7 +1810,7 @@ class DeltaChainIteratorTests(TestCase):
             version=2,
             resolve_ext_ref=self.get_raw_no_repeat,
         )
-        packindex = load_pack_index(idx_path)
+        packindex = load_pack_index(idx_path, DEFAULT_OBJECT_FORMAT)
         pack = Pack.from_objects(packdata, packindex)
         try:
             # Attempting to open this REF_DELTA object would loop forever

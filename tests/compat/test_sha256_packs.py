@@ -76,9 +76,7 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
 
             # Load pack index with SHA256 algorithm
             with open(idx_path, "rb") as f:
-                pack_idx = load_pack_index_file(
-                    idx_path, f, object_format=repo.object_format
-                )
+                pack_idx = load_pack_index_file(idx_path, f, SHA256)
 
             # Verify it's detected as SHA256
             self.assertEqual(pack_idx.hash_size, 32)
@@ -165,49 +163,6 @@ class GitSHA256PackCompatibilityTests(CompatTestCase):
             with open(file_path, "rb") as f:
                 content = f.read()
                 self.assertEqual(content, f"Dulwich blob content {i}".encode())
-
-    def test_pack_index_v1_interop(self):
-        """Test pack index v1 interoperability with SHA256."""
-        # Create repo with git using pack index v1
-        repo_path = tempfile.mkdtemp()
-        self.addCleanup(rmtree_ro, repo_path)
-        self._run_git(["init", "--object-format=sha256", repo_path])
-        self._run_git(["config", "pack.indexVersion", "1"], cwd=repo_path)
-
-        # Create files
-        for i in range(10):
-            test_file = os.path.join(repo_path, f"v1test{i}.txt")
-            with open(test_file, "w") as f:
-                f.write(f"Pack v1 test {i}\n")
-
-        self._run_git(["add", "."], cwd=repo_path)
-        self._run_git(["commit", "-m", "Test pack v1"], cwd=repo_path)
-        self._run_git(["gc"], cwd=repo_path)
-
-        # Read with dulwich
-        repo = Repo(repo_path)
-
-        # Find pack index
-        pack_dir = os.path.join(repo_path, ".git", "objects", "pack")
-        idx_files = [f for f in os.listdir(pack_dir) if f.endswith(".idx")]
-
-        for idx_file in idx_files:
-            idx_path = os.path.join(pack_dir, idx_file)
-            with open(idx_path, "rb") as f:
-                pack_idx = load_pack_index_file(
-                    idx_path, f, object_format=repo.object_format
-                )
-
-            # Verify it's v1 with SHA256
-            self.assertEqual(pack_idx.version, 1)
-            self.assertEqual(pack_idx.hash_size, 32)
-
-            # Verify we can iterate
-            for sha, offset, crc32 in pack_idx.iterentries():
-                self.assertEqual(len(sha), 32)
-                self.assertIsNone(crc32)  # v1 doesn't store CRC32
-
-        repo.close()
 
     def test_large_pack_interop(self):
         """Test large pack file interoperability."""

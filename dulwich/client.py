@@ -1631,7 +1631,9 @@ class TraditionalGitClient(GitClient):
 
             if self._should_send_pack(new_refs):
                 for chunk in PackChunkGenerator(
-                    pack_data_count, pack_data, object_format=DEFAULT_OBJECT_FORMAT
+                    num_records=pack_data_count,
+                    records=pack_data,
+                    object_format=DEFAULT_OBJECT_FORMAT,
                 ):
                     proto.write(chunk)
 
@@ -3993,7 +3995,10 @@ class AbstractHttpGitClient(GitClient):
             )
             if self._should_send_pack(new_refs):
                 yield from PackChunkGenerator(
-                    pack_data_count, pack_data, object_format=DEFAULT_OBJECT_FORMAT
+                    # TODO: Don't hardcode object format
+                    num_records=pack_data_count,
+                    records=pack_data,
+                    object_format=DEFAULT_OBJECT_FORMAT,
                 )
 
         resp, read = self._smart_request("git-receive-pack", url, data=body_generator())

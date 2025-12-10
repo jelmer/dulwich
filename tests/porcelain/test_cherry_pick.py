@@ -27,7 +27,7 @@ import tempfile
 
 from dulwich import porcelain
 
-from . import DependencyMissing, TestCase
+from .. import DependencyMissing, TestCase
 
 
 class PorcelainCherryPickTests(TestCase):

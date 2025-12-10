@@ -364,3 +364,46 @@ class GitSHA256CompatibilityTests(CompatTestCase):
         self.assertNotIn(b"error", fsck_output.lower())
         self.assertNotIn(b"missing", fsck_output.lower())
         self.assertNotIn(b"broken", fsck_output.lower())
+
+    def test_dulwich_clone_sha256_repo(self):
+        """Test that dulwich's clone() auto-detects SHA-256 format from git repo."""
+        from dulwich.client import LocalGitClient
+
+        # Create source SHA-256 repo with git
+        source_path = tempfile.mkdtemp()
+        self.addCleanup(rmtree_ro, source_path)
+        self._run_git(
+            ["init", "--object-format=sha256", "--initial-branch=main", source_path]
+        )
+
+        # Add content and commit
+        test_file = os.path.join(source_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("SHA-256 clone test")
+
+        self._run_git(["add", "test.txt"], cwd=source_path)
+        self._run_git(["commit", "-m", "Test commit"], cwd=source_path)
+
+        # Clone with dulwich LocalGitClient
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(rmtree_ro, target_path)
+
+        client = LocalGitClient()
+        cloned_repo = client.clone(source_path, target_path, mkdir=False)
+        self.addCleanup(cloned_repo.close)
+
+        # Verify the cloned repo is SHA-256
+        self.assertEqual(cloned_repo.object_format, SHA256)
+
+        # Verify config has correct objectformat extension
+        config = cloned_repo.get_config()
+        self.assertEqual(b"sha256", config.get((b"extensions",), b"objectformat"))
+
+        # Verify git also sees it as SHA-256
+        output = self._run_git(["rev-parse", "--show-object-format"], cwd=target_path)
+        self.assertEqual(output.strip(), b"sha256")
+
+        # Verify objects were cloned correctly
+        source_head = self._run_git(["rev-parse", "refs/heads/main"], cwd=source_path)
+        cloned_head = cloned_repo.refs[b"refs/heads/main"]
+        self.assertEqual(source_head.strip(), cloned_head)

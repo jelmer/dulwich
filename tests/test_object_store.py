@@ -387,7 +387,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
         # Load and verify it's version 1
         idx_path = os.path.join(pack_dir, idx_files[0])
-        idx = load_pack_index(idx_path)
+        idx = load_pack_index(idx_path, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(1, idx.version)
 
         # Test version 3
@@ -416,7 +416,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual(1, len(idx_files2))
 
         idx_path2 = os.path.join(pack_dir2, idx_files2[0])
-        idx2 = load_pack_index(idx_path2)
+        idx2 = load_pack_index(idx_path2, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(3, idx2.version)
 
     def test_prune_orphaned_tempfiles(self) -> None:

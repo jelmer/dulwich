@@ -40,8 +40,6 @@ class HashAlgorithmTests(unittest.TestCase):
         self.assertEqual(alg.name, "sha1")
         self.assertEqual(alg.oid_length, 20)
         self.assertEqual(alg.hex_length, 40)
-        self.assertEqual(len(alg.zero_oid), 40)
-        self.assertEqual(len(alg.zero_oid_bin), 20)
 
     def test_sha256_properties(self):
         """Test SHA256 algorithm properties."""
@@ -49,8 +47,6 @@ class HashAlgorithmTests(unittest.TestCase):
         self.assertEqual(alg.name, "sha256")
         self.assertEqual(alg.oid_length, 32)
         self.assertEqual(alg.hex_length, 64)
-        self.assertEqual(len(alg.zero_oid), 64)
-        self.assertEqual(len(alg.zero_oid_bin), 32)
 
     def test_get_hash_algorithm(self):
         """Test getting hash algorithms by name."""

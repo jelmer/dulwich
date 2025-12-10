@@ -179,6 +179,7 @@ def self_test_suite() -> unittest.TestSuite:
         "repository",
         "rerere",
         "server",
+        "source",
         "sparse_patterns",
         "stash",
         "stripspace",

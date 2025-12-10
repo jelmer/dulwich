@@ -17,6 +17,7 @@
 # <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
+#
 
 """Implementation of merge-base following the approach of git."""
 

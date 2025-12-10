@@ -20,7 +20,6 @@
 # License, Version 2.0.
 #
 
-
 """Python implementation of the Git file formats and protocols."""
 
 from collections.abc import Callable

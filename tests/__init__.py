@@ -198,7 +198,9 @@ def self_test_suite() -> unittest.TestSuite:
         "merge",
         "notes",
     ]
-    module_names += ["tests.porcelain"] + ["tests.porcelain.test_" + name for name in porcelain_names]
+    module_names += ["tests.porcelain"] + [
+        "tests.porcelain.test_" + name for name in porcelain_names
+    ]
     loader = unittest.TestLoader()
     return loader.loadTestsFromNames(module_names)
 

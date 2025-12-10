@@ -1,6 +1,7 @@
 # stripspace.py -- Git stripspace functionality
 # Copyright (C) 2025 Jelmer Vernooij <jelmer@jelmer.uk>
 #
+# SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
 # General Public License as published by the Free Software Foundation; version 2.0
 # or (at your option) any later version. You can redistribute it and/or
@@ -16,6 +17,7 @@
 # <http://www.gnu.org/licenses/> for a copy of the GNU General Public License
 # and <http://www.apache.org/licenses/LICENSE-2.0> for a copy of the Apache
 # License, Version 2.0.
+#
 
 """Git stripspace functionality for cleaning up text and commit messages."""
 

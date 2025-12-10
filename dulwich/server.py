@@ -136,6 +136,7 @@ from .protocol import (
     ReceivableProtocol,
     ack_type,
     capability_agent,
+    capability_object_format,
     extract_capabilities,
     extract_want_line_capabilities,
     format_ack_line,
@@ -341,10 +342,9 @@ class PackHandler(Handler):
         self._done_received = False
         self.advertise_refs = False
 
-    @classmethod
-    def capabilities(cls) -> Iterable[bytes]:
+    def capabilities(self) -> Iterable[bytes]:
         """Return a list of capabilities supported by this handler."""
-        raise NotImplementedError(cls.capabilities)
+        raise NotImplementedError(self.capabilities)
 
     @classmethod
     def innocuous_capabilities(cls) -> Iterable[bytes]:
@@ -440,9 +440,12 @@ class UploadPackHandler(PackHandler):
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
 
-    @classmethod
-    def capabilities(cls) -> list[bytes]:
-        """Return the list of capabilities supported by upload-pack."""
+    def capabilities(self) -> list[bytes]:
+        """Return the list of capabilities supported by upload-pack.
+
+        Returns:
+            List of capabilities including object-format for the repository
+        """
         return [
             CAPABILITY_MULTI_ACK_DETAILED,
             CAPABILITY_MULTI_ACK,
@@ -453,6 +456,7 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_INCLUDE_TAG,
             CAPABILITY_SHALLOW,
             CAPABILITY_NO_DONE,
+            capability_object_format(self.repo.object_format.name),
         ]
 
     @classmethod
@@ -1297,12 +1301,11 @@ class ReceivePackHandler(PackHandler):
         self.repo = backend.open_repository(args[0])
         self.advertise_refs = advertise_refs
 
-    @classmethod
-    def capabilities(cls) -> Iterable[bytes]:
+    def capabilities(self) -> Iterable[bytes]:
         """Return supported capabilities.
 
         Returns:
-            List of capability names
+            List of capability names including object-format for the repository
         """
         return [
             CAPABILITY_REPORT_STATUS,
@@ -1311,6 +1314,7 @@ class ReceivePackHandler(PackHandler):
             CAPABILITY_OFS_DELTA,
             CAPABILITY_SIDE_BAND_64K,
             CAPABILITY_NO_DONE,
+            capability_object_format(self.repo.object_format.name),
         ]
 
     def _apply_pack(

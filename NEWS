@@ -6,6 +6,9 @@ compatible.
 
  * Fix ParamikoSSHVendor interface compatibility with SSHVendor. (Jelmer Vernooĳ, #2028)
 
+ * Fix smudge filter subprocess fallback for special characters in path.
+   (Petr Chmelar, #1878)
+
  * Fix UTF-8 decode error in process filter protocol when handling binary files.
    (Jelmer Vernooĳ, #2023)
 
@@ -323,9 +326,6 @@ compatible.
  * Add support for ``core.preloadIndex`` configuration setting to enable
    parallel stat operations when checking for unstaged changes. This improves
    performance on slow filesystems like NFS. (Jelmer Vernooĳ, #1851)
-
- * Fix smudge filter subprocess fallback for special characters in path.
-   (Petr Chmelar, #1878)
 
 0.24.1	2025-08-01
 

@@ -605,9 +605,7 @@ def load_pack_index_file(
                 size=size,
             )
         elif version == 3:
-            return PackIndex3(
-                path, object_format, file=f, contents=contents, size=size
-            )
+            return PackIndex3(path, object_format, file=f, contents=contents, size=size)
         else:
             raise KeyError(f"Unknown pack index format {version}")
     else:

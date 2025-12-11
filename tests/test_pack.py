@@ -613,15 +613,21 @@ class TestPackData(PackTests):
             )
             self.assertEqual(
                 sha1(b"abcd1234wxyz").hexdigest(),
-                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func, buffer_size=5).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, buffer_size=5
+                ).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"abcd1234").hexdigest(),
-                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func, end_ofs=-4).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, end_ofs=-4
+                ).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234wxyz").hexdigest(),
-                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func, start_ofs=4).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, start_ofs=4
+                ).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234").hexdigest(),
@@ -636,13 +642,27 @@ class TestPackData(PackTests):
         f = BytesIO(b"abcd1234wxyz")
         try:
             self.assertRaises(
-                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT.hash_func, -20
+                AssertionError,
+                compute_file_sha,
+                f,
+                DEFAULT_OBJECT_FORMAT.hash_func,
+                -20,
             )
             self.assertRaises(
-                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT.hash_func, 0, 20
+                AssertionError,
+                compute_file_sha,
+                f,
+                DEFAULT_OBJECT_FORMAT.hash_func,
+                0,
+                20,
             )
             self.assertRaises(
-                AssertionError, compute_file_sha, f, DEFAULT_OBJECT_FORMAT.hash_func, 10, -12
+                AssertionError,
+                compute_file_sha,
+                f,
+                DEFAULT_OBJECT_FORMAT.hash_func,
+                10,
+                -12,
             )
         finally:
             f.close()

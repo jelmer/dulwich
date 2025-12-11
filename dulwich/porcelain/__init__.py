@@ -1571,14 +1571,25 @@ def add(
                     )
                 )
                 for untracked_path in current_untracked:
+                    # Convert bytes to string if needed
+                    if isinstance(untracked_path, bytes):
+                        untracked_path_str = untracked_path.decode("utf-8")
+                    else:
+                        untracked_path_str = untracked_path
+
                     # If we're scanning a subdirectory, adjust the path
                     if relpath != ".":
-                        untracked_path = posixpath.join(relpath, untracked_path)
+                        untracked_path_str = posixpath.join(relpath, untracked_path_str)
+                        untracked_path = (
+                            untracked_path_str.encode("utf-8")
+                            if isinstance(untracked_path, bytes)
+                            else untracked_path_str
+                        )
 
-                    if not ignore_manager.is_ignored(untracked_path):
-                        relpaths.append(untracked_path)
+                    if not ignore_manager.is_ignored(untracked_path_str):
+                        relpaths.append(untracked_path_str)
                     else:
-                        ignored.add(untracked_path)
+                        ignored.add(untracked_path_str)
 
                 # Also add unstaged (modified) files within this directory
                 for unstaged_path in all_unstaged_paths:
@@ -2989,7 +3000,7 @@ def status(
         )
         if sys.platform == "win32":
             untracked_changes = [
-                path.replace(os.path.sep, "/") for path in untracked_paths
+                path.replace(os.fsencode(os.path.sep), b"/") for path in untracked_paths
             ]
         else:
             untracked_changes = list(untracked_paths)
@@ -3084,7 +3095,7 @@ def get_untracked_paths(
     index: Index,
     exclude_ignored: bool = False,
     untracked_files: str = "all",
-) -> Iterator[str]:
+) -> Iterator[bytes]:
     """Get untracked paths.
 
     Args:
@@ -3145,7 +3156,9 @@ def get_untracked_paths(
             if ignore_manager.is_ignored(ip) is True:
                 if not exclude_ignored:
                     ignored_dirs.append(
-                        os.path.join(os.path.relpath(path, frompath_str), "")
+                        os.fsencode(
+                            os.path.join(os.path.relpath(path, frompath_str), "")
+                        )
                     )
                 del dirnames[i]
                 continue
@@ -3176,7 +3189,7 @@ def get_untracked_paths(
                     # Check if it should be excluded due to ignore rules
                     is_ignored = ignore_manager.is_ignored(rel_path_base)
                     if not exclude_ignored or not is_ignored:
-                        untracked_dir_list.append(rel_path_from)
+                        untracked_dir_list.append(os.fsencode(rel_path_from))
                     del dirnames[i]
 
         return dirnames
@@ -3194,7 +3207,7 @@ def get_untracked_paths(
                     if not exclude_ignored or not ignore_manager.is_ignored(
                         os.path.relpath(ap, basepath_str)
                     ):
-                        yield os.path.relpath(ap, frompath_str)
+                        yield os.fsencode(os.path.relpath(ap, frompath_str))
     else:  # "normal" mode
         # Walk directories, handling both files and directories
         for ap, is_dir in _walk_working_dir_paths(
@@ -3212,7 +3225,7 @@ def get_untracked_paths(
                     if not exclude_ignored or not ignore_manager.is_ignored(
                         os.path.relpath(ap, basepath_str)
                     ):
-                        yield os.path.join(os.path.relpath(ap, frompath_str), "")
+                        yield os.fsencode(os.path.relpath(ap, frompath_str))
             else:
                 # Check individual files in directories that contain tracked files
                 ip = path_to_tree_path(basepath_str, ap)
@@ -3220,7 +3233,7 @@ def get_untracked_paths(
                     if not exclude_ignored or not ignore_manager.is_ignored(
                         os.path.relpath(ap, basepath_str)
                     ):
-                        yield os.path.relpath(ap, frompath_str)
+                        yield os.fsencode(os.path.relpath(ap, frompath_str))
 
         # Yield any untracked directories found during pruning
         yield from untracked_dir_list

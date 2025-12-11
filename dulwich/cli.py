@@ -3324,12 +3324,22 @@ class cmd_status(Command):
             sys.stdout.write("Untracked files:\n\n")
             if parsed_args.column:
                 # Format untracked files in columns
-                untracked_names = [name for name in status.untracked]
+                untracked_names = [
+                    name.decode(sys.getfilesystemencoding())
+                    if isinstance(name, bytes)
+                    else name
+                    for name in status.untracked
+                ]
                 output = format_columns(untracked_names, mode="column", indent="\t")
                 sys.stdout.write(output)
             else:
                 for name in status.untracked:
-                    sys.stdout.write(f"\t{name}\n")
+                    decoded_name = (
+                        name.decode(sys.getfilesystemencoding())
+                        if isinstance(name, bytes)
+                        else name
+                    )
+                    sys.stdout.write(f"\t{decoded_name}\n")
             sys.stdout.write("\n")
 
 

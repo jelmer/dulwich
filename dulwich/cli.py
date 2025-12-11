@@ -1606,9 +1606,9 @@ class cmd_dump_pack(Command):
         )
         parsed_args = parser.parse_args(args)
 
-        from .object_format import OBJECT_FORMAT_NAMES
+        from .object_format import OBJECT_FORMATS
 
-        object_format = OBJECT_FORMAT_NAMES[parsed_args.object_format]
+        object_format = OBJECT_FORMATS[parsed_args.object_format]
         basename, _ = os.path.splitext(parsed_args.filename)
         x = Pack(basename, object_format=object_format)
         logger.info("Object names checksum: %s", x.name().decode("ascii", "replace"))

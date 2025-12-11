@@ -226,9 +226,7 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
     Returns:
       Compressed JSON bytes containing pack information
     """
-    pack = Pack.from_objects(
-        pack_data, pack_index
-    )
+    pack = Pack.from_objects(pack_data, pack_index)
     info: dict[bytes, Any] = {}
     for obj in pack.iterobjects():
         # Commit
@@ -895,7 +893,9 @@ class SwiftObjectStore(PackBasedObjectStore):
                 f.close()
                 self.scon.put_object(basename + ".idx", index)
                 index.close()
-                final_pack = SwiftPack(basename, object_format=self.object_format, scon=self.scon)
+                final_pack = SwiftPack(
+                    basename, object_format=self.object_format, scon=self.scon
+                )
                 final_pack.check_length_and_checksum()
                 self._add_cached_pack(basename, final_pack)
                 return final_pack
@@ -1020,7 +1020,9 @@ class SwiftObjectStore(PackBasedObjectStore):
         pack_info_file.close()
 
         # Add the pack to the store and return it.
-        final_pack = SwiftPack(pack_base_name, object_format=self.object_format, scon=self.scon)
+        final_pack = SwiftPack(
+            pack_base_name, object_format=self.object_format, scon=self.scon
+        )
         final_pack.check_length_and_checksum()
         self._add_cached_pack(pack_base_name, final_pack)
         return final_pack

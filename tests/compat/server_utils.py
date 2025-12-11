@@ -351,9 +351,7 @@ class NoSideBand64kReceivePackHandler(ReceivePackHandler):
     """ReceivePackHandler that does not support side-band-64k."""
 
     def capabilities(self):
-        return [
-            c for c in super().capabilities() if c != CAPABILITY_SIDE_BAND_64K
-        ]
+        return [c for c in super().capabilities() if c != CAPABILITY_SIDE_BAND_64K]
 
 
 def ignore_error(error):

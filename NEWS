@@ -4,6 +4,9 @@
 is ahead of a 1.0 release, after which API changes will be kept backwards
 compatible.
 
+ * status: Return untracked paths as bytestrings, similar to other
+   paths. (Jelmer Vernooĳ, #889)
+
  * Fix ParamikoSSHVendor interface compatibility with SSHVendor. (Jelmer Vernooĳ, #2028)
 
  * Fix smudge filter subprocess fallback for special characters in path.

@@ -190,7 +190,9 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         porcelain.add(self.repo, paths=[full_path])
         self.worktree.unstage([file])
         status = list(porcelain.status(self.repo))
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], [b"foo"]], status
+        )
 
     def test_unstage_add_file(self):
         """Test unstaging a newly added file."""
@@ -207,7 +209,9 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         porcelain.add(self.repo, paths=[full_path])
         self.worktree.unstage([file])
         status = list(porcelain.status(self.repo))
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], [b"foo"]], status
+        )
 
     def test_unstage_modify_file(self):
         """Test unstaging a modified file."""

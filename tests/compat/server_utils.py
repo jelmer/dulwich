@@ -80,7 +80,7 @@ class ServerTests:
         self._new_repo = self.import_repo("server_new.export")
 
     def url(self, port) -> str:
-        return f"{self.protocol}://localhost:{port}/"
+        return f"{self.protocol}://127.0.0.1:{port}/"
 
     def branch_args(self, branches=None):
         if branches is None:

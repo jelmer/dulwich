@@ -28,7 +28,6 @@ Warning: these tests should be fairly stable, but when writing/debugging new
 
 import os
 import shutil
-import sys
 import tempfile
 import threading
 
@@ -37,12 +36,10 @@ from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 from dulwich.server import DictBackend, TCPGitServer
 
-from .. import skipIf
 from .server_utils import NoSideBand64kReceivePackHandler, ServerTests
 from .utils import CompatTestCase, require_git_version, run_git_or_fail
 
 
-@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class GitServerTestCase(ServerTests, CompatTestCase):
     """Tests for client/server compatibility.
 
@@ -69,7 +66,7 @@ class GitServerTestCase(ServerTests, CompatTestCase):
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
-        dul_server = TCPGitServer(backend, b"localhost", 0, handlers=self._handlers())
+        dul_server = TCPGitServer(backend, "127.0.0.1", 0, handlers=self._handlers())
         self._check_server(dul_server, repo)
 
         # Start server in a thread
@@ -90,7 +87,6 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         return port
 
 
-@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class GitServerSideBand64kTestCase(GitServerTestCase):
     """Tests for client/server compatibility with side-band-64k support."""
 
@@ -122,7 +118,6 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         self.assertIn(b"side-band-64k", caps)
 
 
-@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class GitServerSHA256TestCase(CompatTestCase):
     """Tests for SHA-256 repository server compatibility with git client."""
 
@@ -136,7 +131,7 @@ class GitServerSHA256TestCase(CompatTestCase):
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
-        dul_server = TCPGitServer(backend, b"localhost", 0)
+        dul_server = TCPGitServer(backend, "127.0.0.1", 0)
 
         # Start server in a thread
         server_thread = threading.Thread(target=dul_server.serve)
@@ -155,7 +150,7 @@ class GitServerSHA256TestCase(CompatTestCase):
         return port
 
     def url(self, port) -> str:
-        return f"{self.protocol}://localhost:{port}/"
+        return f"{self.protocol}://127.0.0.1:{port}/"
 
     def test_clone_sha256_repo_from_dulwich_server(self) -> None:
         """Test that git client can clone SHA-256 repo from dulwich server."""

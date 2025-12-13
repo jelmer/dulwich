@@ -1157,7 +1157,7 @@ class GitClient:
 
     def fetch(
         self,
-        path: bytes,
+        path: bytes | str,
         target: BaseRepo,
         determine_wants: "DetermineWantsFunc | None" = None,
         progress: Callable[[bytes], None] | None = None,
@@ -1239,7 +1239,7 @@ class GitClient:
 
     def fetch_pack(
         self,
-        path: bytes,
+        path: bytes | str,
         determine_wants: "DetermineWantsFunc",
         graph_walker: GraphWalker,
         pack_data: Callable[[bytes], int],
@@ -1598,7 +1598,7 @@ class TraditionalGitClient(GitClient):
 
     def fetch_pack(
         self,
-        path: bytes,
+        path: bytes | str,
         determine_wants: "DetermineWantsFunc",
         graph_walker: GraphWalker,
         pack_data: Callable[[bytes], int],
@@ -2350,7 +2350,7 @@ class LocalGitClient(GitClient):
 
     def fetch(
         self,
-        path: bytes,
+        path: bytes | str,
         target: BaseRepo,
         determine_wants: "DetermineWantsFunc | None" = None,
         progress: Callable[[bytes], None] | None = None,
@@ -2680,7 +2680,7 @@ class BundleClient(GitClient):
 
     def fetch(
         self,
-        path: bytes,
+        path: bytes | str,
         target: BaseRepo,
         determine_wants: "DetermineWantsFunc | None" = None,
         progress: Callable[[bytes], None] | None = None,

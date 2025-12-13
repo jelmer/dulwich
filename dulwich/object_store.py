@@ -70,12 +70,14 @@ from typing import (
     cast,
 )
 
+if TYPE_CHECKING:
+    from .object_format import ObjectFormat
+
 from .errors import NotTreeError
 from .file import GitFile, _GitFile
 from .midx import MultiPackIndex, load_midx
 from .objects import (
     S_ISGITLINK,
-    ZERO_SHA,
     Blob,
     Commit,
     ObjectID,
@@ -319,6 +321,16 @@ class PackContainer(Protocol):
 class BaseObjectStore:
     """Object store interface."""
 
+    def __init__(self, *, object_format: "ObjectFormat | None" = None) -> None:
+        """Initialize object store.
+
+        Args:
+            object_format: Object format to use (defaults to DEFAULT_OBJECT_FORMAT)
+        """
+        from .object_format import DEFAULT_OBJECT_FORMAT
+
+        self.object_format = object_format if object_format else DEFAULT_OBJECT_FORMAT
+
     def determine_wants_all(
         self, refs: Mapping[Ref, ObjectID], depth: int | None = None
     ) -> list[ObjectID]:
@@ -336,7 +348,6 @@ class BaseObjectStore:
             for (ref, sha) in refs.items()
             if (sha not in self or _want_deepen(sha))
             and not ref.endswith(PEELED_TAG_SUFFIX)
-            and not sha == ZERO_SHA
         ]
 
     def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
@@ -371,7 +382,9 @@ class BaseObjectStore:
     def __getitem__(self, sha1: ObjectID | RawObjectID) -> ShaFile:
         """Obtain an object by SHA1."""
         type_num, uncomp = self.get_raw(sha1)
-        return ShaFile.from_raw_string(type_num, uncomp, sha=sha1)
+        return ShaFile.from_raw_string(
+            type_num, uncomp, sha=sha1, object_format=self.object_format
+        )
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""
@@ -816,6 +829,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         pack_depth: int | None = None,
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
+        *,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -828,7 +843,9 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           pack_depth: Maximum depth for pack deltas
           pack_threads: Number of threads to use for packing
           pack_big_file_threshold: Threshold for treating files as "big"
+          object_format: Hash algorithm to use
         """
+        super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
@@ -899,6 +916,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 num_records=count,
                 progress=progress,
                 compression_level=self.pack_compression_level,
+                object_format=self.object_format,
             )
         except BaseException:
             abort()
@@ -1167,13 +1185,12 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           name: sha for the object.
         Returns: tuple with numeric type and object contents.
         """
-        if name == ZERO_SHA:
-            raise KeyError(name)
-        if len(name) == 40:
-            sha = hex_to_sha(cast(ObjectID, name))
-            hexsha = cast(ObjectID, name)
-        elif len(name) == 20:
-            sha = cast(RawObjectID, name)
+        sha: RawObjectID
+        if len(name) == self.object_format.hex_length:
+            sha = hex_to_sha(ObjectID(name))
+            hexsha = name
+        elif len(name) == self.object_format.oid_length:
+            sha = RawObjectID(name)
             hexsha = None
         else:
             raise AssertionError(f"Invalid object name {name!r}")
@@ -1305,12 +1322,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           sha1: sha for the object.
           include_comp: Whether to include compression metadata.
         """
-        if sha1 == ZERO_SHA:
-            raise KeyError(sha1)
-        if len(sha1) == 40:
+        if len(sha1) == self.object_format.hex_length:
             sha = hex_to_sha(cast(ObjectID, sha1))
             hexsha = cast(ObjectID, sha1)
-        elif len(sha1) == 20:
+        elif len(sha1) == self.object_format.oid_length:
             sha = cast(RawObjectID, sha1)
             hexsha = None
         else:
@@ -1382,6 +1397,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_write_bitmap_lookup_table: bool = True,
         file_mode: int | None = None,
         dir_mode: int | None = None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Open an object store.
 
@@ -1402,7 +1418,11 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_write_bitmap_lookup_table: whether to include lookup table in bitmaps
           file_mode: File permission mask for shared repository
           dir_mode: Directory permission mask for shared repository
+          object_format: Hash algorithm to use (SHA1 or SHA256)
         """
+        # Import here to avoid circular dependency
+        from .object_format import DEFAULT_OBJECT_FORMAT
+
         super().__init__(
             pack_compression_level=pack_compression_level,
             pack_index_version=pack_index_version,
@@ -1412,6 +1432,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth=pack_depth,
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
+            object_format=object_format if object_format else DEFAULT_OBJECT_FORMAT,
         )
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
@@ -1540,6 +1561,24 @@ class DiskObjectStore(PackBasedObjectStore):
                 (b"repack",), b"writeBitmaps", False
             )
 
+        # Get hash algorithm from config
+        from .object_format import get_object_format
+
+        object_format = None
+        try:
+            try:
+                version = int(config.get((b"core",), b"repositoryformatversion"))
+            except KeyError:
+                version = 0
+            if version == 1:
+                try:
+                    object_format_name = config.get((b"extensions",), b"objectformat")
+                except KeyError:
+                    object_format_name = b"sha1"
+                object_format = get_object_format(object_format_name.decode("ascii"))
+        except (KeyError, ValueError):
+            pass
+
         instance = cls(
             path,
             loose_compression_level=loose_compression_level,
@@ -1557,6 +1596,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_write_bitmap_lookup_table=pack_write_bitmap_lookup_table,
             file_mode=file_mode,
             dir_mode=dir_mode,
+            object_format=object_format,
         )
         instance._use_commit_graph = use_commit_graph
         instance._use_midx = use_midx
@@ -1641,6 +1681,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if f not in self._pack_cache:
                 pack = Pack(
                     os.path.join(self.pack_dir, f),
+                    object_format=self.object_format,
                     delta_window_size=self.pack_delta_window_size,
                     window_memory=self.pack_window_memory,
                     delta_cache_size=self.pack_delta_cache_size,
@@ -1675,6 +1716,9 @@ class DiskObjectStore(PackBasedObjectStore):
         Returns:
             Number of loose objects
         """
+        # Calculate expected filename length for loose
+        # objects (excluding directory)
+        fn_length = self.object_format.hex_length - 2
         count = 0
         if not os.path.exists(self.path):
             return 0
@@ -1683,11 +1727,7 @@ class DiskObjectStore(PackBasedObjectStore):
             subdir = os.path.join(self.path, f"{i:02x}")
             try:
                 count += len(
-                    [
-                        name
-                        for name in os.listdir(subdir)
-                        if len(name) == 38  # 40 - 2 for the prefix
-                    ]
+                    [name for name in os.listdir(subdir) if len(name) == fn_length]
                 )
             except FileNotFoundError:
                 # Directory may have been removed or is inaccessible
@@ -1698,7 +1738,13 @@ class DiskObjectStore(PackBasedObjectStore):
     def _get_loose_object(self, sha: ObjectID | RawObjectID) -> ShaFile | None:
         path = self._get_shafile_path(sha)
         try:
-            return ShaFile.from_path(path)
+            # Load the object from path with SHA and hash algorithm from object store
+            # Convert to hex ObjectID if needed
+            if len(sha) == self.object_format.oid_length:
+                hex_sha: ObjectID = sha_to_hex(RawObjectID(sha))
+            else:
+                hex_sha = ObjectID(sha)
+            return ShaFile.from_path(path, hex_sha, object_format=self.object_format)
         except FileNotFoundError:
             return None
 
@@ -1800,6 +1846,7 @@ class DiskObjectStore(PackBasedObjectStore):
             get_raw=self.get_raw,
             compression_level=self.pack_compression_level,
             progress=progress,
+            object_format=self.object_format,
         )
         f.flush()
         if self.fsync_object_files:
@@ -1853,7 +1900,9 @@ class DiskObjectStore(PackBasedObjectStore):
             # Load the index we just wrote
             with open(target_index_path, "rb") as idx_file:
                 pack_index = load_pack_index_file(
-                    os.path.basename(target_index_path), idx_file
+                    os.path.basename(target_index_path),
+                    idx_file,
+                    self.object_format,
                 )
 
             # Generate the bitmap
@@ -1879,6 +1928,7 @@ class DiskObjectStore(PackBasedObjectStore):
         # Add the pack to the store and return it.
         final_pack = Pack(
             pack_base_name,
+            object_format=self.object_format,
             delta_window_size=self.pack_delta_window_size,
             window_memory=self.pack_window_memory,
             delta_cache_size=self.pack_delta_cache_size,
@@ -1916,8 +1966,18 @@ class DiskObjectStore(PackBasedObjectStore):
         fd, path = tempfile.mkstemp(dir=self.path, prefix="tmp_pack_")
         with os.fdopen(fd, "w+b") as f:
             os.chmod(path, PACK_MODE)
-            indexer = PackIndexer(f, resolve_ext_ref=self.get_raw)  # type: ignore[arg-type]
-            copier = PackStreamCopier(read_all, read_some, f, delta_iter=indexer)  # type: ignore[arg-type]
+            indexer = PackIndexer(
+                f,
+                self.object_format.hash_func,
+                resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
+            )
+            copier = PackStreamCopier(
+                self.object_format.hash_func,
+                read_all,
+                read_some,
+                f,
+                delta_iter=indexer,  # type: ignore[arg-type]
+            )
             copier.verify(progress=progress)
             return self._complete_pack(f, path, len(copier), indexer, progress=progress)
 
@@ -1941,7 +2001,7 @@ class DiskObjectStore(PackBasedObjectStore):
             if f.tell() > 0:
                 f.seek(0)
 
-                with PackData(path, f) as pd:
+                with PackData(path, file=f, object_format=self.object_format) as pd:
                     indexer = PackIndexer.for_pack_data(
                         pd,
                         resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
@@ -1964,7 +2024,9 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           obj: Object to add
         """
-        path = self._get_shafile_path(obj.id)
+        # Use the correct hash algorithm for the object ID
+        obj_id = ObjectID(obj.get_id(self.object_format))
+        path = self._get_shafile_path(obj_id)
         dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
@@ -1987,6 +2049,7 @@ class DiskObjectStore(PackBasedObjectStore):
         *,
         file_mode: int | None = None,
         dir_mode: int | None = None,
+        object_format: "ObjectFormat | None" = None,
     ) -> "DiskObjectStore":
         """Initialize a new disk object store.
 
@@ -1996,6 +2059,7 @@ class DiskObjectStore(PackBasedObjectStore):
           path: Path where the object store should be created
           file_mode: Optional file permission mask for shared repository
           dir_mode: Optional directory permission mask for shared repository
+          object_format: Hash algorithm to use (SHA1 or SHA256)
 
         Returns:
           New DiskObjectStore instance
@@ -2013,7 +2077,9 @@ class DiskObjectStore(PackBasedObjectStore):
         if dir_mode is not None:
             os.chmod(info_path, dir_mode)
             os.chmod(pack_path, dir_mode)
-        return cls(path, file_mode=file_mode, dir_mode=dir_mode)
+        return cls(
+            path, file_mode=file_mode, dir_mode=dir_mode, object_format=object_format
+        )
 
     def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
         """Iterate over all object SHAs with the given prefix.
@@ -2126,6 +2192,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         pack = Pack(
             pack_path,
+            object_format=self.object_format,
             delta_window_size=self.pack_delta_window_size,
             window_memory=self.pack_window_memory,
             delta_cache_size=self.pack_delta_cache_size,
@@ -2170,15 +2237,14 @@ class DiskObjectStore(PackBasedObjectStore):
         Raises:
             KeyError: If object not found
         """
-        if name == ZERO_SHA:
-            raise KeyError(name)
-
         sha: RawObjectID
-        if len(name) == 40:
+        if len(name) in (40, 64):
             # name is ObjectID (hex), convert to RawObjectID
+            # Support both SHA1 (40) and SHA256 (64)
             sha = hex_to_sha(cast(ObjectID, name))
-        elif len(name) == 20:
+        elif len(name) in (20, 32):
             # name is already RawObjectID (binary)
+            # Support both SHA1 (20) and SHA256 (32)
             sha = RawObjectID(name)
         else:
             raise AssertionError(f"Invalid object name {name!r}")
@@ -2265,8 +2331,22 @@ class DiskObjectStore(PackBasedObjectStore):
             # Get all reachable commits
             commit_ids = get_reachable_commits(self, all_refs)
         else:
-            # Just use the direct ref targets (already ObjectIDs)
-            commit_ids = all_refs
+            # Just use the direct ref targets - ensure they're hex ObjectIDs
+            commit_ids = []
+            for ref in all_refs:
+                if isinstance(ref, bytes) and len(ref) == self.object_format.hex_length:
+                    # Already hex ObjectID
+                    commit_ids.append(ref)
+                elif (
+                    isinstance(ref, bytes) and len(ref) == self.object_format.oid_length
+                ):
+                    # Binary SHA, convert to hex ObjectID
+                    from .objects import sha_to_hex
+
+                    commit_ids.append(sha_to_hex(RawObjectID(ref)))
+                else:
+                    # Assume it's already correct format
+                    commit_ids.append(ref)
 
         if commit_ids:
             # Write commit graph directly to our object store path
@@ -2367,19 +2447,22 @@ class DiskObjectStore(PackBasedObjectStore):
 class MemoryObjectStore(PackCapableObjectStore):
     """Object store that keeps all objects in memory."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, object_format: "ObjectFormat | None" = None) -> None:
         """Initialize a MemoryObjectStore.
 
         Creates an empty in-memory object store.
+
+        Args:
+            object_format: Hash algorithm to use (defaults to SHA1)
         """
-        super().__init__()
+        super().__init__(object_format=object_format)
         self._data: dict[ObjectID, ShaFile] = {}
         self.pack_compression_level = -1
 
     def _to_hexsha(self, sha: ObjectID | RawObjectID) -> ObjectID:
-        if len(sha) == 40:
+        if len(sha) == self.object_format.hex_length:
             return cast(ObjectID, sha)
-        elif len(sha) == 20:
+        elif len(sha) == self.object_format.oid_length:
             return sha_to_hex(cast(RawObjectID, sha))
         else:
             raise ValueError(f"Invalid sha {sha!r}")
@@ -2465,7 +2548,7 @@ class MemoryObjectStore(PackCapableObjectStore):
             if size > 0:
                 f.seek(0)
 
-                p = PackData.from_file(f, size)
+                p = PackData.from_file(f, self.object_format, size)
                 for obj in PackInflater.for_pack_data(p, self.get_raw):  # type: ignore[arg-type]
                     self.add_object(obj)
                 p.close()
@@ -2504,6 +2587,7 @@ class MemoryObjectStore(PackCapableObjectStore):
                 unpacked_objects,
                 num_records=count,
                 progress=progress,
+                object_format=self.object_format,
             )
         except BaseException:
             abort()
@@ -2513,8 +2597,8 @@ class MemoryObjectStore(PackCapableObjectStore):
 
     def add_thin_pack(
         self,
-        read_all: Callable[[], bytes],
-        read_some: Callable[[int], bytes],
+        read_all: Callable[[int], bytes],
+        read_some: Callable[[int], bytes] | None,
         progress: Callable[[str], None] | None = None,
     ) -> None:
         """Add a new thin pack to this object store.
@@ -2532,7 +2616,12 @@ class MemoryObjectStore(PackCapableObjectStore):
         """
         f, commit, abort = self.add_pack()
         try:
-            copier = PackStreamCopier(read_all, read_some, f)  # type: ignore[arg-type]
+            copier = PackStreamCopier(
+                self.object_format.hash_func,
+                read_all,
+                read_some,
+                f,
+            )
             copier.verify()
         except BaseException:
             abort()
@@ -2871,6 +2960,7 @@ class ObjectStoreGraphWalker:
     def ack(self, sha: ObjectID) -> None:
         """Ack that a revision and its ancestors are present in the source."""
         if len(sha) != 40:
+            # TODO: support SHA256
             raise ValueError(f"unexpected sha {sha!r} received")
         ancestors = {sha}
 
@@ -2986,7 +3076,20 @@ class OverlayObjectStore(BaseObjectStore):
         Args:
           bases: List of base object stores to overlay
           add_store: Optional store to write new objects to
+
+        Raises:
+          ValueError: If stores have different hash algorithms
         """
+        from .object_format import verify_same_object_format
+
+        # Verify all stores use the same hash algorithm
+        store_algorithms = [store.object_format for store in bases]
+        if add_store:
+            store_algorithms.append(add_store.object_format)
+
+        object_format = verify_same_object_format(*store_algorithms)
+
+        super().__init__(object_format=object_format)
         self.bases = bases
         self.add_store = add_store
 
@@ -3250,7 +3353,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
 
             pf.seek(0)
 
-            p = PackData(pf.name, pf)
+            p = PackData(pf.name, file=pf, object_format=self.object_format)
             entries = p.sorted_entries()
             basename = iter_sha1(entry[0] for entry in entries).decode("ascii")
             idxf = tempfile.SpooledTemporaryFile(
@@ -3259,7 +3362,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
             checksum = p.get_stored_checksum()
             write_pack_index(idxf, entries, checksum, version=self.pack_index_version)
             idxf.seek(0)
-            idx = load_pack_index_file(basename + ".idx", idxf)
+            idx = load_pack_index_file(basename + ".idx", idxf, self.object_format)
             for pack in self.packs:
                 if pack.get_stored_checksum() == p.get_stored_checksum():
                     p.close()

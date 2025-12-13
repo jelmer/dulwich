@@ -17,7 +17,7 @@ from dulwich.gc import (
     prune_unreachable_objects,
     should_run_gc,
 )
-from dulwich.objects import Blob, Commit, Tag, Tree
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tag, Tree
 from dulwich.repo import MemoryRepo, Repo
 
 
@@ -357,7 +357,7 @@ class GCTestCase(TestCase):
         self.repo.refs[b"HEAD"] = commit.id
 
         # Create a broken ref pointing to non-existent object
-        broken_sha = b"0" * 40
+        broken_sha = ZERO_SHA
         self.repo.refs[b"refs/heads/broken"] = broken_sha
 
         # Track progress to see warning

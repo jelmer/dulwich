@@ -154,6 +154,7 @@ from .bundle import Bundle
 from .config import Config, apply_instead_of, get_xdg_config_home_path
 from .credentials import match_partial_url, match_urls
 from .errors import GitProtocolError, HangupException, NotGitRepository, SendPackError
+from .object_format import DEFAULT_OBJECT_FORMAT
 from .object_store import GraphWalker
 from .objects import ObjectID
 from .pack import (
@@ -393,6 +394,24 @@ def read_server_capabilities(pkt_seq: Iterable[bytes]) -> set[bytes]:
     return set(server_capabilities)
 
 
+def extract_object_format_from_capabilities(
+    capabilities: set[bytes],
+) -> str | None:
+    """Extract object format from server capabilities.
+
+    Args:
+        capabilities: Server capabilities
+
+    Returns:
+        Object format name as string (e.g., "sha1", "sha256"), or None if not specified
+    """
+    for capability in capabilities:
+        k, v = parse_capability(capability)
+        if k == b"object-format" and v is not None:
+            return v.decode("ascii").strip()
+    return None
+
+
 def read_pkt_refs_v2(
     pkt_seq: Iterable[bytes],
 ) -> tuple[dict[Ref, ObjectID | None], dict[Ref, Ref], dict[Ref, ObjectID]]:
@@ -509,11 +528,13 @@ class FetchPackResult(_DeprecatedDictProxy):
       refs: Dictionary with all remote refs
       symrefs: Dictionary with remote symrefs
       agent: User agent string
+      object_format: Object format name (e.g., "sha1", "sha256") used by the remote, or None if not specified
     """
 
     refs: dict[Ref, ObjectID | None]
     symrefs: dict[Ref, Ref]
     agent: bytes | None
+    object_format: str | None
 
     def __init__(
         self,
@@ -522,6 +543,7 @@ class FetchPackResult(_DeprecatedDictProxy):
         agent: bytes | None,
         new_shallow: set[ObjectID] | None = None,
         new_unshallow: set[ObjectID] | None = None,
+        object_format: str | None = None,
     ) -> None:
         """Initialize FetchPackResult.
 
@@ -531,12 +553,14 @@ class FetchPackResult(_DeprecatedDictProxy):
             agent: User agent string
             new_shallow: New shallow commits
             new_unshallow: New unshallow commits
+            object_format: Object format name (e.g., "sha1", "sha256") used by the remote
         """
         self.refs = refs
         self.symrefs = symrefs
         self.agent = agent
         self.new_shallow = new_shallow
         self.new_unshallow = new_unshallow
+        self.object_format = object_format
 
     def __eq__(self, other: object) -> bool:
         """Check equality with another object."""
@@ -562,21 +586,28 @@ class LsRemoteResult(_DeprecatedDictProxy):
     Attributes:
       refs: Dictionary with all remote refs
       symrefs: Dictionary with remote symrefs
+      object_format: Object format name (e.g., "sha1", "sha256") used by the remote, or None if not specified
     """
 
     symrefs: dict[Ref, Ref]
+    object_format: str | None
 
     def __init__(
-        self, refs: dict[Ref, ObjectID | None], symrefs: dict[Ref, Ref]
+        self,
+        refs: dict[Ref, ObjectID | None],
+        symrefs: dict[Ref, Ref],
+        object_format: str | None = None,
     ) -> None:
         """Initialize LsRemoteResult.
 
         Args:
             refs: Dictionary with all remote refs
             symrefs: Dictionary with remote symrefs
+            object_format: Object format name (e.g., "sha1", "sha256") used by the remote
         """
         self.refs = refs
         self.symrefs = symrefs
+        self.object_format = object_format
 
     def _warn_deprecated(self) -> None:
         import warnings
@@ -1074,6 +1105,10 @@ class GitClient:
             os.mkdir(target_path)
 
         try:
+            # For network clones, create repository with default SHA-1 format initially.
+            # If remote uses a different format, fetch() will auto-change the repo's format
+            # (since repo is empty at this point).
+            # Subclasses (e.g., LocalGitClient) override to detect format first for efficiency.
             target = None
             if not bare:
                 target = Repo.init(target_path)
@@ -1113,6 +1148,7 @@ class GitClient:
                 filter_spec=filter_spec,
                 protocol_version=protocol_version,
             )
+
             if origin is not None:
                 _import_remote_refs(
                     target.refs, origin, result.refs, message=ref_message
@@ -1229,6 +1265,14 @@ class GitClient:
                 shallow_since=shallow_since,
                 shallow_exclude=shallow_exclude,
             )
+
+            # Fix object format if needed
+            if (
+                result.object_format
+                and result.object_format != target.object_format.name
+            ):
+                # Change the target repo's format if it's empty
+                target._change_object_format(result.object_format)
         except BaseException:
             abort()
             raise
@@ -1586,7 +1630,11 @@ class TraditionalGitClient(GitClient):
             )
 
             if self._should_send_pack(new_refs):
-                for chunk in PackChunkGenerator(pack_data_count, pack_data):
+                for chunk in PackChunkGenerator(
+                    num_records=pack_data_count,
+                    records=pack_data,
+                    object_format=DEFAULT_OBJECT_FORMAT,
+                ):
                     proto.write(chunk)
 
             ref_status = self._handle_receive_pack_tail(
@@ -1657,6 +1705,7 @@ class TraditionalGitClient(GitClient):
             refs: dict[Ref, ObjectID | None]
             symrefs: dict[Ref, Ref]
             agent: bytes | None
+            object_format: str | None
             if self.protocol_version == 2:
                 try:
                     server_capabilities = read_server_capabilities(proto.read_pkt_seq())
@@ -1667,6 +1716,9 @@ class TraditionalGitClient(GitClient):
                     symrefs,
                     agent,
                 ) = self._negotiate_upload_pack_capabilities(server_capabilities)
+                object_format = extract_object_format_from_capabilities(
+                    server_capabilities
+                )
 
                 proto.write_pkt_line(b"command=ls-refs\n")
                 proto.write(b"0001")  # delim-pkt
@@ -1692,13 +1744,18 @@ class TraditionalGitClient(GitClient):
                     symrefs,
                     agent,
                 ) = self._negotiate_upload_pack_capabilities(server_capabilities)
+                object_format = extract_object_format_from_capabilities(
+                    server_capabilities
+                )
 
                 if ref_prefix is not None:
                     refs = filter_ref_prefix(refs, ref_prefix)
 
             if refs is None:
                 proto.write_pkt_line(None)
-                return FetchPackResult(refs, symrefs, agent)
+                return FetchPackResult(
+                    refs, symrefs, agent, object_format=object_format
+                )
 
             try:
                 # Filter out None values (shouldn't be any in v1 protocol)
@@ -1716,7 +1773,9 @@ class TraditionalGitClient(GitClient):
                 wants = [cid for cid in wants if cid != ZERO_SHA]
             if not wants:
                 proto.write_pkt_line(None)
-                return FetchPackResult(refs, symrefs, agent)
+                return FetchPackResult(
+                    refs, symrefs, agent, object_format=object_format
+                )
             if self.protocol_version == 2:
                 proto.write_pkt_line(b"command=fetch\n")
                 proto.write(b"0001")  # delim-pkt
@@ -1754,7 +1813,9 @@ class TraditionalGitClient(GitClient):
                 progress,
                 protocol_version=self.protocol_version,
             )
-            return FetchPackResult(refs, symrefs, agent, new_shallow, new_unshallow)
+            return FetchPackResult(
+                refs, symrefs, agent, new_shallow, new_unshallow, object_format
+            )
 
     def get_refs(
         self,
@@ -1782,6 +1843,7 @@ class TraditionalGitClient(GitClient):
         self.protocol_version = server_protocol_version
         if self.protocol_version == 2:
             server_capabilities = read_server_capabilities(proto.read_pkt_seq())
+            object_format = extract_object_format_from_capabilities(server_capabilities)
             proto.write_pkt_line(b"command=ls-refs\n")
             proto.write(b"0001")  # delim-pkt
             proto.write_pkt_line(b"symrefs")
@@ -1799,7 +1861,7 @@ class TraditionalGitClient(GitClient):
                 proto.write_pkt_line(None)
                 for refname, refvalue in peeled.items():
                     refs[Ref(refname + PEELED_TAG_SUFFIX)] = refvalue
-                return LsRemoteResult(refs, symrefs)
+                return LsRemoteResult(refs, symrefs, object_format=object_format)
         else:
             with proto:
                 try:
@@ -1811,10 +1873,13 @@ class TraditionalGitClient(GitClient):
                 except HangupException as exc:
                     raise _remote_error_from_stderr(stderr) from exc
                 proto.write_pkt_line(None)
+                object_format = extract_object_format_from_capabilities(
+                    server_capabilities
+                )
                 (symrefs, _agent) = _extract_symrefs_and_agent(server_capabilities)
                 if ref_prefix is not None:
                     refs = filter_ref_prefix(refs, ref_prefix)
-                return LsRemoteResult(refs, symrefs)
+                return LsRemoteResult(refs, symrefs, object_format=object_format)
 
     def archive(
         self,
@@ -2393,7 +2458,10 @@ class LocalGitClient(GitClient):
                 depth=depth,
             )
             return FetchPackResult(
-                _to_optional_dict(refs), r.refs.get_symrefs(), agent_string()
+                _to_optional_dict(refs),
+                r.refs.get_symrefs(),
+                agent_string(),
+                object_format=r.object_format.name,
             )
 
     def fetch_pack(
@@ -2451,15 +2519,23 @@ class LocalGitClient(GitClient):
             # Did the process short-circuit (e.g. in a stateless RPC call)?
             # Note that the client still expects a 0-object pack in most cases.
             if object_ids is None:
-                return FetchPackResult(None, symrefs, agent)
+                return FetchPackResult(
+                    None, symrefs, agent, object_format=r.object_format.name
+                )
             write_pack_from_container(
                 pack_data,  # type: ignore[arg-type]
                 r.object_store,
                 object_ids,
                 other_haves=other_haves,
+                object_format=r.object_format,
             )
             # Convert refs to Optional type for FetchPackResult
-            return FetchPackResult(_to_optional_dict(r.get_refs()), symrefs, agent)
+            return FetchPackResult(
+                _to_optional_dict(r.get_refs()),
+                symrefs,
+                agent,
+                object_format=r.object_format.name,
+            )
 
     def get_refs(
         self,
@@ -2485,7 +2561,116 @@ class LocalGitClient(GitClient):
                 except (KeyError, ValueError):
                     # Not a symbolic ref or error reading it
                     pass
-            return LsRemoteResult(refs, symrefs)
+            return LsRemoteResult(
+                refs, symrefs, object_format=target.object_format.name
+            )
+
+    def clone(
+        self,
+        path: str,
+        target_path: str,
+        mkdir: bool = True,
+        bare: bool = False,
+        origin: str | None = "origin",
+        checkout: bool | None = None,
+        branch: str | None = None,
+        progress: Callable[[bytes], None] | None = None,
+        depth: int | None = None,
+        ref_prefix: Sequence[bytes] | None = None,
+        filter_spec: bytes | None = None,
+        protocol_version: int | None = None,
+    ) -> Repo:
+        """Clone a local repository.
+
+        For local clones, we can detect the object format before creating
+        the target repository.
+        """
+        # Detect the object format from the source repository
+        with self._open_repo(path) as source_repo:
+            object_format_name = source_repo.object_format.name
+
+        if mkdir:
+            os.mkdir(target_path)
+
+        try:
+            # Create repository with the correct object format from the start
+            target = None
+            if not bare:
+                target = Repo.init(target_path, object_format=object_format_name)
+                if checkout is None:
+                    checkout = True
+            else:
+                if checkout:
+                    raise ValueError("checkout and bare are incompatible")
+                target = Repo.init_bare(target_path, object_format=object_format_name)
+
+            encoded_path = path.encode("utf-8")
+
+            assert target is not None
+            if origin is not None:
+                target_config = target.get_config()
+                target_config.set(
+                    (b"remote", origin.encode("utf-8")), b"url", encoded_path
+                )
+                target_config.set(
+                    (b"remote", origin.encode("utf-8")),
+                    b"fetch",
+                    b"+refs/heads/*:refs/remotes/" + origin.encode("utf-8") + b"/*",
+                )
+                target_config.write_to_path()
+
+            ref_message = b"clone: from " + encoded_path
+            result = self.fetch(
+                path.encode("utf-8"),
+                target,
+                progress=progress,
+                depth=depth,
+                ref_prefix=ref_prefix,
+                filter_spec=filter_spec,
+                protocol_version=protocol_version,
+            )
+
+            if origin is not None:
+                _import_remote_refs(
+                    target.refs, origin, result.refs, message=ref_message
+                )
+
+            origin_head = result.symrefs.get(HEADREF)
+            origin_sha = result.refs.get(HEADREF)
+            if origin is None or (origin_sha and not origin_head):
+                # set detached HEAD
+                if origin_sha is not None:
+                    target.refs[HEADREF] = origin_sha
+                    head = origin_sha
+                else:
+                    head = None
+            else:
+                _set_origin_head(target.refs, origin.encode("utf-8"), origin_head)
+                head_ref = _set_default_branch(
+                    target.refs,
+                    origin.encode("utf-8"),
+                    origin_head,
+                    branch.encode("utf-8") if branch is not None else None,
+                    ref_message,
+                )
+
+                # Update target head
+                if head_ref:
+                    head = _set_head(target.refs, head_ref, ref_message)
+                else:
+                    head = None
+
+            if checkout and head is not None:
+                target.get_worktree().reset_index()
+        except BaseException:
+            if target is not None:
+                target.close()
+            if mkdir:
+                import shutil
+
+                shutil.rmtree(target_path)
+            raise
+        return target
 
 
 class BundleClient(GitClient):
@@ -2716,7 +2901,7 @@ class BundleClient(GitClient):
         from io import BytesIO
 
         pack_io = BytesIO(pack_bytes)
-        pack_data = PackData.from_file(pack_io)
+        pack_data = PackData.from_file(pack_io, object_format=DEFAULT_OBJECT_FORMAT)
         target.object_store.add_pack_data(len(pack_data), pack_data.iter_unpacked())
 
         # Apply ref filtering if specified
@@ -3809,7 +3994,12 @@ class AbstractHttpGitClient(GitClient):
                 progress=progress,
             )
             if self._should_send_pack(new_refs):
-                yield from PackChunkGenerator(pack_data_count, pack_data)
+                yield from PackChunkGenerator(
+                    # TODO: Don't hardcode object format
+                    num_records=pack_data_count,
+                    records=pack_data,
+                    object_format=DEFAULT_OBJECT_FORMAT,
+                )
 
         resp, read = self._smart_request("git-receive-pack", url, data=body_generator())
         try:
@@ -3874,6 +4064,7 @@ class AbstractHttpGitClient(GitClient):
             capa_symrefs,
             agent,
         ) = self._negotiate_upload_pack_capabilities(server_capabilities)
+        object_format = extract_object_format_from_capabilities(server_capabilities)
         if not symrefs and capa_symrefs:
             symrefs = capa_symrefs
         # Filter out None values from refs for determine_wants
@@ -3885,7 +4076,7 @@ class AbstractHttpGitClient(GitClient):
         if wants is not None:
             wants = [cid for cid in wants if cid != ZERO_SHA]
         if not wants and not self.dumb:
-            return FetchPackResult(refs, symrefs, agent)
+            return FetchPackResult(refs, symrefs, agent, object_format=object_format)
         elif self.dumb:
             # Use dumb HTTP protocol
             from .dumb import DumbRemoteHTTPRepo
@@ -3921,9 +4112,10 @@ class AbstractHttpGitClient(GitClient):
                     iter(pack_data_list),
                     num_records=len(pack_data_list),
                     progress=progress,
+                    object_format=DEFAULT_OBJECT_FORMAT,
                 )
 
-            return FetchPackResult(refs, symrefs, agent)
+            return FetchPackResult(refs, symrefs, agent, object_format=object_format)
         req_data = BytesIO()
         req_proto = Protocol(None, req_data.write)  # type: ignore
         (new_shallow, new_unshallow) = _handle_upload_pack_head(
@@ -3970,7 +4162,9 @@ class AbstractHttpGitClient(GitClient):
                 progress,
                 protocol_version=self.protocol_version,
             )
-            return FetchPackResult(refs, symrefs, agent, new_shallow, new_unshallow)
+            return FetchPackResult(
+                refs, symrefs, agent, new_shallow, new_unshallow, object_format
+            )
         finally:
             resp.close()
 
@@ -3982,15 +4176,16 @@ class AbstractHttpGitClient(GitClient):
     ) -> LsRemoteResult:
         """Retrieve the current refs from a git smart server."""
         url = self._get_url(path)
-        refs, _, _, symrefs, peeled = self._discover_references(
+        refs, server_capabilities, _, symrefs, peeled = self._discover_references(
             b"git-upload-pack",
             url,
             protocol_version=protocol_version,
             ref_prefix=ref_prefix,
         )
+        object_format = extract_object_format_from_capabilities(server_capabilities)
         for refname, refvalue in peeled.items():
             refs[Ref(refname + PEELED_TAG_SUFFIX)] = refvalue
-        return LsRemoteResult(refs, symrefs)
+        return LsRemoteResult(refs, symrefs, object_format=object_format)
 
     def get_url(self, path: str) -> str:
         """Get the HTTP URL for a path."""

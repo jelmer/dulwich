@@ -81,6 +81,7 @@ from typing import IO, TYPE_CHECKING
 from typing import Protocol as TypingProtocol
 
 if TYPE_CHECKING:
+    from .object_format import ObjectFormat
     from .object_store import BaseObjectStore
     from .repo import BaseRepo
 
@@ -129,12 +130,12 @@ from .protocol import (
     SIDE_BAND_CHANNEL_PROGRESS,
     SINGLE_ACK,
     TCP_GIT_PORT,
-    ZERO_SHA,
     BufferedPktLineWriter,
     Protocol,
     ReceivableProtocol,
     ack_type,
     capability_agent,
+    capability_object_format,
     extract_capabilities,
     extract_want_line_capabilities,
     format_ack_line,
@@ -174,6 +175,7 @@ class BackendRepo(TypingProtocol):
 
     object_store: PackBasedObjectStore
     refs: RefsContainer
+    object_format: "ObjectFormat"
 
     def get_refs(self) -> dict[bytes, bytes]:
         """Get all the refs in the repository.
@@ -339,10 +341,9 @@ class PackHandler(Handler):
         self._done_received = False
         self.advertise_refs = False
 
-    @classmethod
-    def capabilities(cls) -> Iterable[bytes]:
+    def capabilities(self) -> Iterable[bytes]:
         """Return a list of capabilities supported by this handler."""
-        raise NotImplementedError(cls.capabilities)
+        raise NotImplementedError(self.capabilities)
 
     @classmethod
     def innocuous_capabilities(cls) -> Iterable[bytes]:
@@ -438,9 +439,12 @@ class UploadPackHandler(PackHandler):
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
 
-    @classmethod
-    def capabilities(cls) -> list[bytes]:
-        """Return the list of capabilities supported by upload-pack."""
+    def capabilities(self) -> list[bytes]:
+        """Return the list of capabilities supported by upload-pack.
+
+        Returns:
+            List of capabilities including object-format for the repository
+        """
         return [
             CAPABILITY_MULTI_ACK_DETAILED,
             CAPABILITY_MULTI_ACK,
@@ -451,6 +455,7 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_INCLUDE_TAG,
             CAPABILITY_SHALLOW,
             CAPABILITY_NO_DONE,
+            capability_object_format(self.repo.object_format.name),
         ]
 
     @classmethod
@@ -585,6 +590,7 @@ class UploadPackHandler(PackHandler):
             self.write_pack_data,
             self.repo.object_store,
             object_ids,
+            object_format=self.repo.object_format,
         )
         # we are done
         self.proto.write_pkt_line(None)
@@ -871,12 +877,12 @@ class _ProtocolGraphWalker:
         """Acknowledge a have reference.
 
         Args:
-          have_ref: SHA to acknowledge (40 bytes hex)
+          have_ref: SHA to acknowledge (40 bytes hex for SHA-1, 64 bytes for SHA-256)
 
         Raises:
-          ValueError: If have_ref is not 40 bytes
+          ValueError: If have_ref is not a valid length
         """
-        if len(have_ref) != 40:
+        if len(have_ref) not in (40, 64):
             raise ValueError(f"invalid sha {have_ref!r}")
         assert self._impl is not None
         return self._impl.ack(have_ref)
@@ -1294,12 +1300,11 @@ class ReceivePackHandler(PackHandler):
         self.repo = backend.open_repository(args[0])
         self.advertise_refs = advertise_refs
 
-    @classmethod
-    def capabilities(cls) -> Iterable[bytes]:
+    def capabilities(self) -> Iterable[bytes]:
         """Return supported capabilities.
 
         Returns:
-            List of capability names
+            List of capability names including object-format for the repository
         """
         return [
             CAPABILITY_REPORT_STATUS,
@@ -1308,6 +1313,7 @@ class ReceivePackHandler(PackHandler):
             CAPABILITY_OFS_DELTA,
             CAPABILITY_SIDE_BAND_64K,
             CAPABILITY_NO_DONE,
+            capability_object_format(self.repo.object_format.name),
         ]
 
     def _apply_pack(
@@ -1332,9 +1338,10 @@ class ReceivePackHandler(PackHandler):
             ObjectFormatException,
         )
         will_send_pack = False
+        zero_sha = ObjectID(b"0" * self.repo.object_format.hex_length)
 
         for command in refs:
-            if command[1] != ZERO_SHA:
+            if command[1] != zero_sha:
                 will_send_pack = True
 
         if will_send_pack:
@@ -1356,7 +1363,7 @@ class ReceivePackHandler(PackHandler):
         for oldsha, sha, ref in refs:
             ref_status = b"ok"
             try:
-                if sha == ZERO_SHA:
+                if sha == zero_sha:
                     if CAPABILITY_DELETE_REFS not in self.capabilities():
                         raise GitProtocolError(
                             "Attempted to delete refs without delete-refs capability."
@@ -1429,7 +1436,8 @@ class ReceivePackHandler(PackHandler):
             symrefs = sorted(self.repo.refs.get_symrefs().items())
 
             if not refs:
-                refs = [(CAPABILITIES_REF, ZERO_SHA)]
+                zero_sha = ObjectID(b"0" * self.repo.object_format.hex_length)
+                refs = [(CAPABILITIES_REF, zero_sha)]
             logger.info("Sending capabilities: %s", self.capabilities())
             self.proto.write_pkt_line(
                 format_ref_line(

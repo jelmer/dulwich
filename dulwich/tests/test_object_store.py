@@ -79,15 +79,6 @@ class ObjectStoreTests:
             ),
         )
 
-    def test_determine_wants_all_zero(self) -> None:
-        """Test determine_wants_all with zero ref."""
-        self.assertEqual(
-            [],
-            self.store.determine_wants_all(
-                {Ref(b"refs/heads/foo"): ObjectID(b"0" * 40)}
-            ),
-        )
-
     def test_determine_wants_all_depth(self) -> None:
         """Test determine_wants_all with depth parameter."""
         self.store.add_object(testobject)

@@ -22,6 +22,8 @@
 """Tests for filters."""
 
 import os
+import shutil
+import sys
 import tempfile
 import threading
 from collections.abc import Iterator
@@ -711,11 +713,9 @@ class FilterContextTests(TestCase):
 
     def test_filter_context_with_real_process_filter(self):
         """Test FilterContext with real ProcessFilterDriver instances."""
-        import sys
-
         # Use existing test filter from ProcessFilterDriverTests
         test_dir = tempfile.mkdtemp()
-        self.addCleanup(lambda: __import__("shutil").rmtree(test_dir))
+        self.addCleanup(shutil.rmtree, test_dir)
 
         # Create a simple test filter that just passes data through
         filter_script = _PASSTHROUGH_FILTER_SCRIPT

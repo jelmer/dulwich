@@ -33,6 +33,7 @@ from dulwich.bitmap import (
     PackBitmap,
     write_bitmap,
 )
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.pack import Pack
 from dulwich.repo import Repo
 
@@ -99,7 +100,7 @@ class BitmapCompatTests(TestCase):
         )
 
         # Try to load the bitmap using Dulwich
-        with Pack(pack_path) as pack:
+        with Pack(pack_path, object_format=DEFAULT_OBJECT_FORMAT) as pack:
             bitmap = pack.bitmap
 
             # Basic checks
@@ -196,7 +197,7 @@ class BitmapCompatTests(TestCase):
         pack_path = os.path.join(pack_dir, pack_basename)
 
         # Load the pack and create bitmap data, then close before writing
-        with Pack(pack_path) as pack:
+        with Pack(pack_path, object_format=DEFAULT_OBJECT_FORMAT) as pack:
             # Create a simple bitmap for testing
             # Git requires BITMAP_OPT_FULL_DAG flag
             bitmap = PackBitmap(
@@ -261,7 +262,7 @@ class BitmapCompatTests(TestCase):
         bitmap_name = bitmap_files[0]
         pack_basename = bitmap_name.replace(".bitmap", "")
         pack_path = os.path.join(pack_dir, pack_basename)
-        with Pack(pack_path) as pack:
+        with Pack(pack_path, object_format=DEFAULT_OBJECT_FORMAT) as pack:
             bitmap = pack.bitmap
 
             self.assertIsNotNone(bitmap)

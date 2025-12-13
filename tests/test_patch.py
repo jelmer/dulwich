@@ -25,7 +25,7 @@ from io import BytesIO, StringIO
 from typing import NoReturn
 
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, Blob, Commit, Tree
+from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Commit, Tree
 from dulwich.patch import (
     DiffAlgorithmNotAvailable,
     commit_patch_id,
@@ -875,7 +875,7 @@ index 3b0f961..a116b51 644
         # Create a commit
         commit = Commit()
         commit.tree = tree2.id
-        commit.parents = [b"0" * 40]  # Fake parent
+        commit.parents = [ZERO_SHA]  # Fake parent
         commit.author = commit.committer = b"Test <test@example.com>"
         commit.author_time = commit.commit_time = 1234567890
         commit.author_timezone = commit.commit_timezone = 0

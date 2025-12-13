@@ -25,7 +25,7 @@ import unittest
 
 from dulwich.filter_branch import CommitFilter, filter_refs
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import Commit, Tree
+from dulwich.objects import ZERO_SHA, Commit, Tree
 from dulwich.refs import DictRefsContainer
 
 
@@ -179,7 +179,7 @@ class FilterRefsTests(unittest.TestCase):
     def test_filter_refs_already_filtered(self):
         """Test error when refs already filtered."""
         # Set up an "already filtered" state
-        self.refs[b"refs/original/refs/heads/master"] = b"0" * 40
+        self.refs[b"refs/original/refs/heads/master"] = ZERO_SHA
 
         filter = CommitFilter(self.store)
         with self.assertRaises(ValueError) as cm:
@@ -194,7 +194,7 @@ class FilterRefsTests(unittest.TestCase):
     def test_filter_refs_force(self):
         """Test force filtering."""
         # Set up an "already filtered" state
-        self.refs[b"refs/original/refs/heads/master"] = b"0" * 40
+        self.refs[b"refs/original/refs/heads/master"] = ZERO_SHA
 
         filter = CommitFilter(self.store)
         # Should not raise with force=True

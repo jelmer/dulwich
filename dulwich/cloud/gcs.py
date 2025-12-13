@@ -87,18 +87,19 @@ class GcsObjectStore(BucketBasedObjectStore):
         with tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE) as f:
             b.download_to_file(f)
             f.seek(0)
-            return PackData(name + ".pack", cast(_GitFile, f))
+            return PackData(name + ".pack", self.object_format, cast(_GitFile, f))
 
     def _load_pack_index(self, name: str) -> PackIndex:
         b = self.bucket.blob(posixpath.join(self.subpath, name + ".idx"))
         with tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE) as f:
             b.download_to_file(f)
             f.seek(0)
-            return load_pack_index_file(name + ".idx", f)
+            return load_pack_index_file(name + ".idx", f, self.object_format)
 
     def _get_pack(self, name: str) -> Pack:
         return Pack.from_lazy_objects(
-            lambda: self._load_pack_data(name), lambda: self._load_pack_index(name)
+            lambda: self._load_pack_data(name),
+            lambda: self._load_pack_index(name),
         )
 
     def _upload_pack(

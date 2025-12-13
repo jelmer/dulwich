@@ -33,6 +33,7 @@ from itertools import permutations
 from dulwich.errors import ObjectFormatException
 from dulwich.objects import (
     MAX_TIME,
+    ZERO_SHA,
     Blob,
     Commit,
     ShaFile,
@@ -994,7 +995,7 @@ class TreeTests(ShaFileCheckTests):
         o = Tree.from_path(hex_to_filename(dir, tree_sha))
         self.assertEqual(
             [(b"a", 0o100644, a_sha), (b"b", 0o100644, b_sha)],
-            list(parse_tree(o.as_raw_string())),
+            list(parse_tree(o.as_raw_string(), 20)),
         )
         # test a broken tree that has a leading 0 on the file mode
         broken_tree = b"0100644 foo\0" + hex_to_sha(a_sha)
@@ -1002,9 +1003,9 @@ class TreeTests(ShaFileCheckTests):
         def eval_parse_tree(*args, **kwargs):
             return list(parse_tree(*args, **kwargs))
 
-        self.assertEqual([(b"foo", 0o100644, a_sha)], eval_parse_tree(broken_tree))
+        self.assertEqual([(b"foo", 0o100644, a_sha)], eval_parse_tree(broken_tree, 20))
         self.assertRaises(
-            ObjectFormatException, eval_parse_tree, broken_tree, strict=True
+            ObjectFormatException, eval_parse_tree, broken_tree, 20, strict=True
         )
 
     test_parse_tree = functest_builder(_do_test_parse_tree, _parse_tree_py)
@@ -1665,7 +1666,7 @@ class ShaFileCopyTests(TestCase):
             tagger=b"Tagger <test@example.com>",
             tag_time=12345,
             tag_timezone=0,
-            object=(Commit, b"0" * 40),
+            object=(Commit, ZERO_SHA),
         )
         self.assert_copy(tag)
 
@@ -1734,7 +1735,7 @@ class ShaFileSerializeTests(TestCase):
             tagger=b"Tagger <test@example.com>",
             tag_time=12345,
             tag_timezone=0,
-            object=(Commit, b"0" * 40),
+            object=(Commit, ZERO_SHA),
         )
 
         with self.assert_serialization_on_change(tag):
@@ -1747,7 +1748,7 @@ class ShaFileSerializeTests(TestCase):
                 name=b"tag",
                 message=b"some message",
                 tagger=b"Tagger <test@example.com> 1174773719+0000",
-                object=(Commit, b"0" * 40),
+                object=(Commit, ZERO_SHA),
             )
             tag._deserialize(tag._serialize())
 

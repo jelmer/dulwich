@@ -28,7 +28,7 @@ from unittest.mock import Mock
 
 from dulwich.dumb import DumbHTTPObjectStore, DumbRemoteHTTPRepo
 from dulwich.errors import NotGitRepository
-from dulwich.objects import Blob, Commit, ShaFile, Tag, Tree, sha_to_hex
+from dulwich.objects import ZERO_SHA, Blob, Commit, ShaFile, Tag, Tree, sha_to_hex
 
 
 class MockResponse:
@@ -171,7 +171,7 @@ P pack-abcdef1234567890abcdef1234567890abcdef12.pack
         self._add_response(path, self._make_object(blob))
 
         self.assertTrue(self.store.contains_loose(hex_sha))
-        self.assertFalse(self.store.contains_loose(b"0" * 40))
+        self.assertFalse(self.store.contains_loose(ZERO_SHA))
 
     def test_add_object_not_implemented(self) -> None:
         blob = Blob()

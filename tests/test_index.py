@@ -69,7 +69,7 @@ from dulwich.index import (
     write_index_dict,
 )
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, Blob, Tree, TreeEntry
+from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Tree, TreeEntry
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
@@ -1578,7 +1578,7 @@ class TestManyFilesFeature(TestCase):
             uid=1000,
             gid=1000,
             size=5,
-            sha=b"0" * 40,
+            sha=ZERO_SHA,
         )
         index[b"test.txt"] = entry
 
@@ -1607,7 +1607,7 @@ class TestManyFilesFeature(TestCase):
             uid=1000,
             gid=1000,
             size=5,
-            sha=b"0" * 40,
+            sha=ZERO_SHA,
         )
         index[b"test.txt"] = entry
 
@@ -1638,7 +1638,7 @@ class TestManyFilesFeature(TestCase):
                 uid=1000,
                 gid=1000,
                 size=5,
-                sha=b"0" * 40,
+                sha=ZERO_SHA,
                 flags=0,
                 extended_flags=0,
             ),
@@ -1866,7 +1866,7 @@ class TestPathPrefixCompression(TestCase):
                 uid=1000,
                 gid=1000,
                 size=10,
-                sha=b"0" * 40,
+                sha=ZERO_SHA,
             )
             index_v2[path] = entry
         index_v2.write()

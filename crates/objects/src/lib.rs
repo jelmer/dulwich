@@ -50,14 +50,16 @@ fn sha_to_pyhex(py: Python, sha: &[u8]) -> PyResult<Py<PyAny>> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (text, strict=None))]
+#[pyo3(signature = (text, sha_len, strict=None))]
 fn parse_tree(
     py: Python,
     mut text: &[u8],
+    sha_len: usize,
     strict: Option<bool>,
 ) -> PyResult<Vec<(Py<PyAny>, u32, Py<PyAny>)>> {
-    let mut entries = Vec::new();
     let strict = strict.unwrap_or(false);
+
+    let mut entries = Vec::new();
     while !text.is_empty() {
         let mode_end = memchr(b' ', text)
             .ok_or_else(|| ObjectFormatException::new_err(("Missing terminator for mode",)))?;
@@ -73,17 +75,22 @@ fn parse_tree(
         let namelen = memchr(b'\0', text)
             .ok_or_else(|| ObjectFormatException::new_err(("Missing trailing \\0",)))?;
         let name = &text[..namelen];
-        if namelen + 20 >= text.len() {
+
+        // Skip name and null terminator
+        text = &text[namelen + 1..];
+
+        // Check if we have enough bytes for the hash
+        if text.len() < sha_len {
             return Err(ObjectFormatException::new_err(("SHA truncated",)));
         }
-        text = &text[namelen + 1..];
-        let sha = &text[..20];
+
+        let sha = &text[..sha_len];
         entries.push((
             PyBytes::new(py, name).into_pyobject(py)?.unbind().into(),
             mode,
             sha_to_pyhex(py, sha)?,
         ));
-        text = &text[20..];
+        text = &text[sha_len..];
     }
     Ok(entries)
 }
@@ -151,8 +158,7 @@ fn sorted_tree_items(
                         .unbind()
                         .into_any(),
                 ))?
-                .unbind()
-                .into())
+                .unbind())
         })
         .collect::<PyResult<Vec<Py<PyAny>>>>()
 }

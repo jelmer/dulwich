@@ -85,7 +85,7 @@ class SubmoduleTests(TestCase):
         binary_file_sha = bytes.fromhex(file_sha.decode("ascii"))
 
         # Generate a valid SHA for the submodule
-        submodule_sha = b"1" * 40
+        submodule_sha = b"1" * repo.object_format.hex_length
         binary_submodule_sha = bytes.fromhex(submodule_sha.decode("ascii"))
 
         # Create raw tree data

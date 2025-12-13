@@ -62,7 +62,8 @@ from dulwich.client import (
     parse_rsync_url,
 )
 from dulwich.config import ConfigDict
-from dulwich.objects import Blob, Commit, Tree
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
 from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
 from dulwich.repo import MemoryRepo, Repo
@@ -404,7 +405,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
@@ -428,7 +429,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
@@ -461,7 +462,7 @@ class GitClientTests(TestCase):
             return 0, []
 
         f = BytesIO()
-        write_pack_objects(f.write, [])
+        write_pack_objects(f.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         self.client.send_pack("/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -507,7 +508,11 @@ class GitClientTests(TestCase):
 
         f = BytesIO()
         count, records = generate_pack_data(None, None)
-        write_pack_data(f.write, records, num_records=count)
+        from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+
+        write_pack_data(
+            f.write, records, num_records=count, object_format=DEFAULT_OBJECT_FORMAT
+        )
         self.client.send_pack(b"/", update_refs, generate_pack_data)
         self.assertEqual(
             self.rout.getvalue(),
@@ -532,7 +537,7 @@ class GitClientTests(TestCase):
         self.rin.seek(0)
 
         def update_refs(refs):
-            return {b"refs/heads/master": b"0" * 40}
+            return {b"refs/heads/master": ZERO_SHA}
 
         def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
             return 0, []
@@ -1110,6 +1115,54 @@ class LocalGitClientTests(TestCase):
         expected[b"refs/remotes/origin/master"] = expected[b"refs/heads/master"]
         self.assertEqual(expected, result_repo.get_refs())
 
+    def test_clone_sha256_local(self) -> None:
+        """Test that cloning a SHA-256 local repo creates a SHA-256 clone."""
+        client = LocalGitClient()
+
+        # Create a SHA-256 source repository
+        source_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, source_path)
+        source_repo = Repo.init(source_path, object_format="sha256")
+
+        # Verify source is SHA-256
+        self.assertEqual("sha256", source_repo.object_format.name)
+        source_repo.close()
+
+        # Clone the repository
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        cloned_repo = client.clone(source_path, target_path, mkdir=False)
+        self.addCleanup(cloned_repo.close)
+
+        # Verify the clone uses SHA-256
+        self.assertEqual("sha256", cloned_repo.object_format.name)
+
+        # Verify the config has the correct objectformat extension
+        config = cloned_repo.get_config()
+        self.assertEqual(b"sha256", config.get((b"extensions",), b"objectformat"))
+
+    def test_clone_sha1_local(self) -> None:
+        """Test that cloning a SHA-1 local repo creates a SHA-1 clone."""
+        client = LocalGitClient()
+
+        # Create a SHA-1 source repository
+        source_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, source_path)
+        source_repo = Repo.init(source_path, object_format="sha1")
+
+        # Verify source is SHA-1
+        self.assertEqual("sha1", source_repo.object_format.name)
+        source_repo.close()
+
+        # Clone the repository
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        cloned_repo = client.clone(source_path, target_path, mkdir=False)
+        self.addCleanup(cloned_repo.close)
+
+        # Verify the clone uses SHA-1
+        self.assertEqual("sha1", cloned_repo.object_format.name)
+
     def test_fetch_empty(self) -> None:
         c = LocalGitClient()
         s = open_repo("a.git")
@@ -1192,6 +1245,84 @@ class LocalGitClientTests(TestCase):
         self.assertDictEqual(local.refs.as_dict(), result.refs)
         # Check that symrefs are detected correctly
         self.assertIn(b"HEAD", result.symrefs)
+
+    def test_fetch_object_format_mismatch_sha256_to_sha1(self) -> None:
+        """Test that fetching from SHA-256 to non-empty SHA-1 repository fails."""
+        from dulwich.objects import Blob
+
+        client = LocalGitClient()
+
+        # Create SHA-256 source repository
+        sha256_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_path)
+        sha256_repo = Repo.init(sha256_path, object_format="sha256")
+        self.addCleanup(sha256_repo.close)
+
+        # Create SHA-1 target repository with an object (so it can't be auto-changed)
+        sha1_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha1_path)
+        sha1_repo = Repo.init(sha1_path, object_format="sha1")
+        self.addCleanup(sha1_repo.close)
+
+        # Add an object to make the repo non-empty
+        blob = Blob.from_string(b"test content")
+        sha1_repo.object_store.add_object(blob)
+
+        # Attempt to fetch should raise AssertionError (repo not empty)
+        with self.assertRaises(AssertionError) as cm:
+            client.fetch(sha256_path, sha1_repo)
+
+        self.assertIn("Cannot change object format", str(cm.exception))
+        self.assertIn("already contains objects", str(cm.exception))
+
+    def test_fetch_object_format_mismatch_sha1_to_sha256(self) -> None:
+        """Test that fetching from SHA-1 to non-empty SHA-256 repository fails."""
+        from dulwich.objects import Blob
+
+        client = LocalGitClient()
+
+        # Create SHA-1 source repository
+        sha1_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha1_path)
+        sha1_repo = Repo.init(sha1_path, object_format="sha1")
+        self.addCleanup(sha1_repo.close)
+
+        # Create SHA-256 target repository with an object (so it can't be auto-changed)
+        sha256_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_path)
+        sha256_repo = Repo.init(sha256_path, object_format="sha256")
+        self.addCleanup(sha256_repo.close)
+
+        # Add an object to make the repo non-empty
+        blob = Blob.from_string(b"test content")
+        sha256_repo.object_store.add_object(blob)
+
+        # Attempt to fetch should raise AssertionError (repo not empty)
+        with self.assertRaises(AssertionError) as cm:
+            client.fetch(sha1_path, sha256_repo)
+
+        self.assertIn("Cannot change object format", str(cm.exception))
+        self.assertIn("already contains objects", str(cm.exception))
+
+    def test_fetch_object_format_same(self) -> None:
+        """Test that fetching between repositories with same object format works."""
+        client = LocalGitClient()
+
+        # Create SHA-256 source repository
+        sha256_src = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_src)
+        src_repo = Repo.init(sha256_src, object_format="sha256")
+        self.addCleanup(src_repo.close)
+
+        # Create SHA-256 target repository
+        sha256_dst = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sha256_dst)
+        dst_repo = Repo.init(sha256_dst, object_format="sha256")
+        self.addCleanup(dst_repo.close)
+
+        # Fetch should succeed without error
+        result = client.fetch(sha256_src, dst_repo)
+        self.assertIsNotNone(result)
 
     def send_and_verify(self, branch, local, target) -> None:
         """Send branch from local to remote repository and verify it worked."""

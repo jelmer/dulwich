@@ -27,14 +27,19 @@ Warning: these tests should be fairly stable, but when writing/debugging new
 """
 
 import os
+import shutil
 import sys
+import tempfile
 import threading
 
+from dulwich.object_format import SHA256
+from dulwich.objects import Blob, Commit, Tree
+from dulwich.repo import Repo
 from dulwich.server import DictBackend, TCPGitServer
 
 from .. import skipIf
 from .server_utils import NoSideBand64kReceivePackHandler, ServerTests
-from .utils import CompatTestCase, require_git_version
+from .utils import CompatTestCase, require_git_version, run_git_or_fail
 
 
 @skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
@@ -49,15 +54,23 @@ class GitServerTestCase(ServerTests, CompatTestCase):
     def _handlers(self):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
-    def _check_server(self, dul_server) -> None:
+    def _check_server(self, dul_server, repo) -> None:
+        from dulwich.protocol import Protocol
+
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
-        caps = receive_pack_handler_cls.capabilities()
+        # Create a handler instance to check capabilities
+        handler = receive_pack_handler_cls(
+            dul_server.backend,
+            [b"/"],
+            Protocol(lambda x: b"", lambda x: None),
+        )
+        caps = handler.capabilities()
         self.assertNotIn(b"side-band-64k", caps)
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
         dul_server = TCPGitServer(backend, b"localhost", 0, handlers=self._handlers())
-        self._check_server(dul_server)
+        self._check_server(dul_server, repo)
 
         # Start server in a thread
         server_thread = threading.Thread(target=dul_server.serve)
@@ -95,7 +108,110 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
     def _handlers(self) -> None:
         return None  # default handlers include side-band-64k
 
-    def _check_server(self, server) -> None:
+    def _check_server(self, server, repo) -> None:
+        from dulwich.protocol import Protocol
+
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
-        caps = receive_pack_handler_cls.capabilities()
+        # Create a handler instance to check capabilities
+        handler = receive_pack_handler_cls(
+            server.backend,
+            [b"/"],
+            Protocol(lambda x: b"", lambda x: None),
+        )
+        caps = handler.capabilities()
         self.assertIn(b"side-band-64k", caps)
+
+
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
+class GitServerSHA256TestCase(CompatTestCase):
+    """Tests for SHA-256 repository server compatibility with git client."""
+
+    protocol = "git"
+    # SHA-256 support was introduced in git 2.29.0
+    min_git_version = (2, 29, 0)
+
+    def setUp(self) -> None:
+        super().setUp()
+        require_git_version(self.min_git_version)
+
+    def _start_server(self, repo):
+        backend = DictBackend({b"/": repo})
+        dul_server = TCPGitServer(backend, b"localhost", 0)
+
+        # Start server in a thread
+        server_thread = threading.Thread(target=dul_server.serve)
+        server_thread.daemon = True
+        server_thread.start()
+
+        # Add cleanup
+        def cleanup_server():
+            dul_server.shutdown()
+            dul_server.server_close()
+            server_thread.join(timeout=1.0)
+
+        self.addCleanup(cleanup_server)
+        self._server = dul_server
+        _, port = self._server.socket.getsockname()
+        return port
+
+    def url(self, port) -> str:
+        return f"{self.protocol}://localhost:{port}/"
+
+    def test_clone_sha256_repo_from_dulwich_server(self) -> None:
+        """Test that git client can clone SHA-256 repo from dulwich server."""
+        # Create SHA-256 repository with dulwich
+        repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_path)
+        source_repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
+
+        # Create test content
+        blob = Blob.from_string(b"Test SHA-256 content from dulwich server")
+        tree = Tree()
+        tree.add(b"test.txt", 0o100644, blob.get_id(SHA256))
+
+        commit = Commit()
+        commit.tree = tree.get_id(SHA256)
+        commit.author = commit.committer = b"Test User <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        commit.message = b"Test SHA-256 commit"
+
+        # Add objects to repo
+        source_repo.object_store.add_object(blob)
+        source_repo.object_store.add_object(tree)
+        source_repo.object_store.add_object(commit)
+
+        # Set master ref
+        source_repo.refs[b"refs/heads/master"] = commit.get_id(SHA256)
+
+        # Start dulwich server
+        port = self._start_server(source_repo)
+
+        # Clone with git client
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        clone_dir = os.path.join(clone_path, "cloned_repo")
+
+        run_git_or_fail(["clone", self.url(port), clone_dir], cwd=clone_path)
+
+        # Verify cloned repo is SHA-256
+        cloned_repo = Repo(clone_dir)
+        self.addCleanup(cloned_repo.close)
+        self.assertEqual(cloned_repo.object_format, SHA256)
+
+        # Verify object format config
+        output = run_git_or_fail(
+            ["config", "--get", "extensions.objectformat"], cwd=clone_dir
+        )
+        self.assertEqual(output.strip(), b"sha256")
+
+        # Verify commit was cloned
+        cloned_head = cloned_repo.refs[b"refs/heads/master"]
+        self.assertEqual(len(cloned_head), 64)  # SHA-256 length
+        self.assertEqual(cloned_head, commit.get_id(SHA256))
+
+        # Verify git can read the commit
+        log_output = run_git_or_fail(["log", "--format=%s", "-n", "1"], cwd=clone_dir)
+        self.assertEqual(log_output.strip(), b"Test SHA-256 commit")
+
+        source_repo.close()

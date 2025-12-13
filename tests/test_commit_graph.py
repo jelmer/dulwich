@@ -30,6 +30,7 @@ from dulwich.commit_graph import (
     get_reachable_commits,
     read_commit_graph,
 )
+from dulwich.object_format import SHA1
 
 
 class CommitGraphEntryTests(unittest.TestCase):
@@ -76,13 +77,13 @@ class CommitGraphTests(unittest.TestCase):
     """Tests for CommitGraph."""
 
     def test_init(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         self.assertEqual(graph.hash_version, HASH_VERSION_SHA1)
         self.assertEqual(len(graph.entries), 0)
         self.assertEqual(len(graph.chunks), 0)
 
     def test_len(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         self.assertEqual(len(graph), 0)
 
         # Add a dummy entry
@@ -91,7 +92,7 @@ class CommitGraphTests(unittest.TestCase):
         self.assertEqual(len(graph), 1)
 
     def test_iter(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         entry1 = CommitGraphEntry(b"a" * 40, b"b" * 40, [], 1, 1000)
         entry2 = CommitGraphEntry(b"c" * 40, b"d" * 40, [], 2, 2000)
         graph.entries.extend([entry1, entry2])
@@ -102,17 +103,17 @@ class CommitGraphTests(unittest.TestCase):
         self.assertEqual(entries[1], entry2)
 
     def test_get_entry_by_oid_missing(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         result = graph.get_entry_by_oid(b"f" * 40)
         self.assertIsNone(result)
 
     def test_get_generation_number_missing(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         result = graph.get_generation_number(b"f" * 40)
         self.assertIsNone(result)
 
     def test_get_parents_missing(self) -> None:
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         result = graph.get_parents(b"f" * 40)
         self.assertIsNone(result)
 
@@ -262,7 +263,7 @@ class CommitGraphTests(unittest.TestCase):
 
     def test_write_empty_graph_raises(self) -> None:
         """Test that writing empty graph raises ValueError."""
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         f = io.BytesIO()
 
         with self.assertRaises(ValueError):
@@ -271,7 +272,7 @@ class CommitGraphTests(unittest.TestCase):
     def test_write_and_read_round_trip(self) -> None:
         """Test writing and reading a commit graph."""
         # Create a simple commit graph
-        graph = CommitGraph()
+        graph = CommitGraph(object_format=SHA1)
         entry = CommitGraphEntry(
             commit_id=b"aa" + b"00" * 19,
             tree_id=b"bb" + b"00" * 19,
@@ -433,6 +434,47 @@ class CommitGraphGenerationTests(unittest.TestCase):
         self.assertEqual(entry.parents, [])
         self.assertEqual(entry.generation, 1)
         self.assertEqual(entry.commit_time, 1234567890)
+
+    def test_generate_commit_graph_oid_index_uses_binary_keys(self) -> None:
+        """Test that generated commit graph _oid_to_index uses binary RawObjectID keys."""
+        from dulwich.object_store import MemoryObjectStore
+        from dulwich.objects import Commit, Tree, hex_to_sha
+
+        object_store = MemoryObjectStore()
+
+        # Create a tree and commit
+        tree = Tree()
+        object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = b"Test Author <test@example.com>"
+        commit.committer = b"Test Author <test@example.com>"
+        commit.commit_time = commit.author_time = 1234567890
+        commit.commit_timezone = commit.author_timezone = 0
+        commit.message = b"Test commit"
+        object_store.add_object(commit)
+
+        # Generate graph
+        graph = generate_commit_graph(object_store, [commit.id])
+
+        # Verify _oid_to_index uses binary keys (RawObjectID)
+        # commit.id is hex (ObjectID), so we need to convert to binary for lookup
+        binary_commit_id = hex_to_sha(commit.id)
+        self.assertIn(binary_commit_id, graph._oid_to_index)
+        self.assertEqual(graph._oid_to_index[binary_commit_id], 0)
+
+        # Verify lookup with hex ObjectID works via get_entry_by_oid
+        entry = graph.get_entry_by_oid(commit.id)
+        self.assertIsNotNone(entry)
+        assert entry is not None
+        self.assertEqual(entry.commit_id, commit.id)
+
+        # Verify lookup with binary RawObjectID also works
+        entry_binary = graph.get_entry_by_oid(binary_commit_id)
+        self.assertIsNotNone(entry_binary)
+        assert entry_binary is not None
+        self.assertEqual(entry_binary.commit_id, commit.id)
 
     def test_get_reachable_commits(self) -> None:
         """Test getting reachable commits."""

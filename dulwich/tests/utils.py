@@ -35,8 +35,9 @@ from typing import Any, BinaryIO, TypeVar
 from unittest import SkipTest
 
 from dulwich.index import commit_tree
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import BaseObjectStore
-from dulwich.objects import Commit, FixedSha, ShaFile, Tag, object_class
+from dulwich.objects import ZERO_SHA, Commit, FixedSha, ShaFile, Tag, object_class
 from dulwich.pack import (
     DELTA_TYPES,
     OFS_DELTA,
@@ -114,7 +115,7 @@ def make_object(cls: type[T], **attrs: Any) -> T:
         if name == "id":
             # id property is read-only, so we overwrite sha instead.
             sha = FixedSha(value)
-            obj.sha = lambda: sha
+            obj.sha = lambda hash_algorithm=None: sha
         else:
             setattr(obj, name, value)
     return obj
@@ -137,7 +138,7 @@ def make_commit(**attrs: Any) -> Commit:
         "commit_timezone": 0,
         "message": b"Test message.",
         "parents": [],
-        "tree": b"0" * 40,
+        "tree": ZERO_SHA,
     }
     all_attrs.update(attrs)
     return make_object(Commit, **all_attrs)
@@ -276,7 +277,9 @@ def build_pack(
                 base = obj_sha(base_type_num, base_data)
             obj = (base, list(create_delta(base_data, data)))
 
-        crc32 = write_pack_object(sf.write, type_num, obj)
+        crc32 = write_pack_object(
+            sf.write, type_num, obj, object_format=DEFAULT_OBJECT_FORMAT
+        )
         offsets[i] = offset
         crc32s[i] = crc32
 

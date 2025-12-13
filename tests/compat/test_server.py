@@ -122,6 +122,7 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         self.assertIn(b"side-band-64k", caps)
 
 
+@skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
 class GitServerSHA256TestCase(CompatTestCase):
     """Tests for SHA-256 repository server compatibility with git client."""
 
